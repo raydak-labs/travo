@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: arm64
+            arch: aarch64
+            ipk_arch: aarch64_cortex-a53
+          - goos: linux
+            goarch: amd64
+            arch: x86_64
+            ipk_arch: x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm build
+        working-directory: frontend
+
+      - name: Set version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Cross-compile backend
+        working-directory: backend
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build \
+            -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o "../dist/openwrt-travel-gui" \
+            ./cmd/server
+
+      - name: Build .ipk package
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          ARCH: ${{ matrix.ipk_arch }}
+        run: bash .github/scripts/build-ipk.sh
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp dist/openwrt-travel-gui \
+            "artifacts/openwrt-travel-gui-${{ steps.version.outputs.VERSION }}-${{ matrix.arch }}"
+          cp dist/openwrt-travel-gui_*.ipk artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: artifacts/*
+          retention-days: 5
+
+  create-release:
+    name: Create Release
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Set version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate checksums
+        working-directory: artifacts
+        run: sha256sum * > SHA256SUMS
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/*
+          body: |
+            ## Quick Install (OpenWRT)
+
+            ```sh
+            wget -O- https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            ```
+
+            Or install a specific version:
+
+            ```sh
+            VERSION=${{ steps.version.outputs.VERSION }} \
+              wget -O- https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
+            ```
+
+            ## Downloads
+
+            | Architecture | Binary | IPK Package |
+            |---|---|---|
+            | aarch64 (GL.iNet MT3000/AXT1800) | `openwrt-travel-gui-${{ steps.version.outputs.VERSION }}-aarch64` | `openwrt-travel-gui_${{ steps.version.outputs.VERSION }}_aarch64_cortex-a53.ipk` |
+            | x86_64 | `openwrt-travel-gui-${{ steps.version.outputs.VERSION }}-x86_64` | `openwrt-travel-gui_${{ steps.version.outputs.VERSION }}_x86_64.ipk` |
+
+            See [SHA256SUMS](SHA256SUMS) for checksums.

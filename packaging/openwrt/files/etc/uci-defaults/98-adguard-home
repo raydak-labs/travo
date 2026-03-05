@@ -1,0 +1,24 @@
+#!/bin/sh
+# 98-adguard-home — UCI defaults script for AdGuard Home integration
+#
+# This runs once during first boot after .ipk installation.
+# Since AdGuard binary download requires network access (unavailable during
+# opkg install), we create a flag file so the travel-gui service can trigger
+# the install from the web UI or on first network-available boot.
+
+FLAG_FILE="/tmp/.install-adguard"
+INSTALL_SCRIPT="/usr/share/openwrt-travel-gui/install-adguard.sh"
+
+# Create the flag file so the travel-gui backend knows AdGuard installation
+# was requested but not yet completed.
+touch "$FLAG_FILE"
+
+# If the install script was bundled, note its location in the flag file
+# so the backend can find it.
+if [ -x "$INSTALL_SCRIPT" ]; then
+    echo "$INSTALL_SCRIPT" > "$FLAG_FILE"
+else
+    echo "pending" > "$FLAG_FILE"
+fi
+
+exit 0

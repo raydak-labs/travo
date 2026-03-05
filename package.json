@@ -10,8 +10,8 @@
     "build": "make build",
     "test": "make test",
     "lint": "eslint 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
-    "format": "prettier --write 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
-    "format:check": "prettier --check 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
+    "format": "prettier --write 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts' '**/*.{yml,yaml}'",
+    "format:check": "prettier --check 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts' '**/*.{yml,yaml}'",
     "clean": "make clean"
   },
   "devDependencies": {

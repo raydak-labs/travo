@@ -20,6 +20,9 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/ws"
 )
 
+// Version is set at build time via -ldflags "-X main.Version=..."
+var Version = "dev"
+
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
@@ -70,6 +73,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub) {
 	vpnSvc := services.NewVpnService(u)
 	svcManager := services.NewServiceManager()
 	captiveSvc := services.NewCaptiveService(captiveProber)
+	adguardSvc := services.NewAdGuardService()
 
 	// Token blocklist with cleanup goroutine
 	blocklist := auth.NewTokenBlocklist()
@@ -101,6 +105,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub) {
 		Vpn:            vpnSvc,
 		ServiceManager: svcManager,
 		Captive:        captiveSvc,
+		AdGuard:        adguardSvc,
 	}
 	api.SetupRoutes(app, deps)
 
@@ -119,7 +124,15 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub) {
 }
 
 func main() {
-	cfg := config.LoadConfigFromEnv()
+	cfg, showVersion, err := config.LoadConfig(os.Args[1:])
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	if showVersion {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
 
 	app, hub := setupAppWithConfig(cfg)
 

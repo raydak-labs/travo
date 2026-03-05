@@ -1,11 +1,12 @@
 #!/bin/bash
-# Build production binary for OpenWRT (aarch64)
+# Build production binary for OpenWRT
 # Usage: ./scripts/build.sh [target_arch] [target_os]
 # Default target: linux/arm64 (aarch64 for MT3000/AXT1800)
+# Override with GOARCH/GOOS env vars or positional arguments.
 set -euo pipefail
 
-TARGET_ARCH=${1:-arm64}
-TARGET_OS=${2:-linux}
+TARGET_ARCH="${GOARCH:-${1:-arm64}}"
+TARGET_OS="${GOOS:-${2:-linux}}"
 BUILD_DIR="dist"
 VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
@@ -18,10 +19,9 @@ mkdir -p "${BUILD_DIR}"
 echo "→ Building frontend..."
 (cd frontend && pnpm build)
 
-# Step 2: Copy frontend dist into backend for static serving
-echo "→ Preparing frontend assets..."
-rm -rf backend/static
-cp -r frontend/dist backend/static
+# Step 2: Tidy Go modules
+echo "→ Tidying Go modules..."
+(cd backend && go mod tidy)
 
 # Step 3: Cross-compile Go backend
 echo "→ Cross-compiling backend for ${TARGET_OS}/${TARGET_ARCH}..."
@@ -33,9 +33,7 @@ echo "→ Cross-compiling backend for ${TARGET_OS}/${TARGET_ARCH}..."
     ./cmd/server
 )
 
-# Cleanup copied static dir
-rm -rf backend/static
-
 # Step 4: Show binary info
 ls -lh "${BUILD_DIR}/openwrt-travel-gui"
 echo "✓ Build complete: ${BUILD_DIR}/openwrt-travel-gui"
+echo "  Frontend assets preserved at frontend/dist/"

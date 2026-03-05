@@ -14,7 +14,6 @@ define Package/openwrt-travel-gui
   CATEGORY:=LuCI
   TITLE:=Modern web UI for OpenWRT travel routers
   DEPENDS:=
-  PKGARCH:=all
 endef
 
 define Package/openwrt-travel-gui/description

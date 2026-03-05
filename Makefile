@@ -1,4 +1,4 @@
-.PHONY: dev build test lint format clean build-prod package deploy docker-dev
+.PHONY: dev build test lint format clean build-prod build-all package package-all deploy docker-dev
 
 # Run frontend and backend dev servers concurrently
 dev:
@@ -29,9 +29,21 @@ format:
 build-prod:
 	@bash scripts/build.sh
 
-# Create .ipk package for OpenWRT
+# Cross-compile for both aarch64 and x86_64
+build-all:
+	GOARCH=arm64 bash scripts/build.sh
+	cp dist/openwrt-travel-gui dist/openwrt-travel-gui-aarch64
+	GOARCH=amd64 bash scripts/build.sh
+	cp dist/openwrt-travel-gui dist/openwrt-travel-gui-x86_64
+
+# Create .ipk package for OpenWRT (default: aarch64)
 package:
 	@bash scripts/package-ipk.sh
+
+# Create .ipk packages for both aarch64 and x86_64
+package-all: build-all
+	ARCH=aarch64_cortex-a53 bash -c 'cp dist/openwrt-travel-gui-aarch64 dist/openwrt-travel-gui && bash scripts/package-ipk.sh'
+	ARCH=x86_64 bash -c 'cp dist/openwrt-travel-gui-x86_64 dist/openwrt-travel-gui && bash scripts/package-ipk.sh'
 
 # Deploy to OpenWRT device (requires ROUTER_IP)
 deploy:

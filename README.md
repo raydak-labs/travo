@@ -4,6 +4,18 @@ A modern, mobile-first web UI for OpenWRT-based travel routers (GL.iNet Beryl AX
 
 Provides an intuitive dashboard, WiFi management with hotel captive portal support, VPN/service management, and system configuration. Built as a Go backend + React frontend monorepo that coexists with LuCI.
 
+## Quick Install
+
+SSH into your OpenWRT router and run:
+
+```sh
+wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | sh
+```
+
+This installs the Travel GUI on port 80, AdGuard Home on port 3000 (DNS on 53),
+and moves LuCI to port 8080. See [docs/deployment.md](docs/deployment.md) for
+all options and manual install instructions.
+
 ## Architecture
 
 ```
@@ -75,18 +87,20 @@ make dev
 
 ### Commands
 
-| Command           | Description                          |
-| ----------------- | ------------------------------------ |
-| `make dev`        | Run frontend + backend dev servers   |
-| `make build`      | Build frontend and backend           |
-| `make test`       | Run all tests (Go + Vitest)          |
-| `make lint`       | Run ESLint + go vet                  |
-| `make format`     | Run Prettier + gofmt                 |
-| `make clean`      | Remove build artifacts               |
-| `make build-prod` | Cross-compile for OpenWRT (aarch64)  |
-| `make package`    | Create .ipk package                  |
-| `make deploy`     | Deploy to router (needs `ROUTER_IP`) |
-| `make docker-dev` | Start Docker dev environment         |
+| Command            | Description                            |
+| ------------------ | -------------------------------------- |
+| `make dev`         | Run frontend + backend dev servers     |
+| `make build`       | Build frontend and backend             |
+| `make test`        | Run all tests (Go + shared + frontend) |
+| `make lint`        | Run ESLint + go vet                    |
+| `make format`      | Run Prettier + gofmt                   |
+| `make clean`       | Remove build artifacts                 |
+| `make build-prod`  | Cross-compile for OpenWRT (aarch64)    |
+| `make build-all`   | Cross-compile for aarch64 and x86_64   |
+| `make package`     | Create .ipk package                    |
+| `make package-all` | Create .ipk for aarch64 and x86_64     |
+| `make deploy`      | Deploy to router (needs `ROUTER_IP`)   |
+| `make docker-dev`  | Start Docker dev environment           |
 
 ## Docker Development
 
@@ -144,6 +158,21 @@ openwrt-travel-gui/
 
 - **GL.iNet Beryl AX (MT3000)** — aarch64
 - **GL.iNet Slate AXT1800** — aarch64
+- Any OpenWRT 23.05+ device (aarch64 or x86_64)
+
+## Releases
+
+Pre-built binaries and `.ipk` packages for aarch64 and x86_64 are available on
+[GitHub Releases](https://github.com/openwrt-travel-gui/openwrt-travel-gui/releases).
+
+To create a new release, tag and push:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The CI/CD pipeline automatically builds all artifacts and publishes a GitHub Release.
 
 ## Contributing
 
