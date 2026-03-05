@@ -1,0 +1,151 @@
+package services
+
+import (
+	"math"
+	"runtime"
+	"syscall"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
+)
+
+// StorageProvider abstracts filesystem storage stat retrieval.
+type StorageProvider interface {
+	GetRootStorage() (total, used, free int64, err error)
+}
+
+// RealStorageProvider reads actual filesystem stats via syscall.Statfs.
+type RealStorageProvider struct{}
+
+// GetRootStorage returns storage stats for the root filesystem.
+func (r *RealStorageProvider) GetRootStorage() (int64, int64, int64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/", &stat); err != nil {
+		return 0, 0, 0, err
+	}
+	total := int64(stat.Blocks) * int64(stat.Bsize)
+	free := int64(stat.Bavail) * int64(stat.Bsize)
+	used := total - free
+	return total, used, free, nil
+}
+
+// MockStorageProvider returns realistic mock storage stats.
+type MockStorageProvider struct{}
+
+// GetRootStorage returns mock storage stats.
+func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
+	// 256MB total, 96MB used, 160MB free — realistic for a travel router
+	return 268435456, 100663296, 167772160, nil
+}
+
+// SystemService provides system information and statistics.
+type SystemService struct {
+	ubus    ubus.Ubus
+	storage StorageProvider
+}
+
+// NewSystemService creates a new SystemService.
+func NewSystemService(ub ubus.Ubus, storage StorageProvider) *SystemService {
+	return &SystemService{ubus: ub, storage: storage}
+}
+
+// GetSystemInfo returns system identification information.
+func (s *SystemService) GetSystemInfo() (models.SystemInfo, error) {
+	board, err := s.ubus.Call("system", "board", nil)
+	if err != nil {
+		return models.SystemInfo{}, err
+	}
+	info, err := s.ubus.Call("system", "info", nil)
+	if err != nil {
+		return models.SystemInfo{}, err
+	}
+
+	hostname, _ := board["hostname"].(string)
+	model, _ := board["model"].(string)
+	kernel, _ := board["kernel"].(string)
+
+	var fwVersion string
+	if release, ok := board["release"].(map[string]interface{}); ok {
+		fwVersion, _ = release["version"].(string)
+	}
+
+	var uptime int64
+	if u, ok := info["uptime"].(float64); ok {
+		uptime = int64(u)
+	}
+
+	return models.SystemInfo{
+		Hostname:        hostname,
+		Model:           model,
+		FirmwareVersion: fwVersion,
+		KernelVersion:   kernel,
+		UptimeSeconds:   uptime,
+	}, nil
+}
+
+// GetSystemStats returns current system statistics.
+func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
+	info, err := s.ubus.Call("system", "info", nil)
+	if err != nil {
+		return models.SystemStats{}, err
+	}
+
+	var stats models.SystemStats
+
+	// Memory
+	if mem, ok := info["memory"].(map[string]interface{}); ok {
+		total, _ := mem["total"].(float64)
+		free, _ := mem["free"].(float64)
+		cached, _ := mem["cached"].(float64)
+		buffered, _ := mem["buffered"].(float64)
+
+		stats.Memory = models.MemoryStats{
+			TotalBytes:  int64(total),
+			FreeBytes:   int64(free),
+			CachedBytes: int64(cached + buffered),
+			UsedBytes:   int64(total - free - cached - buffered),
+		}
+		if total > 0 {
+			stats.Memory.UsagePercent = float64(stats.Memory.UsedBytes) / total * 100
+		}
+	}
+
+	// CPU / Load
+	cores := runtime.NumCPU()
+	if load, ok := info["load"].([]interface{}); ok && len(load) >= 3 {
+		l1, _ := load[0].(float64)
+		l5, _ := load[1].(float64)
+		l15, _ := load[2].(float64)
+
+		loadAvg1 := l1 / 65536
+		loadAvg5 := l5 / 65536
+		loadAvg15 := l15 / 65536
+
+		// CPU usage: min(loadAvg1 / numCPUs * 100, 100)
+		usagePercent := math.Min(loadAvg1/float64(cores)*100, 100)
+
+		stats.CPU = models.CpuStats{
+			LoadAverage:  [3]float64{loadAvg1, loadAvg5, loadAvg15},
+			UsagePercent: usagePercent,
+			Cores:        cores,
+		}
+	}
+
+	// Storage from provider
+	if total, used, free, err := s.storage.GetRootStorage(); err == nil && total > 0 {
+		stats.Storage = models.StorageStats{
+			TotalBytes:   total,
+			UsedBytes:    used,
+			FreeBytes:    free,
+			UsagePercent: float64(used) / float64(total) * 100,
+		}
+	}
+
+	return stats, nil
+}
+
+// Reboot initiates a system reboot via ubus.
+func (s *SystemService) Reboot() error {
+	_, err := s.ubus.Call("system", "reboot", nil)
+	return err
+}

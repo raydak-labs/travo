@@ -1,0 +1,71 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { apiClient } from '@/lib/api-client';
+import { API_ROUTES } from '@shared/index';
+import type { VpnStatus, WireguardConfig, TailscaleStatus } from '@shared/index';
+
+export function useVpnStatus() {
+  return useQuery({
+    queryKey: ['vpn', 'status'],
+    queryFn: () => apiClient.get<VpnStatus[]>(API_ROUTES.vpn.status),
+  });
+}
+
+export function useWireguardConfig() {
+  return useQuery({
+    queryKey: ['vpn', 'wireguard'],
+    queryFn: () => apiClient.get<WireguardConfig>(API_ROUTES.vpn.wireguard.config),
+  });
+}
+
+export function useSetWireguardConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: WireguardConfig) =>
+      apiClient.put<{ success: boolean }>(API_ROUTES.vpn.wireguard.config, config),
+    onSuccess: () => {
+      toast.success('WireGuard configuration updated');
+      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update WireGuard config', { description: error.message });
+    },
+  });
+}
+
+export function useToggleWireguard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enable: boolean) =>
+      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.wireguard.toggle, { enable }),
+    onSuccess: (_data, enable) => {
+      toast.success(`WireGuard ${enable ? 'enabled' : 'disabled'}`);
+      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to toggle WireGuard', { description: error.message });
+    },
+  });
+}
+
+export function useTailscaleStatus() {
+  return useQuery({
+    queryKey: ['vpn', 'tailscale'],
+    queryFn: () => apiClient.get<TailscaleStatus>(API_ROUTES.vpn.tailscale.status),
+  });
+}
+
+export function useToggleTailscale() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enable: boolean) =>
+      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.tailscale.toggle, { enable }),
+    onSuccess: (_data, enable) => {
+      toast.success(`Tailscale ${enable ? 'enabled' : 'disabled'}`);
+      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to toggle Tailscale', { description: error.message });
+    },
+  });
+}

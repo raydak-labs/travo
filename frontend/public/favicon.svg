@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="96" fill="#2563eb"/>
+  <g stroke="#fff" stroke-width="32" stroke-linecap="round" fill="none">
+    <!-- Router waves -->
+    <path d="M160 320a96 96 0 0 1 192 0" />
+    <path d="M112 272a168 168 0 0 1 288 0" />
+    <path d="M64 224a240 240 0 0 1 384 0" />
+    <!-- Base dot -->
+    <circle cx="256" cy="320" r="20" fill="#fff" stroke="none"/>
+    <!-- Travel plane -->
+    <path d="M340 160 l40-40 m0 0 l-16 4 m16-4 l-4 16" stroke-width="24"/>
+  </g>
+</svg>

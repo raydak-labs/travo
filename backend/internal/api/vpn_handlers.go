@@ -1,0 +1,126 @@
+package api
+
+import (
+	"fmt"
+
+	"github.com/gofiber/fiber/v2"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/services"
+)
+
+// VpnStatusHandler handles GET /api/v1/vpn/status.
+func VpnStatusHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		statuses, err := svc.GetVpnStatus()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(statuses)
+	}
+}
+
+// GetWireguardHandler handles GET /api/v1/vpn/wireguard.
+func GetWireguardHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config, err := svc.GetWireguardConfig()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(config)
+	}
+}
+
+// SetWireguardHandler handles PUT /api/v1/vpn/wireguard.
+func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var config models.WireguardConfig
+		if err := c.BodyParser(&config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+
+		// Validate private key
+		if config.PrivateKey != "" && !isValidBase64Key(config.PrivateKey) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "private key must be a valid base64-encoded 32-byte key"})
+		}
+
+		// Validate peers
+		for i, peer := range config.Peers {
+			if peer.Endpoint != "" && !isValidEndpoint(peer.Endpoint) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("peer %d: endpoint must be in host:port format", i)})
+			}
+			for _, cidr := range peer.AllowedIPs {
+				if !isValidCIDR(cidr) {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("peer %d: invalid CIDR in allowed_ips: %s", i, cidr)})
+				}
+			}
+		}
+
+		if err := svc.SetWireguardConfig(config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// ToggleWireguardHandler handles POST /api/v1/vpn/wireguard/toggle.
+func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Enable bool `json:"enable"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.ToggleWireguard(body.Enable); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetTailscaleHandler handles GET /api/v1/vpn/tailscale.
+func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		status, err := svc.GetTailscaleStatus()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(status)
+	}
+}
+
+// ToggleTailscaleHandler handles POST /api/v1/vpn/tailscale/toggle.
+func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Enable bool `json:"enable"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.ToggleTailscale(body.Enable); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// ImportWireguardHandler handles POST /api/v1/vpn/wireguard/import.
+func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Config string `json:"config"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if body.Config == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "config field is required"})
+		}
+		if err := svc.ImportWireguardConfig(body.Config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

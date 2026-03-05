@@ -1,0 +1,11 @@
+#!/bin/sh
+# Move LuCI (uhttpd) to alternate ports so travel-gui can use 80/443
+
+uci set uhttpd.main.listen_http='0.0.0.0:8080'
+uci set uhttpd.main.listen_https='0.0.0.0:8443'
+uci commit uhttpd
+
+# Restart uhttpd to apply port changes
+/etc/init.d/uhttpd restart 2>/dev/null
+
+exit 0

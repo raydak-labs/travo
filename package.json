@@ -1,0 +1,38 @@
+{
+  "name": "openwrt-travel-gui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Modern web UI for OpenWRT travel routers (GL.iNet Beryl AX MT3000, Slate AXT1800)",
+  "license": "MIT",
+  "scripts": {
+    "dev": "make dev",
+    "build": "make build",
+    "test": "make test",
+    "lint": "eslint 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
+    "format": "prettier --write 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
+    "format:check": "prettier --check 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
+    "clean": "make clean"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "eslint": "^9.21.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.25.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "msw"
+    ]
+  },
+  "msw": {
+    "workerDirectory": [
+      "frontend/public"
+    ]
+  }
+}
