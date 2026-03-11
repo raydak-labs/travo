@@ -270,7 +270,7 @@
 
 - [x] WebSocket-based live system stats (2s interval)
 - [x] Bandwidth chart (CPU/Memory over time, 15 data points)
-- [ ] Network throughput chart (RX/TX bytes/sec)
+- [x] Network throughput chart (RX/TX bytes/sec)
 - [ ] Per-interface traffic chart
 - [ ] Connection uptime log (internet available since / lost at — timeline of events)
 - [ ] 🔮 Historical data (store and display last hours/days)

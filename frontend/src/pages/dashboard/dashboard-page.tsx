@@ -4,6 +4,7 @@ import { SystemStatsCard } from './system-stats-card';
 import { ClientsCard } from './clients-card';
 import { QuickActions } from './quick-actions';
 import { BandwidthChart } from './bandwidth-chart';
+import { NetworkChart } from './network-chart';
 import { TimezoneAlert } from '@/components/timezone-alert';
 
 export function DashboardPage() {
@@ -16,7 +17,10 @@ export function DashboardPage() {
         <SystemStatsCard />
         <ClientsCard />
       </div>
-      <BandwidthChart />
+      <div className="grid gap-4 md:grid-cols-2">
+        <BandwidthChart />
+        <NetworkChart />
+      </div>
       <QuickActions />
     </div>
   );

@@ -50,11 +50,19 @@ type StorageStats struct {
 	UsagePercent float64 `json:"usage_percent"`
 }
 
-// SystemStats aggregates CPU, memory, and storage statistics.
+// NetworkInterfaceStats contains network traffic counters for a single interface.
+type NetworkInterfaceStats struct {
+	Interface string `json:"interface"`
+	RxBytes   int64  `json:"rx_bytes"`
+	TxBytes   int64  `json:"tx_bytes"`
+}
+
+// SystemStats aggregates CPU, memory, storage, and network statistics.
 type SystemStats struct {
-	CPU     CpuStats     `json:"cpu"`
-	Memory  MemoryStats  `json:"memory"`
-	Storage StorageStats `json:"storage"`
+	CPU     CpuStats                `json:"cpu"`
+	Memory  MemoryStats             `json:"memory"`
+	Storage StorageStats            `json:"storage"`
+	Network []NetworkInterfaceStats `json:"network"`
 }
 
 // TimezoneConfig holds timezone configuration.

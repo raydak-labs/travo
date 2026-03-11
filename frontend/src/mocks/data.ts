@@ -53,6 +53,10 @@ export const mockSystemStats: SystemStats = {
     free_bytes: 6012954214,
     usage_percent: 20,
   },
+  network: [
+    { interface: 'br-lan', rx_bytes: 2147483648, tx_bytes: 1073741824 },
+    { interface: 'wwan0', rx_bytes: 1073741824, tx_bytes: 536870912 },
+  ],
 };
 
 export const mockNetworkStatus: NetworkStatus = {

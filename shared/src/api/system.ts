@@ -48,11 +48,19 @@ export interface StorageStats {
   readonly usage_percent: number;
 }
 
+/** Network interface traffic counters */
+export interface NetworkInterfaceStats {
+  readonly interface: string;
+  readonly rx_bytes: number;
+  readonly tx_bytes: number;
+}
+
 /** Aggregated system statistics */
 export interface SystemStats {
   readonly cpu: CpuStats;
   readonly memory: MemoryStats;
   readonly storage: StorageStats;
+  readonly network: readonly NetworkInterfaceStats[];
 }
 
 /** Type guard for SystemInfo */

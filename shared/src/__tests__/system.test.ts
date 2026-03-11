@@ -67,6 +67,7 @@ describe('SystemStats', () => {
     cpu: validCpu,
     memory: validMemory,
     storage: validStorage,
+    network: [{ interface: 'br-lan', rx_bytes: 1024, tx_bytes: 512 }],
   };
 
   it('validates correct SystemStats', () => {

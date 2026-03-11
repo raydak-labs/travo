@@ -52,13 +52,14 @@ export function useWebSocket() {
             data: SystemStats;
           };
           if (msg.type === 'system_stats' && msg.data) {
+            const net = msg.data.network?.[0];
             const point: StatsDataPoint = {
               timestamp: Date.now(),
               cpu: msg.data.cpu.usage_percent,
               memoryUsed: msg.data.memory.used_bytes,
               memoryTotal: msg.data.memory.total_bytes,
-              rxBytes: 0,
-              txBytes: 0,
+              rxBytes: net?.rx_bytes ?? 0,
+              txBytes: net?.tx_bytes ?? 0,
             };
             setDataPoints((prev) => {
               const next = [...prev, point];

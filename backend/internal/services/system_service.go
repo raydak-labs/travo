@@ -150,7 +150,39 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 		}
 	}
 
+	// Network interface counters
+	stats.Network = readNetworkStats()
+
 	return stats, nil
+}
+
+// readNetworkStats reads cumulative RX/TX byte counters from sysfs for key interfaces.
+func readNetworkStats() []models.NetworkInterfaceStats {
+	interfaces := []string{"br-lan", "wwan0", "wg0", "eth0"}
+	var result []models.NetworkInterfaceStats
+	for _, iface := range interfaces {
+		rx, errRx := readSysfsCounter(iface, "rx_bytes")
+		tx, errTx := readSysfsCounter(iface, "tx_bytes")
+		if errRx != nil || errTx != nil {
+			continue
+		}
+		result = append(result, models.NetworkInterfaceStats{
+			Interface: iface,
+			RxBytes:   rx,
+			TxBytes:   tx,
+		})
+	}
+	return result
+}
+
+// readSysfsCounter reads a single counter value from /sys/class/net/<iface>/statistics/<counter>.
+func readSysfsCounter(iface, counter string) (int64, error) {
+	path := filepath.Join("/sys/class/net", iface, "statistics", counter)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
 }
 
 // Reboot initiates a system reboot via ubus.

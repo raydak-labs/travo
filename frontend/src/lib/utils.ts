@@ -11,6 +11,18 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
+ * Format a byte-per-second rate into a human-readable string (B/s, KB/s, MB/s).
+ */
+export function formatRate(bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return '0 B/s';
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const k = 1024;
+  const i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
+  const value = bytesPerSec / Math.pow(k, i);
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/**
  * Format seconds into "X days, Y hours, Z minutes".
  */
 export function formatUptime(seconds: number): string {
