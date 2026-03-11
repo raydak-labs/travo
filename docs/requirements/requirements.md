@@ -91,7 +91,7 @@
 - [x] List DHCP clients (MAC, IP, hostname)
 - [ ] Fix "connected since" showing invalid date 🐛
 - [x] Device aliases (name clients: "John's Phone", "Laptop" — stored in local config)
-- [ ] Set static IP / DHCP reservation for a client
+- [x] Set static IP / DHCP reservation for a client
 - [ ] Traffic stats per client (RX/TX)
 - [ ] Client hostname resolution
 - [ ] Block / kick a client

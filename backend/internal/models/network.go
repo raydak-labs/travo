@@ -91,3 +91,11 @@ type DNSEntry struct {
 	IP      string `json:"ip"`
 	Section string `json:"section,omitempty"`
 }
+
+// DHCPReservation represents a static DHCP reservation (IP by MAC).
+type DHCPReservation struct {
+	Name    string `json:"name"`
+	MAC     string `json:"mac"`
+	IP      string `json:"ip"`
+	Section string `json:"section,omitempty"`
+}

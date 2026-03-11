@@ -51,6 +51,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.clients).toBe('/api/v1/network/clients');
     expect(API_ROUTES.network.clientAlias).toBe('/api/v1/network/clients/alias');
     expect(API_ROUTES.network.dhcpLeases).toBe('/api/v1/network/dhcp/leases');
+    expect(API_ROUTES.network.dhcpReservations).toBe('/api/v1/network/dhcp/reservations');
     expect(API_ROUTES.network.dnsEntries).toBe('/api/v1/network/dns/entries');
   });
 
@@ -112,6 +113,7 @@ describe('API_ROUTES', () => {
       '/api/v1/network/clients/alias',
       '/api/v1/network/dhcp',
       '/api/v1/network/dhcp/leases',
+      '/api/v1/network/dhcp/reservations',
       '/api/v1/network/dns',
       '/api/v1/network/dns/entries',
       '/api/v1/wifi/scan',

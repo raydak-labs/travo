@@ -25,6 +25,7 @@ import {
   mockDHCPLeases,
   mockGuestWifi,
   mockDNSEntries,
+  mockDHCPReservations,
 } from './data';
 
 export const handlers = [
@@ -214,6 +215,16 @@ export const handlers = [
 
   http.get(API_ROUTES.network.dhcpLeases, () => {
     return HttpResponse.json(mockDHCPLeases);
+  }),
+
+  http.get(API_ROUTES.network.dhcpReservations, () => {
+    return HttpResponse.json(mockDHCPReservations);
+  }),
+  http.post(API_ROUTES.network.dhcpReservations, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+  http.delete(`${API_ROUTES.network.dhcpReservations}/:section`, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.auth.login, async ({ request }) => {

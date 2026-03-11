@@ -578,3 +578,113 @@ func TestSanitizeSectionName(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDHCPReservations_Empty(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	reservations, err := svc.GetDHCPReservations()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(reservations) != 0 {
+		t.Errorf("expected 0 reservations, got %d", len(reservations))
+	}
+}
+
+func TestAddAndGetDHCPReservation(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	err := svc.AddDHCPReservation(models.DHCPReservation{
+		Name: "laptop",
+		MAC:  "AA:BB:CC:DD:EE:FF",
+		IP:   "192.168.8.50",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reservations, err := svc.GetDHCPReservations()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(reservations) != 1 {
+		t.Fatalf("expected 1 reservation, got %d", len(reservations))
+	}
+	if reservations[0].Name != "laptop" {
+		t.Errorf("expected name 'laptop', got %q", reservations[0].Name)
+	}
+	if reservations[0].MAC != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("expected MAC 'AA:BB:CC:DD:EE:FF', got %q", reservations[0].MAC)
+	}
+	if reservations[0].IP != "192.168.8.50" {
+		t.Errorf("expected IP '192.168.8.50', got %q", reservations[0].IP)
+	}
+	if reservations[0].Section != "host_laptop" {
+		t.Errorf("expected section 'host_laptop', got %q", reservations[0].Section)
+	}
+}
+
+func TestAddMultipleDHCPReservations(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:01", IP: "192.168.8.50"})
+	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "phone", MAC: "AA:BB:CC:DD:EE:02", IP: "192.168.8.51"})
+
+	reservations, err := svc.GetDHCPReservations()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(reservations) != 2 {
+		t.Fatalf("expected 2 reservations, got %d", len(reservations))
+	}
+}
+
+func TestDeleteDHCPReservation(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:FF", IP: "192.168.8.50"})
+
+	err := svc.DeleteDHCPReservation("host_laptop")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reservations, err := svc.GetDHCPReservations()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(reservations) != 0 {
+		t.Errorf("expected 0 reservations after delete, got %d", len(reservations))
+	}
+}
+
+func TestDeleteDHCPReservation_NotFound(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	err := svc.DeleteDHCPReservation("host_nonexistent")
+	if err == nil {
+		t.Error("expected error deleting nonexistent reservation")
+	}
+}
+
+func TestAddDHCPReservation_DuplicateName(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:01", IP: "192.168.8.50"})
+	err := svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:02", IP: "192.168.8.51"})
+	if err == nil {
+		t.Error("expected error adding duplicate DHCP reservation")
+	}
+}

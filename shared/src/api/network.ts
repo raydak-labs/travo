@@ -81,6 +81,14 @@ export interface DNSEntry {
   readonly section?: string;
 }
 
+/** Static DHCP reservation (IP by MAC) */
+export interface DHCPReservation {
+  readonly name: string;
+  readonly mac: string;
+  readonly ip: string;
+  readonly section?: string;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

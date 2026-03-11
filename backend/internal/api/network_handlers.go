@@ -240,3 +240,60 @@ func DeleteDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetDHCPReservationsHandler handles GET /api/v1/network/dhcp/reservations.
+func GetDHCPReservationsHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		reservations, err := svc.GetDHCPReservations()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(reservations)
+	}
+}
+
+// AddDHCPReservationHandler handles POST /api/v1/network/dhcp/reservations.
+func AddDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var reservation models.DHCPReservation
+		if err := c.BodyParser(&reservation); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if reservation.Name == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+		}
+		if !isValidHostname(reservation.Name) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid hostname"})
+		}
+		if reservation.MAC == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mac is required"})
+		}
+		if !isValidMAC(reservation.MAC) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address"})
+		}
+		if reservation.IP == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ip is required"})
+		}
+		if !isValidIPv4(reservation.IP) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid IP address"})
+		}
+		if err := svc.AddDHCPReservation(reservation); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// DeleteDHCPReservationHandler handles DELETE /api/v1/network/dhcp/reservations/:section.
+func DeleteDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		section := c.Params("section")
+		if section == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section is required"})
+		}
+		if err := svc.DeleteDHCPReservation(section); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

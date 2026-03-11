@@ -11,6 +11,7 @@ import type {
   DHCPLease,
   SetAliasRequest,
   DNSEntry,
+  DHCPReservation,
 } from '@shared/index';
 
 export function useNetworkStatus() {
@@ -149,6 +150,43 @@ export function useDeleteDNSEntry() {
     },
     onError: (error) => {
       toast.error('Failed to delete DNS entry', { description: error.message });
+    },
+  });
+}
+
+export function useDHCPReservations() {
+  return useQuery({
+    queryKey: ['network', 'dhcpReservations'],
+    queryFn: () => apiClient.get<DHCPReservation[]>(API_ROUTES.network.dhcpReservations),
+  });
+}
+
+export function useAddDHCPReservation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reservation: { name: string; mac: string; ip: string }) =>
+      apiClient.post<{ status: string }>(API_ROUTES.network.dhcpReservations, reservation),
+    onSuccess: () => {
+      toast.success('DHCP reservation added');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'dhcpReservations'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to add DHCP reservation', { description: error.message });
+    },
+  });
+}
+
+export function useDeleteDHCPReservation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (section: string) =>
+      apiClient.del<{ status: string }>(`${API_ROUTES.network.dhcpReservations}/${section}`),
+    onSuccess: () => {
+      toast.success('DHCP reservation deleted');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'dhcpReservations'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete DHCP reservation', { description: error.message });
     },
   });
 }

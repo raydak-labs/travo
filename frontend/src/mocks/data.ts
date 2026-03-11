@@ -22,6 +22,7 @@ import type {
   DHCPLease,
   GuestWifiConfig,
   DNSEntry,
+  DHCPReservation,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -472,5 +473,20 @@ export const mockDNSEntries: DNSEntry[] = [
     name: 'printer',
     ip: '192.168.8.20',
     section: 'dns_printer',
+  },
+];
+
+export const mockDHCPReservations: DHCPReservation[] = [
+  {
+    name: 'laptop',
+    mac: 'AA:BB:CC:DD:EE:01',
+    ip: '192.168.8.50',
+    section: 'host_laptop',
+  },
+  {
+    name: 'printer',
+    mac: '11:22:33:44:55:66',
+    ip: '192.168.8.20',
+    section: 'host_printer',
   },
 ];

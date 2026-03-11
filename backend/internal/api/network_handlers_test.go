@@ -141,3 +141,140 @@ func TestSetWanConfig_ValidDHCP_Returns200(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 }
+
+func TestGetDHCPReservations_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/dhcp/reservations", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestAddDHCPReservation_ValidRequest_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name": "laptop",
+		"mac":  "AA:BB:CC:DD:EE:FF",
+		"ip":   "192.168.8.50",
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestAddDHCPReservation_MissingName_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"mac": "AA:BB:CC:DD:EE:FF",
+		"ip":  "192.168.8.50",
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestAddDHCPReservation_InvalidMAC_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name": "laptop",
+		"mac":  "invalid-mac",
+		"ip":   "192.168.8.50",
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestAddDHCPReservation_InvalidIP_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name": "laptop",
+		"mac":  "AA:BB:CC:DD:EE:FF",
+		"ip":   "not-an-ip",
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestDeleteDHCPReservation_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	// First add a reservation
+	body, _ := json.Marshal(map[string]interface{}{
+		"name": "laptop",
+		"mac":  "AA:BB:CC:DD:EE:FF",
+		"ip":   "192.168.8.50",
+	})
+	addReq, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
+	addReq.Header.Set("Content-Type", "application/json")
+	addReq.Header.Set("Authorization", "Bearer "+token)
+	addResp, _ := app.Test(addReq, -1)
+	addResp.Body.Close()
+
+	// Now delete it
+	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/network/dhcp/reservations/host_laptop", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}

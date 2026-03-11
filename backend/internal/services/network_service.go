@@ -472,6 +472,56 @@ func sanitizeSectionName(name string) string {
 	return sb.String()
 }
 
+// GetDHCPReservations returns all static DHCP reservations (host sections in dhcp config).
+func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error) {
+	sections, err := n.uci.GetSections("dhcp")
+	if err != nil {
+		return []models.DHCPReservation{}, nil
+	}
+	var reservations []models.DHCPReservation
+	for section, opts := range sections {
+		if opts[".type"] != "host" {
+			continue
+		}
+		reservations = append(reservations, models.DHCPReservation{
+			Name:    opts["name"],
+			MAC:     opts["mac"],
+			IP:      opts["ip"],
+			Section: section,
+		})
+	}
+	if reservations == nil {
+		return []models.DHCPReservation{}, nil
+	}
+	return reservations, nil
+}
+
+// AddDHCPReservation adds a static DHCP reservation as a named UCI section in dhcp config.
+func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
+	section := "host_" + sanitizeSectionName(reservation.Name)
+	if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
+		return fmt.Errorf("adding DHCP reservation section: %w", err)
+	}
+	if err := n.uci.Set("dhcp", section, "name", reservation.Name); err != nil {
+		return fmt.Errorf("setting DHCP reservation name: %w", err)
+	}
+	if err := n.uci.Set("dhcp", section, "mac", reservation.MAC); err != nil {
+		return fmt.Errorf("setting DHCP reservation MAC: %w", err)
+	}
+	if err := n.uci.Set("dhcp", section, "ip", reservation.IP); err != nil {
+		return fmt.Errorf("setting DHCP reservation IP: %w", err)
+	}
+	return n.uci.Commit("dhcp")
+}
+
+// DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
+func (n *NetworkService) DeleteDHCPReservation(section string) error {
+	if err := n.uci.DeleteSection("dhcp", section); err != nil {
+		return fmt.Errorf("deleting DHCP reservation: %w", err)
+	}
+	return n.uci.Commit("dhcp")
+}
+
 // parseDHCPLeases parses the content of /tmp/dhcp.leases into a slice of DHCPLease.
 // Each line has the format: <expiry_epoch> <mac_address> <ip_address> <hostname> <client_id>
 func parseDHCPLeases(data string) []models.DHCPLease {
