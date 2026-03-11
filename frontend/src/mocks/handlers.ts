@@ -239,6 +239,10 @@ export const handlers = [
     return HttpResponse.json(mockWanConfig);
   }),
 
+  http.get(API_ROUTES.network.wanDetect, () => {
+    return HttpResponse.json({ detected_type: 'dhcp', current_type: 'dhcp' });
+  }),
+
   http.put(API_ROUTES.network.wan, () => {
     return HttpResponse.json({ success: true });
   }),

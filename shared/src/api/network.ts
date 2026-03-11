@@ -91,6 +91,12 @@ export interface DNSEntry {
   readonly section?: string;
 }
 
+/** WAN connection type auto-detection result */
+export interface WanDetectResult {
+  readonly detected_type: WanType;
+  readonly current_type: WanType;
+}
+
 /** Static DHCP reservation (IP by MAC) */
 export interface DHCPReservation {
   readonly name: string;

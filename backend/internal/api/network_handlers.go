@@ -31,6 +31,17 @@ func GetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	}
 }
 
+// DetectWanTypeHandler handles GET /api/v1/network/wan/detect.
+func DetectWanTypeHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result, err := svc.DetectWanType()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(result)
+	}
+}
+
 // SetWanConfigHandler handles PUT /api/v1/network/wan.
 func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Network, Globe, Wifi, Settings, List, MapPin, Trash2, HardDrive, Power } from 'lucide-react';
+import { Network, Globe, Wifi, Settings, List, MapPin, Trash2, HardDrive, Power, Search } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import {
   useDeleteDHCPReservation,
   useBlockedClients,
   useSetInterfaceState,
+  useDetectWanType,
 } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
@@ -47,6 +48,7 @@ export function NetworkPage() {
   const deleteDHCPReservation = useDeleteDHCPReservation();
   const { data: blockedClients } = useBlockedClients();
   const setInterfaceState = useSetInterfaceState();
+  const detectWanType = useDetectWanType();
   const [dhcpStart, setDhcpStart] = useState<number>(100);
   const [dhcpLimit, setDhcpLimit] = useState<number>(150);
   const [dhcpLease, setDhcpLease] = useState<string>('12h');
@@ -130,6 +132,27 @@ export function NetworkPage() {
           ) : (
             <p className="text-sm text-gray-500">WAN not configured</p>
           )}
+          <div className="mt-3 flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => detectWanType.mutate()}
+              disabled={detectWanType.isPending}
+            >
+              <Search className="mr-1.5 h-3.5 w-3.5" />
+              {detectWanType.isPending ? 'Detecting…' : 'Auto-detect WAN Type'}
+            </Button>
+            {detectWanType.data && (
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Detected: <strong>{detectWanType.data.detected_type.toUpperCase()}</strong>
+                {detectWanType.data.detected_type !== detectWanType.data.current_type && (
+                  <span className="ml-1 text-amber-600 dark:text-amber-400">
+                    (current: {detectWanType.data.current_type})
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
         </CardContent>
       </Card>
 

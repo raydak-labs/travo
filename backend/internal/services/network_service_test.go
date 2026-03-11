@@ -870,3 +870,82 @@ func TestSetInterfaceState_CommandFailure(t *testing.T) {
 		t.Fatal("expected error when command fails")
 	}
 }
+
+// mapCommandRunner returns different outputs based on the command name.
+type mapCommandRunner struct {
+	responses map[string]struct {
+		output []byte
+		err    error
+	}
+}
+
+func (m *mapCommandRunner) Run(name string, _ ...string) ([]byte, error) {
+	if r, ok := m.responses[name]; ok {
+		return r.output, r.err
+	}
+	return nil, fmt.Errorf("command not found: %s", name)
+}
+
+func TestDetectWanType_DHCP(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmd := &mapCommandRunner{responses: map[string]struct {
+		output []byte
+		err    error
+	}{
+		"pgrep": {nil, fmt.Errorf("not found")},
+	}}
+	// Mock returns error for pgrep (no pppd, no udhcpc) → falls back to UCI config (dhcp)
+	svc := NewNetworkServiceWithRunner(u, ub, cmd)
+
+	result, err := svc.DetectWanType()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.CurrentType != "dhcp" {
+		t.Errorf("expected current_type 'dhcp', got %q", result.CurrentType)
+	}
+	if result.DetectedType != "dhcp" {
+		t.Errorf("expected detected_type 'dhcp', got %q", result.DetectedType)
+	}
+}
+
+func TestDetectWanType_PPPoE(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	// pgrep succeeds on first call (checking pppd) → PPPoE detected
+	cmd := &MockCommandRunner{Output: []byte("1234\n")}
+	svc := NewNetworkServiceWithRunner(u, ub, cmd)
+
+	result, err := svc.DetectWanType()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.DetectedType != "pppoe" {
+		t.Errorf("expected detected_type 'pppoe', got %q", result.DetectedType)
+	}
+	if result.CurrentType != "dhcp" {
+		t.Errorf("expected current_type 'dhcp', got %q", result.CurrentType)
+	}
+}
+
+func TestDetectWanType_FallbackToCurrentConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	// Set current config to static
+	_ = u.Set("network", "wan", "proto", "static")
+	ub := ubus.NewMockUbus()
+	// All pgrep calls fail → falls back to current config
+	cmd := &MockCommandRunner{Err: fmt.Errorf("not found")}
+	svc := NewNetworkServiceWithRunner(u, ub, cmd)
+
+	result, err := svc.DetectWanType()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.CurrentType != "static" {
+		t.Errorf("expected current_type 'static', got %q", result.CurrentType)
+	}
+	if result.DetectedType != "static" {
+		t.Errorf("expected detected_type 'static' (fallback), got %q", result.DetectedType)
+	}
+}

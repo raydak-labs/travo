@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v17 — repeater wizard)
+> **Last updated:** 2026-03-11 (v18 — WAN type auto-detection)
 
 ---
 
@@ -122,6 +122,7 @@
 
 ### 2.6 WAN Auto-Detection
 
+- [x] WAN connection type auto-detection (DHCP, PPPoE, static)
 - [ ] Detect ethernet cable plug-in and auto-switch to wired WAN
 - [ ] Show active WAN source indicator on dashboard
 

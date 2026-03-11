@@ -5,6 +5,7 @@ import { API_ROUTES } from '@shared/index';
 import type {
   NetworkStatus,
   WanConfig,
+  WanDetectResult,
   Client,
   DHCPConfig,
   DNSConfig,
@@ -257,6 +258,15 @@ export function useSetInterfaceState() {
     },
     onError: (error) => {
       toast.error('Failed to change interface state', { description: error.message });
+    },
+  });
+}
+
+export function useDetectWanType() {
+  return useMutation({
+    mutationFn: () => apiClient.get<WanDetectResult>(API_ROUTES.network.wanDetect),
+    onError: (error) => {
+      toast.error('WAN detection failed', { description: error.message });
     },
   });
 }

@@ -415,6 +415,38 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	return n.uci.Commit("network")
 }
 
+// DetectWanType auto-detects the WAN connection type and returns
+// both the detected type and the currently configured type.
+func (n *NetworkService) DetectWanType() (models.WanDetectResult, error) {
+	// Read current UCI configuration
+	currentType := "dhcp"
+	opts, err := n.uci.GetAll("network", "wan")
+	if err == nil {
+		if proto, ok := opts["proto"]; ok && proto != "" {
+			currentType = proto
+		}
+	}
+
+	// Detect running services to determine actual WAN type
+	detectedType := "dhcp" // default
+
+	// Check if pppd is running → PPPoE
+	if _, err := n.cmd.Run("pgrep", "-x", "pppd"); err == nil {
+		detectedType = "pppoe"
+	} else if _, err := n.cmd.Run("pgrep", "-x", "udhcpc"); err == nil {
+		// Check if udhcpc (DHCP client) is running → DHCP
+		detectedType = "dhcp"
+	} else {
+		// Neither running — fall back to current config
+		detectedType = currentType
+	}
+
+	return models.WanDetectResult{
+		DetectedType: detectedType,
+		CurrentType:  currentType,
+	}, nil
+}
+
 // GetClients returns connected LAN clients with aliases merged.
 func (n *NetworkService) GetClients() ([]models.Client, error) {
 	status, err := n.GetNetworkStatus()

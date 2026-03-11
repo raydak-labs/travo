@@ -3,6 +3,7 @@ import {
   isNetworkStatus,
   type NetworkInterface,
   type WanConfig,
+  type WanDetectResult,
   type Client,
   type NetworkStatus,
   type WanType,
@@ -88,5 +89,14 @@ describe('NetworkStatus', () => {
     };
     expect(config.type).toBe('dhcp');
     expect(config.mtu).toBe(1500);
+  });
+
+  it('validates WanDetectResult structure', () => {
+    const result: WanDetectResult = {
+      detected_type: 'pppoe',
+      current_type: 'dhcp',
+    };
+    expect(result.detected_type).toBe('pppoe');
+    expect(result.current_type).toBe('dhcp');
   });
 });

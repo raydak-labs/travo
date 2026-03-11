@@ -99,6 +99,34 @@ func TestSetWanConfig_InvalidMTU_Returns400(t *testing.T) {
 	}
 }
 
+func TestDetectWanTypeEndpoint(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/wan/detect", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if _, ok := data["detected_type"]; !ok {
+		t.Error("expected detected_type in response")
+	}
+	if _, ok := data["current_type"]; !ok {
+		t.Error("expected current_type in response")
+	}
+}
+
 func TestSetWanConfig_InvalidDNS_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")

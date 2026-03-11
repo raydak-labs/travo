@@ -97,6 +97,12 @@ type ClientActionRequest struct {
 	MAC string `json:"mac"`
 }
 
+// WanDetectResult holds the result of WAN connection type auto-detection.
+type WanDetectResult struct {
+	DetectedType string `json:"detected_type"`
+	CurrentType  string `json:"current_type"`
+}
+
 // SetInterfaceStateRequest is the request body for bringing an interface up or down.
 type SetInterfaceStateRequest struct {
 	Up bool `json:"up"`

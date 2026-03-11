@@ -117,6 +117,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/factory-reset',
       '/api/v1/network/status',
       '/api/v1/network/wan',
+      '/api/v1/network/wan/detect',
       '/api/v1/network/clients',
       '/api/v1/network/clients/alias',
       '/api/v1/network/clients/kick',

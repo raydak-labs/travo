@@ -98,4 +98,12 @@ describe('NetworkPage', () => {
       expect(screen.getByText('8.8.8.8, 8.8.4.4')).toBeInTheDocument();
     });
   });
+
+  it('renders auto-detect WAN type button', async () => {
+    renderNetworkPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Auto-detect WAN Type')).toBeInTheDocument();
+    });
+  });
 });
