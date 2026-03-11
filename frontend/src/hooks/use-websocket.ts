@@ -73,6 +73,7 @@ export function useWebSocket() {
       ws.onclose = () => {
         if (mountedRef.current) {
           setConnected(false);
+          setDataPoints([]);
           reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
         }
       };

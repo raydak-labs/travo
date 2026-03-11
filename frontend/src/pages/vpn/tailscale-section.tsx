@@ -1,22 +1,38 @@
 import { Globe } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useServices } from '@/hooks/use-services';
 import { useTailscaleStatus, useToggleTailscale } from '@/hooks/use-vpn';
 
 export function TailscaleSection() {
   const { data: status, isLoading } = useTailscaleStatus();
+  const { data: services = [] } = useServices();
   const toggleMutation = useToggleTailscale();
 
+  const tsService = services.find((s) => s.id === 'tailscale');
+  const isInstalled = tsService ? tsService.state !== 'not_installed' : !!status;
+
   return (
-    <Card>
+    <Card className={!isInstalled ? 'opacity-60' : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Tailscale</CardTitle>
         <Globe className="h-4 w-4 text-blue-500" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
+        {!isInstalled ? (
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-500 mb-2">Tailscale is not installed</p>
+            <Link
+              to="/services"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              Install via Services →
+            </Link>
+          </div>
+        ) : isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
@@ -68,9 +84,7 @@ export function TailscaleSection() {
               </p>
             )}
           </>
-        ) : (
-          <p className="text-sm text-gray-500">Tailscale is not installed</p>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );

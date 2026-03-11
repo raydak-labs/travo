@@ -133,6 +133,29 @@ func (m *MockUbus) populate() {
 	}
 
 	m.responses["system.reboot"] = map[string]interface{}{}
+
+	m.responses["network.wireless.status"] = map[string]interface{}{
+		"radio0": map[string]interface{}{
+			"interfaces": []interface{}{
+				map[string]interface{}{
+					"ifname":  "phy0-sta0",
+					"section": "wifinet2",
+					"config": map[string]interface{}{
+						"mode":       "sta",
+						"ssid":       "Hotel-WiFi",
+						"encryption": "psk2",
+					},
+				},
+			},
+		},
+	}
+
+	m.responses["network.interface.wwan.status"] = map[string]interface{}{
+		"up": true,
+		"ipv4-address": []interface{}{
+			map[string]interface{}{"address": "10.0.0.50", "mask": float64(24)},
+		},
+	}
 }
 
 // Call invokes a mock ubus method.

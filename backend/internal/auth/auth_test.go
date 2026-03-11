@@ -118,6 +118,28 @@ func TestMiddlewareAllowsHealthWithoutToken(t *testing.T) {
 	}
 }
 
+func TestMiddlewareAllowsStaticFilesWithoutToken(t *testing.T) {
+	svc := NewAuthService("admin", "test-secret")
+	app := fiber.New()
+	app.Use(svc.Middleware())
+	app.Get("/*", func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	paths := []string{"/", "/index.html", "/assets/style.css", "/assets/main.js"}
+	for _, p := range paths {
+		req, _ := http.NewRequest(http.MethodGet, p, nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("request to %s failed: %v", p, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected 200 for %s, got %d", p, resp.StatusCode)
+		}
+	}
+}
+
 func TestMiddlewareAllowsLoginWithoutToken(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	app := fiber.New()

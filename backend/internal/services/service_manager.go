@@ -2,47 +2,89 @@ package services
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
-// ServiceManager manages installable services.
-type ServiceManager struct {
-	mu       sync.RWMutex
-	services map[string]*models.ServiceInfo
+// PackageManager abstracts package install/remove operations.
+type PackageManager interface {
+	Install(pkg string) (string, error)
+	Remove(pkg string) (string, error)
+	IsInstalled(pkg string) bool
 }
 
-// NewServiceManager creates a ServiceManager with default service definitions.
-func NewServiceManager() *ServiceManager {
-	sm := &ServiceManager{
-		services: make(map[string]*models.ServiceInfo),
-	}
-	sm.services["adguardhome"] = &models.ServiceInfo{
+// SystemProbe abstracts init.d and process checks.
+type SystemProbe interface {
+	HasInitScript(name string) bool
+	IsRunning(initName string) bool
+	Start(initName string) (string, error)
+	Stop(initName string) (string, error)
+	IsAutoStart(initName string) bool
+}
+
+// serviceDefinition holds static config for a known service.
+type serviceDefinition struct {
+	ID          string
+	Name        string
+	Description string
+	Packages    []string // apk/opkg packages to install
+	InitName    string   // init.d script name (empty if no init script)
+}
+
+var knownServices = []serviceDefinition{
+	{
 		ID: "adguardhome", Name: "AdGuard Home",
 		Description: "Network-wide ad and tracker blocking DNS server",
-		State: "not_installed",
-	}
-	sm.services["wireguard"] = &models.ServiceInfo{
+		Packages:    []string{"adguardhome"},
+		InitName:    "adguardhome",
+	},
+	{
 		ID: "wireguard", Name: "WireGuard",
 		Description: "Fast, modern VPN tunnel",
-		State: "stopped", AutoStart: false,
-	}
-	sm.services["tailscale"] = &models.ServiceInfo{
+		Packages:    []string{"wireguard-tools"},
+		InitName:    "", // managed via UCI/netifd, no init.d
+	},
+	{
 		ID: "tailscale", Name: "Tailscale",
 		Description: "Zero-config mesh VPN",
-		State: "not_installed",
-	}
-	return sm
+		Packages:    []string{"tailscale"},
+		InitName:    "tailscale",
+	},
 }
 
-// ListServices returns all known services.
+// ServiceManager manages installable services.
+type ServiceManager struct {
+	mu    sync.RWMutex
+	defs  []serviceDefinition
+	pkg   PackageManager
+	probe SystemProbe
+}
+
+// NewServiceManager creates a ServiceManager that detects real system state.
+func NewServiceManager() *ServiceManager {
+	return NewServiceManagerWith(detectPackageManager(), &RealSystemProbe{})
+}
+
+// NewServiceManagerWith creates a ServiceManager with injected dependencies (for tests).
+func NewServiceManagerWith(pkg PackageManager, probe SystemProbe) *ServiceManager {
+	return &ServiceManager{
+		defs:  knownServices,
+		pkg:   pkg,
+		probe: probe,
+	}
+}
+
+// ListServices returns all known services with live state.
 func (sm *ServiceManager) ListServices() ([]models.ServiceInfo, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	var result []models.ServiceInfo
-	for _, s := range sm.services {
-		result = append(result, *s)
+	for _, def := range sm.defs {
+		result = append(result, sm.buildInfo(def))
 	}
 	return result, nil
 }
@@ -51,65 +93,256 @@ func (sm *ServiceManager) ListServices() ([]models.ServiceInfo, error) {
 func (sm *ServiceManager) GetServiceStatus(serviceID string) (models.ServiceInfo, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	if s, ok := sm.services[serviceID]; ok {
-		return *s, nil
+	for _, def := range sm.defs {
+		if def.ID == serviceID {
+			return sm.buildInfo(def), nil
+		}
 	}
 	return models.ServiceInfo{}, fmt.Errorf("service not found: %s", serviceID)
 }
 
-// Install marks a service as installed (stopped).
+// buildInfo checks live system state for a service definition.
+func (sm *ServiceManager) buildInfo(def serviceDefinition) models.ServiceInfo {
+	info := models.ServiceInfo{
+		ID:          def.ID,
+		Name:        def.Name,
+		Description: def.Description,
+		State:       "not_installed",
+	}
+
+	installed := true
+	for _, pkg := range def.Packages {
+		if !sm.pkg.IsInstalled(pkg) {
+			installed = false
+			break
+		}
+	}
+	if !installed {
+		return info
+	}
+
+	info.State = "stopped"
+	if def.InitName != "" {
+		info.AutoStart = sm.probe.IsAutoStart(def.InitName)
+		if sm.probe.IsRunning(def.InitName) {
+			info.State = "running"
+		}
+	} else {
+		// Services without init.d (like wireguard via UCI) are "installed" when package present
+		info.State = "installed"
+	}
+	return info
+}
+
+// Install installs the packages for a service.
 func (sm *ServiceManager) Install(serviceID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	s, ok := sm.services[serviceID]
-	if !ok {
-		return fmt.Errorf("service not found: %s", serviceID)
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
 	}
-	if s.State != "not_installed" {
-		return fmt.Errorf("service %s already installed", serviceID)
+	for _, pkg := range def.Packages {
+		if out, err := sm.pkg.Install(pkg); err != nil {
+			return fmt.Errorf("failed to install %s: %w\n%s", pkg, err, out)
+		}
 	}
-	s.State = "stopped"
 	return nil
 }
 
-// Remove marks a service as not installed.
+// Remove removes the packages for a service.
 func (sm *ServiceManager) Remove(serviceID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	s, ok := sm.services[serviceID]
-	if !ok {
-		return fmt.Errorf("service not found: %s", serviceID)
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
 	}
-	s.State = "not_installed"
+	// Stop first if running
+	if def.InitName != "" && sm.probe.IsRunning(def.InitName) {
+		_, _ = sm.probe.Stop(def.InitName)
+	}
+	for _, pkg := range def.Packages {
+		if out, err := sm.pkg.Remove(pkg); err != nil {
+			return fmt.Errorf("failed to remove %s: %w\n%s", pkg, err, out)
+		}
+	}
 	return nil
 }
 
-// Start marks a service as running.
+// Start starts a service via init.d.
 func (sm *ServiceManager) Start(serviceID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	s, ok := sm.services[serviceID]
-	if !ok {
-		return fmt.Errorf("service not found: %s", serviceID)
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
 	}
-	if s.State == "not_installed" {
+	if def.InitName == "" {
+		return fmt.Errorf("service %s does not have an init script", serviceID)
+	}
+	if !sm.probe.HasInitScript(def.InitName) {
 		return fmt.Errorf("service %s not installed", serviceID)
 	}
-	s.State = "running"
+	out, err := sm.probe.Start(def.InitName)
+	if err != nil {
+		return fmt.Errorf("failed to start %s: %w\n%s", serviceID, err, out)
+	}
 	return nil
 }
 
-// Stop marks a service as stopped.
+// Stop stops a service via init.d.
 func (sm *ServiceManager) Stop(serviceID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	s, ok := sm.services[serviceID]
-	if !ok {
-		return fmt.Errorf("service not found: %s", serviceID)
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
 	}
-	if s.State == "not_installed" {
-		return fmt.Errorf("service %s not installed", serviceID)
+	if def.InitName == "" {
+		return fmt.Errorf("service %s does not have an init script", serviceID)
 	}
-	s.State = "stopped"
+	out, err := sm.probe.Stop(def.InitName)
+	if err != nil {
+		return fmt.Errorf("failed to stop %s: %w\n%s", serviceID, err, out)
+	}
 	return nil
 }
+
+func (sm *ServiceManager) findDef(serviceID string) (serviceDefinition, error) {
+	for _, def := range sm.defs {
+		if def.ID == serviceID {
+			return def, nil
+		}
+	}
+	return serviceDefinition{}, fmt.Errorf("service not found: %s", serviceID)
+}
+
+// --- Real implementations ---
+
+// detectPackageManager checks which package manager is available.
+func detectPackageManager() PackageManager {
+	if _, err := exec.LookPath("apk"); err == nil {
+		return &ApkPackageManager{}
+	}
+	if _, err := exec.LookPath("opkg"); err == nil {
+		return &OpkgPackageManager{}
+	}
+	return &NoopPackageManager{}
+}
+
+// ApkPackageManager uses apk (OpenWrt 25.x+).
+type ApkPackageManager struct{}
+
+func (a *ApkPackageManager) Install(pkg string) (string, error) {
+	out, err := exec.Command("apk", "add", pkg).CombinedOutput()
+	return string(out), err
+}
+func (a *ApkPackageManager) Remove(pkg string) (string, error) {
+	out, err := exec.Command("apk", "del", pkg).CombinedOutput()
+	return string(out), err
+}
+func (a *ApkPackageManager) IsInstalled(pkg string) bool {
+	err := exec.Command("apk", "info", "-e", pkg).Run()
+	return err == nil
+}
+
+// OpkgPackageManager uses opkg (OpenWrt <25).
+type OpkgPackageManager struct{}
+
+func (o *OpkgPackageManager) Install(pkg string) (string, error) {
+	out, err := exec.Command("opkg", "install", pkg).CombinedOutput()
+	return string(out), err
+}
+func (o *OpkgPackageManager) Remove(pkg string) (string, error) {
+	out, err := exec.Command("opkg", "remove", pkg).CombinedOutput()
+	return string(out), err
+}
+func (o *OpkgPackageManager) IsInstalled(pkg string) bool {
+	out, err := exec.Command("opkg", "list-installed", pkg).CombinedOutput()
+	return err == nil && strings.Contains(string(out), pkg)
+}
+
+// NoopPackageManager for systems without a package manager.
+type NoopPackageManager struct{}
+
+func (n *NoopPackageManager) Install(string) (string, error) {
+	return "", fmt.Errorf("no package manager available")
+}
+func (n *NoopPackageManager) Remove(string) (string, error) {
+	return "", fmt.Errorf("no package manager available")
+}
+func (n *NoopPackageManager) IsInstalled(string) bool { return false }
+
+// RealSystemProbe checks init.d scripts and running processes.
+type RealSystemProbe struct{}
+
+func (r *RealSystemProbe) HasInitScript(name string) bool {
+	_, err := os.Stat("/etc/init.d/" + name)
+	return err == nil
+}
+func (r *RealSystemProbe) IsRunning(initName string) bool {
+	// OpenWrt init.d scripts return 0 for "running" status
+	err := exec.Command("/etc/init.d/"+initName, "status").Run()
+	return err == nil
+}
+func (r *RealSystemProbe) Start(initName string) (string, error) {
+	out, err := exec.Command("/etc/init.d/"+initName, "start").CombinedOutput()
+	return string(out), err
+}
+func (r *RealSystemProbe) Stop(initName string) (string, error) {
+	out, err := exec.Command("/etc/init.d/"+initName, "stop").CombinedOutput()
+	return string(out), err
+}
+func (r *RealSystemProbe) IsAutoStart(initName string) bool {
+	err := exec.Command("/etc/init.d/"+initName, "enabled").Run()
+	return err == nil
+}
+
+// --- Mock implementations for tests ---
+
+// MockPackageManager tracks install/remove state in memory.
+type MockPackageManager struct {
+	installed map[string]bool
+}
+
+func NewMockPackageManager() *MockPackageManager {
+	return &MockPackageManager{installed: make(map[string]bool)}
+}
+func (m *MockPackageManager) Install(pkg string) (string, error) {
+	m.installed[pkg] = true
+	return "ok", nil
+}
+func (m *MockPackageManager) Remove(pkg string) (string, error) {
+	delete(m.installed, pkg)
+	return "ok", nil
+}
+func (m *MockPackageManager) IsInstalled(pkg string) bool {
+	return m.installed[pkg]
+}
+
+// MockSystemProbe tracks init.d state in memory.
+type MockSystemProbe struct {
+	scripts   map[string]bool
+	running   map[string]bool
+	autoStart map[string]bool
+}
+
+func NewMockSystemProbe() *MockSystemProbe {
+	return &MockSystemProbe{
+		scripts:   make(map[string]bool),
+		running:   make(map[string]bool),
+		autoStart: make(map[string]bool),
+	}
+}
+func (m *MockSystemProbe) HasInitScript(name string) bool { return m.scripts[name] }
+func (m *MockSystemProbe) IsRunning(initName string) bool { return m.running[initName] }
+func (m *MockSystemProbe) Start(initName string) (string, error) {
+	m.running[initName] = true
+	return "ok", nil
+}
+func (m *MockSystemProbe) Stop(initName string) (string, error) {
+	delete(m.running, initName)
+	return "ok", nil
+}
+func (m *MockSystemProbe) IsAutoStart(initName string) bool { return m.autoStart[initName] }

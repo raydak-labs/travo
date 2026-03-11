@@ -5,13 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSystemInfo } from '@/hooks/use-system';
-import { useSystemStats } from '@/hooks/use-system';
+import { useSystemInfo, useSystemStats, useReboot } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 export function SystemPage() {
   const { data: info, isLoading: infoLoading } = useSystemInfo();
   const { data: stats, isLoading: statsLoading } = useSystemStats();
+  const rebootMutation = useReboot();
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
 
   return (
@@ -90,7 +90,8 @@ export function SystemPage() {
                 </div>
                 <Progress value={stats.cpu.usage_percent} />
                 <p className="mt-0.5 text-xs text-gray-500">
-                  Load: {stats.cpu.load_average.join(', ')} · {stats.cpu.cores} cores
+                  Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
+                  {stats.cpu.cores} cores
                 </p>
               </div>
 
@@ -99,8 +100,8 @@ export function SystemPage() {
                 <div className="mb-1 flex items-center justify-between text-sm">
                   <span className="text-gray-700 dark:text-gray-300">Memory</span>
                   <span className="text-gray-900 dark:text-white">
-                    {stats.memory.usage_percent}% ({formatBytes(stats.memory.used_bytes)} /{' '}
-                    {formatBytes(stats.memory.total_bytes)})
+                    {stats.memory.usage_percent.toFixed(1)}% ({formatBytes(stats.memory.used_bytes)}{' '}
+                    / {formatBytes(stats.memory.total_bytes)})
                   </span>
                 </div>
                 <Progress value={stats.memory.usage_percent} />
@@ -116,7 +117,8 @@ export function SystemPage() {
                     </span>
                   </span>
                   <span className="text-gray-900 dark:text-white">
-                    {stats.storage.usage_percent}% ({formatBytes(stats.storage.used_bytes)} /{' '}
+                    {stats.storage.usage_percent.toFixed(1)}% (
+                    {formatBytes(stats.storage.used_bytes)} /{' '}
                     {formatBytes(stats.storage.total_bytes)})
                   </span>
                 </div>
@@ -136,8 +138,16 @@ export function SystemPage() {
           {showRebootConfirm ? (
             <div className="flex items-center gap-3">
               <Badge variant="warning">Confirm reboot?</Badge>
-              <Button size="sm" variant="destructive" onClick={() => setShowRebootConfirm(false)}>
-                Reboot Now
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  rebootMutation.mutate();
+                  setShowRebootConfirm(false);
+                }}
+                disabled={rebootMutation.isPending}
+              >
+                {rebootMutation.isPending ? 'Rebooting…' : 'Reboot Now'}
               </Button>
               <Button size="sm" variant="outline" onClick={() => setShowRebootConfirm(false)}>
                 Cancel

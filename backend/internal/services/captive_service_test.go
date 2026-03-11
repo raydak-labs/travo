@@ -7,8 +7,8 @@ import (
 
 func TestCaptivePortal_NoRedirect_NoPortal(t *testing.T) {
 	prober := &MockHTTPProber{
-		StatusCode: 200,
-		Body:       "success\n",
+		StatusCode: 204,
+		Body:       "",
 	}
 	svc := NewCaptiveService(prober)
 

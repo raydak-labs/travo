@@ -7,7 +7,7 @@ export function CaptivePortalBanner() {
   const { data: status } = useCaptivePortal();
   const [dismissed, setDismissed] = useState(false);
 
-  if (!status?.detected || dismissed) {
+  if (!status?.detected || status?.can_reach_internet || dismissed) {
     return null;
   }
 

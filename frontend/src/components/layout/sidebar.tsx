@@ -6,7 +6,6 @@ import {
   Monitor,
   Settings,
   Shield,
-  Users,
   Wifi,
   ChevronLeft,
   ChevronRight,
@@ -90,20 +89,6 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
           );
         })}
       </nav>
-
-      <div className="border-t border-gray-200 p-2 dark:border-gray-800">
-        <Link
-          to="/system"
-          onClick={onNavClick}
-          className={cn(
-            'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300',
-            collapsed && !inDrawer && 'justify-center px-0',
-          )}
-        >
-          <Users className="h-5 w-5 shrink-0" />
-          {(!collapsed || inDrawer) && <span>Clients</span>}
-        </Link>
-      </div>
     </aside>
   );
 }

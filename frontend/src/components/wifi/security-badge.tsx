@@ -30,8 +30,8 @@ export function SecurityBadge({ encryption }: SecurityBadgeProps) {
   const Icon = encryption === 'none' ? Unlock : Lock;
 
   return (
-    <Badge variant={variant} data-testid="security-badge">
-      <Icon className="mr-1 h-3 w-3" />
+    <Badge variant={variant} data-testid="security-badge" className="gap-1">
+      <Icon className="h-3 w-3 shrink-0" />
       {label}
     </Badge>
   );

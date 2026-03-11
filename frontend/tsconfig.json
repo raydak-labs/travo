@@ -1,7 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "jsx": "react-jsx",
     "baseUrl": ".",
@@ -9,7 +8,9 @@
       "@/*": ["./src/*"],
       "@shared/*": ["../shared/src/*"]
     },
-    "outDir": "./dist"
+    "rootDir": "..",
+    "outDir": "./dist",
+    "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "../shared/src"]
 }

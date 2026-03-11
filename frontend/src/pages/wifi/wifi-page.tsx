@@ -1,39 +1,18 @@
-import { useState } from 'react';
 import { Wifi, WifiOff, Signal } from 'lucide-react';
-import type { WifiScanResult } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CaptivePortalBanner } from '@/components/wifi/captive-portal-banner';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
-import { WifiScanList } from './wifi-scan-list';
-import { WifiConnectDialog } from './wifi-connect-dialog';
-import { WifiModeSelector } from './wifi-mode-selector';
-import {
-  useWifiConnection,
-  useWifiScan,
-  useWifiConnect,
-  useWifiDisconnect,
-  useWifiMode,
-  useSavedNetworks,
-} from '@/hooks/use-wifi';
+import { WifiScanDialog } from './wifi-scan-dialog';
+import { useWifiConnection, useWifiDisconnect, useSavedNetworks } from '@/hooks/use-wifi';
 
 export function WifiPage() {
   const { data: connection, isLoading: connectionLoading } = useWifiConnection();
-  const { data: scanResults = [], isLoading: scanLoading, refetch: refetchScan } = useWifiScan();
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
-  const connectMutation = useWifiConnect();
   const disconnectMutation = useWifiDisconnect();
-  const modeMutation = useWifiMode();
-
-  const [selectedNetwork, setSelectedNetwork] = useState<WifiScanResult | null>(null);
-
-  function handleConnect(ssid: string, password: string) {
-    connectMutation.mutate({ ssid, password }, { onSuccess: () => setSelectedNetwork(null) });
-  }
 
   return (
     <div className="space-y-6">
@@ -73,30 +52,24 @@ export function WifiPage() {
                 <span>IP: {connection.ip_address}</span>
                 <SecurityBadge encryption={connection.encryption} />
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => disconnectMutation.mutate()}
-                disabled={disconnectMutation.isPending}
-              >
-                {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnectMutation.mutate()}
+                  disabled={disconnectMutation.isPending}
+                >
+                  {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+                </Button>
+                <WifiScanDialog />
+              </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Not connected to any WiFi network</p>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">Not connected to any WiFi network</p>
+              <WifiScanDialog />
+            </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Available Networks */}
-      <Card>
-        <CardContent className="pt-6">
-          <WifiScanList
-            networks={scanResults}
-            isLoading={scanLoading}
-            onRefresh={() => void refetchScan()}
-            onConnect={setSelectedNetwork}
-          />
         </CardContent>
       </Card>
 
@@ -126,38 +99,15 @@ export function WifiPage() {
                       <SecurityBadge encryption={network.encryption} />
                     </div>
                   </div>
-                  <Switch
-                    defaultChecked={network.auto_connect}
-                    aria-label={`Auto-connect ${network.ssid}`}
-                  />
+                  <Badge variant={network.auto_connect ? 'success' : 'outline'}>
+                    {network.auto_connect ? 'Auto' : 'Manual'}
+                  </Badge>
                 </li>
               ))}
             </ul>
           )}
         </CardContent>
       </Card>
-
-      {/* WiFi Mode Selector */}
-      <Card>
-        <CardContent className="pt-6">
-          <WifiModeSelector
-            currentMode={connection?.mode ?? 'client'}
-            onModeChange={(mode) => modeMutation.mutate(mode)}
-            isChanging={modeMutation.isPending}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Connect Dialog */}
-      {selectedNetwork && (
-        <WifiConnectDialog
-          network={selectedNetwork}
-          isConnecting={connectMutation.isPending}
-          error={connectMutation.error?.message ?? null}
-          onConnect={handleConnect}
-          onCancel={() => setSelectedNetwork(null)}
-        />
-      )}
     </div>
   );
 }

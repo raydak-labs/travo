@@ -22,17 +22,22 @@ func NewVpnService(u uci.UCI) *VpnService {
 func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	var statuses []models.VpnStatus
 
-	// WireGuard
-	disabled, _ := v.uci.Get("network", "wg0", "disabled")
-	wgEnabled := disabled != "1"
-	statuses = append(statuses, models.VpnStatus{
-		Type:      "wireguard",
-		Enabled:   wgEnabled,
-		Connected: wgEnabled,
-		Endpoint:  "vpn.example.com:51820",
-	})
+	// WireGuard — only include if configured
+	disabled, err := v.uci.Get("network", "wg0", "disabled")
+	if err == nil {
+		// WireGuard is configured
+		wgStatus := models.VpnStatus{Type: "wireguard"}
+		wgStatus.Enabled = disabled != "1"
+		wgStatus.Connected = wgStatus.Enabled
+		if wgStatus.Enabled {
+			if endpoint, err := v.uci.Get("network", "wg0_peer0", "endpoint"); err == nil {
+				wgStatus.Endpoint = endpoint
+			}
+		}
+		statuses = append(statuses, wgStatus)
+	}
 
-	// Tailscale (mock - not configured)
+	// Tailscale
 	statuses = append(statuses, models.VpnStatus{
 		Type:    "tailscale",
 		Enabled: false,
@@ -45,7 +50,8 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	opts, err := v.uci.GetAll("network", "wg0")
 	if err != nil {
-		return models.WireguardConfig{}, err
+		// WireGuard not configured - return empty config (not an error)
+		return models.WireguardConfig{}, nil
 	}
 
 	config := models.WireguardConfig{

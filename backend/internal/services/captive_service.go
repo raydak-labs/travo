@@ -3,13 +3,12 @@ package services
 import (
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
-const captiveProbeURL = "http://detectportal.firefox.com/canonical.html"
+const captiveProbeURL = "http://connectivitycheck.gstatic.com/generate_204"
 
 // HTTPProber performs HTTP probes for captive portal detection.
 type HTTPProber interface {
@@ -81,16 +80,23 @@ func NewCaptiveService(prober HTTPProber) *CaptiveService {
 // CheckCaptivePortal probes for captive portals by making an HTTP request
 // to a known endpoint and checking for redirects or unexpected responses.
 func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error) {
-	statusCode, body, redirectURL, err := c.prober.Do(captiveProbeURL)
+	statusCode, _, redirectURL, err := c.prober.Do(captiveProbeURL)
 	if err != nil {
-		// Connection failed — no internet
 		return models.CaptivePortalStatus{
 			Detected:         false,
 			CanReachInternet: false,
 		}, nil
 	}
 
-	// Check for redirect (captive portal intercept)
+	// 204 No Content = internet works fine
+	if statusCode == http.StatusNoContent {
+		return models.CaptivePortalStatus{
+			Detected:         false,
+			CanReachInternet: true,
+		}, nil
+	}
+
+	// Redirect = captive portal
 	if statusCode == http.StatusMovedPermanently ||
 		statusCode == http.StatusFound ||
 		statusCode == http.StatusTemporaryRedirect {
@@ -102,17 +108,17 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 		}, nil
 	}
 
-	// Check for expected response
-	if statusCode == http.StatusOK && strings.Contains(body, "success") {
+	// 200 with content = likely captive portal login page
+	if statusCode == http.StatusOK {
 		return models.CaptivePortalStatus{
-			Detected:         false,
-			CanReachInternet: true,
+			Detected:         true,
+			CanReachInternet: false,
 		}, nil
 	}
 
-	// Status 200 but wrong body — likely a captive portal login page
+	// Anything else — assume no internet
 	return models.CaptivePortalStatus{
-		Detected:         true,
+		Detected:         false,
 		CanReachInternet: false,
 	}, nil
 }

@@ -8,10 +8,15 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-func TestWifiScan(t *testing.T) {
+func newTestWifiService() (*WifiService, *uci.MockUCI) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewWifiService(u, ub)
+	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	return svc, u
+}
+
+func TestWifiScan(t *testing.T) {
+	svc, _ := newTestWifiService()
 
 	results, err := svc.Scan()
 	if err != nil {
@@ -26,9 +31,7 @@ func TestWifiScan(t *testing.T) {
 }
 
 func TestWifiConnect(t *testing.T) {
-	u := uci.NewMockUCI()
-	ub := ubus.NewMockUbus()
-	svc := NewWifiService(u, ub)
+	svc, u := newTestWifiService()
 
 	err := svc.Connect(models.WifiConfig{
 		SSID: "Test-Network", Password: "testpass", Encryption: "psk2",
@@ -36,16 +39,14 @@ func TestWifiConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	val, _ := u.Get("wireless", "sta0", "ssid")
+	val, _ := u.Get("wireless", "wifinet2", "ssid")
 	if val != "Test-Network" {
 		t.Errorf("expected ssid 'Test-Network', got %q", val)
 	}
 }
 
 func TestWifiGetConnection(t *testing.T) {
-	u := uci.NewMockUCI()
-	ub := ubus.NewMockUbus()
-	svc := NewWifiService(u, ub)
+	svc, _ := newTestWifiService()
 
 	conn, err := svc.GetConnection()
 	if err != nil {
@@ -60,9 +61,7 @@ func TestWifiGetConnection(t *testing.T) {
 }
 
 func TestWifiSetMode(t *testing.T) {
-	u := uci.NewMockUCI()
-	ub := ubus.NewMockUbus()
-	svc := NewWifiService(u, ub)
+	svc, u := newTestWifiService()
 
 	err := svc.SetMode("sta")
 	if err != nil {
@@ -75,9 +74,7 @@ func TestWifiSetMode(t *testing.T) {
 }
 
 func TestWifiGetSavedNetworks(t *testing.T) {
-	u := uci.NewMockUCI()
-	ub := ubus.NewMockUbus()
-	svc := NewWifiService(u, ub)
+	svc, _ := newTestWifiService()
 
 	networks, err := svc.GetSavedNetworks()
 	if err != nil {

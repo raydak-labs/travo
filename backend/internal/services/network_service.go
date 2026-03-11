@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -36,20 +37,32 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 
 	wanData, err := n.ubus.Call("network.interface.wan", "status", nil)
 	if err == nil {
-		wan := parseInterface("wan", "eth0", wanData)
+		wan := parseInterface("wan", "eth0", wanData, n.ubus)
 		status.WAN = &wan
 	}
 
 	lanData, err := n.ubus.Call("network.interface.lan", "status", nil)
 	if err == nil {
-		status.LAN = parseInterface("lan", "br-lan", lanData)
+		status.LAN = parseInterface("lan", "br-lan", lanData, n.ubus)
 	}
+
+	// Also check wwan (WiFi uplink) — common on travel routers
+	wwanData, wwanErr := n.ubus.Call("network.interface.wwan", "status", nil)
 
 	status.Interfaces = []models.NetworkInterface{}
 	if status.WAN != nil {
 		status.Interfaces = append(status.Interfaces, *status.WAN)
 	}
 	status.Interfaces = append(status.Interfaces, status.LAN)
+
+	if wwanErr == nil {
+		wwanIface := parseInterface("wwan", "phy0-sta0", wwanData, n.ubus)
+		status.Interfaces = append(status.Interfaces, wwanIface)
+		// If wwan is up and wan is not, use wwan as the effective WAN
+		if wwanIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
+			status.WAN = &wwanIface
+		}
+	}
 
 	// Fetch DHCP clients from ubus
 	status.Clients = n.fetchDHCPClients()
@@ -58,57 +71,107 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	return status, nil
 }
 
-// fetchDHCPClients queries ubus for DHCP lease information.
+// fetchDHCPClients queries ubus for DHCP lease information with ARP fallback.
 func (n *NetworkService) fetchDHCPClients() []models.Client {
 	var clients []models.Client
 
+	// Try ubus dhcp ipv4leases first
 	data, err := n.ubus.Call("dhcp", "ipv4leases", nil)
+	if err == nil {
+		if device, ok := data["device"].(map[string]interface{}); ok {
+			for ifaceName, ifaceData := range device {
+				ifaceMap, ok := ifaceData.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				leases, ok := ifaceMap["leases"].([]interface{})
+				if !ok {
+					continue
+				}
+				for _, lease := range leases {
+					lm, ok := lease.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					ip, _ := lm["ip"].(string)
+					mac, _ := lm["mac"].(string)
+					hostname, _ := lm["hostname"].(string)
+					clients = append(clients, models.Client{
+						IPAddress: ip, MACAddress: mac,
+						Hostname: hostname, InterfaceName: ifaceName,
+					})
+				}
+			}
+			if len(clients) > 0 {
+				return clients
+			}
+		}
+	}
+
+	// Fallback: read ARP table
+	arpData, err := os.ReadFile("/proc/net/arp")
 	if err != nil {
 		return clients
 	}
-
-	device, ok := data["device"].(map[string]interface{})
-	if !ok {
-		return clients
-	}
-
-	for ifaceName, ifaceData := range device {
-		ifaceMap, ok := ifaceData.(map[string]interface{})
-		if !ok {
+	lines := strings.Split(string(arpData), "\n")
+	for _, line := range lines[1:] { // skip header
+		fields := strings.Fields(line)
+		if len(fields) < 6 {
 			continue
 		}
-		leases, ok := ifaceMap["leases"].([]interface{})
-		if !ok {
+		ip := fields[0]
+		mac := fields[3]
+		iface := fields[5]
+		// Skip incomplete entries and the router's own interface IPs
+		if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
 			continue
 		}
-		for _, lease := range leases {
-			lm, ok := lease.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			ip, _ := lm["ip"].(string)
-			mac, _ := lm["mac"].(string)
-			hostname, _ := lm["hostname"].(string)
-
-			clients = append(clients, models.Client{
-				IPAddress:     ip,
-				MACAddress:    mac,
-				Hostname:      hostname,
-				InterfaceName: ifaceName,
-			})
+		// Only include LAN clients (br-lan), not upstream (phy0-sta0, wan)
+		if iface != "br-lan" {
+			continue
 		}
+		clients = append(clients, models.Client{
+			IPAddress: ip, MACAddress: mac,
+			InterfaceName: iface,
+		})
 	}
 
 	return clients
 }
 
-func parseInterface(name, device string, data map[string]interface{}) models.NetworkInterface {
+func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ubus) models.NetworkInterface {
 	iface := models.NetworkInterface{
-		Name: name, Type: name, MACAddress: "00:00:00:00:00:00",
+		Name: name, Type: name,
 	}
 	if up, ok := data["up"].(bool); ok {
 		iface.IsUp = up
 	}
+	// Get device name from ubus response
+	devName, _ := data["device"].(string)
+	if devName == "" {
+		devName, _ = data["l3_device"].(string)
+	}
+	if devName == "" {
+		devName = device
+	}
+
+	// Fetch device stats for MAC and traffic
+	if ub != nil && devName != "" {
+		if devData, err := ub.Call("network.device", "status", map[string]interface{}{"name": devName}); err == nil {
+			if mac, ok := devData["macaddr"].(string); ok && mac != "" {
+				iface.MACAddress = mac
+			}
+			if stats, ok := devData["statistics"].(map[string]interface{}); ok {
+				if rxBytes, ok := stats["rx_bytes"].(float64); ok {
+					iface.RxBytes = int64(rxBytes)
+				}
+				if txBytes, ok := stats["tx_bytes"].(float64); ok {
+					iface.TxBytes = int64(txBytes)
+				}
+			}
+		}
+	}
+
 	if addrs, ok := data["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
 		if a, ok := addrs[0].(map[string]interface{}); ok {
 			iface.IPAddress, _ = a["address"].(string)
@@ -135,7 +198,6 @@ func parseInterface(name, device string, data map[string]interface{}) models.Net
 			}
 		}
 	}
-	_ = device
 	return iface
 }
 

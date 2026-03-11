@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { render, type RenderOptions } from '@testing-library/react';
+import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -46,7 +46,7 @@ export function renderWithProviders(
     initialPath?: string;
     renderOptions?: Omit<RenderOptions, 'wrapper'>;
   } = {},
-) {
+): RenderResult {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },

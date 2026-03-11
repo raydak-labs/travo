@@ -118,6 +118,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub) {
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
 		app.Static("/", cfg.StaticDir)
+		// SPA catch-all: serve index.html for non-API routes that don't match static files
+		app.Get("/*", func(c *fiber.Ctx) error {
+			return c.SendFile(cfg.StaticDir + "/index.html")
+		})
 	}
 
 	return app, hub

@@ -1,25 +1,97 @@
 package services
 
 import (
+	"fmt"
+	"os/exec"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
+// WifiReloader applies wireless configuration changes (e.g. "wifi reload").
+type WifiReloader interface {
+	Reload() error
+}
+
+// ShellWifiReloader runs "wifi reload" via exec.
+type ShellWifiReloader struct{}
+
+// Reload executes "wifi reload" to apply UCI wireless changes.
+func (r *ShellWifiReloader) Reload() error {
+	return exec.Command("wifi", "reload").Run()
+}
+
+// NoopWifiReloader does nothing (for tests).
+type NoopWifiReloader struct{}
+
+// Reload is a no-op.
+func (r *NoopWifiReloader) Reload() error { return nil }
+
 // WifiService provides WiFi scanning, connection, and configuration.
 type WifiService struct {
-	uci  uci.UCI
-	ubus ubus.Ubus
+	uci      uci.UCI
+	ubus     ubus.Ubus
+	reloader WifiReloader
 }
 
 // NewWifiService creates a new WifiService.
 func NewWifiService(u uci.UCI, ub ubus.Ubus) *WifiService {
-	return &WifiService{uci: u, ubus: ub}
+	return &WifiService{uci: u, ubus: ub, reloader: &ShellWifiReloader{}}
+}
+
+// NewWifiServiceWithReloader creates a WifiService with a custom reloader (for tests).
+func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiService {
+	return &WifiService{uci: u, ubus: ub, reloader: r}
+}
+
+// findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.
+// It looks for an interface with mode "sta" and returns its ifname (e.g., "phy0-sta0") and section name (e.g., "wifinet2").
+func (w *WifiService) findSTADevice() (ifname string, section string, err error) {
+	resp, err := w.ubus.Call("network.wireless", "status", nil)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get wireless status: %w", err)
+	}
+
+	for _, radioData := range resp {
+		radioMap, ok := radioData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ifaces, ok := radioMap["interfaces"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, iface := range ifaces {
+			ifaceMap, ok := iface.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			config, ok := ifaceMap["config"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			mode, _ := config["mode"].(string)
+			if mode == "sta" {
+				ifn, _ := ifaceMap["ifname"].(string)
+				sec, _ := ifaceMap["section"].(string)
+				if ifn != "" {
+					return ifn, sec, nil
+				}
+			}
+		}
+	}
+	return "", "", fmt.Errorf("no STA interface found")
 }
 
 // Scan returns available WiFi networks.
 func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
-	resp, err := w.ubus.Call("iwinfo", "scan", nil)
+	ifname, _, err := w.findSTADevice()
+	if err != nil {
+		return []models.WifiScanResult{}, nil
+	}
+
+	resp, err := w.ubus.Call("iwinfo", "scan", map[string]interface{}{"device": ifname})
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +117,53 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 		enc := "none"
 		if encMap, ok := rm["encryption"].(map[string]interface{}); ok {
 			if enabled, ok := encMap["enabled"].(bool); ok && enabled {
-				enc = "psk2"
+				if wpa, ok := encMap["wpa"].([]interface{}); ok {
+					if auth, ok := encMap["authentication"].([]interface{}); ok {
+						authStr := ""
+						if len(auth) > 0 {
+							authStr, _ = auth[0].(string)
+						}
+						wpaVer := 0
+						if len(wpa) > 0 {
+							wpaVer = int(wpa[len(wpa)-1].(float64))
+						}
+						if authStr == "sae" {
+							enc = "sae"
+						} else if authStr == "psk" && wpaVer == 2 {
+							enc = "psk2"
+						} else if authStr == "psk" {
+							enc = "psk"
+						} else {
+							enc = "psk2"
+						}
+					} else {
+						enc = "psk2"
+					}
+				} else {
+					enc = "wep"
+				}
+			}
+		}
+
+		// Detect band from frequency or channel
+		if band == "" {
+			freq, _ := rm["frequency"].(float64)
+			if freq > 0 {
+				if freq < 3000 {
+					band = "2.4GHz"
+				} else if freq < 6000 {
+					band = "5GHz"
+				} else {
+					band = "6GHz"
+				}
+			} else if ch > 0 {
+				if ch <= 14 {
+					band = "2.4GHz"
+				} else if ch <= 177 {
+					band = "5GHz"
+				} else {
+					band = "6GHz"
+				}
 			}
 		}
 
@@ -60,24 +178,43 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 
 // Connect connects to a WiFi network.
 func (w *WifiService) Connect(config models.WifiConfig) error {
-	_ = w.uci.Set("wireless", "sta0", "ssid", config.SSID)
-	_ = w.uci.Set("wireless", "sta0", "key", config.Password)
-	if config.Encryption != "" {
-		_ = w.uci.Set("wireless", "sta0", "encryption", config.Encryption)
+	_, section, err := w.findSTADevice()
+	if err != nil {
+		section = "sta0" // fallback
 	}
-	_ = w.uci.Set("wireless", "sta0", "disabled", "0")
-	return w.uci.Commit("wireless")
+	_ = w.uci.Set("wireless", section, "ssid", config.SSID)
+	_ = w.uci.Set("wireless", section, "key", config.Password)
+	if config.Encryption != "" {
+		_ = w.uci.Set("wireless", section, "encryption", config.Encryption)
+	}
+	_ = w.uci.Set("wireless", section, "disabled", "0")
+	if err := w.uci.Commit("wireless"); err != nil {
+		return err
+	}
+	return w.reloader.Reload()
 }
 
 // Disconnect disconnects from the current WiFi network.
 func (w *WifiService) Disconnect() error {
-	_ = w.uci.Set("wireless", "sta0", "disabled", "1")
-	return w.uci.Commit("wireless")
+	_, section, err := w.findSTADevice()
+	if err != nil {
+		section = "sta0"
+	}
+	_ = w.uci.Set("wireless", section, "disabled", "1")
+	if err := w.uci.Commit("wireless"); err != nil {
+		return err
+	}
+	return w.reloader.Reload()
 }
 
 // GetConnection returns the current WiFi connection info.
 func (w *WifiService) GetConnection() (models.WifiConnection, error) {
-	resp, err := w.ubus.Call("iwinfo", "info", nil)
+	ifname, _, err := w.findSTADevice()
+	if err != nil {
+		return models.WifiConnection{}, nil
+	}
+
+	resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": ifname})
 	if err != nil {
 		return models.WifiConnection{}, err
 	}
@@ -91,36 +228,86 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 	enc, _ := resp["encryption"].(string)
 	band, _ := resp["band"].(string)
 
-	return models.WifiConnection{
+	conn := models.WifiConnection{
 		SSID: ssid, BSSID: bssid,
 		Mode: mode, Channel: int(ch),
 		SignalDBM: int(sig), SignalPercent: int(qual),
 		Encryption: enc, Band: band,
-		Connected: ssid != "", IPAddress: "192.168.1.100",
-	}, nil
+		Connected: ssid != "",
+	}
+
+	// Get IP from wwan interface
+	if conn.Connected {
+		if wwanData, err := w.ubus.Call("network.interface.wwan", "status", nil); err == nil {
+			if addrs, ok := wwanData["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
+				if a, ok := addrs[0].(map[string]interface{}); ok {
+					conn.IPAddress, _ = a["address"].(string)
+				}
+			}
+		}
+	}
+
+	return conn, nil
 }
 
 // SetMode sets the WiFi operating mode (e.g., "ap", "sta", "repeater").
 func (w *WifiService) SetMode(mode string) error {
 	_ = w.uci.Set("wireless", "default_radio0", "mode", mode)
-	return w.uci.Commit("wireless")
+	if err := w.uci.Commit("wireless"); err != nil {
+		return err
+	}
+	return w.reloader.Reload()
 }
 
 // GetSavedNetworks returns saved WiFi networks.
 func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
-	// Get sta0 config as a saved network
-	opts, err := w.uci.GetAll("wireless", "sta0")
+	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
 		return []models.SavedNetwork{}, nil
 	}
 
-	network := models.SavedNetwork{
-		SSID:        opts["ssid"],
-		Encryption:  opts["encryption"],
-		Mode:        opts["mode"],
-		AutoConnect: opts["disabled"] != "1",
-		Priority:    1,
-	}
+	var networks []models.SavedNetwork
+	for _, radioData := range resp {
+		radioMap, ok := radioData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ifaces, ok := radioMap["interfaces"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, iface := range ifaces {
+			ifaceMap, ok := iface.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			config, ok := ifaceMap["config"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			mode, _ := config["mode"].(string)
+			if mode != "sta" {
+				continue
+			}
+			ssid, _ := config["ssid"].(string)
+			encryption, _ := config["encryption"].(string)
 
-	return []models.SavedNetwork{network}, nil
+			section, _ := ifaceMap["section"].(string)
+			disabled := false
+			if section != "" {
+				if d, err := w.uci.Get("wireless", section, "disabled"); err == nil {
+					disabled = d == "1"
+				}
+			}
+
+			networks = append(networks, models.SavedNetwork{
+				SSID:        ssid,
+				Encryption:  encryption,
+				Mode:        mode,
+				AutoConnect: !disabled,
+				Priority:    1,
+			})
+		}
+	}
+	return networks, nil
 }

@@ -30,7 +30,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 		RateLimiter:    rateLimiter,
 		System:         services.NewSystemService(ub, &services.MockStorageProvider{}),
 		Network:        services.NewNetworkService(u, ub),
-		Wifi:           services.NewWifiService(u, ub),
+		Wifi:           services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{}),
 		Vpn:            services.NewVpnService(u),
 		ServiceManager: services.NewServiceManager(),
 		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),

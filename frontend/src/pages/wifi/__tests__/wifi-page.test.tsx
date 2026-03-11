@@ -76,14 +76,11 @@ describe('WifiPage', () => {
     });
   });
 
-  it('renders wifi mode selector', async () => {
+  it('renders scan networks button', async () => {
     renderWifiPage();
 
     await waitFor(() => {
-      expect(screen.getByText('WiFi Mode')).toBeInTheDocument();
-      expect(screen.getByText('Client')).toBeInTheDocument();
-      expect(screen.getByText('Repeater')).toBeInTheDocument();
-      expect(screen.getByText('Access Point')).toBeInTheDocument();
+      expect(screen.getByText('Scan Networks')).toBeInTheDocument();
     });
   });
 

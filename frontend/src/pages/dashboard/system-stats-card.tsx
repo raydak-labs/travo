@@ -39,7 +39,7 @@ export function SystemStatsCard() {
           <div className="mb-1 flex justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">CPU</span>
             <span className="font-medium text-gray-900 dark:text-white">
-              {stats.cpu.usage_percent}%
+              {stats.cpu.usage_percent.toFixed(1)}%
             </span>
           </div>
           <Progress value={stats.cpu.usage_percent} />

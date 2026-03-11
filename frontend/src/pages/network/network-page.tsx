@@ -51,7 +51,7 @@ export function NetworkPage() {
                 <span className="text-gray-900 dark:text-white">{network.wan.gateway}</span>
                 <span className="text-gray-500">DNS</span>
                 <span className="text-gray-900 dark:text-white">
-                  {network.wan.dns_servers.join(', ')}
+                  {(network.wan.dns_servers ?? []).join(', ') || '—'}
                 </span>
                 <span className="text-gray-500">MAC</span>
                 <span className="text-gray-900 dark:text-white">{network.wan.mac_address}</span>
@@ -107,7 +107,7 @@ export function NetworkPage() {
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
             </div>
-          ) : network && network.clients.length > 0 ? (
+          ) : network?.clients && network.clients.length > 0 ? (
             <ClientsTable clients={network.clients} />
           ) : (
             <p className="text-sm text-gray-500">No clients connected</p>

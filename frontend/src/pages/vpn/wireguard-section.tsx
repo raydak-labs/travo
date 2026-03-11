@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Shield } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useServices } from '@/hooks/use-services';
 import {
   useWireguardConfig,
   useSetWireguardConfig,
@@ -15,21 +17,34 @@ import { formatBytes } from '@/lib/utils';
 
 export function WireguardSection() {
   const { data: vpnStatuses = [] } = useVpnStatus();
+  const { data: services = [] } = useServices();
   const { data: config, isLoading } = useWireguardConfig();
   const setConfigMutation = useSetWireguardConfig();
   const toggleMutation = useToggleWireguard();
   const [configText, setConfigText] = useState('');
 
   const wgStatus = vpnStatuses.find((v) => v.type === 'wireguard');
+  const wgService = services.find((s) => s.id === 'wireguard');
+  const isInstalled = wgService ? wgService.state !== 'not_installed' : !!wgStatus;
 
   return (
-    <Card>
+    <Card className={!isInstalled ? 'opacity-60' : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">WireGuard</CardTitle>
         <Shield className="h-4 w-4 text-blue-500" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
+        {!isInstalled ? (
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-500 mb-2">WireGuard is not installed</p>
+            <Link
+              to="/services"
+              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              Install via Services →
+            </Link>
+          </div>
+        ) : isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
@@ -72,7 +87,7 @@ export function WireguardSection() {
             )}
 
             {/* Peers */}
-            {config && config.peers.length > 0 && (
+            {config && config.peers && config.peers.length > 0 && (
               <div>
                 <h4 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Peers ({config.peers.length})
@@ -88,7 +103,7 @@ export function WireguardSection() {
                         <span className="text-gray-900 dark:text-white">{peer.endpoint}</span>
                         <span className="text-gray-500">Allowed IPs</span>
                         <span className="text-gray-900 dark:text-white">
-                          {peer.allowed_ips.join(', ')}
+                          {(peer.allowed_ips ?? []).join(', ')}
                         </span>
                         {peer.last_handshake && (
                           <>

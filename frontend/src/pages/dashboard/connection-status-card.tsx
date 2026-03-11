@@ -35,7 +35,7 @@ export function ConnectionStatusCard() {
     );
   }
 
-  const isConnected = network?.wan?.is_up ?? false;
+  const isConnected = (network?.wan?.is_up ?? false) || (wifi?.connected ?? false);
   const connectionType = network?.wan?.type ?? 'none';
 
   const ConnectionIcon = connectionType === 'wifi' ? Wifi : Globe;
@@ -69,7 +69,7 @@ export function ConnectionStatusCard() {
                   {wifi.signal_percent}% ({wifi.signal_dbm} dBm)
                 </span>
               </div>
-              <div>IP: {network?.wan?.ip_address}</div>
+              <div>IP: {wifi?.ip_address || network?.wan?.ip_address || '—'}</div>
             </div>
           )}
         </CardContent>

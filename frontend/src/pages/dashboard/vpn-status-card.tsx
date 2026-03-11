@@ -27,7 +27,7 @@ export function VpnStatusCard() {
     );
   }
 
-  const vpn = data?.[0];
+  const vpn = data?.find((v) => v.enabled || v.connected);
 
   return (
     <Card>

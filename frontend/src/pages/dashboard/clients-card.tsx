@@ -25,7 +25,7 @@ export function ClientsCard() {
     );
   }
 
-  const clientCount = network?.clients.length ?? 0;
+  const clientCount = network?.clients?.length ?? 0;
 
   return (
     <Card>
