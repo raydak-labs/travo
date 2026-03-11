@@ -122,6 +122,12 @@ export interface TimezoneConfig {
   readonly timezone: string;
 }
 
+/** NTP time synchronization configuration */
+export interface NTPConfig {
+  readonly enabled: boolean;
+  readonly servers: readonly string[];
+}
+
 /** Firmware upgrade request options */
 export interface FirmwareUpgradeRequest {
   readonly keep_settings: boolean;

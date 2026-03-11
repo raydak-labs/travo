@@ -162,3 +162,49 @@ func TestFirmwareUpgrade_ValidFile(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 }
+
+func TestGetNTPConfig(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/ntp", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if _, ok := data["enabled"]; !ok {
+		t.Error("expected enabled in response")
+	}
+	if _, ok := data["servers"]; !ok {
+		t.Error("expected servers in response")
+	}
+}
+
+func TestSetNTPConfig(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	payload := `{"enabled":true,"servers":["pool.ntp.org","time.google.com"]}`
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/system/ntp", strings.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}

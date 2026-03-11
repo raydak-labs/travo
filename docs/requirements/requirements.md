@@ -245,7 +245,7 @@
 - [x] Show current device time
 - [x] Timezone configuration
 - [x] Detect timezone mismatch between device and browser (GL.iNet style)
-- [ ] NTP server configuration
+- [x] NTP server configuration
 - [ ] 🔮 NTP sync status indicator
 
 ### 5.4 Password Management

@@ -76,6 +76,12 @@ type FirmwareUpgradeRequest struct {
 	KeepSettings bool `json:"keep_settings"`
 }
 
+// NTPConfig holds NTP time synchronization configuration.
+type NTPConfig struct {
+	Enabled bool     `json:"enabled"`
+	Servers []string `json:"servers"`
+}
+
 // LogEntry represents a single log line from logread or dmesg.
 type LogEntry struct {
 	Line  string `json:"line"`

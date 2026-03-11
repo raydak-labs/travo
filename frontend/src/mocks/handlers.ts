@@ -21,6 +21,7 @@ import {
   mockDHCPConfig,
   mockDNSConfig,
   mockTimezoneConfig,
+  mockNTPConfig,
   mockAPConfigs,
   mockMACAddresses,
   mockDHCPLeases,
@@ -372,6 +373,13 @@ export const handlers = [
     return HttpResponse.json(mockTimezoneConfig);
   }),
   http.put(API_ROUTES.system.timezone, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.system.ntp, () => {
+    return HttpResponse.json(mockNTPConfig);
+  }),
+  http.put(API_ROUTES.system.ntp, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 

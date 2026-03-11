@@ -46,6 +46,8 @@ import {
   useBackup,
   useRestore,
   useFirmwareUpgrade,
+  useNTPConfig,
+  useSetNTPConfig,
 } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
@@ -88,6 +90,8 @@ export function SystemPage() {
   const backup = useBackup();
   const restore = useRestore();
   const firmwareUpgrade = useFirmwareUpgrade();
+  const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
+  const setNTPMutation = useSetNTPConfig();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firmwareInputRef = useRef<HTMLInputElement>(null);
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
@@ -101,12 +105,22 @@ export function SystemPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [ntpEnabled, setNtpEnabled] = useState(true);
+  const [ntpServers, setNtpServers] = useState<string[]>([]);
+  const [ntpNewServer, setNtpNewServer] = useState('');
 
   useEffect(() => {
     if (timezoneConfig?.zonename) {
       setSelectedTz(timezoneConfig.zonename);
     }
   }, [timezoneConfig]);
+
+  useEffect(() => {
+    if (ntpConfig) {
+      setNtpEnabled(ntpConfig.enabled);
+      setNtpServers([...ntpConfig.servers]);
+    }
+  }, [ntpConfig]);
 
   return (
     <div className="space-y-6">
@@ -251,6 +265,93 @@ export function SystemPage() {
                 size="sm"
               >
                 {setTz.isPending ? 'Saving…' : 'Save Timezone'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* NTP Configuration */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">NTP Configuration</CardTitle>
+          <Clock className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          {ntpLoading ? (
+            <Skeleton className="h-4 w-1/2" />
+          ) : (
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={ntpEnabled}
+                  onChange={(e) => setNtpEnabled(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Enable NTP time synchronization
+              </label>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">NTP Servers</label>
+                {ntpServers.map((server, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      className="h-8 text-sm"
+                      value={server}
+                      onChange={(e) => {
+                        const updated = [...ntpServers];
+                        updated[idx] = e.target.value;
+                        setNtpServers(updated);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-red-500 hover:text-red-700"
+                      onClick={() => setNtpServers(ntpServers.filter((_, i) => i !== idx))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="h-8 text-sm"
+                    placeholder="Add NTP server address"
+                    value={ntpNewServer}
+                    onChange={(e) => setNtpNewServer(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && ntpNewServer.trim()) {
+                        e.preventDefault();
+                        setNtpServers([...ntpServers, ntpNewServer.trim()]);
+                        setNtpNewServer('');
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={!ntpNewServer.trim()}
+                    onClick={() => {
+                      setNtpServers([...ntpServers, ntpNewServer.trim()]);
+                      setNtpNewServer('');
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+              <Button
+                onClick={() =>
+                  setNTPMutation.mutate({ enabled: ntpEnabled, servers: ntpServers })
+                }
+                disabled={setNTPMutation.isPending}
+                size="sm"
+              >
+                {setNTPMutation.isPending ? 'Saving…' : 'Save NTP Settings'}
               </Button>
             </div>
           )}

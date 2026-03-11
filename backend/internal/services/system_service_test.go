@@ -376,6 +376,76 @@ func TestSetTimezone(t *testing.T) {
 	}
 }
 
+func TestGetNTPConfig(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	config, err := svc.GetNTPConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !config.Enabled {
+		t.Error("expected NTP to be enabled")
+	}
+	if len(config.Servers) != 4 {
+		t.Errorf("expected 4 NTP servers, got %d", len(config.Servers))
+	}
+	if config.Servers[0] != "0.openwrt.pool.ntp.org" {
+		t.Errorf("expected first server '0.openwrt.pool.ntp.org', got %q", config.Servers[0])
+	}
+}
+
+func TestSetNTPConfig(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	err := svc.SetNTPConfig(models.NTPConfig{
+		Enabled: false,
+		Servers: []string{"pool.ntp.org", "time.google.com"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config, err := svc.GetNTPConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Enabled {
+		t.Error("expected NTP to be disabled")
+	}
+	if len(config.Servers) != 2 {
+		t.Errorf("expected 2 NTP servers, got %d", len(config.Servers))
+	}
+	if config.Servers[0] != "pool.ntp.org" {
+		t.Errorf("expected first server 'pool.ntp.org', got %q", config.Servers[0])
+	}
+	if config.Servers[1] != "time.google.com" {
+		t.Errorf("expected second server 'time.google.com', got %q", config.Servers[1])
+	}
+}
+
+func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	// Remove the ntp section to test default fallback
+	u.DeleteSection("system", "ntp")
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	config, err := svc.GetNTPConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !config.Enabled {
+		t.Error("expected NTP defaults to be enabled")
+	}
+	if len(config.Servers) != 4 {
+		t.Errorf("expected 4 default NTP servers, got %d", len(config.Servers))
+	}
+}
+
 func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})

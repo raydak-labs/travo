@@ -11,6 +11,7 @@ import type {
   LEDStatus,
   SetLEDRequest,
   TimezoneConfig,
+  NTPConfig,
 } from '@shared/index';
 
 export function useSystemInfo() {
@@ -221,6 +222,28 @@ export function useFirmwareUpgrade() {
     },
     onError: (error) => {
       toast.error('Firmware upgrade failed', { description: error.message });
+    },
+  });
+}
+
+export function useNTPConfig() {
+  return useQuery({
+    queryKey: ['system', 'ntp'],
+    queryFn: () => apiClient.get<NTPConfig>(API_ROUTES.system.ntp),
+  });
+}
+
+export function useSetNTPConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: { enabled: boolean; servers: string[] }) =>
+      apiClient.put<{ status: string }>(API_ROUTES.system.ntp, config),
+    onSuccess: () => {
+      toast.success('NTP configuration updated');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'ntp'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update NTP configuration', { description: error.message });
     },
   });
 }

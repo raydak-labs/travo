@@ -18,6 +18,7 @@ import type {
   DNSConfig,
   LogResponse,
   TimezoneConfig,
+  NTPConfig,
   APConfig,
   MACConfig,
   DHCPLease,
@@ -440,6 +441,16 @@ export const mockKernelLogs: LogResponse = {
 export const mockTimezoneConfig: TimezoneConfig = {
   zonename: 'UTC',
   timezone: 'UTC0',
+};
+
+export const mockNTPConfig: NTPConfig = {
+  enabled: true,
+  servers: [
+    '0.openwrt.pool.ntp.org',
+    '1.openwrt.pool.ntp.org',
+    '2.openwrt.pool.ntp.org',
+    '3.openwrt.pool.ntp.org',
+  ],
 };
 
 export const mockAPConfigs: APConfig[] = [

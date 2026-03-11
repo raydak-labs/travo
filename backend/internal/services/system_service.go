@@ -219,6 +219,40 @@ func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
 	return s.uci.Commit("system")
 }
 
+// GetNTPConfig returns the NTP time synchronization configuration.
+func (s *SystemService) GetNTPConfig() (models.NTPConfig, error) {
+	opts, err := s.uci.GetAll("system", "ntp")
+	if err != nil {
+		// Section may not exist — return defaults
+		return models.NTPConfig{
+			Enabled: true,
+			Servers: []string{"0.openwrt.pool.ntp.org", "1.openwrt.pool.ntp.org", "2.openwrt.pool.ntp.org", "3.openwrt.pool.ntp.org"},
+		}, nil
+	}
+	config := models.NTPConfig{
+		Enabled: opts["enabled"] != "0",
+	}
+	if srv, ok := opts["server"]; ok && srv != "" {
+		config.Servers = strings.Split(srv, " ")
+	}
+	return config, nil
+}
+
+// SetNTPConfig updates the NTP time synchronization configuration.
+func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
+	enabled := "1"
+	if !config.Enabled {
+		enabled = "0"
+	}
+	if err := s.uci.Set("system", "ntp", "enabled", enabled); err != nil {
+		return fmt.Errorf("setting ntp enabled: %w", err)
+	}
+	if err := s.uci.Set("system", "ntp", "server", strings.Join(config.Servers, " ")); err != nil {
+		return fmt.Errorf("setting ntp servers: %w", err)
+	}
+	return s.uci.Commit("system")
+}
+
 // SetHostname changes the device hostname via UCI and applies it.
 func (s *SystemService) SetHostname(hostname string) error {
 	if err := s.uci.Set("system", "system", "hostname", hostname); err != nil {

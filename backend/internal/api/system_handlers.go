@@ -206,3 +206,28 @@ func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 		return c.JSON(svc.GetLEDStatus())
 	}
 }
+
+// GetNTPConfigHandler handles GET /api/v1/system/ntp.
+func GetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config, err := svc.GetNTPConfig()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(config)
+	}
+}
+
+// SetNTPConfigHandler handles PUT /api/v1/system/ntp.
+func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var config models.NTPConfig
+		if err := c.BodyParser(&config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetNTPConfig(config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

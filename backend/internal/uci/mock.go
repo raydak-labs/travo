@@ -61,6 +61,8 @@ func (m *MockUCI) populate() {
 	m.setInternal("system", "system", "hostname", "OpenWrt")
 	m.setInternal("system", "system", "timezone", "UTC0")
 	m.setInternal("system", "system", "zonename", "UTC")
+	m.setInternal("system", "ntp", "enabled", "1")
+	m.setInternal("system", "ntp", "server", "0.openwrt.pool.ntp.org 1.openwrt.pool.ntp.org 2.openwrt.pool.ntp.org 3.openwrt.pool.ntp.org")
 	m.setInternal("dhcp", "lan", "interface", "lan")
 	m.setInternal("dhcp", "lan", "start", "100")
 	m.setInternal("dhcp", "lan", "limit", "150")
