@@ -65,11 +65,14 @@ type ServiceManager struct {
 	defs  []serviceDefinition
 	pkg   PackageManager
 	probe SystemProbe
+	cache map[string]models.ServiceInfo
 }
 
 // NewServiceManager creates a ServiceManager that detects real system state.
 func NewServiceManager() *ServiceManager {
-	return NewServiceManagerWith(detectPackageManager(), &RealSystemProbe{})
+	sm := NewServiceManagerWith(detectPackageManager(), &RealSystemProbe{})
+	sm.RefreshCache()
+	return sm
 }
 
 // NewServiceManagerWith creates a ServiceManager with injected dependencies (for tests).
@@ -78,24 +81,51 @@ func NewServiceManagerWith(pkg PackageManager, probe SystemProbe) *ServiceManage
 		defs:  knownServices,
 		pkg:   pkg,
 		probe: probe,
+		cache: make(map[string]models.ServiceInfo),
 	}
 }
 
-// ListServices returns all known services with live state.
+// RefreshCache reloads the state of all services from the system.
+func (sm *ServiceManager) RefreshCache() {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	for _, def := range sm.defs {
+		sm.cache[def.ID] = sm.buildInfo(def)
+	}
+}
+
+// refreshOne updates the cache for a single service (must hold write lock).
+func (sm *ServiceManager) refreshOne(serviceID string) {
+	for _, def := range sm.defs {
+		if def.ID == serviceID {
+			sm.cache[def.ID] = sm.buildInfo(def)
+			return
+		}
+	}
+}
+
+// ListServices returns all known services from cache.
 func (sm *ServiceManager) ListServices() ([]models.ServiceInfo, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	var result []models.ServiceInfo
+	result := make([]models.ServiceInfo, 0, len(sm.defs))
 	for _, def := range sm.defs {
-		result = append(result, sm.buildInfo(def))
+		if info, ok := sm.cache[def.ID]; ok {
+			result = append(result, info)
+		} else {
+			result = append(result, sm.buildInfo(def))
+		}
 	}
 	return result, nil
 }
 
-// GetServiceStatus returns the status of a specific service.
+// GetServiceStatus returns the status of a specific service from cache.
 func (sm *ServiceManager) GetServiceStatus(serviceID string) (models.ServiceInfo, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+	if info, ok := sm.cache[serviceID]; ok {
+		return info, nil
+	}
 	for _, def := range sm.defs {
 		if def.ID == serviceID {
 			return sm.buildInfo(def), nil
@@ -150,6 +180,7 @@ func (sm *ServiceManager) Install(serviceID string) error {
 			return fmt.Errorf("failed to install %s: %w\n%s", pkg, err, out)
 		}
 	}
+	sm.refreshOne(serviceID)
 	return nil
 }
 
@@ -170,6 +201,7 @@ func (sm *ServiceManager) Remove(serviceID string) error {
 			return fmt.Errorf("failed to remove %s: %w\n%s", pkg, err, out)
 		}
 	}
+	sm.refreshOne(serviceID)
 	return nil
 }
 
@@ -187,6 +219,7 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 			return fmt.Errorf("failed to install %s: %w", pkg, err)
 		}
 	}
+	sm.refreshOne(serviceID)
 	return nil
 }
 
@@ -209,6 +242,7 @@ func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) er
 			return fmt.Errorf("failed to remove %s: %w", pkg, err)
 		}
 	}
+	sm.refreshOne(serviceID)
 	return nil
 }
 
@@ -230,6 +264,7 @@ func (sm *ServiceManager) Start(serviceID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to start %s: %w\n%s", serviceID, err, out)
 	}
+	sm.refreshOne(serviceID)
 	return nil
 }
 
@@ -248,6 +283,7 @@ func (sm *ServiceManager) Stop(serviceID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to stop %s: %w\n%s", serviceID, err, out)
 	}
+	sm.refreshOne(serviceID)
 	return nil
 }
 

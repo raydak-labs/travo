@@ -90,7 +90,10 @@ export function InstallLogDialog({
 
   return (
     <Dialog open={open} onOpenChange={status !== 'streaming' ? handleClose : undefined}>
-      <DialogContent className="max-w-2xl" onInteractOutside={(e) => status === 'streaming' && e.preventDefault()}>
+      <DialogContent
+        className="max-w-2xl"
+        onInteractOutside={(e) => status === 'streaming' && e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {status === 'streaming' && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -109,7 +112,9 @@ export function InstallLogDialog({
           ref={logRef}
           className="max-h-80 overflow-auto rounded-md bg-gray-950 p-4 font-mono text-xs text-gray-200"
         >
-          {lines.length === 0 && status === 'streaming' ? 'Waiting for output...\n' : lines.join('\n')}
+          {lines.length === 0 && status === 'streaming'
+            ? 'Waiting for output...\n'
+            : lines.join('\n')}
         </pre>
 
         <DialogFooter>

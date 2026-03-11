@@ -179,7 +179,7 @@
 - [x] Install progress feedback — streaming log output in a popup/dialog so user sees what's happening
 - [x] Show install errors clearly
 - [ ] Service auto-start on boot toggle
-- [ ] Backend caches installed-service state at startup; updates on install/remove actions
+- [x] Backend caches installed-service state at startup; updates on install/remove actions
 
 ### 4.2 AdGuard Home
 

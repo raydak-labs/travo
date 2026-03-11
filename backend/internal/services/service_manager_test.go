@@ -195,3 +195,86 @@ func TestRemoveWithLogStopsRunning(t *testing.T) {
 		t.Error("expected 'Stopping adguardhome...' in log output")
 	}
 }
+
+func TestCacheUpdatesOnInstall(t *testing.T) {
+	sm, _, probe := newTestServiceManager()
+	sm.RefreshCache()
+
+	// Before install, cache shows not_installed
+	info, _ := sm.GetServiceStatus("adguardhome")
+	if info.State != "not_installed" {
+		t.Errorf("expected 'not_installed', got %q", info.State)
+	}
+
+	// Install updates cache
+	_ = sm.Install("adguardhome")
+	probe.scripts["adguardhome"] = true
+	sm.RefreshCache() // simulate init script appearing after install
+	info, _ = sm.GetServiceStatus("adguardhome")
+	if info.State != "stopped" {
+		t.Errorf("expected 'stopped' after install, got %q", info.State)
+	}
+}
+
+func TestCacheUpdatesOnStartStop(t *testing.T) {
+	sm, _, probe := newTestServiceManager()
+	_ = sm.Install("adguardhome")
+	probe.scripts["adguardhome"] = true
+	sm.RefreshCache()
+
+	_ = sm.Start("adguardhome")
+	info, _ := sm.GetServiceStatus("adguardhome")
+	if info.State != "running" {
+		t.Errorf("expected 'running' after start, got %q", info.State)
+	}
+
+	_ = sm.Stop("adguardhome")
+	info, _ = sm.GetServiceStatus("adguardhome")
+	if info.State != "stopped" {
+		t.Errorf("expected 'stopped' after stop, got %q", info.State)
+	}
+}
+
+func TestCacheUpdatesOnRemove(t *testing.T) {
+	sm, _, probe := newTestServiceManager()
+	_ = sm.Install("adguardhome")
+	probe.scripts["adguardhome"] = true
+	sm.RefreshCache()
+
+	_ = sm.Remove("adguardhome")
+	info, _ := sm.GetServiceStatus("adguardhome")
+	if info.State != "not_installed" {
+		t.Errorf("expected 'not_installed' after remove, got %q", info.State)
+	}
+}
+
+func TestListServicesUsesCache(t *testing.T) {
+	sm, pkg, probe := newTestServiceManager()
+	pkg.installed["wireguard-tools"] = true
+	sm.RefreshCache()
+
+	// Cache should now reflect wireguard as installed
+	services, _ := sm.ListServices()
+	for _, s := range services {
+		if s.ID == "wireguard" && s.State != "installed" {
+			t.Errorf("expected wireguard 'installed' from cache, got %q", s.State)
+		}
+	}
+
+	// Externally change state but don't refresh — cache should still show old state
+	delete(pkg.installed, "wireguard-tools")
+	services, _ = sm.ListServices()
+	for _, s := range services {
+		if s.ID == "wireguard" && s.State != "installed" {
+			t.Errorf("expected wireguard still 'installed' from stale cache, got %q", s.State)
+		}
+	}
+
+	// After refresh, should show not_installed
+	sm.RefreshCache()
+	info, _ := sm.GetServiceStatus("wireguard")
+	if info.State != "not_installed" {
+		t.Errorf("expected 'not_installed' after refresh, got %q", info.State)
+	}
+	_ = probe // suppress unused
+}
