@@ -73,6 +73,7 @@ describe('API_ROUTES', () => {
 
   it('has vpn routes matching backend', () => {
     expect(API_ROUTES.vpn.status).toBe('/api/v1/vpn/status');
+    expect(API_ROUTES.vpn.killswitch).toBe('/api/v1/vpn/killswitch');
     expect(API_ROUTES.vpn.wireguard.config).toBe('/api/v1/vpn/wireguard');
     expect(API_ROUTES.vpn.wireguard.toggle).toBe('/api/v1/vpn/wireguard/toggle');
     expect(API_ROUTES.vpn.wireguard.status).toBe('/api/v1/vpn/wireguard/status');
@@ -138,6 +139,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/mac',
       '/api/v1/wifi/guest',
       '/api/v1/vpn/status',
+      '/api/v1/vpn/killswitch',
       '/api/v1/vpn/wireguard',
       '/api/v1/vpn/wireguard/toggle',
       '/api/v1/vpn/wireguard/import',

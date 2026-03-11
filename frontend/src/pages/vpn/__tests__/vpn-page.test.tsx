@@ -101,4 +101,12 @@ describe('VpnPage', () => {
       expect(screen.getByText('gl-mt3000')).toBeInTheDocument();
     });
   });
+
+  it('shows kill switch toggle', async () => {
+    renderVpnPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Kill Switch')).toBeInTheDocument();
+    });
+  });
 });

@@ -25,6 +25,7 @@ import type {
   DNSEntry,
   DHCPReservation,
   RadioInfo,
+  KillSwitchStatus,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -561,3 +562,7 @@ export const mockWireguardProfiles: WireGuardProfile[] = [
     created_at: '2026-03-05T14:30:00Z',
   },
 ];
+
+export const mockKillSwitchStatus: KillSwitchStatus = {
+  enabled: false,
+};

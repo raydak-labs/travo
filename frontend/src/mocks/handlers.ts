@@ -29,6 +29,7 @@ import {
   mockDHCPReservations,
   mockBlockedClients,
   mockRadios,
+  mockKillSwitchStatus,
 } from './data';
 
 export const handlers = [
@@ -166,6 +167,14 @@ export const handlers = [
   }),
 
   http.post(`${API_ROUTES.vpn.wireguard.profiles}/:id/activate`, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.vpn.killswitch, () => {
+    return HttpResponse.json(mockKillSwitchStatus);
+  }),
+
+  http.put(API_ROUTES.vpn.killswitch, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 

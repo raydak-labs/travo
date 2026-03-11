@@ -55,6 +55,11 @@ type WireGuardProfile struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// KillSwitchStatus represents the VPN kill switch state.
+type KillSwitchStatus struct {
+	Enabled bool `json:"enabled"`
+}
+
 // TailscaleStatus represents Tailscale connection status.
 type TailscaleStatus struct {
 	Installed      bool    `json:"installed"`

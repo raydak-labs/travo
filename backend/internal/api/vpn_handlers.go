@@ -198,3 +198,30 @@ func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetKillSwitchHandler handles GET /api/v1/vpn/killswitch.
+func GetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		status, err := svc.GetKillSwitch()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(status)
+	}
+}
+
+// SetKillSwitchHandler handles PUT /api/v1/vpn/killswitch.
+func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetKillSwitch(body.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

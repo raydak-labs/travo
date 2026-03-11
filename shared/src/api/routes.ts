@@ -50,6 +50,7 @@ export const API_ROUTES = {
   },
   vpn: {
     status: '/api/v1/vpn/status',
+    killswitch: '/api/v1/vpn/killswitch',
     wireguard: {
       config: '/api/v1/vpn/wireguard',
       toggle: '/api/v1/vpn/wireguard/toggle',

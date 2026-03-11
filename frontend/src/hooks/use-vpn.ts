@@ -8,6 +8,7 @@ import type {
   TailscaleStatus,
   WireGuardStatus,
   WireGuardProfile,
+  KillSwitchStatus,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -132,6 +133,28 @@ export function useActivateWireguardProfile() {
     },
     onError: (error) => {
       toast.error('Failed to activate profile', { description: error.message });
+    },
+  });
+}
+
+export function useKillSwitch() {
+  return useQuery({
+    queryKey: ['vpn', 'killswitch'],
+    queryFn: () => apiClient.get<KillSwitchStatus>(API_ROUTES.vpn.killswitch),
+  });
+}
+
+export function useSetKillSwitch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiClient.put<{ status: string }>(API_ROUTES.vpn.killswitch, { enabled }),
+    onSuccess: (_data, enabled) => {
+      toast.success(`VPN kill switch ${enabled ? 'enabled' : 'disabled'}`);
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'killswitch'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update kill switch', { description: error.message });
     },
   });
 }

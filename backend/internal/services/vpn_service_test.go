@@ -82,6 +82,50 @@ func TestGetTailscaleStatus(t *testing.T) {
 	}
 }
 
+func TestGetKillSwitch_DisabledByDefault(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnService(u)
+	ks, err := svc.GetKillSwitch()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ks.Enabled {
+		t.Error("expected kill switch disabled by default")
+	}
+}
+
+func TestSetKillSwitch_Enable(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnService(u)
+	if err := svc.SetKillSwitch(true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ks, err := svc.GetKillSwitch()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ks.Enabled {
+		t.Error("expected kill switch enabled")
+	}
+}
+
+func TestSetKillSwitch_Disable(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnService(u)
+	// Enable first, then disable
+	_ = svc.SetKillSwitch(true)
+	if err := svc.SetKillSwitch(false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ks, err := svc.GetKillSwitch()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ks.Enabled {
+		t.Error("expected kill switch disabled after disabling")
+	}
+}
+
 func TestGetWireGuardStatus_Success(t *testing.T) {
 	u := uci.NewMockUCI()
 	dump := "PRIVATE_KEY\tPUBLIC_KEY_IFACE\t51820\toff\n" +

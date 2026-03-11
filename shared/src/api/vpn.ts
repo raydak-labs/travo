@@ -67,6 +67,11 @@ export interface WireGuardProfile {
   readonly created_at: string;
 }
 
+/** VPN kill switch status */
+export interface KillSwitchStatus {
+  readonly enabled: boolean;
+}
+
 /** Type guard for VpnStatus */
 export function isVpnStatus(value: unknown): value is VpnStatus {
   if (typeof value !== 'object' || value === null) return false;

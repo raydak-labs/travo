@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v13 — Radio hardware info on WiFi page)
+> **Last updated:** 2026-03-11 (v14 — WireGuard kill switch)
 
 ---
 
@@ -144,7 +144,7 @@
 - [x] Enable / disable WireGuard
 - [x] Show connection status (handshake time, transfer stats)
 - [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
-- [ ] Kill switch (block traffic if VPN drops)
+- [x] Kill switch (block traffic if VPN drops)
 - [ ] Split tunneling (route only selected traffic through VPN)
 - [ ] VPN + AdGuard interplay configuration
 

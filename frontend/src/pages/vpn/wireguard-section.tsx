@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Trash2, Play, Plus, Upload } from 'lucide-react';
+import { Shield, ShieldAlert, Trash2, Play, Plus, Upload } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,8 @@ import {
   useAddWireguardProfile,
   useDeleteWireguardProfile,
   useActivateWireguardProfile,
+  useKillSwitch,
+  useSetKillSwitch,
 } from '@/hooks/use-vpn';
 import { formatBytes } from '@/lib/utils';
 
@@ -39,6 +41,8 @@ export function WireguardSection() {
   const addProfileMutation = useAddWireguardProfile();
   const deleteProfileMutation = useDeleteWireguardProfile();
   const activateProfileMutation = useActivateWireguardProfile();
+  const { data: killSwitch } = useKillSwitch();
+  const killSwitchMutation = useSetKillSwitch();
   const [configText, setConfigText] = useState('');
   const [profileName, setProfileName] = useState('');
 
@@ -228,6 +232,31 @@ export function WireguardSection() {
                 </ul>
               </div>
             )}
+
+            {/* Kill Switch */}
+            <div className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-orange-500" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Kill Switch
+                  </span>
+                </div>
+                <Switch
+                  id="killswitch-toggle"
+                  checked={killSwitch?.enabled ?? false}
+                  onChange={() =>
+                    killSwitchMutation.mutate(!(killSwitch?.enabled ?? false))
+                  }
+                  disabled={killSwitchMutation.isPending}
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                {killSwitch?.enabled
+                  ? 'All traffic is blocked if VPN disconnects. Disable to allow direct internet access.'
+                  : 'When enabled, blocks all internet traffic if the VPN connection drops to prevent IP leaks.'}
+              </p>
+            </div>
 
             {/* Import Config as Profile */}
             <div>

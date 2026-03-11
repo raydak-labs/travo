@@ -263,3 +263,57 @@ func TestActivateWireguardProfile_NotFound_Returns400(t *testing.T) {
 		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
 	}
 }
+
+func TestGetKillSwitch_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/killswitch", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result["enabled"] != false {
+		t.Errorf("expected enabled=false by default, got %v", result["enabled"])
+	}
+}
+
+func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]bool{"enabled": true})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/killswitch", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+
+	// Verify it was enabled
+	req2, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/killswitch", nil)
+	req2.Header.Set("Authorization", "Bearer "+token)
+	resp2, _ := app.Test(req2, -1)
+	defer resp2.Body.Close()
+	var result map[string]interface{}
+	_ = json.NewDecoder(resp2.Body).Decode(&result)
+	if result["enabled"] != true {
+		t.Errorf("expected enabled=true after setting, got %v", result["enabled"])
+	}
+}

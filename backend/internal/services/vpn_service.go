@@ -204,6 +204,33 @@ func (v *VpnService) GetTailscaleStatus() (models.TailscaleStatus, error) {
 	}, nil
 }
 
+// GetKillSwitch checks whether the VPN kill switch firewall rule exists.
+func (v *VpnService) GetKillSwitch() (models.KillSwitchStatus, error) {
+	opts, err := v.uci.GetAll("firewall", "vpn_killswitch")
+	if err != nil {
+		return models.KillSwitchStatus{Enabled: false}, nil
+	}
+	return models.KillSwitchStatus{
+		Enabled: opts["src"] == "lan" && opts["dest"] == "wan" && opts["target"] == "REJECT",
+	}, nil
+}
+
+// SetKillSwitch enables or disables the VPN kill switch firewall rule.
+func (v *VpnService) SetKillSwitch(enabled bool) error {
+	if enabled {
+		// Create the firewall rule that blocks LAN→WAN when VPN is down.
+		_ = v.uci.AddSection("firewall", "vpn_killswitch", "rule")
+		_ = v.uci.Set("firewall", "vpn_killswitch", "name", "VPN Kill Switch")
+		_ = v.uci.Set("firewall", "vpn_killswitch", "src", "lan")
+		_ = v.uci.Set("firewall", "vpn_killswitch", "dest", "wan")
+		_ = v.uci.Set("firewall", "vpn_killswitch", "target", "REJECT")
+	} else {
+		// Remove the firewall rule; ignore error if it doesn't exist.
+		_ = v.uci.DeleteSection("firewall", "vpn_killswitch")
+	}
+	return v.uci.Commit("firewall")
+}
+
 // ImportWireguardConfig parses a .conf file and applies it via UCI.
 func (v *VpnService) ImportWireguardConfig(confContent string) error {
 	parsed, err := ParseWireguardConfig(confContent)
