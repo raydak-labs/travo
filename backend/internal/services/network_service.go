@@ -124,9 +124,75 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	return status, nil
 }
 
+// dhcpLeaseTimeSeconds reads the DHCP lease time from UCI and returns it in seconds.
+func (n *NetworkService) dhcpLeaseTimeSeconds() float64 {
+	const defaultLease = 43200.0 // 12h
+	opts, err := n.uci.GetAll("dhcp", "lan")
+	if err != nil {
+		return defaultLease
+	}
+	lt, ok := opts["leasetime"]
+	if !ok || lt == "" {
+		return defaultLease
+	}
+	return parseLeaseTime(lt, defaultLease)
+}
+
+// parseLeaseTime converts a lease time string (e.g. "12h", "30m", "86400") to seconds.
+func parseLeaseTime(s string, fallback float64) float64 {
+	if s == "" {
+		return fallback
+	}
+	// Check for suffix
+	last := s[len(s)-1]
+	switch last {
+	case 'h', 'H':
+		if v, err := strconv.Atoi(s[:len(s)-1]); err == nil && v > 0 {
+			return float64(v) * 3600
+		}
+	case 'm', 'M':
+		if v, err := strconv.Atoi(s[:len(s)-1]); err == nil && v > 0 {
+			return float64(v) * 60
+		}
+	case 's', 'S':
+		if v, err := strconv.Atoi(s[:len(s)-1]); err == nil && v > 0 {
+			return float64(v)
+		}
+	default:
+		// Plain number = seconds
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			return float64(v)
+		}
+	}
+	return fallback
+}
+
+// parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of MAC → lease expiry time.
+func parseDHCPLeasesFile() map[string]int64 {
+	result := map[string]int64{}
+	data, err := os.ReadFile("/tmp/dhcp.leases")
+	if err != nil {
+		return result
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		expiry, err := strconv.ParseInt(fields[0], 10, 64)
+		if err != nil {
+			continue
+		}
+		mac := strings.ToUpper(fields[1])
+		result[mac] = expiry
+	}
+	return result
+}
+
 // fetchDHCPClients queries ubus for DHCP lease information with ARP fallback.
 func (n *NetworkService) fetchDHCPClients() []models.Client {
 	var clients []models.Client
+	leaseTimeSec := n.dhcpLeaseTimeSeconds()
 
 	// Try ubus dhcp ipv4leases first
 	data, err := n.ubus.Call("dhcp", "ipv4leases", nil)
@@ -152,12 +218,11 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 					expires, _ := lm["expires"].(float64)
 
 					// Calculate connected_since from lease expiry.
-					// Default DHCP lease is 12h (43200s). The "expires" field
-					// counts down from the lease time, so connected_since ≈ now - (leaseTime - expires).
+					// The "expires" field counts down from the lease time,
+					// so connected_since ≈ now - (leaseTime - expires).
 					var connectedSince string
 					if expires > 0 {
-						leaseTime := 43200.0 // 12h default
-						elapsed := leaseTime - expires
+						elapsed := leaseTimeSec - expires
 						if elapsed < 0 {
 							elapsed = 0
 						}
@@ -178,7 +243,9 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 		}
 	}
 
-	// Fallback: read ARP table
+	// Fallback: read /tmp/dhcp.leases then ARP table
+	dhcpLeases := parseDHCPLeasesFile()
+
 	arpData, err := os.ReadFile("/proc/net/arp")
 	if err != nil {
 		return clients
@@ -200,9 +267,16 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 		if iface != "br-lan" {
 			continue
 		}
+		// Try to compute connected_since from dhcp.leases expiry
+		var connectedSince string
+		if expiry, ok := dhcpLeases[strings.ToUpper(mac)]; ok && expiry > 0 {
+			connSince := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
+			connectedSince = connSince.UTC().Format(time.RFC3339)
+		}
 		clients = append(clients, models.Client{
 			IPAddress: ip, MACAddress: mac,
 			InterfaceName: iface,
+			ConnectedSince: connectedSince,
 		})
 	}
 

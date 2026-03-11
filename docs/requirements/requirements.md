@@ -89,7 +89,7 @@
 ### 2.2 Connected Clients
 
 - [x] List DHCP clients (MAC, IP, hostname)
-- [ ] Fix "connected since" showing invalid date 🐛
+- [x] Fix "connected since" showing invalid date 🐛
 - [x] Device aliases (name clients: "John's Phone", "Laptop" — stored in local config)
 - [x] Set static IP / DHCP reservation for a client
 - [ ] Traffic stats per client (RX/TX)

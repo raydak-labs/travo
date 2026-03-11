@@ -135,7 +135,7 @@ export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
                 <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
                   {client.connected_since && !isNaN(new Date(client.connected_since).getTime())
                     ? new Date(client.connected_since).toLocaleString()
-                    : '—'}
+                    : 'Unknown'}
                 </td>
                 <td className="py-2 text-right text-gray-600 dark:text-gray-400">
                   ↓ {formatBytes(client.rx_bytes)} / ↑ {formatBytes(client.tx_bytes)}
