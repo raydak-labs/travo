@@ -31,6 +31,18 @@ export function useReboot() {
   });
 }
 
+export function useFactoryReset() {
+  return useMutation({
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.factoryReset),
+    onSuccess: () => {
+      toast.success('Factory reset initiated', { description: 'Device will restart with default settings.' });
+    },
+    onError: (error) => {
+      toast.error('Factory reset failed', { description: error.message });
+    },
+  });
+}
+
 export function useSystemLogs() {
   return useQuery({
     queryKey: ['system', 'logs'],

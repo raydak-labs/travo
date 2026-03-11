@@ -37,6 +37,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/system/logs", SystemLogsHandler(deps.System))
 	v1.Get("/system/logs/kernel", SystemKernelLogsHandler(deps.System))
 	v1.Post("/system/reboot", SystemRebootHandler(deps.System))
+	v1.Post("/system/factory-reset", FactoryResetHandler(deps.System))
 	v1.Put("/system/hostname", SetHostnameHandler(deps.System))
 	v1.Get("/system/leds", GetLEDStatusHandler(deps.System))
 	v1.Put("/system/leds", SetLEDStealthHandler(deps.System))

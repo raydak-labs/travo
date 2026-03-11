@@ -17,6 +17,7 @@ export const API_ROUTES = {
     timezone: '/api/v1/system/timezone',
     backup: '/api/v1/system/backup',
     restore: '/api/v1/system/restore',
+    factoryReset: '/api/v1/system/factory-reset',
   },
   network: {
     status: '/api/v1/network/status',

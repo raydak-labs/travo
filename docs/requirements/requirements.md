@@ -234,7 +234,7 @@
 - [x] Reboot with confirmation dialog
 - [ ] Reboot actually working on device 🐛
 - [ ] Firmware upgrade (upload sysupgrade image)
-- [ ] Factory reset with confirmation
+- [x] Factory reset with confirmation
 - [x] Hostname change
 - [x] Backup / restore configuration (export/import UCI configs as archive)
 - [x] LED control — stealth mode (turn off all router LEDs via sysfs toggle)

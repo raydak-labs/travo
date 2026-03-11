@@ -76,3 +76,22 @@ func TestReboot_ReturnsOk(t *testing.T) {
 		t.Errorf("expected ok in response, got: %s", body)
 	}
 }
+
+func TestFactoryReset_ReturnsError(t *testing.T) {
+	// Factory reset calls exec.Command("firstboot") which won't exist in test env,
+	// so we expect a 500 error.
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/factory-reset", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	// firstboot doesn't exist in test environment, so expect 500
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected 500 (firstboot not available in test), got %d", resp.StatusCode)
+	}
+}

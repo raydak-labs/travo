@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb, Download, Upload } from 'lucide-react';
+import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb, Download, Upload, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth, useTimezone, useSetTimezone, useBackup, useRestore } from '@/hooks/use-system';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useSystemInfo, useSystemStats, useReboot, useFactoryReset, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth, useTimezone, useSetTimezone, useBackup, useRestore } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 const TIMEZONES = [
@@ -39,6 +40,7 @@ export function SystemPage() {
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
   const { data: stats, isLoading: statsLoading } = useSystemStats();
   const rebootMutation = useReboot();
+  const factoryResetMutation = useFactoryReset();
   const changePasswordMutation = useChangePassword();
   const setHostnameMutation = useSetHostname();
   const { data: ledStatus } = useLEDStatus();
@@ -49,6 +51,7 @@ export function SystemPage() {
   const restore = useRestore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
+  const [showFactoryResetDialog, setShowFactoryResetDialog] = useState(false);
   const [editingHostname, setEditingHostname] = useState(false);
   const [hostnameValue, setHostnameValue] = useState('');
   const [selectedTz, setSelectedTz] = useState<string>('');
@@ -305,6 +308,56 @@ export function SystemPage() {
               Reboot
             </Button>
           )}
+
+          <div className="mt-4 border-t pt-4">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setShowFactoryResetDialog(true)}
+            >
+              Factory Reset
+            </Button>
+            <p className="mt-1 text-xs text-gray-500">
+              Erase all settings and restore factory defaults.
+            </p>
+          </div>
+
+          <Dialog open={showFactoryResetDialog} onOpenChange={setShowFactoryResetDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle className="h-5 w-5" />
+                  Factory Reset
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  This will <strong>erase all configuration changes</strong> and restore the device to factory defaults. The device will reboot.
+                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  You will need to reconnect to the default WiFi network after the reset completes.
+                </p>
+                <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+                  <strong>This action cannot be undone.</strong>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowFactoryResetDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    factoryResetMutation.mutate();
+                    setShowFactoryResetDialog(false);
+                  }}
+                  disabled={factoryResetMutation.isPending}
+                >
+                  {factoryResetMutation.isPending ? 'Resetting…' : 'I understand, Factory Reset'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
 

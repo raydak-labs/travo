@@ -219,6 +219,10 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.post(API_ROUTES.system.factoryReset, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.put(API_ROUTES.system.hostname, async ({ request }) => {
     const body = (await request.json()) as { hostname: string };
     if (!body.hostname) {

@@ -156,6 +156,16 @@ func GetLEDStatusHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// FactoryResetHandler handles POST /api/v1/system/factory-reset.
+func FactoryResetHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if err := svc.FactoryReset(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // SetLEDStealthHandler handles PUT /api/v1/system/leds.
 func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

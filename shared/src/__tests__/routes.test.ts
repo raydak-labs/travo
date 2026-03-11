@@ -42,6 +42,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.system.logs).toBe('/api/v1/system/logs');
     expect(API_ROUTES.system.kernelLogs).toBe('/api/v1/system/logs/kernel');
     expect(API_ROUTES.system.timezone).toBe('/api/v1/system/timezone');
+    expect(API_ROUTES.system.factoryReset).toBe('/api/v1/system/factory-reset');
   });
 
   it('has network routes matching backend', () => {
@@ -99,6 +100,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/timezone',
       '/api/v1/system/backup',
       '/api/v1/system/restore',
+      '/api/v1/system/factory-reset',
       '/api/v1/network/status',
       '/api/v1/network/wan',
       '/api/v1/network/clients',

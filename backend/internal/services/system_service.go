@@ -276,6 +276,19 @@ func (s *SystemService) RestoreBackup(path string) error {
 	return nil
 }
 
+// FactoryReset clears the overlay partition and reboots, restoring factory defaults.
+func (s *SystemService) FactoryReset() error {
+	cmd := exec.Command("firstboot", "-y")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("factory reset failed: %s: %w", string(out), err)
+	}
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		_ = exec.Command("reboot").Run()
+	}()
+	return nil
+}
+
 func parseLogOutput(source, output string) models.LogResponse {
 	raw := strings.Split(strings.TrimSpace(output), "\n")
 	lines := make([]models.LogEntry, 0, len(raw))
