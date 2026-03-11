@@ -259,50 +259,134 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 					})
 				}
 			}
-			if len(clients) > 0 {
-				return clients
+		}
+	}
+
+	// Fallback: read /tmp/dhcp.leases then ARP table if no ubus clients
+	if len(clients) == 0 {
+		dhcpLeases := parseDHCPLeasesFile()
+		arpData, err := os.ReadFile("/proc/net/arp")
+		if err == nil {
+			lines := strings.Split(string(arpData), "\n")
+			for _, line := range lines[1:] { // skip header
+				fields := strings.Fields(line)
+				if len(fields) < 6 {
+					continue
+				}
+				ip := fields[0]
+				mac := fields[3]
+				iface := fields[5]
+				if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
+					continue
+				}
+				if iface != "br-lan" {
+					continue
+				}
+				var connectedSince string
+				if expiry, ok := dhcpLeases[strings.ToUpper(mac)]; ok && expiry > 0 {
+					connSince := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
+					connectedSince = connSince.UTC().Format(time.RFC3339)
+				}
+				clients = append(clients, models.Client{
+					IPAddress: ip, MACAddress: mac,
+					InterfaceName:  iface,
+					ConnectedSince: connectedSince,
+				})
 			}
 		}
 	}
 
-	// Fallback: read /tmp/dhcp.leases then ARP table
-	dhcpLeases := parseDHCPLeasesFile()
-
-	arpData, err := os.ReadFile("/proc/net/arp")
-	if err != nil {
-		return clients
-	}
-	lines := strings.Split(string(arpData), "\n")
-	for _, line := range lines[1:] { // skip header
-		fields := strings.Fields(line)
-		if len(fields) < 6 {
-			continue
+	// Merge WiFi per-client traffic stats
+	trafficStats := n.getWifiClientTraffic()
+	for i := range clients {
+		mac := strings.ToUpper(clients[i].MACAddress)
+		if stats, ok := trafficStats[mac]; ok {
+			clients[i].RxBytes = stats[0]
+			clients[i].TxBytes = stats[1]
 		}
-		ip := fields[0]
-		mac := fields[3]
-		iface := fields[5]
-		// Skip incomplete entries and the router's own interface IPs
-		if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
-			continue
-		}
-		// Only include LAN clients (br-lan), not upstream (phy0-sta0, wan)
-		if iface != "br-lan" {
-			continue
-		}
-		// Try to compute connected_since from dhcp.leases expiry
-		var connectedSince string
-		if expiry, ok := dhcpLeases[strings.ToUpper(mac)]; ok && expiry > 0 {
-			connSince := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
-			connectedSince = connSince.UTC().Format(time.RFC3339)
-		}
-		clients = append(clients, models.Client{
-			IPAddress: ip, MACAddress: mac,
-			InterfaceName:  iface,
-			ConnectedSince: connectedSince,
-		})
 	}
 
 	return clients
+}
+
+// parseStationDump parses "iw dev <iface> station dump" output and returns
+// a map of uppercase MAC → [rxBytes, txBytes] from the client's perspective.
+// In station dump: "rx bytes" = AP received from client = client TX,
+// "tx bytes" = AP sent to client = client RX.
+func parseStationDump(output string) map[string][2]int64 {
+	result := make(map[string][2]int64)
+	var currentMAC string
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Station ") {
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				currentMAC = strings.ToUpper(parts[1])
+			}
+			continue
+		}
+		if currentMAC == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "rx bytes:") {
+			valStr := strings.TrimSpace(strings.TrimPrefix(trimmed, "rx bytes:"))
+			if v, err := strconv.ParseInt(valStr, 10, 64); err == nil {
+				entry := result[currentMAC]
+				entry[1] = v // AP rx from client = client TX
+				result[currentMAC] = entry
+			}
+		} else if strings.HasPrefix(trimmed, "tx bytes:") {
+			valStr := strings.TrimSpace(strings.TrimPrefix(trimmed, "tx bytes:"))
+			if v, err := strconv.ParseInt(valStr, 10, 64); err == nil {
+				entry := result[currentMAC]
+				entry[0] = v // AP tx to client = client RX
+				result[currentMAC] = entry
+			}
+		}
+	}
+	return result
+}
+
+// parseIwDev parses "iw dev" output and returns interface names in AP mode.
+func parseIwDev(output string) []string {
+	var interfaces []string
+	var currentIface string
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Interface ") {
+			currentIface = strings.TrimPrefix(trimmed, "Interface ")
+		} else if strings.HasPrefix(trimmed, "type ") && currentIface != "" {
+			if strings.TrimPrefix(trimmed, "type ") == "AP" {
+				interfaces = append(interfaces, currentIface)
+			}
+			currentIface = ""
+		}
+	}
+	return interfaces
+}
+
+// getWifiClientTraffic returns per-client traffic stats from WiFi station dumps.
+// Returns a map of uppercase MAC → [rxBytes, txBytes] from the client's perspective.
+func (n *NetworkService) getWifiClientTraffic() map[string][2]int64 {
+	result := make(map[string][2]int64)
+	iwDevOutput, err := n.cmd.Run("iw", "dev")
+	if err != nil {
+		return result
+	}
+	apIfaces := parseIwDev(string(iwDevOutput))
+	for _, iface := range apIfaces {
+		dumpOutput, err := n.cmd.Run("iw", "dev", iface, "station", "dump")
+		if err != nil {
+			continue
+		}
+		for mac, stats := range parseStationDump(string(dumpOutput)) {
+			entry := result[mac]
+			entry[0] += stats[0]
+			entry[1] += stats[1]
+			result[mac] = entry
+		}
+	}
+	return result
 }
 
 func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ubus) models.NetworkInterface {

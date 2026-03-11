@@ -949,3 +949,184 @@ func TestDetectWanType_FallbackToCurrentConfig(t *testing.T) {
 		t.Errorf("expected detected_type 'static' (fallback), got %q", result.DetectedType)
 	}
 }
+
+func TestParseStationDump(t *testing.T) {
+	output := `Station aa:bb:cc:11:22:33 (on phy0-ap0)
+	inactive time:	1234 ms
+	rx bytes:	500000
+	rx packets:	1234
+	tx bytes:	1000000
+	tx packets:	4321
+	signal:  	-45 dBm
+Station AA:BB:CC:44:55:66 (on phy0-ap0)
+	inactive time:	5678 ms
+	rx bytes:	200000
+	rx packets:	7890
+	tx bytes:	400000
+	tx packets:	3456`
+
+	stats := parseStationDump(output)
+
+	if len(stats) != 2 {
+		t.Fatalf("expected 2 stations, got %d", len(stats))
+	}
+
+	// Station 1: AP rx 500000 from client = client TX, AP tx 1000000 to client = client RX
+	s1 := stats["AA:BB:CC:11:22:33"]
+	if s1[0] != 1000000 {
+		t.Errorf("station1 RxBytes: expected 1000000, got %d", s1[0])
+	}
+	if s1[1] != 500000 {
+		t.Errorf("station1 TxBytes: expected 500000, got %d", s1[1])
+	}
+
+	s2 := stats["AA:BB:CC:44:55:66"]
+	if s2[0] != 400000 {
+		t.Errorf("station2 RxBytes: expected 400000, got %d", s2[0])
+	}
+	if s2[1] != 200000 {
+		t.Errorf("station2 TxBytes: expected 200000, got %d", s2[1])
+	}
+}
+
+func TestParseStationDump_Empty(t *testing.T) {
+	stats := parseStationDump("")
+	if len(stats) != 0 {
+		t.Errorf("expected empty map, got %d entries", len(stats))
+	}
+}
+
+func TestParseIwDev(t *testing.T) {
+	output := `phy#0
+	Interface phy0-ap0
+		ifindex 6
+		wdev 0x2
+		addr 00:11:22:33:44:55
+		ssid MyNetwork
+		type AP
+		channel 6 (2437 MHz), width: 20 MHz
+	Interface phy0-sta0
+		ifindex 7
+		wdev 0x3
+		addr 00:11:22:33:44:56
+		type managed
+phy#1
+	Interface phy1-ap0
+		ifindex 8
+		wdev 0x100000002
+		addr 00:11:22:33:44:57
+		ssid MyNetwork-5G
+		type AP`
+
+	ifaces := parseIwDev(output)
+	if len(ifaces) != 2 {
+		t.Fatalf("expected 2 AP interfaces, got %d: %v", len(ifaces), ifaces)
+	}
+	if ifaces[0] != "phy0-ap0" {
+		t.Errorf("expected phy0-ap0, got %s", ifaces[0])
+	}
+	if ifaces[1] != "phy1-ap0" {
+		t.Errorf("expected phy1-ap0, got %s", ifaces[1])
+	}
+}
+
+func TestParseIwDev_NoAP(t *testing.T) {
+	output := `phy#0
+	Interface phy0-sta0
+		type managed`
+
+	ifaces := parseIwDev(output)
+	if len(ifaces) != 0 {
+		t.Errorf("expected 0 AP interfaces, got %d", len(ifaces))
+	}
+}
+
+// FuncCommandRunner lets tests provide a function-based command runner.
+type FuncCommandRunner struct {
+	RunFunc func(name string, args ...string) ([]byte, error)
+}
+
+func (f *FuncCommandRunner) Run(name string, args ...string) ([]byte, error) {
+	return f.RunFunc(name, args...)
+}
+
+func TestGetClients_WithTrafficStats(t *testing.T) {
+	iwDevOutput := `phy#0
+	Interface phy0-ap0
+		type AP`
+
+	stationDump := `Station AA:BB:CC:11:22:33 (on phy0-ap0)
+	rx bytes:	300000
+	tx bytes:	600000
+Station AA:BB:CC:44:55:66 (on phy0-ap0)
+	rx bytes:	100000
+	tx bytes:	200000`
+
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(name string, args ...string) ([]byte, error) {
+			if name == "iw" && len(args) > 0 && args[0] == "dev" {
+				if len(args) == 1 {
+					return []byte(iwDevOutput), nil
+				}
+				if len(args) == 4 && args[2] == "station" && args[3] == "dump" {
+					return []byte(stationDump), nil
+				}
+			}
+			return nil, fmt.Errorf("unknown command: %s %v", name, args)
+		},
+	}
+
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	clients, err := svc.GetClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, c := range clients {
+		switch c.MACAddress {
+		case "AA:BB:CC:11:22:33":
+			if c.RxBytes != 600000 {
+				t.Errorf("laptop RxBytes: expected 600000, got %d", c.RxBytes)
+			}
+			if c.TxBytes != 300000 {
+				t.Errorf("laptop TxBytes: expected 300000, got %d", c.TxBytes)
+			}
+		case "AA:BB:CC:44:55:66":
+			if c.RxBytes != 200000 {
+				t.Errorf("phone RxBytes: expected 200000, got %d", c.RxBytes)
+			}
+			if c.TxBytes != 100000 {
+				t.Errorf("phone TxBytes: expected 100000, got %d", c.TxBytes)
+			}
+		}
+	}
+}
+
+func TestGetClients_NoIwCommand(t *testing.T) {
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return nil, fmt.Errorf("iw not found")
+		},
+	}
+
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	clients, err := svc.GetClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should still return clients, just without traffic stats
+	if len(clients) < 2 {
+		t.Errorf("expected at least 2 clients, got %d", len(clients))
+	}
+	for _, c := range clients {
+		if c.RxBytes != 0 || c.TxBytes != 0 {
+			t.Errorf("expected zero traffic stats when iw fails, got rx=%d tx=%d", c.RxBytes, c.TxBytes)
+		}
+	}
+}

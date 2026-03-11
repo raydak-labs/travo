@@ -92,7 +92,7 @@
 - [x] Fix "connected since" showing invalid date 🐛
 - [x] Device aliases (name clients: "John's Phone", "Laptop" — stored in local config)
 - [x] Set static IP / DHCP reservation for a client
-- [ ] Traffic stats per client (RX/TX)
+- [x] Traffic stats per client (RX/TX)
 - [ ] Client hostname resolution
 - [x] Block / kick a client
 - [ ] 🔮 Client bandwidth limiting (QoS per device)
