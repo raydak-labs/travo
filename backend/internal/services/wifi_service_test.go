@@ -129,3 +129,43 @@ func TestWifiDisconnectThenReconnect(t *testing.T) {
 		t.Errorf("expected ssid 'New-Network', got %q", val)
 	}
 }
+
+func TestWifiDeleteNetwork(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Verify the section exists first
+	_, err := u.Get("wireless", "sta0", "ssid")
+	if err != nil {
+		t.Fatalf("expected sta0 section to exist: %v", err)
+	}
+
+	// Delete the network
+	err = svc.DeleteNetwork("sta0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify section is gone
+	_, err = u.Get("wireless", "sta0", "ssid")
+	if err == nil {
+		t.Error("expected sta0 section to be deleted")
+	}
+}
+
+func TestWifiDeleteNetwork_EmptySection(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	err := svc.DeleteNetwork("")
+	if err == nil {
+		t.Error("expected error for empty section")
+	}
+}
+
+func TestWifiDeleteNetwork_NonexistentSection(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	err := svc.DeleteNetwork("nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent section")
+	}
+}

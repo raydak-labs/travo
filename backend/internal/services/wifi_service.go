@@ -302,6 +302,7 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 
 			networks = append(networks, models.SavedNetwork{
 				SSID:        ssid,
+				Section:     section,
 				Encryption:  encryption,
 				Mode:        mode,
 				AutoConnect: !disabled,
@@ -310,4 +311,18 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 		}
 	}
 	return networks, nil
+}
+
+// DeleteNetwork removes a saved WiFi network by its UCI section name.
+func (w *WifiService) DeleteNetwork(section string) error {
+	if section == "" {
+		return fmt.Errorf("section name is required")
+	}
+	if err := w.uci.DeleteSection("wireless", section); err != nil {
+		return fmt.Errorf("failed to delete network: %w", err)
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return err
+	}
+	return w.reloader.Reload()
 }

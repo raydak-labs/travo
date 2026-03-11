@@ -48,6 +48,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/wifi/connection", WifiConnectionHandler(deps.Wifi))
 	v1.Put("/wifi/mode", WifiSetModeHandler(deps.Wifi))
 	v1.Get("/wifi/saved", WifiSavedHandler(deps.Wifi))
+	v1.Delete("/wifi/saved/:section", WifiDeleteHandler(deps.Wifi))
 
 	// VPN routes
 	v1.Get("/vpn/status", VpnStatusHandler(deps.Vpn))

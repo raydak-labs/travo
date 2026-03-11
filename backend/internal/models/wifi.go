@@ -39,6 +39,7 @@ type WifiConfig struct {
 // SavedNetwork represents a saved WiFi network.
 type SavedNetwork struct {
 	SSID        string `json:"ssid"`
+	Section     string `json:"section"`
 	Encryption  string `json:"encryption"`
 	Mode        string `json:"mode"`
 	AutoConnect bool   `json:"auto_connect"`

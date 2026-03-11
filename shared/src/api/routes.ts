@@ -22,6 +22,7 @@ export const API_ROUTES = {
     connection: '/api/v1/wifi/connection',
     mode: '/api/v1/wifi/mode',
     saved: '/api/v1/wifi/saved',
+    deleteSaved: '/api/v1/wifi/saved',
   },
   vpn: {
     status: '/api/v1/vpn/status',

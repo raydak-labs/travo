@@ -46,6 +46,7 @@ export interface WifiConfig {
 /** Saved WiFi network */
 export interface SavedNetwork {
   readonly ssid: string;
+  readonly section: string;
   readonly encryption: WifiEncryption;
   readonly mode: WifiMode;
   readonly auto_connect: boolean;

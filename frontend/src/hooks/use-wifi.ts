@@ -75,3 +75,18 @@ export function useSavedNetworks() {
     queryFn: () => apiClient.get<SavedNetwork[]>(API_ROUTES.wifi.saved),
   });
 }
+
+export function useWifiDelete() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (section: string) =>
+      apiClient.del<{ status: string }>(`${API_ROUTES.wifi.deleteSaved}/${section}`),
+    onSuccess: () => {
+      toast.success('Network removed');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to remove network', { description: error.message });
+    },
+  });
+}

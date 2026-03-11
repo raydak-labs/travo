@@ -92,3 +92,17 @@ func WifiSavedHandler(svc *services.WifiService) fiber.Handler {
 		return c.JSON(networks)
 	}
 }
+
+// WifiDeleteHandler handles DELETE /api/v1/wifi/saved/:section.
+func WifiDeleteHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		section := c.Params("section")
+		if section == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section parameter is required"})
+		}
+		if err := svc.DeleteNetwork(section); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

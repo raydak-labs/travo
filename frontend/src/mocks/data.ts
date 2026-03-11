@@ -237,6 +237,7 @@ export const mockServices: ServiceInfo[] = [
 export const mockSavedNetworks: SavedNetwork[] = [
   {
     ssid: 'Hotel_Guest_5G',
+    section: 'wifinet2',
     encryption: 'wpa2',
     mode: 'client',
     auto_connect: true,
@@ -244,6 +245,7 @@ export const mockSavedNetworks: SavedNetwork[] = [
   },
   {
     ssid: 'Home_WiFi',
+    section: 'wifinet3',
     encryption: 'wpa3',
     mode: 'client',
     auto_connect: true,
@@ -251,6 +253,7 @@ export const mockSavedNetworks: SavedNetwork[] = [
   },
   {
     ssid: 'Office_Network',
+    section: 'wifinet4',
     encryption: 'wpa2/wpa3',
     mode: 'client',
     auto_connect: false,

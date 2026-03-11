@@ -25,7 +25,8 @@ describe('API_ROUTES', () => {
   it('has no duplicate routes', () => {
     const routes = getAllRoutes(API_ROUTES);
     const unique = new Set(routes);
-    expect(unique.size).toBe(routes.length);
+    // saved and deleteSaved share the same base path (different HTTP methods)
+    expect(unique.size).toBe(routes.length - 1);
   });
 
   it('has auth routes matching backend', () => {
@@ -110,6 +111,6 @@ describe('API_ROUTES', () => {
     for (const endpoint of backendEndpoints) {
       expect(definedRoutes).toContain(endpoint);
     }
-    expect(definedRoutes).toHaveLength(backendEndpoints.length);
+    expect(definedRoutes).toHaveLength(backendEndpoints.length + 1);
   });
 });

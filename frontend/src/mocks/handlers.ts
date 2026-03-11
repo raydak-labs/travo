@@ -55,6 +55,10 @@ export const handlers = [
     return HttpResponse.json(mockSavedNetworks);
   }),
 
+  http.delete(`${API_ROUTES.wifi.deleteSaved}/:section`, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.vpn.status, () => {
     return HttpResponse.json([mockVpnStatus]);
   }),

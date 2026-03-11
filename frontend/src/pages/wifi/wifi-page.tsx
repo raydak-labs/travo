@@ -1,4 +1,4 @@
-import { Wifi, WifiOff, Signal } from 'lucide-react';
+import { Wifi, WifiOff, Signal, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,12 +7,13 @@ import { CaptivePortalBanner } from '@/components/wifi/captive-portal-banner';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { WifiScanDialog } from './wifi-scan-dialog';
-import { useWifiConnection, useWifiDisconnect, useSavedNetworks } from '@/hooks/use-wifi';
+import { useWifiConnection, useWifiDisconnect, useSavedNetworks, useWifiDelete } from '@/hooks/use-wifi';
 
 export function WifiPage() {
   const { data: connection, isLoading: connectionLoading } = useWifiConnection();
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
   const disconnectMutation = useWifiDisconnect();
+  const deleteMutation = useWifiDelete();
 
   return (
     <div className="space-y-6">
@@ -89,7 +90,7 @@ export function WifiPage() {
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
               {savedNetworks.map((network) => (
-                <li key={network.ssid} className="flex items-center justify-between py-3">
+                <li key={network.section} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
                     <Wifi className="h-4 w-4 text-gray-400" />
                     <div>
@@ -99,9 +100,20 @@ export function WifiPage() {
                       <SecurityBadge encryption={network.encryption} />
                     </div>
                   </div>
-                  <Badge variant={network.auto_connect ? 'success' : 'outline'}>
-                    {network.auto_connect ? 'Auto' : 'Manual'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={network.auto_connect ? 'success' : 'outline'}>
+                      {network.auto_connect ? 'Auto' : 'Manual'}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(network.section)}
+                      disabled={deleteMutation.isPending}
+                      title="Remove network"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

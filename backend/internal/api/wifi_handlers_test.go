@@ -170,3 +170,36 @@ func TestWifiDisconnectEndpoint(t *testing.T) {
 		t.Errorf("expected status 'ok', got %v", data["status"])
 	}
 }
+
+func TestWifiDeleteEndpoint(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/wifi/saved/sta0", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestWifiDeleteEndpoint_NonexistentSection(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/wifi/saved/nonexistent", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected 500 for nonexistent section, got %d", resp.StatusCode)
+	}
+}
