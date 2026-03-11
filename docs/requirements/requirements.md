@@ -42,7 +42,7 @@
 - [x] Signal strength visualization (icon + dBm + percentage)
 - [x] Security badge (WPA2, WPA3, Open, etc.)
 - [x] Scan dialog (button-triggered popup with results)
-- [ ] Disconnect from upstream WiFi 🐛 *(button exists but does not work)*
+- [x] Disconnect from upstream WiFi
 - [x] Delete saved WiFi networks
 - [ ] Priority ordering of saved networks (auto-connect preference)
 - [ ] Auto-reconnect to known networks on startup

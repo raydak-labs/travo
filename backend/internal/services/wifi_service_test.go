@@ -152,6 +152,55 @@ func TestWifiDeleteNetwork(t *testing.T) {
 	}
 }
 
+func TestWifiDisconnectFallsBackToUCI(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	// Register wireless status with no STA interfaces (simulating disabled STA)
+	ub.RegisterResponse("network.wireless.status", map[string]interface{}{
+		"radio0": map[string]interface{}{
+			"interfaces": []interface{}{},
+		},
+	})
+	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+
+	err := svc.Disconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// findSTASection should find "sta0" in mock UCI
+	val, _ := u.Get("wireless", "sta0", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled='1', got %q", val)
+	}
+}
+
+func TestWifiConnectFallsBackToUCI(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	// Register wireless status with no STA interfaces (simulating disabled STA)
+	ub.RegisterResponse("network.wireless.status", map[string]interface{}{
+		"radio0": map[string]interface{}{
+			"interfaces": []interface{}{},
+		},
+	})
+	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+
+	err := svc.Connect(models.WifiConfig{
+		SSID: "New-Network", Password: "newpass123", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := u.Get("wireless", "sta0", "ssid")
+	if val != "New-Network" {
+		t.Errorf("expected ssid 'New-Network', got %q", val)
+	}
+	val, _ = u.Get("wireless", "sta0", "disabled")
+	if val != "0" {
+		t.Errorf("expected disabled='0', got %q", val)
+	}
+}
+
 func TestWifiDeleteNetwork_EmptySection(t *testing.T) {
 	svc, _ := newTestWifiService()
 

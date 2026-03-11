@@ -87,11 +87,42 @@ func (w *WifiService) findSTADevice() (ifname string, section string, err error)
 	return "", "", fmt.Errorf("no STA interface found")
 }
 
+// findSTASection discovers the STA section name from UCI config.
+// Unlike findSTADevice, this works even when the STA interface is disabled.
+func (w *WifiService) findSTASection() (string, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "", fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	for name, opts := range sections {
+		if opts["mode"] == "sta" {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no STA section found in UCI config")
+}
+
 // Scan returns available WiFi networks.
 func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 	ifname, _, err := w.findSTADevice()
 	if err != nil {
-		return []models.WifiScanResult{}, nil
+		// STA interface may be disabled; try re-enabling it for scanning
+		section, secErr := w.findSTASection()
+		if secErr != nil {
+			return []models.WifiScanResult{}, nil
+		}
+		_ = w.uci.Set("wireless", section, "disabled", "0")
+		if commitErr := w.uci.Commit("wireless"); commitErr != nil {
+			return []models.WifiScanResult{}, nil
+		}
+		if reloadErr := w.reloader.Reload(); reloadErr != nil {
+			return []models.WifiScanResult{}, nil
+		}
+		// Retry finding the STA device after re-enabling
+		ifname, _, err = w.findSTADevice()
+		if err != nil {
+			return []models.WifiScanResult{}, nil
+		}
 	}
 
 	resp, err := w.ubus.Call("iwinfo", "scan", map[string]interface{}{"device": ifname})
@@ -183,7 +214,11 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 func (w *WifiService) Connect(config models.WifiConfig) error {
 	_, section, err := w.findSTADevice()
 	if err != nil {
-		section = "sta0" // fallback
+		// STA interface may be disabled; fall back to UCI-based lookup
+		section, err = w.findSTASection()
+		if err != nil {
+			return fmt.Errorf("no STA interface found: %w", err)
+		}
 	}
 	_ = w.uci.Set("wireless", section, "ssid", config.SSID)
 	_ = w.uci.Set("wireless", section, "key", config.Password)
@@ -201,7 +236,11 @@ func (w *WifiService) Connect(config models.WifiConfig) error {
 func (w *WifiService) Disconnect() error {
 	_, section, err := w.findSTADevice()
 	if err != nil {
-		section = "sta0"
+		// STA interface may already be disabled; fall back to UCI-based lookup
+		section, err = w.findSTASection()
+		if err != nil {
+			return fmt.Errorf("no STA interface found: %w", err)
+		}
 	}
 	_ = w.uci.Set("wireless", section, "disabled", "1")
 	if err := w.uci.Commit("wireless"); err != nil {
