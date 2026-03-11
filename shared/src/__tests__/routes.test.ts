@@ -57,6 +57,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.dhcpLeases).toBe('/api/v1/network/dhcp/leases');
     expect(API_ROUTES.network.dhcpReservations).toBe('/api/v1/network/dhcp/reservations');
     expect(API_ROUTES.network.dnsEntries).toBe('/api/v1/network/dns/entries');
+    expect(API_ROUTES.network.interfaceState).toBe('/api/v1/network/interfaces/:name/state');
   });
 
   it('has wifi routes matching backend', () => {
@@ -127,6 +128,7 @@ describe('API_ROUTES', () => {
       '/api/v1/network/dhcp/reservations',
       '/api/v1/network/dns',
       '/api/v1/network/dns/entries',
+      '/api/v1/network/interfaces/:name/state',
       '/api/v1/wifi/scan',
       '/api/v1/wifi/connect',
       '/api/v1/wifi/disconnect',

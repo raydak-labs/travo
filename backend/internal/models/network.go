@@ -97,6 +97,11 @@ type ClientActionRequest struct {
 	MAC string `json:"mac"`
 }
 
+// SetInterfaceStateRequest is the request body for bringing an interface up or down.
+type SetInterfaceStateRequest struct {
+	Up bool `json:"up"`
+}
+
 // DHCPReservation represents a static DHCP reservation (IP by MAC).
 type DHCPReservation struct {
 	Name    string `json:"name"`

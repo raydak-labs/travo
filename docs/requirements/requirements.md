@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v15 — session timeout warning)
+> **Last updated:** 2026-03-11 (v16 — interface up/down toggle)
 
 ---
 
@@ -84,7 +84,7 @@
 - [x] WAN configuration (static IP, DHCP, PPPoE)
 - [x] WAN settings: IP, netmask, gateway, DNS, MTU
 - [ ] WAN/WWAN interplay explanation (which is active, failover?)
-- [ ] Interface up/down toggle
+- [x] Interface up/down toggle
 
 ### 2.2 Connected Clients
 

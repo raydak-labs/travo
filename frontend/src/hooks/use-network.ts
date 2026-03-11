@@ -240,3 +240,23 @@ export function useBlockedClients() {
     queryFn: () => apiClient.get<string[]>(API_ROUTES.network.clientBlocked),
   });
 }
+
+export function useSetInterfaceState() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, up }: { name: string; up: boolean }) =>
+      apiClient.post<{ status: string }>(
+        API_ROUTES.network.interfaceState.replace(':name', name),
+        { up },
+      ),
+    onSuccess: (_data, variables) => {
+      toast.success(
+        `Interface ${variables.name} ${variables.up ? 'brought up' : 'brought down'}`,
+      );
+      void queryClient.invalidateQueries({ queryKey: ['network'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to change interface state', { description: error.message });
+    },
+  });
+}

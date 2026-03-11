@@ -49,6 +49,11 @@ export interface ClientActionRequest {
   readonly mac: string;
 }
 
+/** Request to set interface up/down state */
+export interface SetInterfaceStateRequest {
+  readonly up: boolean;
+}
+
 /** Overall network status */
 export interface NetworkStatus {
   readonly wan: NetworkInterface | null;

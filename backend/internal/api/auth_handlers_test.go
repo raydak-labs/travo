@@ -33,7 +33,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
 		System:      services.NewSystemService(ub, u, &services.MockStorageProvider{}),
-		Network:     services.NewNetworkService(u, ub),
+		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
 		Wifi:        services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{}),
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),

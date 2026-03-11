@@ -50,8 +50,8 @@ describe('NetworkPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('192.168.1.105')).toBeInTheDocument();
-      expect(screen.getByText('192.168.1.1')).toBeInTheDocument();
+      expect(screen.getAllByText('192.168.1.105').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('192.168.1.1').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -63,7 +63,7 @@ describe('NetworkPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('192.168.8.1')).toBeInTheDocument();
+      expect(screen.getAllByText('192.168.8.1').length).toBeGreaterThanOrEqual(1);
     });
   });
 

@@ -815,3 +815,58 @@ func TestBlockClient_CaseInsensitive(t *testing.T) {
 		t.Errorf("expected MAC stored as uppercase, got %q", blocked[0])
 	}
 }
+
+func TestSetInterfaceState_Up(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.SetInterfaceState("wan", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetInterfaceState_Down(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.SetInterfaceState("lan", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetInterfaceState_Wwan(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.SetInterfaceState("wwan", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetInterfaceState_UnknownInterface(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.SetInterfaceState("invalid", true)
+	if err == nil {
+		t.Fatal("expected error for unknown interface")
+	}
+}
+
+func TestSetInterfaceState_CommandFailure(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{Err: fmt.Errorf("command failed")})
+
+	err := svc.SetInterfaceState("wan", true)
+	if err == nil {
+		t.Fatal("expected error when command fails")
+	}
+}

@@ -76,6 +76,27 @@ func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	}
 }
 
+// SetInterfaceStateHandler handles POST /api/v1/network/interfaces/:name/state.
+func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		name := c.Params("name")
+		if name == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "interface name is required"})
+		}
+		var req models.SetInterfaceStateRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetInterfaceState(name, req.Up); err != nil {
+			if err.Error() == fmt.Sprintf("unknown interface: %s", name) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetDNSConfigHandler handles GET /api/v1/network/dns.
 func GetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

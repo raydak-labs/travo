@@ -298,6 +298,10 @@ export const handlers = [
     return HttpResponse.json(mockBlockedClients);
   }),
 
+  http.post(`${API_ROUTES.network.interfaceState.replace(':name', ':name')}`, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.post(API_ROUTES.auth.login, async ({ request }) => {
     const body = (await request.json()) as { password: string };
     if (body.password === 'admin') {

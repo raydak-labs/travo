@@ -37,6 +37,28 @@ func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *Ne
 	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json", cmd: cmd}
 }
 
+// allowedInterfaces is the set of interface names that can be toggled.
+var allowedInterfaces = map[string]bool{
+	"wan":  true,
+	"lan":  true,
+	"wwan": true,
+}
+
+// SetInterfaceState brings a network interface up or down via ifup/ifdown.
+func (n *NetworkService) SetInterfaceState(iface string, up bool) error {
+	if !allowedInterfaces[iface] {
+		return fmt.Errorf("unknown interface: %s", iface)
+	}
+	cmd := "ifdown"
+	if up {
+		cmd = "ifup"
+	}
+	if _, err := n.cmd.Run(cmd, iface); err != nil {
+		return fmt.Errorf("%s %s: %w", cmd, iface, err)
+	}
+	return nil
+}
+
 // loadAliases reads the alias file and returns a mac->alias map.
 func (n *NetworkService) loadAliases() map[string]string {
 	data, err := os.ReadFile(n.aliasFile)
