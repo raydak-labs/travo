@@ -335,3 +335,53 @@ func TestRadioStatusSetEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 }
+
+func TestWifiSetPriorityEndpoint(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"ssids": []string{"Hotel-WiFi", "Office-Net"},
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/saved/priority", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	var data map[string]interface{}
+	if err := json.Unmarshal(b, &data); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if data["status"] != "ok" {
+		t.Errorf("expected status 'ok', got %v", data["status"])
+	}
+}
+
+func TestWifiSetPriorityEndpoint_EmptySSIDs(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"ssids": []string{},
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/saved/priority", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}

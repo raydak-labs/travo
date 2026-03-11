@@ -116,6 +116,10 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.put(API_ROUTES.wifi.savedPriority, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.vpn.status, () => {
     return HttpResponse.json([mockVpnStatus]);
   }),

@@ -27,6 +27,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 
 	tmpDir, _ := os.MkdirTemp("", "vpn-test-*")
 	profilesPath := tmpDir + "/wireguard_profiles.json"
+	priorityPath := tmpDir + "/wifi-priorities.json"
 
 	deps := &Dependencies{
 		Auth:        authSvc,
@@ -34,7 +35,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 		RateLimiter: rateLimiter,
 		System:      services.NewSystemService(ub, u, &services.MockStorageProvider{}),
 		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
-		Wifi:        services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{}),
+		Wifi:        services.NewWifiServiceWithPriorityFile(u, ub, &services.NoopWifiReloader{}, priorityPath),
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
 		}, profilesPath),

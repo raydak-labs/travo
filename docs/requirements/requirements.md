@@ -44,7 +44,7 @@
 - [x] Scan dialog (button-triggered popup with results)
 - [x] Disconnect from upstream WiFi
 - [x] Delete saved WiFi networks
-- [ ] Priority ordering of saved networks (auto-connect preference)
+- [x] Priority ordering of saved networks (auto-connect preference)
 - [ ] Auto-reconnect to known networks on startup
 - [x] Hidden network support (manual SSID entry)
 

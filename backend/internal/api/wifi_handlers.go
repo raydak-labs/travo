@@ -202,6 +202,25 @@ func SetMACHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// WifiSetPriorityHandler handles PUT /api/v1/wifi/saved/priority.
+func WifiSetPriorityHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			SSIDs []string `json:"ssids"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if len(body.SSIDs) == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ssids list must not be empty"})
+		}
+		if err := svc.ReorderNetworks(body.SSIDs); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetRadiosHandler handles GET /api/v1/wifi/radios.
 func GetRadiosHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

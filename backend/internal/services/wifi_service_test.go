@@ -634,3 +634,76 @@ func TestSetRadioEnabled_Enable(t *testing.T) {
 		t.Errorf("expected radio1 disabled='0', got %q", val1)
 	}
 }
+
+func TestWifiReorderNetworks(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpFile := t.TempDir() + "/priorities.json"
+	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+
+	err := svc.ReorderNetworks([]string{"Network-A", "Network-B", "Network-C"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify priorities were saved
+	priorities := svc.loadPriorities()
+	if priorities["Network-A"] != 1 {
+		t.Errorf("expected Network-A priority 1, got %d", priorities["Network-A"])
+	}
+	if priorities["Network-B"] != 2 {
+		t.Errorf("expected Network-B priority 2, got %d", priorities["Network-B"])
+	}
+	if priorities["Network-C"] != 3 {
+		t.Errorf("expected Network-C priority 3, got %d", priorities["Network-C"])
+	}
+}
+
+func TestWifiGetSavedNetworksWithPriority(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpFile := t.TempDir() + "/priorities.json"
+	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+
+	// Set priority for Hotel-WiFi (the mock SSID)
+	err := svc.ReorderNetworks([]string{"Hotel-WiFi"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	networks, err := svc.GetSavedNetworks()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(networks) == 0 {
+		t.Fatal("expected at least one saved network")
+	}
+	if networks[0].Priority != 1 {
+		t.Errorf("expected priority 1, got %d", networks[0].Priority)
+	}
+}
+
+func TestWifiReorderNetworks_Overwrite(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpFile := t.TempDir() + "/priorities.json"
+	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+
+	// First ordering
+	_ = svc.ReorderNetworks([]string{"A", "B", "C"})
+	// Second ordering overwrites
+	err := svc.ReorderNetworks([]string{"C", "A", "B"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	priorities := svc.loadPriorities()
+	if priorities["C"] != 1 {
+		t.Errorf("expected C priority 1, got %d", priorities["C"])
+	}
+	if priorities["A"] != 2 {
+		t.Errorf("expected A priority 2, got %d", priorities["A"])
+	}
+	if priorities["B"] != 3 {
+		t.Errorf("expected B priority 3, got %d", priorities["B"])
+	}
+}

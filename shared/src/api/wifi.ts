@@ -109,3 +109,8 @@ export interface GuestWifiConfig {
   readonly encryption: string;
   readonly key: string;
 }
+
+/** Request to reorder saved network priorities */
+export interface NetworkPriorityRequest {
+  readonly ssids: string[];
+}

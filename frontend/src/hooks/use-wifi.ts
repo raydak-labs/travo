@@ -11,6 +11,7 @@ import type {
   MACConfig,
   GuestWifiConfig,
   RadioInfo,
+  NetworkPriorityRequest,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -96,6 +97,21 @@ export function useWifiDelete() {
     },
     onError: (error) => {
       toast.error('Failed to remove network', { description: error.message });
+    },
+  });
+}
+
+export function useSetNetworkPriority() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: NetworkPriorityRequest) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.savedPriority, req),
+    onSuccess: () => {
+      toast.success('Network priority updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update priority', { description: error.message });
     },
   });
 }

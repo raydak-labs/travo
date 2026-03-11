@@ -135,6 +135,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/connection',
       '/api/v1/wifi/mode',
       '/api/v1/wifi/saved',
+      '/api/v1/wifi/saved/priority',
       '/api/v1/wifi/radio',
       '/api/v1/wifi/radios',
       '/api/v1/wifi/ap',

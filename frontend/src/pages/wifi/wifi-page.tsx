@@ -10,6 +10,8 @@ import {
   RotateCcw,
   ShieldCheck,
   Cpu,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import type { APConfig, GuestWifiConfig } from '@shared/index';
@@ -37,6 +39,7 @@ import {
   useWifiDisconnect,
   useSavedNetworks,
   useWifiDelete,
+  useSetNetworkPriority,
   useAPConfigs,
   useSetAPConfig,
   useMACAddresses,
@@ -77,6 +80,7 @@ export function WifiPage() {
   const { data: apConfigs, isLoading: apLoading } = useAPConfigs();
   const disconnectMutation = useWifiDisconnect();
   const deleteMutation = useWifiDelete();
+  const priorityMutation = useSetNetworkPriority();
   const setAP = useSetAPConfig();
   const { data: macAddresses, isLoading: macLoading } = useMACAddresses();
   const setMAC = useSetMAC();
@@ -261,7 +265,7 @@ export function WifiPage() {
             <p className="text-sm text-gray-500">No saved networks</p>
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
-              {savedNetworks.map((network) => (
+              {savedNetworks.map((network, index) => (
                 <li key={network.section} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
                     <Wifi className="h-4 w-4 text-gray-400" />
@@ -272,10 +276,46 @@ export function WifiPage() {
                       <SecurityBadge encryption={network.encryption} />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Badge variant={network.auto_connect ? 'success' : 'outline'}>
                       {network.auto_connect ? 'Auto' : 'Manual'}
                     </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const ssids = savedNetworks.map((n) => n.ssid);
+                        const newSsids = [...ssids];
+                        [newSsids[index - 1], newSsids[index]] = [
+                          newSsids[index],
+                          newSsids[index - 1],
+                        ];
+                        priorityMutation.mutate({ ssids: newSsids });
+                      }}
+                      disabled={index === 0 || priorityMutation.isPending}
+                      title="Move up (higher priority)"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const ssids = savedNetworks.map((n) => n.ssid);
+                        const newSsids = [...ssids];
+                        [newSsids[index], newSsids[index + 1]] = [
+                          newSsids[index + 1],
+                          newSsids[index],
+                        ];
+                        priorityMutation.mutate({ ssids: newSsids });
+                      }}
+                      disabled={
+                        index === savedNetworks.length - 1 || priorityMutation.isPending
+                      }
+                      title="Move down (lower priority)"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

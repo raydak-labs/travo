@@ -1,9 +1,12 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -33,19 +36,27 @@ func (r *NoopWifiReloader) Reload() error { return nil }
 
 // WifiService provides WiFi scanning, connection, and configuration.
 type WifiService struct {
-	uci      uci.UCI
-	ubus     ubus.Ubus
-	reloader WifiReloader
+	uci          uci.UCI
+	ubus         ubus.Ubus
+	reloader     WifiReloader
+	priorityFile string
 }
+
+const defaultPriorityFile = "/etc/openwrt-travel-gui/wifi-priorities.json"
 
 // NewWifiService creates a new WifiService.
 func NewWifiService(u uci.UCI, ub ubus.Ubus) *WifiService {
-	return &WifiService{uci: u, ubus: ub, reloader: &ShellWifiReloader{}}
+	return &WifiService{uci: u, ubus: ub, reloader: &ShellWifiReloader{}, priorityFile: defaultPriorityFile}
 }
 
 // NewWifiServiceWithReloader creates a WifiService with a custom reloader (for tests).
 func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiService {
-	return &WifiService{uci: u, ubus: ub, reloader: r}
+	return &WifiService{uci: u, ubus: ub, reloader: r, priorityFile: defaultPriorityFile}
+}
+
+// NewWifiServiceWithPriorityFile creates a WifiService with a custom priority file (for tests).
+func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf string) *WifiService {
+	return &WifiService{uci: u, ubus: ub, reloader: r, priorityFile: pf}
 }
 
 // findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.
@@ -306,12 +317,50 @@ func (w *WifiService) SetMode(mode string) error {
 	return w.reloader.Reload()
 }
 
+// loadPriorities reads the priority file and returns an ssid->priority map.
+func (w *WifiService) loadPriorities() map[string]int {
+	data, err := os.ReadFile(w.priorityFile)
+	if err != nil {
+		return map[string]int{}
+	}
+	priorities := map[string]int{}
+	if err := json.Unmarshal(data, &priorities); err != nil {
+		return map[string]int{}
+	}
+	return priorities
+}
+
+// savePriorities writes the priority map to the priority file.
+func (w *WifiService) savePriorities(priorities map[string]int) error {
+	dir := filepath.Dir(w.priorityFile)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("creating priority directory: %w", err)
+	}
+	data, err := json.Marshal(priorities)
+	if err != nil {
+		return fmt.Errorf("marshaling priorities: %w", err)
+	}
+	return os.WriteFile(w.priorityFile, data, 0600)
+}
+
+// ReorderNetworks sets priority order for saved networks based on an ordered list of SSIDs.
+// The first SSID in the list gets priority 1 (highest), second gets 2, etc.
+func (w *WifiService) ReorderNetworks(ssids []string) error {
+	priorities := make(map[string]int, len(ssids))
+	for i, ssid := range ssids {
+		priorities[ssid] = i + 1
+	}
+	return w.savePriorities(priorities)
+}
+
 // GetSavedNetworks returns saved WiFi networks.
 func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
 		return []models.SavedNetwork{}, nil
 	}
+
+	priorities := w.loadPriorities()
 
 	var networks []models.SavedNetwork
 	for _, radioData := range resp {
@@ -347,16 +396,37 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 				}
 			}
 
+			priority := 0
+			if p, ok := priorities[ssid]; ok {
+				priority = p
+			}
+
 			networks = append(networks, models.SavedNetwork{
 				SSID:        ssid,
 				Section:     section,
 				Encryption:  encryption,
 				Mode:        mode,
 				AutoConnect: !disabled,
-				Priority:    1,
+				Priority:    priority,
 			})
 		}
 	}
+
+	// Sort by priority (lower number = higher priority), 0 means unset (goes last)
+	sort.Slice(networks, func(i, j int) bool {
+		pi, pj := networks[i].Priority, networks[j].Priority
+		if pi == 0 && pj == 0 {
+			return false
+		}
+		if pi == 0 {
+			return false
+		}
+		if pj == 0 {
+			return true
+		}
+		return pi < pj
+	})
+
 	return networks, nil
 }
 
