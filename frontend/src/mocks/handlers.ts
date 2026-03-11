@@ -145,6 +145,10 @@ export const handlers = [
     return HttpResponse.json({ success: true });
   }),
 
+  http.post(API_ROUTES.services.autostart, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.network.wan, () => {
     return HttpResponse.json(mockWanConfig);
   }),

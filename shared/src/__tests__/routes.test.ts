@@ -120,6 +120,7 @@ describe('API_ROUTES', () => {
       '/api/v1/services/:id/remove/stream',
       '/api/v1/services/:id/start',
       '/api/v1/services/:id/stop',
+      '/api/v1/services/:id/autostart',
       '/api/v1/captive/status',
     ];
 

@@ -65,6 +65,23 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	}
 }
 
+// SetAutoStartHandler handles POST /api/v1/services/:id/autostart.
+func SetAutoStartHandler(mgr *services.ServiceManager) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := mgr.SetAutoStart(id, body.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // streamLogEvent represents a single NDJSON log event.
 type streamLogEvent struct {
 	Type string `json:"type"`

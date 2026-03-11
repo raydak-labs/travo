@@ -8,6 +8,7 @@ import {
   useRemoveService,
   useStartService,
   useStopService,
+  useSetAutoStart,
 } from '@/hooks/use-services';
 import { ServiceCard } from './service-card';
 import { InstallLogDialog } from './install-log-dialog';
@@ -25,6 +26,7 @@ export function ServicesPage() {
   const removeMutation = useRemoveService();
   const startMutation = useStartService();
   const stopMutation = useStopService();
+  const setAutoStartMutation = useSetAutoStart();
   const queryClient = useQueryClient();
 
   const [streamAction, setStreamAction] = useState<StreamAction | null>(null);
@@ -76,7 +78,11 @@ export function ServicesPage() {
                   onRemove={handleRemove}
                   onStart={(id) => startMutation.mutate(id)}
                   onStop={(id) => stopMutation.mutate(id)}
+                  onAutoStartChange={(id, enabled) =>
+                    setAutoStartMutation.mutate({ id, enabled })
+                  }
                   isPending={isPending || streamAction !== null}
+                  isAutoStartPending={setAutoStartMutation.isPending}
                 />
               ))}
             </div>

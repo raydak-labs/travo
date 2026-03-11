@@ -52,6 +52,7 @@ export const API_ROUTES = {
     removeStream: '/api/v1/services/:id/remove/stream',
     start: '/api/v1/services/:id/start',
     stop: '/api/v1/services/:id/stop',
+    autostart: '/api/v1/services/:id/autostart',
   },
   captive: {
     status: '/api/v1/captive/status',

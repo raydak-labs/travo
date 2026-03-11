@@ -27,6 +27,8 @@ type SystemProbe interface {
 	Start(initName string) (string, error)
 	Stop(initName string) (string, error)
 	IsAutoStart(initName string) bool
+	Enable(initName string) error
+	Disable(initName string) error
 }
 
 // serviceDefinition holds static config for a known service.
@@ -287,6 +289,34 @@ func (sm *ServiceManager) Stop(serviceID string) error {
 	return nil
 }
 
+// SetAutoStart enables or disables auto-start for a service.
+func (sm *ServiceManager) SetAutoStart(serviceID string, enabled bool) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
+	}
+	if def.InitName == "" {
+		return fmt.Errorf("service %s does not have an init script", serviceID)
+	}
+	info, ok := sm.cache[def.ID]
+	if !ok || info.State == "not_installed" {
+		return fmt.Errorf("service %s is not installed", serviceID)
+	}
+	if enabled {
+		if err := sm.probe.Enable(def.InitName); err != nil {
+			return fmt.Errorf("enabling auto-start for %s: %w", def.InitName, err)
+		}
+	} else {
+		if err := sm.probe.Disable(def.InitName); err != nil {
+			return fmt.Errorf("disabling auto-start for %s: %w", def.InitName, err)
+		}
+	}
+	sm.refreshOne(serviceID)
+	return nil
+}
+
 func (sm *ServiceManager) findDef(serviceID string) (serviceDefinition, error) {
 	for _, def := range sm.defs {
 		if def.ID == serviceID {
@@ -414,6 +444,12 @@ func (r *RealSystemProbe) IsAutoStart(initName string) bool {
 	err := exec.Command("/etc/init.d/"+initName, "enabled").Run()
 	return err == nil
 }
+func (r *RealSystemProbe) Enable(initName string) error {
+	return exec.Command("/etc/init.d/"+initName, "enable").Run()
+}
+func (r *RealSystemProbe) Disable(initName string) error {
+	return exec.Command("/etc/init.d/"+initName, "disable").Run()
+}
 
 // --- Mock implementations for tests ---
 
@@ -474,3 +510,11 @@ func (m *MockSystemProbe) Stop(initName string) (string, error) {
 	return "ok", nil
 }
 func (m *MockSystemProbe) IsAutoStart(initName string) bool { return m.autoStart[initName] }
+func (m *MockSystemProbe) Enable(initName string) error {
+	m.autoStart[initName] = true
+	return nil
+}
+func (m *MockSystemProbe) Disable(initName string) error {
+	delete(m.autoStart, initName)
+	return nil
+}

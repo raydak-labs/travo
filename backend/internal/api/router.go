@@ -79,6 +79,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/services/:id/remove/stream", RemoveServiceStreamHandler(deps.ServiceManager))
 	v1.Post("/services/:id/start", StartServiceHandler(deps.ServiceManager))
 	v1.Post("/services/:id/stop", StopServiceHandler(deps.ServiceManager))
+	v1.Post("/services/:id/autostart", SetAutoStartHandler(deps.ServiceManager))
 
 	// AdGuard Home
 	v1.Get("/services/adguardhome/status", AdGuardStatusHandler(deps.AdGuard))

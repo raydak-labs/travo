@@ -70,3 +70,21 @@ export function useStopService() {
     },
   });
 }
+
+export function useSetAutoStart() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      apiClient.post<{ status: string }>(
+        API_ROUTES.services.autostart.replace(':id', id),
+        { enabled },
+      ),
+    onSuccess: () => {
+      toast.success('Auto-start setting updated');
+      void queryClient.invalidateQueries({ queryKey: ['services'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update auto-start', { description: error.message });
+    },
+  });
+}

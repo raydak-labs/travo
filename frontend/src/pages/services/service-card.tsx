@@ -34,7 +34,9 @@ interface ServiceCardProps {
   onRemove: (id: string) => void;
   onStart: (id: string) => void;
   onStop: (id: string) => void;
+  onAutoStartChange: (id: string, enabled: boolean) => void;
   isPending: boolean;
+  isAutoStartPending: boolean;
 }
 
 export function ServiceCard({
@@ -43,7 +45,9 @@ export function ServiceCard({
   onRemove,
   onStart,
   onStop,
+  onAutoStartChange,
   isPending,
+  isAutoStartPending,
 }: ServiceCardProps) {
   const Icon = serviceIcons[service.id] ?? Globe;
 
@@ -69,7 +73,8 @@ export function ServiceCard({
                   id={`autostart-${service.id}`}
                   label="Auto-start"
                   checked={service.auto_start}
-                  readOnly
+                  disabled={isAutoStartPending}
+                  onChange={() => onAutoStartChange(service.id, !service.auto_start)}
                 />
               </div>
             )}

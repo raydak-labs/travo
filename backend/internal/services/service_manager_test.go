@@ -278,3 +278,47 @@ func TestListServicesUsesCache(t *testing.T) {
 	}
 	_ = probe // suppress unused
 }
+
+func TestSetAutoStart(t *testing.T) {
+	pkg := NewMockPackageManager()
+	probe := NewMockSystemProbe()
+	probe.scripts["adguardhome"] = true
+	sm := NewServiceManagerWith(pkg, probe)
+
+	// Install adguardhome first
+	pkg.installed["adguardhome"] = true
+	sm.RefreshCache()
+
+	// Enable auto-start
+	err := sm.SetAutoStart("adguardhome", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, _ := sm.GetServiceStatus("adguardhome")
+	if !info.AutoStart {
+		t.Error("expected auto_start to be true")
+	}
+
+	// Disable auto-start
+	err = sm.SetAutoStart("adguardhome", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, _ = sm.GetServiceStatus("adguardhome")
+	if info.AutoStart {
+		t.Error("expected auto_start to be false")
+	}
+}
+
+func TestSetAutoStart_NotInstalled(t *testing.T) {
+	pkg := NewMockPackageManager()
+	probe := NewMockSystemProbe()
+	sm := NewServiceManagerWith(pkg, probe)
+
+	err := sm.SetAutoStart("adguardhome", true)
+	if err == nil {
+		t.Error("expected error for not installed service")
+	}
+}
