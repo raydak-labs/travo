@@ -83,7 +83,7 @@
 - [x] Internet reachability detection
 - [x] WAN configuration (static IP, DHCP, PPPoE)
 - [x] WAN settings: IP, netmask, gateway, DNS, MTU
-- [ ] WAN/WWAN interplay explanation (which is active, failover?)
+- [x] WAN/WWAN interplay explanation (which is active, failover?)
 - [x] Interface up/down toggle
 
 ### 2.2 Connected Clients

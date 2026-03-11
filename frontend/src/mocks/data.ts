@@ -90,6 +90,18 @@ export const mockNetworkStatus: NetworkStatus = {
   },
   interfaces: [
     {
+      name: 'wan',
+      type: 'wan',
+      ip_address: '',
+      netmask: '',
+      gateway: '',
+      dns_servers: [],
+      mac_address: '00:1A:2B:3C:4D:60',
+      is_up: false,
+      rx_bytes: 0,
+      tx_bytes: 0,
+    },
+    {
       name: 'wlan-sta0',
       type: 'wifi',
       ip_address: '192.168.1.105',
