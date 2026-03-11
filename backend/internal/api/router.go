@@ -48,6 +48,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/firmware/upgrade", FirmwareUpgradeHandler(deps.System))
 	v1.Get("/system/ntp", GetNTPConfigHandler(deps.System))
 	v1.Put("/system/ntp", SetNTPConfigHandler(deps.System))
+	v1.Get("/system/setup-complete", GetSetupCompleteHandler(deps.System))
+	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
 
 	// Network routes
 	v1.Get("/network/status", NetworkStatusHandler(deps.Network))

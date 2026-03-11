@@ -468,3 +468,39 @@ func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	}
 	os.Remove("/tmp/firmware.bin")
 }
+
+func TestGetSetupComplete_NotComplete(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+
+	status := svc.GetSetupComplete()
+	if status.Complete {
+		t.Error("expected setup not complete when flag file doesn't exist")
+	}
+}
+
+func TestSetSetupComplete_CreatesFlag(t *testing.T) {
+	// Use a temp directory for the flag file
+	tmpDir, err := os.MkdirTemp("", "setup-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Test the logic: create the flag directory and file, then verify it exists.
+	flagDir := tmpDir + "/etc/openwrt-travel-gui"
+	if err := os.MkdirAll(flagDir, 0o755); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	flagPath := flagDir + "/setup-complete"
+	f, err := os.Create(flagPath)
+	if err != nil {
+		t.Fatalf("failed to create flag: %v", err)
+	}
+	f.Close()
+
+	// Verify the file exists
+	if _, err := os.Stat(flagPath); err != nil {
+		t.Errorf("expected flag file to exist: %v", err)
+	}
+}

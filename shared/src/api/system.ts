@@ -132,3 +132,8 @@ export interface NTPConfig {
 export interface FirmwareUpgradeRequest {
   readonly keep_settings: boolean;
 }
+
+/** Setup completion status */
+export interface SetupStatus {
+  readonly complete: boolean;
+}

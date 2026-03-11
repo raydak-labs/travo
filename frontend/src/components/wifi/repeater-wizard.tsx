@@ -161,16 +161,15 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
   const canProceedUpstream =
     selectedNetwork != null && (!needsPassword || upstream.password.length >= 8);
   const canProceedAP =
-    apConfig.sameAsUpstream || (apConfig.ssid.length > 0 && (apConfig.encryption === 'none' || apConfig.key.length >= 8));
+    apConfig.sameAsUpstream ||
+    (apConfig.ssid.length > 0 && (apConfig.encryption === 'none' || apConfig.key.length >= 8));
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Repeater Setup Wizard</DialogTitle>
-          <DialogDescription>
-            Set up your router as a WiFi repeater in 3 steps.
-          </DialogDescription>
+          <DialogDescription>Set up your router as a WiFi repeater in 3 steps.</DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}
@@ -319,9 +318,7 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
                   <Input
                     id="ap-ssid"
                     value={apConfig.ssid}
-                    onChange={(e) =>
-                      setApConfig((prev) => ({ ...prev, ssid: e.target.value }))
-                    }
+                    onChange={(e) => setApConfig((prev) => ({ ...prev, ssid: e.target.value }))}
                     placeholder="Network name for your devices"
                   />
                 </div>
@@ -367,9 +364,7 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
                       id="ap-key"
                       type="password"
                       value={apConfig.key}
-                      onChange={(e) =>
-                        setApConfig((prev) => ({ ...prev, key: e.target.value }))
-                      }
+                      onChange={(e) => setApConfig((prev) => ({ ...prev, key: e.target.value }))}
                       placeholder="Minimum 8 characters"
                     />
                     {apConfig.key.length > 0 && apConfig.key.length < 8 && (
@@ -404,21 +399,19 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
                 <div className="flex items-center gap-2">
                   <Wifi className="h-4 w-4 text-gray-500" />
                   <span className="text-sm font-medium">{upstream.ssid}</span>
-                  {selectedNetwork && (
-                    <SecurityBadge encryption={selectedNetwork.encryption} />
-                  )}
+                  {selectedNetwork && <SecurityBadge encryption={selectedNetwork.encryption} />}
                 </div>
               </div>
 
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Access Point
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Access Point</h3>
               <div className="rounded-lg border p-3">
                 <div className="flex items-center gap-2">
                   <Radio className="h-4 w-4 text-gray-500" />
                   <span className="text-sm font-medium">{effectiveAPSSID}</span>
                   <Badge variant="outline">
-                    {effectiveAPEncryption === 'none' ? 'Open' : effectiveAPEncryption.toUpperCase()}
+                    {effectiveAPEncryption === 'none'
+                      ? 'Open'
+                      : effectiveAPEncryption.toUpperCase()}
                   </Badge>
                 </div>
                 {apConfig.sameAsUpstream && (
@@ -434,11 +427,7 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
             )}
 
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setStep('configure-ap')}
-                disabled={applying}
-              >
+              <Button variant="outline" onClick={() => setStep('configure-ap')} disabled={applying}>
                 <ArrowLeft className="mr-1.5 h-4 w-4" />
                 Back
               </Button>

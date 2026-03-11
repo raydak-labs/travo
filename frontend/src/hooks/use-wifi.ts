@@ -33,8 +33,12 @@ export function useWifiConnection() {
 export function useWifiConnect() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: { ssid: string; password: string; encryption?: string; hidden?: boolean }) =>
-      apiClient.post<{ status: string }>(API_ROUTES.wifi.connect, params),
+    mutationFn: (params: {
+      ssid: string;
+      password: string;
+      encryption?: string;
+      hidden?: boolean;
+    }) => apiClient.post<{ status: string }>(API_ROUTES.wifi.connect, params),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
       // Delay refetch so the wireless subsystem has time to apply changes after wifi reload

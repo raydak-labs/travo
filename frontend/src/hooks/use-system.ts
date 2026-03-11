@@ -12,6 +12,7 @@ import type {
   SetLEDRequest,
   TimezoneConfig,
   NTPConfig,
+  SetupStatus,
 } from '@shared/index';
 
 export function useSystemInfo() {
@@ -244,6 +245,23 @@ export function useSetNTPConfig() {
     },
     onError: (error) => {
       toast.error('Failed to update NTP configuration', { description: error.message });
+    },
+  });
+}
+
+export function useSetupStatus() {
+  return useQuery({
+    queryKey: ['system', 'setup-complete'],
+    queryFn: () => apiClient.get<SetupStatus>(API_ROUTES.system.setupComplete),
+  });
+}
+
+export function useCompleteSetup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.setupComplete),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['system', 'setup-complete'] });
     },
   });
 }

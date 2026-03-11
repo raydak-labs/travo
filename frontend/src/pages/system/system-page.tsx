@@ -345,9 +345,7 @@ export function SystemPage() {
                 </div>
               </div>
               <Button
-                onClick={() =>
-                  setNTPMutation.mutate({ enabled: ntpEnabled, servers: ntpServers })
-                }
+                onClick={() => setNTPMutation.mutate({ enabled: ntpEnabled, servers: ntpServers })}
                 disabled={setNTPMutation.isPending}
                 size="sm"
               >
@@ -611,11 +609,7 @@ export function SystemPage() {
                   e.target.value = '';
                 }}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => firmwareInputRef.current?.click()}
-              >
+              <Button variant="outline" size="sm" onClick={() => firmwareInputRef.current?.click()}>
                 <Upload className="mr-2 h-4 w-4" />
                 Select Firmware Image
               </Button>

@@ -390,6 +390,27 @@ func (s *SystemService) FactoryReset() error {
 	return nil
 }
 
+const setupCompleteFlagPath = "/etc/openwrt-travel-gui/setup-complete"
+
+// GetSetupComplete checks whether the first-run setup has been completed.
+func (s *SystemService) GetSetupComplete() models.SetupStatus {
+	_, err := os.Stat(setupCompleteFlagPath)
+	return models.SetupStatus{Complete: err == nil}
+}
+
+// SetSetupComplete marks the first-run setup as completed by creating the flag file.
+func (s *SystemService) SetSetupComplete() error {
+	dir := filepath.Dir(setupCompleteFlagPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create setup dir: %w", err)
+	}
+	f, err := os.Create(setupCompleteFlagPath)
+	if err != nil {
+		return fmt.Errorf("create setup flag: %w", err)
+	}
+	return f.Close()
+}
+
 // logLevelSeverity maps syslog level names to numeric severity (lower = more severe).
 var logLevelSeverity = map[string]int{
 	"emerg":   0,

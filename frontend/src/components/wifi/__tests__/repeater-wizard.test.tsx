@@ -20,9 +20,7 @@ function renderWizard(open = true, onOpenChange = vi.fn()) {
 
   const rootRoute = createRootRoute({ component: Outlet });
 
-  const TestComponent = () => (
-    <RepeaterWizard open={open} onOpenChange={onOpenChange} />
-  );
+  const TestComponent = () => <RepeaterWizard open={open} onOpenChange={onOpenChange} />;
 
   const testRoute = createRoute({
     getParentRoute: () => rootRoute,

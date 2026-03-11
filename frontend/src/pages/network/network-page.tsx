@@ -1,5 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Network, Globe, Wifi, Settings, List, MapPin, Trash2, HardDrive, Power, Search } from 'lucide-react';
+import {
+  Network,
+  Globe,
+  Wifi,
+  Settings,
+  List,
+  MapPin,
+  Trash2,
+  HardDrive,
+  Power,
+  Search,
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -191,9 +202,7 @@ export function NetworkPage() {
                   <Button
                     variant={iface.is_up ? 'destructive' : 'default'}
                     size="sm"
-                    onClick={() =>
-                      setInterfaceState.mutate({ name: iface.name, up: !iface.is_up })
-                    }
+                    onClick={() => setInterfaceState.mutate({ name: iface.name, up: !iface.is_up })}
                     disabled={setInterfaceState.isPending}
                   >
                     {iface.is_up ? 'Bring Down' : 'Bring Up'}

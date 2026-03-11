@@ -330,9 +330,7 @@ export function WifiPage() {
                         ];
                         priorityMutation.mutate({ ssids: newSsids });
                       }}
-                      disabled={
-                        index === savedNetworks.length - 1 || priorityMutation.isPending
-                      }
+                      disabled={index === savedNetworks.length - 1 || priorityMutation.isPending}
                       title="Move down (lower priority)"
                     >
                       <ChevronDown className="h-4 w-4" />

@@ -436,4 +436,11 @@ export const handlers = [
   http.put(API_ROUTES.wifi.autoreconnect, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
+
+  http.get(API_ROUTES.system.setupComplete, () => {
+    return HttpResponse.json({ complete: false });
+  }),
+  http.post(API_ROUTES.system.setupComplete, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
 ];

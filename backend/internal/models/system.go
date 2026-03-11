@@ -94,3 +94,8 @@ type LogResponse struct {
 	Lines  []LogEntry `json:"lines"`
 	Total  int        `json:"total"`
 }
+
+// SetupStatus represents whether first-run setup has been completed.
+type SetupStatus struct {
+	Complete bool `json:"complete"`
+}

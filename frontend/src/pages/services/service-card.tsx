@@ -122,11 +122,7 @@ export function ServiceCard({
                 </>
               )}
               {service.id === 'adguardhome' && service.state === 'running' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  asChild
-                >
+                <Button size="sm" variant="outline" asChild>
                   <a
                     href={`http://${window.location.hostname}:3000`}
                     target="_blank"

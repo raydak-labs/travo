@@ -15,7 +15,9 @@ import { ServicesPage } from '@/pages/services/services-page';
 import { NetworkPage } from '@/pages/network/network-page';
 import { SystemPage } from '@/pages/system/system-page';
 import { LogsPage } from '@/pages/logs/logs-page';
+import { SetupPage } from '@/pages/setup/setup-page';
 import { getToken } from '@/lib/api-client';
+import { API_ROUTES } from '@shared/index';
 
 // Root route
 const rootRoute = createRootRoute({
@@ -29,10 +31,42 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
+// Public: Setup wizard
+const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+  beforeLoad: () => {
+    if (!getToken()) {
+      throw redirect({ to: '/login' });
+    }
+  },
+  component: SetupPage,
+});
+
 // Auth guard helper
 function requireAuth() {
   if (!getToken()) {
     throw redirect({ to: '/login' });
+  }
+}
+
+/** Check setup status and redirect to /setup if not complete */
+async function requireSetupComplete() {
+  requireAuth();
+  try {
+    const res = await fetch(API_ROUTES.system.setupComplete, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { complete: boolean };
+      if (!data.complete) {
+        throw redirect({ to: '/setup' });
+      }
+    }
+  } catch (e: unknown) {
+    // Re-throw redirect objects from TanStack Router
+    if (e !== null && typeof e === 'object' && 'to' in e) throw e;
+    // If the check fails (e.g. network error), allow through
   }
 }
 
@@ -49,7 +83,7 @@ const indexRoute = createRoute({
 const protectedRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'protected',
-  beforeLoad: requireAuth,
+  beforeLoad: requireSetupComplete,
 });
 
 // Dashboard
@@ -141,6 +175,7 @@ const logsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  setupRoute,
   protectedRoute.addChildren([
     dashboardRoute,
     wifiRoute,

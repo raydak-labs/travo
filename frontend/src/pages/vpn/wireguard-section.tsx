@@ -245,9 +245,7 @@ export function WireguardSection() {
                 <Switch
                   id="killswitch-toggle"
                   checked={killSwitch?.enabled ?? false}
-                  onChange={() =>
-                    killSwitchMutation.mutate(!(killSwitch?.enabled ?? false))
-                  }
+                  onChange={() => killSwitchMutation.mutate(!(killSwitch?.enabled ?? false))}
                   disabled={killSwitchMutation.isPending}
                 />
               </div>

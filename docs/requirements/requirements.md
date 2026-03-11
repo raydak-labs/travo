@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v19 — firmware upgrade)
+> **Last updated:** 2026-03-11 (v20 — first-run setup wizard)
 
 ---
 
@@ -359,7 +359,7 @@
 - [x] Error handling with toast notifications
 - [ ] Tooltips / hover info for WiFi networks (signal details, channel, etc.)
 - [ ] Tooltips for technical fields (what is MTU? what is DHCP range?)
-- [ ] Onboarding / first-run setup wizard
+- [x] Onboarding / first-run setup wizard
 - [ ] 🔮 Multi-language support (i18n)
 - [ ] 🔮 PWA enhancements (offline indicator, app-like experience)
 

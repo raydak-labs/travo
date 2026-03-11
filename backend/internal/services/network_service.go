@@ -297,7 +297,7 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 		}
 		clients = append(clients, models.Client{
 			IPAddress: ip, MACAddress: mac,
-			InterfaceName: iface,
+			InterfaceName:  iface,
 			ConnectedSince: connectedSince,
 		})
 	}
