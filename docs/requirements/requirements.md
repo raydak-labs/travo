@@ -51,7 +51,7 @@
 ### 1.2 Access Point (AP — Own WiFi for clients)
 
 - [x] Configure AP SSID and password
-- [ ] Separate 2.4 GHz and 5 GHz AP networks (or combined, depending on hardware)
+- [x] Separate 2.4 GHz and 5 GHz AP networks (or combined, depending on hardware)
 - [x] Show which radios are available on the device and their capabilities
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
