@@ -1,7 +1,10 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -302,6 +305,126 @@ func TestParseDHCPLeases_Empty(t *testing.T) {
 	leases := parseDHCPLeases("")
 	if len(leases) != 0 {
 		t.Fatalf("expected no leases, got %d", len(leases))
+	}
+}
+
+func TestSetAlias(t *testing.T) {
+	dir := t.TempDir()
+	aliasFile := filepath.Join(dir, "aliases.json")
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithAliasFile(u, ub, aliasFile)
+
+	// Set an alias
+	err := svc.SetAlias("AA:BB:CC:11:22:33", "John's Laptop")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify file written
+	data, err := os.ReadFile(aliasFile)
+	if err != nil {
+		t.Fatalf("failed to read alias file: %v", err)
+	}
+	var aliases map[string]string
+	if err := json.Unmarshal(data, &aliases); err != nil {
+		t.Fatalf("failed to parse alias file: %v", err)
+	}
+	if aliases["AA:BB:CC:11:22:33"] != "John's Laptop" {
+		t.Errorf("expected alias 'John's Laptop', got %q", aliases["AA:BB:CC:11:22:33"])
+	}
+}
+
+func TestSetAlias_Remove(t *testing.T) {
+	dir := t.TempDir()
+	aliasFile := filepath.Join(dir, "aliases.json")
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithAliasFile(u, ub, aliasFile)
+
+	// Set then remove
+	_ = svc.SetAlias("AA:BB:CC:11:22:33", "Laptop")
+	err := svc.SetAlias("AA:BB:CC:11:22:33", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, _ := os.ReadFile(aliasFile)
+	var aliases map[string]string
+	_ = json.Unmarshal(data, &aliases)
+	if _, ok := aliases["AA:BB:CC:11:22:33"]; ok {
+		t.Error("expected alias to be removed")
+	}
+}
+
+func TestSetAlias_CaseInsensitive(t *testing.T) {
+	dir := t.TempDir()
+	aliasFile := filepath.Join(dir, "aliases.json")
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithAliasFile(u, ub, aliasFile)
+
+	_ = svc.SetAlias("aa:bb:cc:11:22:33", "Laptop")
+
+	aliases := svc.loadAliases()
+	if aliases["AA:BB:CC:11:22:33"] != "Laptop" {
+		t.Errorf("expected alias stored as uppercase MAC, got %v", aliases)
+	}
+}
+
+func TestGetClients_MergesAliases(t *testing.T) {
+	dir := t.TempDir()
+	aliasFile := filepath.Join(dir, "aliases.json")
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithAliasFile(u, ub, aliasFile)
+
+	// Set alias for one of the mock clients
+	_ = svc.SetAlias("AA:BB:CC:11:22:33", "Work Laptop")
+
+	clients, err := svc.GetClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	found := false
+	for _, c := range clients {
+		if c.MACAddress == "AA:BB:CC:11:22:33" {
+			found = true
+			if c.Alias != "Work Laptop" {
+				t.Errorf("expected alias 'Work Laptop', got %q", c.Alias)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected to find client with MAC AA:BB:CC:11:22:33")
+	}
+}
+
+func TestLoadAliases_NoFile(t *testing.T) {
+	dir := t.TempDir()
+	aliasFile := filepath.Join(dir, "nonexistent.json")
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithAliasFile(u, ub, aliasFile)
+
+	aliases := svc.loadAliases()
+	if len(aliases) != 0 {
+		t.Errorf("expected empty map for nonexistent file, got %v", aliases)
+	}
+}
+
+func TestLoadAliases_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	aliasFile := filepath.Join(dir, "aliases.json")
+	_ = os.WriteFile(aliasFile, []byte("not json"), 0600)
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithAliasFile(u, ub, aliasFile)
+
+	aliases := svc.loadAliases()
+	if len(aliases) != 0 {
+		t.Errorf("expected empty map for invalid JSON, got %v", aliases)
 	}
 }
 

@@ -1,8 +1,10 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,13 +16,57 @@ import (
 
 // NetworkService provides network status and configuration.
 type NetworkService struct {
-	uci  uci.UCI
-	ubus ubus.Ubus
+	uci       uci.UCI
+	ubus      ubus.Ubus
+	aliasFile string
 }
 
 // NewNetworkService creates a new NetworkService.
 func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return &NetworkService{uci: u, ubus: ub}
+	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json"}
+}
+
+// NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
+func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *NetworkService {
+	return &NetworkService{uci: u, ubus: ub, aliasFile: aliasFile}
+}
+
+// loadAliases reads the alias file and returns a mac->alias map.
+func (n *NetworkService) loadAliases() map[string]string {
+	data, err := os.ReadFile(n.aliasFile)
+	if err != nil {
+		return map[string]string{}
+	}
+	aliases := map[string]string{}
+	if err := json.Unmarshal(data, &aliases); err != nil {
+		return map[string]string{}
+	}
+	return aliases
+}
+
+// saveAliases writes the alias map to the alias file.
+func (n *NetworkService) saveAliases(aliases map[string]string) error {
+	dir := filepath.Dir(n.aliasFile)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("creating alias directory: %w", err)
+	}
+	data, err := json.Marshal(aliases)
+	if err != nil {
+		return fmt.Errorf("marshaling aliases: %w", err)
+	}
+	return os.WriteFile(n.aliasFile, data, 0600)
+}
+
+// SetAlias sets or removes (if empty) an alias for a MAC address.
+func (n *NetworkService) SetAlias(mac, alias string) error {
+	aliases := n.loadAliases()
+	upperMAC := strings.ToUpper(mac)
+	if alias == "" {
+		delete(aliases, upperMAC)
+	} else {
+		aliases[upperMAC] = alias
+	}
+	return n.saveAliases(aliases)
 }
 
 func maskToNetmask(mask float64) string {
@@ -267,13 +313,20 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	return n.uci.Commit("network")
 }
 
-// GetClients returns connected LAN clients.
+// GetClients returns connected LAN clients with aliases merged.
 func (n *NetworkService) GetClients() ([]models.Client, error) {
 	status, err := n.GetNetworkStatus()
 	if err != nil {
 		return nil, err
 	}
-	return status.Clients, nil
+	aliases := n.loadAliases()
+	clients := status.Clients
+	for i := range clients {
+		if alias, ok := aliases[strings.ToUpper(clients[i].MACAddress)]; ok {
+			clients[i].Alias = alias
+		}
+	}
+	return clients, nil
 }
 
 // GetDHCPConfig returns the DHCP configuration for the LAN.

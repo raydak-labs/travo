@@ -75,9 +75,10 @@ describe('NetworkPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('MacBook-Pro')).toBeInTheDocument();
+      // Clients with aliases show the alias as primary name
+      expect(screen.getByText("John's Laptop")).toBeInTheDocument();
       expect(screen.getByText('iPhone-15')).toBeInTheDocument();
-      expect(screen.getByText('iPad-Air')).toBeInTheDocument();
+      expect(screen.getByText('Living Room iPad')).toBeInTheDocument();
     });
   });
 

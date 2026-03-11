@@ -31,10 +31,17 @@ export interface Client {
   readonly ip_address: string;
   readonly mac_address: string;
   readonly hostname: string;
+  readonly alias?: string;
   readonly interface_name: string;
   readonly rx_bytes: number;
   readonly tx_bytes: number;
   readonly connected_since: string;
+}
+
+/** Request to set a device alias */
+export interface SetAliasRequest {
+  readonly mac: string;
+  readonly alias: string;
 }
 
 /** Overall network status */

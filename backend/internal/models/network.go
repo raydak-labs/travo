@@ -30,10 +30,17 @@ type Client struct {
 	IPAddress      string `json:"ip_address"`
 	MACAddress     string `json:"mac_address"`
 	Hostname       string `json:"hostname"`
+	Alias          string `json:"alias,omitempty"`
 	InterfaceName  string `json:"interface_name"`
 	RxBytes        int64  `json:"rx_bytes"`
 	TxBytes        int64  `json:"tx_bytes"`
 	ConnectedSince string `json:"connected_since"`
+}
+
+// SetAliasRequest holds the request to set a device alias.
+type SetAliasRequest struct {
+	MAC   string `json:"mac"`
+	Alias string `json:"alias"`
 }
 
 // NetworkStatus is the overall network state.

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { NetworkStatus, WanConfig, Client, DHCPConfig, DNSConfig, DHCPLease } from '@shared/index';
+import type { NetworkStatus, WanConfig, Client, DHCPConfig, DNSConfig, DHCPLease, SetAliasRequest } from '@shared/index';
 
 export function useNetworkStatus() {
   return useQuery({
@@ -88,6 +88,21 @@ export function useSetDHCPConfig() {
     },
     onError: (error) => {
       toast.error('Failed to update DHCP config', { description: error.message });
+    },
+  });
+}
+
+export function useSetClientAlias() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SetAliasRequest) =>
+      apiClient.put<{ status: string }>(API_ROUTES.network.clientAlias, data),
+    onSuccess: () => {
+      toast.success('Client alias updated');
+      void queryClient.invalidateQueries({ queryKey: ['network'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update alias', { description: error.message });
     },
   });
 }

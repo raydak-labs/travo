@@ -169,3 +169,23 @@ func GetDHCPLeasesHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(leases)
 	}
 }
+
+// SetClientAliasHandler handles PUT /api/v1/network/clients/alias.
+func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.SetAliasRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if req.MAC == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+		}
+		if !isValidMAC(req.MAC) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+		}
+		if err := svc.SetAlias(req.MAC, req.Alias); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

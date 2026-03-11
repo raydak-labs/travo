@@ -23,6 +23,7 @@ export const API_ROUTES = {
     status: '/api/v1/network/status',
     wan: '/api/v1/network/wan',
     clients: '/api/v1/network/clients',
+    clientAlias: '/api/v1/network/clients/alias',
     dhcp: '/api/v1/network/dhcp',
     dhcpLeases: '/api/v1/network/dhcp/leases',
     dns: '/api/v1/network/dns',

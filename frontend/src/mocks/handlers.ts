@@ -164,6 +164,10 @@ export const handlers = [
     return HttpResponse.json(mockClients);
   }),
 
+  http.put(API_ROUTES.network.clientAlias, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.network.dhcp, () => {
     return HttpResponse.json(mockDHCPConfig);
   }),
