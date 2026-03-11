@@ -20,6 +20,9 @@ This is a pnpm monorepo with:
 - Run `cd backend && go mod tidy` for Go dependencies
 - Run `make test` to run all tests
 - Run `make dev` for development servers
+- Run `make format` for formatting code
+- Run `make lint` to run lint check
+- Run `make build` to build the projects
 
 ## Testing
 
@@ -38,5 +41,5 @@ Follow TDD: write tests first, see them fail, write minimal code to pass.
 
 ## Commit / finish task
 
-- before you finish the task you must ensure the lint and tests are working (check Makefile for general things)
+- before you finish the task you must ensure the lint, tests and build are working (check Makefile for general things)
 - if you have failed tests focus only on running them and at the end again test with Makefile
