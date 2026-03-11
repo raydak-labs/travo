@@ -240,12 +240,13 @@ func listLEDs() []string {
 }
 
 // GetLogs retrieves system logs from logread.
-func (s *SystemService) GetLogs() (models.LogResponse, error) {
+// If service is non-empty, only lines containing that service name (case-insensitive) are returned.
+func (s *SystemService) GetLogs(service string) (models.LogResponse, error) {
 	out, err := exec.Command("logread").CombinedOutput()
 	if err != nil {
 		return models.LogResponse{}, err
 	}
-	return parseLogOutput("syslog", string(out)), nil
+	return parseLogOutput("syslog", string(out), service), nil
 }
 
 // GetKernelLogs retrieves kernel logs from dmesg.
@@ -254,7 +255,7 @@ func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
 	if err != nil {
 		return models.LogResponse{}, err
 	}
-	return parseLogOutput("kernel", string(out)), nil
+	return parseLogOutput("kernel", string(out), ""), nil
 }
 
 // CreateBackup generates a configuration backup archive and returns its path.
@@ -289,13 +290,18 @@ func (s *SystemService) FactoryReset() error {
 	return nil
 }
 
-func parseLogOutput(source, output string) models.LogResponse {
+func parseLogOutput(source, output, service string) models.LogResponse {
 	raw := strings.Split(strings.TrimSpace(output), "\n")
 	lines := make([]models.LogEntry, 0, len(raw))
+	serviceLower := strings.ToLower(service)
 	for _, l := range raw {
-		if l != "" {
-			lines = append(lines, models.LogEntry{Line: l})
+		if l == "" {
+			continue
 		}
+		if service != "" && !strings.Contains(strings.ToLower(l), serviceLower) {
+			continue
+		}
+		lines = append(lines, models.LogEntry{Line: l})
 	}
 	return models.LogResponse{
 		Source: source,

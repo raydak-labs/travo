@@ -35,7 +35,20 @@ export const handlers = [
     return HttpResponse.json(mockSystemStats);
   }),
 
-  http.get(API_ROUTES.system.logs, () => {
+  http.get(API_ROUTES.system.logs, ({ request }) => {
+    const url = new URL(request.url);
+    const service = url.searchParams.get('service');
+    if (service) {
+      const lower = service.toLowerCase();
+      const filtered = mockSystemLogs.lines.filter((entry) =>
+        entry.line.toLowerCase().includes(lower),
+      );
+      return HttpResponse.json({
+        source: mockSystemLogs.source,
+        lines: filtered,
+        total: filtered.length,
+      });
+    }
     return HttpResponse.json(mockSystemLogs);
   }),
 

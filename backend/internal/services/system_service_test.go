@@ -134,7 +134,7 @@ func (p *testStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 
 func TestParseLogOutput_Normal(t *testing.T) {
 	input := "line one\nline two\nline three"
-	result := parseLogOutput("syslog", input)
+	result := parseLogOutput("syslog", input, "")
 
 	if result.Source != "syslog" {
 		t.Errorf("expected source 'syslog', got %q", result.Source)
@@ -154,7 +154,7 @@ func TestParseLogOutput_Normal(t *testing.T) {
 }
 
 func TestParseLogOutput_Empty(t *testing.T) {
-	result := parseLogOutput("kernel", "")
+	result := parseLogOutput("kernel", "", "")
 
 	if result.Source != "kernel" {
 		t.Errorf("expected source 'kernel', got %q", result.Source)
@@ -169,7 +169,7 @@ func TestParseLogOutput_Empty(t *testing.T) {
 
 func TestParseLogOutput_BlankLines(t *testing.T) {
 	input := "first\n\nsecond\n\n\nthird\n"
-	result := parseLogOutput("syslog", input)
+	result := parseLogOutput("syslog", input, "")
 
 	if result.Total != 3 {
 		t.Errorf("expected 3 non-blank lines, got %d", result.Total)
@@ -179,6 +179,37 @@ func TestParseLogOutput_BlankLines(t *testing.T) {
 	}
 	if result.Lines[1].Line != "second" {
 		t.Errorf("expected 'second', got %q", result.Lines[1].Line)
+	}
+}
+
+func TestParseLogOutput_ServiceFilter(t *testing.T) {
+	input := `Tue Mar 11 09:17:52 2026 daemon.info dnsmasq[1234]: query from 192.168.8.100
+Tue Mar 11 09:17:53 2026 daemon.info AdGuardHome[3732]: blocked ad.example.com
+Tue Mar 11 09:17:54 2026 daemon.info dnsmasq[1234]: forwarded google.com
+Tue Mar 11 09:17:55 2026 kern.info netifd[456]: interface up`
+
+	// Filter by dnsmasq
+	result := parseLogOutput("syslog", input, "dnsmasq")
+	if result.Total != 2 {
+		t.Errorf("expected 2 dnsmasq lines, got %d", result.Total)
+	}
+
+	// Filter by AdGuardHome (case-insensitive)
+	result = parseLogOutput("syslog", input, "adguardhome")
+	if result.Total != 1 {
+		t.Errorf("expected 1 AdGuardHome line, got %d", result.Total)
+	}
+
+	// No filter returns all
+	result = parseLogOutput("syslog", input, "")
+	if result.Total != 4 {
+		t.Errorf("expected 4 lines with no filter, got %d", result.Total)
+	}
+
+	// Non-matching filter returns none
+	result = parseLogOutput("syslog", input, "wireguard")
+	if result.Total != 0 {
+		t.Errorf("expected 0 lines for wireguard filter, got %d", result.Total)
 	}
 }
 

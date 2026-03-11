@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { ScrollText, Search, RefreshCw } from 'lucide-react';
+import { ScrollText, Search, RefreshCw, Filter } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,31 @@ import { useSystemLogs, useKernelLogs } from '@/hooks/use-system';
 
 type LogTab = 'system' | 'kernel';
 
+const SERVICE_FILTERS = [
+  { label: 'All', value: '' },
+  { label: 'dnsmasq', value: 'dnsmasq' },
+  { label: 'AdGuardHome', value: 'AdGuardHome' },
+  { label: 'wireguard', value: 'wireguard' },
+  { label: 'netifd', value: 'netifd' },
+  { label: 'hostapd', value: 'hostapd' },
+  { label: 'dropbear', value: 'dropbear' },
+] as const;
+
 export function LogsPage() {
   const [activeTab, setActiveTab] = useState<LogTab>('system');
   const [filter, setFilter] = useState('');
+  const [serviceFilter, setServiceFilter] = useState('');
+  const [customService, setCustomService] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
 
-  const { data: systemLogs, isLoading: systemLoading, refetch: refetchSystem } = useSystemLogs();
+  const activeService = showCustomInput ? customService : serviceFilter;
+
+  const {
+    data: systemLogs,
+    isLoading: systemLoading,
+    refetch: refetchSystem,
+  } = useSystemLogs(activeTab === 'system' ? activeService || undefined : undefined);
   const { data: kernelLogs, isLoading: kernelLoading, refetch: refetchKernel } = useKernelLogs();
 
   const logs = activeTab === 'system' ? systemLogs : kernelLogs;
@@ -80,6 +99,48 @@ export function LogsPage() {
               </Button>
             </div>
           </div>
+
+          {/* Service filter (system logs only) */}
+          {activeTab === 'system' && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-400" />
+              {SERVICE_FILTERS.map((sf) => (
+                <Button
+                  key={sf.value}
+                  variant={!showCustomInput && serviceFilter === sf.value ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setServiceFilter(sf.value);
+                    setShowCustomInput(false);
+                    setCustomService('');
+                  }}
+                >
+                  {sf.label}
+                </Button>
+              ))}
+              <Button
+                variant={showCustomInput ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setShowCustomInput(true);
+                  setServiceFilter('');
+                }}
+              >
+                Custom
+              </Button>
+              {showCustomInput && (
+                <Input
+                  placeholder="Service name…"
+                  value={customService}
+                  onChange={(e) => setCustomService(e.target.value)}
+                  className="h-7 w-40 text-xs"
+                  autoFocus
+                />
+              )}
+            </div>
+          )}
 
           {/* Log display */}
           {isLoading ? (

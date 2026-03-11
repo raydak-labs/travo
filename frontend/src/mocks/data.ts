@@ -369,8 +369,16 @@ export const mockDNSConfig: DNSConfig = {
 
 export const mockSystemLogs: LogResponse = {
   source: 'system',
-  lines: [{ line: '2026-03-04T12:00:00Z kern.info System started' }],
-  total: 1,
+  lines: [
+    { line: 'Tue Mar 11 09:17:50 2026 daemon.info dnsmasq[1234]: query[A] google.com from 192.168.8.100' },
+    { line: 'Tue Mar 11 09:17:51 2026 daemon.info AdGuardHome[3732]: blocked ad.tracker.com' },
+    { line: 'Tue Mar 11 09:17:52 2026 daemon.info dnsmasq[1234]: forwarded google.com to 8.8.8.8' },
+    { line: 'Tue Mar 11 09:17:53 2026 kern.info netifd[456]: Interface wan up' },
+    { line: 'Tue Mar 11 09:17:54 2026 daemon.info hostapd[789]: wlan0: STA aa:bb:cc:dd:ee:ff associated' },
+    { line: 'Tue Mar 11 09:17:55 2026 authpriv.info dropbear[1024]: Password auth succeeded for root' },
+    { line: 'Tue Mar 11 09:17:56 2026 daemon.info wireguard: wg0 peer endpoint 10.0.0.1:51820 handshake' },
+  ],
+  total: 7,
 };
 
 export const mockKernelLogs: LogResponse = {

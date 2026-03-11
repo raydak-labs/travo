@@ -320,7 +320,7 @@
 
 - [x] System log viewer (logread / syslog)
 - [x] Kernel log (dmesg)
-- [ ] Service-specific logs (AdGuard, WireGuard, etc.)
+- [x] Service-specific logs (AdGuard, WireGuard, etc.)
 - [ ] Log level filtering
 - [x] Log search / filter
 - [ ] 🔮 Log export / download
