@@ -98,6 +98,7 @@ describe('SavedNetwork', () => {
       mode: 'client',
       auto_connect: true,
       priority: 1,
+      section: 'wifinet2',
     };
     expect(saved.auto_connect).toBe(true);
     expect(saved.priority).toBe(1);

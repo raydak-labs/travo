@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Package } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,6 +10,14 @@ import {
   useStopService,
 } from '@/hooks/use-services';
 import { ServiceCard } from './service-card';
+import { InstallLogDialog } from './install-log-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+
+interface StreamAction {
+  serviceId: string;
+  serviceName: string;
+  action: 'install' | 'remove';
+}
 
 export function ServicesPage() {
   const { data: services = [], isLoading } = useServices();
@@ -16,12 +25,30 @@ export function ServicesPage() {
   const removeMutation = useRemoveService();
   const startMutation = useStartService();
   const stopMutation = useStopService();
+  const queryClient = useQueryClient();
+
+  const [streamAction, setStreamAction] = useState<StreamAction | null>(null);
 
   const isPending =
     installMutation.isPending ||
     removeMutation.isPending ||
     startMutation.isPending ||
     stopMutation.isPending;
+
+  const handleInstall = (id: string) => {
+    const service = services.find((s) => s.id === id);
+    setStreamAction({ serviceId: id, serviceName: service?.name ?? id, action: 'install' });
+  };
+
+  const handleRemove = (id: string) => {
+    const service = services.find((s) => s.id === id);
+    setStreamAction({ serviceId: id, serviceName: service?.name ?? id, action: 'remove' });
+  };
+
+  const handleStreamComplete = () => {
+    setStreamAction(null);
+    void queryClient.invalidateQueries({ queryKey: ['services'] });
+  };
 
   return (
     <div className="space-y-6">
@@ -45,17 +72,28 @@ export function ServicesPage() {
                 <ServiceCard
                   key={service.id}
                   service={service}
-                  onInstall={(id) => installMutation.mutate(id)}
-                  onRemove={(id) => removeMutation.mutate(id)}
+                  onInstall={handleInstall}
+                  onRemove={handleRemove}
                   onStart={(id) => startMutation.mutate(id)}
                   onStop={(id) => stopMutation.mutate(id)}
-                  isPending={isPending}
+                  isPending={isPending || streamAction !== null}
                 />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {streamAction && (
+        <InstallLogDialog
+          open={true}
+          onOpenChange={(open) => !open && handleStreamComplete()}
+          serviceId={streamAction.serviceId}
+          serviceName={streamAction.serviceName}
+          action={streamAction.action}
+          onComplete={handleStreamComplete}
+        />
+      )}
     </div>
   );
 }

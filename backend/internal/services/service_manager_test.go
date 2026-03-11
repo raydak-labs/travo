@@ -123,3 +123,75 @@ func TestRemoveServiceStopsFirst(t *testing.T) {
 		t.Error("expected stopped after remove")
 	}
 }
+
+func TestInstallWithLog(t *testing.T) {
+	sm, pkg, _ := newTestServiceManager()
+	var lines []string
+	logFn := func(line string) { lines = append(lines, line) }
+
+	err := sm.InstallWithLog("adguardhome", logFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pkg.IsInstalled("adguardhome") {
+		t.Error("expected package installed")
+	}
+	if len(lines) < 2 {
+		t.Errorf("expected at least 2 log lines, got %d", len(lines))
+	}
+}
+
+func TestInstallWithLogNotFound(t *testing.T) {
+	sm, _, _ := newTestServiceManager()
+	err := sm.InstallWithLog("nonexistent", func(string) {})
+	if err == nil {
+		t.Error("expected error for nonexistent service")
+	}
+}
+
+func TestRemoveWithLog(t *testing.T) {
+	sm, pkg, probe := newTestServiceManager()
+	_ = sm.Install("adguardhome")
+	probe.scripts["adguardhome"] = true
+	_ = sm.Start("adguardhome")
+
+	var lines []string
+	logFn := func(line string) { lines = append(lines, line) }
+
+	err := sm.RemoveWithLog("adguardhome", logFn)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pkg.IsInstalled("adguardhome") {
+		t.Error("expected package removed")
+	}
+	if len(lines) < 2 {
+		t.Errorf("expected at least 2 log lines, got %d", len(lines))
+	}
+}
+
+func TestRemoveWithLogStopsRunning(t *testing.T) {
+	sm, _, probe := newTestServiceManager()
+	_ = sm.Install("adguardhome")
+	probe.scripts["adguardhome"] = true
+	_ = sm.Start("adguardhome")
+
+	var lines []string
+	logFn := func(line string) { lines = append(lines, line) }
+
+	_ = sm.RemoveWithLog("adguardhome", logFn)
+	if probe.running["adguardhome"] {
+		t.Error("expected service stopped before removal")
+	}
+	// Should contain a "Stopping" line
+	found := false
+	for _, l := range lines {
+		if l == "Stopping adguardhome..." {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected 'Stopping adguardhome...' in log output")
+	}
+}

@@ -77,3 +77,67 @@ export const apiClient = {
     return request<T>('DELETE', path);
   },
 };
+
+/** NDJSON stream event from the backend. */
+export interface StreamEvent {
+  type: 'log' | 'done' | 'error';
+  data?: string;
+}
+
+/**
+ * Makes a POST request that returns an NDJSON stream.
+ * Calls onEvent for each parsed event. Resolves when the stream ends.
+ */
+export async function streamRequest(
+  path: string,
+  onEvent: (event: StreamEvent) => void,
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(path, { method: 'POST', headers });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      handleUnauthorized();
+    }
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        onEvent(JSON.parse(trimmed) as StreamEvent);
+      } catch {
+        // skip malformed lines
+      }
+    }
+  }
+
+  // Process any remaining buffer
+  if (buffer.trim()) {
+    try {
+      onEvent(JSON.parse(buffer.trim()) as StreamEvent);
+    } catch {
+      // skip
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v2)
+> **Last updated:** 2025-07-16 (v3 — service install log streaming)
 
 ---
 
@@ -176,8 +176,8 @@
 - [x] Install packages (APK or opkg auto-detection)
 - [x] Remove packages
 - [x] Start / stop services via init.d
-- [ ] Install progress feedback — streaming log output in a popup/dialog so user sees what's happening
-- [ ] Show install errors clearly
+- [x] Install progress feedback — streaming log output in a popup/dialog so user sees what's happening
+- [x] Show install errors clearly
 - [ ] Service auto-start on boot toggle
 - [ ] Backend caches installed-service state at startup; updates on install/remove actions
 

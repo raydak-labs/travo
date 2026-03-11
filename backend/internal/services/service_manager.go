@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +16,8 @@ type PackageManager interface {
 	Install(pkg string) (string, error)
 	Remove(pkg string) (string, error)
 	IsInstalled(pkg string) bool
+	InstallStream(pkg string, logFn func(string)) error
+	RemoveStream(pkg string, logFn func(string)) error
 }
 
 // SystemProbe abstracts init.d and process checks.
@@ -170,6 +173,45 @@ func (sm *ServiceManager) Remove(serviceID string) error {
 	return nil
 }
 
+// InstallWithLog installs packages and streams output line by line via logFn.
+func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
+	}
+	for _, pkg := range def.Packages {
+		logFn(fmt.Sprintf("Installing package: %s", pkg))
+		if err := sm.pkg.InstallStream(pkg, logFn); err != nil {
+			return fmt.Errorf("failed to install %s: %w", pkg, err)
+		}
+	}
+	return nil
+}
+
+// RemoveWithLog removes packages and streams output line by line via logFn.
+func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	def, err := sm.findDef(serviceID)
+	if err != nil {
+		return err
+	}
+	// Stop first if running
+	if def.InitName != "" && sm.probe.IsRunning(def.InitName) {
+		logFn(fmt.Sprintf("Stopping %s...", def.InitName))
+		_, _ = sm.probe.Stop(def.InitName)
+	}
+	for _, pkg := range def.Packages {
+		logFn(fmt.Sprintf("Removing package: %s", pkg))
+		if err := sm.pkg.RemoveStream(pkg, logFn); err != nil {
+			return fmt.Errorf("failed to remove %s: %w", pkg, err)
+		}
+	}
+	return nil
+}
+
 // Start starts a service via init.d.
 func (sm *ServiceManager) Start(serviceID string) error {
 	sm.mu.Lock()
@@ -246,6 +288,12 @@ func (a *ApkPackageManager) IsInstalled(pkg string) bool {
 	err := exec.Command("apk", "info", "-e", pkg).Run()
 	return err == nil
 }
+func (a *ApkPackageManager) InstallStream(pkg string, logFn func(string)) error {
+	return streamCommand(exec.Command("apk", "add", pkg), logFn)
+}
+func (a *ApkPackageManager) RemoveStream(pkg string, logFn func(string)) error {
+	return streamCommand(exec.Command("apk", "del", pkg), logFn)
+}
 
 // OpkgPackageManager uses opkg (OpenWrt <25).
 type OpkgPackageManager struct{}
@@ -262,6 +310,12 @@ func (o *OpkgPackageManager) IsInstalled(pkg string) bool {
 	out, err := exec.Command("opkg", "list-installed", pkg).CombinedOutput()
 	return err == nil && strings.Contains(string(out), pkg)
 }
+func (o *OpkgPackageManager) InstallStream(pkg string, logFn func(string)) error {
+	return streamCommand(exec.Command("opkg", "install", pkg), logFn)
+}
+func (o *OpkgPackageManager) RemoveStream(pkg string, logFn func(string)) error {
+	return streamCommand(exec.Command("opkg", "remove", pkg), logFn)
+}
 
 // NoopPackageManager for systems without a package manager.
 type NoopPackageManager struct{}
@@ -273,6 +327,32 @@ func (n *NoopPackageManager) Remove(string) (string, error) {
 	return "", fmt.Errorf("no package manager available")
 }
 func (n *NoopPackageManager) IsInstalled(string) bool { return false }
+func (n *NoopPackageManager) InstallStream(string, func(string)) error {
+	return fmt.Errorf("no package manager available")
+}
+func (n *NoopPackageManager) RemoveStream(string, func(string)) error {
+	return fmt.Errorf("no package manager available")
+}
+
+// streamCommand runs a command and sends each output line to logFn.
+func streamCommand(cmd *exec.Cmd, logFn func(string)) error {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = cmd.Stdout // merge stderr into stdout
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		logFn(scanner.Text())
+	}
+
+	return cmd.Wait()
+}
 
 // RealSystemProbe checks init.d scripts and running processes.
 type RealSystemProbe struct{}
@@ -319,6 +399,18 @@ func (m *MockPackageManager) Remove(pkg string) (string, error) {
 }
 func (m *MockPackageManager) IsInstalled(pkg string) bool {
 	return m.installed[pkg]
+}
+func (m *MockPackageManager) InstallStream(pkg string, logFn func(string)) error {
+	logFn("Installing " + pkg + "...")
+	m.installed[pkg] = true
+	logFn("Package " + pkg + " installed successfully")
+	return nil
+}
+func (m *MockPackageManager) RemoveStream(pkg string, logFn func(string)) error {
+	logFn("Removing " + pkg + "...")
+	delete(m.installed, pkg)
+	logFn("Package " + pkg + " removed successfully")
+	return nil
 }
 
 // MockSystemProbe tracks init.d state in memory.

@@ -39,7 +39,9 @@ export const API_ROUTES = {
   services: {
     list: '/api/v1/services',
     install: '/api/v1/services/:id/install',
+    installStream: '/api/v1/services/:id/install/stream',
     remove: '/api/v1/services/:id/remove',
+    removeStream: '/api/v1/services/:id/remove/stream',
     start: '/api/v1/services/:id/start',
     stop: '/api/v1/services/:id/stop',
   },

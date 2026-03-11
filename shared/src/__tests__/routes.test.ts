@@ -66,7 +66,9 @@ describe('API_ROUTES', () => {
   it('has services routes with :id parameter matching backend', () => {
     expect(API_ROUTES.services.list).toBe('/api/v1/services');
     expect(API_ROUTES.services.install).toBe('/api/v1/services/:id/install');
+    expect(API_ROUTES.services.installStream).toBe('/api/v1/services/:id/install/stream');
     expect(API_ROUTES.services.remove).toBe('/api/v1/services/:id/remove');
+    expect(API_ROUTES.services.removeStream).toBe('/api/v1/services/:id/remove/stream');
     expect(API_ROUTES.services.start).toBe('/api/v1/services/:id/start');
     expect(API_ROUTES.services.stop).toBe('/api/v1/services/:id/stop');
   });
@@ -101,7 +103,9 @@ describe('API_ROUTES', () => {
       '/api/v1/vpn/tailscale/toggle',
       '/api/v1/services',
       '/api/v1/services/:id/install',
+      '/api/v1/services/:id/install/stream',
       '/api/v1/services/:id/remove',
+      '/api/v1/services/:id/remove/stream',
       '/api/v1/services/:id/start',
       '/api/v1/services/:id/stop',
       '/api/v1/captive/status',

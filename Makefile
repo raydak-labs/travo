@@ -49,6 +49,10 @@ package-all: build-all
 deploy:
 	@bash scripts/deploy.sh $(ROUTER_IP)
 
+# Deploy locally via direct copy (fast iteration)
+deploy-local:
+	@bash scripts/deploy-local.sh --build $(DEPLOY_ARGS)
+
 # Start Docker dev environment
 docker-dev:
 	docker compose up
