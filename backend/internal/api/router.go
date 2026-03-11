@@ -80,6 +80,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/wifi/radio", SetRadioEnabledHandler(deps.Wifi))
 	v1.Get("/wifi/ap", GetAPConfigHandler(deps.Wifi))
 	v1.Put("/wifi/ap/:section", SetAPConfigHandler(deps.Wifi))
+	v1.Get("/wifi/radios", GetRadiosHandler(deps.Wifi))
 	v1.Get("/wifi/mac", GetMACHandler(deps.Wifi))
 	v1.Put("/wifi/mac", SetMACHandler(deps.Wifi))
 	v1.Get("/wifi/guest", GetGuestWifiHandler(deps.Wifi))

@@ -202,6 +202,17 @@ func SetMACHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// GetRadiosHandler handles GET /api/v1/wifi/radios.
+func GetRadiosHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		radios, err := svc.GetRadios()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(radios)
+	}
+}
+
 // GetGuestWifiHandler handles GET /api/v1/wifi/guest.
 func GetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

@@ -9,6 +9,7 @@ import {
   Shuffle,
   RotateCcw,
   ShieldCheck,
+  Cpu,
 } from 'lucide-react';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import type { APConfig, GuestWifiConfig } from '@shared/index';
@@ -42,6 +43,7 @@ import {
   useSetMAC,
   useGuestWifi,
   useSetGuestWifi,
+  useRadios,
 } from '@/hooks/use-wifi';
 
 interface APFormState {
@@ -80,6 +82,7 @@ export function WifiPage() {
   const setMAC = useSetMAC();
   const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
   const setGuestWifi = useSetGuestWifi();
+  const { data: radios, isLoading: radiosLoading } = useRadios();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
   const [qrAP, setQrAP] = useState<APConfig | null>(null);
   const [customMAC, setCustomMAC] = useState('');
@@ -128,6 +131,61 @@ export function WifiPage() {
 
       {/* WiFi Mode */}
       <WifiModeCard />
+
+      {/* Radio Hardware */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Radio Hardware</CardTitle>
+          <Cpu className="h-4 w-4 text-gray-400" />
+        </CardHeader>
+        <CardContent>
+          {radiosLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : !radios || radios.length === 0 ? (
+            <p className="text-sm text-gray-500">No radio hardware detected</p>
+          ) : (
+            <div className="space-y-3">
+              {radios.map((radio) => {
+                const bandLabel =
+                  radio.band === '5g'
+                    ? '5 GHz'
+                    : radio.band === '2g'
+                      ? '2.4 GHz'
+                      : radio.band === '6g'
+                        ? '6 GHz'
+                        : radio.band;
+                return (
+                  <div
+                    key={radio.name}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Radio className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {radio.name}
+                        </p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                          <span>{bandLabel}</span>
+                          <span>Ch {radio.channel}</span>
+                          <span>{radio.htmode}</span>
+                          <span>{radio.type}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant={radio.disabled ? 'destructive' : 'success'}>
+                      {radio.disabled ? 'Disabled' : 'Active'}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Current Connection */}
       <Card>

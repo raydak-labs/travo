@@ -253,6 +253,58 @@ func TestWifiDeleteNetwork_NonexistentSection(t *testing.T) {
 	}
 }
 
+func TestGetRadios(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	radios, err := svc.GetRadios()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(radios) < 2 {
+		t.Fatalf("expected at least 2 radios, got %d", len(radios))
+	}
+
+	// Collect radios by name for deterministic checks
+	byName := map[string]models.RadioInfo{}
+	for _, r := range radios {
+		byName[r.Name] = r
+	}
+
+	r0, ok := byName["radio0"]
+	if !ok {
+		t.Fatal("expected radio0")
+	}
+	if r0.Band != "2g" {
+		t.Errorf("radio0 band: expected '2g', got %q", r0.Band)
+	}
+	if r0.Channel != 6 {
+		t.Errorf("radio0 channel: expected 6, got %d", r0.Channel)
+	}
+	if r0.HTMode != "HT20" {
+		t.Errorf("radio0 htmode: expected 'HT20', got %q", r0.HTMode)
+	}
+	if r0.Type != "mac80211" {
+		t.Errorf("radio0 type: expected 'mac80211', got %q", r0.Type)
+	}
+	if r0.Disabled {
+		t.Error("radio0 should not be disabled")
+	}
+
+	r1, ok := byName["radio1"]
+	if !ok {
+		t.Fatal("expected radio1")
+	}
+	if r1.Band != "5g" {
+		t.Errorf("radio1 band: expected '5g', got %q", r1.Band)
+	}
+	if r1.Channel != 36 {
+		t.Errorf("radio1 channel: expected 36, got %d", r1.Channel)
+	}
+	if r1.HTMode != "VHT80" {
+		t.Errorf("radio1 htmode: expected 'VHT80', got %q", r1.HTMode)
+	}
+}
+
 func TestGetAPConfigs(t *testing.T) {
 	svc, _ := newTestWifiService()
 

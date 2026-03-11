@@ -10,6 +10,7 @@ import type {
   APConfig,
   MACConfig,
   GuestWifiConfig,
+  RadioInfo,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -168,6 +169,13 @@ export function useRadioStatus() {
   return useQuery({
     queryKey: ['wifi', 'radio'],
     queryFn: () => apiClient.get<{ enabled: boolean }>(API_ROUTES.wifi.radio),
+  });
+}
+
+export function useRadios() {
+  return useQuery({
+    queryKey: ['wifi', 'radios'],
+    queryFn: () => apiClient.get<RadioInfo[]>(API_ROUTES.wifi.radios),
   });
 }
 

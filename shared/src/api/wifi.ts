@@ -92,6 +92,16 @@ export interface SetMACRequest {
   readonly mac: string;
 }
 
+/** WiFi radio hardware info */
+export interface RadioInfo {
+  readonly name: string;
+  readonly band: string;
+  readonly channel: number;
+  readonly htmode: string;
+  readonly type: string;
+  readonly disabled: boolean;
+}
+
 /** Guest WiFi network configuration */
 export interface GuestWifiConfig {
   readonly enabled: boolean;

@@ -65,3 +65,13 @@ type GuestWifiConfig struct {
 	Encryption string `json:"encryption"`
 	Key        string `json:"key"`
 }
+
+// RadioInfo describes a WiFi radio hardware device.
+type RadioInfo struct {
+	Name     string `json:"name"`
+	Band     string `json:"band"`
+	Channel  int    `json:"channel"`
+	HTMode   string `json:"htmode"`
+	Type     string `json:"type"`
+	Disabled bool   `json:"disabled"`
+}

@@ -28,6 +28,7 @@ import {
   mockDNSEntries,
   mockDHCPReservations,
   mockBlockedClients,
+  mockRadios,
 } from './data';
 
 export const handlers = [
@@ -104,6 +105,10 @@ export const handlers = [
 
   http.get(API_ROUTES.wifi.saved, () => {
     return HttpResponse.json(mockSavedNetworks);
+  }),
+
+  http.get(API_ROUTES.wifi.radios, () => {
+    return HttpResponse.json(mockRadios);
   }),
 
   http.delete(`${API_ROUTES.wifi.deleteSaved}/:section`, () => {

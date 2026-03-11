@@ -24,6 +24,7 @@ import type {
   GuestWifiConfig,
   DNSEntry,
   DHCPReservation,
+  RadioInfo,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -522,6 +523,25 @@ export const mockDHCPReservations: DHCPReservation[] = [
 ];
 
 export const mockBlockedClients: string[] = [];
+
+export const mockRadios: RadioInfo[] = [
+  {
+    name: 'radio0',
+    band: '2g',
+    channel: 6,
+    htmode: 'HE20',
+    type: 'mac80211',
+    disabled: false,
+  },
+  {
+    name: 'radio1',
+    band: '5g',
+    channel: 36,
+    htmode: 'HE80',
+    type: 'mac80211',
+    disabled: false,
+  },
+];
 
 export const mockWireguardProfiles: WireGuardProfile[] = [
   {

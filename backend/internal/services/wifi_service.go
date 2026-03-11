@@ -405,6 +405,37 @@ func (w *WifiService) DeleteNetwork(section string) error {
 	return w.reloader.Reload()
 }
 
+// GetRadios returns information about all WiFi radio hardware.
+func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return []models.RadioInfo{}, nil
+	}
+	var radios []models.RadioInfo
+	for name, opts := range sections {
+		// wifi-device sections have a "type" option (e.g. "mac80211")
+		devType := opts["type"]
+		if devType == "" {
+			continue
+		}
+		channel := 0
+		if ch, ok := opts["channel"]; ok {
+			if v, err := strconv.Atoi(ch); err == nil {
+				channel = v
+			}
+		}
+		radios = append(radios, models.RadioInfo{
+			Name:     name,
+			Band:     opts["band"],
+			Channel:  channel,
+			HTMode:   opts["htmode"],
+			Type:     devType,
+			Disabled: opts["disabled"] == "1",
+		})
+	}
+	return radios, nil
+}
+
 // GetAPConfigs returns the AP configuration for all radios.
 func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
 	var configs []models.APConfig

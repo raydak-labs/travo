@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v12 — WiFi mode selection UI)
+> **Last updated:** 2026-03-11 (v13 — Radio hardware info on WiFi page)
 
 ---
 
@@ -52,7 +52,7 @@
 
 - [x] Configure AP SSID and password
 - [ ] Separate 2.4 GHz and 5 GHz AP networks (or combined, depending on hardware)
-- [ ] Show which radios are available on the device and their capabilities
+- [x] Show which radios are available on the device and their capabilities
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
@@ -68,7 +68,7 @@
 
 ### 1.4 Multi-Radio Support
 
-- [ ] Detect and enumerate all radio hardware (phy0, phy1, …)
+- [x] Detect and enumerate all radio hardware (phy0, phy1, …)
 - [ ] Per-radio configuration (one for uplink, one for AP, etc.)
 - [ ] Recommended configuration based on detected hardware
 - [ ] 🔮 Startup script to auto-discover radio setup and persist config
