@@ -135,3 +135,66 @@ func GetWireguardStatusHandler(svc *services.VpnService) fiber.Handler {
 		return c.JSON(status)
 	}
 }
+
+// GetWireguardProfilesHandler handles GET /api/v1/vpn/wireguard/profiles.
+func GetWireguardProfilesHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		profiles, err := svc.GetProfiles()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(profiles)
+	}
+}
+
+// AddWireguardProfileHandler handles POST /api/v1/vpn/wireguard/profiles.
+func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Name   string `json:"name"`
+			Config string `json:"config"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if body.Name == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+		}
+		if body.Config == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "config is required"})
+		}
+		profile, err := svc.AddProfile(body.Name, body.Config)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusCreated).JSON(profile)
+	}
+}
+
+// DeleteWireguardProfileHandler handles DELETE /api/v1/vpn/wireguard/profiles/:id.
+func DeleteWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		if id == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "profile id is required"})
+		}
+		if err := svc.DeleteProfile(id); err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// ActivateWireguardProfileHandler handles POST /api/v1/vpn/wireguard/profiles/:id/activate.
+func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		if id == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "profile id is required"})
+		}
+		if err := svc.ActivateProfile(id); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

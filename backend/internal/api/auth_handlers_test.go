@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -24,16 +25,19 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	authSvc.SetBlocklist(blocklist)
 	rateLimiter := auth.NewRateLimiter(5, time.Minute)
 
+	tmpDir, _ := os.MkdirTemp("", "vpn-test-*")
+	profilesPath := tmpDir + "/wireguard_profiles.json"
+
 	deps := &Dependencies{
-		Auth:           authSvc,
-		Blocklist:      blocklist,
-		RateLimiter:    rateLimiter,
-		System:         services.NewSystemService(ub, u, &services.MockStorageProvider{}),
-		Network:        services.NewNetworkService(u, ub),
-		Wifi:           services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{}),
-		Vpn:            services.NewVpnServiceWithRunner(u, &services.MockCommandRunner{
+		Auth:        authSvc,
+		Blocklist:   blocklist,
+		RateLimiter: rateLimiter,
+		System:      services.NewSystemService(ub, u, &services.MockStorageProvider{}),
+		Network:     services.NewNetworkService(u, ub),
+		Wifi:        services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{}),
+		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
-		}),
+		}, profilesPath),
 		ServiceManager: services.NewServiceManager(),
 		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
 	}

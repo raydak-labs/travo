@@ -429,9 +429,7 @@ export function NetworkPage() {
                     <tbody>
                       {dhcpReservations.map((reservation) => (
                         <tr key={reservation.section} className="border-b last:border-0">
-                          <td className="py-2 text-gray-900 dark:text-white">
-                            {reservation.name}
-                          </td>
+                          <td className="py-2 text-gray-900 dark:text-white">{reservation.name}</td>
                           <td className="py-2 font-mono text-gray-500">{reservation.mac}</td>
                           <td className="py-2 font-mono text-gray-900 dark:text-white">
                             {reservation.ip}

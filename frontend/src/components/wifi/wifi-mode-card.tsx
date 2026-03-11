@@ -98,9 +98,7 @@ export function WifiModeCard() {
                       <Icon
                         className={cn(
                           'h-5 w-5',
-                          isActive
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-gray-400',
+                          isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400',
                         )}
                       />
                       {isActive && <Badge variant="default">Active</Badge>}

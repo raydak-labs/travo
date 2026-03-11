@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield } from 'lucide-react';
+import { Shield, Trash2, Play, Plus, Upload } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,10 +9,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useServices } from '@/hooks/use-services';
 import {
   useWireguardConfig,
-  useSetWireguardConfig,
   useToggleWireguard,
   useVpnStatus,
   useWireguardStatus,
+  useWireguardProfiles,
+  useAddWireguardProfile,
+  useDeleteWireguardProfile,
+  useActivateWireguardProfile,
 } from '@/hooks/use-vpn';
 import { formatBytes } from '@/lib/utils';
 
@@ -31,13 +34,30 @@ export function WireguardSection() {
   const { data: services = [] } = useServices();
   const { data: config, isLoading } = useWireguardConfig();
   const { data: wgLiveStatus } = useWireguardStatus();
-  const setConfigMutation = useSetWireguardConfig();
+  const { data: profiles = [] } = useWireguardProfiles();
   const toggleMutation = useToggleWireguard();
+  const addProfileMutation = useAddWireguardProfile();
+  const deleteProfileMutation = useDeleteWireguardProfile();
+  const activateProfileMutation = useActivateWireguardProfile();
   const [configText, setConfigText] = useState('');
+  const [profileName, setProfileName] = useState('');
 
   const wgStatus = vpnStatuses.find((v) => v.type === 'wireguard');
   const wgService = services.find((s) => s.id === 'wireguard');
   const isInstalled = wgService ? wgService.state !== 'not_installed' : !!wgStatus;
+
+  const handleAddProfile = () => {
+    if (!profileName.trim() || !configText.trim()) return;
+    addProfileMutation.mutate(
+      { name: profileName.trim(), config: configText.trim() },
+      {
+        onSuccess: () => {
+          setConfigText('');
+          setProfileName('');
+        },
+      },
+    );
+  };
 
   return (
     <Card className={!isInstalled ? 'opacity-60' : undefined}>
@@ -159,11 +179,71 @@ export function WireguardSection() {
               </div>
             )}
 
-            {/* Import Config */}
+            {/* Profiles */}
+            {profiles.length > 0 && (
+              <div>
+                <h4 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Profiles ({profiles.length})
+                </h4>
+                <ul className="space-y-2" role="list" aria-label="WireGuard profiles">
+                  {profiles.map((profile) => (
+                    <li
+                      key={profile.id}
+                      className={`flex items-center justify-between rounded-md border p-3 text-sm ${
+                        profile.active
+                          ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950'
+                          : 'border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {profile.name}
+                        </span>
+                        {profile.active && <Badge variant="success">Active</Badge>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {!profile.active && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => activateProfileMutation.mutate(profile.id)}
+                            disabled={activateProfileMutation.isPending}
+                            title="Activate profile"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteProfileMutation.mutate(profile.id)}
+                          disabled={deleteProfileMutation.isPending}
+                          title="Delete profile"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Import Config as Profile */}
             <div>
               <h4 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Import Configuration
+                <div className="flex items-center gap-1">
+                  <Upload className="h-4 w-4" />
+                  Import Profile
+                </div>
               </h4>
+              <input
+                type="text"
+                className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white mb-2"
+                placeholder="Profile name (e.g. Home VPN, Travel, Work)"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+              />
               <textarea
                 className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm font-mono dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 rows={4}
@@ -174,15 +254,11 @@ export function WireguardSection() {
               <Button
                 size="sm"
                 className="mt-2"
-                disabled={!configText.trim() || setConfigMutation.isPending}
-                onClick={() => {
-                  setConfigMutation.mutate(
-                    { private_key: configText, address: '', dns: [], peers: [] },
-                    { onSuccess: () => setConfigText('') },
-                  );
-                }}
+                disabled={!configText.trim() || !profileName.trim() || addProfileMutation.isPending}
+                onClick={handleAddProfile}
               >
-                {setConfigMutation.isPending ? 'Importing...' : 'Import'}
+                <Plus className="h-4 w-4 mr-1" />
+                {addProfileMutation.isPending ? 'Saving...' : 'Save Profile'}
               </Button>
             </div>
           </>

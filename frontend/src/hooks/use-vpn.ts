@@ -2,7 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { VpnStatus, WireguardConfig, TailscaleStatus, WireGuardStatus } from '@shared/index';
+import type {
+  VpnStatus,
+  WireguardConfig,
+  TailscaleStatus,
+  WireGuardStatus,
+  WireGuardProfile,
+} from '@shared/index';
 
 export function useVpnStatus() {
   return useQuery({
@@ -74,6 +80,58 @@ export function useToggleTailscale() {
     },
     onError: (error) => {
       toast.error('Failed to toggle Tailscale', { description: error.message });
+    },
+  });
+}
+
+export function useWireguardProfiles() {
+  return useQuery({
+    queryKey: ['vpn', 'wireguard', 'profiles'],
+    queryFn: () => apiClient.get<WireGuardProfile[]>(API_ROUTES.vpn.wireguard.profiles),
+  });
+}
+
+export function useAddWireguardProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; config: string }) =>
+      apiClient.post<WireGuardProfile>(API_ROUTES.vpn.wireguard.profiles, data),
+    onSuccess: () => {
+      toast.success('WireGuard profile saved');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'wireguard', 'profiles'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save profile', { description: error.message });
+    },
+  });
+}
+
+export function useDeleteWireguardProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.del<{ status: string }>(`${API_ROUTES.vpn.wireguard.profiles}/${id}`),
+    onSuccess: () => {
+      toast.success('WireGuard profile deleted');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'wireguard', 'profiles'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete profile', { description: error.message });
+    },
+  });
+}
+
+export function useActivateWireguardProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.post<{ status: string }>(`${API_ROUTES.vpn.wireguard.profiles}/${id}/activate`),
+    onSuccess: () => {
+      toast.success('WireGuard profile activated');
+      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to activate profile', { description: error.message });
     },
   });
 }

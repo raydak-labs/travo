@@ -54,6 +54,7 @@ export const API_ROUTES = {
       toggle: '/api/v1/vpn/wireguard/toggle',
       import: '/api/v1/vpn/wireguard/import',
       status: '/api/v1/vpn/wireguard/status',
+      profiles: '/api/v1/vpn/wireguard/profiles',
     },
     tailscale: {
       status: '/api/v1/vpn/tailscale',

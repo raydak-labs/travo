@@ -4,7 +4,12 @@ import type { Client } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useSetClientAlias, useKickClient, useBlockClient, useUnblockClient } from '@/hooks/use-network';
+import {
+  useSetClientAlias,
+  useKickClient,
+  useBlockClient,
+  useUnblockClient,
+} from '@/hooks/use-network';
 
 interface ClientsTableProps {
   clients: readonly Client[];

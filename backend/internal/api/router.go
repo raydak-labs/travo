@@ -92,6 +92,10 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/vpn/wireguard/toggle", ToggleWireguardHandler(deps.Vpn))
 	v1.Post("/vpn/wireguard/import", ImportWireguardHandler(deps.Vpn))
 	v1.Get("/vpn/wireguard/status", GetWireguardStatusHandler(deps.Vpn))
+	v1.Get("/vpn/wireguard/profiles", GetWireguardProfilesHandler(deps.Vpn))
+	v1.Post("/vpn/wireguard/profiles", AddWireguardProfileHandler(deps.Vpn))
+	v1.Delete("/vpn/wireguard/profiles/:id", DeleteWireguardProfileHandler(deps.Vpn))
+	v1.Post("/vpn/wireguard/profiles/:id/activate", ActivateWireguardProfileHandler(deps.Vpn))
 	v1.Get("/vpn/tailscale", GetTailscaleHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/toggle", ToggleTailscaleHandler(deps.Vpn))
 

@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { RefreshCw, Shield, Power, Loader2, Check, X, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useWifiDisconnect, useWifiConnect, useWifiConnection, useRadioStatus, useSetRadioEnabled } from '@/hooks/use-wifi';
+import {
+  useWifiDisconnect,
+  useWifiConnect,
+  useWifiConnection,
+  useRadioStatus,
+  useSetRadioEnabled,
+} from '@/hooks/use-wifi';
 import { useToggleWireguard, useVpnStatus } from '@/hooks/use-vpn';
 import { useReboot } from '@/hooks/use-system';
 
@@ -142,11 +148,7 @@ export function QuickActions() {
                 <WifiOff className="mr-2 h-4 w-4" />
               ),
             )}
-            {wifiRadioState === 'loading'
-              ? 'Toggling...'
-              : radioEnabled
-                ? 'WiFi On'
-                : 'WiFi Off'}
+            {wifiRadioState === 'loading' ? 'Toggling...' : radioEnabled ? 'WiFi On' : 'WiFi Off'}
           </Button>
           <Button
             variant="outline"

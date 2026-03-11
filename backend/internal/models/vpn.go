@@ -42,8 +42,17 @@ type WireGuardPeerStatus struct {
 type WireGuardStatus struct {
 	Interface  string                `json:"interface"`
 	PublicKey  string                `json:"public_key"`
-	ListenPort int                  `json:"listen_port"`
+	ListenPort int                   `json:"listen_port"`
 	Peers      []WireGuardPeerStatus `json:"peers"`
+}
+
+// WireGuardProfile represents a saved WireGuard configuration profile.
+type WireGuardProfile struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Config    string `json:"config"` // Raw WireGuard .conf content
+	Active    bool   `json:"active"` // Is this the currently loaded profile?
+	CreatedAt string `json:"created_at"`
 }
 
 // TailscaleStatus represents Tailscale connection status.

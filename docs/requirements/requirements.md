@@ -143,7 +143,7 @@
 - [x] Import from .conf file (full parser with key validation)
 - [x] Enable / disable WireGuard
 - [x] Show connection status (handshake time, transfer stats)
-- [ ] Multiple WireGuard profiles (switch between configs)
+- [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
 - [ ] Kill switch (block traffic if VPN drops)
 - [ ] Split tunneling (route only selected traffic through VPN)
 - [ ] VPN + AdGuard interplay configuration

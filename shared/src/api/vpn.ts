@@ -58,6 +58,15 @@ export interface WireGuardStatus {
   readonly peers: readonly WireGuardPeerStatus[];
 }
 
+/** Saved WireGuard profile */
+export interface WireGuardProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly config: string;
+  readonly active: boolean;
+  readonly created_at: string;
+}
+
 /** Type guard for VpnStatus */
 export function isVpnStatus(value: unknown): value is VpnStatus {
   if (typeof value !== 'object' || value === null) return false;

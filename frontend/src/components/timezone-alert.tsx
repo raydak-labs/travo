@@ -9,9 +9,7 @@ const SESSION_KEY = 'timezone-alert-dismissed';
 export function TimezoneAlert() {
   const { data: deviceTz } = useTimezone();
   const navigate = useNavigate();
-  const [dismissed, setDismissed] = useState(
-    () => sessionStorage.getItem(SESSION_KEY) === 'true',
-  );
+  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(SESSION_KEY) === 'true');
 
   if (dismissed || !deviceTz) return null;
 

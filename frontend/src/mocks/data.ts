@@ -11,6 +11,7 @@ import type {
   WireguardConfig,
   TailscaleStatus,
   WireGuardStatus,
+  WireGuardProfile,
   WanConfig,
   Client,
   DHCPConfig,
@@ -392,14 +393,38 @@ export const mockDNSConfig: DNSConfig = {
 export const mockSystemLogs: LogResponse = {
   source: 'system',
   lines: [
-    { line: 'Tue Mar 11 09:17:50 2026 daemon.info dnsmasq[1234]: query[A] google.com from 192.168.8.100', level: 'info' },
-    { line: 'Tue Mar 11 09:17:51 2026 daemon.info AdGuardHome[3732]: blocked ad.tracker.com', level: 'info' },
-    { line: 'Tue Mar 11 09:17:52 2026 daemon.err dnsmasq[1234]: failed to allocate lease', level: 'err' },
-    { line: 'Tue Mar 11 09:17:53 2026 kern.warning netifd[456]: Interface wan flapping', level: 'warning' },
-    { line: 'Tue Mar 11 09:17:54 2026 daemon.notice hostapd[789]: wlan0: STA aa:bb:cc:dd:ee:ff associated', level: 'notice' },
-    { line: 'Tue Mar 11 09:17:55 2026 authpriv.info dropbear[1024]: Password auth succeeded for root', level: 'info' },
-    { line: 'Tue Mar 11 09:17:56 2026 daemon.debug wireguard: wg0 peer endpoint 10.0.0.1:51820 handshake', level: 'debug' },
-    { line: 'Tue Mar 11 09:17:57 2026 daemon.crit dnsmasq[1234]: unable to bind port 53', level: 'crit' },
+    {
+      line: 'Tue Mar 11 09:17:50 2026 daemon.info dnsmasq[1234]: query[A] google.com from 192.168.8.100',
+      level: 'info',
+    },
+    {
+      line: 'Tue Mar 11 09:17:51 2026 daemon.info AdGuardHome[3732]: blocked ad.tracker.com',
+      level: 'info',
+    },
+    {
+      line: 'Tue Mar 11 09:17:52 2026 daemon.err dnsmasq[1234]: failed to allocate lease',
+      level: 'err',
+    },
+    {
+      line: 'Tue Mar 11 09:17:53 2026 kern.warning netifd[456]: Interface wan flapping',
+      level: 'warning',
+    },
+    {
+      line: 'Tue Mar 11 09:17:54 2026 daemon.notice hostapd[789]: wlan0: STA aa:bb:cc:dd:ee:ff associated',
+      level: 'notice',
+    },
+    {
+      line: 'Tue Mar 11 09:17:55 2026 authpriv.info dropbear[1024]: Password auth succeeded for root',
+      level: 'info',
+    },
+    {
+      line: 'Tue Mar 11 09:17:56 2026 daemon.debug wireguard: wg0 peer endpoint 10.0.0.1:51820 handshake',
+      level: 'debug',
+    },
+    {
+      line: 'Tue Mar 11 09:17:57 2026 daemon.crit dnsmasq[1234]: unable to bind port 53',
+      level: 'crit',
+    },
   ],
   total: 8,
 };
@@ -497,3 +522,22 @@ export const mockDHCPReservations: DHCPReservation[] = [
 ];
 
 export const mockBlockedClients: string[] = [];
+
+export const mockWireguardProfiles: WireGuardProfile[] = [
+  {
+    id: 'profile-001',
+    name: 'Home VPN',
+    config:
+      '[Interface]\nPrivateKey = cGVlcnByaXZhdGVrZXk=\nAddress = 10.0.0.2/32\nDNS = 1.1.1.1\n\n[Peer]\nPublicKey = cGVlcnB1YmxpY2tleTE=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n',
+    active: true,
+    created_at: '2026-03-01T10:00:00Z',
+  },
+  {
+    id: 'profile-002',
+    name: 'Travel VPN',
+    config:
+      '[Interface]\nPrivateKey = dHJhdmVscHJpdmF0ZWtleQ==\nAddress = 10.0.1.2/32\nDNS = 8.8.8.8\n\n[Peer]\nPublicKey = dHJhdmVscHVibGlja2V5\nEndpoint = travel.vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n',
+    active: false,
+    created_at: '2026-03-05T14:30:00Z',
+  },
+];

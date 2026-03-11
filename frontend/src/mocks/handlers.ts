@@ -13,6 +13,7 @@ import {
   mockWireguardConfig,
   mockTailscaleStatus,
   mockWireguardStatus,
+  mockWireguardProfiles,
   mockWanConfig,
   mockClients,
   mockSystemLogs,
@@ -43,7 +44,14 @@ export const handlers = [
     const service = url.searchParams.get('service');
     const level = url.searchParams.get('level');
     const levelSeverity: Record<string, number> = {
-      emerg: 0, alert: 1, crit: 2, err: 3, warning: 4, notice: 5, info: 6, debug: 7,
+      emerg: 0,
+      alert: 1,
+      crit: 2,
+      err: 3,
+      warning: 4,
+      notice: 5,
+      info: 6,
+      debug: 7,
     };
     let lines = [...mockSystemLogs.lines];
     if (service) {
@@ -128,6 +136,32 @@ export const handlers = [
 
   http.get(API_ROUTES.vpn.wireguard.status, () => {
     return HttpResponse.json(mockWireguardStatus);
+  }),
+
+  http.get(API_ROUTES.vpn.wireguard.profiles, () => {
+    return HttpResponse.json(mockWireguardProfiles);
+  }),
+
+  http.post(API_ROUTES.vpn.wireguard.profiles, async ({ request }) => {
+    const body = (await request.json()) as { name: string; config: string };
+    return HttpResponse.json(
+      {
+        id: `profile-${Date.now()}`,
+        name: body.name,
+        config: body.config,
+        active: false,
+        created_at: new Date().toISOString(),
+      },
+      { status: 201 },
+    );
+  }),
+
+  http.delete(`${API_ROUTES.vpn.wireguard.profiles}/:id`, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.post(`${API_ROUTES.vpn.wireguard.profiles}/:id/activate`, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.vpn.tailscale.status, () => {

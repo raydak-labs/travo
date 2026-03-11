@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -167,5 +169,168 @@ func TestParseWgDump_NoHandshake(t *testing.T) {
 	}
 	if status.Peers[0].LatestHandshake != 0 {
 		t.Errorf("expected handshake 0, got %d", status.Peers[0].LatestHandshake)
+	}
+}
+
+func newTestVpnService(t *testing.T) (*VpnService, string) {
+	t.Helper()
+	dir := t.TempDir()
+	profilesPath := filepath.Join(dir, "wireguard_profiles.json")
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
+	svc := NewVpnServiceWithProfilesPath(u, cmd, profilesPath)
+	return svc, profilesPath
+}
+
+func TestGetProfiles_EmptyByDefault(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+	profiles, err := svc.GetProfiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(profiles) != 0 {
+		t.Errorf("expected 0 profiles, got %d", len(profiles))
+	}
+}
+
+func TestAddProfile(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+
+	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	profile, err := svc.AddProfile("Test VPN", conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if profile.Name != "Test VPN" {
+		t.Errorf("expected name 'Test VPN', got %q", profile.Name)
+	}
+	if profile.ID == "" {
+		t.Error("expected non-empty ID")
+	}
+	if profile.Active {
+		t.Error("expected new profile to not be active")
+	}
+
+	profiles, _ := svc.GetProfiles()
+	if len(profiles) != 1 {
+		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+}
+
+func TestAddProfile_InvalidConfig(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+	_, err := svc.AddProfile("Bad", "not a valid config")
+	if err == nil {
+		t.Error("expected error for invalid config")
+	}
+}
+
+func TestDeleteProfile(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+
+	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	profile, _ := svc.AddProfile("Test VPN", conf)
+
+	err := svc.DeleteProfile(profile.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	profiles, _ := svc.GetProfiles()
+	if len(profiles) != 0 {
+		t.Errorf("expected 0 profiles after delete, got %d", len(profiles))
+	}
+}
+
+func TestDeleteProfile_NotFound(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+	err := svc.DeleteProfile("nonexistent")
+	if err == nil {
+		t.Error("expected error for non-existent profile")
+	}
+}
+
+func TestActivateProfile(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+
+	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	p1, _ := svc.AddProfile("VPN 1", conf)
+	p2, _ := svc.AddProfile("VPN 2", conf)
+
+	err := svc.ActivateProfile(p1.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	profiles, _ := svc.GetProfiles()
+	for _, p := range profiles {
+		if p.ID == p1.ID && !p.Active {
+			t.Error("expected p1 to be active")
+		}
+		if p.ID == p2.ID && p.Active {
+			t.Error("expected p2 to not be active")
+		}
+	}
+
+	// Now activate p2
+	err = svc.ActivateProfile(p2.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	profiles, _ = svc.GetProfiles()
+	for _, p := range profiles {
+		if p.ID == p1.ID && p.Active {
+			t.Error("expected p1 to not be active after activating p2")
+		}
+		if p.ID == p2.ID && !p.Active {
+			t.Error("expected p2 to be active")
+		}
+	}
+}
+
+func TestActivateProfile_NotFound(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+	err := svc.ActivateProfile("nonexistent")
+	if err == nil {
+		t.Error("expected error for non-existent profile")
+	}
+}
+
+func TestProfilesPersistence(t *testing.T) {
+	dir := t.TempDir()
+	profilesPath := filepath.Join(dir, "wireguard_profiles.json")
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
+
+	svc1 := NewVpnServiceWithProfilesPath(u, cmd, profilesPath)
+	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	_, _ = svc1.AddProfile("Persistent", conf)
+
+	// Create a new service instance pointing to the same file
+	svc2 := NewVpnServiceWithProfilesPath(u, cmd, profilesPath)
+	profiles, err := svc2.GetProfiles()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(profiles) != 1 {
+		t.Errorf("expected 1 profile persisted, got %d", len(profiles))
+	}
+	if profiles[0].Name != "Persistent" {
+		t.Errorf("expected name 'Persistent', got %q", profiles[0].Name)
+	}
+}
+
+func TestProfilesFilePermissions(t *testing.T) {
+	svc, profilesPath := newTestVpnService(t)
+	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	_, _ = svc.AddProfile("Perm Test", conf)
+
+	info, err := os.Stat(profilesPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Check file is only readable/writable by owner
+	if info.Mode().Perm() != 0o600 {
+		t.Errorf("expected file mode 0600, got %o", info.Mode().Perm())
 	}
 }
