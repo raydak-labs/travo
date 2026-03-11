@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -9,7 +10,9 @@ import {
   Outlet,
   createMemoryHistory,
 } from '@tanstack/react-router';
+import { API_ROUTES } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
+import { server } from '@/mocks/server';
 import { VpnPage } from '../vpn-page';
 
 function renderVpnPage() {
@@ -25,7 +28,13 @@ function renderVpnPage() {
     component: VpnPage,
   });
 
-  const routeTree = rootRoute.addChildren([vpnRoute]);
+  const servicesRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/services',
+    component: () => <div>Services</div>,
+  });
+
+  const routeTree = rootRoute.addChildren([vpnRoute, servicesRoute]);
 
   const router = createRouter({
     routeTree,
@@ -108,5 +117,72 @@ describe('VpnPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Kill Switch')).toBeInTheDocument();
     });
+  });
+
+  it('shows not-installed message when WireGuard is not installed', async () => {
+    server.use(
+      http.get(API_ROUTES.services.list, () => {
+        return HttpResponse.json([
+          {
+            id: 'wireguard',
+            name: 'WireGuard',
+            description: 'Fast, modern, secure VPN tunnel',
+            state: 'not_installed',
+            auto_start: false,
+          },
+          {
+            id: 'tailscale',
+            name: 'Tailscale',
+            description: 'Zero config VPN mesh network',
+            state: 'running',
+            version: '1.62.0',
+            auto_start: true,
+          },
+        ]);
+      }),
+    );
+
+    renderVpnPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('WireGuard is not installed')).toBeInTheDocument();
+    });
+
+    const links = screen.getAllByText('Install via Services →');
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    expect(links[0].closest('a')).toHaveAttribute('href', '/services');
+  });
+
+  it('shows not-installed message when Tailscale is not installed', async () => {
+    server.use(
+      http.get(API_ROUTES.services.list, () => {
+        return HttpResponse.json([
+          {
+            id: 'wireguard',
+            name: 'WireGuard',
+            description: 'Fast, modern, secure VPN tunnel',
+            state: 'running',
+            version: '1.0.20210914',
+            auto_start: true,
+          },
+          {
+            id: 'tailscale',
+            name: 'Tailscale',
+            description: 'Zero config VPN mesh network',
+            state: 'not_installed',
+            auto_start: false,
+          },
+        ]);
+      }),
+    );
+
+    renderVpnPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Tailscale is not installed')).toBeInTheDocument();
+    });
+
+    const links = screen.getAllByText('Install via Services →');
+    expect(links.length).toBeGreaterThanOrEqual(1);
   });
 });

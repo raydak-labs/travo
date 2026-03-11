@@ -159,8 +159,8 @@
 
 ### 3.3 General VPN UX
 
-- [ ] Grey out VPN options when packages not installed (link to Services page)
-- [ ] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
+- [x] Grey out VPN options when packages not installed (link to Services page)
+- [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
 - [ ] Show VPN data usage on dashboard
 - [ ] DNS leak test (verify traffic routes through VPN correctly)
 - [ ] 🔮 OpenVPN support
