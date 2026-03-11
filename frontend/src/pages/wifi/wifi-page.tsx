@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Signal, Trash2, Radio, QrCode } from 'lucide-react';
+import { Wifi, WifiOff, Signal, Trash2, Radio, QrCode, Shuffle, RotateCcw } from 'lucide-react';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import type { APConfig } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -26,6 +26,8 @@ import {
   useWifiDelete,
   useAPConfigs,
   useSetAPConfig,
+  useMACAddresses,
+  useSetMAC,
 } from '@/hooks/use-wifi';
 
 interface APFormState {
@@ -35,6 +37,14 @@ interface APFormState {
   enabled: boolean;
 }
 
+function generateRandomMAC(): string {
+  const hex = () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+  const first = (Math.floor(Math.random() * 256) & 0xfe) | 0x02; // locally administered, unicast
+  return [first.toString(16).padStart(2, '0'), hex(), hex(), hex(), hex(), hex()].join(':');
+}
+
+const MAC_REGEX = /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/;
+
 export function WifiPage() {
   const { data: connection, isLoading: connectionLoading } = useWifiConnection();
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
@@ -42,8 +52,11 @@ export function WifiPage() {
   const disconnectMutation = useWifiDisconnect();
   const deleteMutation = useWifiDelete();
   const setAP = useSetAPConfig();
+  const { data: macAddresses, isLoading: macLoading } = useMACAddresses();
+  const setMAC = useSetMAC();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
   const [qrAP, setQrAP] = useState<APConfig | null>(null);
+  const [customMAC, setCustomMAC] = useState('');
 
   useEffect(() => {
     if (apConfigs) {
@@ -59,6 +72,12 @@ export function WifiPage() {
       setApState(state);
     }
   }, [apConfigs]);
+
+  useEffect(() => {
+    if (macAddresses && macAddresses.length > 0) {
+      setCustomMAC(macAddresses[0].custom_mac || '');
+    }
+  }, [macAddresses]);
 
   return (
     <div className="space-y-6">
@@ -313,6 +332,86 @@ export function WifiPage() {
       </Card>
 
       <WifiQRDialog open={qrAP !== null} onOpenChange={(open) => !open && setQrAP(null)} ap={qrAP} />
+
+      {/* MAC Address Cloning */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">MAC Address Cloning</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {macLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : !macAddresses || macAddresses.length === 0 ? (
+            <p className="text-sm text-gray-500">No STA interface detected</p>
+          ) : (
+            <div className="space-y-4">
+              {macAddresses.map((mac) => (
+                <div key={mac.interface} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">STA Interface</Badge>
+                    {mac.current_mac && (
+                      <span className="text-sm font-mono text-gray-600 dark:text-gray-400">
+                        Current: {mac.current_mac}
+                      </span>
+                    )}
+                  </div>
+                  {mac.custom_mac && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Custom MAC active: {mac.custom_mac}
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="mac-input"
+                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >
+                      Custom MAC Address
+                    </label>
+                    <Input
+                      id="mac-input"
+                      value={customMAC}
+                      onChange={(e) => setCustomMAC(e.target.value)}
+                      placeholder="AA:BB:CC:DD:EE:FF"
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setCustomMAC(generateRandomMAC())}
+                    >
+                      <Shuffle className="h-4 w-4 mr-1" />
+                      Random
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={setMAC.isPending || (customMAC !== '' && !MAC_REGEX.test(customMAC))}
+                      onClick={() => setMAC.mutate(customMAC)}
+                    >
+                      {setMAC.isPending ? 'Applying...' : 'Apply'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={setMAC.isPending}
+                      onClick={() => {
+                        setCustomMAC('');
+                        setMAC.mutate('');
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset to Default
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

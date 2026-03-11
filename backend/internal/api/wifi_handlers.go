@@ -145,3 +145,32 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetMACHandler handles GET /api/v1/wifi/mac.
+func GetMACHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		configs, err := svc.GetMACAddresses()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(configs)
+	}
+}
+
+// SetMACHandler handles PUT /api/v1/wifi/mac.
+func SetMACHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.SetMACRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		// Validate MAC format if provided (empty means reset)
+		if req.MAC != "" && !isValidMAC(req.MAC) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format (expected XX:XX:XX:XX:XX:XX)"})
+		}
+		if err := svc.SetMACAddress(req.MAC); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

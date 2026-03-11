@@ -162,3 +162,18 @@ func TestIsValidPort(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidMAC(t *testing.T) {
+	valid := []string{"AA:BB:CC:DD:EE:FF", "aa:bb:cc:dd:ee:ff", "00:11:22:33:44:55"}
+	for _, mac := range valid {
+		if !isValidMAC(mac) {
+			t.Errorf("expected %q to be valid", mac)
+		}
+	}
+	invalid := []string{"", "AA:BB:CC:DD:EE", "GG:HH:II:JJ:KK:LL", "AABBCCDDEEFF", "AA-BB-CC-DD-EE-FF"}
+	for _, mac := range invalid {
+		if isValidMAC(mac) {
+			t.Errorf("expected %q to be invalid", mac)
+		}
+	}
+}

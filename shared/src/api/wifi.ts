@@ -79,3 +79,15 @@ export function isWifiScanResult(value: unknown): value is WifiScanResult {
     typeof v.band === 'string'
   );
 }
+
+/** MAC address configuration for an interface */
+export interface MACConfig {
+  readonly interface: string;
+  readonly current_mac: string;
+  readonly custom_mac?: string;
+}
+
+/** Request to set MAC address */
+export interface SetMACRequest {
+  readonly mac: string;
+}

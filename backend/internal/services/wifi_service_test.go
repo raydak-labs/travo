@@ -251,3 +251,55 @@ func TestSetAPConfig_InvalidSection(t *testing.T) {
 		t.Error("expected error for nonexistent section")
 	}
 }
+
+func TestSetMACAddress(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify MAC was set
+	opts, err := u.GetAll("wireless", "sta0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts["macaddr"] != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("expected macaddr 'AA:BB:CC:DD:EE:FF', got '%s'", opts["macaddr"])
+	}
+}
+
+func TestSetMACAddress_Reset(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Set then reset
+	_ = svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
+	err := svc.SetMACAddress("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	opts, err := u.GetAll("wireless", "sta0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts["macaddr"] != "" {
+		t.Errorf("expected empty macaddr, got '%s'", opts["macaddr"])
+	}
+}
+
+func TestGetMACAddresses(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	configs, err := svc.GetMACAddresses()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(configs) == 0 {
+		t.Fatal("expected at least one MAC config")
+	}
+	if configs[0].Interface != "sta" {
+		t.Errorf("expected interface 'sta', got '%s'", configs[0].Interface)
+	}
+}

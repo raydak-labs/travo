@@ -20,6 +20,7 @@ import {
   mockDNSConfig,
   mockTimezoneConfig,
   mockAPConfigs,
+  mockMACAddresses,
 } from './data';
 
 export const handlers = [
@@ -250,6 +251,13 @@ export const handlers = [
     return HttpResponse.json(mockAPConfigs);
   }),
   http.put(/\/api\/v1\/wifi\/ap\/.*/, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.wifi.mac, () => {
+    return HttpResponse.json(mockMACAddresses);
+  }),
+  http.put(API_ROUTES.wifi.mac, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 ];

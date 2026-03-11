@@ -2,8 +2,10 @@ package services
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -397,6 +399,67 @@ func (w *WifiService) SetAPConfig(section string, config models.APConfig) error 
 	}
 	if err := w.uci.Set("wireless", section, "disabled", disabled); err != nil {
 		return fmt.Errorf("setting disabled: %w", err)
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return fmt.Errorf("committing wireless: %w", err)
+	}
+	w.reloader.Reload()
+	return nil
+}
+
+// GetMACAddresses returns the MAC address info for WiFi interfaces.
+func (w *WifiService) GetMACAddresses() ([]models.MACConfig, error) {
+	var configs []models.MACConfig
+
+	// Get STA interface MAC
+	staSection := "sta0"
+	staOpts, err := w.uci.GetAll("wireless", staSection)
+	if err != nil {
+		// Try wifinet2 as fallback section name
+		staSection = "wifinet2"
+		staOpts, err = w.uci.GetAll("wireless", staSection)
+	}
+	if err == nil && staOpts["mode"] == "sta" {
+		currentMAC := ""
+		// Try reading from sysfs
+		data, readErr := os.ReadFile("/sys/class/net/phy0-sta0/address")
+		if readErr == nil {
+			currentMAC = strings.TrimSpace(string(data))
+		}
+		configs = append(configs, models.MACConfig{
+			Interface:  "sta",
+			CurrentMAC: currentMAC,
+			CustomMAC:  staOpts["macaddr"],
+		})
+	}
+
+	return configs, nil
+}
+
+// SetMACAddress sets a custom MAC address on the STA WiFi interface.
+func (w *WifiService) SetMACAddress(mac string) error {
+	// Find STA section
+	staSection := "sta0"
+	opts, err := w.uci.GetAll("wireless", staSection)
+	if err != nil {
+		staSection = "wifinet2"
+		opts, err = w.uci.GetAll("wireless", staSection)
+	}
+	if err != nil {
+		return fmt.Errorf("STA interface not found")
+	}
+	if opts["mode"] != "sta" {
+		return fmt.Errorf("section %s is not a STA interface", staSection)
+	}
+	if mac == "" {
+		// Reset: clear the macaddr option
+		if err := w.uci.Set("wireless", staSection, "macaddr", ""); err != nil {
+			return fmt.Errorf("clearing MAC: %w", err)
+		}
+	} else {
+		if err := w.uci.Set("wireless", staSection, "macaddr", mac); err != nil {
+			return fmt.Errorf("setting MAC: %w", err)
+		}
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return fmt.Errorf("committing wireless: %w", err)

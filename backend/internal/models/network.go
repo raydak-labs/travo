@@ -57,3 +57,15 @@ type DNSConfig struct {
 	UseCustomDNS bool     `json:"use_custom_dns"`
 	Servers      []string `json:"servers"`
 }
+
+// MACConfig holds MAC address configuration.
+type MACConfig struct {
+	Interface  string `json:"interface"`
+	CurrentMAC string `json:"current_mac"`
+	CustomMAC  string `json:"custom_mac,omitempty"`
+}
+
+// SetMACRequest holds the request to set a MAC address.
+type SetMACRequest struct {
+	MAC string `json:"mac"`
+}

@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v9 — AP WiFi configuration)
+> **Last updated:** 2026-03-11 (v10 — MAC address cloning)
 
 ---
 
@@ -331,9 +331,9 @@
 
 ## 10. Privacy & Identity
 
-- [ ] MAC address cloning (copy client MAC for hotel WiFi device registration)
+- [x] MAC address cloning (copy client MAC for hotel WiFi device registration)
 - [ ] MAC address randomization / anonymization (generate random MAC per connection)
-- [ ] Show current MAC per interface
+- [x] Show current MAC per interface
 - [ ] 🔮 Per-network MAC policy (remember which MAC to use for which SSID)
 
 ---

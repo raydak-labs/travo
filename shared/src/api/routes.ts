@@ -34,6 +34,7 @@ export const API_ROUTES = {
     saved: '/api/v1/wifi/saved',
     deleteSaved: '/api/v1/wifi/saved',
     ap: '/api/v1/wifi/ap',
+    mac: '/api/v1/wifi/mac',
   },
   vpn: {
     status: '/api/v1/vpn/status',

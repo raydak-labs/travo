@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode, APConfig } from '@shared/index';
+import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode, APConfig, MACConfig } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
   return useQuery({
@@ -109,6 +109,28 @@ export function useSetAPConfig() {
     },
     onError: (error) => {
       toast.error('Failed to update AP config', { description: error.message });
+    },
+  });
+}
+
+export function useMACAddresses() {
+  return useQuery({
+    queryKey: ['wifi', 'mac'],
+    queryFn: () => apiClient.get<MACConfig[]>(API_ROUTES.wifi.mac),
+  });
+}
+
+export function useSetMAC() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mac: string) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.mac, { mac }),
+    onSuccess: () => {
+      toast.success('MAC address updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update MAC address', { description: error.message });
     },
   });
 }

@@ -17,6 +17,7 @@ import type {
   LogResponse,
   TimezoneConfig,
   APConfig,
+  MACConfig,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -400,5 +401,13 @@ export const mockAPConfigs: APConfig[] = [
     enabled: true,
     channel: 36,
     section: 'default_radio1',
+  },
+];
+
+export const mockMACAddresses: MACConfig[] = [
+  {
+    interface: 'sta',
+    current_mac: '94:83:c4:1f:28:3a',
+    custom_mac: '',
   },
 ];

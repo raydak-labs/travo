@@ -86,3 +86,22 @@ func isValidWanType(t string) bool {
 	}
 	return false
 }
+
+// isValidMAC checks if a string is a valid MAC address (XX:XX:XX:XX:XX:XX).
+func isValidMAC(mac string) bool {
+	parts := strings.Split(mac, ":")
+	if len(parts) != 6 {
+		return false
+	}
+	for _, part := range parts {
+		if len(part) != 2 {
+			return false
+		}
+		for _, c := range part {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				return false
+			}
+		}
+	}
+	return true
+}
