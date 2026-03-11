@@ -78,6 +78,37 @@ func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// GetTimezoneHandler handles GET /api/v1/system/timezone.
+func GetTimezoneHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config, err := svc.GetTimezone()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(config)
+	}
+}
+
+// SetTimezoneHandler handles PUT /api/v1/system/timezone.
+func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var config models.TimezoneConfig
+		if err := c.BodyParser(&config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if config.Zonename == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "zonename is required"})
+		}
+		if config.Timezone == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "timezone is required"})
+		}
+		if err := svc.SetTimezone(config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetLEDStatusHandler handles GET /api/v1/system/leds.
 func GetLEDStatusHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

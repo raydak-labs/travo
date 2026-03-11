@@ -17,6 +17,7 @@ import {
   mockSystemLogs,
   mockKernelLogs,
   mockDHCPConfig,
+  mockTimezoneConfig,
 } from './data';
 
 export const handlers = [
@@ -214,5 +215,12 @@ export const handlers = [
   http.put(API_ROUTES.system.leds, async ({ request }) => {
     const body = (await request.json()) as { stealth_mode: boolean };
     return HttpResponse.json({ stealth_mode: body.stealth_mode, led_count: 3 });
+  }),
+
+  http.get(API_ROUTES.system.timezone, () => {
+    return HttpResponse.json(mockTimezoneConfig);
+  }),
+  http.put(API_ROUTES.system.timezone, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 ];

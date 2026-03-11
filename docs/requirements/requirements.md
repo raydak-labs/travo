@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2025-07-16 (v7 — LED stealth mode)
+> **Last updated:** 2026-03-11 (v8 — timezone configuration)
 
 ---
 
@@ -241,8 +241,8 @@
 
 ### 5.3 Time & Timezone
 
-- [ ] Show current device time
-- [ ] Timezone configuration
+- [x] Show current device time
+- [x] Timezone configuration
 - [ ] Detect timezone mismatch between device and browser (GL.iNet style)
 - [ ] NTP server configuration
 - [ ] 🔮 NTP sync status indicator

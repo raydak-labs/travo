@@ -59,7 +59,7 @@ func (m *MockUCI) populate() {
 	m.setInternal("wireless", "sta0", "key", "hotelpass")
 	m.setInternal("wireless", "sta0", "disabled", "0")
 	m.setInternal("system", "system", "hostname", "OpenWrt")
-	m.setInternal("system", "system", "timezone", "UTC")
+	m.setInternal("system", "system", "timezone", "UTC0")
 	m.setInternal("system", "system", "zonename", "UTC")
 	m.setInternal("dhcp", "lan", "interface", "lan")
 	m.setInternal("dhcp", "lan", "start", "100")

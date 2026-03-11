@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +6,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth } from '@/hooks/use-system';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth, useTimezone, useSetTimezone } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
+
+const TIMEZONES = [
+  { zonename: 'UTC', timezone: 'UTC0' },
+  { zonename: 'Europe/London', timezone: 'GMT0BST,M3.5.0/1,M10.5.0' },
+  { zonename: 'Europe/Berlin', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
+  { zonename: 'Europe/Paris', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
+  { zonename: 'Europe/Rome', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
+  { zonename: 'Europe/Madrid', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
+  { zonename: 'Europe/Moscow', timezone: 'MSK-3' },
+  { zonename: 'America/New_York', timezone: 'EST5EDT,M3.2.0,M11.1.0' },
+  { zonename: 'America/Chicago', timezone: 'CST6CDT,M3.2.0,M11.1.0' },
+  { zonename: 'America/Denver', timezone: 'MST7MDT,M3.2.0,M11.1.0' },
+  { zonename: 'America/Los_Angeles', timezone: 'PST8PDT,M3.2.0,M11.1.0' },
+  { zonename: 'America/Sao_Paulo', timezone: '<-03>3' },
+  { zonename: 'Asia/Tokyo', timezone: 'JST-9' },
+  { zonename: 'Asia/Shanghai', timezone: 'CST-8' },
+  { zonename: 'Asia/Kolkata', timezone: 'IST-5:30' },
+  { zonename: 'Asia/Dubai', timezone: '<+04>-4' },
+  { zonename: 'Asia/Singapore', timezone: '<+08>-8' },
+  { zonename: 'Asia/Seoul', timezone: 'KST-9' },
+  { zonename: 'Australia/Sydney', timezone: 'AEST-10AEDT,M10.1.0,M4.1.0/3' },
+  { zonename: 'Pacific/Auckland', timezone: 'NZST-12NZDT,M9.5.0,M4.1.0/3' },
+  { zonename: 'Africa/Cairo', timezone: 'EET-2EEST,M4.5.5/0,M10.5.4/24' },
+  { zonename: 'Africa/Johannesburg', timezone: 'SAST-2' },
+] as const;
 
 export function SystemPage() {
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
@@ -17,12 +43,21 @@ export function SystemPage() {
   const setHostnameMutation = useSetHostname();
   const { data: ledStatus } = useLEDStatus();
   const setLEDStealthMutation = useSetLEDStealth();
+  const { data: timezoneConfig, isLoading: tzLoading } = useTimezone();
+  const setTz = useSetTimezone();
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
   const [editingHostname, setEditingHostname] = useState(false);
   const [hostnameValue, setHostnameValue] = useState('');
+  const [selectedTz, setSelectedTz] = useState<string>('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    if (timezoneConfig?.zonename) {
+      setSelectedTz(timezoneConfig.zonename);
+    }
+  }, [timezoneConfig]);
 
   return (
     <div className="space-y-6">
@@ -121,6 +156,53 @@ export function SystemPage() {
               {formatUptime(info.uptime_seconds)}
             </p>
           ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Time & Timezone */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Time & Timezone</CardTitle>
+          <Clock className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          {tzLoading ? (
+            <Skeleton className="h-4 w-1/2" />
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-gray-500">Timezone</span>
+                  <span className="text-gray-900 dark:text-white">{timezoneConfig?.zonename || '—'}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Change Timezone</label>
+                <Select value={selectedTz} onValueChange={setSelectedTz}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONES.map((tz) => (
+                      <SelectItem key={tz.zonename} value={tz.zonename}>
+                        {tz.zonename}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => {
+                  const tz = TIMEZONES.find((t) => t.zonename === selectedTz);
+                  if (tz) setTz.mutate({ zonename: tz.zonename, timezone: tz.timezone });
+                }}
+                disabled={setTz.isPending || !selectedTz}
+                size="sm"
+              >
+                {setTz.isPending ? 'Saving…' : 'Save Timezone'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

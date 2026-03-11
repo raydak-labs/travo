@@ -14,6 +14,7 @@ import type {
   Client,
   DHCPConfig,
   LogResponse,
+  TimezoneConfig,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -365,4 +366,9 @@ export const mockKernelLogs: LogResponse = {
     { line: '2026-03-04T12:00:00Z kern.info Kernel initialized' },
   ],
   total: 1,
+};
+
+export const mockTimezoneConfig: TimezoneConfig = {
+  zonename: 'UTC',
+  timezone: 'UTC0',
 };

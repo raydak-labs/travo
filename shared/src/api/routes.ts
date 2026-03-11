@@ -14,6 +14,7 @@ export const API_ROUTES = {
     reboot: '/api/v1/system/reboot',
     hostname: '/api/v1/system/hostname',
     leds: '/api/v1/system/leds',
+    timezone: '/api/v1/system/timezone',
   },
   network: {
     status: '/api/v1/network/status',

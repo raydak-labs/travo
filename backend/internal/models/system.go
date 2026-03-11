@@ -57,6 +57,12 @@ type SystemStats struct {
 	Storage StorageStats `json:"storage"`
 }
 
+// TimezoneConfig holds timezone configuration.
+type TimezoneConfig struct {
+	Zonename string `json:"zonename"` // e.g. "Europe/Berlin", "UTC"
+	Timezone string `json:"timezone"` // POSIX TZ string e.g. "CET-1CEST,M3.5.0,M10.5.0/3"
+}
+
 // LogEntry represents a single log line from logread or dmesg.
 type LogEntry struct {
 	Line string `json:"line"`

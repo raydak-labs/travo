@@ -1,8 +1,8 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest, SetHostnameRequest, LEDStatus, SetLEDRequest } from '@shared/index';
+import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest, SetHostnameRequest, LEDStatus, SetLEDRequest, TimezoneConfig } from '@shared/index';
 
 export function useSystemInfo() {
   return useQuery({
@@ -87,6 +87,28 @@ export function useSetLEDStealth() {
     },
     onError: (error) => {
       toast.error('Failed to update LED mode', { description: error.message });
+    },
+  });
+}
+
+export function useTimezone() {
+  return useQuery({
+    queryKey: ['system', 'timezone'],
+    queryFn: () => apiClient.get<TimezoneConfig>(API_ROUTES.system.timezone),
+  });
+}
+
+export function useSetTimezone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: TimezoneConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.system.timezone, config),
+    onSuccess: () => {
+      toast.success('Timezone updated');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'timezone'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update timezone', { description: error.message });
     },
   });
 }

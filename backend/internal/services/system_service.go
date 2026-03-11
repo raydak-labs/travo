@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
@@ -159,6 +160,29 @@ func (s *SystemService) Reboot() error {
 		_, _ = s.ubus.Call("system", "reboot", nil)
 	}()
 	return nil
+}
+
+// GetTimezone returns the current timezone configuration.
+func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
+	opts, err := s.uci.GetAll("system", "system")
+	if err != nil {
+		return models.TimezoneConfig{}, err
+	}
+	return models.TimezoneConfig{
+		Zonename: opts["zonename"],
+		Timezone: opts["timezone"],
+	}, nil
+}
+
+// SetTimezone updates the timezone configuration.
+func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
+	if err := s.uci.Set("system", "system", "zonename", config.Zonename); err != nil {
+		return fmt.Errorf("setting zonename: %w", err)
+	}
+	if err := s.uci.Set("system", "system", "timezone", config.Timezone); err != nil {
+		return fmt.Errorf("setting timezone: %w", err)
+	}
+	return s.uci.Commit("system")
 }
 
 // SetHostname changes the device hostname via UCI and applies it.

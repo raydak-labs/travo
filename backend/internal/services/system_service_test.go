@@ -3,6 +3,7 @@ package services
 import (
 	"testing"
 
+	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -197,5 +198,47 @@ func TestSetHostname(t *testing.T) {
 	}
 	if val != "MyRouter" {
 		t.Errorf("expected hostname 'MyRouter', got %q", val)
+	}
+}
+
+func TestGetTimezone(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	config, err := svc.GetTimezone()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Zonename == "" {
+		t.Error("expected non-empty zonename")
+	}
+	if config.Timezone == "" {
+		t.Error("expected non-empty timezone")
+	}
+}
+
+func TestSetTimezone(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	err := svc.SetTimezone(models.TimezoneConfig{
+		Zonename: "Europe/Berlin",
+		Timezone: "CET-1CEST,M3.5.0,M10.5.0/3",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config, err := svc.GetTimezone()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Zonename != "Europe/Berlin" {
+		t.Errorf("expected zonename 'Europe/Berlin', got '%s'", config.Zonename)
+	}
+	if config.Timezone != "CET-1CEST,M3.5.0,M10.5.0/3" {
+		t.Errorf("expected timezone 'CET-1CEST,M3.5.0,M10.5.0/3', got '%s'", config.Timezone)
 	}
 }

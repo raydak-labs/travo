@@ -93,3 +93,9 @@ export interface LogResponse {
   readonly lines: readonly LogEntry[];
   readonly total: number;
 }
+
+/** Timezone configuration */
+export interface TimezoneConfig {
+  readonly zonename: string;
+  readonly timezone: string;
+}
