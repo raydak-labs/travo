@@ -60,6 +60,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.connection).toBe('/api/v1/wifi/connection');
     expect(API_ROUTES.wifi.mode).toBe('/api/v1/wifi/mode');
     expect(API_ROUTES.wifi.saved).toBe('/api/v1/wifi/saved');
+    expect(API_ROUTES.wifi.guest).toBe('/api/v1/wifi/guest');
   });
 
   it('has vpn routes matching backend', () => {
@@ -117,6 +118,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/saved',
       '/api/v1/wifi/ap',
       '/api/v1/wifi/mac',
+      '/api/v1/wifi/guest',
       '/api/v1/vpn/status',
       '/api/v1/vpn/wireguard',
       '/api/v1/vpn/wireguard/toggle',

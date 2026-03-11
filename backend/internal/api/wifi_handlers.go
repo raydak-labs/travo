@@ -174,3 +174,40 @@ func SetMACHandler(svc *services.WifiService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetGuestWifiHandler handles GET /api/v1/wifi/guest.
+func GetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		cfg, err := svc.GetGuestWifi()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(cfg)
+	}
+}
+
+// SetGuestWifiHandler handles PUT /api/v1/wifi/guest.
+func SetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var cfg models.GuestWifiConfig
+		if err := c.BodyParser(&cfg); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if cfg.Enabled {
+			if strings.TrimSpace(cfg.SSID) == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ssid is required"})
+			}
+			validEnc := map[string]bool{"none": true, "psk2": true, "sae": true, "psk-mixed": true}
+			if cfg.Encryption != "" && !validEnc[cfg.Encryption] {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "encryption must be one of: none, psk2, sae, psk-mixed"})
+			}
+			if cfg.Encryption != "" && cfg.Encryption != "none" && len(cfg.Key) < 8 {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters"})
+			}
+		}
+		if err := svc.SetGuestWifi(cfg); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

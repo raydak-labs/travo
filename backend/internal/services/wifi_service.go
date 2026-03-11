@@ -467,3 +467,81 @@ func (w *WifiService) SetMACAddress(mac string) error {
 	w.reloader.Reload()
 	return nil
 }
+
+// GetGuestWifi returns the guest WiFi configuration.
+func (w *WifiService) GetGuestWifi() (*models.GuestWifiConfig, error) {
+	opts, err := w.uci.GetAll("wireless", "guest")
+	if err != nil {
+		return &models.GuestWifiConfig{Enabled: false}, nil
+	}
+	return &models.GuestWifiConfig{
+		Enabled:    opts["disabled"] != "1",
+		SSID:       opts["ssid"],
+		Encryption: opts["encryption"],
+		Key:        opts["key"],
+	}, nil
+}
+
+// SetGuestWifi creates or updates the guest WiFi network with full isolation.
+func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) error {
+	if !cfg.Enabled {
+		_, err := w.uci.GetAll("wireless", "guest")
+		if err == nil {
+			_ = w.uci.Set("wireless", "guest", "disabled", "1")
+			_ = w.uci.Commit("wireless")
+			w.reloader.Reload()
+		}
+		return nil
+	}
+
+	// Network interface for guest subnet
+	_ = w.uci.Set("network", "guest", "proto", "static")
+	_ = w.uci.Set("network", "guest", "ipaddr", "192.168.2.1")
+	_ = w.uci.Set("network", "guest", "netmask", "255.255.255.0")
+	_ = w.uci.Commit("network")
+
+	// DHCP for guest network
+	_ = w.uci.Set("dhcp", "guest", "interface", "guest")
+	_ = w.uci.Set("dhcp", "guest", "start", "100")
+	_ = w.uci.Set("dhcp", "guest", "limit", "50")
+	_ = w.uci.Set("dhcp", "guest", "leasetime", "2h")
+	_ = w.uci.Commit("dhcp")
+
+	// Wireless interface for guest AP
+	_ = w.uci.Set("wireless", "guest", "device", "radio0")
+	_ = w.uci.Set("wireless", "guest", "mode", "ap")
+	_ = w.uci.Set("wireless", "guest", "network", "guest")
+	_ = w.uci.Set("wireless", "guest", "ssid", cfg.SSID)
+	_ = w.uci.Set("wireless", "guest", "encryption", cfg.Encryption)
+	_ = w.uci.Set("wireless", "guest", "key", cfg.Key)
+	_ = w.uci.Set("wireless", "guest", "isolate", "1")
+	_ = w.uci.Set("wireless", "guest", "disabled", "0")
+	_ = w.uci.Commit("wireless")
+
+	// Firewall zone for guest
+	_ = w.uci.Set("firewall", "guest_zone", "name", "guest")
+	_ = w.uci.Set("firewall", "guest_zone", "network", "guest")
+	_ = w.uci.Set("firewall", "guest_zone", "input", "REJECT")
+	_ = w.uci.Set("firewall", "guest_zone", "output", "ACCEPT")
+	_ = w.uci.Set("firewall", "guest_zone", "forward", "REJECT")
+
+	// Forwarding: guest -> wan
+	_ = w.uci.Set("firewall", "guest_fwd", "src", "guest")
+	_ = w.uci.Set("firewall", "guest_fwd", "dest", "wan")
+
+	// Allow DNS from guest
+	_ = w.uci.Set("firewall", "guest_dns", "name", "Allow-Guest-DNS")
+	_ = w.uci.Set("firewall", "guest_dns", "src", "guest")
+	_ = w.uci.Set("firewall", "guest_dns", "dest_port", "53")
+	_ = w.uci.Set("firewall", "guest_dns", "target", "ACCEPT")
+
+	// Allow DHCP from guest
+	_ = w.uci.Set("firewall", "guest_dhcp", "name", "Allow-Guest-DHCP")
+	_ = w.uci.Set("firewall", "guest_dhcp", "src", "guest")
+	_ = w.uci.Set("firewall", "guest_dhcp", "dest_port", "67-68")
+	_ = w.uci.Set("firewall", "guest_dhcp", "target", "ACCEPT")
+	_ = w.uci.Commit("firewall")
+
+	w.reloader.Reload()
+	return nil
+}

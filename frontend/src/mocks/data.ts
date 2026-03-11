@@ -19,6 +19,7 @@ import type {
   APConfig,
   MACConfig,
   DHCPLease,
+  GuestWifiConfig,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -431,3 +432,10 @@ export const mockDHCPLeases: DHCPLease[] = [
     hostname: 'phone-2',
   },
 ];
+
+export const mockGuestWifi: GuestWifiConfig = {
+  enabled: false,
+  ssid: 'Guest-Travel',
+  encryption: 'psk2',
+  key: 'guestpass123',
+};

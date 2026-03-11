@@ -303,3 +303,135 @@ func TestGetMACAddresses(t *testing.T) {
 		t.Errorf("expected interface 'sta', got '%s'", configs[0].Interface)
 	}
 }
+
+func TestGetGuestWifi_NotConfigured(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	cfg, err := svc.GetGuestWifi()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Enabled {
+		t.Error("expected guest wifi to be disabled when not configured")
+	}
+}
+
+func TestSetGuestWifi_Enable(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	err := svc.SetGuestWifi(models.GuestWifiConfig{
+		Enabled:    true,
+		SSID:       "Guest-Travel",
+		Encryption: "psk2",
+		Key:        "guestpass123",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify wireless guest section
+	opts, err := u.GetAll("wireless", "guest")
+	if err != nil {
+		t.Fatalf("expected wireless.guest to exist: %v", err)
+	}
+	if opts["ssid"] != "Guest-Travel" {
+		t.Errorf("expected ssid 'Guest-Travel', got %q", opts["ssid"])
+	}
+	if opts["isolate"] != "1" {
+		t.Errorf("expected isolate '1', got %q", opts["isolate"])
+	}
+	if opts["disabled"] != "0" {
+		t.Errorf("expected disabled '0', got %q", opts["disabled"])
+	}
+	if opts["network"] != "guest" {
+		t.Errorf("expected network 'guest', got %q", opts["network"])
+	}
+
+	// Verify network.guest interface
+	netOpts, err := u.GetAll("network", "guest")
+	if err != nil {
+		t.Fatalf("expected network.guest to exist: %v", err)
+	}
+	if netOpts["ipaddr"] != "192.168.2.1" {
+		t.Errorf("expected ipaddr '192.168.2.1', got %q", netOpts["ipaddr"])
+	}
+
+	// Verify dhcp.guest
+	dhcpOpts, err := u.GetAll("dhcp", "guest")
+	if err != nil {
+		t.Fatalf("expected dhcp.guest to exist: %v", err)
+	}
+	if dhcpOpts["interface"] != "guest" {
+		t.Errorf("expected dhcp interface 'guest', got %q", dhcpOpts["interface"])
+	}
+
+	// Verify firewall guest zone
+	fwOpts, err := u.GetAll("firewall", "guest_zone")
+	if err != nil {
+		t.Fatalf("expected firewall.guest_zone to exist: %v", err)
+	}
+	if fwOpts["forward"] != "REJECT" {
+		t.Errorf("expected forward 'REJECT', got %q", fwOpts["forward"])
+	}
+
+	// Verify guest->wan forwarding
+	fwdOpts, err := u.GetAll("firewall", "guest_fwd")
+	if err != nil {
+		t.Fatalf("expected firewall.guest_fwd to exist: %v", err)
+	}
+	if fwdOpts["dest"] != "wan" {
+		t.Errorf("expected forwarding dest 'wan', got %q", fwdOpts["dest"])
+	}
+
+	// Verify GetGuestWifi returns correct config
+	cfg, err := svc.GetGuestWifi()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Enabled {
+		t.Error("expected guest wifi to be enabled")
+	}
+	if cfg.SSID != "Guest-Travel" {
+		t.Errorf("expected SSID 'Guest-Travel', got %q", cfg.SSID)
+	}
+}
+
+func TestSetGuestWifi_Disable(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Enable first
+	_ = svc.SetGuestWifi(models.GuestWifiConfig{
+		Enabled:    true,
+		SSID:       "Guest-Travel",
+		Encryption: "psk2",
+		Key:        "guestpass123",
+	})
+
+	// Disable
+	err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	val, err := u.Get("wireless", "guest", "disabled")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "1" {
+		t.Errorf("expected disabled '1', got %q", val)
+	}
+
+	cfg, _ := svc.GetGuestWifi()
+	if cfg.Enabled {
+		t.Error("expected guest wifi to be disabled")
+	}
+}
+
+func TestSetGuestWifi_DisableWhenNotConfigured(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

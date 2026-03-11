@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Signal, Trash2, Radio, QrCode, Shuffle, RotateCcw } from 'lucide-react';
+import { Wifi, WifiOff, Signal, Trash2, Radio, QrCode, Shuffle, RotateCcw, ShieldCheck } from 'lucide-react';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
-import type { APConfig } from '@shared/index';
+import type { APConfig, GuestWifiConfig } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ import {
   useSetAPConfig,
   useMACAddresses,
   useSetMAC,
+  useGuestWifi,
+  useSetGuestWifi,
 } from '@/hooks/use-wifi';
 
 interface APFormState {
@@ -35,6 +37,13 @@ interface APFormState {
   encryption: string;
   key: string;
   enabled: boolean;
+}
+
+interface GuestFormState {
+  enabled: boolean;
+  ssid: string;
+  encryption: string;
+  key: string;
 }
 
 function generateRandomMAC(): string {
@@ -54,9 +63,17 @@ export function WifiPage() {
   const setAP = useSetAPConfig();
   const { data: macAddresses, isLoading: macLoading } = useMACAddresses();
   const setMAC = useSetMAC();
+  const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
+  const setGuestWifi = useSetGuestWifi();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
   const [qrAP, setQrAP] = useState<APConfig | null>(null);
   const [customMAC, setCustomMAC] = useState('');
+  const [guestState, setGuestState] = useState<GuestFormState>({
+    enabled: false,
+    ssid: '',
+    encryption: 'psk2',
+    key: '',
+  });
 
   useEffect(() => {
     if (apConfigs) {
@@ -78,6 +95,17 @@ export function WifiPage() {
       setCustomMAC(macAddresses[0].custom_mac || '');
     }
   }, [macAddresses]);
+
+  useEffect(() => {
+    if (guestWifi) {
+      setGuestState({
+        enabled: guestWifi.enabled,
+        ssid: guestWifi.ssid,
+        encryption: guestWifi.encryption || 'psk2',
+        key: guestWifi.key,
+      });
+    }
+  }, [guestWifi]);
 
   return (
     <div className="space-y-6">
@@ -332,6 +360,120 @@ export function WifiPage() {
       </Card>
 
       <WifiQRDialog open={qrAP !== null} onOpenChange={(open) => !open && setQrAP(null)} ap={qrAP} />
+
+      {/* Guest Network */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Guest Network</CardTitle>
+          <ShieldCheck className="h-4 w-4 text-gray-400" />
+        </CardHeader>
+        <CardContent>
+          {guestLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Enable Guest WiFi</span>
+                  <p className="text-xs text-gray-500">
+                    Separate network (192.168.2.0/24) with client isolation
+                  </p>
+                </div>
+                <Switch
+                  id="guest-enabled"
+                  label="Enabled"
+                  checked={guestState.enabled}
+                  onChange={(e) =>
+                    setGuestState((prev) => ({ ...prev, enabled: e.target.checked }))
+                  }
+                />
+              </div>
+              {guestState.enabled && (
+                <div className="space-y-3 rounded-lg border p-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="guest-ssid"
+                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >
+                      SSID
+                    </label>
+                    <Input
+                      id="guest-ssid"
+                      value={guestState.ssid}
+                      onChange={(e) =>
+                        setGuestState((prev) => ({ ...prev, ssid: e.target.value }))
+                      }
+                      placeholder="Guest network name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="guest-encryption"
+                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >
+                      Encryption
+                    </label>
+                    <Select
+                      value={guestState.encryption}
+                      onValueChange={(val) =>
+                        setGuestState((prev) => ({
+                          ...prev,
+                          encryption: val,
+                          key: val === 'none' ? '' : prev.key,
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="guest-encryption">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None (Open)</SelectItem>
+                        <SelectItem value="psk2">WPA2-PSK</SelectItem>
+                        <SelectItem value="sae">WPA3-SAE</SelectItem>
+                        <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {guestState.encryption !== 'none' && (
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="guest-key"
+                        className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                      >
+                        Password
+                      </label>
+                      <Input
+                        id="guest-key"
+                        type="password"
+                        value={guestState.key}
+                        onChange={(e) =>
+                          setGuestState((prev) => ({ ...prev, key: e.target.value }))
+                        }
+                        placeholder="Minimum 8 characters"
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Client isolation is enabled — guests cannot see each other. Internet access only, no LAN access.
+                  </p>
+                </div>
+              )}
+              <Button
+                size="sm"
+                disabled={setGuestWifi.isPending}
+                onClick={() =>
+                  setGuestWifi.mutate(guestState as GuestWifiConfig)
+                }
+              >
+                {setGuestWifi.isPending ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* MAC Address Cloning */}
       <Card>

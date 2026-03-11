@@ -22,6 +22,7 @@ import {
   mockAPConfigs,
   mockMACAddresses,
   mockDHCPLeases,
+  mockGuestWifi,
 } from './data';
 
 export const handlers = [
@@ -271,6 +272,13 @@ export const handlers = [
     return HttpResponse.json(mockMACAddresses);
   }),
   http.put(API_ROUTES.wifi.mac, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.wifi.guest, () => {
+    return HttpResponse.json(mockGuestWifi);
+  }),
+  http.put(API_ROUTES.wifi.guest, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 ];

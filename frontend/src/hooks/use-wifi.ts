@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode, APConfig, MACConfig } from '@shared/index';
+import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode, APConfig, MACConfig, GuestWifiConfig } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
   return useQuery({
@@ -131,6 +131,28 @@ export function useSetMAC() {
     },
     onError: (error) => {
       toast.error('Failed to update MAC address', { description: error.message });
+    },
+  });
+}
+
+export function useGuestWifi() {
+  return useQuery({
+    queryKey: ['wifi', 'guest'],
+    queryFn: () => apiClient.get<GuestWifiConfig>(API_ROUTES.wifi.guest),
+  });
+}
+
+export function useSetGuestWifi() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cfg: GuestWifiConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.guest, cfg),
+    onSuccess: () => {
+      toast.success('Guest WiFi updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'guest'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update guest WiFi', { description: error.message });
     },
   });
 }

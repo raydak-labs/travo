@@ -91,3 +91,11 @@ export interface MACConfig {
 export interface SetMACRequest {
   readonly mac: string;
 }
+
+/** Guest WiFi network configuration */
+export interface GuestWifiConfig {
+  readonly enabled: boolean;
+  readonly ssid: string;
+  readonly encryption: string;
+  readonly key: string;
+}

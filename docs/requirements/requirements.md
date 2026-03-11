@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v10 — MAC address cloning)
+> **Last updated:** 2026-03-11 (v11 — Guest WiFi with client isolation)
 
 ---
 
@@ -54,7 +54,7 @@
 - [ ] Separate 2.4 GHz and 5 GHz AP networks (or combined, depending on hardware)
 - [ ] Show which radios are available on the device and their capabilities
 - [x] Enable/disable AP per radio
-- [ ] Guest network with client isolation
+- [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)

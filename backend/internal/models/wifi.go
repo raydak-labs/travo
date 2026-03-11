@@ -57,3 +57,11 @@ type APConfig struct {
 	Channel    int    `json:"channel"`
 	Section    string `json:"section"`
 }
+
+// GuestWifiConfig holds the guest WiFi network configuration.
+type GuestWifiConfig struct {
+	Enabled    bool   `json:"enabled"`
+	SSID       string `json:"ssid"`
+	Encryption string `json:"encryption"`
+	Key        string `json:"key"`
+}
