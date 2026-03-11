@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v14 — WireGuard kill switch)
+> **Last updated:** 2026-03-11 (v15 — session timeout warning)
 
 ---
 
@@ -298,7 +298,7 @@
 - [x] Rate limiting (5 failed attempts/min)
 - [x] Remember me toggle (localStorage vs sessionStorage)
 - [x] WebSocket auth via JWT query parameter
-- [ ] Session timeout warning
+- [x] Session timeout warning (toast 5 min before JWT expiry, auto-redirect on expiry)
 - [ ] HTTPS / TLS support
 - [ ] 🔮 Two-factor authentication
 - [ ] 🔮 IP-based access control

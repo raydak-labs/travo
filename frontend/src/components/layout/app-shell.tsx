@@ -3,6 +3,7 @@ import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSessionTimeout } from '@/hooks/use-session-timeout';
 
 interface AppShellProps {
   children: ReactNode;
@@ -13,6 +14,7 @@ export function AppShell({ children, title }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
+  useSessionTimeout();
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 theme-transition dark:bg-gray-900">
