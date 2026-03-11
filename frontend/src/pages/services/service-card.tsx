@@ -1,5 +1,5 @@
 import type { ServiceInfo, ServiceState } from '@shared/index';
-import { Shield, ShieldCheck, ShieldBan, Globe } from 'lucide-react';
+import { Shield, ShieldCheck, ShieldBan, Globe, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,6 +120,22 @@ export function ServiceCard({
                     Remove
                   </Button>
                 </>
+              )}
+              {service.id === 'adguardhome' && service.state === 'running' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                >
+                  <a
+                    href={`http://${window.location.hostname}:3000`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Open Dashboard
+                  </a>
+                </Button>
               )}
               {service.state === 'error' && (
                 <>

@@ -188,7 +188,7 @@
 - [ ] Auto-configure after install (port, interfaces, DNS integration with dnsmasq)
 - [ ] "AdGuard Home handles client requests" toggle (GL.iNet style, with VPN hint; defaults to off)
 - [ ] Show if AdGuard is configured as default DNS for LAN
-- [ ] Quick link to AdGuard web UI (with correct IP:port)
+- [x] Quick link to AdGuard web UI (with correct IP:port)
 - [ ] Toggle DNS filtering on/off without stopping AdGuard
 - [ ] Configure AdGuard to work alongside VPN
 - [ ] 🔮 Blocklist management from travel router UI
