@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Signal, Trash2, Radio } from 'lucide-react';
+import { Wifi, WifiOff, Signal, Trash2, Radio, QrCode } from 'lucide-react';
+import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
+import type { APConfig } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +43,7 @@ export function WifiPage() {
   const deleteMutation = useWifiDelete();
   const setAP = useSetAPConfig();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
+  const [qrAP, setQrAP] = useState<APConfig | null>(null);
 
   useEffect(() => {
     if (apConfigs) {
@@ -273,24 +276,34 @@ export function WifiPage() {
                         />
                       </div>
                     )}
-                    <Button
-                      size="sm"
-                      disabled={setAP.isPending}
-                      onClick={() =>
-                        setAP.mutate({
-                          section: ap.section,
-                          config: {
-                            ...ap,
-                            ssid: form.ssid,
-                            encryption: form.encryption,
-                            key: form.key,
-                            enabled: form.enabled,
-                          },
-                        })
-                      }
-                    >
-                      {setAP.isPending ? 'Saving...' : 'Save'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={setAP.isPending}
+                        onClick={() =>
+                          setAP.mutate({
+                            section: ap.section,
+                            config: {
+                              ...ap,
+                              ssid: form.ssid,
+                              encryption: form.encryption,
+                              key: form.key,
+                              enabled: form.enabled,
+                            },
+                          })
+                        }
+                      >
+                        {setAP.isPending ? 'Saving...' : 'Save'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQrAP(ap)}
+                      >
+                        <QrCode className="h-4 w-4 mr-1" />
+                        QR Code
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
@@ -298,6 +311,8 @@ export function WifiPage() {
           )}
         </CardContent>
       </Card>
+
+      <WifiQRDialog open={qrAP !== null} onOpenChange={(open) => !open && setQrAP(null)} ap={qrAP} />
     </div>
   );
 }

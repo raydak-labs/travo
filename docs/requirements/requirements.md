@@ -55,7 +55,7 @@
 - [ ] Show which radios are available on the device and their capabilities
 - [x] Enable/disable AP per radio
 - [ ] Guest network with client isolation
-- [ ] QR code for WiFi sharing (generate scannable QR with AP credentials)
+- [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)
 
