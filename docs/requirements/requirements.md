@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v11 — Guest WiFi with client isolation)
+> **Last updated:** 2026-03-11 (v12 — WiFi mode selection UI)
 
 ---
 
@@ -62,7 +62,7 @@
 ### 1.3 WiFi Modes
 
 - [x] WiFi mode switching API (AP / STA / Repeater)
-- [ ] Clear UI for mode selection with explanation of each mode
+- [x] Clear UI for mode selection with explanation of each mode
 - [ ] Repeater mode setup wizard (upstream + AP on same radio)
 - [ ] 🔮 Mesh / WDS mode
 

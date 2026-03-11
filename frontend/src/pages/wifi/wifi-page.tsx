@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CaptivePortalBanner } from '@/components/wifi/captive-portal-banner';
+import { WifiModeCard } from '@/components/wifi/wifi-mode-card';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { WifiScanDialog } from './wifi-scan-dialog';
@@ -123,6 +124,9 @@ export function WifiPage() {
   return (
     <div className="space-y-6">
       <CaptivePortalBanner />
+
+      {/* WiFi Mode */}
+      <WifiModeCard />
 
       {/* Current Connection */}
       <Card>
