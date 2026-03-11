@@ -2,7 +2,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { NetworkStatus, WanConfig, Client, DHCPConfig, DNSConfig, DHCPLease, SetAliasRequest } from '@shared/index';
+import type {
+  NetworkStatus,
+  WanConfig,
+  Client,
+  DHCPConfig,
+  DNSConfig,
+  DHCPLease,
+  SetAliasRequest,
+  DNSEntry,
+} from '@shared/index';
 
 export function useNetworkStatus() {
   return useQuery({
@@ -103,6 +112,43 @@ export function useSetClientAlias() {
     },
     onError: (error) => {
       toast.error('Failed to update alias', { description: error.message });
+    },
+  });
+}
+
+export function useDNSEntries() {
+  return useQuery({
+    queryKey: ['network', 'dnsEntries'],
+    queryFn: () => apiClient.get<DNSEntry[]>(API_ROUTES.network.dnsEntries),
+  });
+}
+
+export function useAddDNSEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (entry: { name: string; ip: string }) =>
+      apiClient.post<{ status: string }>(API_ROUTES.network.dnsEntries, entry),
+    onSuccess: () => {
+      toast.success('DNS entry added');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to add DNS entry', { description: error.message });
+    },
+  });
+}
+
+export function useDeleteDNSEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (section: string) =>
+      apiClient.del<{ status: string }>(`${API_ROUTES.network.dnsEntries}/${section}`),
+    onSuccess: () => {
+      toast.success('DNS entry deleted');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete DNS entry', { description: error.message });
     },
   });
 }

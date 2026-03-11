@@ -189,3 +189,54 @@ func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetDNSEntriesHandler handles GET /api/v1/network/dns/entries.
+func GetDNSEntriesHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		entries, err := svc.GetDNSEntries()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(entries)
+	}
+}
+
+// AddDNSEntryHandler handles POST /api/v1/network/dns/entries.
+func AddDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var entry models.DNSEntry
+		if err := c.BodyParser(&entry); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if entry.Name == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+		}
+		if !isValidHostname(entry.Name) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid hostname"})
+		}
+		if entry.IP == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ip is required"})
+		}
+		if !isValidIPv4(entry.IP) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid IP address"})
+		}
+		if err := svc.AddDNSEntry(entry); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// DeleteDNSEntryHandler handles DELETE /api/v1/network/dns/entries/:section.
+func DeleteDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		section := c.Params("section")
+		if section == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section is required"})
+		}
+		if err := svc.DeleteDNSEntry(section); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

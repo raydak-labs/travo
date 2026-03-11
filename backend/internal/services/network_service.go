@@ -413,6 +413,65 @@ func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
 	return parseDHCPLeases(string(data))
 }
 
+// GetDNSEntries returns all local DNS entries from dhcp config (domain sections).
+func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
+	sections, err := n.uci.GetSections("dhcp")
+	if err != nil {
+		return []models.DNSEntry{}, nil
+	}
+	var entries []models.DNSEntry
+	for section, opts := range sections {
+		if opts[".type"] != "domain" {
+			continue
+		}
+		entries = append(entries, models.DNSEntry{
+			Name:    opts["name"],
+			IP:      opts["ip"],
+			Section: section,
+		})
+	}
+	if entries == nil {
+		return []models.DNSEntry{}, nil
+	}
+	return entries, nil
+}
+
+// AddDNSEntry adds a new local DNS entry as a named UCI section in dhcp config.
+func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
+	section := "dns_" + sanitizeSectionName(entry.Name)
+	if err := n.uci.AddSection("dhcp", section, "domain"); err != nil {
+		return fmt.Errorf("adding DNS entry section: %w", err)
+	}
+	if err := n.uci.Set("dhcp", section, "name", entry.Name); err != nil {
+		return fmt.Errorf("setting DNS entry name: %w", err)
+	}
+	if err := n.uci.Set("dhcp", section, "ip", entry.IP); err != nil {
+		return fmt.Errorf("setting DNS entry IP: %w", err)
+	}
+	return n.uci.Commit("dhcp")
+}
+
+// DeleteDNSEntry removes a local DNS entry by its UCI section name.
+func (n *NetworkService) DeleteDNSEntry(section string) error {
+	if err := n.uci.DeleteSection("dhcp", section); err != nil {
+		return fmt.Errorf("deleting DNS entry: %w", err)
+	}
+	return n.uci.Commit("dhcp")
+}
+
+// sanitizeSectionName converts a hostname to a valid UCI section name.
+func sanitizeSectionName(name string) string {
+	var sb strings.Builder
+	for _, c := range strings.ToLower(name) {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+			sb.WriteRune(c)
+		} else {
+			sb.WriteRune('_')
+		}
+	}
+	return sb.String()
+}
+
 // parseDHCPLeases parses the content of /tmp/dhcp.leases into a slice of DHCPLease.
 // Each line has the format: <expiry_epoch> <mac_address> <ip_address> <hostname> <client_id>
 func parseDHCPLeases(data string) []models.DHCPLease {

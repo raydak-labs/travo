@@ -3,9 +3,12 @@ package api
 import (
 	"encoding/base64"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 )
+
+var validHostnameRe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,61}[a-zA-Z0-9])?$`)
 
 // isValidIPv4 returns true if s is a valid IPv4 address (no CIDR, no port).
 func isValidIPv4(s string) bool {
@@ -104,4 +107,12 @@ func isValidMAC(mac string) bool {
 		}
 	}
 	return true
+}
+
+// isValidHostname checks if a string is a valid DNS hostname.
+func isValidHostname(name string) bool {
+	if len(name) == 0 || len(name) > 63 {
+		return false
+	}
+	return validHostnameRe.MatchString(name)
 }

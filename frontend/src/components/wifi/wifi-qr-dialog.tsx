@@ -1,10 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { APConfig } from '@shared/index';
 
 interface WifiQRDialogProps {

@@ -45,7 +45,13 @@ function AliasCell({ client }: { client: Client }) {
           placeholder="Alias"
           autoFocus
         />
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSave} disabled={setAlias.isPending}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={handleSave}
+          disabled={setAlias.isPending}
+        >
           <Check className="h-3 w-3" />
         </Button>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancel}>
@@ -63,7 +69,12 @@ function AliasCell({ client }: { client: Client }) {
           <span className="ml-1 text-xs text-gray-400">({client.hostname})</span>
         )}
       </div>
-      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => setEditing(true)}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+        onClick={() => setEditing(true)}
+      >
         <Pencil className="h-3 w-3" />
       </Button>
     </div>

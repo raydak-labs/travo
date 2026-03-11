@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Network, Globe, Wifi, Settings, List } from 'lucide-react';
+import { Network, Globe, Wifi, Settings, List, MapPin, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useNetworkStatus, useDHCPConfig, useSetDHCPConfig, useDNSConfig, useSetDNSConfig, useDHCPLeases } from '@/hooks/use-network';
+import {
+  useNetworkStatus,
+  useDHCPConfig,
+  useSetDHCPConfig,
+  useDNSConfig,
+  useSetDNSConfig,
+  useDHCPLeases,
+  useDNSEntries,
+  useAddDNSEntry,
+  useDeleteDNSEntry,
+} from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
 
@@ -24,12 +34,17 @@ export function NetworkPage() {
   const { data: dnsConfig, isLoading: dnsLoading } = useDNSConfig();
   const setDNS = useSetDNSConfig();
   const { data: dhcpLeases, isLoading: dhcpLeasesLoading } = useDHCPLeases();
+  const { data: dnsEntries, isLoading: dnsEntriesLoading } = useDNSEntries();
+  const addDNSEntry = useAddDNSEntry();
+  const deleteDNSEntry = useDeleteDNSEntry();
   const [dhcpStart, setDhcpStart] = useState<number>(100);
   const [dhcpLimit, setDhcpLimit] = useState<number>(150);
   const [dhcpLease, setDhcpLease] = useState<string>('12h');
   const [useCustomDNS, setUseCustomDNS] = useState(false);
   const [dnsServer1, setDnsServer1] = useState('');
   const [dnsServer2, setDnsServer2] = useState('');
+  const [newDnsName, setNewDnsName] = useState('');
+  const [newDnsIP, setNewDnsIP] = useState('');
 
   useEffect(() => {
     if (dhcpConfig) {
@@ -211,24 +226,62 @@ export function NetworkPage() {
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Switch checked={useCustomDNS} onChange={(e) => setUseCustomDNS(e.target.checked)} />
+                <Switch
+                  checked={useCustomDNS}
+                  onChange={(e) => setUseCustomDNS(e.target.checked)}
+                />
                 <span className="text-sm">Use custom DNS servers</span>
               </div>
               {useCustomDNS && (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => { setDnsServer1('8.8.8.8'); setDnsServer2('8.8.4.4'); }}>Google</Button>
-                    <Button variant="outline" size="sm" onClick={() => { setDnsServer1('1.1.1.1'); setDnsServer2('1.0.0.1'); }}>Cloudflare</Button>
-                    <Button variant="outline" size="sm" onClick={() => { setDnsServer1('9.9.9.9'); setDnsServer2('149.112.112.112'); }}>Quad9</Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDnsServer1('8.8.8.8');
+                        setDnsServer2('8.8.4.4');
+                      }}
+                    >
+                      Google
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDnsServer1('1.1.1.1');
+                        setDnsServer2('1.0.0.1');
+                      }}
+                    >
+                      Cloudflare
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDnsServer1('9.9.9.9');
+                        setDnsServer2('149.112.112.112');
+                      }}
+                    >
+                      Quad9
+                    </Button>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs text-gray-500">Primary DNS</label>
-                      <Input value={dnsServer1} onChange={(e) => setDnsServer1(e.target.value)} placeholder="8.8.8.8" />
+                      <Input
+                        value={dnsServer1}
+                        onChange={(e) => setDnsServer1(e.target.value)}
+                        placeholder="8.8.8.8"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-gray-500">Secondary DNS</label>
-                      <Input value={dnsServer2} onChange={(e) => setDnsServer2(e.target.value)} placeholder="8.8.4.4" />
+                      <Input
+                        value={dnsServer2}
+                        onChange={(e) => setDnsServer2(e.target.value)}
+                        placeholder="8.8.4.4"
+                      />
                     </div>
                   </div>
                 </>
@@ -243,6 +296,95 @@ export function NetworkPage() {
               >
                 {setDNS.isPending ? 'Saving…' : 'Save DNS Settings'}
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* DNS Entries */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Local DNS Entries</CardTitle>
+          <MapPin className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          {dnsEntriesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {dnsEntries && dnsEntries.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="pb-2 font-medium">Hostname</th>
+                        <th className="pb-2 font-medium">IP Address</th>
+                        <th className="pb-2 font-medium w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dnsEntries.map((entry) => (
+                        <tr key={entry.section} className="border-b last:border-0">
+                          <td className="py-2 text-gray-900 dark:text-white">{entry.name}</td>
+                          <td className="py-2 font-mono text-gray-900 dark:text-white">
+                            {entry.ip}
+                          </td>
+                          <td className="py-2 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => entry.section && deleteDNSEntry.mutate(entry.section)}
+                              disabled={deleteDNSEntry.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">Hostname</label>
+                  <Input
+                    value={newDnsName}
+                    onChange={(e) => setNewDnsName(e.target.value)}
+                    placeholder="myserver"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">IP Address</label>
+                  <Input
+                    value={newDnsIP}
+                    onChange={(e) => setNewDnsIP(e.target.value)}
+                    placeholder="192.168.8.10"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (newDnsName && newDnsIP) {
+                      addDNSEntry.mutate(
+                        { name: newDnsName, ip: newDnsIP },
+                        {
+                          onSuccess: () => {
+                            setNewDnsName('');
+                            setNewDnsIP('');
+                          },
+                        },
+                      );
+                    }
+                  }}
+                  disabled={addDNSEntry.isPending || !newDnsName || !newDnsIP}
+                >
+                  {addDNSEntry.isPending ? 'Adding…' : 'Add'}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -274,7 +416,9 @@ export function NetworkPage() {
                 <tbody>
                   {dhcpLeases.map((lease) => (
                     <tr key={lease.mac} className="border-b last:border-0">
-                      <td className="py-2 text-gray-900 dark:text-white">{lease.hostname || '—'}</td>
+                      <td className="py-2 text-gray-900 dark:text-white">
+                        {lease.hostname || '—'}
+                      </td>
                       <td className="py-2 font-mono text-gray-900 dark:text-white">{lease.ip}</td>
                       <td className="py-2 font-mono text-gray-500">{lease.mac}</td>
                       <td className="py-2 text-gray-500">

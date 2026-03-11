@@ -57,6 +57,9 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/network/dns", SetDNSConfigHandler(deps.Network))
 	v1.Get("/network/dhcp/leases", GetDHCPLeasesHandler(deps.Network))
 	v1.Put("/network/clients/alias", SetClientAliasHandler(deps.Network))
+	v1.Get("/network/dns/entries", GetDNSEntriesHandler(deps.Network))
+	v1.Post("/network/dns/entries", AddDNSEntryHandler(deps.Network))
+	v1.Delete("/network/dns/entries/:section", DeleteDNSEntryHandler(deps.Network))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))

@@ -158,3 +158,20 @@ func (m *MockUCI) DeleteSection(config, section string) error {
 	}
 	return fmt.Errorf("uci: section not found %s.%s", config, section)
 }
+
+func (m *MockUCI) GetSections(config string) (map[string]map[string]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	c, ok := m.data[config]
+	if !ok {
+		return map[string]map[string]string{}, nil
+	}
+	result := make(map[string]map[string]string, len(c))
+	for section, opts := range c {
+		result[section] = make(map[string]string, len(opts))
+		for k, v := range opts {
+			result[section][k] = v
+		}
+	}
+	return result, nil
+}

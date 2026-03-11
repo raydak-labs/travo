@@ -84,3 +84,10 @@ type DHCPLease struct {
 	IP       string `json:"ip"`
 	Hostname string `json:"hostname"`
 }
+
+// DNSEntry represents a local DNS entry (hostname → IP mapping).
+type DNSEntry struct {
+	Name    string `json:"name"`
+	IP      string `json:"ip"`
+	Section string `json:"section,omitempty"`
+}

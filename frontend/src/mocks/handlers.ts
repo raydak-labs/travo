@@ -23,6 +23,7 @@ import {
   mockMACAddresses,
   mockDHCPLeases,
   mockGuestWifi,
+  mockDNSEntries,
 } from './data';
 
 export const handlers = [
@@ -183,6 +184,16 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.get(API_ROUTES.network.dnsEntries, () => {
+    return HttpResponse.json(mockDNSEntries);
+  }),
+  http.post(API_ROUTES.network.dnsEntries, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+  http.delete(`${API_ROUTES.network.dnsEntries}/:section`, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.network.dhcpLeases, () => {
     return HttpResponse.json(mockDHCPLeases);
   }),
@@ -258,7 +269,10 @@ export const handlers = [
     });
   }),
   http.post(API_ROUTES.system.restore, () => {
-    return HttpResponse.json({ status: 'ok', message: 'Configuration restored. Reboot to apply changes.' });
+    return HttpResponse.json({
+      status: 'ok',
+      message: 'Configuration restored. Reboot to apply changes.',
+    });
   }),
 
   http.get(API_ROUTES.wifi.ap, () => {

@@ -2,7 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode, APConfig, MACConfig, GuestWifiConfig } from '@shared/index';
+import type {
+  WifiScanResult,
+  WifiConnection,
+  SavedNetwork,
+  WifiMode,
+  APConfig,
+  MACConfig,
+  GuestWifiConfig,
+} from '@shared/index';
 
 export function useWifiScan(enabled = true) {
   return useQuery({
@@ -123,8 +131,7 @@ export function useMACAddresses() {
 export function useSetMAC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.put<{ status: string }>(API_ROUTES.wifi.mac, { mac }),
+    mutationFn: (mac: string) => apiClient.put<{ status: string }>(API_ROUTES.wifi.mac, { mac }),
     onSuccess: () => {
       toast.success('MAC address updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });

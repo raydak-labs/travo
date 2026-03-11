@@ -27,6 +27,7 @@ export const API_ROUTES = {
     dhcp: '/api/v1/network/dhcp',
     dhcpLeases: '/api/v1/network/dhcp/leases',
     dns: '/api/v1/network/dns',
+    dnsEntries: '/api/v1/network/dns/entries',
   },
   wifi: {
     scan: '/api/v1/wifi/scan',

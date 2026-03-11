@@ -2,7 +2,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest, SetHostnameRequest, LEDStatus, SetLEDRequest, TimezoneConfig } from '@shared/index';
+import type {
+  SystemInfo,
+  SystemStats,
+  LogResponse,
+  ChangePasswordRequest,
+  SetHostnameRequest,
+  LEDStatus,
+  SetLEDRequest,
+  TimezoneConfig,
+} from '@shared/index';
 
 export function useSystemInfo() {
   return useQuery({
@@ -35,7 +44,9 @@ export function useFactoryReset() {
   return useMutation({
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.factoryReset),
     onSuccess: () => {
-      toast.success('Factory reset initiated', { description: 'Device will restart with default settings.' });
+      toast.success('Factory reset initiated', {
+        description: 'Device will restart with default settings.',
+      });
     },
     onError: (error) => {
       toast.error('Factory reset failed', { description: error.message });
@@ -92,8 +103,7 @@ export function useLEDStatus() {
 
 export function useSetLEDStealth() {
   return useMutation({
-    mutationFn: (data: SetLEDRequest) =>
-      apiClient.put<LEDStatus>(API_ROUTES.system.leds, data),
+    mutationFn: (data: SetLEDRequest) => apiClient.put<LEDStatus>(API_ROUTES.system.leds, data),
     onSuccess: () => {
       toast.success('LED mode updated');
     },

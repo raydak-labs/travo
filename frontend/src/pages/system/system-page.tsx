@@ -1,14 +1,50 @@
 import { useState, useEffect, useRef } from 'react';
-import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb, Download, Upload, AlertTriangle } from 'lucide-react';
+import {
+  Server,
+  Cpu,
+  HardDrive,
+  Clock,
+  KeyRound,
+  Pencil,
+  Lightbulb,
+  Download,
+  Upload,
+  AlertTriangle,
+} from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useSystemInfo, useSystemStats, useReboot, useFactoryReset, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth, useTimezone, useSetTimezone, useBackup, useRestore } from '@/hooks/use-system';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  useSystemInfo,
+  useSystemStats,
+  useReboot,
+  useFactoryReset,
+  useChangePassword,
+  useSetHostname,
+  useLEDStatus,
+  useSetLEDStealth,
+  useTimezone,
+  useSetTimezone,
+  useBackup,
+  useRestore,
+} from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 const TIMEZONES = [
@@ -179,7 +215,9 @@ export function SystemPage() {
               <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
                 <div className="grid grid-cols-2 gap-2">
                   <span className="text-gray-500">Timezone</span>
-                  <span className="text-gray-900 dark:text-white">{timezoneConfig?.zonename || '—'}</span>
+                  <span className="text-gray-900 dark:text-white">
+                    {timezoneConfig?.zonename || '—'}
+                  </span>
                 </div>
               </div>
               <div className="space-y-1">
@@ -310,11 +348,7 @@ export function SystemPage() {
           )}
 
           <div className="mt-4 border-t pt-4">
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setShowFactoryResetDialog(true)}
-            >
+            <Button size="sm" variant="destructive" onClick={() => setShowFactoryResetDialog(true)}>
               Factory Reset
             </Button>
             <p className="mt-1 text-xs text-gray-500">
@@ -332,7 +366,8 @@ export function SystemPage() {
               </DialogHeader>
               <div className="space-y-3">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  This will <strong>erase all configuration changes</strong> and restore the device to factory defaults. The device will reboot.
+                  This will <strong>erase all configuration changes</strong> and restore the device
+                  to factory defaults. The device will reboot.
                 </p>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   You will need to reconnect to the default WiFi network after the reset completes.
@@ -418,7 +453,11 @@ export function SystemPage() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    if (window.confirm('Restore this backup? Current configuration will be overwritten. A reboot will be needed to apply changes.')) {
+                    if (
+                      window.confirm(
+                        'Restore this backup? Current configuration will be overwritten. A reboot will be needed to apply changes.',
+                      )
+                    ) {
                       restore.mutate(file);
                     }
                     e.target.value = '';

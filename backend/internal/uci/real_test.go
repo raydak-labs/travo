@@ -206,3 +206,62 @@ func TestRealUCIDeleteSectionValidation(t *testing.T) {
 		t.Error("expected validation error for section")
 	}
 }
+
+func TestRealUCIGetSectionsValidation(t *testing.T) {
+	r := NewRealUCI()
+
+	_, err := r.GetSections("net;work")
+	if err == nil {
+		t.Error("expected validation error for config")
+	}
+}
+
+func TestParseShowConfigOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		sections int
+	}{
+		{
+			name:     "empty",
+			input:    "",
+			sections: 0,
+		},
+		{
+			name:     "single section with type and options",
+			input:    "dhcp.lan=dhcp\ndhcp.lan.interface='lan'\ndhcp.lan.start='100'\n",
+			sections: 1,
+		},
+		{
+			name:     "multiple sections",
+			input:    "dhcp.lan=dhcp\ndhcp.lan.start='100'\ndhcp.dns_test=domain\ndhcp.dns_test.name='test'\ndhcp.dns_test.ip='192.168.1.10'\n",
+			sections: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseShowConfigOutput(tt.input)
+			if len(result) != tt.sections {
+				t.Errorf("expected %d sections, got %d: %v", tt.sections, len(result), result)
+			}
+		})
+	}
+}
+
+func TestParseShowConfigOutput_SectionType(t *testing.T) {
+	input := "dhcp.dns_test=domain\ndhcp.dns_test.name='myhost'\ndhcp.dns_test.ip='10.0.0.1'\n"
+	result := parseShowConfigOutput(input)
+	section := result["dns_test"]
+	if section == nil {
+		t.Fatal("expected dns_test section")
+	}
+	if section[".type"] != "domain" {
+		t.Errorf("expected .type 'domain', got %q", section[".type"])
+	}
+	if section["name"] != "myhost" {
+		t.Errorf("expected name 'myhost', got %q", section["name"])
+	}
+	if section["ip"] != "10.0.0.1" {
+		t.Errorf("expected ip '10.0.0.1', got %q", section["ip"])
+	}
+}

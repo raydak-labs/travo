@@ -74,6 +74,13 @@ export interface DHCPLease {
   readonly hostname: string;
 }
 
+/** Local DNS entry (hostname → IP mapping) */
+export interface DNSEntry {
+  readonly name: string;
+  readonly ip: string;
+  readonly section?: string;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

@@ -78,9 +78,7 @@ export function ServicesPage() {
                   onRemove={handleRemove}
                   onStart={(id) => startMutation.mutate(id)}
                   onStop={(id) => stopMutation.mutate(id)}
-                  onAutoStartChange={(id, enabled) =>
-                    setAutoStartMutation.mutate({ id, enabled })
-                  }
+                  onAutoStartChange={(id, enabled) => setAutoStartMutation.mutate({ id, enabled })}
                   isPending={isPending || streamAction !== null}
                   isAutoStartPending={setAutoStartMutation.isPending}
                 />

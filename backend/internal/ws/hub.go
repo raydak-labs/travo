@@ -12,10 +12,10 @@ import (
 
 // Hub manages WebSocket connections and broadcasts system stats.
 type Hub struct {
-	clients    map[*websocket.Conn]bool
-	mu         sync.RWMutex
-	systemSvc  *services.SystemService
-	stopCh     chan struct{}
+	clients           map[*websocket.Conn]bool
+	mu                sync.RWMutex
+	systemSvc         *services.SystemService
+	stopCh            chan struct{}
 	BroadcastInterval time.Duration
 }
 

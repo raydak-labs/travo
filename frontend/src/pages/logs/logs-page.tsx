@@ -70,7 +70,12 @@ export function LogsPage() {
                   className="pl-9"
                 />
               </div>
-              <Button variant="outline" size="icon" onClick={() => refetch()} aria-label="Refresh logs">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetch()}
+                aria-label="Refresh logs"
+              >
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
@@ -92,11 +97,13 @@ export function LogsPage() {
               className="max-h-[500px] overflow-y-auto rounded-md bg-gray-950 p-4 text-xs leading-relaxed text-green-400 font-mono"
             >
               <code>
-                {filteredLines.length > 0
-                  ? filteredLines.map((entry, i) => (
-                      <div key={i}>{entry.line}</div>
-                    ))
-                  : <span className="text-gray-500">No log entries{filter ? ' matching filter' : ''}</span>}
+                {filteredLines.length > 0 ? (
+                  filteredLines.map((entry, i) => <div key={i}>{entry.line}</div>)
+                ) : (
+                  <span className="text-gray-500">
+                    No log entries{filter ? ' matching filter' : ''}
+                  </span>
+                )}
               </code>
             </pre>
           )}
@@ -104,7 +111,8 @@ export function LogsPage() {
           {/* Line count */}
           {!isLoading && logs && (
             <p className="mt-2 text-xs text-gray-500">
-              {filteredLines.length}{filter ? ` / ${logs.total}` : ''} lines
+              {filteredLines.length}
+              {filter ? ` / ${logs.total}` : ''} lines
             </p>
           )}
         </CardContent>

@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Signal, Trash2, Radio, QrCode, Shuffle, RotateCcw, ShieldCheck } from 'lucide-react';
+import {
+  Wifi,
+  WifiOff,
+  Signal,
+  Trash2,
+  Radio,
+  QrCode,
+  Shuffle,
+  RotateCcw,
+  ShieldCheck,
+} from 'lucide-react';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import type { APConfig, GuestWifiConfig } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -47,7 +57,10 @@ interface GuestFormState {
 }
 
 function generateRandomMAC(): string {
-  const hex = () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+  const hex = () =>
+    Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, '0');
   const first = (Math.floor(Math.random() * 256) & 0xfe) | 0x02; // locally administered, unicast
   return [first.toString(16).padStart(2, '0'), hex(), hex(), hex(), hex(), hex()].join(':');
 }
@@ -231,7 +244,8 @@ export function WifiPage() {
               {apConfigs.map((ap) => {
                 const form = apState[ap.section];
                 if (!form) return null;
-                const bandLabel = ap.band === '5g' ? '5 GHz' : ap.band === '2g' ? '2.4 GHz' : ap.band;
+                const bandLabel =
+                  ap.band === '5g' ? '5 GHz' : ap.band === '2g' ? '2.4 GHz' : ap.band;
                 return (
                   <div key={ap.section} className="space-y-3 rounded-lg border p-4">
                     <div className="flex items-center justify-between">
@@ -286,7 +300,11 @@ export function WifiPage() {
                         onValueChange={(val) =>
                           setApState((prev) => ({
                             ...prev,
-                            [ap.section]: { ...prev[ap.section], encryption: val, key: val === 'none' ? '' : prev[ap.section].key },
+                            [ap.section]: {
+                              ...prev[ap.section],
+                              encryption: val,
+                              key: val === 'none' ? '' : prev[ap.section].key,
+                            },
                           }))
                         }
                       >
@@ -342,11 +360,7 @@ export function WifiPage() {
                       >
                         {setAP.isPending ? 'Saving...' : 'Save'}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQrAP(ap)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setQrAP(ap)}>
                         <QrCode className="h-4 w-4 mr-1" />
                         QR Code
                       </Button>
@@ -359,7 +373,11 @@ export function WifiPage() {
         </CardContent>
       </Card>
 
-      <WifiQRDialog open={qrAP !== null} onOpenChange={(open) => !open && setQrAP(null)} ap={qrAP} />
+      <WifiQRDialog
+        open={qrAP !== null}
+        onOpenChange={(open) => !open && setQrAP(null)}
+        ap={qrAP}
+      />
 
       {/* Guest Network */}
       <Card>
@@ -377,7 +395,9 @@ export function WifiPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Enable Guest WiFi</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Enable Guest WiFi
+                  </span>
                   <p className="text-xs text-gray-500">
                     Separate network (192.168.2.0/24) with client isolation
                   </p>
@@ -403,9 +423,7 @@ export function WifiPage() {
                     <Input
                       id="guest-ssid"
                       value={guestState.ssid}
-                      onChange={(e) =>
-                        setGuestState((prev) => ({ ...prev, ssid: e.target.value }))
-                      }
+                      onChange={(e) => setGuestState((prev) => ({ ...prev, ssid: e.target.value }))}
                       placeholder="Guest network name"
                     />
                   </div>
@@ -457,16 +475,15 @@ export function WifiPage() {
                     </div>
                   )}
                   <p className="text-xs text-gray-500">
-                    Client isolation is enabled — guests cannot see each other. Internet access only, no LAN access.
+                    Client isolation is enabled — guests cannot see each other. Internet access
+                    only, no LAN access.
                   </p>
                 </div>
               )}
               <Button
                 size="sm"
                 disabled={setGuestWifi.isPending}
-                onClick={() =>
-                  setGuestWifi.mutate(guestState as GuestWifiConfig)
-                }
+                onClick={() => setGuestWifi.mutate(guestState as GuestWifiConfig)}
               >
                 {setGuestWifi.isPending ? 'Saving...' : 'Save'}
               </Button>
@@ -521,16 +538,15 @@ export function WifiPage() {
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => setCustomMAC(generateRandomMAC())}
-                    >
+                    <Button size="sm" onClick={() => setCustomMAC(generateRandomMAC())}>
                       <Shuffle className="h-4 w-4 mr-1" />
                       Random
                     </Button>
                     <Button
                       size="sm"
-                      disabled={setMAC.isPending || (customMAC !== '' && !MAC_REGEX.test(customMAC))}
+                      disabled={
+                        setMAC.isPending || (customMAC !== '' && !MAC_REGEX.test(customMAC))
+                      }
                       onClick={() => setMAC.mutate(customMAC)}
                     >
                       {setMAC.isPending ? 'Applying...' : 'Apply'}

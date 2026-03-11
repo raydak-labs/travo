@@ -142,3 +142,46 @@ func TestMockUCIPrePopulated(t *testing.T) {
 		}
 	}
 }
+
+func TestMockUCIGetSections(t *testing.T) {
+	m := NewMockUCI()
+	sections, err := m.GetSections("dhcp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := sections["lan"]; !ok {
+		t.Error("expected 'lan' section in dhcp config")
+	}
+	if sections["lan"]["start"] != "100" {
+		t.Errorf("expected start '100', got %q", sections["lan"]["start"])
+	}
+}
+
+func TestMockUCIGetSections_EmptyConfig(t *testing.T) {
+	m := NewMockUCI()
+	sections, err := m.GetSections("nonexistent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sections) != 0 {
+		t.Errorf("expected empty map, got %d sections", len(sections))
+	}
+}
+
+func TestMockUCIGetSections_WithAddedSection(t *testing.T) {
+	m := NewMockUCI()
+	_ = m.AddSection("dhcp", "dns_test", "domain")
+	_ = m.Set("dhcp", "dns_test", "name", "test")
+	_ = m.Set("dhcp", "dns_test", "ip", "192.168.1.10")
+
+	sections, err := m.GetSections("dhcp")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sections["dns_test"][".type"] != "domain" {
+		t.Errorf("expected .type 'domain', got %q", sections["dns_test"][".type"])
+	}
+	if sections["dns_test"]["name"] != "test" {
+		t.Errorf("expected name 'test', got %q", sections["dns_test"]["name"])
+	}
+}

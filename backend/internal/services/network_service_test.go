@@ -457,3 +457,124 @@ func TestGetDHCPLeases_FileNotExist(t *testing.T) {
 		t.Errorf("expected empty slice when file not found, got %d", len(leases))
 	}
 }
+
+func TestGetDNSEntries_Empty(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	entries, err := svc.GetDNSEntries()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected 0 DNS entries, got %d", len(entries))
+	}
+}
+
+func TestAddAndGetDNSEntry(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	err := svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.50"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := svc.GetDNSEntries()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 DNS entry, got %d", len(entries))
+	}
+	if entries[0].Name != "myserver" {
+		t.Errorf("expected name 'myserver', got %q", entries[0].Name)
+	}
+	if entries[0].IP != "192.168.1.50" {
+		t.Errorf("expected IP '192.168.1.50', got %q", entries[0].IP)
+	}
+	if entries[0].Section != "dns_myserver" {
+		t.Errorf("expected section 'dns_myserver', got %q", entries[0].Section)
+	}
+}
+
+func TestAddMultipleDNSEntries(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	_ = svc.AddDNSEntry(models.DNSEntry{Name: "server1", IP: "192.168.1.50"})
+	_ = svc.AddDNSEntry(models.DNSEntry{Name: "server2", IP: "192.168.1.60"})
+
+	entries, err := svc.GetDNSEntries()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 DNS entries, got %d", len(entries))
+	}
+}
+
+func TestDeleteDNSEntry(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	_ = svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.50"})
+
+	err := svc.DeleteDNSEntry("dns_myserver")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := svc.GetDNSEntries()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected 0 DNS entries after delete, got %d", len(entries))
+	}
+}
+
+func TestDeleteDNSEntry_NotFound(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	err := svc.DeleteDNSEntry("dns_nonexistent")
+	if err == nil {
+		t.Error("expected error deleting nonexistent section")
+	}
+}
+
+func TestAddDNSEntry_DuplicateName(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	_ = svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.50"})
+	err := svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.60"})
+	if err == nil {
+		t.Error("expected error adding duplicate DNS entry")
+	}
+}
+
+func TestSanitizeSectionName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"myserver", "myserver"},
+		{"my-server", "my_server"},
+		{"My.Server", "my_server"},
+		{"test123", "test123"},
+	}
+	for _, tt := range tests {
+		got := sanitizeSectionName(tt.input)
+		if got != tt.expected {
+			t.Errorf("sanitizeSectionName(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}

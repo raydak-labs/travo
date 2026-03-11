@@ -20,6 +20,7 @@ import type {
   MACConfig,
   DHCPLease,
   GuestWifiConfig,
+  DNSEntry,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -368,17 +369,13 @@ export const mockDNSConfig: DNSConfig = {
 
 export const mockSystemLogs: LogResponse = {
   source: 'system',
-  lines: [
-    { line: '2026-03-04T12:00:00Z kern.info System started' },
-  ],
+  lines: [{ line: '2026-03-04T12:00:00Z kern.info System started' }],
   total: 1,
 };
 
 export const mockKernelLogs: LogResponse = {
   source: 'kernel',
-  lines: [
-    { line: '2026-03-04T12:00:00Z kern.info Kernel initialized' },
-  ],
+  lines: [{ line: '2026-03-04T12:00:00Z kern.info Kernel initialized' }],
   total: 1,
 };
 
@@ -439,3 +436,16 @@ export const mockGuestWifi: GuestWifiConfig = {
   encryption: 'psk2',
   key: 'guestpass123',
 };
+
+export const mockDNSEntries: DNSEntry[] = [
+  {
+    name: 'nas',
+    ip: '192.168.8.10',
+    section: 'dns_nas',
+  },
+  {
+    name: 'printer',
+    ip: '192.168.8.20',
+    section: 'dns_printer',
+  },
+];
