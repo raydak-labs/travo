@@ -30,6 +30,7 @@ export const API_ROUTES = {
     mode: '/api/v1/wifi/mode',
     saved: '/api/v1/wifi/saved',
     deleteSaved: '/api/v1/wifi/saved',
+    ap: '/api/v1/wifi/ap',
   },
   vpn: {
     status: '/api/v1/vpn/status',

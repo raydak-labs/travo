@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode } from '@shared/index';
+import type { WifiScanResult, WifiConnection, SavedNetwork, WifiMode, APConfig } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
   return useQuery({
@@ -87,6 +87,28 @@ export function useWifiDelete() {
     },
     onError: (error) => {
       toast.error('Failed to remove network', { description: error.message });
+    },
+  });
+}
+
+export function useAPConfigs() {
+  return useQuery({
+    queryKey: ['wifi', 'ap'],
+    queryFn: () => apiClient.get<APConfig[]>(API_ROUTES.wifi.ap),
+  });
+}
+
+export function useSetAPConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ section, config }: { section: string; config: APConfig }) =>
+      apiClient.put<{ status: string }>(`${API_ROUTES.wifi.ap}/${section}`, config),
+    onSuccess: () => {
+      toast.success('AP configuration updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'ap'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update AP config', { description: error.message });
     },
   });
 }

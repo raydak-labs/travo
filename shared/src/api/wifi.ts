@@ -53,6 +53,18 @@ export interface SavedNetwork {
   readonly priority: number;
 }
 
+/** Access Point configuration for a radio */
+export interface APConfig {
+  readonly radio: string;
+  readonly band: string;
+  readonly ssid: string;
+  readonly encryption: string;
+  readonly key: string;
+  readonly enabled: boolean;
+  readonly channel: number;
+  readonly section: string;
+}
+
 /** Type guard for WifiScanResult */
 export function isWifiScanResult(value: unknown): value is WifiScanResult {
   if (typeof value !== 'object' || value === null) return false;

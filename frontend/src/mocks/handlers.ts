@@ -18,6 +18,7 @@ import {
   mockKernelLogs,
   mockDHCPConfig,
   mockTimezoneConfig,
+  mockAPConfigs,
 } from './data';
 
 export const handlers = [
@@ -221,6 +222,13 @@ export const handlers = [
     return HttpResponse.json(mockTimezoneConfig);
   }),
   http.put(API_ROUTES.system.timezone, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.wifi.ap, () => {
+    return HttpResponse.json(mockAPConfigs);
+  }),
+  http.put(/\/api\/v1\/wifi\/ap\/.*/, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 ];

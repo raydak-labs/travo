@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -325,4 +326,81 @@ func (w *WifiService) DeleteNetwork(section string) error {
 		return err
 	}
 	return w.reloader.Reload()
+}
+
+// GetAPConfigs returns the AP configuration for all radios.
+func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
+	var configs []models.APConfig
+	for i := 0; i < 4; i++ {
+		section := fmt.Sprintf("default_radio%d", i)
+		opts, err := w.uci.GetAll("wireless", section)
+		if err != nil {
+			continue
+		}
+		if opts["mode"] != "ap" {
+			continue
+		}
+		radio := opts["device"]
+		if radio == "" {
+			continue
+		}
+		radioOpts, _ := w.uci.GetAll("wireless", radio)
+		band := radioOpts["band"]
+		channel := 0
+		if ch, ok := radioOpts["channel"]; ok {
+			if v, err := strconv.Atoi(ch); err == nil {
+				channel = v
+			}
+		}
+		enabled := opts["disabled"] != "1"
+		configs = append(configs, models.APConfig{
+			Radio:      radio,
+			Band:       band,
+			SSID:       opts["ssid"],
+			Encryption: opts["encryption"],
+			Key:        opts["key"],
+			Enabled:    enabled,
+			Channel:    channel,
+			Section:    section,
+		})
+	}
+	return configs, nil
+}
+
+// SetAPConfig updates AP configuration for a specific section.
+func (w *WifiService) SetAPConfig(section string, config models.APConfig) error {
+	opts, err := w.uci.GetAll("wireless", section)
+	if err != nil {
+		return fmt.Errorf("AP section %s not found", section)
+	}
+	if opts["mode"] != "ap" {
+		return fmt.Errorf("section %s is not an AP interface", section)
+	}
+	if config.SSID != "" {
+		if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
+			return fmt.Errorf("setting SSID: %w", err)
+		}
+	}
+	if config.Encryption != "" {
+		if err := w.uci.Set("wireless", section, "encryption", config.Encryption); err != nil {
+			return fmt.Errorf("setting encryption: %w", err)
+		}
+	}
+	if config.Encryption != "none" && config.Key != "" {
+		if err := w.uci.Set("wireless", section, "key", config.Key); err != nil {
+			return fmt.Errorf("setting key: %w", err)
+		}
+	}
+	disabled := "0"
+	if !config.Enabled {
+		disabled = "1"
+	}
+	if err := w.uci.Set("wireless", section, "disabled", disabled); err != nil {
+		return fmt.Errorf("setting disabled: %w", err)
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return fmt.Errorf("committing wireless: %w", err)
+	}
+	w.reloader.Reload()
+	return nil
 }

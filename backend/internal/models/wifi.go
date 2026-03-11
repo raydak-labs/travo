@@ -45,3 +45,15 @@ type SavedNetwork struct {
 	AutoConnect bool   `json:"auto_connect"`
 	Priority    int    `json:"priority"`
 }
+
+// APConfig holds access point configuration for a radio.
+type APConfig struct {
+	Radio      string `json:"radio"`
+	Band       string `json:"band"`
+	SSID       string `json:"ssid"`
+	Encryption string `json:"encryption"`
+	Key        string `json:"key"`
+	Enabled    bool   `json:"enabled"`
+	Channel    int    `json:"channel"`
+	Section    string `json:"section"`
+}

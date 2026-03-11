@@ -169,3 +169,85 @@ func TestWifiDeleteNetwork_NonexistentSection(t *testing.T) {
 		t.Error("expected error for nonexistent section")
 	}
 }
+
+func TestGetAPConfigs(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	configs, err := svc.GetAPConfigs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(configs) < 2 {
+		t.Fatalf("expected at least 2 AP configs, got %d", len(configs))
+	}
+	found2g := false
+	found5g := false
+	for _, c := range configs {
+		if c.Band == "2g" {
+			found2g = true
+			if c.SSID != "OpenWrt-Travel" {
+				t.Errorf("expected 2g SSID 'OpenWrt-Travel', got '%s'", c.SSID)
+			}
+		}
+		if c.Band == "5g" {
+			found5g = true
+			if c.SSID != "OpenWrt-Travel-5G" {
+				t.Errorf("expected 5g SSID 'OpenWrt-Travel-5G', got '%s'", c.SSID)
+			}
+		}
+	}
+	if !found2g {
+		t.Error("expected to find 2g AP config")
+	}
+	if !found5g {
+		t.Error("expected to find 5g AP config")
+	}
+}
+
+func TestSetAPConfig(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	err := svc.SetAPConfig("default_radio0", models.APConfig{
+		SSID:       "MyTravelRouter",
+		Encryption: "psk2",
+		Key:        "newpassword123",
+		Enabled:    true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	configs, err := svc.GetAPConfigs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var found *models.APConfig
+	for _, c := range configs {
+		if c.Section == "default_radio0" {
+			found = &c
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("expected to find default_radio0 config")
+	}
+	if found.SSID != "MyTravelRouter" {
+		t.Errorf("expected SSID 'MyTravelRouter', got '%s'", found.SSID)
+	}
+	if !found.Enabled {
+		t.Error("expected AP to be enabled")
+	}
+}
+
+func TestSetAPConfig_InvalidSection(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	err := svc.SetAPConfig("nonexistent", models.APConfig{
+		SSID:       "Test",
+		Encryption: "none",
+		Enabled:    true,
+	})
+	if err == nil {
+		t.Error("expected error for nonexistent section")
+	}
+}

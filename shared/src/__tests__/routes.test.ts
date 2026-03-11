@@ -106,6 +106,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/connection',
       '/api/v1/wifi/mode',
       '/api/v1/wifi/saved',
+      '/api/v1/wifi/ap',
       '/api/v1/vpn/status',
       '/api/v1/vpn/wireguard',
       '/api/v1/vpn/wireguard/toggle',

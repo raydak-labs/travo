@@ -15,6 +15,7 @@ import type {
   DHCPConfig,
   LogResponse,
   TimezoneConfig,
+  APConfig,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -372,3 +373,26 @@ export const mockTimezoneConfig: TimezoneConfig = {
   zonename: 'UTC',
   timezone: 'UTC0',
 };
+
+export const mockAPConfigs: APConfig[] = [
+  {
+    radio: 'radio0',
+    band: '2g',
+    ssid: 'OpenWrt-Travel',
+    encryption: 'psk2',
+    key: 'travel12345',
+    enabled: true,
+    channel: 6,
+    section: 'default_radio0',
+  },
+  {
+    radio: 'radio1',
+    band: '5g',
+    ssid: 'OpenWrt-Travel-5G',
+    encryption: 'psk2',
+    key: 'travel12345',
+    enabled: true,
+    channel: 36,
+    section: 'default_radio1',
+  },
+];

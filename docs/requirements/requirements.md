@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v8 — timezone configuration)
+> **Last updated:** 2026-03-11 (v9 — AP WiFi configuration)
 
 ---
 
@@ -50,10 +50,10 @@
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 
-- [ ] Configure AP SSID and password
+- [x] Configure AP SSID and password
 - [ ] Separate 2.4 GHz and 5 GHz AP networks (or combined, depending on hardware)
 - [ ] Show which radios are available on the device and their capabilities
-- [ ] Enable/disable AP per radio
+- [x] Enable/disable AP per radio
 - [ ] Guest network with client isolation
 - [ ] QR code for WiFi sharing (generate scannable QR with AP credentials)
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
