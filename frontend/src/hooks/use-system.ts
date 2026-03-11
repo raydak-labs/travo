@@ -2,7 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest, SetHostnameRequest } from '@shared/index';
+import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest, SetHostnameRequest, LEDStatus, SetLEDRequest } from '@shared/index';
 
 export function useSystemInfo() {
   return useQuery({
@@ -67,6 +67,26 @@ export function useSetHostname() {
     },
     onError: (error) => {
       toast.error('Failed to update hostname', { description: error.message });
+    },
+  });
+}
+
+export function useLEDStatus() {
+  return useQuery({
+    queryKey: ['system', 'leds'],
+    queryFn: () => apiClient.get<LEDStatus>(API_ROUTES.system.leds),
+  });
+}
+
+export function useSetLEDStealth() {
+  return useMutation({
+    mutationFn: (data: SetLEDRequest) =>
+      apiClient.put<LEDStatus>(API_ROUTES.system.leds, data),
+    onSuccess: () => {
+      toast.success('LED mode updated');
+    },
+    onError: (error) => {
+      toast.error('Failed to update LED mode', { description: error.message });
     },
   });
 }

@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2025-07-16 (v6 — hostname change)
+> **Last updated:** 2025-07-16 (v7 — LED stealth mode)
 
 ---
 
@@ -237,7 +237,7 @@
 - [ ] Factory reset with confirmation
 - [x] Hostname change
 - [ ] Backup / restore configuration (export/import UCI configs as archive)
-- [ ] LED control — stealth mode (turn off all router LEDs via UCI toggle)
+- [x] LED control — stealth mode (turn off all router LEDs via sysfs toggle)
 
 ### 5.3 Time & Timezone
 

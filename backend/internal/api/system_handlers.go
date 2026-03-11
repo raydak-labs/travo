@@ -77,3 +77,24 @@ func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetLEDStatusHandler handles GET /api/v1/system/leds.
+func GetLEDStatusHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(svc.GetLEDStatus())
+	}
+}
+
+// SetLEDStealthHandler handles PUT /api/v1/system/leds.
+func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.SetLEDRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetLEDStealthMode(req.StealthMode); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(svc.GetLEDStatus())
+	}
+}

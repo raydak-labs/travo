@@ -13,6 +13,7 @@ export const API_ROUTES = {
     kernelLogs: '/api/v1/system/logs/kernel',
     reboot: '/api/v1/system/reboot',
     hostname: '/api/v1/system/hostname',
+    leds: '/api/v1/system/leds',
   },
   network: {
     status: '/api/v1/network/status',

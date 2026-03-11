@@ -2,7 +2,9 @@ package services
 
 import (
 	"math"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -165,6 +167,51 @@ func (s *SystemService) SetHostname(hostname string) error {
 		return err
 	}
 	return s.uci.Commit("system")
+}
+
+// GetLEDStatus returns the current stealth mode state by checking LED brightness.
+func (s *SystemService) GetLEDStatus() models.LEDStatus {
+	leds := listLEDs()
+	allOff := len(leds) > 0
+	for _, led := range leds {
+		b, err := os.ReadFile(filepath.Join("/sys/class/leds", led, "brightness"))
+		if err == nil && strings.TrimSpace(string(b)) != "0" {
+			allOff = false
+			break
+		}
+	}
+	return models.LEDStatus{
+		StealthMode: allOff,
+		LEDCount:    len(leds),
+	}
+}
+
+// SetLEDStealthMode turns all LEDs off (stealth) or restores them.
+func (s *SystemService) SetLEDStealthMode(stealth bool) error {
+	leds := listLEDs()
+	for _, led := range leds {
+		path := filepath.Join("/sys/class/leds", led, "brightness")
+		val := "255"
+		if stealth {
+			val = "0"
+		}
+		if err := os.WriteFile(path, []byte(val), 0644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func listLEDs() []string {
+	entries, err := os.ReadDir("/sys/class/leds")
+	if err != nil {
+		return nil
+	}
+	var leds []string
+	for _, e := range entries {
+		leds = append(leds, e.Name())
+	}
+	return leds
 }
 
 // GetLogs retrieves system logs from logread.

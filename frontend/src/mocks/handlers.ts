@@ -198,4 +198,13 @@ export const handlers = [
     }
     return HttpResponse.json({ status: 'ok' });
   }),
+
+  http.get(API_ROUTES.system.leds, () => {
+    return HttpResponse.json({ stealth_mode: false, led_count: 3 });
+  }),
+
+  http.put(API_ROUTES.system.leds, async ({ request }) => {
+    const body = (await request.json()) as { stealth_mode: boolean };
+    return HttpResponse.json({ stealth_mode: body.stealth_mode, led_count: 3 });
+  }),
 ];

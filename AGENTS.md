@@ -35,3 +35,8 @@ Follow TDD: write tests first, see them fail, write minimal code to pass.
 - for scp you have to use the legacy option and commands like rg are not available on the target system, use the simpler alternatives like grep
 - always test things directly on the target system either with a browser if you capable to or via curl
 - if needed cross check with the real configurations on the system
+
+## Commit / finish task
+
+- before you finish the task you must ensure the lint and tests are working (check Makefile for general things)
+- if you have failed tests focus only on running them and at the end again test with Makefile

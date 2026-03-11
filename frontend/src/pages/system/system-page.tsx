@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil } from 'lucide-react';
+import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname } from '@/hooks/use-system';
+import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 export function SystemPage() {
@@ -15,6 +15,8 @@ export function SystemPage() {
   const rebootMutation = useReboot();
   const changePasswordMutation = useChangePassword();
   const setHostnameMutation = useSetHostname();
+  const { data: ledStatus } = useLEDStatus();
+  const setLEDStealthMutation = useSetLEDStealth();
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
   const [editingHostname, setEditingHostname] = useState(false);
   const [hostnameValue, setHostnameValue] = useState('');
@@ -220,6 +222,37 @@ export function SystemPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* LED Stealth Mode */}
+      {ledStatus && ledStatus.led_count > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">LED Stealth Mode</CardTitle>
+            <Lightbulb className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {ledStatus.stealth_mode
+                    ? 'All LEDs are off — stealth mode active'
+                    : `${ledStatus.led_count} LED${ledStatus.led_count > 1 ? 's' : ''} active`}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant={ledStatus.stealth_mode ? 'default' : 'outline'}
+                disabled={setLEDStealthMutation.isPending}
+                onClick={() =>
+                  setLEDStealthMutation.mutate({ stealth_mode: !ledStatus.stealth_mode })
+                }
+              >
+                {ledStatus.stealth_mode ? 'Restore LEDs' : 'Go Stealth'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Change Password */}
       <Card>

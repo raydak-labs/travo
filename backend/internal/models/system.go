@@ -14,6 +14,17 @@ type SetHostnameRequest struct {
 	Hostname string `json:"hostname"`
 }
 
+// LEDStatus represents the current LED state.
+type LEDStatus struct {
+	StealthMode bool `json:"stealth_mode"`
+	LEDCount    int  `json:"led_count"`
+}
+
+// SetLEDRequest is the payload for toggling LED stealth mode.
+type SetLEDRequest struct {
+	StealthMode bool `json:"stealth_mode"`
+}
+
 // CpuStats contains CPU usage information.
 type CpuStats struct {
 	UsagePercent       float64    `json:"usage_percent"`
