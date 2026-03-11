@@ -82,9 +82,14 @@ export function isSystemStats(value: unknown): value is SystemStats {
   );
 }
 
+/** Syslog severity levels ordered from most to least severe */
+export const LOG_LEVELS = ['emerg', 'alert', 'crit', 'err', 'warning', 'notice', 'info', 'debug'] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
 /** A single log entry */
 export interface LogEntry {
   readonly line: string;
+  readonly level: string;
 }
 
 /** Response from log retrieval endpoints */

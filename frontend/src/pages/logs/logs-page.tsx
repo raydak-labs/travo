@@ -18,10 +18,41 @@ const SERVICE_FILTERS = [
   { label: 'dropbear', value: 'dropbear' },
 ] as const;
 
+const LEVEL_FILTERS: { label: string; value: string }[] = [
+  { label: 'All Levels', value: '' },
+  { label: 'Error & above', value: 'err' },
+  { label: 'Warning & above', value: 'warning' },
+  { label: 'Notice & above', value: 'notice' },
+  { label: 'Info & above', value: 'info' },
+  { label: 'Debug (all)', value: 'debug' },
+];
+
+const LEVEL_COLORS: Record<string, string> = {
+  emerg: 'bg-red-600 text-white',
+  alert: 'bg-red-500 text-white',
+  crit: 'bg-red-500 text-white',
+  err: 'bg-red-400 text-white',
+  warning: 'bg-amber-400 text-amber-950',
+  notice: 'bg-green-400 text-green-950',
+  info: 'bg-blue-400 text-white',
+  debug: 'bg-gray-400 text-gray-950',
+};
+
+function LevelBadge({ level }: { level: string }) {
+  if (!level) return null;
+  const color = LEVEL_COLORS[level] ?? 'bg-gray-300 text-gray-800';
+  return (
+    <span className={`mr-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none ${color}`}>
+      {level}
+    </span>
+  );
+}
+
 export function LogsPage() {
   const [activeTab, setActiveTab] = useState<LogTab>('system');
   const [filter, setFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
+  const [levelFilter, setLevelFilter] = useState('');
   const [customService, setCustomService] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
@@ -32,7 +63,10 @@ export function LogsPage() {
     data: systemLogs,
     isLoading: systemLoading,
     refetch: refetchSystem,
-  } = useSystemLogs(activeTab === 'system' ? activeService || undefined : undefined);
+  } = useSystemLogs(
+    activeTab === 'system' ? activeService || undefined : undefined,
+    activeTab === 'system' ? levelFilter || undefined : undefined,
+  );
   const { data: kernelLogs, isLoading: kernelLoading, refetch: refetchKernel } = useKernelLogs();
 
   const logs = activeTab === 'system' ? systemLogs : kernelLogs;
@@ -161,6 +195,25 @@ export function LogsPage() {
             </div>
           )}
 
+          {/* Level filter (system logs only) */}
+          {activeTab === 'system' && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <span className="text-xs text-gray-500">Level:</span>
+              {LEVEL_FILTERS.map((lf) => (
+                <Button
+                  key={lf.value}
+                  variant={levelFilter === lf.value ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setLevelFilter(lf.value)}
+                >
+                  {lf.label}
+                </Button>
+              ))}
+            </div>
+          )}
+
           {/* Log display */}
           {isLoading ? (
             <div className="space-y-2">
@@ -178,7 +231,12 @@ export function LogsPage() {
             >
               <code>
                 {filteredLines.length > 0 ? (
-                  filteredLines.map((entry, i) => <div key={i}>{entry.line}</div>)
+                  filteredLines.map((entry, i) => (
+                    <div key={i}>
+                      <LevelBadge level={entry.level} />
+                      {entry.line}
+                    </div>
+                  ))
                 ) : (
                   <span className="text-gray-500">
                     No log entries{filter ? ' matching filter' : ''}

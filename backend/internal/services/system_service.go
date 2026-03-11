@@ -241,12 +241,13 @@ func listLEDs() []string {
 
 // GetLogs retrieves system logs from logread.
 // If service is non-empty, only lines containing that service name (case-insensitive) are returned.
-func (s *SystemService) GetLogs(service string) (models.LogResponse, error) {
+// If level is non-empty, only lines at or above that severity are returned.
+func (s *SystemService) GetLogs(service, level string) (models.LogResponse, error) {
 	out, err := exec.Command("logread").CombinedOutput()
 	if err != nil {
 		return models.LogResponse{}, err
 	}
-	return parseLogOutput("syslog", string(out), service), nil
+	return parseLogOutput("syslog", string(out), service, level), nil
 }
 
 // GetKernelLogs retrieves kernel logs from dmesg.
@@ -255,7 +256,7 @@ func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
 	if err != nil {
 		return models.LogResponse{}, err
 	}
-	return parseLogOutput("kernel", string(out), ""), nil
+	return parseLogOutput("kernel", string(out), "", ""), nil
 }
 
 // CreateBackup generates a configuration backup archive and returns its path.
@@ -290,10 +291,52 @@ func (s *SystemService) FactoryReset() error {
 	return nil
 }
 
-func parseLogOutput(source, output, service string) models.LogResponse {
+// logLevelSeverity maps syslog level names to numeric severity (lower = more severe).
+var logLevelSeverity = map[string]int{
+	"emerg":   0,
+	"alert":   1,
+	"crit":    2,
+	"err":     3,
+	"warning": 4,
+	"warn":    4,
+	"notice":  5,
+	"info":    6,
+	"debug":   7,
+}
+
+// extractLevel extracts the syslog level from a log line.
+// Syslog format: "Tue Mar 10 22:00:34 2026 kern.info kernel: ..."
+// Returns the level string (e.g. "info", "err") or empty string if not found.
+func extractLevel(line string) string {
+	// Find facility.level pattern — appears after the timestamp (first 5 fields)
+	parts := strings.Fields(line)
+	if len(parts) < 6 {
+		return ""
+	}
+	// The facility.level field is typically at index 5 (after: dow mon day time year)
+	facLevel := parts[5]
+	if idx := strings.IndexByte(facLevel, '.'); idx >= 0 && idx < len(facLevel)-1 {
+		level := facLevel[idx+1:]
+		if _, ok := logLevelSeverity[level]; ok {
+			return level
+		}
+	}
+	return ""
+}
+
+func parseLogOutput(source, output, service, level string) models.LogResponse {
 	raw := strings.Split(strings.TrimSpace(output), "\n")
 	lines := make([]models.LogEntry, 0, len(raw))
 	serviceLower := strings.ToLower(service)
+
+	// Resolve minimum severity threshold
+	minSeverity := -1
+	if level != "" {
+		if sev, ok := logLevelSeverity[strings.ToLower(level)]; ok {
+			minSeverity = sev
+		}
+	}
+
 	for _, l := range raw {
 		if l == "" {
 			continue
@@ -301,7 +344,17 @@ func parseLogOutput(source, output, service string) models.LogResponse {
 		if service != "" && !strings.Contains(strings.ToLower(l), serviceLower) {
 			continue
 		}
-		lines = append(lines, models.LogEntry{Line: l})
+		entryLevel := extractLevel(l)
+		if minSeverity >= 0 && entryLevel != "" {
+			if sev, ok := logLevelSeverity[entryLevel]; ok && sev > minSeverity {
+				continue
+			}
+		}
+		// Normalize "warn" to "warning"
+		if entryLevel == "warn" {
+			entryLevel = "warning"
+		}
+		lines = append(lines, models.LogEntry{Line: l, Level: entryLevel})
 	}
 	return models.LogResponse{
 		Source: source,

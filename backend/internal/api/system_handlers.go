@@ -45,7 +45,8 @@ func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
 func SystemLogsHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		service := c.Query("service")
-		logs, err := svc.GetLogs(service)
+		level := c.Query("level")
+		logs, err := svc.GetLogs(service, level)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}

@@ -54,13 +54,15 @@ export function useFactoryReset() {
   });
 }
 
-export function useSystemLogs(service?: string) {
+export function useSystemLogs(service?: string, level?: string) {
   return useQuery({
-    queryKey: ['system', 'logs', service ?? ''],
+    queryKey: ['system', 'logs', service ?? '', level ?? ''],
     queryFn: () => {
-      const url = service
-        ? `${API_ROUTES.system.logs}?service=${encodeURIComponent(service)}`
-        : API_ROUTES.system.logs;
+      const params = new URLSearchParams();
+      if (service) params.set('service', service);
+      if (level) params.set('level', level);
+      const qs = params.toString();
+      const url = qs ? `${API_ROUTES.system.logs}?${qs}` : API_ROUTES.system.logs;
       return apiClient.get<LogResponse>(url);
     },
   });

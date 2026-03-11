@@ -65,7 +65,8 @@ type TimezoneConfig struct {
 
 // LogEntry represents a single log line from logread or dmesg.
 type LogEntry struct {
-	Line string `json:"line"`
+	Line  string `json:"line"`
+	Level string `json:"level"`
 }
 
 // LogResponse is the response for log retrieval endpoints.

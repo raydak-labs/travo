@@ -388,20 +388,21 @@ export const mockDNSConfig: DNSConfig = {
 export const mockSystemLogs: LogResponse = {
   source: 'system',
   lines: [
-    { line: 'Tue Mar 11 09:17:50 2026 daemon.info dnsmasq[1234]: query[A] google.com from 192.168.8.100' },
-    { line: 'Tue Mar 11 09:17:51 2026 daemon.info AdGuardHome[3732]: blocked ad.tracker.com' },
-    { line: 'Tue Mar 11 09:17:52 2026 daemon.info dnsmasq[1234]: forwarded google.com to 8.8.8.8' },
-    { line: 'Tue Mar 11 09:17:53 2026 kern.info netifd[456]: Interface wan up' },
-    { line: 'Tue Mar 11 09:17:54 2026 daemon.info hostapd[789]: wlan0: STA aa:bb:cc:dd:ee:ff associated' },
-    { line: 'Tue Mar 11 09:17:55 2026 authpriv.info dropbear[1024]: Password auth succeeded for root' },
-    { line: 'Tue Mar 11 09:17:56 2026 daemon.info wireguard: wg0 peer endpoint 10.0.0.1:51820 handshake' },
+    { line: 'Tue Mar 11 09:17:50 2026 daemon.info dnsmasq[1234]: query[A] google.com from 192.168.8.100', level: 'info' },
+    { line: 'Tue Mar 11 09:17:51 2026 daemon.info AdGuardHome[3732]: blocked ad.tracker.com', level: 'info' },
+    { line: 'Tue Mar 11 09:17:52 2026 daemon.err dnsmasq[1234]: failed to allocate lease', level: 'err' },
+    { line: 'Tue Mar 11 09:17:53 2026 kern.warning netifd[456]: Interface wan flapping', level: 'warning' },
+    { line: 'Tue Mar 11 09:17:54 2026 daemon.notice hostapd[789]: wlan0: STA aa:bb:cc:dd:ee:ff associated', level: 'notice' },
+    { line: 'Tue Mar 11 09:17:55 2026 authpriv.info dropbear[1024]: Password auth succeeded for root', level: 'info' },
+    { line: 'Tue Mar 11 09:17:56 2026 daemon.debug wireguard: wg0 peer endpoint 10.0.0.1:51820 handshake', level: 'debug' },
+    { line: 'Tue Mar 11 09:17:57 2026 daemon.crit dnsmasq[1234]: unable to bind port 53', level: 'crit' },
   ],
-  total: 7,
+  total: 8,
 };
 
 export const mockKernelLogs: LogResponse = {
   source: 'kernel',
-  lines: [{ line: '2026-03-04T12:00:00Z kern.info Kernel initialized' }],
+  lines: [{ line: '2026-03-04T12:00:00Z kern.info Kernel initialized', level: 'info' }],
   total: 1,
 };
 

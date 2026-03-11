@@ -321,7 +321,7 @@
 - [x] System log viewer (logread / syslog)
 - [x] Kernel log (dmesg)
 - [x] Service-specific logs (AdGuard, WireGuard, etc.)
-- [ ] Log level filtering
+- [x] Log level filtering
 - [x] Log search / filter
 - [x] Log export / download
 - [ ] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)

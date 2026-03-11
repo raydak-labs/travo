@@ -41,18 +41,27 @@ export const handlers = [
   http.get(API_ROUTES.system.logs, ({ request }) => {
     const url = new URL(request.url);
     const service = url.searchParams.get('service');
+    const level = url.searchParams.get('level');
+    const levelSeverity: Record<string, number> = {
+      emerg: 0, alert: 1, crit: 2, err: 3, warning: 4, notice: 5, info: 6, debug: 7,
+    };
+    let lines = [...mockSystemLogs.lines];
     if (service) {
       const lower = service.toLowerCase();
-      const filtered = mockSystemLogs.lines.filter((entry) =>
-        entry.line.toLowerCase().includes(lower),
-      );
-      return HttpResponse.json({
-        source: mockSystemLogs.source,
-        lines: filtered,
-        total: filtered.length,
+      lines = lines.filter((entry) => entry.line.toLowerCase().includes(lower));
+    }
+    if (level && level in levelSeverity) {
+      const minSev = levelSeverity[level];
+      lines = lines.filter((entry) => {
+        const entrySev = levelSeverity[entry.level];
+        return entrySev !== undefined && entrySev <= minSev;
       });
     }
-    return HttpResponse.json(mockSystemLogs);
+    return HttpResponse.json({
+      source: mockSystemLogs.source,
+      lines,
+      total: lines.length,
+    });
   }),
 
   http.get(API_ROUTES.system.kernelLogs, () => {
