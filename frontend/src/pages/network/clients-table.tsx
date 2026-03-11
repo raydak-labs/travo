@@ -37,7 +37,9 @@ export function ClientsTable({ clients }: ClientsTableProps) {
                 {client.interface_name}
               </td>
               <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
-                {client.connected_since ? new Date(client.connected_since).toLocaleString() : '—'}
+                {client.connected_since && !isNaN(new Date(client.connected_since).getTime())
+                  ? new Date(client.connected_since).toLocaleString()
+                  : '—'}
               </td>
               <td className="py-2 text-right text-gray-600 dark:text-gray-400">
                 ↓ {formatBytes(client.rx_bytes)} / ↑ {formatBytes(client.tx_bytes)}

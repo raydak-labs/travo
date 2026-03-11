@@ -23,10 +23,13 @@ export function useWifiConnect() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: { ssid: string; password: string; encryption?: string }) =>
-      apiClient.post<{ success: boolean }>(API_ROUTES.wifi.connect, params),
+      apiClient.post<{ status: string }>(API_ROUTES.wifi.connect, params),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      // Delay refetch so the wireless subsystem has time to apply changes after wifi reload
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      }, 3000);
     },
     onError: (error) => {
       toast.error('WiFi connection failed', { description: error.message });
@@ -37,10 +40,13 @@ export function useWifiConnect() {
 export function useWifiDisconnect() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<{ success: boolean }>(API_ROUTES.wifi.disconnect),
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.wifi.disconnect),
     onSuccess: () => {
       toast.success('Disconnected from WiFi');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      // Delay refetch so the wireless subsystem has time to apply changes after wifi reload
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      }, 2000);
     },
     onError: (error) => {
       toast.error('Failed to disconnect', { description: error.message });

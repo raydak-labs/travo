@@ -87,3 +87,45 @@ func TestWifiGetSavedNetworks(t *testing.T) {
 		t.Errorf("expected SSID 'Hotel-WiFi', got %q", networks[0].SSID)
 	}
 }
+
+func TestWifiDisconnect(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	err := svc.Disconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := u.Get("wireless", "wifinet2", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled='1', got %q", val)
+	}
+}
+
+func TestWifiDisconnectThenReconnect(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Disconnect
+	if err := svc.Disconnect(); err != nil {
+		t.Fatalf("disconnect failed: %v", err)
+	}
+	val, _ := u.Get("wireless", "wifinet2", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled='1' after disconnect, got %q", val)
+	}
+
+	// Reconnect
+	err := svc.Connect(models.WifiConfig{
+		SSID: "New-Network", Password: "newpass123", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("connect failed: %v", err)
+	}
+	val, _ = u.Get("wireless", "wifinet2", "disabled")
+	if val != "0" {
+		t.Errorf("expected disabled='0' after connect, got %q", val)
+	}
+	val, _ = u.Get("wireless", "wifinet2", "ssid")
+	if val != "New-Network" {
+		t.Errorf("expected ssid 'New-Network', got %q", val)
+	}
+}

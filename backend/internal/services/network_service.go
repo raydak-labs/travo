@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -96,9 +97,26 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 					ip, _ := lm["ip"].(string)
 					mac, _ := lm["mac"].(string)
 					hostname, _ := lm["hostname"].(string)
+					expires, _ := lm["expires"].(float64)
+
+					// Calculate connected_since from lease expiry.
+					// Default DHCP lease is 12h (43200s). The "expires" field
+					// counts down from the lease time, so connected_since ≈ now - (leaseTime - expires).
+					var connectedSince string
+					if expires > 0 {
+						leaseTime := 43200.0 // 12h default
+						elapsed := leaseTime - expires
+						if elapsed < 0 {
+							elapsed = 0
+						}
+						connSince := time.Now().Add(-time.Duration(elapsed) * time.Second)
+						connectedSince = connSince.UTC().Format(time.RFC3339)
+					}
+
 					clients = append(clients, models.Client{
 						IPAddress: ip, MACAddress: mac,
 						Hostname: hostname, InterfaceName: ifaceName,
+						ConnectedSince: connectedSince,
 					})
 				}
 			}

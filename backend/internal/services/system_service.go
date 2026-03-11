@@ -4,6 +4,7 @@ import (
 	"math"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -145,7 +146,11 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 }
 
 // Reboot initiates a system reboot via ubus.
+// The reboot call is async so the HTTP response returns before the system goes down.
 func (s *SystemService) Reboot() error {
-	_, err := s.ubus.Call("system", "reboot", nil)
-	return err
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		_, _ = s.ubus.Call("system", "reboot", nil)
+	}()
+	return nil
 }
