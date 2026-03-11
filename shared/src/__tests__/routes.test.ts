@@ -50,6 +50,10 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.wan).toBe('/api/v1/network/wan');
     expect(API_ROUTES.network.clients).toBe('/api/v1/network/clients');
     expect(API_ROUTES.network.clientAlias).toBe('/api/v1/network/clients/alias');
+    expect(API_ROUTES.network.clientKick).toBe('/api/v1/network/clients/kick');
+    expect(API_ROUTES.network.clientBlock).toBe('/api/v1/network/clients/block');
+    expect(API_ROUTES.network.clientUnblock).toBe('/api/v1/network/clients/unblock');
+    expect(API_ROUTES.network.clientBlocked).toBe('/api/v1/network/clients/blocked');
     expect(API_ROUTES.network.dhcpLeases).toBe('/api/v1/network/dhcp/leases');
     expect(API_ROUTES.network.dhcpReservations).toBe('/api/v1/network/dhcp/reservations');
     expect(API_ROUTES.network.dnsEntries).toBe('/api/v1/network/dns/entries');
@@ -111,6 +115,10 @@ describe('API_ROUTES', () => {
       '/api/v1/network/wan',
       '/api/v1/network/clients',
       '/api/v1/network/clients/alias',
+      '/api/v1/network/clients/kick',
+      '/api/v1/network/clients/block',
+      '/api/v1/network/clients/unblock',
+      '/api/v1/network/clients/blocked',
       '/api/v1/network/dhcp',
       '/api/v1/network/dhcp/leases',
       '/api/v1/network/dhcp/reservations',

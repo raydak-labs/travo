@@ -92,6 +92,11 @@ type DNSEntry struct {
 	Section string `json:"section,omitempty"`
 }
 
+// ClientActionRequest is the request body for kick/block/unblock actions.
+type ClientActionRequest struct {
+	MAC string `json:"mac"`
+}
+
 // DHCPReservation represents a static DHCP reservation (IP by MAC).
 type DHCPReservation struct {
 	Name    string `json:"name"`

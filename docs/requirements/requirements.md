@@ -94,7 +94,7 @@
 - [x] Set static IP / DHCP reservation for a client
 - [ ] Traffic stats per client (RX/TX)
 - [ ] Client hostname resolution
-- [ ] Block / kick a client
+- [x] Block / kick a client
 - [ ] 🔮 Client bandwidth limiting (QoS per device)
 - [ ] 🔮 Parental controls / client group policies
 

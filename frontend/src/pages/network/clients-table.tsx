@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Pencil, Check, X } from 'lucide-react';
+import { Pencil, Check, X, Zap, Ban, ShieldOff } from 'lucide-react';
 import type { Client } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useSetClientAlias } from '@/hooks/use-network';
+import { useSetClientAlias, useKickClient, useBlockClient, useUnblockClient } from '@/hooks/use-network';
 
 interface ClientsTableProps {
   clients: readonly Client[];
+  blockedMacs?: readonly string[];
 }
 
 function AliasCell({ client }: { client: Client }) {
@@ -81,12 +82,17 @@ function AliasCell({ client }: { client: Client }) {
   );
 }
 
-export function ClientsTable({ clients }: ClientsTableProps) {
+export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
   const sorted = [...clients].sort((a, b) => {
     const nameA = a.alias || a.hostname || '';
     const nameB = b.alias || b.hostname || '';
     return nameA.localeCompare(nameB);
   });
+  const kick = useKickClient();
+  const block = useBlockClient();
+  const unblock = useUnblockClient();
+
+  const blockedSet = new Set(blockedMacs.map((m) => m.toUpperCase()));
 
   return (
     <div className="overflow-x-auto">
@@ -103,31 +109,72 @@ export function ClientsTable({ clients }: ClientsTableProps) {
               Connected Since
             </th>
             <th className="pb-2 text-right font-medium text-gray-500">Traffic</th>
+            <th className="pb-2 text-right font-medium text-gray-500">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {sorted.map((client) => (
-            <tr key={client.mac_address} className="group">
-              <td className="py-2">
-                <AliasCell client={client} />
-              </td>
-              <td className="py-2 text-gray-600 dark:text-gray-400">{client.ip_address}</td>
-              <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
-                {client.mac_address}
-              </td>
-              <td className="hidden py-2 text-gray-600 dark:text-gray-400 lg:table-cell">
-                {client.interface_name}
-              </td>
-              <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
-                {client.connected_since && !isNaN(new Date(client.connected_since).getTime())
-                  ? new Date(client.connected_since).toLocaleString()
-                  : '—'}
-              </td>
-              <td className="py-2 text-right text-gray-600 dark:text-gray-400">
-                ↓ {formatBytes(client.rx_bytes)} / ↑ {formatBytes(client.tx_bytes)}
-              </td>
-            </tr>
-          ))}
+          {sorted.map((client) => {
+            const isBlocked = blockedSet.has(client.mac_address.toUpperCase());
+            return (
+              <tr key={client.mac_address} className="group">
+                <td className="py-2">
+                  <AliasCell client={client} />
+                </td>
+                <td className="py-2 text-gray-600 dark:text-gray-400">{client.ip_address}</td>
+                <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
+                  {client.mac_address}
+                </td>
+                <td className="hidden py-2 text-gray-600 dark:text-gray-400 lg:table-cell">
+                  {client.interface_name}
+                </td>
+                <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
+                  {client.connected_since && !isNaN(new Date(client.connected_since).getTime())
+                    ? new Date(client.connected_since).toLocaleString()
+                    : '—'}
+                </td>
+                <td className="py-2 text-right text-gray-600 dark:text-gray-400">
+                  ↓ {formatBytes(client.rx_bytes)} / ↑ {formatBytes(client.tx_bytes)}
+                </td>
+                <td className="py-2 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      title="Kick (disconnect)"
+                      onClick={() => kick.mutate(client.mac_address)}
+                      disabled={kick.isPending}
+                    >
+                      <Zap className="h-3.5 w-3.5" />
+                    </Button>
+                    {isBlocked ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-green-600"
+                        title="Unblock"
+                        onClick={() => unblock.mutate(client.mac_address)}
+                        disabled={unblock.isPending}
+                      >
+                        <ShieldOff className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-600"
+                        title="Block"
+                        onClick={() => block.mutate(client.mac_address)}
+                        disabled={block.isPending}
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

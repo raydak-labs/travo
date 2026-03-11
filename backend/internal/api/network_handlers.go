@@ -297,3 +297,74 @@ func DeleteDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// KickClientHandler handles POST /api/v1/network/clients/kick.
+func KickClientHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.ClientActionRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if req.MAC == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+		}
+		if !isValidMAC(req.MAC) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+		}
+		if err := svc.KickClient(req.MAC); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// BlockClientHandler handles POST /api/v1/network/clients/block.
+func BlockClientHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.ClientActionRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if req.MAC == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+		}
+		if !isValidMAC(req.MAC) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+		}
+		if err := svc.BlockClient(req.MAC); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// UnblockClientHandler handles POST /api/v1/network/clients/unblock.
+func UnblockClientHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.ClientActionRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if req.MAC == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+		}
+		if !isValidMAC(req.MAC) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+		}
+		if err := svc.UnblockClient(req.MAC); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetBlockedClientsHandler handles GET /api/v1/network/clients/blocked.
+func GetBlockedClientsHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		blocked, err := svc.GetBlockedClients()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(blocked)
+	}
+}

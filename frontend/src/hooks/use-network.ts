@@ -190,3 +190,53 @@ export function useDeleteDHCPReservation() {
     },
   });
 }
+
+export function useKickClient() {
+  return useMutation({
+    mutationFn: (mac: string) =>
+      apiClient.post<{ status: string }>(API_ROUTES.network.clientKick, { mac }),
+    onSuccess: () => {
+      toast.success('Client disconnected');
+    },
+    onError: (error) => {
+      toast.error('Failed to kick client', { description: error.message });
+    },
+  });
+}
+
+export function useBlockClient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mac: string) =>
+      apiClient.post<{ status: string }>(API_ROUTES.network.clientBlock, { mac }),
+    onSuccess: () => {
+      toast.success('Client blocked');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to block client', { description: error.message });
+    },
+  });
+}
+
+export function useUnblockClient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (mac: string) =>
+      apiClient.post<{ status: string }>(API_ROUTES.network.clientUnblock, { mac }),
+    onSuccess: () => {
+      toast.success('Client unblocked');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to unblock client', { description: error.message });
+    },
+  });
+}
+
+export function useBlockedClients() {
+  return useQuery({
+    queryKey: ['network', 'blockedClients'],
+    queryFn: () => apiClient.get<string[]>(API_ROUTES.network.clientBlocked),
+  });
+}

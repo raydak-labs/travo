@@ -26,6 +26,7 @@ import {
   useDHCPReservations,
   useAddDHCPReservation,
   useDeleteDHCPReservation,
+  useBlockedClients,
 } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
@@ -43,6 +44,7 @@ export function NetworkPage() {
   const { data: dhcpReservations, isLoading: dhcpReservationsLoading } = useDHCPReservations();
   const addDHCPReservation = useAddDHCPReservation();
   const deleteDHCPReservation = useDeleteDHCPReservation();
+  const { data: blockedClients } = useBlockedClients();
   const [dhcpStart, setDhcpStart] = useState<number>(100);
   const [dhcpLimit, setDhcpLimit] = useState<number>(150);
   const [dhcpLease, setDhcpLease] = useState<string>('12h');
@@ -572,7 +574,7 @@ export function NetworkPage() {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : network?.clients && network.clients.length > 0 ? (
-            <ClientsTable clients={network.clients} />
+            <ClientsTable clients={network.clients} blockedMacs={blockedClients} />
           ) : (
             <p className="text-sm text-gray-500">No clients connected</p>
           )}

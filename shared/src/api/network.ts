@@ -44,6 +44,11 @@ export interface SetAliasRequest {
   readonly alias: string;
 }
 
+/** Request body for kick/block/unblock client actions */
+export interface ClientActionRequest {
+  readonly mac: string;
+}
+
 /** Overall network status */
 export interface NetworkStatus {
   readonly wan: NetworkInterface | null;

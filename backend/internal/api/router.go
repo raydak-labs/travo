@@ -63,6 +63,10 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/network/dhcp/reservations", GetDHCPReservationsHandler(deps.Network))
 	v1.Post("/network/dhcp/reservations", AddDHCPReservationHandler(deps.Network))
 	v1.Delete("/network/dhcp/reservations/:section", DeleteDHCPReservationHandler(deps.Network))
+	v1.Post("/network/clients/kick", KickClientHandler(deps.Network))
+	v1.Post("/network/clients/block", BlockClientHandler(deps.Network))
+	v1.Post("/network/clients/unblock", UnblockClientHandler(deps.Network))
+	v1.Get("/network/clients/blocked", GetBlockedClientsHandler(deps.Network))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))

@@ -19,16 +19,22 @@ type NetworkService struct {
 	uci       uci.UCI
 	ubus      ubus.Ubus
 	aliasFile string
+	cmd       CommandRunner
 }
 
 // NewNetworkService creates a new NetworkService.
 func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json"}
+	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json", cmd: &RealCommandRunner{}}
 }
 
 // NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
 func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *NetworkService {
-	return &NetworkService{uci: u, ubus: ub, aliasFile: aliasFile}
+	return &NetworkService{uci: u, ubus: ub, aliasFile: aliasFile, cmd: &RealCommandRunner{}}
+}
+
+// NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
+func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
+	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json", cmd: cmd}
 }
 
 // loadAliases reads the alias file and returns a mac->alias map.
@@ -550,4 +556,71 @@ func parseDHCPLeases(data string) []models.DHCPLease {
 		return []models.DHCPLease{}
 	}
 	return leases
+}
+
+// KickClient disconnects a WiFi client by deauthentication.
+func (n *NetworkService) KickClient(mac string) error {
+	// Try common AP interfaces
+	for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
+		_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+	}
+	return nil
+}
+
+// BlockClient adds a firewall rule to drop all traffic from a MAC address.
+func (n *NetworkService) BlockClient(mac string) error {
+	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
+		return fmt.Errorf("adding firewall block rule: %w", err)
+	}
+	if err := n.uci.Set("firewall", section, "name", "Block-"+strings.ToUpper(mac)); err != nil {
+		return fmt.Errorf("setting block rule name: %w", err)
+	}
+	if err := n.uci.Set("firewall", section, "src", "lan"); err != nil {
+		return fmt.Errorf("setting block rule src: %w", err)
+	}
+	if err := n.uci.Set("firewall", section, "src_mac", strings.ToUpper(mac)); err != nil {
+		return fmt.Errorf("setting block rule src_mac: %w", err)
+	}
+	if err := n.uci.Set("firewall", section, "target", "DROP"); err != nil {
+		return fmt.Errorf("setting block rule target: %w", err)
+	}
+	if err := n.uci.Commit("firewall"); err != nil {
+		return fmt.Errorf("committing firewall: %w", err)
+	}
+	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	return nil
+}
+
+// UnblockClient removes the firewall block rule for a MAC address.
+func (n *NetworkService) UnblockClient(mac string) error {
+	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	if err := n.uci.DeleteSection("firewall", section); err != nil {
+		return fmt.Errorf("deleting firewall block rule: %w", err)
+	}
+	if err := n.uci.Commit("firewall"); err != nil {
+		return fmt.Errorf("committing firewall: %w", err)
+	}
+	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	return nil
+}
+
+// GetBlockedClients returns a list of blocked MAC addresses.
+func (n *NetworkService) GetBlockedClients() ([]string, error) {
+	sections, err := n.uci.GetSections("firewall")
+	if err != nil {
+		return []string{}, nil
+	}
+	var blocked []string
+	for _, opts := range sections {
+		if opts[".type"] == "rule" && strings.HasPrefix(opts["name"], "Block-") {
+			if mac := opts["src_mac"]; mac != "" {
+				blocked = append(blocked, mac)
+			}
+		}
+	}
+	if blocked == nil {
+		return []string{}, nil
+	}
+	return blocked, nil
 }

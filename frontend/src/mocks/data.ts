@@ -490,3 +490,5 @@ export const mockDHCPReservations: DHCPReservation[] = [
     section: 'host_printer',
   },
 ];
+
+export const mockBlockedClients: string[] = [];

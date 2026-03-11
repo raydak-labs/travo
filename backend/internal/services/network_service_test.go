@@ -688,3 +688,130 @@ func TestAddDHCPReservation_DuplicateName(t *testing.T) {
 		t.Error("expected error adding duplicate DHCP reservation")
 	}
 }
+
+func TestBlockClient(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.BlockClient("AA:BB:CC:DD:EE:FF")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	blocked, err := svc.GetBlockedClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(blocked) != 1 {
+		t.Fatalf("expected 1 blocked client, got %d", len(blocked))
+	}
+	if blocked[0] != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("expected blocked MAC 'AA:BB:CC:DD:EE:FF', got %q", blocked[0])
+	}
+}
+
+func TestUnblockClient(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	_ = svc.BlockClient("AA:BB:CC:DD:EE:FF")
+
+	err := svc.UnblockClient("AA:BB:CC:DD:EE:FF")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	blocked, err := svc.GetBlockedClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Errorf("expected 0 blocked clients after unblock, got %d", len(blocked))
+	}
+}
+
+func TestGetBlockedClients_Empty(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	blocked, err := svc.GetBlockedClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Errorf("expected 0 blocked clients, got %d", len(blocked))
+	}
+}
+
+func TestBlockMultipleClients(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	_ = svc.BlockClient("AA:BB:CC:DD:EE:01")
+	_ = svc.BlockClient("AA:BB:CC:DD:EE:02")
+
+	blocked, err := svc.GetBlockedClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(blocked) != 2 {
+		t.Fatalf("expected 2 blocked clients, got %d", len(blocked))
+	}
+}
+
+func TestBlockClient_AlreadyBlocked(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	_ = svc.BlockClient("AA:BB:CC:DD:EE:FF")
+	err := svc.BlockClient("AA:BB:CC:DD:EE:FF")
+	if err == nil {
+		t.Error("expected error blocking already-blocked client")
+	}
+}
+
+func TestUnblockClient_NotBlocked(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.UnblockClient("AA:BB:CC:DD:EE:FF")
+	if err == nil {
+		t.Error("expected error unblocking non-blocked client")
+	}
+}
+
+func TestKickClient(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.KickClient("AA:BB:CC:DD:EE:FF")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBlockClient_CaseInsensitive(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+
+	err := svc.BlockClient("aa:bb:cc:dd:ee:ff")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	blocked, _ := svc.GetBlockedClients()
+	if len(blocked) != 1 {
+		t.Fatalf("expected 1 blocked client, got %d", len(blocked))
+	}
+	if blocked[0] != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("expected MAC stored as uppercase, got %q", blocked[0])
+	}
+}

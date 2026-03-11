@@ -26,6 +26,7 @@ import {
   mockGuestWifi,
   mockDNSEntries,
   mockDHCPReservations,
+  mockBlockedClients,
 } from './data';
 
 export const handlers = [
@@ -225,6 +226,19 @@ export const handlers = [
   }),
   http.delete(`${API_ROUTES.network.dhcpReservations}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.post(API_ROUTES.network.clientKick, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+  http.post(API_ROUTES.network.clientBlock, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+  http.post(API_ROUTES.network.clientUnblock, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+  http.get(API_ROUTES.network.clientBlocked, () => {
+    return HttpResponse.json(mockBlockedClients);
   }),
 
   http.post(API_ROUTES.auth.login, async ({ request }) => {
