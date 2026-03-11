@@ -102,6 +102,7 @@ describe('API_ROUTES', () => {
       '/api/v1/network/wan',
       '/api/v1/network/clients',
       '/api/v1/network/dhcp',
+      '/api/v1/network/dns',
       '/api/v1/wifi/scan',
       '/api/v1/wifi/connect',
       '/api/v1/wifi/disconnect',

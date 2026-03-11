@@ -23,6 +23,7 @@ export const API_ROUTES = {
     wan: '/api/v1/network/wan',
     clients: '/api/v1/network/clients',
     dhcp: '/api/v1/network/dhcp',
+    dns: '/api/v1/network/dns',
   },
   wifi: {
     scan: '/api/v1/wifi/scan',

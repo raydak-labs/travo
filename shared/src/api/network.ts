@@ -53,6 +53,12 @@ export interface DHCPConfig {
   readonly lease_time: string;
 }
 
+/** Custom DNS server configuration */
+export interface DNSConfig {
+  readonly use_custom_dns: boolean;
+  readonly servers: readonly string[];
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

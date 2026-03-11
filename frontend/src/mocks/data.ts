@@ -13,6 +13,7 @@ import type {
   WanConfig,
   Client,
   DHCPConfig,
+  DNSConfig,
   LogResponse,
   TimezoneConfig,
   APConfig,
@@ -351,6 +352,11 @@ export const mockDHCPConfig: DHCPConfig = {
   start: 100,
   limit: 150,
   lease_time: '12h',
+};
+
+export const mockDNSConfig: DNSConfig = {
+  use_custom_dns: false,
+  servers: [],
 };
 
 export const mockSystemLogs: LogResponse = {

@@ -193,6 +193,58 @@ func TestSetDHCPConfig(t *testing.T) {
 	}
 }
 
+func TestGetDNSConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	config, err := svc.GetDNSConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Default mock has no peerdns set, so use_custom_dns should be false
+	if config.UseCustomDNS {
+		t.Error("expected use_custom_dns to be false by default")
+	}
+}
+
+func TestSetDNSConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	// Enable custom DNS
+	err := svc.SetDNSConfig(models.DNSConfig{
+		UseCustomDNS: true,
+		Servers:      []string{"8.8.8.8", "1.1.1.1"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config, _ := svc.GetDNSConfig()
+	if !config.UseCustomDNS {
+		t.Error("expected use_custom_dns to be true")
+	}
+	if len(config.Servers) != 2 {
+		t.Fatalf("expected 2 DNS servers, got %d", len(config.Servers))
+	}
+	if config.Servers[0] != "8.8.8.8" {
+		t.Errorf("expected first server '8.8.8.8', got '%s'", config.Servers[0])
+	}
+
+	// Disable custom DNS
+	err = svc.SetDNSConfig(models.DNSConfig{UseCustomDNS: false})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config, _ = svc.GetDNSConfig()
+	if config.UseCustomDNS {
+		t.Error("expected use_custom_dns to be false")
+	}
+}
+
 func TestSetWanConfigPropagatesEachFieldError(t *testing.T) {
 	tests := []struct {
 		name   string

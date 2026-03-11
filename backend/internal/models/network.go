@@ -51,3 +51,9 @@ type DHCPConfig struct {
 	Limit     int    `json:"limit"`
 	LeaseTime string `json:"lease_time"`
 }
+
+// DNSConfig holds custom DNS server configuration.
+type DNSConfig struct {
+	UseCustomDNS bool     `json:"use_custom_dns"`
+	Servers      []string `json:"servers"`
+}

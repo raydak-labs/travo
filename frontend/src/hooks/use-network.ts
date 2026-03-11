@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { NetworkStatus, WanConfig, Client, DHCPConfig } from '@shared/index';
+import type { NetworkStatus, WanConfig, Client, DHCPConfig, DNSConfig } from '@shared/index';
 
 export function useNetworkStatus() {
   return useQuery({
@@ -44,6 +44,28 @@ export function useDHCPConfig() {
   return useQuery({
     queryKey: ['network', 'dhcp'],
     queryFn: () => apiClient.get<DHCPConfig>(API_ROUTES.network.dhcp),
+  });
+}
+
+export function useDNSConfig() {
+  return useQuery({
+    queryKey: ['network', 'dns'],
+    queryFn: () => apiClient.get<DNSConfig>(API_ROUTES.network.dns),
+  });
+}
+
+export function useSetDNSConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: DNSConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.network.dns, config),
+    onSuccess: () => {
+      toast.success('DNS configuration updated');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'dns'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update DNS config', { description: error.message });
+    },
   });
 }
 

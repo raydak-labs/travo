@@ -301,6 +301,42 @@ func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
 	return models.DHCPConfig{Start: start, Limit: limit, LeaseTime: leaseTime}, nil
 }
 
+// GetDNSConfig returns the custom DNS configuration.
+func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
+	opts, err := n.uci.GetAll("network", "wan")
+	if err != nil {
+		return models.DNSConfig{}, err
+	}
+	config := models.DNSConfig{
+		UseCustomDNS: opts["peerdns"] == "0",
+	}
+	if dns, ok := opts["dns"]; ok && dns != "" {
+		config.Servers = strings.Split(dns, " ")
+	}
+	return config, nil
+}
+
+// SetDNSConfig updates the custom DNS configuration.
+func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
+	if config.UseCustomDNS {
+		if err := n.uci.Set("network", "wan", "peerdns", "0"); err != nil {
+			return fmt.Errorf("setting peerdns: %w", err)
+		}
+		dns := strings.Join(config.Servers, " ")
+		if err := n.uci.Set("network", "wan", "dns", dns); err != nil {
+			return fmt.Errorf("setting dns: %w", err)
+		}
+	} else {
+		if err := n.uci.Set("network", "wan", "peerdns", "1"); err != nil {
+			return fmt.Errorf("setting peerdns: %w", err)
+		}
+		if err := n.uci.Set("network", "wan", "dns", ""); err != nil {
+			return fmt.Errorf("clearing dns: %w", err)
+		}
+	}
+	return n.uci.Commit("network")
+}
+
 // SetDHCPConfig updates the DHCP configuration for the LAN.
 func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
 	if err := n.uci.Set("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {

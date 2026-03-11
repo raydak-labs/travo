@@ -17,6 +17,7 @@ import {
   mockSystemLogs,
   mockKernelLogs,
   mockDHCPConfig,
+  mockDNSConfig,
   mockTimezoneConfig,
   mockAPConfigs,
 } from './data';
@@ -165,6 +166,13 @@ export const handlers = [
     return HttpResponse.json(mockDHCPConfig);
   }),
   http.put(API_ROUTES.network.dhcp, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.network.dns, () => {
+    return HttpResponse.json(mockDNSConfig);
+  }),
+  http.put(API_ROUTES.network.dns, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 

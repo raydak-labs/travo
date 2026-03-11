@@ -76,6 +76,41 @@ func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	}
 }
 
+// GetDNSConfigHandler handles GET /api/v1/network/dns.
+func GetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config, err := svc.GetDNSConfig()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(config)
+	}
+}
+
+// SetDNSConfigHandler handles PUT /api/v1/network/dns.
+func SetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var config models.DNSConfig
+		if err := c.BodyParser(&config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if config.UseCustomDNS {
+			if len(config.Servers) == 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "at least one DNS server is required when using custom DNS"})
+			}
+			for _, s := range config.Servers {
+				if !isValidIPv4(s) {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("invalid DNS server IP: %s", s)})
+				}
+			}
+		}
+		if err := svc.SetDNSConfig(config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetClientsHandler handles GET /api/v1/network/clients.
 func GetClientsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
