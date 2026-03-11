@@ -229,6 +229,15 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.get(API_ROUTES.system.backup, () => {
+    return new HttpResponse(new Blob(['mock-backup-data'], { type: 'application/gzip' }), {
+      headers: { 'Content-Disposition': 'attachment; filename=openwrt-backup.tar.gz' },
+    });
+  }),
+  http.post(API_ROUTES.system.restore, () => {
+    return HttpResponse.json({ status: 'ok', message: 'Configuration restored. Reboot to apply changes.' });
+  }),
+
   http.get(API_ROUTES.wifi.ap, () => {
     return HttpResponse.json(mockAPConfigs);
   }),

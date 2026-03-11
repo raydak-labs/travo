@@ -96,6 +96,8 @@ describe('API_ROUTES', () => {
       '/api/v1/system/hostname',
       '/api/v1/system/leds',
       '/api/v1/system/timezone',
+      '/api/v1/system/backup',
+      '/api/v1/system/restore',
       '/api/v1/network/status',
       '/api/v1/network/wan',
       '/api/v1/network/clients',

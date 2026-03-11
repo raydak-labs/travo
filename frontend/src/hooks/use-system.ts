@@ -98,6 +98,59 @@ export function useTimezone() {
   });
 }
 
+export function useBackup() {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(API_ROUTES.system.backup, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token') || ''}`,
+        },
+      });
+      if (!response.ok) throw new Error('Backup failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'openwrt-backup.tar.gz';
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onSuccess: () => {
+      toast.success('Backup downloaded');
+    },
+    onError: (error) => {
+      toast.error('Failed to create backup', { description: error.message });
+    },
+  });
+}
+
+export function useRestore() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('backup', file);
+      const response = await fetch(API_ROUTES.system.restore, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token') || ''}`,
+        },
+        body: formData,
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Restore failed');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success('Configuration restored. Reboot to apply changes.');
+    },
+    onError: (error) => {
+      toast.error('Failed to restore configuration', { description: error.message });
+    },
+  });
+}
+
 export function useSetTimezone() {
   const queryClient = useQueryClient();
   return useMutation({

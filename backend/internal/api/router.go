@@ -42,6 +42,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/system/leds", SetLEDStealthHandler(deps.System))
 	v1.Get("/system/timezone", GetTimezoneHandler(deps.System))
 	v1.Put("/system/timezone", SetTimezoneHandler(deps.System))
+	v1.Get("/system/backup", BackupHandler(deps.System))
+	v1.Post("/system/restore", RestoreHandler(deps.System))
 
 	// Network routes
 	v1.Get("/network/status", NetworkStatusHandler(deps.Network))

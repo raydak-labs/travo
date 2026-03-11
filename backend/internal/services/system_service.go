@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -254,6 +255,25 @@ func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
 		return models.LogResponse{}, err
 	}
 	return parseLogOutput("kernel", string(out)), nil
+}
+
+// CreateBackup generates a configuration backup archive and returns its path.
+func (s *SystemService) CreateBackup() (string, error) {
+	path := "/tmp/backup-" + strconv.FormatInt(time.Now().Unix(), 10) + ".tar.gz"
+	out, err := exec.Command("sysupgrade", "-b", path).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("creating backup: %w: %s", err, string(out))
+	}
+	return path, nil
+}
+
+// RestoreBackup applies a configuration backup from the given file path.
+func (s *SystemService) RestoreBackup(path string) error {
+	out, err := exec.Command("sysupgrade", "-r", path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("restoring backup: %w: %s", err, string(out))
+	}
+	return nil
 }
 
 func parseLogOutput(source, output string) models.LogResponse {

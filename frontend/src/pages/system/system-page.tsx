@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil, Lightbulb, Download, Upload } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth, useTimezone, useSetTimezone } from '@/hooks/use-system';
+import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname, useLEDStatus, useSetLEDStealth, useTimezone, useSetTimezone, useBackup, useRestore } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 const TIMEZONES = [
@@ -45,6 +45,9 @@ export function SystemPage() {
   const setLEDStealthMutation = useSetLEDStealth();
   const { data: timezoneConfig, isLoading: tzLoading } = useTimezone();
   const setTz = useSetTimezone();
+  const backup = useBackup();
+  const restore = useRestore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
   const [editingHostname, setEditingHostname] = useState(false);
   const [hostnameValue, setHostnameValue] = useState('');
@@ -335,6 +338,53 @@ export function SystemPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Backup & Restore */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Backup & Restore</CardTitle>
+          <Download className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => backup.mutate()}
+              disabled={backup.isPending}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {backup.isPending ? 'Creating backup…' : 'Download Backup'}
+            </Button>
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".tar.gz,.gz"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (window.confirm('Restore this backup? Current configuration will be overwritten. A reboot will be needed to apply changes.')) {
+                      restore.mutate(file);
+                    }
+                    e.target.value = '';
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={restore.isPending}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {restore.isPending ? 'Restoring…' : 'Restore from Backup'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Change Password */}
       <Card>

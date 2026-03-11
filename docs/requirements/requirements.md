@@ -236,7 +236,7 @@
 - [ ] Firmware upgrade (upload sysupgrade image)
 - [ ] Factory reset with confirmation
 - [x] Hostname change
-- [ ] Backup / restore configuration (export/import UCI configs as archive)
+- [x] Backup / restore configuration (export/import UCI configs as archive)
 - [x] LED control — stealth mode (turn off all router LEDs via sysfs toggle)
 
 ### 5.3 Time & Timezone

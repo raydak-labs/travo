@@ -15,6 +15,8 @@ export const API_ROUTES = {
     hostname: '/api/v1/system/hostname',
     leds: '/api/v1/system/leds',
     timezone: '/api/v1/system/timezone',
+    backup: '/api/v1/system/backup',
+    restore: '/api/v1/system/restore',
   },
   network: {
     status: '/api/v1/network/status',

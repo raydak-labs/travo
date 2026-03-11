@@ -1,6 +1,8 @@
 package api
 
 import (
+	"os"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -106,6 +108,44 @@ func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// BackupHandler handles GET /api/v1/system/backup — downloads config backup.
+func BackupHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		path, err := svc.CreateBackup()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		defer os.Remove(path)
+		c.Set("Content-Disposition", "attachment; filename=openwrt-backup.tar.gz")
+		return c.SendFile(path)
+	}
+}
+
+// RestoreHandler handles POST /api/v1/system/restore — uploads and restores config backup.
+func RestoreHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		file, err := c.FormFile("backup")
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "backup file is required"})
+		}
+		// Validate file type
+		ct := file.Header.Get("Content-Type")
+		if ct != "" && ct != "application/gzip" && ct != "application/x-gzip" && ct != "application/octet-stream" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file type, expected tar.gz"})
+		}
+		// Save to temp path
+		tmpPath := "/tmp/restore-upload.tar.gz"
+		if err := c.SaveFile(file, tmpPath); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to save uploaded file"})
+		}
+		defer os.Remove(tmpPath)
+		if err := svc.RestoreBackup(tmpPath); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok", "message": "Configuration restored. Reboot to apply changes."})
 	}
 }
 
