@@ -61,6 +61,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.connection).toBe('/api/v1/wifi/connection');
     expect(API_ROUTES.wifi.mode).toBe('/api/v1/wifi/mode');
     expect(API_ROUTES.wifi.saved).toBe('/api/v1/wifi/saved');
+    expect(API_ROUTES.wifi.radio).toBe('/api/v1/wifi/radio');
     expect(API_ROUTES.wifi.guest).toBe('/api/v1/wifi/guest');
   });
 
@@ -118,6 +119,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/connection',
       '/api/v1/wifi/mode',
       '/api/v1/wifi/saved',
+      '/api/v1/wifi/radio',
       '/api/v1/wifi/ap',
       '/api/v1/wifi/mac',
       '/api/v1/wifi/guest',

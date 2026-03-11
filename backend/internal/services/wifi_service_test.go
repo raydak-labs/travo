@@ -435,3 +435,67 @@ func TestSetGuestWifi_DisableWhenNotConfigured(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestGetRadioStatus_Enabled(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	enabled, err := svc.GetRadioStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !enabled {
+		t.Error("expected radios to be enabled by default")
+	}
+}
+
+func TestGetRadioStatus_AllDisabled(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	_ = u.Set("wireless", "radio0", "disabled", "1")
+	_ = u.Set("wireless", "radio1", "disabled", "1")
+
+	enabled, err := svc.GetRadioStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if enabled {
+		t.Error("expected radios to be disabled")
+	}
+}
+
+func TestSetRadioEnabled_Disable(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	err := svc.SetRadioEnabled(false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val0, _ := u.Get("wireless", "radio0", "disabled")
+	val1, _ := u.Get("wireless", "radio1", "disabled")
+	if val0 != "1" {
+		t.Errorf("expected radio0 disabled='1', got %q", val0)
+	}
+	if val1 != "1" {
+		t.Errorf("expected radio1 disabled='1', got %q", val1)
+	}
+}
+
+func TestSetRadioEnabled_Enable(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// First disable
+	_ = svc.SetRadioEnabled(false)
+	// Then enable
+	err := svc.SetRadioEnabled(true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val0, _ := u.Get("wireless", "radio0", "disabled")
+	val1, _ := u.Get("wireless", "radio1", "disabled")
+	if val0 != "0" {
+		t.Errorf("expected radio0 disabled='0', got %q", val0)
+	}
+	if val1 != "0" {
+		t.Errorf("expected radio1 disabled='0', got %q", val1)
+	}
+}

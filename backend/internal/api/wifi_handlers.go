@@ -107,6 +107,33 @@ func WifiDeleteHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// GetRadioStatusHandler handles GET /api/v1/wifi/radio.
+func GetRadioStatusHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		enabled, err := svc.GetRadioStatus()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"enabled": enabled})
+	}
+}
+
+// SetRadioEnabledHandler handles PUT /api/v1/wifi/radio.
+func SetRadioEnabledHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetRadioEnabled(body.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetAPConfigHandler handles GET /api/v1/wifi/ap.
 func GetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

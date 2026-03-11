@@ -316,6 +316,37 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 	return networks, nil
 }
 
+// GetRadioStatus returns whether any WiFi radio is enabled.
+func (w *WifiService) GetRadioStatus() (bool, error) {
+	for _, radio := range []string{"radio0", "radio1"} {
+		opts, err := w.uci.GetAll("wireless", radio)
+		if err != nil {
+			continue
+		}
+		if opts["disabled"] != "1" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// SetRadioEnabled enables or disables all WiFi radios.
+func (w *WifiService) SetRadioEnabled(enabled bool) error {
+	value := "0"
+	if !enabled {
+		value = "1"
+	}
+	for _, radio := range []string{"radio0", "radio1"} {
+		if _, err := w.uci.GetAll("wireless", radio); err == nil {
+			_ = w.uci.Set("wireless", radio, "disabled", value)
+		}
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return err
+	}
+	return w.reloader.Reload()
+}
+
 // DeleteNetwork removes a saved WiFi network by its UCI section name.
 func (w *WifiService) DeleteNetwork(section string) error {
 	if section == "" {

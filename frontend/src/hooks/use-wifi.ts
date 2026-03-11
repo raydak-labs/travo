@@ -163,3 +163,25 @@ export function useSetGuestWifi() {
     },
   });
 }
+
+export function useRadioStatus() {
+  return useQuery({
+    queryKey: ['wifi', 'radio'],
+    queryFn: () => apiClient.get<{ enabled: boolean }>(API_ROUTES.wifi.radio),
+  });
+}
+
+export function useSetRadioEnabled() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.radio, { enabled }),
+    onSuccess: () => {
+      toast.success('WiFi radio updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update WiFi radio', { description: error.message });
+    },
+  });
+}

@@ -37,6 +37,7 @@ export const API_ROUTES = {
     mode: '/api/v1/wifi/mode',
     saved: '/api/v1/wifi/saved',
     deleteSaved: '/api/v1/wifi/saved',
+    radio: '/api/v1/wifi/radio',
     ap: '/api/v1/wifi/ap',
     mac: '/api/v1/wifi/mac',
     guest: '/api/v1/wifi/guest',

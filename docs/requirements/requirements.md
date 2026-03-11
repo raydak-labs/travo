@@ -280,7 +280,7 @@
 - [x] WiFi scan shortcut
 - [x] Reboot shortcut
 - [x] VPN toggle shortcut
-- [ ] WiFi on/off shortcut
+- [x] WiFi on/off shortcut
 
 ### 6.4 Notifications & Alerts
 
