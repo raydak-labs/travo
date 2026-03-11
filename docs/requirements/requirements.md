@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v18 — WAN type auto-detection)
+> **Last updated:** 2026-03-11 (v19 — firmware upgrade)
 
 ---
 
@@ -234,7 +234,7 @@
 
 - [x] Reboot with confirmation dialog
 - [ ] Reboot actually working on device 🐛
-- [ ] Firmware upgrade (upload sysupgrade image)
+- [x] Firmware upgrade (upload sysupgrade image)
 - [x] Factory reset with confirmation
 - [x] Hostname change
 - [x] Backup / restore configuration (export/import UCI configs as archive)

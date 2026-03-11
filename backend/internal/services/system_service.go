@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -307,6 +308,38 @@ func (s *SystemService) RestoreBackup(path string) error {
 	if err != nil {
 		return fmt.Errorf("restoring backup: %w: %s", err, string(out))
 	}
+	return nil
+}
+
+// UpgradeFirmware saves the uploaded firmware image and flashes it via sysupgrade.
+// If keepSettings is true, current configuration is preserved (-v flag).
+// If keepSettings is false, settings are discarded (-n flag).
+func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error {
+	firmwarePath := "/tmp/firmware.bin"
+	out, err := os.Create(firmwarePath)
+	if err != nil {
+		return fmt.Errorf("creating firmware file: %w", err)
+	}
+	if _, err := io.Copy(out, file); err != nil {
+		out.Close()
+		os.Remove(firmwarePath)
+		return fmt.Errorf("saving firmware file: %w", err)
+	}
+	out.Close()
+
+	var args []string
+	if keepSettings {
+		args = []string{"-v", firmwarePath}
+	} else {
+		args = []string{"-n", firmwarePath}
+	}
+
+	// Run sysupgrade asynchronously — the device will reboot
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		_ = exec.Command("sysupgrade", args...).Run()
+	}()
+
 	return nil
 }
 

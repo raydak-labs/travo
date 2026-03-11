@@ -194,3 +194,33 @@ export function useSetTimezone() {
     },
   });
 }
+
+export function useFirmwareUpgrade() {
+  return useMutation({
+    mutationFn: async ({ file, keepSettings }: { file: File; keepSettings: boolean }) => {
+      const formData = new FormData();
+      formData.append('firmware', file);
+      formData.append('keep_settings', String(keepSettings));
+      const response = await fetch(API_ROUTES.system.firmwareUpgrade, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('openwrt-auth-token') || sessionStorage.getItem('openwrt-auth-token') || ''}`,
+        },
+        body: formData,
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Firmware upgrade failed');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success('Firmware upgrade initiated', {
+        description: 'Device will reboot with the new firmware.',
+      });
+    },
+    onError: (error) => {
+      toast.error('Firmware upgrade failed', { description: error.message });
+    },
+  });
+}

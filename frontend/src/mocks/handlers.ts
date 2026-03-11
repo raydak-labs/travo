@@ -387,6 +387,13 @@ export const handlers = [
     });
   }),
 
+  http.post(API_ROUTES.system.firmwareUpgrade, () => {
+    return HttpResponse.json({
+      status: 'ok',
+      message: 'Firmware upgrade initiated. Device will reboot.',
+    });
+  }),
+
   http.get(API_ROUTES.wifi.ap, () => {
     return HttpResponse.json(mockAPConfigs);
   }),

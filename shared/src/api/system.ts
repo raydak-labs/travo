@@ -121,3 +121,8 @@ export interface TimezoneConfig {
   readonly zonename: string;
   readonly timezone: string;
 }
+
+/** Firmware upgrade request options */
+export interface FirmwareUpgradeRequest {
+  readonly keep_settings: boolean;
+}

@@ -18,6 +18,7 @@ export const API_ROUTES = {
     backup: '/api/v1/system/backup',
     restore: '/api/v1/system/restore',
     factoryReset: '/api/v1/system/factory-reset',
+    firmwareUpgrade: '/api/v1/system/firmware/upgrade',
   },
   network: {
     status: '/api/v1/network/status',

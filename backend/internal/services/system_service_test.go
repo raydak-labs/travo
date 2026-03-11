@@ -1,6 +1,8 @@
 package services
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -372,4 +374,27 @@ func TestSetTimezone(t *testing.T) {
 	if config.Timezone != "CET-1CEST,M3.5.0,M10.5.0/3" {
 		t.Errorf("expected timezone 'CET-1CEST,M3.5.0,M10.5.0/3', got '%s'", config.Timezone)
 	}
+}
+
+func TestUpgradeFirmware_SavesFile(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+
+	content := "fake firmware binary"
+	reader := strings.NewReader(content)
+
+	err := svc.UpgradeFirmware(reader, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify the file was written to /tmp/firmware.bin
+	data, err := os.ReadFile("/tmp/firmware.bin")
+	if err != nil {
+		t.Fatalf("failed to read firmware file: %v", err)
+	}
+	if string(data) != content {
+		t.Errorf("expected firmware content %q, got %q", content, string(data))
+	}
+	os.Remove("/tmp/firmware.bin")
 }

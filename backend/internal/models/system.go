@@ -71,6 +71,11 @@ type TimezoneConfig struct {
 	Timezone string `json:"timezone"` // POSIX TZ string e.g. "CET-1CEST,M3.5.0,M10.5.0/3"
 }
 
+// FirmwareUpgradeRequest holds options for a firmware upgrade.
+type FirmwareUpgradeRequest struct {
+	KeepSettings bool `json:"keep_settings"`
+}
+
 // LogEntry represents a single log line from logread or dmesg.
 type LogEntry struct {
 	Line  string `json:"line"`

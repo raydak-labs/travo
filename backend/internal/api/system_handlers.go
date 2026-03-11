@@ -2,6 +2,7 @@ package api
 
 import (
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -165,6 +166,30 @@ func FactoryResetHandler(svc *services.SystemService) fiber.Handler {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// FirmwareUpgradeHandler handles POST /api/v1/system/firmware/upgrade.
+func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		file, err := c.FormFile("firmware")
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "firmware file is required"})
+		}
+		// Validate file extension
+		if !strings.HasSuffix(file.Filename, ".bin") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file type, expected .bin firmware image"})
+		}
+		keepSettings := c.FormValue("keep_settings", "true") == "true"
+		f, err := file.Open()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to read uploaded file"})
+		}
+		defer f.Close()
+		if err := svc.UpgradeFirmware(f, keepSettings); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok", "message": "Firmware upgrade initiated. Device will reboot."})
 	}
 }
 

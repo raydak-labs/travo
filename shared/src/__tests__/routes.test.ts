@@ -115,6 +115,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/backup',
       '/api/v1/system/restore',
       '/api/v1/system/factory-reset',
+      '/api/v1/system/firmware/upgrade',
       '/api/v1/network/status',
       '/api/v1/network/wan',
       '/api/v1/network/wan/detect',
