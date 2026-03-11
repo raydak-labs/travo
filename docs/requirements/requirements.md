@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v16 — interface up/down toggle)
+> **Last updated:** 2026-03-11 (v17 — repeater wizard)
 
 ---
 
@@ -63,7 +63,7 @@
 
 - [x] WiFi mode switching API (AP / STA / Repeater)
 - [x] Clear UI for mode selection with explanation of each mode
-- [ ] Repeater mode setup wizard (upstream + AP on same radio)
+- [x] Repeater mode setup wizard (upstream + AP on same radio)
 - [ ] 🔮 Mesh / WDS mode
 
 ### 1.4 Multi-Radio Support

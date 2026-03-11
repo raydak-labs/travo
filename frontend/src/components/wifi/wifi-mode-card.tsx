@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useWifiConnection, useWifiMode } from '@/hooks/use-wifi';
 import { cn } from '@/lib/cn';
 import type { WifiMode } from '@shared/index';
+import { RepeaterWizard } from '@/components/wifi/repeater-wizard';
 
 interface ModeOption {
   mode: WifiMode;
@@ -51,6 +52,7 @@ export function WifiModeCard() {
   const { data: connection, isLoading } = useWifiConnection();
   const setMode = useWifiMode();
   const [pendingMode, setPendingMode] = useState<WifiMode | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const currentMode: WifiMode = connection?.mode ?? 'client';
 
@@ -63,6 +65,7 @@ export function WifiModeCard() {
 
   return (
     <>
+      <RepeaterWizard open={wizardOpen} onOpenChange={setWizardOpen} />
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">WiFi Mode</CardTitle>
@@ -84,7 +87,13 @@ export function WifiModeCard() {
                     type="button"
                     disabled={setMode.isPending}
                     onClick={() => {
-                      if (!isActive) setPendingMode(mode);
+                      if (!isActive) {
+                        if (mode === 'repeater') {
+                          setWizardOpen(true);
+                        } else {
+                          setPendingMode(mode);
+                        }
+                      }
                     }}
                     className={cn(
                       'flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors',
