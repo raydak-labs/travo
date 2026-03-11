@@ -225,6 +225,11 @@ func (w *WifiService) Connect(config models.WifiConfig) error {
 	if config.Encryption != "" {
 		_ = w.uci.Set("wireless", section, "encryption", config.Encryption)
 	}
+	if config.Hidden {
+		_ = w.uci.Set("wireless", section, "hidden", "1")
+	} else {
+		_ = w.uci.Set("wireless", section, "hidden", "0")
+	}
 	_ = w.uci.Set("wireless", section, "disabled", "0")
 	if err := w.uci.Commit("wireless"); err != nil {
 		return err

@@ -210,6 +210,40 @@ func TestWifiDeleteNetwork_EmptySection(t *testing.T) {
 	}
 }
 
+func TestWifiConnectHiddenNetwork(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	err := svc.Connect(models.WifiConfig{
+		SSID: "Hidden-Net", Password: "secretpass", Encryption: "psk2", Hidden: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := u.Get("wireless", "wifinet2", "ssid")
+	if val != "Hidden-Net" {
+		t.Errorf("expected ssid 'Hidden-Net', got %q", val)
+	}
+	val, _ = u.Get("wireless", "wifinet2", "hidden")
+	if val != "1" {
+		t.Errorf("expected hidden='1', got %q", val)
+	}
+}
+
+func TestWifiConnectNonHiddenNetwork(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	err := svc.Connect(models.WifiConfig{
+		SSID: "Visible-Net", Password: "secretpass", Encryption: "psk2", Hidden: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := u.Get("wireless", "wifinet2", "hidden")
+	if val != "0" {
+		t.Errorf("expected hidden='0', got %q", val)
+	}
+}
+
 func TestWifiDeleteNetwork_NonexistentSection(t *testing.T) {
 	svc, _ := newTestWifiService()
 

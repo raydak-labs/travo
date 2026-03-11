@@ -46,7 +46,7 @@
 - [x] Delete saved WiFi networks
 - [ ] Priority ordering of saved networks (auto-connect preference)
 - [ ] Auto-reconnect to known networks on startup
-- [ ] Hidden network support (manual SSID entry)
+- [x] Hidden network support (manual SSID entry)
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 

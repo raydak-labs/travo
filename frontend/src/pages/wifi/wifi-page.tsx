@@ -30,6 +30,7 @@ import { WifiModeCard } from '@/components/wifi/wifi-mode-card';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { WifiScanDialog } from './wifi-scan-dialog';
+import { WifiHiddenNetworkDialog } from './wifi-hidden-network-dialog';
 import {
   useWifiConnection,
   useWifiDisconnect,
@@ -172,12 +173,16 @@ export function WifiPage() {
                   {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
                 </Button>
                 <WifiScanDialog />
+                <WifiHiddenNetworkDialog />
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-gray-500">Not connected to any WiFi network</p>
-              <WifiScanDialog />
+              <div className="flex gap-2">
+                <WifiScanDialog />
+                <WifiHiddenNetworkDialog />
+              </div>
             </div>
           )}
         </CardContent>
