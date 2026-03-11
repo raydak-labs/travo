@@ -118,3 +118,35 @@ func TestSetWireguard_ValidConfig_Returns200(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 }
+
+func TestGetWireguardStatus_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/wireguard/status", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if result["interface"] != "wg0" {
+		t.Errorf("expected interface wg0, got %v", result["interface"])
+	}
+	if result["public_key"] != "PUB_KEY" {
+		t.Errorf("expected public key PUB_KEY, got %v", result["public_key"])
+	}
+	peers, ok := result["peers"].([]interface{})
+	if !ok || len(peers) != 1 {
+		t.Errorf("expected 1 peer, got %v", result["peers"])
+	}
+}

@@ -69,6 +69,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.status).toBe('/api/v1/vpn/status');
     expect(API_ROUTES.vpn.wireguard.config).toBe('/api/v1/vpn/wireguard');
     expect(API_ROUTES.vpn.wireguard.toggle).toBe('/api/v1/vpn/wireguard/toggle');
+    expect(API_ROUTES.vpn.wireguard.status).toBe('/api/v1/vpn/wireguard/status');
     expect(API_ROUTES.vpn.tailscale.status).toBe('/api/v1/vpn/tailscale');
     expect(API_ROUTES.vpn.tailscale.toggle).toBe('/api/v1/vpn/tailscale/toggle');
   });
@@ -127,6 +128,7 @@ describe('API_ROUTES', () => {
       '/api/v1/vpn/wireguard',
       '/api/v1/vpn/wireguard/toggle',
       '/api/v1/vpn/wireguard/import',
+      '/api/v1/vpn/wireguard/status',
       '/api/v1/vpn/tailscale',
       '/api/v1/vpn/tailscale/toggle',
       '/api/v1/services',

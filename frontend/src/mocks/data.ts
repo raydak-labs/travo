@@ -10,6 +10,7 @@ import type {
   CaptivePortalStatus,
   WireguardConfig,
   TailscaleStatus,
+  WireGuardStatus,
   WanConfig,
   Client,
   DHCPConfig,
@@ -312,6 +313,22 @@ export const mockTailscaleStatus: TailscaleStatus = {
   hostname: 'gl-mt3000',
   exit_node: 'us-east-1',
   exit_node_active: true,
+};
+
+export const mockWireguardStatus: WireGuardStatus = {
+  interface: 'wg0',
+  public_key: 'cHVibGlja2V5aWZhY2U=',
+  listen_port: 51820,
+  peers: [
+    {
+      public_key: 'cGVlcnB1YmxpY2tleTE=',
+      endpoint: '1.2.3.4:51820',
+      latest_handshake: Math.floor(Date.now() / 1000) - 92,
+      transfer_rx: 129536789,
+      transfer_tx: 71234567,
+      allowed_ips: '0.0.0.0/0',
+    },
+  ],
 };
 
 export const mockWanConfig: WanConfig = {

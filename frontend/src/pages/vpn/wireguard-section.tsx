@@ -12,13 +12,25 @@ import {
   useSetWireguardConfig,
   useToggleWireguard,
   useVpnStatus,
+  useWireguardStatus,
 } from '@/hooks/use-vpn';
 import { formatBytes } from '@/lib/utils';
+
+function formatHandshakeTime(epoch: number): string {
+  if (epoch === 0) return 'Never';
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - epoch;
+  if (diff < 60) return `${diff} seconds ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  return `${Math.floor(diff / 86400)} days ago`;
+}
 
 export function WireguardSection() {
   const { data: vpnStatuses = [] } = useVpnStatus();
   const { data: services = [] } = useServices();
   const { data: config, isLoading } = useWireguardConfig();
+  const { data: wgLiveStatus } = useWireguardStatus();
   const setConfigMutation = useSetWireguardConfig();
   const toggleMutation = useToggleWireguard();
   const [configText, setConfigText] = useState('');
@@ -68,8 +80,35 @@ export function WireguardSection() {
               />
             </div>
 
-            {/* Connection Details */}
-            {wgStatus?.connected && (
+            {/* Connection Details — live stats from wg show */}
+            {wgStatus?.connected && wgLiveStatus && wgLiveStatus.peers.length > 0 && (
+              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+                <h4 className="mb-2 font-medium text-gray-700 dark:text-gray-300">
+                  Connection Status
+                </h4>
+                {wgLiveStatus.peers.map((peer) => (
+                  <div key={peer.public_key} className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-500">Endpoint</span>
+                    <span className="text-gray-900 dark:text-white">{peer.endpoint}</span>
+                    <span className="text-gray-500">Last Handshake</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {formatHandshakeTime(peer.latest_handshake)}
+                    </span>
+                    <span className="text-gray-500">RX</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {formatBytes(peer.transfer_rx)}
+                    </span>
+                    <span className="text-gray-500">TX</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {formatBytes(peer.transfer_tx)}
+                    </span>
+                    <span className="text-gray-500">Allowed IPs</span>
+                    <span className="text-gray-900 dark:text-white">{peer.allowed_ips}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {wgStatus?.connected && !wgLiveStatus && (
               <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
                 <div className="grid grid-cols-2 gap-2">
                   <span className="text-gray-500">Endpoint</span>

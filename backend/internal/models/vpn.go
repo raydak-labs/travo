@@ -28,6 +28,24 @@ type WireguardConfig struct {
 	Peers      []WireguardPeer `json:"peers"`
 }
 
+// WireGuardPeerStatus holds live status for a single WireGuard peer.
+type WireGuardPeerStatus struct {
+	PublicKey       string `json:"public_key"`
+	Endpoint        string `json:"endpoint"`
+	LatestHandshake int64  `json:"latest_handshake"` // unix epoch seconds, 0 = never
+	TransferRx      int64  `json:"transfer_rx"`      // bytes received
+	TransferTx      int64  `json:"transfer_tx"`      // bytes sent
+	AllowedIPs      string `json:"allowed_ips"`
+}
+
+// WireGuardStatus holds live WireGuard interface status from `wg show`.
+type WireGuardStatus struct {
+	Interface  string                `json:"interface"`
+	PublicKey  string                `json:"public_key"`
+	ListenPort int                  `json:"listen_port"`
+	Peers      []WireGuardPeerStatus `json:"peers"`
+}
+
 // TailscaleStatus represents Tailscale connection status.
 type TailscaleStatus struct {
 	Installed      bool    `json:"installed"`

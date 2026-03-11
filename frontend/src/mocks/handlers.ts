@@ -12,6 +12,7 @@ import {
   mockCaptivePortalStatus,
   mockWireguardConfig,
   mockTailscaleStatus,
+  mockWireguardStatus,
   mockWanConfig,
   mockClients,
   mockSystemLogs,
@@ -112,6 +113,10 @@ export const handlers = [
 
   http.post(API_ROUTES.vpn.wireguard.toggle, () => {
     return HttpResponse.json({ success: true });
+  }),
+
+  http.get(API_ROUTES.vpn.wireguard.status, () => {
+    return HttpResponse.json(mockWireguardStatus);
   }),
 
   http.get(API_ROUTES.vpn.tailscale.status, () => {

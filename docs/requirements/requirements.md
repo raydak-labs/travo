@@ -142,7 +142,7 @@
 - [x] Edit WireGuard configuration
 - [x] Import from .conf file (full parser with key validation)
 - [x] Enable / disable WireGuard
-- [ ] Show connection status (handshake time, transfer stats)
+- [x] Show connection status (handshake time, transfer stats)
 - [ ] Multiple WireGuard profiles (switch between configs)
 - [ ] Kill switch (block traffic if VPN drops)
 - [ ] Split tunneling (route only selected traffic through VPN)

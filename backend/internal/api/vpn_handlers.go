@@ -124,3 +124,14 @@ func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetWireguardStatusHandler handles GET /api/v1/vpn/wireguard/status.
+func GetWireguardStatusHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		status, err := svc.GetWireGuardStatus()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(status)
+	}
+}

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { VpnStatus, WireguardConfig, TailscaleStatus } from '@shared/index';
+import type { VpnStatus, WireguardConfig, TailscaleStatus, WireGuardStatus } from '@shared/index';
 
 export function useVpnStatus() {
   return useQuery({
@@ -15,6 +15,14 @@ export function useWireguardConfig() {
   return useQuery({
     queryKey: ['vpn', 'wireguard'],
     queryFn: () => apiClient.get<WireguardConfig>(API_ROUTES.vpn.wireguard.config),
+  });
+}
+
+export function useWireguardStatus() {
+  return useQuery({
+    queryKey: ['vpn', 'wireguard', 'status'],
+    queryFn: () => apiClient.get<WireGuardStatus>(API_ROUTES.vpn.wireguard.status),
+    refetchInterval: 10000, // refresh every 10 seconds for live stats
   });
 }
 

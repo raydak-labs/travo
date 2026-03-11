@@ -40,6 +40,24 @@ export interface TailscaleStatus {
   readonly exit_node_active: boolean;
 }
 
+/** Live WireGuard peer status from `wg show` */
+export interface WireGuardPeerStatus {
+  readonly public_key: string;
+  readonly endpoint: string;
+  readonly latest_handshake: number; // unix epoch seconds, 0 = never
+  readonly transfer_rx: number; // bytes received
+  readonly transfer_tx: number; // bytes sent
+  readonly allowed_ips: string;
+}
+
+/** Live WireGuard interface status from `wg show` */
+export interface WireGuardStatus {
+  readonly interface: string;
+  readonly public_key: string;
+  readonly listen_port: number;
+  readonly peers: readonly WireGuardPeerStatus[];
+}
+
 /** Type guard for VpnStatus */
 export function isVpnStatus(value: unknown): value is VpnStatus {
   if (typeof value !== 'object' || value === null) return false;

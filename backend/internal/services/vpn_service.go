@@ -2,20 +2,41 @@ package services
 
 import (
 	"fmt"
+	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
+// CommandRunner abstracts command execution for testability.
+type CommandRunner interface {
+	Run(name string, args ...string) ([]byte, error)
+}
+
+// RealCommandRunner executes real OS commands.
+type RealCommandRunner struct{}
+
+// Run executes a command and returns its output.
+func (r *RealCommandRunner) Run(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
+
 // VpnService provides VPN status and configuration.
 type VpnService struct {
 	uci uci.UCI
+	cmd CommandRunner
 }
 
-// NewVpnService creates a new VpnService.
+// NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
-	return &VpnService{uci: u}
+	return &VpnService{uci: u, cmd: &RealCommandRunner{}}
+}
+
+// NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
+func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
+	return &VpnService{uci: u, cmd: cmd}
 }
 
 // GetVpnStatus returns all VPN connection statuses.
@@ -44,6 +65,66 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	})
 
 	return statuses, nil
+}
+
+// GetWireGuardStatus returns live WireGuard status by running `wg show wg0 dump`.
+// The dump format is tab-separated:
+// Line 1 (interface): private_key  public_key  listen_port  fwmark
+// Line 2+ (peers): public_key  preshared_key  endpoint  allowed_ips  latest_handshake_epoch  transfer_rx  transfer_tx  persistent_keepalive
+func (v *VpnService) GetWireGuardStatus() (*models.WireGuardStatus, error) {
+	out, err := v.cmd.Run("wg", "show", "wg0", "dump")
+	if err != nil {
+		return nil, fmt.Errorf("wg show failed: %w", err)
+	}
+	return ParseWgDump(string(out))
+}
+
+// ParseWgDump parses the output of `wg show <iface> dump` into a WireGuardStatus.
+func ParseWgDump(dump string) (*models.WireGuardStatus, error) {
+	lines := strings.Split(strings.TrimSpace(dump), "\n")
+	if len(lines) == 0 || lines[0] == "" {
+		return nil, fmt.Errorf("empty wg dump output")
+	}
+
+	// Parse interface line
+	ifFields := strings.Split(lines[0], "\t")
+	if len(ifFields) < 3 {
+		return nil, fmt.Errorf("invalid interface line: expected at least 3 fields, got %d", len(ifFields))
+	}
+
+	listenPort, _ := strconv.Atoi(ifFields[2])
+	status := &models.WireGuardStatus{
+		Interface:  "wg0",
+		PublicKey:  ifFields[1],
+		ListenPort: listenPort,
+	}
+
+	// Parse peer lines
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 8 {
+			continue
+		}
+		handshake, _ := strconv.ParseInt(fields[4], 10, 64)
+		rx, _ := strconv.ParseInt(fields[5], 10, 64)
+		tx, _ := strconv.ParseInt(fields[6], 10, 64)
+
+		peer := models.WireGuardPeerStatus{
+			PublicKey:       fields[0],
+			Endpoint:        fields[2],
+			AllowedIPs:      fields[3],
+			LatestHandshake: handshake,
+			TransferRx:      rx,
+			TransferTx:      tx,
+		}
+		status.Peers = append(status.Peers, peer)
+	}
+
+	return status, nil
 }
 
 // GetWireguardConfig returns the WireGuard configuration.
