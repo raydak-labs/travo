@@ -323,7 +323,7 @@
 - [x] Service-specific logs (AdGuard, WireGuard, etc.)
 - [ ] Log level filtering
 - [x] Log search / filter
-- [ ] 🔮 Log export / download
+- [x] Log export / download
 - [ ] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)
 - [ ] 🔮 Speed test (run from device to measure actual WAN throughput)
 

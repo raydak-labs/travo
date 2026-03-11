@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { ScrollText, Search, RefreshCw, Filter } from 'lucide-react';
+import { ScrollText, Search, RefreshCw, Filter, Download } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,6 +89,25 @@ export function LogsPage() {
                   className="pl-9"
                 />
               </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (filteredLines.length === 0) return;
+                  const text = filteredLines.map((e) => e.line).join('\n');
+                  const blob = new Blob([text], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `logs-${activeTab}-${new Date().toISOString().split('T')[0]}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                disabled={filteredLines.length === 0}
+                aria-label="Download logs"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="icon"
