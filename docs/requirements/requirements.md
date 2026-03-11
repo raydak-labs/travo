@@ -243,7 +243,7 @@
 
 - [x] Show current device time
 - [x] Timezone configuration
-- [ ] Detect timezone mismatch between device and browser (GL.iNet style)
+- [x] Detect timezone mismatch between device and browser (GL.iNet style)
 - [ ] NTP server configuration
 - [ ] 🔮 NTP sync status indicator
 

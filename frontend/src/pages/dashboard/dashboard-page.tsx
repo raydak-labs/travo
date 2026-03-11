@@ -4,10 +4,12 @@ import { SystemStatsCard } from './system-stats-card';
 import { ClientsCard } from './clients-card';
 import { QuickActions } from './quick-actions';
 import { BandwidthChart } from './bandwidth-chart';
+import { TimezoneAlert } from '@/components/timezone-alert';
 
 export function DashboardPage() {
   return (
     <div className="space-y-6">
+      <TimezoneAlert />
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <ConnectionStatusCard />
         <VpnStatusCard />
