@@ -69,3 +69,11 @@ type MACConfig struct {
 type SetMACRequest struct {
 	MAC string `json:"mac"`
 }
+
+// DHCPLease represents an active DHCP lease.
+type DHCPLease struct {
+	Expiry   int64  `json:"expiry"`
+	MAC      string `json:"mac"`
+	IP       string `json:"ip"`
+	Hostname string `json:"hostname"`
+}

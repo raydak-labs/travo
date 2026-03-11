@@ -18,6 +18,7 @@ import type {
   TimezoneConfig,
   APConfig,
   MACConfig,
+  DHCPLease,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -409,5 +410,20 @@ export const mockMACAddresses: MACConfig[] = [
     interface: 'sta',
     current_mac: '94:83:c4:1f:28:3a',
     custom_mac: '',
+  },
+];
+
+export const mockDHCPLeases: DHCPLease[] = [
+  {
+    expiry: Math.floor(Date.now() / 1000) + 3600,
+    mac: 'aa:bb:cc:dd:ee:ff',
+    ip: '192.168.8.100',
+    hostname: 'laptop-1',
+  },
+  {
+    expiry: Math.floor(Date.now() / 1000) + 7200,
+    mac: '11:22:33:44:55:66',
+    ip: '192.168.8.101',
+    hostname: 'phone-2',
   },
 ];

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Network, Globe, Wifi, Settings } from 'lucide-react';
+import { Network, Globe, Wifi, Settings, List } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useNetworkStatus, useDHCPConfig, useSetDHCPConfig, useDNSConfig, useSetDNSConfig } from '@/hooks/use-network';
+import { useNetworkStatus, useDHCPConfig, useSetDHCPConfig, useDNSConfig, useSetDNSConfig, useDHCPLeases } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
 
@@ -23,6 +23,7 @@ export function NetworkPage() {
   const setDHCP = useSetDHCPConfig();
   const { data: dnsConfig, isLoading: dnsLoading } = useDNSConfig();
   const setDNS = useSetDNSConfig();
+  const { data: dhcpLeases, isLoading: dhcpLeasesLoading } = useDHCPLeases();
   const [dhcpStart, setDhcpStart] = useState<number>(100);
   const [dhcpLimit, setDhcpLimit] = useState<number>(150);
   const [dhcpLease, setDhcpLease] = useState<string>('12h');
@@ -243,6 +244,49 @@ export function NetworkPage() {
                 {setDNS.isPending ? 'Saving…' : 'Save DNS Settings'}
               </Button>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* DHCP Leases */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">DHCP Leases</CardTitle>
+          <List className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          {dhcpLeasesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : dhcpLeases && dhcpLeases.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="pb-2 font-medium">Hostname</th>
+                    <th className="pb-2 font-medium">IP Address</th>
+                    <th className="pb-2 font-medium">MAC Address</th>
+                    <th className="pb-2 font-medium">Expires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dhcpLeases.map((lease) => (
+                    <tr key={lease.mac} className="border-b last:border-0">
+                      <td className="py-2 text-gray-900 dark:text-white">{lease.hostname || '—'}</td>
+                      <td className="py-2 font-mono text-gray-900 dark:text-white">{lease.ip}</td>
+                      <td className="py-2 font-mono text-gray-500">{lease.mac}</td>
+                      <td className="py-2 text-gray-500">
+                        {new Date(lease.expiry * 1000).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">(No active leases)</p>
           )}
         </CardContent>
       </Card>

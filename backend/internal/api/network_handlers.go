@@ -161,3 +161,11 @@ func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetDHCPLeasesHandler handles GET /api/v1/network/dhcp/leases.
+func GetDHCPLeasesHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		leases := svc.GetDHCPLeases()
+		return c.JSON(leases)
+	}
+}

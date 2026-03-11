@@ -48,6 +48,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.status).toBe('/api/v1/network/status');
     expect(API_ROUTES.network.wan).toBe('/api/v1/network/wan');
     expect(API_ROUTES.network.clients).toBe('/api/v1/network/clients');
+    expect(API_ROUTES.network.dhcpLeases).toBe('/api/v1/network/dhcp/leases');
   });
 
   it('has wifi routes matching backend', () => {
@@ -102,6 +103,7 @@ describe('API_ROUTES', () => {
       '/api/v1/network/wan',
       '/api/v1/network/clients',
       '/api/v1/network/dhcp',
+      '/api/v1/network/dhcp/leases',
       '/api/v1/network/dns',
       '/api/v1/wifi/scan',
       '/api/v1/wifi/connect',

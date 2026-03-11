@@ -271,3 +271,66 @@ func TestSetWanConfigPropagatesEachFieldError(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDHCPLeases(t *testing.T) {
+	data := "1718900000 aa:bb:cc:dd:ee:ff 192.168.1.100 laptop-1 *\n1718903600 11:22:33:44:55:66 192.168.1.101 phone-2 01:11:22:33:44:55:66\n"
+	leases := parseDHCPLeases(data)
+	if len(leases) != 2 {
+		t.Fatalf("expected 2 leases, got %d", len(leases))
+	}
+	if leases[0].MAC != "aa:bb:cc:dd:ee:ff" {
+		t.Errorf("expected MAC aa:bb:cc:dd:ee:ff, got %s", leases[0].MAC)
+	}
+	if leases[0].IP != "192.168.1.100" {
+		t.Errorf("expected IP 192.168.1.100, got %s", leases[0].IP)
+	}
+	if leases[0].Hostname != "laptop-1" {
+		t.Errorf("expected hostname laptop-1, got %s", leases[0].Hostname)
+	}
+	if leases[0].Expiry != 1718900000 {
+		t.Errorf("expected expiry 1718900000, got %d", leases[0].Expiry)
+	}
+	if leases[1].MAC != "11:22:33:44:55:66" {
+		t.Errorf("expected MAC 11:22:33:44:55:66, got %s", leases[1].MAC)
+	}
+	if leases[1].Hostname != "phone-2" {
+		t.Errorf("expected hostname phone-2, got %s", leases[1].Hostname)
+	}
+}
+
+func TestParseDHCPLeases_Empty(t *testing.T) {
+	leases := parseDHCPLeases("")
+	if len(leases) != 0 {
+		t.Fatalf("expected no leases, got %d", len(leases))
+	}
+}
+
+func TestParseDHCPLeases_WildcardHostname(t *testing.T) {
+	data := "1718900000 aa:bb:cc:dd:ee:ff 192.168.1.100 * *\n"
+	leases := parseDHCPLeases(data)
+	if len(leases) != 1 {
+		t.Fatalf("expected 1 lease, got %d", len(leases))
+	}
+	if leases[0].Hostname != "" {
+		t.Errorf("expected empty hostname for *, got %q", leases[0].Hostname)
+	}
+}
+
+func TestParseDHCPLeases_InvalidLine(t *testing.T) {
+	data := "invalid line\n1718900000 aa:bb:cc:dd:ee:ff 192.168.1.100 laptop *\n"
+	leases := parseDHCPLeases(data)
+	if len(leases) != 1 {
+		t.Fatalf("expected 1 lease (skipping invalid), got %d", len(leases))
+	}
+}
+
+func TestGetDHCPLeases_FileNotExist(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	leases := svc.GetDHCPLeases()
+	if len(leases) != 0 {
+		t.Errorf("expected empty slice when file not found, got %d", len(leases))
+	}
+}

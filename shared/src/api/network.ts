@@ -59,6 +59,14 @@ export interface DNSConfig {
   readonly servers: readonly string[];
 }
 
+/** Active DHCP lease */
+export interface DHCPLease {
+  readonly expiry: number;
+  readonly mac: string;
+  readonly ip: string;
+  readonly hostname: string;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

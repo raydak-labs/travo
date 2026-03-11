@@ -21,6 +21,7 @@ import {
   mockTimezoneConfig,
   mockAPConfigs,
   mockMACAddresses,
+  mockDHCPLeases,
 } from './data';
 
 export const handlers = [
@@ -175,6 +176,10 @@ export const handlers = [
   }),
   http.put(API_ROUTES.network.dns, () => {
     return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.network.dhcpLeases, () => {
+    return HttpResponse.json(mockDHCPLeases);
   }),
 
   http.post(API_ROUTES.auth.login, async ({ request }) => {

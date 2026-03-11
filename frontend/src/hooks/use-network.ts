@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { NetworkStatus, WanConfig, Client, DHCPConfig, DNSConfig } from '@shared/index';
+import type { NetworkStatus, WanConfig, Client, DHCPConfig, DNSConfig, DHCPLease } from '@shared/index';
 
 export function useNetworkStatus() {
   return useQuery({
@@ -44,6 +44,14 @@ export function useDHCPConfig() {
   return useQuery({
     queryKey: ['network', 'dhcp'],
     queryFn: () => apiClient.get<DHCPConfig>(API_ROUTES.network.dhcp),
+  });
+}
+
+export function useDHCPLeases() {
+  return useQuery({
+    queryKey: ['network', 'dhcpLeases'],
+    queryFn: () => apiClient.get<DHCPLease[]>(API_ROUTES.network.dhcpLeases),
+    refetchInterval: 30000,
   });
 }
 

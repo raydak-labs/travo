@@ -350,3 +350,42 @@ func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
 	}
 	return n.uci.Commit("dhcp")
 }
+
+// GetDHCPLeases reads active DHCP leases from /tmp/dhcp.leases.
+func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
+	data, err := os.ReadFile("/tmp/dhcp.leases")
+	if err != nil {
+		return []models.DHCPLease{}
+	}
+	return parseDHCPLeases(string(data))
+}
+
+// parseDHCPLeases parses the content of /tmp/dhcp.leases into a slice of DHCPLease.
+// Each line has the format: <expiry_epoch> <mac_address> <ip_address> <hostname> <client_id>
+func parseDHCPLeases(data string) []models.DHCPLease {
+	var leases []models.DHCPLease
+	for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		expiry, err := strconv.ParseInt(fields[0], 10, 64)
+		if err != nil {
+			continue
+		}
+		hostname := fields[3]
+		if hostname == "*" {
+			hostname = ""
+		}
+		leases = append(leases, models.DHCPLease{
+			Expiry:   expiry,
+			MAC:      fields[1],
+			IP:       fields[2],
+			Hostname: hostname,
+		})
+	}
+	if leases == nil {
+		return []models.DHCPLease{}
+	}
+	return leases
+}

@@ -101,7 +101,7 @@
 ### 2.3 DHCP & DNS
 
 - [x] Configure DHCP range (start, end, lease time)
-- [ ] View active DHCP leases with expiry
+- [x] View active DHCP leases with expiry
 - [x] Custom DNS servers for LAN
 - [ ] Local DNS entries (hostname → IP mapping)
 - [ ] 🔮 DNS over HTTPS / DNS over TLS toggle
