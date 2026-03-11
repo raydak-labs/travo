@@ -11,6 +11,12 @@ type LoginResponse struct {
 	ExpiresAt string `json:"expires_at"`
 }
 
+// ChangePasswordRequest is the payload for changing the admin password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // Session represents an active authentication session.
 type Session struct {
 	Token     string `json:"token"`

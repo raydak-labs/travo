@@ -1,18 +1,23 @@
 import { useState } from 'react';
-import { Server, Cpu, HardDrive, Clock } from 'lucide-react';
+import { Server, Cpu, HardDrive, Clock, KeyRound } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSystemInfo, useSystemStats, useReboot } from '@/hooks/use-system';
+import { useSystemInfo, useSystemStats, useReboot, useChangePassword } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 export function SystemPage() {
   const { data: info, isLoading: infoLoading } = useSystemInfo();
   const { data: stats, isLoading: statsLoading } = useSystemStats();
   const rebootMutation = useReboot();
+  const changePasswordMutation = useChangePassword();
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   return (
     <div className="space-y-6">
@@ -158,6 +163,73 @@ export function SystemPage() {
               Reboot
             </Button>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Change Password */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Change Password</CardTitle>
+          <KeyRound className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newPassword !== confirmPassword) return;
+              changePasswordMutation.mutate(
+                { current_password: currentPassword, new_password: newPassword },
+                {
+                  onSuccess: () => {
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  },
+                },
+              );
+            }}
+          >
+            <Input
+              type="password"
+              placeholder="Current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+            <Input
+              type="password"
+              placeholder="New password (min 6 characters)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              minLength={6}
+              required
+            />
+            <Input
+              type="password"
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={6}
+              required
+            />
+            {newPassword && confirmPassword && newPassword !== confirmPassword && (
+              <p className="text-sm text-red-500">Passwords do not match</p>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                changePasswordMutation.isPending ||
+                !currentPassword ||
+                !newPassword ||
+                newPassword !== confirmPassword ||
+                newPassword.length < 6
+              }
+            >
+              {changePasswordMutation.isPending ? 'Changing…' : 'Change Password'}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

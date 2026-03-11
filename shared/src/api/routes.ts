@@ -4,6 +4,7 @@ export const API_ROUTES = {
     login: '/api/v1/auth/login',
     logout: '/api/v1/auth/logout',
     session: '/api/v1/auth/session',
+    password: '/api/v1/auth/password',
   },
   system: {
     info: '/api/v1/system/info',

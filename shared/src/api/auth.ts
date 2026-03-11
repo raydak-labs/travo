@@ -9,6 +9,12 @@ export interface LoginResponse {
   readonly expires_at: string;
 }
 
+/** Change password request payload */
+export interface ChangePasswordRequest {
+  readonly current_password: string;
+  readonly new_password: string;
+}
+
 /** Active session */
 export interface Session {
   readonly token: string;

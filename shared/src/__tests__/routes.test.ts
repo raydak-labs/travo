@@ -33,6 +33,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.auth.login).toBe('/api/v1/auth/login');
     expect(API_ROUTES.auth.logout).toBe('/api/v1/auth/logout');
     expect(API_ROUTES.auth.session).toBe('/api/v1/auth/session');
+    expect(API_ROUTES.auth.password).toBe('/api/v1/auth/password');
   });
 
   it('has system routes matching backend', () => {
@@ -85,6 +86,7 @@ describe('API_ROUTES', () => {
       '/api/v1/auth/login',
       '/api/v1/auth/logout',
       '/api/v1/auth/session',
+      '/api/v1/auth/password',
       '/api/v1/system/info',
       '/api/v1/system/stats',
       '/api/v1/system/logs',

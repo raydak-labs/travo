@@ -97,6 +97,22 @@ func (a *AuthService) TokenExpiry(tokenStr string) (time.Time, error) {
 	return exp.Time, nil
 }
 
+// ChangePassword verifies the current password and updates to the new one.
+func (a *AuthService) ChangePassword(currentPassword, newPassword string) error {
+	if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(currentPassword)); err != nil {
+		return errors.New("invalid current password")
+	}
+	if len(newPassword) < 6 {
+		return errors.New("new password must be at least 6 characters")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	a.passwordHash = hash
+	return nil
+}
+
 // Middleware returns a Fiber middleware that checks for a valid Bearer token.
 func (a *AuthService) Middleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {

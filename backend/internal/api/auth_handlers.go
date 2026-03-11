@@ -70,3 +70,21 @@ func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
 		return c.JSON(fiber.Map{"valid": true})
 	}
 }
+
+// ChangePasswordHandler handles PUT /api/v1/auth/password.
+func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.ChangePasswordRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := authSvc.ChangePassword(req.CurrentPassword, req.NewPassword); err != nil {
+			status := fiber.StatusBadRequest
+			if err.Error() == "invalid current password" {
+				status = fiber.StatusUnauthorized
+			}
+			return c.Status(status).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

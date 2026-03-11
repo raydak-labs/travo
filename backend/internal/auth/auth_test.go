@@ -157,3 +157,40 @@ func TestMiddlewareAllowsLoginWithoutToken(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 }
+
+func TestChangePasswordSuccess(t *testing.T) {
+	svc := NewAuthService("admin", "test-secret")
+	if err := svc.ChangePassword("admin", "newpassword123"); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	// Old password should no longer work
+	if _, _, err := svc.Login("admin"); err == nil {
+		t.Error("expected old password to fail")
+	}
+	// New password should work
+	if _, _, err := svc.Login("newpassword123"); err != nil {
+		t.Errorf("expected new password to work, got: %v", err)
+	}
+}
+
+func TestChangePasswordWrongCurrent(t *testing.T) {
+	svc := NewAuthService("admin", "test-secret")
+	err := svc.ChangePassword("wrongpassword", "newpassword123")
+	if err == nil {
+		t.Error("expected error for wrong current password")
+	}
+	if err.Error() != "invalid current password" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestChangePasswordTooShort(t *testing.T) {
+	svc := NewAuthService("admin", "test-secret")
+	err := svc.ChangePassword("admin", "short")
+	if err == nil {
+		t.Error("expected error for short password")
+	}
+	if err.Error() != "new password must be at least 6 characters" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

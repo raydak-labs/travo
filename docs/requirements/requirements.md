@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2025-07-16 (v4 — system log viewer)
+> **Last updated:** 2025-07-16 (v5 — change admin password)
 
 ---
 
@@ -250,8 +250,8 @@
 ### 5.4 Password Management
 
 - [x] Login with password (bcrypt hashed)
-- [ ] Change admin password from UI
-- [ ] Password strength requirements
+- [x] Change admin password from UI
+- [x] Password strength requirements
 - [ ] 🔮 SSH key management
 
 ---

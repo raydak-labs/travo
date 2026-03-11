@@ -173,6 +173,20 @@ export const handlers = [
     return HttpResponse.json({ valid: true });
   }),
 
+  http.put(API_ROUTES.auth.password, async ({ request }) => {
+    const body = (await request.json()) as { current_password: string; new_password: string };
+    if (body.current_password !== 'admin') {
+      return HttpResponse.json({ error: 'invalid current password' }, { status: 401 });
+    }
+    if (body.new_password.length < 6) {
+      return HttpResponse.json(
+        { error: 'new password must be at least 6 characters' },
+        { status: 400 },
+      );
+    }
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.post(API_ROUTES.system.reboot, () => {
     return HttpResponse.json({ status: 'ok' });
   }),

@@ -29,6 +29,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
 	v1.Post("/auth/logout", LogoutHandler(deps.Auth, deps.Blocklist))
 	v1.Get("/auth/session", SessionHandler(deps.Auth))
+	v1.Put("/auth/password", ChangePasswordHandler(deps.Auth))
 
 	// System routes
 	v1.Get("/system/info", SystemInfoHandler(deps.System))
