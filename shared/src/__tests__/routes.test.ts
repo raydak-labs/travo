@@ -141,6 +141,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/ap',
       '/api/v1/wifi/mac',
       '/api/v1/wifi/guest',
+      '/api/v1/wifi/autoreconnect',
       '/api/v1/vpn/status',
       '/api/v1/vpn/killswitch',
       '/api/v1/vpn/wireguard',

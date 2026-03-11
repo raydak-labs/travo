@@ -410,4 +410,11 @@ export const handlers = [
   http.put(API_ROUTES.wifi.radio, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
+
+  http.get(API_ROUTES.wifi.autoreconnect, () => {
+    return HttpResponse.json({ enabled: false });
+  }),
+  http.put(API_ROUTES.wifi.autoreconnect, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
 ];

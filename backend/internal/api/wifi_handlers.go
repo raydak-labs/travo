@@ -268,3 +268,30 @@ func SetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetAutoReconnectHandler handles GET /api/v1/wifi/autoreconnect.
+func GetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		enabled, err := svc.GetAutoReconnect()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"enabled": enabled})
+	}
+}
+
+// SetAutoReconnectHandler handles PUT /api/v1/wifi/autoreconnect.
+func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetAutoReconnect(body.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

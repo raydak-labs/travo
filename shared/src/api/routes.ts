@@ -49,6 +49,7 @@ export const API_ROUTES = {
     ap: '/api/v1/wifi/ap',
     mac: '/api/v1/wifi/mac',
     guest: '/api/v1/wifi/guest',
+    autoreconnect: '/api/v1/wifi/autoreconnect',
   },
   vpn: {
     status: '/api/v1/vpn/status',

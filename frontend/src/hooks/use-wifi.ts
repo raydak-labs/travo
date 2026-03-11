@@ -12,6 +12,7 @@ import type {
   GuestWifiConfig,
   RadioInfo,
   NetworkPriorityRequest,
+  AutoReconnectConfig,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -206,6 +207,28 @@ export function useSetRadioEnabled() {
     },
     onError: (error) => {
       toast.error('Failed to update WiFi radio', { description: error.message });
+    },
+  });
+}
+
+export function useAutoReconnect() {
+  return useQuery({
+    queryKey: ['wifi', 'autoreconnect'],
+    queryFn: () => apiClient.get<AutoReconnectConfig>(API_ROUTES.wifi.autoreconnect),
+  });
+}
+
+export function useSetAutoReconnect() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.autoreconnect, { enabled }),
+    onSuccess: (_data, enabled) => {
+      toast.success(enabled ? 'Auto-reconnect enabled' : 'Auto-reconnect disabled');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'autoreconnect'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update auto-reconnect', { description: error.message });
     },
   });
 }

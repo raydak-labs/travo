@@ -114,3 +114,8 @@ export interface GuestWifiConfig {
 export interface NetworkPriorityRequest {
   readonly ssids: string[];
 }
+
+/** Auto-reconnect configuration */
+export interface AutoReconnectConfig {
+  readonly enabled: boolean;
+}

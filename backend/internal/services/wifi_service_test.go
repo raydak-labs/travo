@@ -1,6 +1,7 @@
 package services
 
 import (
+	"os"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -705,5 +706,79 @@ func TestWifiReorderNetworks_Overwrite(t *testing.T) {
 	}
 	if priorities["B"] != 3 {
 		t.Errorf("expected B priority 3, got %d", priorities["B"])
+	}
+}
+
+func TestGetAutoReconnect_Default(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+
+	enabled, err := svc.GetAutoReconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if enabled {
+		t.Error("expected auto-reconnect to be disabled by default")
+	}
+}
+
+func TestSetAutoReconnect_Enable(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+
+	err := svc.SetAutoReconnect(true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	enabled, err := svc.GetAutoReconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !enabled {
+		t.Error("expected auto-reconnect to be enabled")
+	}
+
+	// Verify script was written
+	data, err := os.ReadFile(tmpDir + "/wifi-reconnect.sh")
+	if err != nil {
+		t.Fatalf("expected script to exist: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("expected non-empty script")
+	}
+}
+
+func TestSetAutoReconnect_Disable(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+
+	// Enable first, then disable
+	_ = svc.SetAutoReconnect(true)
+	err := svc.SetAutoReconnect(false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	enabled, err := svc.GetAutoReconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if enabled {
+		t.Error("expected auto-reconnect to be disabled")
+	}
+
+	// Verify script was removed
+	if _, err := os.Stat(tmpDir + "/wifi-reconnect.sh"); err == nil {
+		t.Error("expected script to be removed")
 	}
 }

@@ -45,7 +45,7 @@
 - [x] Disconnect from upstream WiFi
 - [x] Delete saved WiFi networks
 - [x] Priority ordering of saved networks (auto-connect preference)
-- [ ] Auto-reconnect to known networks on startup
+- [x] Auto-reconnect to known networks when connection drops
 - [x] Hidden network support (manual SSID entry)
 
 ### 1.2 Access Point (AP — Own WiFi for clients)

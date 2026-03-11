@@ -36,27 +36,53 @@ func (r *NoopWifiReloader) Reload() error { return nil }
 
 // WifiService provides WiFi scanning, connection, and configuration.
 type WifiService struct {
-	uci          uci.UCI
-	ubus         ubus.Ubus
-	reloader     WifiReloader
-	priorityFile string
+	uci               uci.UCI
+	ubus              ubus.Ubus
+	reloader          WifiReloader
+	cmd               CommandRunner
+	priorityFile      string
+	autoReconnectFile string
+	reconnectScript   string
 }
 
 const defaultPriorityFile = "/etc/openwrt-travel-gui/wifi-priorities.json"
+const defaultAutoReconnectFile = "/etc/openwrt-travel-gui/autoreconnect.json"
+const defaultReconnectScript = "/etc/openwrt-travel-gui/wifi-reconnect.sh"
 
 // NewWifiService creates a new WifiService.
 func NewWifiService(u uci.UCI, ub ubus.Ubus) *WifiService {
-	return &WifiService{uci: u, ubus: ub, reloader: &ShellWifiReloader{}, priorityFile: defaultPriorityFile}
+	return &WifiService{
+		uci: u, ubus: ub, reloader: &ShellWifiReloader{}, cmd: &RealCommandRunner{},
+		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
+		reconnectScript: defaultReconnectScript,
+	}
 }
 
 // NewWifiServiceWithReloader creates a WifiService with a custom reloader (for tests).
 func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiService {
-	return &WifiService{uci: u, ubus: ub, reloader: r, priorityFile: defaultPriorityFile}
+	return &WifiService{
+		uci: u, ubus: ub, reloader: r, cmd: &RealCommandRunner{},
+		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
+		reconnectScript: defaultReconnectScript,
+	}
 }
 
 // NewWifiServiceWithPriorityFile creates a WifiService with a custom priority file (for tests).
 func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf string) *WifiService {
-	return &WifiService{uci: u, ubus: ub, reloader: r, priorityFile: pf}
+	return &WifiService{
+		uci: u, ubus: ub, reloader: r, cmd: &RealCommandRunner{},
+		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
+		reconnectScript: defaultReconnectScript,
+	}
+}
+
+// NewWifiServiceForTesting creates a WifiService with all fields customizable (for tests).
+func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd CommandRunner, pf, arFile, rsFile string) *WifiService {
+	return &WifiService{
+		uci: u, ubus: ub, reloader: r, cmd: cmd,
+		priorityFile: pf, autoReconnectFile: arFile,
+		reconnectScript: rsFile,
+	}
 }
 
 // findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.
@@ -719,5 +745,76 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) error {
 	_ = w.uci.Commit("firewall")
 
 	w.reloader.Reload()
+	return nil
+}
+
+// GetAutoReconnect returns whether auto-reconnect is enabled.
+func (w *WifiService) GetAutoReconnect() (bool, error) {
+	data, err := os.ReadFile(w.autoReconnectFile)
+	if err != nil {
+		return false, nil
+	}
+	var config struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return false, nil
+	}
+	return config.Enabled, nil
+}
+
+// SetAutoReconnect enables or disables auto-reconnect to saved WiFi networks.
+// When enabled, it writes a reconnect script and adds a cron entry.
+// When disabled, it removes the cron entry and script.
+func (w *WifiService) SetAutoReconnect(enabled bool) error {
+	dir := filepath.Dir(w.autoReconnectFile)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+
+	config := struct {
+		Enabled bool `json:"enabled"`
+	}{Enabled: enabled}
+	data, _ := json.Marshal(config)
+	if err := os.WriteFile(w.autoReconnectFile, data, 0600); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	if enabled {
+		return w.enableAutoReconnect()
+	}
+	return w.disableAutoReconnect()
+}
+
+func (w *WifiService) enableAutoReconnect() error {
+	script := "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
+		"IP=$(ubus call network.interface.wwan status 2>/dev/null | jsonfilter -e '@[\"ipv4-address\"][0].address' 2>/dev/null)\n" +
+		"if [ -n \"$IP\" ]; then\n    exit 0\nfi\n\n" +
+		"# Connection dropped — reload WiFi to trigger reassociation\nwifi reload\n"
+
+	scriptDir := filepath.Dir(w.reconnectScript)
+	if err := os.MkdirAll(scriptDir, 0750); err != nil {
+		return fmt.Errorf("creating script directory: %w", err)
+	}
+	if err := os.WriteFile(w.reconnectScript, []byte(script), 0750); err != nil {
+		return fmt.Errorf("writing reconnect script: %w", err)
+	}
+
+	// Add cron entry (every minute)
+	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s'; echo '* * * * * %s') | crontab -`,
+		w.reconnectScript, w.reconnectScript)
+	if _, err := w.cmd.Run("sh", "-c", cronCmd); err != nil {
+		return fmt.Errorf("adding cron entry: %w", err)
+	}
+	return nil
+}
+
+func (w *WifiService) disableAutoReconnect() error {
+	// Remove cron entry
+	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s') | crontab -`, w.reconnectScript)
+	_, _ = w.cmd.Run("sh", "-c", cronCmd)
+
+	// Remove script file
+	os.Remove(w.reconnectScript)
 	return nil
 }

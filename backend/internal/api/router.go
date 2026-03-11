@@ -87,6 +87,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/wifi/mac", SetMACHandler(deps.Wifi))
 	v1.Get("/wifi/guest", GetGuestWifiHandler(deps.Wifi))
 	v1.Put("/wifi/guest", SetGuestWifiHandler(deps.Wifi))
+	v1.Get("/wifi/autoreconnect", GetAutoReconnectHandler(deps.Wifi))
+	v1.Put("/wifi/autoreconnect", SetAutoReconnectHandler(deps.Wifi))
 
 	// VPN routes
 	v1.Get("/vpn/status", VpnStatusHandler(deps.Vpn))

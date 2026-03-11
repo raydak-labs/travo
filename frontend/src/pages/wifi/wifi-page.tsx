@@ -47,6 +47,8 @@ import {
   useGuestWifi,
   useSetGuestWifi,
   useRadios,
+  useAutoReconnect,
+  useSetAutoReconnect,
 } from '@/hooks/use-wifi';
 
 interface APFormState {
@@ -87,6 +89,8 @@ export function WifiPage() {
   const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
   const setGuestWifi = useSetGuestWifi();
   const { data: radios, isLoading: radiosLoading } = useRadios();
+  const { data: autoReconnect } = useAutoReconnect();
+  const setAutoReconnect = useSetAutoReconnect();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
   const [qrAP, setQrAP] = useState<APConfig | null>(null);
   const [customMAC, setCustomMAC] = useState('');
@@ -256,6 +260,23 @@ export function WifiPage() {
           <CardTitle className="text-sm font-medium">Saved Networks</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                Auto-Reconnect
+              </span>
+              <p className="text-xs text-gray-500">
+                Automatically reconnect to saved networks when connection drops
+              </p>
+            </div>
+            <Switch
+              id="auto-reconnect"
+              label="Auto-reconnect"
+              checked={autoReconnect?.enabled ?? false}
+              onChange={(e) => setAutoReconnect.mutate(e.target.checked)}
+              disabled={setAutoReconnect.isPending}
+            />
+          </div>
           {savedLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-10 w-full" />
