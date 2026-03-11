@@ -44,3 +44,10 @@ type NetworkStatus struct {
 	Clients           []Client           `json:"clients"`
 	InternetReachable bool               `json:"internet_reachable"`
 }
+
+// DHCPConfig holds DHCP server configuration for the LAN.
+type DHCPConfig struct {
+	Start     int    `json:"start"`
+	Limit     int    `json:"limit"`
+	LeaseTime string `json:"lease_time"`
+}

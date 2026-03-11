@@ -12,6 +12,7 @@ import type {
   TailscaleStatus,
   WanConfig,
   Client,
+  DHCPConfig,
   LogResponse,
 } from '@shared/index';
 
@@ -343,3 +344,25 @@ export const mockClients: Client[] = [
     connected_since: '2026-03-04T10:00:00Z',
   },
 ];
+
+export const mockDHCPConfig: DHCPConfig = {
+  start: 100,
+  limit: 150,
+  lease_time: '12h',
+};
+
+export const mockSystemLogs: LogResponse = {
+  source: 'system',
+  lines: [
+    { line: '2026-03-04T12:00:00Z kern.info System started' },
+  ],
+  total: 1,
+};
+
+export const mockKernelLogs: LogResponse = {
+  source: 'kernel',
+  lines: [
+    { line: '2026-03-04T12:00:00Z kern.info Kernel initialized' },
+  ],
+  total: 1,
+};

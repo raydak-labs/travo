@@ -46,6 +46,13 @@ export interface NetworkStatus {
   readonly internet_reachable: boolean;
 }
 
+/** DHCP server configuration for LAN */
+export interface DHCPConfig {
+  readonly start: number;
+  readonly limit: number;
+  readonly lease_time: string;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

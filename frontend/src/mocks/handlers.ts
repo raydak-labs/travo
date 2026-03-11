@@ -16,6 +16,7 @@ import {
   mockClients,
   mockSystemLogs,
   mockKernelLogs,
+  mockDHCPConfig,
 } from './data';
 
 export const handlers = [
@@ -152,6 +153,13 @@ export const handlers = [
 
   http.get(API_ROUTES.network.clients, () => {
     return HttpResponse.json(mockClients);
+  }),
+
+  http.get(API_ROUTES.network.dhcp, () => {
+    return HttpResponse.json(mockDHCPConfig);
+  }),
+  http.put(API_ROUTES.network.dhcp, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.auth.login, async ({ request }) => {

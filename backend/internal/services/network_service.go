@@ -275,3 +275,42 @@ func (n *NetworkService) GetClients() ([]models.Client, error) {
 	}
 	return status.Clients, nil
 }
+
+// GetDHCPConfig returns the DHCP configuration for the LAN.
+func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
+	opts, err := n.uci.GetAll("dhcp", "lan")
+	if err != nil {
+		return models.DHCPConfig{}, err
+	}
+	start := 100
+	if s, ok := opts["start"]; ok && s != "" {
+		if v, err := strconv.Atoi(s); err == nil {
+			start = v
+		}
+	}
+	limit := 150
+	if l, ok := opts["limit"]; ok && l != "" {
+		if v, err := strconv.Atoi(l); err == nil {
+			limit = v
+		}
+	}
+	leaseTime := "12h"
+	if lt, ok := opts["leasetime"]; ok && lt != "" {
+		leaseTime = lt
+	}
+	return models.DHCPConfig{Start: start, Limit: limit, LeaseTime: leaseTime}, nil
+}
+
+// SetDHCPConfig updates the DHCP configuration for the LAN.
+func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
+	if err := n.uci.Set("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
+		return fmt.Errorf("setting DHCP start: %w", err)
+	}
+	if err := n.uci.Set("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
+		return fmt.Errorf("setting DHCP limit: %w", err)
+	}
+	if err := n.uci.Set("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
+		return fmt.Errorf("setting DHCP leasetime: %w", err)
+	}
+	return n.uci.Commit("dhcp")
+}

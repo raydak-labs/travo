@@ -86,3 +86,43 @@ func GetClientsHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(clients)
 	}
 }
+
+// GetDHCPConfigHandler handles GET /api/v1/network/dhcp.
+func GetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config, err := svc.GetDHCPConfig()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(config)
+	}
+}
+
+// SetDHCPConfigHandler handles PUT /api/v1/network/dhcp.
+func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var config models.DHCPConfig
+		if err := c.BodyParser(&config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+
+		// Validate DHCP config
+		if config.Start < 2 || config.Start > 254 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "start must be between 2 and 254"})
+		}
+		if config.Limit < 1 || config.Limit > 253 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "limit must be between 1 and 253"})
+		}
+		if config.Start+config.Limit > 255 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "start + limit must not exceed 255"})
+		}
+		if config.LeaseTime == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "lease_time is required"})
+		}
+
+		if err := svc.SetDHCPConfig(config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

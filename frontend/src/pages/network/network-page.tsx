@@ -1,13 +1,36 @@
-import { Network, Globe, Wifi } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Network, Globe, Wifi, Settings } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNetworkStatus } from '@/hooks/use-network';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useNetworkStatus, useDHCPConfig, useSetDHCPConfig } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
 
 export function NetworkPage() {
   const { data: network, isLoading } = useNetworkStatus();
+  const { data: dhcpConfig, isLoading: dhcpLoading } = useDHCPConfig();
+  const setDHCP = useSetDHCPConfig();
+  const [dhcpStart, setDhcpStart] = useState<number>(100);
+  const [dhcpLimit, setDhcpLimit] = useState<number>(150);
+  const [dhcpLease, setDhcpLease] = useState<string>('12h');
+
+  useEffect(() => {
+    if (dhcpConfig) {
+      setDhcpStart(dhcpConfig.start);
+      setDhcpLimit(dhcpConfig.limit);
+      setDhcpLease(dhcpConfig.lease_time);
+    }
+  }, [dhcpConfig]);
 
   return (
     <div className="space-y-6">
@@ -91,6 +114,73 @@ export function NetworkPage() {
               </div>
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      {/* DHCP Configuration */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">DHCP Configuration</CardTitle>
+          <Settings className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          {dhcpLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">Start Offset</label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={254}
+                    value={dhcpStart}
+                    onChange={(e) => setDhcpStart(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">Pool Size</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={253}
+                    value={dhcpLimit}
+                    onChange={(e) => setDhcpLimit(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Lease Time</label>
+                <Select value={dhcpLease} onValueChange={setDhcpLease}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1h">1 hour</SelectItem>
+                    <SelectItem value="2h">2 hours</SelectItem>
+                    <SelectItem value="6h">6 hours</SelectItem>
+                    <SelectItem value="12h">12 hours</SelectItem>
+                    <SelectItem value="24h">24 hours</SelectItem>
+                    <SelectItem value="48h">48 hours</SelectItem>
+                    <SelectItem value="7d">7 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() =>
+                  setDHCP.mutate({ start: dhcpStart, limit: dhcpLimit, lease_time: dhcpLease })
+                }
+                disabled={setDHCP.isPending}
+                size="sm"
+              >
+                {setDHCP.isPending ? 'Saving…' : 'Save DHCP Settings'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

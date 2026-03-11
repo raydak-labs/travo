@@ -148,6 +148,51 @@ func TestSetWanConfigReturnsErrorOnSetFailure(t *testing.T) {
 	}
 }
 
+func TestGetDHCPConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	config, err := svc.GetDHCPConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Start != 100 {
+		t.Errorf("expected start 100, got %d", config.Start)
+	}
+	if config.Limit != 150 {
+		t.Errorf("expected limit 150, got %d", config.Limit)
+	}
+	if config.LeaseTime != "12h" {
+		t.Errorf("expected lease_time '12h', got '%s'", config.LeaseTime)
+	}
+}
+
+func TestSetDHCPConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	err := svc.SetDHCPConfig(models.DHCPConfig{Start: 50, Limit: 100, LeaseTime: "24h"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config, err := svc.GetDHCPConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Start != 50 {
+		t.Errorf("expected start 50, got %d", config.Start)
+	}
+	if config.Limit != 100 {
+		t.Errorf("expected limit 100, got %d", config.Limit)
+	}
+	if config.LeaseTime != "24h" {
+		t.Errorf("expected lease_time '24h', got '%s'", config.LeaseTime)
+	}
+}
+
 func TestSetWanConfigPropagatesEachFieldError(t *testing.T) {
 	tests := []struct {
 		name   string

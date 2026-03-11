@@ -46,6 +46,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/network/wan", GetWanConfigHandler(deps.Network))
 	v1.Put("/network/wan", SetWanConfigHandler(deps.Network))
 	v1.Get("/network/clients", GetClientsHandler(deps.Network))
+	v1.Get("/network/dhcp", GetDHCPConfigHandler(deps.Network))
+	v1.Put("/network/dhcp", SetDHCPConfigHandler(deps.Network))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))
