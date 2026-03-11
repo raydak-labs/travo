@@ -33,6 +33,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// System routes
 	v1.Get("/system/info", SystemInfoHandler(deps.System))
 	v1.Get("/system/stats", SystemStatsHandler(deps.System))
+	v1.Get("/system/logs", SystemLogsHandler(deps.System))
+	v1.Get("/system/logs/kernel", SystemKernelLogsHandler(deps.System))
 	v1.Post("/system/reboot", SystemRebootHandler(deps.System))
 
 	// Network routes

@@ -4,6 +4,7 @@ import {
   Activity,
   Globe,
   Monitor,
+  ScrollText,
   Settings,
   Shield,
   Wifi,
@@ -19,6 +20,7 @@ const navItems = [
   { to: '/vpn', label: 'VPN', icon: Shield },
   { to: '/services', label: 'Services', icon: Monitor },
   { to: '/system', label: 'System', icon: Settings },
+  { to: '/logs', label: 'Logs', icon: ScrollText },
 ] as const;
 
 interface SidebarProps {

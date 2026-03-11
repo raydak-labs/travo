@@ -2,7 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { SystemInfo, SystemStats } from '@shared/index';
+import type { SystemInfo, SystemStats, LogResponse } from '@shared/index';
 
 export function useSystemInfo() {
   return useQuery({
@@ -28,5 +28,19 @@ export function useReboot() {
     onError: (error) => {
       toast.error('Failed to reboot', { description: error.message });
     },
+  });
+}
+
+export function useSystemLogs() {
+  return useQuery({
+    queryKey: ['system', 'logs'],
+    queryFn: () => apiClient.get<LogResponse>(API_ROUTES.system.logs),
+  });
+}
+
+export function useKernelLogs() {
+  return useQuery({
+    queryKey: ['system', 'logs', 'kernel'],
+    queryFn: () => apiClient.get<LogResponse>(API_ROUTES.system.kernelLogs),
   });
 }

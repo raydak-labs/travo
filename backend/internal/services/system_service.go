@@ -2,7 +2,9 @@ package services
 
 import (
 	"math"
+	"os/exec"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -153,4 +155,37 @@ func (s *SystemService) Reboot() error {
 		_, _ = s.ubus.Call("system", "reboot", nil)
 	}()
 	return nil
+}
+
+// GetLogs retrieves system logs from logread.
+func (s *SystemService) GetLogs() (models.LogResponse, error) {
+	out, err := exec.Command("logread").CombinedOutput()
+	if err != nil {
+		return models.LogResponse{}, err
+	}
+	return parseLogOutput("syslog", string(out)), nil
+}
+
+// GetKernelLogs retrieves kernel logs from dmesg.
+func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
+	out, err := exec.Command("dmesg").CombinedOutput()
+	if err != nil {
+		return models.LogResponse{}, err
+	}
+	return parseLogOutput("kernel", string(out)), nil
+}
+
+func parseLogOutput(source, output string) models.LogResponse {
+	raw := strings.Split(strings.TrimSpace(output), "\n")
+	lines := make([]models.LogEntry, 0, len(raw))
+	for _, l := range raw {
+		if l != "" {
+			lines = append(lines, models.LogEntry{Line: l})
+		}
+	}
+	return models.LogResponse{
+		Source: source,
+		Lines:  lines,
+		Total:  len(lines),
+	}
 }

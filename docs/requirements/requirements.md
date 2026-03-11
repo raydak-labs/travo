@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2025-07-16 (v3 — service install log streaming)
+> **Last updated:** 2025-07-16 (v4 — system log viewer)
 
 ---
 
@@ -43,7 +43,7 @@
 - [x] Security badge (WPA2, WPA3, Open, etc.)
 - [x] Scan dialog (button-triggered popup with results)
 - [ ] Disconnect from upstream WiFi 🐛 *(button exists but does not work)*
-- [ ] Delete saved WiFi networks
+- [x] Delete saved WiFi networks
 - [ ] Priority ordering of saved networks (auto-connect preference)
 - [ ] Auto-reconnect to known networks on startup
 - [ ] Hidden network support (manual SSID entry)
@@ -318,11 +318,11 @@
 
 ## 9. Logs & Diagnostics
 
-- [ ] System log viewer (logread / syslog)
-- [ ] Kernel log (dmesg)
+- [x] System log viewer (logread / syslog)
+- [x] Kernel log (dmesg)
 - [ ] Service-specific logs (AdGuard, WireGuard, etc.)
 - [ ] Log level filtering
-- [ ] Log search / filter
+- [x] Log search / filter
 - [ ] 🔮 Log export / download
 - [ ] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)
 - [ ] 🔮 Speed test (run from device to measure actual WAN throughput)

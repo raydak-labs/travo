@@ -40,3 +40,15 @@ type SystemStats struct {
 	Memory  MemoryStats  `json:"memory"`
 	Storage StorageStats `json:"storage"`
 }
+
+// LogEntry represents a single log line from logread or dmesg.
+type LogEntry struct {
+	Line string `json:"line"`
+}
+
+// LogResponse is the response for log retrieval endpoints.
+type LogResponse struct {
+	Source string     `json:"source"`
+	Lines  []LogEntry `json:"lines"`
+	Total  int        `json:"total"`
+}

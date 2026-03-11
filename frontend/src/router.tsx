@@ -14,6 +14,7 @@ import { VpnPage } from '@/pages/vpn/vpn-page';
 import { ServicesPage } from '@/pages/services/services-page';
 import { NetworkPage } from '@/pages/network/network-page';
 import { SystemPage } from '@/pages/system/system-page';
+import { LogsPage } from '@/pages/logs/logs-page';
 import { getToken } from '@/lib/api-client';
 
 // Root route
@@ -124,6 +125,18 @@ const systemRoute = createRoute({
   ),
 });
 
+const logsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/logs',
+  component: () => (
+    <AppShell title="Logs">
+      <ErrorBoundary>
+        <LogsPage />
+      </ErrorBoundary>
+    </AppShell>
+  ),
+});
+
 // Build route tree
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -135,6 +148,7 @@ const routeTree = rootRoute.addChildren([
     vpnRoute,
     servicesRoute,
     systemRoute,
+    logsRoute,
   ]),
 ]);
 

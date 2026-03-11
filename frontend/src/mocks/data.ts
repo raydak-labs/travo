@@ -12,6 +12,7 @@ import type {
   TailscaleStatus,
   WanConfig,
   Client,
+  LogResponse,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {

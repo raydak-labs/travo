@@ -37,3 +37,25 @@ func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// SystemLogsHandler handles GET /api/v1/system/logs.
+func SystemLogsHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		logs, err := svc.GetLogs()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(logs)
+	}
+}
+
+// SystemKernelLogsHandler handles GET /api/v1/system/logs/kernel.
+func SystemKernelLogsHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		logs, err := svc.GetKernelLogs()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(logs)
+	}
+}

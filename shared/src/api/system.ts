@@ -65,3 +65,15 @@ export function isSystemStats(value: unknown): value is SystemStats {
     v.storage !== null
   );
 }
+
+/** A single log entry */
+export interface LogEntry {
+  readonly line: string;
+}
+
+/** Response from log retrieval endpoints */
+export interface LogResponse {
+  readonly source: string;
+  readonly lines: readonly LogEntry[];
+  readonly total: number;
+}

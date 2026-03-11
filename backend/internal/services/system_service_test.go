@@ -129,3 +129,53 @@ type testStorageProvider struct {
 func (p *testStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 	return p.total, p.used, p.free, nil
 }
+
+func TestParseLogOutput_Normal(t *testing.T) {
+	input := "line one\nline two\nline three"
+	result := parseLogOutput("syslog", input)
+
+	if result.Source != "syslog" {
+		t.Errorf("expected source 'syslog', got %q", result.Source)
+	}
+	if result.Total != 3 {
+		t.Errorf("expected 3 lines, got %d", result.Total)
+	}
+	if len(result.Lines) != 3 {
+		t.Fatalf("expected 3 line entries, got %d", len(result.Lines))
+	}
+	if result.Lines[0].Line != "line one" {
+		t.Errorf("expected 'line one', got %q", result.Lines[0].Line)
+	}
+	if result.Lines[2].Line != "line three" {
+		t.Errorf("expected 'line three', got %q", result.Lines[2].Line)
+	}
+}
+
+func TestParseLogOutput_Empty(t *testing.T) {
+	result := parseLogOutput("kernel", "")
+
+	if result.Source != "kernel" {
+		t.Errorf("expected source 'kernel', got %q", result.Source)
+	}
+	if result.Total != 0 {
+		t.Errorf("expected 0 lines, got %d", result.Total)
+	}
+	if len(result.Lines) != 0 {
+		t.Errorf("expected empty lines slice, got %d entries", len(result.Lines))
+	}
+}
+
+func TestParseLogOutput_BlankLines(t *testing.T) {
+	input := "first\n\nsecond\n\n\nthird\n"
+	result := parseLogOutput("syslog", input)
+
+	if result.Total != 3 {
+		t.Errorf("expected 3 non-blank lines, got %d", result.Total)
+	}
+	if len(result.Lines) != 3 {
+		t.Fatalf("expected 3 line entries, got %d", len(result.Lines))
+	}
+	if result.Lines[1].Line != "second" {
+		t.Errorf("expected 'second', got %q", result.Lines[1].Line)
+	}
+}

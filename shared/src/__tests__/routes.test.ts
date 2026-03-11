@@ -38,6 +38,8 @@ describe('API_ROUTES', () => {
   it('has system routes matching backend', () => {
     expect(API_ROUTES.system.info).toBe('/api/v1/system/info');
     expect(API_ROUTES.system.stats).toBe('/api/v1/system/stats');
+    expect(API_ROUTES.system.logs).toBe('/api/v1/system/logs');
+    expect(API_ROUTES.system.kernelLogs).toBe('/api/v1/system/logs/kernel');
   });
 
   it('has network routes matching backend', () => {
@@ -85,6 +87,8 @@ describe('API_ROUTES', () => {
       '/api/v1/auth/session',
       '/api/v1/system/info',
       '/api/v1/system/stats',
+      '/api/v1/system/logs',
+      '/api/v1/system/logs/kernel',
       '/api/v1/system/reboot',
       '/api/v1/network/status',
       '/api/v1/network/wan',

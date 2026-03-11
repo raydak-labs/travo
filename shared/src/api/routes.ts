@@ -8,6 +8,8 @@ export const API_ROUTES = {
   system: {
     info: '/api/v1/system/info',
     stats: '/api/v1/system/stats',
+    logs: '/api/v1/system/logs',
+    kernelLogs: '/api/v1/system/logs/kernel',
     reboot: '/api/v1/system/reboot',
   },
   network: {

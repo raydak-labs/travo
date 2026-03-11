@@ -14,6 +14,8 @@ import {
   mockTailscaleStatus,
   mockWanConfig,
   mockClients,
+  mockSystemLogs,
+  mockKernelLogs,
 } from './data';
 
 export const handlers = [
@@ -23,6 +25,14 @@ export const handlers = [
 
   http.get(API_ROUTES.system.stats, () => {
     return HttpResponse.json(mockSystemStats);
+  }),
+
+  http.get(API_ROUTES.system.logs, () => {
+    return HttpResponse.json(mockSystemLogs);
+  }),
+
+  http.get(API_ROUTES.system.kernelLogs, () => {
+    return HttpResponse.json(mockKernelLogs);
   }),
 
   http.get(API_ROUTES.network.status, () => {
