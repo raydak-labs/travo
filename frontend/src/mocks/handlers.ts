@@ -190,4 +190,12 @@ export const handlers = [
   http.post(API_ROUTES.system.reboot, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
+
+  http.put(API_ROUTES.system.hostname, async ({ request }) => {
+    const body = (await request.json()) as { hostname: string };
+    if (!body.hostname) {
+      return HttpResponse.json({ error: 'hostname is required' }, { status: 400 });
+    }
+    return HttpResponse.json({ status: 'ok' });
+  }),
 ];

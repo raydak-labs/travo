@@ -92,6 +92,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/logs',
       '/api/v1/system/logs/kernel',
       '/api/v1/system/reboot',
+      '/api/v1/system/hostname',
       '/api/v1/network/status',
       '/api/v1/network/wan',
       '/api/v1/network/clients',

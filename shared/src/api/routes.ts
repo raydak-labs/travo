@@ -12,6 +12,7 @@ export const API_ROUTES = {
     logs: '/api/v1/system/logs',
     kernelLogs: '/api/v1/system/logs/kernel',
     reboot: '/api/v1/system/reboot',
+    hostname: '/api/v1/system/hostname',
   },
   network: {
     status: '/api/v1/network/status',

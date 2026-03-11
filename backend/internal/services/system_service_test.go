@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 func TestGetSystemInfo(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	info, err := svc.GetSystemInfo()
 	if err != nil {
@@ -33,7 +34,7 @@ func TestGetSystemInfo(t *testing.T) {
 
 func TestGetSystemStats(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -55,7 +56,7 @@ func TestGetSystemStats(t *testing.T) {
 
 func TestGetSystemInfo_StorageNotHardcoded(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -85,7 +86,7 @@ func TestGetSystemInfo_StorageNotHardcoded(t *testing.T) {
 
 func TestGetSystemInfo_CpuUsageReasonable(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -108,7 +109,7 @@ func TestGetSystemInfo_CpuUsageReasonable(t *testing.T) {
 func TestGetSystemStats_CustomStorageProvider(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	custom := &testStorageProvider{total: 1073741824, used: 536870912, free: 536870912}
-	svc := NewSystemService(ub, custom)
+	svc := NewSystemService(ub, uci.NewMockUCI(), custom)
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -177,5 +178,24 @@ func TestParseLogOutput_BlankLines(t *testing.T) {
 	}
 	if result.Lines[1].Line != "second" {
 		t.Errorf("expected 'second', got %q", result.Lines[1].Line)
+	}
+}
+
+func TestSetHostname(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	if err := svc.SetHostname("MyRouter"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify it was written to UCI
+	val, err := u.Get("system", "system", "hostname")
+	if err != nil {
+		t.Fatalf("failed to read hostname from UCI: %v", err)
+	}
+	if val != "MyRouter" {
+		t.Errorf("expected hostname 'MyRouter', got %q", val)
 	}
 }

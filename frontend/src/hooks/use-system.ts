@@ -2,7 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest } from '@shared/index';
+import type { SystemInfo, SystemStats, LogResponse, ChangePasswordRequest, SetHostnameRequest } from '@shared/index';
 
 export function useSystemInfo() {
   return useQuery({
@@ -54,6 +54,19 @@ export function useChangePassword() {
     },
     onError: (error) => {
       toast.error('Failed to change password', { description: error.message });
+    },
+  });
+}
+
+export function useSetHostname() {
+  return useMutation({
+    mutationFn: (data: SetHostnameRequest) =>
+      apiClient.put<{ status: string }>(API_ROUTES.system.hostname, data),
+    onSuccess: () => {
+      toast.success('Hostname updated');
+    },
+    onError: (error) => {
+      toast.error('Failed to update hostname', { description: error.message });
     },
   });
 }

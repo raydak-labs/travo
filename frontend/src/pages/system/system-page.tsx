@@ -1,20 +1,23 @@
 import { useState } from 'react';
-import { Server, Cpu, HardDrive, Clock, KeyRound } from 'lucide-react';
+import { Server, Cpu, HardDrive, Clock, KeyRound, Pencil } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSystemInfo, useSystemStats, useReboot, useChangePassword } from '@/hooks/use-system';
+import { useSystemInfo, useSystemStats, useReboot, useChangePassword, useSetHostname } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 export function SystemPage() {
-  const { data: info, isLoading: infoLoading } = useSystemInfo();
+  const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
   const { data: stats, isLoading: statsLoading } = useSystemStats();
   const rebootMutation = useReboot();
   const changePasswordMutation = useChangePassword();
+  const setHostnameMutation = useSetHostname();
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
+  const [editingHostname, setEditingHostname] = useState(false);
+  const [hostnameValue, setHostnameValue] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -37,7 +40,59 @@ export function SystemPage() {
             <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
               <div className="grid grid-cols-2 gap-2">
                 <span className="text-gray-500">Hostname</span>
-                <span className="text-gray-900 dark:text-white">{info.hostname}</span>
+                <span className="flex items-center gap-1 text-gray-900 dark:text-white">
+                  {editingHostname ? (
+                    <form
+                      className="flex items-center gap-1"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (hostnameValue) {
+                          setHostnameMutation.mutate(
+                            { hostname: hostnameValue },
+                            {
+                              onSuccess: () => {
+                                setEditingHostname(false);
+                                refetchInfo();
+                              },
+                            },
+                          );
+                        }
+                      }}
+                    >
+                      <Input
+                        className="h-6 w-32 text-xs"
+                        value={hostnameValue}
+                        onChange={(e) => setHostnameValue(e.target.value)}
+                        autoFocus
+                      />
+                      <Button type="submit" size="sm" variant="ghost" className="h-6 px-1 text-xs">
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1 text-xs"
+                        onClick={() => setEditingHostname(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : (
+                    <>
+                      {info.hostname}
+                      <button
+                        className="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        onClick={() => {
+                          setHostnameValue(info.hostname);
+                          setEditingHostname(true);
+                        }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
+                </span>
                 <span className="text-gray-500">Model</span>
                 <span className="text-gray-900 dark:text-white">{info.model}</span>
                 <span className="text-gray-500">Firmware</span>

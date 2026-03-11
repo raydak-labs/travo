@@ -7,6 +7,11 @@ export interface SystemInfo {
   readonly uptime_seconds: number;
 }
 
+/** Set hostname request payload */
+export interface SetHostnameRequest {
+  readonly hostname: string;
+}
+
 /** CPU statistics */
 export interface CpuStats {
   readonly usage_percent: number;

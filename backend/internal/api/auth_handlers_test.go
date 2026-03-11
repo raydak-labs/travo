@@ -28,7 +28,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 		Auth:           authSvc,
 		Blocklist:      blocklist,
 		RateLimiter:    rateLimiter,
-		System:         services.NewSystemService(ub, &services.MockStorageProvider{}),
+		System:         services.NewSystemService(ub, u, &services.MockStorageProvider{}),
 		Network:        services.NewNetworkService(u, ub),
 		Wifi:           services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{}),
 		Vpn:            services.NewVpnService(u),

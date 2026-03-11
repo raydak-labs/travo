@@ -6,11 +6,12 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 func TestNewHub(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, &services.MockStorageProvider{})
+	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
 	hub := NewHub(svc)
 
 	if hub == nil {
@@ -23,7 +24,7 @@ func TestNewHub(t *testing.T) {
 
 func TestHubStartStop(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, &services.MockStorageProvider{})
+	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
 	hub := NewHub(svc)
 	hub.BroadcastInterval = 10 * time.Millisecond
 

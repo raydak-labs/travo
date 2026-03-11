@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2025-07-16 (v5 — change admin password)
+> **Last updated:** 2025-07-16 (v6 — hostname change)
 
 ---
 
@@ -235,7 +235,7 @@
 - [ ] Reboot actually working on device 🐛
 - [ ] Firmware upgrade (upload sysupgrade image)
 - [ ] Factory reset with confirmation
-- [ ] Hostname change
+- [x] Hostname change
 - [ ] Backup / restore configuration (export/import UCI configs as archive)
 - [ ] LED control — stealth mode (turn off all router LEDs via UCI toggle)
 

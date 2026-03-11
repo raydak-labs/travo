@@ -10,6 +10,7 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // StorageProvider abstracts filesystem storage stat retrieval.
@@ -44,12 +45,13 @@ func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 // SystemService provides system information and statistics.
 type SystemService struct {
 	ubus    ubus.Ubus
+	uci     uci.UCI
 	storage StorageProvider
 }
 
 // NewSystemService creates a new SystemService.
-func NewSystemService(ub ubus.Ubus, storage StorageProvider) *SystemService {
-	return &SystemService{ubus: ub, storage: storage}
+func NewSystemService(ub ubus.Ubus, u uci.UCI, storage StorageProvider) *SystemService {
+	return &SystemService{ubus: ub, uci: u, storage: storage}
 }
 
 // GetSystemInfo returns system identification information.
@@ -155,6 +157,14 @@ func (s *SystemService) Reboot() error {
 		_, _ = s.ubus.Call("system", "reboot", nil)
 	}()
 	return nil
+}
+
+// SetHostname changes the device hostname via UCI and applies it.
+func (s *SystemService) SetHostname(hostname string) error {
+	if err := s.uci.Set("system", "system", "hostname", hostname); err != nil {
+		return err
+	}
+	return s.uci.Commit("system")
 }
 
 // GetLogs retrieves system logs from logread.

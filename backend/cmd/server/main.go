@@ -67,7 +67,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub) {
 		captiveProber = services.NewRealHTTPProber()
 	}
 
-	systemSvc := services.NewSystemService(ub, storage)
+	systemSvc := services.NewSystemService(ub, u, storage)
 	networkSvc := services.NewNetworkService(u, ub)
 	wifiSvc := services.NewWifiService(u, ub)
 	vpnSvc := services.NewVpnService(u)

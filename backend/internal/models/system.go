@@ -9,6 +9,11 @@ type SystemInfo struct {
 	UptimeSeconds   int64  `json:"uptime_seconds"`
 }
 
+// SetHostnameRequest is the payload for changing the device hostname.
+type SetHostnameRequest struct {
+	Hostname string `json:"hostname"`
+}
+
 // CpuStats contains CPU usage information.
 type CpuStats struct {
 	UsagePercent       float64    `json:"usage_percent"`
