@@ -71,6 +71,7 @@ describe('DashboardPage', () => {
     renderDashboard();
     await waitFor(() => {
       expect(screen.getByText('Connection Status')).toBeInTheDocument();
+      expect(screen.getByText('WAN Source')).toBeInTheDocument();
       expect(screen.getByText('VPN Status')).toBeInTheDocument();
       expect(screen.getByText('System Stats')).toBeInTheDocument();
       expect(screen.getByText('Connected Clients')).toBeInTheDocument();

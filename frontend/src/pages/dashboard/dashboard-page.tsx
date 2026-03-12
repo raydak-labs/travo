@@ -1,4 +1,5 @@
 import { ConnectionStatusCard } from './connection-status-card';
+import { WanSourceCard } from './wan-source-card';
 import { VpnStatusCard } from './vpn-status-card';
 import { SystemStatsCard } from './system-stats-card';
 import { ClientsCard } from './clients-card';
@@ -11,8 +12,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <TimezoneAlert />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <ConnectionStatusCard />
+        <WanSourceCard />
         <VpnStatusCard />
         <SystemStatsCard />
         <ClientsCard />

@@ -124,7 +124,7 @@
 
 - [x] WAN connection type auto-detection (DHCP, PPPoE, static)
 - [ ] Detect ethernet cable plug-in and auto-switch to wired WAN
-- [ ] Show active WAN source indicator on dashboard
+- [x] Show active WAN source indicator on dashboard
 
 ### 2.7 Connection Failover
 
