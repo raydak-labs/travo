@@ -88,6 +88,12 @@ func TestCaptivePortal_WrongBody_PortalDetected(t *testing.T) {
 	if status.CanReachInternet {
 		t.Error("expected internet NOT reachable")
 	}
+	if status.PortalURL == nil {
+		t.Fatal("expected fallback portal URL for HTTP 200 captive portal")
+	}
+	if *status.PortalURL != "http://connectivitycheck.gstatic.com/generate_204" {
+		t.Errorf("expected probe URL as fallback, got %q", *status.PortalURL)
+	}
 }
 
 func TestCaptivePortal_301Redirect(t *testing.T) {

@@ -110,8 +110,10 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 
 	// 200 with content = likely captive portal login page
 	if statusCode == http.StatusOK {
+		fallback := captiveProbeURL
 		return models.CaptivePortalStatus{
 			Detected:         true,
+			PortalURL:        &fallback,
 			CanReachInternet: false,
 		}, nil
 	}

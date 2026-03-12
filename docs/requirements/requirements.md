@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v25 — Dashboard data usage card)
+> **Last updated:** 2026-03-12 (v26 — Captive portal open-login button)
 
 ---
 
@@ -317,7 +317,7 @@
 - [x] Detect redirect URL for portal login
 - [x] Banner on dashboard and WiFi page
 - [x] Auto-refresh every 30 seconds
-- [ ] Open portal login in new tab / embedded frame
+- [x] Open portal login in new tab (button in captive portal banner)
 - [ ] 🔮 Auto-accept portal terms (common portal patterns)
 
 ---
