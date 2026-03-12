@@ -29,8 +29,7 @@ function detectWanSource(
   if (interfaces) {
     for (const iface of interfaces) {
       if (!iface.is_up || iface.type === 'lan' || iface.type === 'vpn') continue;
-      if (iface.type === 'usb')
-        return { source: 'usb', label: 'USB Tether', icon: Usb, iface };
+      if (iface.type === 'usb') return { source: 'usb', label: 'USB Tether', icon: Usb, iface };
       if (iface.type === 'wifi') return { source: 'wifi', label: 'WiFi', icon: Wifi, iface };
       if (iface.type === 'wan')
         return { source: 'ethernet', label: 'Ethernet', icon: Cable, iface };
@@ -69,9 +68,7 @@ export function WanSourceCard() {
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-2">
-          <div
-            className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`}
-          />
+          <div className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`} />
           <Badge variant={isActive ? 'success' : 'destructive'}>{info.label}</Badge>
         </div>
         {info.iface && (

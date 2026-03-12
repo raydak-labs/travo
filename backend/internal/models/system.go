@@ -99,3 +99,17 @@ type LogResponse struct {
 type SetupStatus struct {
 	Complete bool `json:"complete"`
 }
+
+// Alert represents a system alert notification.
+type Alert struct {
+	ID        string `json:"id"`
+	Type      string `json:"type"` // wifi_disconnect, storage_low, high_cpu, high_memory
+	Message   string `json:"message"`
+	Severity  string `json:"severity"`  // info, warning, critical
+	Timestamp int64  `json:"timestamp"` // unix millis
+}
+
+// AlertsResponse is the response for GET /api/v1/system/alerts.
+type AlertsResponse struct {
+	Alerts []Alert `json:"alerts"`
+}

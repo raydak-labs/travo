@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-11 (v20 — first-run setup wizard)
+> **Last updated:** 2026-03-12 (v21 — push alerts via WebSocket)
 
 ---
 
@@ -286,8 +286,11 @@
 
 ### 6.4 Notifications & Alerts
 
-- [ ] Push alerts via WebSocket (VPN drop, WiFi disconnect, storage low, etc.)
-- [ ] Notification history / log in UI
+- [x] Push alerts via WebSocket (storage low, high CPU, high memory)
+- [x] Notification bell with unread count badge in header
+- [x] Dropdown panel showing recent alerts with severity indicators
+- [x] Toast notification on new alert
+- [x] Notification history via GET /api/v1/system/alerts (last 50 in memory)
 - [ ] 🔮 Configurable alert thresholds (e.g., storage < 10%)
 
 ---

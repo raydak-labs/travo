@@ -451,4 +451,8 @@ export const handlers = [
     const body = (await request.json()) as { enabled: boolean };
     return HttpResponse.json({ status: 'ok', enabled: body.enabled });
   }),
+
+  http.get(API_ROUTES.system.alerts, () => {
+    return HttpResponse.json({ alerts: [] });
+  }),
 ];

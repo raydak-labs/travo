@@ -31,11 +31,13 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	autoReconnectPath := tmpDir + "/autoreconnect.json"
 	reconnectScriptPath := tmpDir + "/wifi-reconnect.sh"
 
+	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
+
 	deps := &Dependencies{
 		Auth:        authSvc,
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
-		System:      services.NewSystemService(ub, u, &services.MockStorageProvider{}),
+		System:      systemSvc,
 		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
 		Wifi:        services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath),
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
@@ -43,6 +45,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 		}, profilesPath),
 		ServiceManager: services.NewServiceManager(),
 		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
+		Alerts:         services.NewAlertService(systemSvc),
 	}
 
 	app := fiber.New()

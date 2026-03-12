@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/websocket/v2"
 
+	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
@@ -15,15 +16,17 @@ type Hub struct {
 	clients           map[*websocket.Conn]bool
 	mu                sync.RWMutex
 	systemSvc         *services.SystemService
+	alertSvc          *services.AlertService
 	stopCh            chan struct{}
 	BroadcastInterval time.Duration
 }
 
 // NewHub creates a new WebSocket hub.
-func NewHub(systemSvc *services.SystemService) *Hub {
+func NewHub(systemSvc *services.SystemService, alertSvc *services.AlertService) *Hub {
 	return &Hub{
 		clients:           make(map[*websocket.Conn]bool),
 		systemSvc:         systemSvc,
+		alertSvc:          alertSvc,
 		stopCh:            make(chan struct{}),
 		BroadcastInterval: 2 * time.Second,
 	}
@@ -61,15 +64,25 @@ func (h *Hub) Broadcast(data []byte) {
 	}
 }
 
-// Start begins the periodic stats broadcast loop.
+// Start begins the periodic stats broadcast loop and alert forwarding.
 func (h *Hub) Start() {
 	go func() {
 		ticker := time.NewTicker(h.BroadcastInterval)
 		defer ticker.Stop()
+
+		var alertCh <-chan models.Alert
+		if h.alertSvc != nil {
+			alertCh = h.alertSvc.AlertCh()
+		}
+
 		for {
 			select {
 			case <-ticker.C:
 				h.broadcastStats()
+			case alert, ok := <-alertCh:
+				if ok {
+					h.broadcastAlert(alert)
+				}
 			case <-h.stopCh:
 				return
 			}
@@ -90,6 +103,18 @@ func (h *Hub) broadcastStats() {
 	msg := map[string]interface{}{
 		"type": "system_stats",
 		"data": stats,
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	h.Broadcast(data)
+}
+
+func (h *Hub) broadcastAlert(alert models.Alert) {
+	msg := map[string]interface{}{
+		"type": "alert",
+		"data": alert,
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {

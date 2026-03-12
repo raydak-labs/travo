@@ -137,3 +137,17 @@ export interface FirmwareUpgradeRequest {
 export interface SetupStatus {
   readonly complete: boolean;
 }
+
+/** System alert notification */
+export interface Alert {
+  readonly id: string;
+  readonly type: string;
+  readonly message: string;
+  readonly severity: 'info' | 'warning' | 'critical';
+  readonly timestamp: number;
+}
+
+/** Response from GET /api/v1/system/alerts */
+export interface AlertsResponse {
+  readonly alerts: readonly Alert[];
+}

@@ -59,8 +59,7 @@ const WAN_SOURCES = [
     key: 'wwan',
     label: 'WWAN (WiFi Client)',
     match: (iface: NetworkInterface) =>
-      iface.type === 'wifi' &&
-      (iface.name.startsWith('wlan-sta') || iface.name.startsWith('wwan')),
+      iface.type === 'wifi' && (iface.name.startsWith('wlan-sta') || iface.name.startsWith('wwan')),
     description: 'Wireless uplink connected to an upstream WiFi network.',
   },
 ] as const;
@@ -91,17 +90,13 @@ function WanInterplay({ interfaces }: { interfaces: readonly NetworkInterface[] 
               aria-label={src.active ? 'Active' : 'Inactive'}
             />
             <div className="flex-1">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {src.label}
-              </span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">{src.label}</span>
               {src.iface && (
                 <span className="ml-2 text-xs text-gray-500">
                   {src.active ? src.iface.ip_address : 'down'}
                 </span>
               )}
-              {!src.iface && (
-                <span className="ml-2 text-xs text-gray-400">not configured</span>
-              )}
+              {!src.iface && <span className="ml-2 text-xs text-gray-400">not configured</span>}
             </div>
             <Badge variant={src.active ? 'success' : 'secondary'}>
               {src.active ? 'Active' : 'Inactive'}

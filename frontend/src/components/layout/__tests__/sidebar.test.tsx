@@ -18,6 +18,10 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(() => false),
 }));
 
+vi.mock('@/hooks/use-alerts', () => ({
+  useAlerts: vi.fn(() => ({ alerts: [], unreadCount: 0, markAllRead: vi.fn() })),
+}));
+
 const mockUseIsMobile = vi.mocked(useIsMobile);
 
 function renderSidebar(currentPath = '/dashboard') {

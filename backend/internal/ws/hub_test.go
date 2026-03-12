@@ -12,7 +12,8 @@ import (
 func TestNewHub(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	hub := NewHub(svc)
+	alertSvc := services.NewAlertService(svc)
+	hub := NewHub(svc, alertSvc)
 
 	if hub == nil {
 		t.Fatal("expected non-nil hub")
@@ -25,7 +26,8 @@ func TestNewHub(t *testing.T) {
 func TestHubStartStop(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	hub := NewHub(svc)
+	alertSvc := services.NewAlertService(svc)
+	hub := NewHub(svc, alertSvc)
 	hub.BroadcastInterval = 10 * time.Millisecond
 
 	hub.Start()

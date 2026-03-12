@@ -19,6 +19,7 @@ type Dependencies struct {
 	ServiceManager *services.ServiceManager
 	Captive        *services.CaptiveService
 	AdGuard        *services.AdGuardService
+	Alerts         *services.AlertService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -50,6 +51,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/system/ntp", SetNTPConfigHandler(deps.System))
 	v1.Get("/system/setup-complete", GetSetupCompleteHandler(deps.System))
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
+	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
 
 	// Network routes
 	v1.Get("/network/status", NetworkStatusHandler(deps.Network))

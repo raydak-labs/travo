@@ -248,3 +248,11 @@ func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// SystemAlertsHandler handles GET /api/v1/system/alerts.
+func SystemAlertsHandler(svc *services.AlertService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		alerts := svc.GetAlerts()
+		return c.JSON(models.AlertsResponse{Alerts: alerts})
+	}
+}
