@@ -18,3 +18,9 @@ type AdGuardStatus struct {
 	BlockPercentage float64 `json:"block_percentage"`
 	AvgResponseMS   float64 `json:"avg_response_ms"`
 }
+
+// AdGuardDNSStatus indicates whether AdGuard is configured as the LAN DNS.
+type AdGuardDNSStatus struct {
+	Enabled bool `json:"enabled"`
+	DNSPort int  `json:"dns_port"`
+}

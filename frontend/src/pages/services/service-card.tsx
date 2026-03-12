@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { useAdGuardDNS, useSetAdGuardDNS } from '@/hooks/use-services';
 
 const serviceIcons: Record<string, typeof Shield> = {
   wireguard: Shield,
@@ -50,6 +51,9 @@ export function ServiceCard({
   isAutoStartPending,
 }: ServiceCardProps) {
   const Icon = serviceIcons[service.id] ?? Globe;
+  const isAdGuardRunning = service.id === 'adguardhome' && service.state === 'running';
+  const { data: dnsStatus } = useAdGuardDNS();
+  const setDNS = useSetAdGuardDNS();
 
   return (
     <Card>
@@ -76,6 +80,24 @@ export function ServiceCard({
                   disabled={isAutoStartPending}
                   onChange={() => onAutoStartChange(service.id, !service.auto_start)}
                 />
+              </div>
+            )}
+
+            {/* AdGuard DNS toggle (only when running) */}
+            {isAdGuardRunning && dnsStatus && (
+              <div className="mt-2">
+                <Switch
+                  id="adguard-dns-toggle"
+                  label="DNS Filtering Active"
+                  checked={dnsStatus.enabled}
+                  disabled={setDNS.isPending}
+                  onChange={() => setDNS.mutate(!dnsStatus.enabled)}
+                />
+                <p className="mt-0.5 text-xs text-gray-400">
+                  {dnsStatus.enabled
+                    ? `Forwarding LAN DNS to AdGuard (port ${dnsStatus.dns_port})`
+                    : 'AdGuard is not handling LAN DNS queries'}
+                </p>
               </div>
             )}
 

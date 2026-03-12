@@ -29,3 +29,30 @@ func AdGuardStatusHandler(adguard *services.AdGuardService) fiber.Handler {
 		return c.JSON(response)
 	}
 }
+
+// AdGuardDNSStatusHandler handles GET /api/v1/adguard/dns.
+func AdGuardDNSStatusHandler(adguard *services.AdGuardService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		status, err := adguard.GetDNSStatus()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(status)
+	}
+}
+
+// SetAdGuardDNSHandler handles PUT /api/v1/adguard/dns.
+func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := adguard.SetDNS(body.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

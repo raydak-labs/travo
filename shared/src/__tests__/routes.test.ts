@@ -164,6 +164,7 @@ describe('API_ROUTES', () => {
       '/api/v1/services/:id/stop',
       '/api/v1/services/:id/autostart',
       '/api/v1/captive/status',
+      '/api/v1/adguard/dns',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

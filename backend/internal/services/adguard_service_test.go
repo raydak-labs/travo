@@ -188,3 +188,168 @@ func TestGetStatus_APIUnreachable(t *testing.T) {
 		t.Error("expected error when API is unreachable")
 	}
 }
+
+func TestGetDNSStatus_Enabled(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.commands["uci get dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"127.0.0.1#5353", nil}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	status, err := svc.GetDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !status.Enabled {
+		t.Error("expected Enabled=true when server includes AdGuard entry")
+	}
+	if status.DNSPort != 5353 {
+		t.Errorf("expected DNSPort=5353, got %d", status.DNSPort)
+	}
+}
+
+func TestGetDNSStatus_Disabled(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.commands["uci get dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"", fmt.Errorf("uci: Entry not found")}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	status, err := svc.GetDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Enabled {
+		t.Error("expected Enabled=false when server option not set")
+	}
+}
+
+func TestGetDNSStatus_DefaultPort(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		err: fmt.Errorf("connection refused"),
+	}
+	mock.commands["uci get dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"", fmt.Errorf("uci: Entry not found")}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	status, err := svc.GetDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.DNSPort != 5353 {
+		t.Errorf("expected default DNSPort=5353, got %d", status.DNSPort)
+	}
+}
+
+func TestSetDNS_Enable(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	// delete may fail (option not set yet), that's ok
+	mock.commands["uci delete dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["uci add_list dhcp.@dnsmasq[0].server=127.0.0.1#5353"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["uci set dhcp.@dnsmasq[0].noresolv=1"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["uci commit dhcp"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["/etc/init.d/dnsmasq restart"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	err := svc.SetDNS(true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetDNS_Disable(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.commands["uci delete dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["uci set dhcp.@dnsmasq[0].noresolv=0"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["uci commit dhcp"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["/etc/init.d/dnsmasq restart"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	err := svc.SetDNS(false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetDNS_Enable_FailAddList(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.commands["uci delete dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands["uci add_list dhcp.@dnsmasq[0].server=127.0.0.1#5353"] = struct {
+		output string
+		err    error
+	}{"", fmt.Errorf("uci error")}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	err := svc.SetDNS(true)
+	if err == nil {
+		t.Error("expected error when add_list fails")
+	}
+}

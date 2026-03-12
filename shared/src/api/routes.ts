@@ -83,4 +83,7 @@ export const API_ROUTES = {
   captive: {
     status: '/api/v1/captive/status',
   },
+  adguard: {
+    dns: '/api/v1/adguard/dns',
+  },
 } as const;

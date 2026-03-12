@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { ServiceInfo } from '@shared/index';
+import type { ServiceInfo, AdGuardDNSStatus } from '@shared/index';
 
 export function useServices() {
   return useQuery({
@@ -84,6 +84,28 @@ export function useSetAutoStart() {
     },
     onError: (error) => {
       toast.error('Failed to update auto-start', { description: error.message });
+    },
+  });
+}
+
+export function useAdGuardDNS() {
+  return useQuery({
+    queryKey: ['adguard-dns'],
+    queryFn: () => apiClient.get<AdGuardDNSStatus>(API_ROUTES.adguard.dns),
+  });
+}
+
+export function useSetAdGuardDNS() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiClient.put<{ status: string }>(API_ROUTES.adguard.dns, { enabled }),
+    onSuccess: (_data, enabled) => {
+      toast.success(enabled ? 'AdGuard DNS enabled' : 'AdGuard DNS disabled');
+      void queryClient.invalidateQueries({ queryKey: ['adguard-dns'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update AdGuard DNS', { description: error.message });
     },
   });
 }

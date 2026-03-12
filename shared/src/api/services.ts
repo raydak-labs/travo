@@ -20,6 +20,12 @@ export interface AdGuardStatus {
   readonly avg_response_ms: number;
 }
 
+/** AdGuard DNS forwarding status */
+export interface AdGuardDNSStatus {
+  readonly enabled: boolean;
+  readonly dns_port: number;
+}
+
 /** Type guard for ServiceInfo */
 export function isServiceInfo(value: unknown): value is ServiceInfo {
   if (typeof value !== 'object' || value === null) return false;

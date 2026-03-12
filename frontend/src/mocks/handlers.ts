@@ -443,4 +443,12 @@ export const handlers = [
   http.post(API_ROUTES.system.setupComplete, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
+
+  http.get(API_ROUTES.adguard.dns, () => {
+    return HttpResponse.json({ enabled: false, dns_port: 5353 });
+  }),
+  http.put(API_ROUTES.adguard.dns, async ({ request }) => {
+    const body = (await request.json()) as { enabled: boolean };
+    return HttpResponse.json({ status: 'ok', enabled: body.enabled });
+  }),
 ];

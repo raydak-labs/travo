@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	adguardBinary  = "/opt/AdGuardHome/AdGuardHome"
-	adguardInitd   = "/etc/init.d/adguardhome"
-	adguardAPIBase = "http://127.0.0.1:3000"
+	adguardBinary         = "/opt/AdGuardHome/AdGuardHome"
+	adguardInitd          = "/etc/init.d/adguardhome"
+	adguardAPIBase        = "http://127.0.0.1:3000"
+	adguardDefaultDNSPort = 5353
 )
 
 // AdGuardChecker abstracts filesystem/process checks for testability.
@@ -160,4 +161,73 @@ func (s *AdGuardService) GetStatus() (models.AdGuardStatus, error) {
 	result.AvgResponseMS = statsResp.AvgProcessingTime * 1000.0
 
 	return result, nil
+}
+
+// adguardDNSInfoResponse matches the JSON from /control/dns_info.
+type adguardDNSInfoResponse struct {
+	Port int `json:"port"`
+}
+
+// getDNSPort returns the DNS port AdGuard listens on, or the default.
+func (s *AdGuardService) getDNSPort() int {
+	body, err := s.checker.HTTPGet(adguardAPIBase + "/control/dns_info")
+	if err != nil {
+		return adguardDefaultDNSPort
+	}
+	var info adguardDNSInfoResponse
+	if err := json.Unmarshal(body, &info); err != nil || info.Port == 0 {
+		return adguardDefaultDNSPort
+	}
+	return info.Port
+}
+
+// dnsmasqServerEntry returns the dnsmasq server value for a given port.
+func dnsmasqServerEntry(port int) string {
+	return fmt.Sprintf("127.0.0.1#%d", port)
+}
+
+// GetDNSStatus checks whether dnsmasq is configured to forward to AdGuard.
+func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
+	port := s.getDNSPort()
+	entry := dnsmasqServerEntry(port)
+
+	out, err := s.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].server")
+	if err != nil {
+		// No server option set means not enabled.
+		return models.AdGuardDNSStatus{Enabled: false, DNSPort: port}, nil
+	}
+
+	enabled := strings.Contains(out, entry)
+	return models.AdGuardDNSStatus{Enabled: enabled, DNSPort: port}, nil
+}
+
+// SetDNS enables or disables dnsmasq forwarding to AdGuard Home.
+func (s *AdGuardService) SetDNS(enabled bool) error {
+	port := s.getDNSPort()
+	entry := dnsmasqServerEntry(port)
+
+	if enabled {
+		// Remove any existing server list, then add AdGuard entry.
+		// Ignore error if option doesn't exist yet.
+		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
+		if _, err := s.checker.RunCommand("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", entry)); err != nil {
+			return fmt.Errorf("failed to set dnsmasq server: %w", err)
+		}
+		if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=1"); err != nil {
+			return fmt.Errorf("failed to set noresolv: %w", err)
+		}
+	} else {
+		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
+		if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=0"); err != nil {
+			return fmt.Errorf("failed to unset noresolv: %w", err)
+		}
+	}
+
+	if _, err := s.checker.RunCommand("uci", "commit", "dhcp"); err != nil {
+		return fmt.Errorf("failed to commit dhcp: %w", err)
+	}
+	if _, err := s.checker.RunCommand("/etc/init.d/dnsmasq", "restart"); err != nil {
+		return fmt.Errorf("failed to restart dnsmasq: %w", err)
+	}
+	return nil
 }

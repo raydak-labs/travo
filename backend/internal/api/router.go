@@ -124,6 +124,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 
 	// AdGuard Home
 	v1.Get("/services/adguardhome/status", AdGuardStatusHandler(deps.AdGuard))
+	v1.Get("/adguard/dns", AdGuardDNSStatusHandler(deps.AdGuard))
+	v1.Put("/adguard/dns", SetAdGuardDNSHandler(deps.AdGuard))
 
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))
