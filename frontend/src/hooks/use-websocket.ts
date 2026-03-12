@@ -11,6 +11,12 @@ export interface StatsDataPoint {
   txBytes: number;
 }
 
+export interface InterfaceDataPoint {
+  timestamp: number;
+  rxBytes: number;
+  txBytes: number;
+}
+
 const MAX_POINTS = 15; // 30 seconds at 2s intervals
 const RECONNECT_DELAY = 3000;
 
@@ -20,6 +26,9 @@ const RECONNECT_DELAY = 3000;
  */
 export function useWebSocket() {
   const [dataPoints, setDataPoints] = useState<StatsDataPoint[]>([]);
+  const [interfaceDataPoints, setInterfaceDataPoints] = useState<
+    Record<string, InterfaceDataPoint[]>
+  >({});
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,6 +74,27 @@ export function useWebSocket() {
               const next = [...prev, point];
               return next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
             });
+
+            // Track per-interface data
+            if (msg.data.network) {
+              const ts = Date.now();
+              setInterfaceDataPoints((prev) => {
+                const updated = { ...prev };
+                for (const iface of msg.data.network) {
+                  const key = iface.interface;
+                  const ifPoint: InterfaceDataPoint = {
+                    timestamp: ts,
+                    rxBytes: iface.rx_bytes,
+                    txBytes: iface.tx_bytes,
+                  };
+                  const existing = updated[key] ?? [];
+                  const next = [...existing, ifPoint];
+                  updated[key] =
+                    next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
+                }
+                return updated;
+              });
+            }
           }
         } catch {
           // Ignore malformed messages
@@ -75,6 +105,7 @@ export function useWebSocket() {
         if (mountedRef.current) {
           setConnected(false);
           setDataPoints([]);
+          setInterfaceDataPoints({});
           reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
         }
       };
@@ -105,5 +136,5 @@ export function useWebSocket() {
     };
   }, [connect]);
 
-  return { dataPoints, connected };
+  return { dataPoints, interfaceDataPoints, connected };
 }

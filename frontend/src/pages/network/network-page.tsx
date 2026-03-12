@@ -45,6 +45,7 @@ import {
 } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
+import { InterfaceTrafficCharts } from './interface-traffic-charts';
 import type { NetworkInterface } from '@shared/index';
 
 const WAN_SOURCES = [
@@ -203,6 +204,9 @@ export function NetworkPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Interface Traffic Charts */}
+      <InterfaceTrafficCharts />
 
       {/* WAN Configuration */}
       <Card>

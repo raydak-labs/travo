@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v21 — push alerts via WebSocket)
+> **Last updated:** 2026-03-12 (v22 — per-interface traffic charts on network page)
 
 ---
 
@@ -86,6 +86,7 @@
 - [x] WAN settings: IP, netmask, gateway, DNS, MTU
 - [x] WAN/WWAN interplay explanation (which is active, failover?)
 - [x] Interface up/down toggle
+- [x] Per-interface real-time traffic charts (RX/TX throughput via WebSocket)
 
 ### 2.2 Connected Clients
 
@@ -273,7 +274,7 @@
 - [x] WebSocket-based live system stats (2s interval)
 - [x] Bandwidth chart (CPU/Memory over time, 15 data points)
 - [x] Network throughput chart (RX/TX bytes/sec)
-- [ ] Per-interface traffic chart
+- [x] Per-interface traffic chart
 - [ ] Connection uptime log (internet available since / lost at — timeline of events)
 - [ ] 🔮 Historical data (store and display last hours/days)
 
