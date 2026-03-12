@@ -32,6 +32,15 @@
 
 ---
 
+## 0. Bug List
+
+- [ ] Toggles should also be bluish in dark mode (currently they are grey)
+- [ ] Links should be moved from services to system
+- [ ] Link for LUCI is wrong (with this program this is moved to :8080)
+- [ ] Adguard config viewer / editor does not work
+- [ ] VPN list are not equal. Why does tailscale not available look different then other? this should be equal
+- [ ] Why is startup of this app logged as err in the logs? (errThu Mar 12 12:27:11 2026 daemon.err openwrt-travel-gui[12344]: 2026/03/12 12:27:11 Starting openwrt-travel-gui backend on :80 (mock=false))
+
 ## 1. WiFi Management
 
 ### 1.1 Upstream WiFi (STA / WWAN — Connect to existing WiFi)
