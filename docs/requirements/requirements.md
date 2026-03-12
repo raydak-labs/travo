@@ -67,6 +67,8 @@
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
+- [ ] We need to ensure that WIFI is always enabled (as this is a travel router with mostly wifi access). So during boot the application has to ensure the wifi is enabled and running.
+- [ ] We can add options to disable wifi but those should be with clear warnings.
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)
 
