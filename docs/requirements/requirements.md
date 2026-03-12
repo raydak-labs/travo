@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v24 — Client hostname resolution)
+> **Last updated:** 2026-03-12 (v25 — Dashboard data usage card)
 
 ---
 
@@ -113,7 +113,7 @@
 - [ ] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether)
 - [ ] Data usage budget / cap with warning threshold
 - [ ] Reset counters (per-session, daily, manual)
-- [ ] Show data usage on dashboard
+- [x] Show data usage on dashboard (cumulative RX/TX since boot, human-readable format)
 
 ### 2.5 USB Tethering
 

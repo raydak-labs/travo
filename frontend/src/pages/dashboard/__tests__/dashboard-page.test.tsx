@@ -75,6 +75,7 @@ describe('DashboardPage', () => {
       expect(screen.getByText('VPN Status')).toBeInTheDocument();
       expect(screen.getByText('System Stats')).toBeInTheDocument();
       expect(screen.getByText('Connected Clients')).toBeInTheDocument();
+      expect(screen.getByText('Data Usage')).toBeInTheDocument();
     });
   });
 
