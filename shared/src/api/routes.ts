@@ -14,6 +14,7 @@ export const API_ROUTES = {
     reboot: '/api/v1/system/reboot',
     hostname: '/api/v1/system/hostname',
     leds: '/api/v1/system/leds',
+    ledsSchedule: '/api/v1/system/leds/schedule',
     timezone: '/api/v1/system/timezone',
     backup: '/api/v1/system/backup',
     restore: '/api/v1/system/restore',
@@ -89,5 +90,6 @@ export const API_ROUTES = {
   },
   adguard: {
     dns: '/api/v1/adguard/dns',
+    config: '/api/v1/adguard/config',
   },
 } as const;

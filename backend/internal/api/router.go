@@ -42,6 +42,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/system/hostname", SetHostnameHandler(deps.System))
 	v1.Get("/system/leds", GetLEDStatusHandler(deps.System))
 	v1.Put("/system/leds", SetLEDStealthHandler(deps.System))
+	v1.Get("/system/leds/schedule", GetLEDScheduleHandler(deps.System))
+	v1.Put("/system/leds/schedule", SetLEDScheduleHandler(deps.System))
 	v1.Get("/system/timezone", GetTimezoneHandler(deps.System))
 	v1.Put("/system/timezone", SetTimezoneHandler(deps.System))
 	v1.Get("/system/backup", BackupHandler(deps.System))
@@ -132,6 +134,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/services/adguardhome/status", AdGuardStatusHandler(deps.AdGuard))
 	v1.Get("/adguard/dns", AdGuardDNSStatusHandler(deps.AdGuard))
 	v1.Put("/adguard/dns", SetAdGuardDNSHandler(deps.AdGuard))
+	v1.Get("/adguard/config", GetAdGuardConfigHandler(deps.AdGuard))
+	v1.Put("/adguard/config", SetAdGuardConfigHandler(deps.AdGuard))
 
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))

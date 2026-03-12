@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { ServiceInfo, AdGuardDNSStatus } from '@shared/index';
+import type { ServiceInfo, AdGuardDNSStatus, AdGuardConfig } from '@shared/index';
 
 export function useServices() {
   return useQuery({
@@ -106,6 +106,29 @@ export function useSetAdGuardDNS() {
     },
     onError: (error) => {
       toast.error('Failed to update AdGuard DNS', { description: error.message });
+    },
+  });
+}
+
+export function useAdGuardConfig() {
+  return useQuery({
+    queryKey: ['adguard-config'],
+    queryFn: () => apiClient.get<AdGuardConfig>(API_ROUTES.adguard.config),
+    enabled: false, // Only fetch on demand
+  });
+}
+
+export function useSetAdGuardConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (content: string) =>
+      apiClient.put<{ status: string }>(API_ROUTES.adguard.config, { content }),
+    onSuccess: () => {
+      toast.success('AdGuard configuration saved and service restarted');
+      void queryClient.invalidateQueries({ queryKey: ['adguard-config'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save AdGuard config', { description: error.message });
     },
   });
 }

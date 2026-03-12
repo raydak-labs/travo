@@ -22,6 +22,11 @@ vi.mock('@/hooks/use-alerts', () => ({
   useAlerts: vi.fn(() => ({ alerts: [], unreadCount: 0, markAllRead: vi.fn() })),
 }));
 
+vi.mock('@/hooks/use-system', () => ({
+  useSystemInfo: vi.fn(() => ({ data: null, isError: false })),
+  useReboot: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
 const mockUseIsMobile = vi.mocked(useIsMobile);
 
 function renderSidebar(currentPath = '/dashboard') {

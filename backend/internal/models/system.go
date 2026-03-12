@@ -14,15 +14,29 @@ type SetHostnameRequest struct {
 	Hostname string `json:"hostname"`
 }
 
+// LEDInfo represents a single LED on the device.
+type LEDInfo struct {
+	Name       string `json:"name"`
+	Brightness int    `json:"brightness"`
+}
+
 // LEDStatus represents the current LED state.
 type LEDStatus struct {
-	StealthMode bool `json:"stealth_mode"`
-	LEDCount    int  `json:"led_count"`
+	StealthMode bool      `json:"stealth_mode"`
+	LEDCount    int       `json:"led_count"`
+	LEDs        []LEDInfo `json:"leds"`
 }
 
 // SetLEDRequest is the payload for toggling LED stealth mode.
 type SetLEDRequest struct {
 	StealthMode bool `json:"stealth_mode"`
+}
+
+// LEDSchedule represents a cron-based schedule for LED stealth mode.
+type LEDSchedule struct {
+	Enabled bool   `json:"enabled"`
+	OnTime  string `json:"on_time"`  // HH:MM format
+	OffTime string `json:"off_time"` // HH:MM format
 }
 
 // CpuStats contains CPU usage information.

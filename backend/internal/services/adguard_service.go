@@ -231,3 +231,25 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 	}
 	return nil
 }
+
+const adguardConfigPath = "/opt/AdGuardHome/AdGuardHome.yaml"
+
+// GetConfig reads the AdGuard Home YAML configuration file.
+func (s *AdGuardService) GetConfig() (string, error) {
+	data, err := os.ReadFile(adguardConfigPath)
+	if err != nil {
+		return "", fmt.Errorf("reading AdGuard config: %w", err)
+	}
+	return string(data), nil
+}
+
+// SetConfig writes the AdGuard Home YAML configuration and restarts the service.
+func (s *AdGuardService) SetConfig(content string) error {
+	if err := os.WriteFile(adguardConfigPath, []byte(content), 0600); err != nil {
+		return fmt.Errorf("writing AdGuard config: %w", err)
+	}
+	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {
+		return fmt.Errorf("restarting AdGuard: %w", err)
+	}
+	return nil
+}

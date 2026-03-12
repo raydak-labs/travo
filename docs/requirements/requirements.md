@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v26 — Captive portal open-login button)
+> **Last updated:** 2026-03-12 (v27 — AdGuard config editor, hardware buttons, UI fixes)
 
 ---
 
@@ -19,6 +19,7 @@
 - [11. Advanced Networking](#11-advanced-networking)
 - [12. UX & UI Polish](#12-ux--ui-polish)
 - [13. Deployment & Packaging](#13-deployment--packaging)
+- [14. Hardware Buttons](#14-hardware-buttons)
 
 ---
 
@@ -193,6 +194,7 @@
 - [x] Show if AdGuard is configured as default DNS for LAN
 - [x] Quick link to AdGuard web UI (with correct IP:port)
 - [x] Toggle DNS filtering on/off without stopping AdGuard
+- [x] AdGuard Home configuration editor (show/edit AdGuardHome.yaml with restart)
 - [ ] Configure AdGuard to work alongside VPN
 - [ ] 🔮 Blocklist management from travel router UI
 
@@ -241,6 +243,7 @@
 - [x] Hostname change
 - [x] Backup / restore configuration (export/import UCI configs as archive)
 - [x] LED control — stealth mode (turn off all router LEDs via sysfs toggle)
+- [x] LED control — per-LED brightness display and scheduled on/off via cron
 
 ### 5.3 Time & Timezone
 
@@ -362,9 +365,14 @@
 - [x] Dark mode support
 - [x] Loading skeletons
 - [x] Error handling with toast notifications
-- [ ] Tooltips / hover info for WiFi networks (signal details, channel, etc.)
+- [x] Tooltips / hover info for WiFi networks (signal details, channel, etc.)
 - [ ] Tooltips for technical fields (what is MTU? what is DHCP range?)
 - [x] Onboarding / first-run setup wizard
+- [x] Connection status indicator in header (green/red dot)
+- [x] Actions dropdown menu in toolbar (Reboot, Logout)
+- [x] Quick links to LuCI and AdGuard dashboards on Services page
+- [x] Dialog close button visible in dark mode
+- [x] Select component dark mode styling
 - [ ] 🔮 Multi-language support (i18n)
 - [ ] 🔮 PWA enhancements (offline indicator, app-like experience)
 
@@ -381,6 +389,16 @@
 - [ ] CI/CD pipeline (build + test + package)
 - [ ] Size optimization audit (bundle size, Go binary strip)
 - [ ] 🔮 Automatic updates mechanism
+
+---
+
+## 14. Hardware Buttons
+
+- [ ] Detect hardware buttons (identify available buttons via /sys/class/gpio or hotplug)
+- [ ] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.)
+- [ ] Button event handler via hotplug.d integration
+- [ ] 🔮 Custom button action scripting
+- [ ] 🔮 Long-press vs short-press differentiation
 
 ---
 

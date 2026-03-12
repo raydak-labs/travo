@@ -26,6 +26,11 @@ export interface AdGuardDNSStatus {
   readonly dns_port: number;
 }
 
+/** AdGuard Home configuration (raw YAML content) */
+export interface AdGuardConfig {
+  readonly content: string;
+}
+
 /** Type guard for ServiceInfo */
 export function isServiceInfo(value: unknown): value is ServiceInfo {
   if (typeof value !== 'object' || value === null) return false;

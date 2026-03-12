@@ -207,6 +207,27 @@ func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// GetLEDScheduleHandler handles GET /api/v1/system/leds/schedule.
+func GetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(svc.GetLEDSchedule())
+	}
+}
+
+// SetLEDScheduleHandler handles PUT /api/v1/system/leds/schedule.
+func SetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.LEDSchedule
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetLEDSchedule(req); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(svc.GetLEDSchedule())
+	}
+}
+
 // GetNTPConfigHandler handles GET /api/v1/system/ntp.
 func GetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

@@ -265,16 +265,26 @@ func (s *SystemService) SetHostname(hostname string) error {
 func (s *SystemService) GetLEDStatus() models.LEDStatus {
 	leds := listLEDs()
 	allOff := len(leds) > 0
+	var ledInfos []models.LEDInfo
 	for _, led := range leds {
 		b, err := os.ReadFile(filepath.Join("/sys/class/leds", led, "brightness"))
-		if err == nil && strings.TrimSpace(string(b)) != "0" {
-			allOff = false
-			break
+		brightness := 0
+		if err == nil {
+			val := strings.TrimSpace(string(b))
+			brightness, _ = strconv.Atoi(val)
+			if val != "0" {
+				allOff = false
+			}
 		}
+		ledInfos = append(ledInfos, models.LEDInfo{
+			Name:       led,
+			Brightness: brightness,
+		})
 	}
 	return models.LEDStatus{
 		StealthMode: allOff,
 		LEDCount:    len(leds),
+		LEDs:        ledInfos,
 	}
 }
 
@@ -304,6 +314,64 @@ func listLEDs() []string {
 		leds = append(leds, e.Name())
 	}
 	return leds
+}
+
+const ledCronTag = "# openwrt-travel-gui-led-schedule"
+
+// GetLEDSchedule reads the LED stealth schedule from crontab.
+func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
+	data, err := os.ReadFile("/etc/crontabs/root")
+	if err != nil {
+		return models.LEDSchedule{}
+	}
+	schedule := models.LEDSchedule{}
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.Contains(line, ledCronTag) {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 5 {
+			continue
+		}
+		minute, hour := parts[0], parts[1]
+		timeStr := fmt.Sprintf("%s:%s", hour, minute)
+		if strings.Contains(line, "brightness-off") {
+			schedule.OffTime = timeStr
+			schedule.Enabled = true
+		} else if strings.Contains(line, "brightness-on") {
+			schedule.OnTime = timeStr
+			schedule.Enabled = true
+		}
+	}
+	return schedule
+}
+
+// SetLEDSchedule writes or removes LED schedule cron entries.
+func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
+	data, _ := os.ReadFile("/etc/crontabs/root")
+	var lines []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if line == "" || strings.Contains(line, ledCronTag) {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if schedule.Enabled && schedule.OffTime != "" && schedule.OnTime != "" {
+		offParts := strings.SplitN(schedule.OffTime, ":", 2)
+		onParts := strings.SplitN(schedule.OnTime, ":", 2)
+		if len(offParts) == 2 && len(onParts) == 2 {
+			ledScript := "for f in /sys/class/leds/*/brightness; do echo %s > $f; done"
+			offLine := fmt.Sprintf("%s %s * * * %s %s", offParts[1], offParts[0], fmt.Sprintf(ledScript, "0"), ledCronTag+" brightness-off")
+			onLine := fmt.Sprintf("%s %s * * * %s %s", onParts[1], onParts[0], fmt.Sprintf(ledScript, "255"), ledCronTag+" brightness-on")
+			lines = append(lines, offLine, onLine)
+		}
+	}
+	lines = append(lines, "")
+	if err := os.WriteFile("/etc/crontabs/root", []byte(strings.Join(lines, "\n")), 0600); err != nil {
+		return fmt.Errorf("writing crontab: %w", err)
+	}
+	_ = exec.Command("/etc/init.d/cron", "restart").Run()
+	return nil
 }
 
 // GetLogs retrieves system logs from logread.

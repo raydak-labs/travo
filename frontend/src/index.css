@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:is(.dark *));
+
 /* Page transition animation */
 @keyframes page-fade-in {
   from {

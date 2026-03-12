@@ -176,8 +176,8 @@ export function NetworkPage() {
   useEffect(() => {
     if (dnsConfig) {
       setUseCustomDNS(dnsConfig.use_custom_dns);
-      setDnsServer1(dnsConfig.servers[0] || '');
-      setDnsServer2(dnsConfig.servers[1] || '');
+      setDnsServer1(dnsConfig.servers?.[0] || '');
+      setDnsServer2(dnsConfig.servers?.[1] || '');
     }
   }, [dnsConfig]);
 

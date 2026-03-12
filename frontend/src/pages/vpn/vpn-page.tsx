@@ -3,12 +3,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVpnStatus } from '@/hooks/use-vpn';
+import { useServices } from '@/hooks/use-services';
 import { formatBytes } from '@/lib/utils';
 import { WireguardSection } from './wireguard-section';
 import { TailscaleSection } from './tailscale-section';
 
 export function VpnPage() {
   const { data: vpnStatuses = [], isLoading } = useVpnStatus();
+  const { data: services = [] } = useServices();
 
   return (
     <div className="space-y-6">
@@ -28,25 +30,37 @@ export function VpnPage() {
             <p className="text-sm text-gray-500">No VPN connections configured</p>
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
-              {vpnStatuses.map((vpn) => (
-                <li key={vpn.type} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900 dark:text-white capitalize">
-                      {vpn.type}
-                    </span>
-                    <Badge variant={vpn.connected ? 'success' : 'outline'}>
-                      {vpn.connected ? 'Connected' : 'Disconnected'}
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {vpn.connected && (
-                      <span>
-                        ↓ {formatBytes(vpn.rx_bytes)} / ↑ {formatBytes(vpn.tx_bytes)}
+              {vpnStatuses.map((vpn) => {
+                const svc = services.find(
+                  (s) => s.id === vpn.type || s.id === vpn.type.toLowerCase(),
+                );
+                const notInstalled = svc?.state === 'not_installed';
+                return (
+                  <li key={vpn.type} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`font-medium capitalize ${notInstalled ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                      >
+                        {vpn.type}
                       </span>
-                    )}
-                  </div>
-                </li>
-              ))}
+                      {notInstalled ? (
+                        <Badge variant="secondary">Not Installed</Badge>
+                      ) : (
+                        <Badge variant={vpn.connected ? 'success' : 'outline'}>
+                          {vpn.connected ? 'Connected' : 'Disconnected'}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {vpn.connected && !notInstalled && (
+                        <span>
+                          ↓ {formatBytes(vpn.rx_bytes)} / ↑ {formatBytes(vpn.tx_bytes)}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>

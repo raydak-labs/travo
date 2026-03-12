@@ -4,6 +4,8 @@ A modern, mobile-first web UI for OpenWRT-based travel routers (GL.iNet Beryl AX
 
 Provides an intuitive dashboard, WiFi management with hotel captive portal support, VPN/service management, and system configuration. Built as a Go backend + React frontend monorepo that coexists with LuCI.
 
+![Dashboard](<docs/images/markdown-readme.webp>)
+
 ## Quick Install
 
 SSH into your OpenWRT router and run:

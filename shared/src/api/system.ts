@@ -12,15 +12,29 @@ export interface SetHostnameRequest {
   readonly hostname: string;
 }
 
+/** Individual LED info */
+export interface LEDInfo {
+  readonly name: string;
+  readonly brightness: number;
+}
+
 /** LED status */
 export interface LEDStatus {
   readonly stealth_mode: boolean;
   readonly led_count: number;
+  readonly leds: LEDInfo[];
 }
 
 /** Set LED stealth mode request */
 export interface SetLEDRequest {
   readonly stealth_mode: boolean;
+}
+
+/** LED schedule configuration */
+export interface LEDSchedule {
+  readonly enabled: boolean;
+  readonly on_time: string;
+  readonly off_time: string;
 }
 
 /** CPU statistics */

@@ -116,6 +116,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/reboot',
       '/api/v1/system/hostname',
       '/api/v1/system/leds',
+      '/api/v1/system/leds/schedule',
       '/api/v1/system/timezone',
       '/api/v1/system/backup',
       '/api/v1/system/restore',
@@ -174,6 +175,7 @@ describe('API_ROUTES', () => {
       '/api/v1/services/:id/autostart',
       '/api/v1/captive/status',
       '/api/v1/adguard/dns',
+      '/api/v1/adguard/config',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

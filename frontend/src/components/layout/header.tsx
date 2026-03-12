@@ -1,10 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, LogOut, Menu, Bell } from 'lucide-react';
+import { Sun, Moon, LogOut, Menu, Bell, RotateCcw, MoreVertical } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAlerts } from '@/hooks/use-alerts';
+import { useSystemInfo, useReboot } from '@/hooks/use-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 interface HeaderProps {
   title: string;
@@ -28,20 +36,30 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const logout = useAuthStore((s) => s.logout);
   const { alerts, unreadCount, markAllRead } = useAlerts();
+  const { data: systemInfo, isError: systemError } = useSystemInfo();
+  const rebootMutation = useReboot();
   const [showPanel, setShowPanel] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showRebootConfirm, setShowRebootConfirm] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+
+  const isConnected = !!systemInfo && !systemError;
 
   // Close panel on click outside
   useEffect(() => {
-    if (!showPanel) return;
+    if (!showPanel && !showActionsMenu) return;
     function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (showPanel && panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setShowPanel(false);
+      }
+      if (showActionsMenu && actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setShowActionsMenu(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [showPanel]);
+  }, [showPanel, showActionsMenu]);
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 theme-transition sm:px-6 dark:border-gray-800 dark:bg-gray-950">
@@ -60,6 +78,16 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h1>
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
+        {/* Connection status indicator */}
+        <span
+          className={`inline-block h-2 w-2 rounded-full ${
+            isConnected
+              ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]'
+              : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]'
+          }`}
+          title={isConnected ? 'Connected to router' : 'Connection lost'}
+        />
+
         {/* Notification bell */}
         <div className="relative" ref={panelRef}>
           <Button
@@ -117,13 +145,74 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
           )}
         </div>
 
+        {/* Actions menu */}
+        <div className="relative" ref={actionsRef}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Actions"
+            onClick={() => setShowActionsMenu((v) => !v)}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+
+          {showActionsMenu && (
+            <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => {
+                  setShowActionsMenu(false);
+                  setShowRebootConfirm(true);
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reboot Router
+              </button>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => {
+                  setShowActionsMenu(false);
+                  logout();
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+
         <Button variant="ghost" size="sm" onClick={toggleTheme} aria-label="Toggle theme">
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
-        <Button variant="ghost" size="sm" onClick={logout} aria-label="Logout">
-          <LogOut className="h-4 w-4" />
-        </Button>
       </div>
+
+      {/* Reboot confirmation dialog */}
+      <Dialog open={showRebootConfirm} onOpenChange={setShowRebootConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reboot Router?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            The router will be unavailable for about 30 seconds during reboot.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRebootConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={rebootMutation.isPending}
+              onClick={() => {
+                rebootMutation.mutate();
+                setShowRebootConfirm(false);
+              }}
+            >
+              {rebootMutation.isPending ? 'Rebooting...' : 'Reboot'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

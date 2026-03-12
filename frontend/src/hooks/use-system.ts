@@ -10,6 +10,7 @@ import type {
   SetHostnameRequest,
   LEDStatus,
   SetLEDRequest,
+  LEDSchedule,
   TimezoneConfig,
   NTPConfig,
   SetupStatus,
@@ -111,13 +112,37 @@ export function useLEDStatus() {
 }
 
 export function useSetLEDStealth() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: SetLEDRequest) => apiClient.put<LEDStatus>(API_ROUTES.system.leds, data),
     onSuccess: () => {
       toast.success('LED mode updated');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'leds'] });
     },
     onError: (error) => {
       toast.error('Failed to update LED mode', { description: error.message });
+    },
+  });
+}
+
+export function useLEDSchedule() {
+  return useQuery({
+    queryKey: ['system', 'leds', 'schedule'],
+    queryFn: () => apiClient.get<LEDSchedule>(API_ROUTES.system.ledsSchedule),
+  });
+}
+
+export function useSetLEDSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: LEDSchedule) =>
+      apiClient.put<LEDSchedule>(API_ROUTES.system.ledsSchedule, data),
+    onSuccess: () => {
+      toast.success('LED schedule updated');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'leds', 'schedule'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update LED schedule', { description: error.message });
     },
   });
 }
