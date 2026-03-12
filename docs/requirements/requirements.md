@@ -338,7 +338,7 @@
 ## 10. Privacy & Identity
 
 - [x] MAC address cloning (copy client MAC for hotel WiFi device registration)
-- [ ] MAC address randomization / anonymization (generate random MAC per connection)
+- [x] MAC address randomization / anonymization (generate random MAC per connection)
 - [x] Show current MAC per interface
 - [ ] 🔮 Per-network MAC policy (remember which MAC to use for which SSID)
 

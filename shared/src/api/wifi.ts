@@ -92,6 +92,12 @@ export interface SetMACRequest {
   readonly mac: string;
 }
 
+/** Response from randomize MAC endpoint */
+export interface RandomizeMACResponse {
+  readonly status: string;
+  readonly mac: string;
+}
+
 /** WiFi radio hardware info */
 export interface RadioInfo {
   readonly name: string;

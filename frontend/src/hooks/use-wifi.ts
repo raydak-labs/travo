@@ -13,6 +13,7 @@ import type {
   RadioInfo,
   NetworkPriorityRequest,
   AutoReconnectConfig,
+  RandomizeMACResponse,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -160,6 +161,21 @@ export function useSetMAC() {
     },
     onError: (error) => {
       toast.error('Failed to update MAC address', { description: error.message });
+    },
+  });
+}
+
+export function useRandomizeMAC() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize),
+    onSuccess: (data) => {
+      toast.success(`MAC randomized to ${data.mac}`);
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to randomize MAC', { description: error.message });
     },
   });
 }

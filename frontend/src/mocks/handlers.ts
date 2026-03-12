@@ -417,6 +417,9 @@ export const handlers = [
   http.put(API_ROUTES.wifi.mac, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
+  http.post(API_ROUTES.wifi.macRandomize, () => {
+    return HttpResponse.json({ status: 'ok', mac: '02:ab:cd:ef:12:34' });
+  }),
 
   http.get(API_ROUTES.wifi.guest, () => {
     return HttpResponse.json(mockGuestWifi);

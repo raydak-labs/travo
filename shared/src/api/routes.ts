@@ -55,6 +55,7 @@ export const API_ROUTES = {
     radios: '/api/v1/wifi/radios',
     ap: '/api/v1/wifi/ap',
     mac: '/api/v1/wifi/mac',
+    macRandomize: '/api/v1/wifi/mac/randomize',
     guest: '/api/v1/wifi/guest',
     autoreconnect: '/api/v1/wifi/autoreconnect',
   },

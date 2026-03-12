@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -437,6 +438,58 @@ func TestGetMACAddresses(t *testing.T) {
 	}
 	if configs[0].Interface != "sta" {
 		t.Errorf("expected interface 'sta', got '%s'", configs[0].Interface)
+	}
+}
+
+func TestRandomizeMAC(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	mac, err := svc.RandomizeMAC()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify MAC format (XX:XX:XX:XX:XX:XX)
+	if len(mac) != 17 {
+		t.Fatalf("expected 17 char MAC, got %d: %s", len(mac), mac)
+	}
+
+	// Parse first octet to check locally-administered + unicast
+	var firstOctet int
+	if _, err := fmt.Sscanf(mac[:2], "%x", &firstOctet); err != nil {
+		t.Fatalf("failed to parse first octet: %v", err)
+	}
+	if firstOctet&0x02 == 0 {
+		t.Error("expected locally-administered bit set (bit 1 of first octet)")
+	}
+	if firstOctet&0x01 != 0 {
+		t.Error("expected unicast bit cleared (bit 0 of first octet)")
+	}
+
+	// Verify MAC was applied in UCI
+	opts, err := u.GetAll("wireless", "sta0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts["macaddr"] != mac {
+		t.Errorf("expected macaddr '%s', got '%s'", mac, opts["macaddr"])
+	}
+}
+
+func TestRandomizeMAC_UniquePerCall(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	mac1, err := svc.RandomizeMAC()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mac2, err := svc.RandomizeMAC()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Extremely unlikely to be the same with 46 bits of randomness
+	if mac1 == mac2 {
+		t.Errorf("expected different MACs, both were %s", mac1)
 	}
 }
 

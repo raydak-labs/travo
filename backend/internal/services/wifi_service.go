@@ -1,6 +1,7 @@
 package services
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -668,6 +669,31 @@ func (w *WifiService) SetMACAddress(mac string) error {
 	}
 	w.reloader.Reload()
 	return nil
+}
+
+// RandomizeMAC generates a random locally-administered unicast MAC address
+// and applies it to the STA WiFi interface. It returns the new MAC.
+func (w *WifiService) RandomizeMAC() (string, error) {
+	mac, err := generateRandomMAC()
+	if err != nil {
+		return "", fmt.Errorf("generating random MAC: %w", err)
+	}
+	if err := w.SetMACAddress(mac); err != nil {
+		return "", err
+	}
+	return mac, nil
+}
+
+// generateRandomMAC creates a random locally-administered unicast MAC address.
+// Locally-administered: bit 1 of first octet set. Unicast: bit 0 of first octet cleared.
+func generateRandomMAC() (string, error) {
+	buf := make([]byte, 6)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	// Set locally-administered bit (bit 1) and clear unicast/multicast bit (bit 0)
+	buf[0] = (buf[0] | 0x02) & 0xFE
+	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]), nil
 }
 
 // GetGuestWifi returns the guest WiFi configuration.

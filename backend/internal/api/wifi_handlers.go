@@ -202,6 +202,17 @@ func SetMACHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// RandomizeMACHandler handles POST /api/v1/wifi/mac/randomize.
+func RandomizeMACHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		mac, err := svc.RandomizeMAC()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok", "mac": mac})
+	}
+}
+
 // WifiSetPriorityHandler handles PUT /api/v1/wifi/saved/priority.
 func WifiSetPriorityHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

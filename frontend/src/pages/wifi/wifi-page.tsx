@@ -44,6 +44,7 @@ import {
   useSetAPConfig,
   useMACAddresses,
   useSetMAC,
+  useRandomizeMAC,
   useGuestWifi,
   useSetGuestWifi,
   useRadios,
@@ -86,6 +87,7 @@ export function WifiPage() {
   const setAP = useSetAPConfig();
   const { data: macAddresses, isLoading: macLoading } = useMACAddresses();
   const setMAC = useSetMAC();
+  const randomizeMAC = useRandomizeMAC();
   const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
   const setGuestWifi = useSetGuestWifi();
   const { data: radios, isLoading: radiosLoading } = useRadios();
@@ -667,6 +669,15 @@ export function WifiPage() {
                     <Button size="sm" onClick={() => setCustomMAC(generateRandomMAC())}>
                       <Shuffle className="h-4 w-4 mr-1" />
                       Random
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={randomizeMAC.isPending}
+                      onClick={() => randomizeMAC.mutate()}
+                    >
+                      <Shuffle className="h-4 w-4 mr-1" />
+                      {randomizeMAC.isPending ? 'Randomizing...' : 'Randomize & Apply'}
                     </Button>
                     <Button
                       size="sm"

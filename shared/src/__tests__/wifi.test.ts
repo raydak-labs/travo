@@ -8,6 +8,9 @@ import {
   type WifiConnection,
   type WifiConfig,
   type SavedNetwork,
+  type MACConfig,
+  type SetMACRequest,
+  type RandomizeMACResponse,
 } from '../api/wifi';
 
 describe('WifiMode', () => {
@@ -102,5 +105,46 @@ describe('SavedNetwork', () => {
     };
     expect(saved.auto_connect).toBe(true);
     expect(saved.priority).toBe(1);
+  });
+});
+
+describe('MACConfig', () => {
+  it('validates structure', () => {
+    const mac: MACConfig = {
+      interface: 'sta',
+      current_mac: 'AA:BB:CC:DD:EE:FF',
+      custom_mac: '02:11:22:33:44:55',
+    };
+    expect(mac.interface).toBe('sta');
+    expect(mac.current_mac).toBe('AA:BB:CC:DD:EE:FF');
+    expect(mac.custom_mac).toBe('02:11:22:33:44:55');
+  });
+
+  it('allows optional custom_mac', () => {
+    const mac: MACConfig = {
+      interface: 'sta',
+      current_mac: 'AA:BB:CC:DD:EE:FF',
+    };
+    expect(mac.custom_mac).toBeUndefined();
+  });
+});
+
+describe('SetMACRequest', () => {
+  it('validates structure', () => {
+    const req: SetMACRequest = { mac: '02:11:22:33:44:55' };
+    expect(req.mac).toBe('02:11:22:33:44:55');
+  });
+
+  it('allows empty mac for reset', () => {
+    const req: SetMACRequest = { mac: '' };
+    expect(req.mac).toBe('');
+  });
+});
+
+describe('RandomizeMACResponse', () => {
+  it('validates structure', () => {
+    const resp: RandomizeMACResponse = { status: 'ok', mac: '02:ab:cd:ef:12:34' };
+    expect(resp.status).toBe('ok');
+    expect(resp.mac).toBe('02:ab:cd:ef:12:34');
   });
 });
