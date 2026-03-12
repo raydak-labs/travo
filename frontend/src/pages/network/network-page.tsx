@@ -561,10 +561,7 @@ export function NetworkPage() {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={ddnsEnabled}
-                  onChange={(e) => setDdnsEnabled(e.target.checked)}
-                />
+                <Switch checked={ddnsEnabled} onChange={(e) => setDdnsEnabled(e.target.checked)} />
                 <span className="text-sm">Enable Dynamic DNS</span>
               </div>
               {ddnsEnabled && (

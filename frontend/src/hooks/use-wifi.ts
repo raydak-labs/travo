@@ -168,8 +168,7 @@ export function useSetMAC() {
 export function useRandomizeMAC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize),
+    mutationFn: () => apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize),
     onSuccess: (data) => {
       toast.success(`MAC randomized to ${data.mac}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });
