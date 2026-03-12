@@ -42,6 +42,7 @@
 - [x] Signal strength visualization (icon + dBm + percentage)
 - [x] Security badge (WPA2, WPA3, Open, etc.)
 - [x] Scan dialog (button-triggered popup with results)
+- [x] Hover tooltips on scan results (signal dBm, channel, band, encryption, BSSID)
 - [x] Disconnect from upstream WiFi
 - [x] Delete saved WiFi networks
 - [x] Priority ordering of saved networks (auto-connect preference)

@@ -26,6 +26,16 @@ function bandLabel(band: string): string {
   }
 }
 
+function scanTooltip(network: WifiScanResult): string {
+  return [
+    `Signal: ${network.signal_percent}% (${network.signal_dbm} dBm)`,
+    `Channel: ${network.channel}`,
+    `Band: ${bandLabel(network.band)}`,
+    `Encryption: ${network.encryption === 'none' ? 'Open' : network.encryption.toUpperCase()}`,
+    `BSSID: ${network.bssid}`,
+  ].join('\n');
+}
+
 export function WifiScanList({ networks, isLoading, onRefresh, onConnect }: WifiScanListProps) {
   const sorted = [...networks].sort((a, b) => b.signal_percent - a.signal_percent);
 
@@ -50,7 +60,11 @@ export function WifiScanList({ networks, isLoading, onRefresh, onConnect }: Wifi
       ) : (
         <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
           {sorted.map((network) => (
-            <li key={network.bssid} className="flex items-center justify-between gap-3 py-3">
+            <li
+              key={network.bssid}
+              className="flex items-center justify-between gap-3 py-3"
+              title={scanTooltip(network)}
+            >
               <div className="flex items-center gap-3">
                 <SignalStrengthIcon signalPercent={network.signal_percent} />
                 <div>
