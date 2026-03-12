@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v23 — DDNS provider configuration)
+> **Last updated:** 2026-03-12 (v24 — Client hostname resolution)
 
 ---
 
@@ -95,7 +95,7 @@
 - [x] Device aliases (name clients: "John's Phone", "Laptop" — stored in local config)
 - [x] Set static IP / DHCP reservation for a client
 - [x] Traffic stats per client (RX/TX)
-- [ ] Client hostname resolution
+- [x] Client hostname resolution (DHCP leases + /etc/hosts cross-reference)
 - [x] Block / kick a client
 - [ ] 🔮 Client bandwidth limiting (QoS per device)
 - [ ] 🔮 Parental controls / client group policies

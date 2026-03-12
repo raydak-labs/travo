@@ -189,9 +189,16 @@ func parseLeaseTime(s string, fallback float64) float64 {
 	return fallback
 }
 
-// parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of MAC → lease expiry time.
-func parseDHCPLeasesFile() map[string]int64 {
-	result := map[string]int64{}
+// dhcpLease holds expiry and hostname from a DHCP lease entry.
+type dhcpLease struct {
+	Expiry   int64
+	Hostname string
+}
+
+// parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of MAC → lease info.
+// Format: timestamp MAC IP hostname clientid
+func parseDHCPLeasesFile() map[string]dhcpLease {
+	result := map[string]dhcpLease{}
 	data, err := os.ReadFile("/tmp/dhcp.leases")
 	if err != nil {
 		return result
@@ -206,7 +213,39 @@ func parseDHCPLeasesFile() map[string]int64 {
 			continue
 		}
 		mac := strings.ToUpper(fields[1])
-		result[mac] = expiry
+		hostname := fields[3]
+		if hostname == "*" {
+			hostname = ""
+		}
+		result[mac] = dhcpLease{Expiry: expiry, Hostname: hostname}
+	}
+	return result
+}
+
+// parseEtcHosts reads /etc/hosts and returns a map of IP → hostname.
+func parseEtcHosts() map[string]string {
+	result := map[string]string{}
+	data, err := os.ReadFile("/etc/hosts")
+	if err != nil {
+		return result
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		ip := fields[0]
+		// Use the first hostname for each IP, skip localhost entries.
+		if ip == "127.0.0.1" || ip == "::1" {
+			continue
+		}
+		if _, exists := result[ip]; !exists {
+			result[ip] = fields[1]
+		}
 	}
 	return result
 }
@@ -283,15 +322,30 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 					continue
 				}
 				var connectedSince string
-				if expiry, ok := dhcpLeases[strings.ToUpper(mac)]; ok && expiry > 0 {
-					connSince := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
-					connectedSince = connSince.UTC().Format(time.RFC3339)
+				var hostname string
+				if lease, ok := dhcpLeases[strings.ToUpper(mac)]; ok {
+					hostname = lease.Hostname
+					if lease.Expiry > 0 {
+						connSince := time.Unix(lease.Expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
+						connectedSince = connSince.UTC().Format(time.RFC3339)
+					}
 				}
 				clients = append(clients, models.Client{
 					IPAddress: ip, MACAddress: mac,
+					Hostname:       hostname,
 					InterfaceName:  iface,
 					ConnectedSince: connectedSince,
 				})
+			}
+		}
+	}
+
+	// Resolve hostnames from /etc/hosts for clients missing a hostname.
+	hostsMap := parseEtcHosts()
+	for i := range clients {
+		if clients[i].Hostname == "" {
+			if h, ok := hostsMap[clients[i].IPAddress]; ok {
+				clients[i].Hostname = h
 			}
 		}
 	}

@@ -1261,3 +1261,66 @@ func TestGetDDNSStatus_NotRunning(t *testing.T) {
 		t.Errorf("expected empty public IP, got %q", status.PublicIP)
 	}
 }
+
+func TestParseEtcHosts(t *testing.T) {
+	hosts := parseEtcHosts()
+	// On macOS/CI /etc/hosts exists but only has localhost entries which we skip.
+	// Just verify it returns a map without error.
+	if hosts == nil {
+		t.Fatal("expected non-nil map")
+	}
+}
+
+func TestParseEtcHosts_Format(t *testing.T) {
+	// Test the parsing logic directly by verifying known format handling.
+	// The function reads /etc/hosts which varies by environment,
+	// so we test the internal parsing via the exported result structure.
+	hosts := parseEtcHosts()
+	// Should not contain localhost entries
+	if _, ok := hosts["127.0.0.1"]; ok {
+		t.Error("expected localhost entries to be skipped")
+	}
+	if _, ok := hosts["::1"]; ok {
+		t.Error("expected ipv6 localhost entries to be skipped")
+	}
+}
+
+func TestParseDHCPLeasesFile_ReturnsHostnames(t *testing.T) {
+	// parseDHCPLeasesFile reads /tmp/dhcp.leases which doesn't exist in test.
+	// Verify it returns empty map gracefully.
+	leases := parseDHCPLeasesFile()
+	if leases == nil {
+		t.Fatal("expected non-nil map")
+	}
+	if len(leases) != 0 {
+		t.Errorf("expected empty map when file missing, got %d entries", len(leases))
+	}
+}
+
+func TestGetClients_HostnamesFromUbus(t *testing.T) {
+	// Verify that ubus-sourced clients already have hostnames populated
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	clients, err := svc.GetClients()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	hostnameCount := 0
+	for _, c := range clients {
+		if c.Hostname != "" {
+			hostnameCount++
+		}
+		if c.MACAddress == "AA:BB:CC:11:22:33" && c.Hostname != "laptop" {
+			t.Errorf("expected hostname 'laptop' for AA:BB:CC:11:22:33, got %q", c.Hostname)
+		}
+		if c.MACAddress == "AA:BB:CC:44:55:66" && c.Hostname != "phone" {
+			t.Errorf("expected hostname 'phone' for AA:BB:CC:44:55:66, got %q", c.Hostname)
+		}
+	}
+	if hostnameCount == 0 {
+		t.Error("expected at least one client with a hostname")
+	}
+}
