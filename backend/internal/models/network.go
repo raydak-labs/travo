@@ -115,3 +115,20 @@ type DHCPReservation struct {
 	IP      string `json:"ip"`
 	Section string `json:"section,omitempty"`
 }
+
+// DDNSConfig holds Dynamic DNS provider configuration.
+type DDNSConfig struct {
+	Enabled    bool   `json:"enabled"`
+	Service    string `json:"service"`
+	Domain     string `json:"domain"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	LookupHost string `json:"lookup_host"`
+}
+
+// DDNSStatus holds the current DDNS service status.
+type DDNSStatus struct {
+	Running    bool   `json:"running"`
+	PublicIP   string `json:"public_ip"`
+	LastUpdate string `json:"last_update"`
+}

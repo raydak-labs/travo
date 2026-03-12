@@ -79,6 +79,12 @@ func (m *MockUCI) populate() {
 	m.setInternal("network", "wg0_peer0", "public_key", "mock_peer_public_key_base64")
 	m.setInternal("network", "wg0_peer0", "endpoint", "vpn.example.com:51820")
 	m.setInternal("network", "wg0_peer0", "allowed_ips", "0.0.0.0/0")
+	m.setInternal("ddns", "myddns", "enabled", "0")
+	m.setInternal("ddns", "myddns", "service_name", "duckdns.org")
+	m.setInternal("ddns", "myddns", "domain", "myrouter.duckdns.org")
+	m.setInternal("ddns", "myddns", "username", "mytoken")
+	m.setInternal("ddns", "myddns", "password", "")
+	m.setInternal("ddns", "myddns", "lookup_host", "myrouter.duckdns.org")
 }
 
 func (m *MockUCI) setInternal(config, section, option, value string) {

@@ -27,6 +27,8 @@ import type {
   DHCPReservation,
   RadioInfo,
   KillSwitchStatus,
+  DDNSConfig,
+  DDNSStatus,
 } from '@shared/index';
 
 export const mockSystemInfo: SystemInfo = {
@@ -588,4 +590,19 @@ export const mockWireguardProfiles: WireGuardProfile[] = [
 
 export const mockKillSwitchStatus: KillSwitchStatus = {
   enabled: false,
+};
+
+export const mockDDNSConfig: DDNSConfig = {
+  enabled: false,
+  service: '',
+  domain: '',
+  username: '',
+  password: '',
+  lookup_host: '',
+};
+
+export const mockDDNSStatus: DDNSStatus = {
+  running: false,
+  public_ip: '',
+  last_update: '',
 };

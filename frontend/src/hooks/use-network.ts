@@ -13,6 +13,8 @@ import type {
   SetAliasRequest,
   DNSEntry,
   DHCPReservation,
+  DDNSConfig,
+  DDNSStatus,
 } from '@shared/index';
 
 export function useNetworkStatus() {
@@ -264,6 +266,37 @@ export function useDetectWanType() {
     mutationFn: () => apiClient.get<WanDetectResult>(API_ROUTES.network.wanDetect),
     onError: (error) => {
       toast.error('WAN detection failed', { description: error.message });
+    },
+  });
+}
+
+export function useDDNSConfig() {
+  return useQuery({
+    queryKey: ['network', 'ddns'],
+    queryFn: () => apiClient.get<DDNSConfig>(API_ROUTES.network.ddns),
+  });
+}
+
+export function useDDNSStatus() {
+  return useQuery({
+    queryKey: ['network', 'ddnsStatus'],
+    queryFn: () => apiClient.get<DDNSStatus>(API_ROUTES.network.ddnsStatus),
+    refetchInterval: 30000,
+  });
+}
+
+export function useSetDDNSConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: DDNSConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.network.ddns, config),
+    onSuccess: () => {
+      toast.success('DDNS configuration updated');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'ddns'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'ddnsStatus'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update DDNS config', { description: error.message });
     },
   });
 }

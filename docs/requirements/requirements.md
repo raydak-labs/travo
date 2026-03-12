@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v22 — per-interface traffic charts on network page)
+> **Last updated:** 2026-03-12 (v23 — DDNS provider configuration)
 
 ---
 
@@ -208,8 +208,8 @@
 
 ### 4.5 Dynamic DNS
 
-- [ ] DDNS provider configuration (DuckDNS, No-IP, Cloudflare, etc.)
-- [ ] DDNS status indicator (current public IP, last update)
+- [x] DDNS provider configuration (DuckDNS, No-IP, Cloudflare, etc.)
+- [x] DDNS status indicator (current public IP, last update)
 - [ ] 🔮 Custom DDNS update URL
 
 ### 4.6 Future Services

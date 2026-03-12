@@ -1130,3 +1130,134 @@ func TestGetClients_NoIwCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDDNSConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	config, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Enabled {
+		t.Error("expected DDNS disabled by default")
+	}
+	if config.Service != "duckdns.org" {
+		t.Errorf("expected service 'duckdns.org', got %q", config.Service)
+	}
+	if config.Domain != "myrouter.duckdns.org" {
+		t.Errorf("expected domain 'myrouter.duckdns.org', got %q", config.Domain)
+	}
+	if config.Username != "mytoken" {
+		t.Errorf("expected username 'mytoken', got %q", config.Username)
+	}
+	if config.LookupHost != "myrouter.duckdns.org" {
+		t.Errorf("expected lookup_host 'myrouter.duckdns.org', got %q", config.LookupHost)
+	}
+}
+
+func TestSetDDNSConfig(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return []byte("ok"), nil
+		},
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	newConfig := models.DDNSConfig{
+		Enabled:    true,
+		Service:    "no-ip.com",
+		Domain:     "test.no-ip.org",
+		Username:   "user",
+		Password:   "pass",
+		LookupHost: "test.no-ip.org",
+	}
+	if err := svc.SetDDNSConfig(newConfig); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify config was written
+	config, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !config.Enabled {
+		t.Error("expected DDNS enabled")
+	}
+	if config.Service != "no-ip.com" {
+		t.Errorf("expected service 'no-ip.com', got %q", config.Service)
+	}
+	if config.Domain != "test.no-ip.org" {
+		t.Errorf("expected domain 'test.no-ip.org', got %q", config.Domain)
+	}
+	if config.Username != "user" {
+		t.Errorf("expected username 'user', got %q", config.Username)
+	}
+	if config.Password != "pass" {
+		t.Errorf("expected password 'pass', got %q", config.Password)
+	}
+	if config.LookupHost != "test.no-ip.org" {
+		t.Errorf("expected lookup_host 'test.no-ip.org', got %q", config.LookupHost)
+	}
+}
+
+func TestGetDDNSStatus(t *testing.T) {
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(cmd string, args ...string) ([]byte, error) {
+			if cmd == "pgrep" {
+				return []byte("123"), nil
+			}
+			if cmd == "cat" && len(args) > 0 {
+				if args[0] == "/var/run/ddns/myddns.ip" {
+					return []byte("203.0.113.42\n"), nil
+				}
+				if args[0] == "/var/run/ddns/myddns.update" {
+					return []byte("2026-03-12 10:00:00\n"), nil
+				}
+			}
+			return nil, fmt.Errorf("command not found")
+		},
+	}
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	status, err := svc.GetDDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !status.Running {
+		t.Error("expected DDNS running")
+	}
+	if status.PublicIP != "203.0.113.42" {
+		t.Errorf("expected public IP '203.0.113.42', got %q", status.PublicIP)
+	}
+	if status.LastUpdate != "2026-03-12 10:00:00" {
+		t.Errorf("expected last update '2026-03-12 10:00:00', got %q", status.LastUpdate)
+	}
+}
+
+func TestGetDDNSStatus_NotRunning(t *testing.T) {
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return nil, fmt.Errorf("not found")
+		},
+	}
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	status, err := svc.GetDDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.Running {
+		t.Error("expected DDNS not running")
+	}
+	if status.PublicIP != "" {
+		t.Errorf("expected empty public IP, got %q", status.PublicIP)
+	}
+}

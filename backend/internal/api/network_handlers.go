@@ -400,3 +400,47 @@ func GetBlockedClientsHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(blocked)
 	}
 }
+
+// GetDDNSConfigHandler handles GET /api/v1/network/ddns.
+func GetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		config, err := svc.GetDDNSConfig()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(config)
+	}
+}
+
+// SetDDNSConfigHandler handles PUT /api/v1/network/ddns.
+func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var config models.DDNSConfig
+		if err := c.BodyParser(&config); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if config.Enabled {
+			if config.Service == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "service is required when DDNS is enabled"})
+			}
+			if config.Domain == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "domain is required when DDNS is enabled"})
+			}
+		}
+		if err := svc.SetDDNSConfig(config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetDDNSStatusHandler handles GET /api/v1/network/ddns/status.
+func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		status, err := svc.GetDDNSStatus()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(status)
+	}
+}

@@ -836,3 +836,82 @@ func (n *NetworkService) GetBlockedClients() ([]string, error) {
 	}
 	return blocked, nil
 }
+
+// GetDDNSConfig reads the DDNS configuration from UCI (ddns.myddns).
+func (n *NetworkService) GetDDNSConfig() (models.DDNSConfig, error) {
+	opts, err := n.uci.GetAll("ddns", "myddns")
+	if err != nil {
+		// No ddns config — return defaults (disabled)
+		return models.DDNSConfig{}, nil
+	}
+	config := models.DDNSConfig{
+		Enabled:    opts["enabled"] == "1",
+		Service:    opts["service_name"],
+		Domain:     opts["domain"],
+		Username:   opts["username"],
+		Password:   opts["password"],
+		LookupHost: opts["lookup_host"],
+	}
+	return config, nil
+}
+
+// SetDDNSConfig writes the DDNS configuration to UCI and restarts ddns-scripts.
+func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
+	enabled := "0"
+	if config.Enabled {
+		enabled = "1"
+	}
+	if err := n.uci.Set("ddns", "myddns", "enabled", enabled); err != nil {
+		return fmt.Errorf("setting ddns enabled: %w", err)
+	}
+	if err := n.uci.Set("ddns", "myddns", "service_name", config.Service); err != nil {
+		return fmt.Errorf("setting ddns service_name: %w", err)
+	}
+	if err := n.uci.Set("ddns", "myddns", "domain", config.Domain); err != nil {
+		return fmt.Errorf("setting ddns domain: %w", err)
+	}
+	if err := n.uci.Set("ddns", "myddns", "username", config.Username); err != nil {
+		return fmt.Errorf("setting ddns username: %w", err)
+	}
+	if err := n.uci.Set("ddns", "myddns", "password", config.Password); err != nil {
+		return fmt.Errorf("setting ddns password: %w", err)
+	}
+	if err := n.uci.Set("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
+		return fmt.Errorf("setting ddns lookup_host: %w", err)
+	}
+	if err := n.uci.Commit("ddns"); err != nil {
+		return fmt.Errorf("committing ddns: %w", err)
+	}
+	_, _ = n.cmd.Run("/etc/init.d/ddns", "restart")
+	return nil
+}
+
+// GetDDNSStatus checks whether the ddns service is running and returns public IP info.
+func (n *NetworkService) GetDDNSStatus() (models.DDNSStatus, error) {
+	var status models.DDNSStatus
+
+	// Check if ddns process is running
+	if _, err := n.cmd.Run("pgrep", "-f", "ddns"); err == nil {
+		status.Running = true
+	}
+
+	// Read cached public IP from ddns update file
+	data, err := n.cmd.Run("cat", "/var/run/ddns/myddns.ip")
+	if err == nil {
+		ip := strings.TrimSpace(string(data))
+		if ip != "" {
+			status.PublicIP = ip
+		}
+	}
+
+	// Read last update timestamp
+	data, err = n.cmd.Run("cat", "/var/run/ddns/myddns.update")
+	if err == nil {
+		ts := strings.TrimSpace(string(data))
+		if ts != "" {
+			status.LastUpdate = ts
+		}
+	}
+
+	return status, nil
+}

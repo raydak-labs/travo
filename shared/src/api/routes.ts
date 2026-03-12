@@ -39,6 +39,8 @@ export const API_ROUTES = {
     dnsEntries: '/api/v1/network/dns/entries',
     interfaceState: '/api/v1/network/interfaces/:name/state',
     wanDetect: '/api/v1/network/wan/detect',
+    ddns: '/api/v1/network/ddns',
+    ddnsStatus: '/api/v1/network/ddns/status',
   },
   wifi: {
     scan: '/api/v1/wifi/scan',

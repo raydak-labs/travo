@@ -31,6 +31,8 @@ import {
   mockBlockedClients,
   mockRadios,
   mockKillSwitchStatus,
+  mockDDNSConfig,
+  mockDDNSStatus,
 } from './data';
 
 export const handlers = [
@@ -454,5 +456,15 @@ export const handlers = [
 
   http.get(API_ROUTES.system.alerts, () => {
     return HttpResponse.json({ alerts: [] });
+  }),
+
+  http.get(API_ROUTES.network.ddns, () => {
+    return HttpResponse.json(mockDDNSConfig);
+  }),
+  http.put(API_ROUTES.network.ddns, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+  http.get(API_ROUTES.network.ddnsStatus, () => {
+    return HttpResponse.json(mockDDNSStatus);
   }),
 ];

@@ -105,6 +105,23 @@ export interface DHCPReservation {
   readonly section?: string;
 }
 
+/** Dynamic DNS provider configuration */
+export interface DDNSConfig {
+  readonly enabled: boolean;
+  readonly service: string;
+  readonly domain: string;
+  readonly username: string;
+  readonly password: string;
+  readonly lookup_host: string;
+}
+
+/** Dynamic DNS service status */
+export interface DDNSStatus {
+  readonly running: boolean;
+  readonly public_ip: string;
+  readonly last_update: string;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

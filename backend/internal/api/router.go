@@ -76,6 +76,9 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/network/clients/block", BlockClientHandler(deps.Network))
 	v1.Post("/network/clients/unblock", UnblockClientHandler(deps.Network))
 	v1.Get("/network/clients/blocked", GetBlockedClientsHandler(deps.Network))
+	v1.Get("/network/ddns", GetDDNSConfigHandler(deps.Network))
+	v1.Put("/network/ddns", SetDDNSConfigHandler(deps.Network))
+	v1.Get("/network/ddns/status", GetDDNSStatusHandler(deps.Network))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))
