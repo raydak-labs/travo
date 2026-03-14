@@ -154,7 +154,7 @@ deploy_direct() {
     [[ -d "$frontend_dir" ]] || error "Frontend assets not found at $frontend_dir. Run with --build first."
     info "Uploading frontend assets..."
     ssh_cmd "mkdir -p /www/openwrt-travel-gui"
-    tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/openwrt-travel-gui/"
+    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/openwrt-travel-gui/"
   else
     info "Skipping frontend (--binary-only)."
   fi
@@ -190,15 +190,26 @@ restart_service() {
   info "Restarting openwrt-travel-gui service..."
   ssh_cmd "/etc/init.d/openwrt-travel-gui restart 2>/dev/null || /etc/init.d/openwrt-travel-gui start 2>/dev/null || true"
 
-  # Give it a moment to start
-  sleep 2
+  # Give procd time to (re)start the process. On slower routers or after a
+  # package install that triggers a reboot, the service may take longer.
+  info "Waiting for service to start..."
+  sleep 8
 
-  info "Checking service status..."
-  if ssh_cmd "pgrep -f openwrt-travel-gui >/dev/null 2>&1"; then
-    echo -e "${GREEN}✓${NC} Service is running."
-  else
-    warn "Service does not appear to be running. Check logs on the device."
-  fi
+  # Retry up to 5 times (3s apart) in case procd is still initializing.
+  local attempts=0
+  while [[ $attempts -lt 5 ]]; do
+    if ssh_cmd "pgrep -f openwrt-travel-gui >/dev/null 2>&1"; then
+      echo -e "${GREEN}✓${NC} Service is running."
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    if [[ $attempts -lt 5 ]]; then
+      warn "Service not yet detected, retrying in 3s... (${attempts}/5)"
+      sleep 3
+    fi
+  done
+  warn "Service not detected after $((8 + 4 * 3))s. Check logs with:"
+  warn "  ssh root@${ROUTER_IP} 'logread | grep openwrt-travel-gui | tail -20'"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
