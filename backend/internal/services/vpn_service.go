@@ -86,7 +86,8 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 func (v *VpnService) GetWireGuardStatus() (*models.WireGuardStatus, error) {
 	out, err := v.cmd.Run("wg", "show", "wg0", "dump")
 	if err != nil {
-		return nil, fmt.Errorf("wg show failed: %w", err)
+		// wg show fails with exit status 1 when interface doesn't exist (tunnel not active)
+		return &models.WireGuardStatus{}, nil
 	}
 	return ParseWgDump(string(out))
 }

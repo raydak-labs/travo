@@ -178,6 +178,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 }
 
 func main() {
+	log.SetOutput(os.Stdout)
 	cfg, showVersion, err := config.LoadConfig(os.Args[1:])
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)

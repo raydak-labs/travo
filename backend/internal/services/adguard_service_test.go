@@ -1,14 +1,17 @@
 package services
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"testing"
 )
 
 // mockAdGuardChecker is a test double for AdGuardChecker.
 type mockAdGuardChecker struct {
-	files    map[string]bool
-	commands map[string]struct {
+	files        map[string]bool
+	fileContents map[string]string
+	commands     map[string]struct {
 		output string
 		err    error
 	}
@@ -20,7 +23,8 @@ type mockAdGuardChecker struct {
 
 func newMockAdGuardChecker() *mockAdGuardChecker {
 	return &mockAdGuardChecker{
-		files: make(map[string]bool),
+		files:        make(map[string]bool),
+		fileContents: make(map[string]string),
 		commands: make(map[string]struct {
 			output string
 			err    error
@@ -52,6 +56,22 @@ func (m *mockAdGuardChecker) HTTPGet(url string) ([]byte, error) {
 		return r.body, r.err
 	}
 	return nil, fmt.Errorf("URL not mocked: %s", url)
+}
+
+func (m *mockAdGuardChecker) ReadFile(path string) ([]byte, error) {
+	if content, ok := m.fileContents[path]; ok {
+		return []byte(content), nil
+	}
+	if exists := m.files[path]; exists {
+		return nil, fmt.Errorf("file %s exists but no content defined in mock", path)
+	}
+	return nil, os.ErrNotExist
+}
+
+func (m *mockAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMode) error {
+	m.fileContents[path] = string(data)
+	m.files[path] = true
+	return nil
 }
 
 func TestIsInstalled_True(t *testing.T) {
@@ -351,5 +371,62 @@ func TestSetDNS_Enable_FailAddList(t *testing.T) {
 	err := svc.SetDNS(true)
 	if err == nil {
 		t.Error("expected error when add_list fails")
+	}
+}
+
+func TestGetConfig_FileNotFound(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	// Don't add the config file to the mock - it doesn't exist
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	content, err := svc.GetConfig()
+	if err == nil {
+		t.Error("expected error when config file doesn't exist")
+	}
+	if content != "" {
+		t.Error("expected empty content when file doesn't exist")
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("expected os.ErrNotExist error, got: %v", err)
+	}
+}
+
+func TestGetConfig_Success(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	testContent := `bind_host: 0.0.0.0
+bind_port: 3000
+users:
+  - name: admin
+    password: test`
+	mock.fileContents["/opt/AdGuardHome/AdGuardHome.yaml"] = testContent
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	content, err := svc.GetConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if content != testContent {
+		t.Errorf("expected content %q, got %q", testContent, content)
+	}
+}
+
+func TestSetConfig_Success(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.commands["/etc/init.d/adguardhome restart"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	testContent := `bind_host: 0.0.0.0
+bind_port: 3000`
+	err := svc.SetConfig(testContent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify the content was written
+	if written, ok := mock.fileContents["/opt/AdGuardHome/AdGuardHome.yaml"]; !ok || written != testContent {
+		t.Errorf("expected config to be written, got: %v", written)
 	}
 }

@@ -1,6 +1,9 @@
 package api
 
 import (
+	"errors"
+	"os"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/openwrt-travel-gui/backend/internal/services"
@@ -62,6 +65,9 @@ func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		content, err := adguard.GetConfig()
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) || (err.Error() != "" && errors.Unwrap(err) != nil && errors.Is(errors.Unwrap(err), os.ErrNotExist)) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "AdGuard config file not found"})
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"content": content})

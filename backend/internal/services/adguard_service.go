@@ -28,6 +28,10 @@ type AdGuardChecker interface {
 	RunCommand(name string, args ...string) (string, error)
 	// HTTPGet performs an HTTP GET and returns the body bytes.
 	HTTPGet(url string) ([]byte, error)
+	// ReadFile reads the contents of a file.
+	ReadFile(path string) ([]byte, error)
+	// WriteFile writes contents to a file.
+	WriteFile(path string, data []byte, perm os.FileMode) error
 }
 
 // RealAdGuardChecker performs real OS operations.
@@ -62,6 +66,14 @@ func (r *RealAdGuardChecker) HTTPGet(url string) ([]byte, error) {
 		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
 	}
 	return io.ReadAll(resp.Body)
+}
+
+func (r *RealAdGuardChecker) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
+
+func (r *RealAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(path, data, perm)
 }
 
 // AdGuardService provides status and statistics for AdGuard Home.
@@ -232,11 +244,11 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 	return nil
 }
 
-const adguardConfigPath = "/opt/AdGuardHome/AdGuardHome.yaml"
+const adguardConfigPath = "/etc/adguardhome/adguardhome.yaml"
 
 // GetConfig reads the AdGuard Home YAML configuration file.
 func (s *AdGuardService) GetConfig() (string, error) {
-	data, err := os.ReadFile(adguardConfigPath)
+	data, err := s.checker.ReadFile(adguardConfigPath)
 	if err != nil {
 		return "", fmt.Errorf("reading AdGuard config: %w", err)
 	}
@@ -245,7 +257,7 @@ func (s *AdGuardService) GetConfig() (string, error) {
 
 // SetConfig writes the AdGuard Home YAML configuration and restarts the service.
 func (s *AdGuardService) SetConfig(content string) error {
-	if err := os.WriteFile(adguardConfigPath, []byte(content), 0600); err != nil {
+	if err := s.checker.WriteFile(adguardConfigPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("writing AdGuard config: %w", err)
 	}
 	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {

@@ -34,15 +34,15 @@
 
 ## 0. Bug List / smaller changes
 
-- [ ] AdguardConfig button under Services: {"error":"reading AdGuard config: open /opt/AdGuardHome/AdGuardHome.yaml: no such file or directory"}
-- [ ] request fails http://192.168.1.1/api/v1/system/timezone: {"error":"uci show system.system: uci: Entry not found"}
-- [ ] Seeing in VPN view when wireguard is installed error calls like: {"error":"wg show failed: exit status 1"}
+- [x] AdguardConfig button under Services: {"error":"reading AdGuard config: open /opt/AdGuardHome/AdGuardHome.yaml: no such file or directory"}
+- [x] request fails http://192.168.1.1/api/v1/system/timezone: {"error":"uci show system.system: uci: Entry not found"}
+- [x] Seeing in VPN view when wireguard is installed error calls like: {"error":"wg show failed: exit status 1"}
 - [ ] Toggles should also be bluish in dark mode (currently they are grey)
-- [ ] Links should be moved from services to system
-- [ ] Link for LUCI is wrong (with this program this is moved to :8080)
-- [ ] Adguard config viewer / editor does not work
-- [ ] VPN Overview in VPN tab is not useful. Remove
-- [ ] Why is startup of this app logged as err in the logs? (errThu Mar 12 12:27:11 2026 daemon.err openwrt-travel-gui[12344]: 2026/03/12 12:27:11 Starting openwrt-travel-gui backend on :80 (mock=false))
+- [x] Links should be moved from services to system
+- [x] Link for LUCI is wrong (with this program this is moved to :8080)
+- [x] Adguard config viewer / editor does not work
+- [x] VPN Overview in VPN tab is not useful. Remove
+- [x] Why is startup of this app logged as err in the logs? (errThu Mar 12 12:27:11 2026 daemon.err openwrt-travel-gui[12344]: 2026/03/12 12:27:11 Starting openwrt-travel-gui backend on :80 (mock=false))
 
 ## 1. WiFi Management
 
@@ -270,6 +270,7 @@
 - [x] Detect timezone mismatch between device and browser (GL.iNet style)
 - [x] NTP server configuration
 - [x] Browser time sync on login — before JWT is issued, client POSTs its clock to `/api/v1/system/time-sync`; if skew > 60s the router clock is corrected via `date -s` (fixes clock-skew login loop on devices without NTP access at first boot)
+- [ ] lucy also has the function to sync with browser or sync with NTP server. Do we use the same?
 - [ ] Time sync feature needs validations. Assume when we travel to other countries. Is this correctly covered?
 - [ ] 🔮 NTP sync status indicator
 

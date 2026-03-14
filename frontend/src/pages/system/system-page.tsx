@@ -11,7 +11,10 @@ import {
   Upload,
   AlertTriangle,
   Zap,
+  ExternalLink,
+  FileEdit,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   useSystemInfo,
@@ -52,6 +56,7 @@ import {
   useNTPConfig,
   useSetNTPConfig,
 } from '@/hooks/use-system';
+import { useServices, useAdGuardConfig, useSetAdGuardConfig } from '@/hooks/use-services';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 const TIMEZONES = [
@@ -97,6 +102,9 @@ export function SystemPage() {
   const firmwareUpgrade = useFirmwareUpgrade();
   const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
   const setNTPMutation = useSetNTPConfig();
+  const { data: services = [] } = useServices();
+  const adguardConfigQuery = useAdGuardConfig();
+  const setAdGuardConfig = useSetAdGuardConfig();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firmwareInputRef = useRef<HTMLInputElement>(null);
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
@@ -116,6 +124,8 @@ export function SystemPage() {
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleOnTime, setScheduleOnTime] = useState('07:00');
   const [scheduleOffTime, setScheduleOffTime] = useState('22:00');
+  const [configEditorOpen, setConfigEditorOpen] = useState(false);
+  const [configContent, setConfigContent] = useState('');
 
   useEffect(() => {
     if (timezoneConfig?.zonename) {
@@ -138,8 +148,78 @@ export function SystemPage() {
     }
   }, [ledSchedule]);
 
+  const adguardRunning = services.some((s) => s.id === 'adguardhome' && s.state === 'running');
+  const adguardInstalled = services.some(
+    (s) => s.id === 'adguardhome' && s.state !== 'not_installed',
+  );
+
+  const handleOpenConfigEditor = async () => {
+    const result = await adguardConfigQuery.refetch();
+    if (result.data) {
+      setConfigContent(result.data.content);
+      setConfigEditorOpen(true);
+    } else if (result.error) {
+      toast.error(
+        result.error instanceof Error
+          ? result.error.message
+          : 'Failed to load AdGuard configuration',
+      );
+    }
+  };
+
+  const handleSaveConfig = () => {
+    setAdGuardConfig.mutate(configContent, {
+      onSuccess: () => setConfigEditorOpen(false),
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Quick Links */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Quick Links</CardTitle>
+          <ExternalLink className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <a
+                href={`http://${window.location.hostname}:8080/cgi-bin/luci`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                LuCI Web Interface
+              </a>
+            </Button>
+            {adguardRunning && (
+              <Button size="sm" variant="outline" asChild>
+                <a
+                  href={`http://${window.location.hostname}:3000`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  AdGuard Dashboard
+                </a>
+              </Button>
+            )}
+            {adguardInstalled && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleOpenConfigEditor}
+                disabled={adguardConfigQuery.isFetching}
+              >
+                <FileEdit className="mr-1.5 h-3.5 w-3.5" />
+                {adguardConfigQuery.isFetching ? 'Loading…' : 'AdGuard Config'}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* System Info */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -872,6 +952,32 @@ export function SystemPage() {
           </form>
         </CardContent>
       </Card>
+
+      <Dialog open={configEditorOpen} onOpenChange={setConfigEditorOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>AdGuard Home Configuration</DialogTitle>
+            <DialogDescription>
+              Edit the AdGuardHome.yaml configuration file. The service will be restarted after
+              saving.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            className="h-96 w-full rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+            value={configContent}
+            onChange={(e) => setConfigContent(e.target.value)}
+            spellCheck={false}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveConfig} disabled={setAdGuardConfig.isPending}>
+              {setAdGuardConfig.isPending ? 'Saving…' : 'Save & Restart'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

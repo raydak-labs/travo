@@ -132,6 +132,7 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 
 	if wwanErr == nil {
 		wwanIface := parseInterface("wwan", "phy0-sta0", wwanData, n.ubus)
+		wwanIface.Type = "wifi"
 		status.Interfaces = append(status.Interfaces, wwanIface)
 		// If wwan is up and wan is not, use wwan as the effective WAN
 		if wwanIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {

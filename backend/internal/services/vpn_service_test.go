@@ -195,12 +195,18 @@ func TestGetWireGuardStatus_EmptyOutput(t *testing.T) {
 
 func TestGetWireGuardStatus_CommandError(t *testing.T) {
 	u := uci.NewMockUCI()
-	cmd := &MockCommandRunner{Err: fmt.Errorf("command not found")}
+	cmd := &MockCommandRunner{Err: fmt.Errorf("exit status 1")}
 	svc := NewVpnServiceWithRunner(u, cmd)
 
-	_, err := svc.GetWireGuardStatus()
-	if err == nil {
-		t.Error("expected error when wg command fails")
+	status, err := svc.GetWireGuardStatus()
+	if err != nil {
+		t.Errorf("expected no error when wg command fails (tunnel not active), got: %v", err)
+	}
+	if status == nil {
+		t.Fatal("expected empty status, got nil")
+	}
+	if status.Interface != "" || status.PublicKey != "" || status.ListenPort != 0 || len(status.Peers) != 0 {
+		t.Errorf("expected empty status when tunnel not active, got: %+v", status)
 	}
 }
 

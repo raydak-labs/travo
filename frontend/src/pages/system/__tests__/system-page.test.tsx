@@ -104,4 +104,21 @@ describe('SystemPage', () => {
       expect(screen.getByRole('button', { name: 'Reboot' })).toBeInTheDocument();
     });
   });
+
+  it('renders Quick Links section', async () => {
+    renderSystemPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Quick Links')).toBeInTheDocument();
+    });
+  });
+
+  it('shows LuCI link with port 8080', async () => {
+    renderSystemPage();
+
+    await waitFor(() => {
+      const luciLink = screen.getByText('LuCI Web Interface').closest('a');
+      expect(luciLink).toHaveAttribute('href', expect.stringContaining(':8080'));
+    });
+  });
 });

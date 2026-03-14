@@ -51,14 +51,6 @@ function renderVpnPage() {
 }
 
 describe('VpnPage', () => {
-  it('renders VPN overview section', async () => {
-    renderVpnPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('VPN Overview')).toBeInTheDocument();
-    });
-  });
-
   it('shows WireGuard connection status', async () => {
     renderVpnPage();
 

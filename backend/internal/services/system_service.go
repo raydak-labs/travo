@@ -196,11 +196,32 @@ func (s *SystemService) Reboot() error {
 	return nil
 }
 
+// findSystemSection returns the UCI section name for the system-type section.
+// On real OpenWRT it's an anonymous section (e.g. cfg01e48a); in mocks it may be "system".
+func (s *SystemService) findSystemSection() (string, map[string]string, error) {
+	// Try the named section first (works in mocks and some configs)
+	if opts, err := s.uci.GetAll("system", "system"); err == nil {
+		return "system", opts, nil
+	}
+	// Fall back to scanning for the anonymous system-type section
+	sections, err := s.uci.GetSections("system")
+	if err != nil {
+		return "", nil, err
+	}
+	for name, opts := range sections {
+		if opts[".type"] == "system" {
+			return name, opts, nil
+		}
+	}
+	return "", nil, fmt.Errorf("no system-type section found in UCI")
+}
+
 // GetTimezone returns the current timezone configuration.
 func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
-	opts, err := s.uci.GetAll("system", "system")
+	_, opts, err := s.findSystemSection()
 	if err != nil {
-		return models.TimezoneConfig{}, err
+		// Section may not exist — return empty default
+		return models.TimezoneConfig{}, nil
 	}
 	return models.TimezoneConfig{
 		Zonename: opts["zonename"],
@@ -210,10 +231,14 @@ func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
 
 // SetTimezone updates the timezone configuration.
 func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
-	if err := s.uci.Set("system", "system", "zonename", config.Zonename); err != nil {
+	section, _, err := s.findSystemSection()
+	if err != nil {
+		return fmt.Errorf("finding system section: %w", err)
+	}
+	if err := s.uci.Set("system", section, "zonename", config.Zonename); err != nil {
 		return fmt.Errorf("setting zonename: %w", err)
 	}
-	if err := s.uci.Set("system", "system", "timezone", config.Timezone); err != nil {
+	if err := s.uci.Set("system", section, "timezone", config.Timezone); err != nil {
 		return fmt.Errorf("setting timezone: %w", err)
 	}
 	return s.uci.Commit("system")
@@ -255,7 +280,11 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 
 // SetHostname changes the device hostname via UCI and applies it.
 func (s *SystemService) SetHostname(hostname string) error {
-	if err := s.uci.Set("system", "system", "hostname", hostname); err != nil {
+	section, _, err := s.findSystemSection()
+	if err != nil {
+		return fmt.Errorf("finding system section: %w", err)
+	}
+	if err := s.uci.Set("system", section, "hostname", hostname); err != nil {
 		return err
 	}
 	return s.uci.Commit("system")

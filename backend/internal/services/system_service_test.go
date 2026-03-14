@@ -504,3 +504,25 @@ func TestSetSetupComplete_CreatesFlag(t *testing.T) {
 		t.Errorf("expected flag file to exist: %v", err)
 	}
 }
+
+func TestGetTimezone_MissingSection(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	u := uci.NewMockUCI()
+	svc := NewSystemService(ub, u, &MockStorageProvider{})
+
+	// Delete the system section to simulate it missing
+	err := u.DeleteSection("system", "system")
+	if err != nil {
+		t.Fatalf("failed to delete section: %v", err)
+	}
+
+	// GetTimezone should return defaults, not error
+	config, err := svc.GetTimezone()
+	if err != nil {
+		t.Errorf("expected no error when section missing, got: %v", err)
+	}
+	// Should return empty/default values
+	if config.Zonename != "" || config.Timezone != "" {
+		t.Errorf("expected empty timezone config when section missing, got zonename=%q timezone=%q", config.Zonename, config.Timezone)
+	}
+}
