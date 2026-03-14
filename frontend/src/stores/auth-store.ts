@@ -16,6 +16,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: !!getToken(),
 
   login: async (password: string, rememberMe = true) => {
+    try {
+      await apiClient.post(API_ROUTES.system.timeSync, { client_time_ms: Date.now() });
+    } catch {
+      // best-effort clock sync — don't fail login if this fails
+    }
     const response = await apiClient.post<LoginResponse>(API_ROUTES.auth.login, { password });
     setToken(response.token, rememberMe);
     set({ token: response.token, isAuthenticated: true });

@@ -1,8 +1,11 @@
 package api
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -267,6 +270,39 @@ func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// SyncTimeHandler handles POST /api/v1/system/time-sync (unauthenticated).
+// Sets the system clock to the client's browser time, fixing clock-skew issues
+// on devices that boot without NTP access. Only applied when skew > 60 seconds.
+func SyncTimeHandler() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req struct {
+			ClientTimeMs int64 `json:"client_time_ms"`
+		}
+		if err := c.BodyParser(&req); err != nil || req.ClientTimeMs <= 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "client_time_ms is required",
+			})
+		}
+
+		clientTime := time.UnixMilli(req.ClientTimeMs)
+		skew := clientTime.Sub(time.Now()).Abs()
+		if skew < 60*time.Second {
+			return c.JSON(fiber.Map{"synced": false, "reason": "clock already accurate"})
+		}
+
+		epoch := clientTime.Unix()
+		if err := exec.Command("date", "-s", fmt.Sprintf("@%d", epoch)).Run(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to set system time",
+			})
+		}
+		// Persist to hardware clock if available (best-effort)
+		_ = exec.Command("hwclock", "-w").Run()
+
+		return c.JSON(fiber.Map{"synced": true, "set_to": clientTime.UTC().Format(time.RFC3339)})
 	}
 }
 

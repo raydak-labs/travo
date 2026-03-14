@@ -118,7 +118,7 @@ func (a *AuthService) Middleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		path := c.Path()
 
-		if !strings.HasPrefix(path, "/api/") || path == "/api/health" || path == "/api/v1/auth/login" || path == "/api/v1/ws" {
+		if !strings.HasPrefix(path, "/api/") || path == "/api/health" || path == "/api/v1/auth/login" || path == "/api/v1/ws" || path == "/api/v1/system/time-sync" {
 			return c.Next()
 		}
 

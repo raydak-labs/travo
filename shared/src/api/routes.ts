@@ -22,6 +22,7 @@ export const API_ROUTES = {
     firmwareUpgrade: '/api/v1/system/firmware/upgrade',
     ntp: '/api/v1/system/ntp',
     setupComplete: '/api/v1/system/setup-complete',
+    timeSync: '/api/v1/system/time-sync',
     alerts: '/api/v1/system/alerts',
   },
   network: {
