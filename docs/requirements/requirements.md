@@ -32,15 +32,16 @@
 
 ---
 
-## 0. Bug List
+## 0. Bug List / smaller changes
 
-- [ ] Refresh in browser on subpaths does not work -> for example http://192.168.1.1/dashboard
+- [ ] AdguardConfig button under Services: {"error":"reading AdGuard config: open /opt/AdGuardHome/AdGuardHome.yaml: no such file or directory"}
 - [ ] request fails http://192.168.1.1/api/v1/system/timezone: {"error":"uci show system.system: uci: Entry not found"}
+- [ ] Seeing in VPN view when wireguard is installed error calls like: {"error":"wg show failed: exit status 1"}
 - [ ] Toggles should also be bluish in dark mode (currently they are grey)
 - [ ] Links should be moved from services to system
 - [ ] Link for LUCI is wrong (with this program this is moved to :8080)
 - [ ] Adguard config viewer / editor does not work
-- [ ] VPN list are not equal. Why does tailscale not available look different then other? this should be equal
+- [ ] VPN Overview in VPN tab is not useful. Remove
 - [ ] Why is startup of this app logged as err in the logs? (errThu Mar 12 12:27:11 2026 daemon.err openwrt-travel-gui[12344]: 2026/03/12 12:27:11 Starting openwrt-travel-gui backend on :80 (mock=false))
 
 ## 1. WiFi Management
@@ -60,6 +61,7 @@
 - [x] Priority ordering of saved networks (auto-connect preference)
 - [x] Auto-reconnect to known networks when connection drops
 - [x] Hidden network support (manual SSID entry)
+- [ ] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with optional “prefer 5 GHz” for the STA. See [Wifi dual-band bundling (plan)](../plans/wifi-dual-band-bundling.md).
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 
@@ -69,7 +71,7 @@
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
-- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes)
+- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). We use `wifi up` only when an AP was re-enabled; SSID/key-only fixes are committed without running wifi. All wireless apply uses `wifi up`, not `wifi reload`, to avoid ath11k/IPQ6018 crash loops. Auto-reconnect cron script also uses `wifi up`.
 - [ ] We can add options to disable wifi but those should be with clear warnings.
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)
@@ -162,6 +164,9 @@
 - [x] Show connection status (handshake time, transfer stats)
 - [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
 - [x] Kill switch (block traffic if VPN drops)
+- [ ] Also install luci-proto-wireguard for wireguard
+- [ ] VPN probably needs own interfaces, zones, rules etc? Currently wireguard things nothing works. Added `docs/plans/wireguard_client_openwrt_25.12.md` as reference
+- [ ] Maybe add a button in VPN page to verify the configurations (which checks, interfaces, zones etc) and add and button to update/create the necessary things required for VPN.
 - [ ] Split tunneling (route only selected traffic through VPN)
 - [ ] VPN + AdGuard interplay configuration
 

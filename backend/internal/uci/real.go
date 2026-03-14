@@ -8,6 +8,12 @@ import (
 )
 
 var validIdentifier = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+var validSectionType = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`) // OpenWrt uses wifi-iface, wifi-device, etc.
+// validSectionNameForList allows named sections (zone_wan) and anonymous (@zone[0]) for firewall etc.
+var validSectionNameForList = regexp.MustCompile(`^([a-zA-Z0-9_]+|@[a-zA-Z0-9_]+\[\d+\])$`)
+
+// validListValue allows identifiers + hyphens + dots + slashes + colons for IPs/CIDRs/interface names.
+var validListValue = regexp.MustCompile(`^[a-zA-Z0-9_.:/+-]+$`)
 
 // RealUCI implements the UCI interface by shelling out to the uci CLI.
 type RealUCI struct{}
@@ -132,8 +138,8 @@ func (r *RealUCI) AddSection(config, section, stype string) error {
 	if err := validateIdentifier("section", section); err != nil {
 		return err
 	}
-	if err := validateIdentifier("stype", stype); err != nil {
-		return err
+	if !validSectionType.MatchString(stype) {
+		return fmt.Errorf("uci: invalid stype %q", stype)
 	}
 
 	// "uci set config.section=stype" creates a named section of the given type
@@ -141,6 +147,29 @@ func (r *RealUCI) AddSection(config, section, stype string) error {
 	out, err := exec.Command("uci", "set", arg).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("uci add section %s.%s: %s", config, section, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// AddList appends a value to a UCI list option (e.g. firewall zone network list).
+// Section may be a named section (zone_wan) or anonymous (@zone[0]).
+func (r *RealUCI) AddList(config, section, option, value string) error {
+	if err := validateIdentifier("config", config); err != nil {
+		return err
+	}
+	if !validSectionNameForList.MatchString(section) {
+		return fmt.Errorf("uci: invalid section name for add_list %q", section)
+	}
+	if err := validateIdentifier("option", option); err != nil {
+		return err
+	}
+	if !validListValue.MatchString(value) {
+		return fmt.Errorf("uci: invalid value for add_list %q", value)
+	}
+	arg := fmt.Sprintf("%s.%s.%s=%s", config, section, option, value)
+	out, err := exec.Command("uci", "add_list", arg).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("uci add_list %s: %s", arg, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

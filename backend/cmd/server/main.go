@@ -69,23 +69,50 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 
 	systemSvc := services.NewSystemService(ub, u, storage)
 	networkSvc := services.NewNetworkService(u, ub)
-	wifiSvc := services.NewWifiService(u, ub)
+	var wifiSvc *services.WifiService
+	if cfg.MockMode {
+		wifiSvc = services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{})
+	} else {
+		wifiSvc = services.NewWifiService(u, ub) // uses apply+confirm instead of wifi up
+	}
 
-	// Ensure WiFi AP is up on every startup/reboot.
-	// Runs in a background goroutine with a startup delay so the HTTP server is
-	// immediately available and so the WiFi subsystem (netifd/hostapd) has time
-	// to fully initialize before we call "wifi reload". Running it synchronously
-	// at boot causes a race: the backend starts only ~2s after wifi-scripts and
-	// an immediate reload interferes with ongoing AP/STA initialization.
-	// Skipped in mock mode — mock UCI state is already correctly configured.
+	// Fix wireless UCI on startup (country/channel, missing SSID/key on existing APs,
+	// enable radios when AP enabled). Apply via apply+confirm so fixes take effect without reboot.
+	// Uses crash guard per AGENTS.md mandatory failsafe pattern.
 	if !cfg.MockMode {
 		go func() {
 			time.Sleep(30 * time.Second)
-			if fixed, err := wifiSvc.EnsureAPRunning(); err != nil {
+			guardFile := "/etc/openwrt-travel-gui/ap-health-in-progress"
+			// If guard exists, a previous apply crashed — skip to avoid reboot loop.
+			if _, err := os.Stat(guardFile); err == nil {
+				log.Printf("WARNING: WiFi AP health guard file exists (%s) — skipping apply (previous run may have crashed). Remove guard and redeploy to retry.", guardFile)
+				return
+			}
+			fixed, needApply, err := wifiSvc.EnsureAPRunning()
+			if err != nil {
 				log.Printf("WARNING: WiFi AP health check failed: %v", err)
+				return
+			}
+			if fixed && needApply {
+				// Write guard before apply — cleared on success or by deploy-local.sh.
+				_ = os.MkdirAll("/etc/openwrt-travel-gui", 0750)
+				_ = os.WriteFile(guardFile, []byte("ap-health"), 0600)
+				if applyErr := wifiSvc.ApplyWireless(); applyErr != nil {
+					log.Printf("WiFi AP health: UCI fixes committed. Apply failed (use LuCI or reboot): %v", applyErr)
+				} else {
+					log.Printf("WiFi AP health: UCI fixes applied and confirmed.")
+					_ = os.Remove(guardFile)
+				}
 			} else if fixed {
-				log.Printf("WiFi AP health check: reset misconfigured APs to defaults (SSID: %q, password: %q)",
-					services.DefaultAPSSID, services.DefaultAPKey)
+				log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
+			}
+		}()
+		// Replace any old auto-reconnect script that still had "wifi reload" with
+		// the safe "wifi up" version, so cron does not crash the device every minute.
+		go func() {
+			time.Sleep(5 * time.Second)
+			if enabled, _ := wifiSvc.GetAutoReconnect(); enabled {
+				wifiSvc.WriteReconnectScriptSafe()
 			}
 		}()
 	}

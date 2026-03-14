@@ -100,6 +100,26 @@ func TestMockUCIAddSectionAlreadyExists(t *testing.T) {
 	}
 }
 
+func TestMockUCIAddList(t *testing.T) {
+	m := NewMockUCI()
+	// zone_wan already exists from populate() — just add wwan to its network list
+	if err := m.AddList("firewall", "zone_wan", "network", "wwan"); err != nil {
+		t.Fatalf("add_list: %v", err)
+	}
+	opts, _ := m.GetAll("firewall", "zone_wan")
+	if opts["network"] != "wwan" {
+		t.Errorf("expected network=wwan, got %q", opts["network"])
+	}
+}
+
+func TestMockUCIAddListSectionNotFound(t *testing.T) {
+	m := NewMockUCI()
+	err := m.AddList("firewall", "nonexistent", "network", "wwan")
+	if err == nil {
+		t.Error("expected error when section does not exist")
+	}
+}
+
 func TestMockUCIDeleteSection(t *testing.T) {
 	m := NewMockUCI()
 	if err := m.DeleteSection("network", "wan"); err != nil {

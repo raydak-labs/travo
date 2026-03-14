@@ -9,7 +9,8 @@
 #   2. Uploads the init.d service script
 #   3. Uploads the UCI config (password, port, etc.)
 #   4. Creates /www/openwrt-travel-gui
-#   5. Enables the service (does not start — no binary yet)
+#   5. Ensures initial wireless AP state (radios + default_radio0/1, default SSID/key)
+#   6. Enables the service (does not start — no binary yet)
 #
 # Usage:
 #   ./scripts/setup-local.sh [options]
@@ -27,7 +28,7 @@ ROUTER_USER="root"
 PASSWORD="admin"
 MOVE_LUCI=true
 LEGACY_SCP=true
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -140,11 +141,54 @@ scp_cmd "$TMPCONFIG" "${REMOTE}:/etc/config/openwrt-travel-gui"
 info "Creating /www/openwrt-travel-gui..."
 ssh_cmd "mkdir -p /www/openwrt-travel-gui"
 
-# Step 5: Mark setup as complete (skip the first-run wizard)
+# Step 5: Initial wireless AP state (radios + default_radio0 / default_radio1, no STA changes)
+info "Ensuring initial wireless AP state..."
+WIRELESS_SCRIPT="${SCRIPT_DIR}/setup-wireless-ap.sh"
+if [[ -f "$WIRELESS_SCRIPT" ]]; then
+  # Try to get session via LuCI HTTP RPC (works when ubus session login is not available on device)
+  UCI_SID=""
+  LUCI_AUTH=$(curl -s -X POST "http://${ROUTER_IP}:8080/cgi-bin/luci/rpc/auth" \
+    -H "Content-Type: application/json" \
+    -d '{"id":1,"method":"login","params":["root",""]}' \
+    --connect-timeout 3 2>/dev/null) || true
+  if echo "$LUCI_AUTH" | grep -q '"result":"[^"]*"'; then
+    UCI_SID=$(echo "$LUCI_AUTH" | sed -n 's/.*"result":"\([^"]*\)".*/\1/p' | head -1)
+  fi
+  scp_cmd "$WIRELESS_SCRIPT" "${REMOTE}:/tmp/setup-wireless-ap.sh"
+  WIRELESS_OUT=$(ssh_cmd "UCI_APPLY_SID=${UCI_SID:-} sh /tmp/setup-wireless-ap.sh 2>&1; rm -f /tmp/setup-wireless-ap.sh" || true)
+  echo "$WIRELESS_OUT" | grep -E '^\[setup-wireless\]' || true
+  if echo "$WIRELESS_OUT" | grep -q 'UCI_APPLY_SESSION='; then
+    UCI_SID=$(echo "$WIRELESS_OUT" | grep 'UCI_APPLY_SESSION=' | tail -1 | sed 's/^.*UCI_APPLY_SESSION=//')
+  fi
+  if [[ -n "$UCI_SID" ]]; then
+    info "Sending uci confirm (rollback window ~25s)..."
+    _confirmed=false
+    for _i in $(seq 1 13); do
+      sleep 2
+      if ssh_cmd "ubus call uci confirm '{\"ubus_rpc_session\":\"$UCI_SID\"}'" 2>/dev/null; then
+        _confirmed=true
+        break
+      fi
+    done
+    if [[ "$_confirmed" != "true" ]]; then
+      warn "Could not confirm within window; device may roll back wireless config in a few seconds."
+    fi
+  else
+    echo -e "${YELLOW}  To bring WiFi up: use LuCI → Network → Wireless → Save & Apply, or reboot the device.${NC}"
+  fi
+  info "Verifying AP entries on device..."
+  if ! ssh_cmd "uci get wireless.default_radio0.ssid >/dev/null 2>&1 && uci get wireless.default_radio1.ssid >/dev/null 2>&1"; then
+    error "Wireless AP verification failed: default_radio0 or default_radio1 missing or empty on device. Check wireless config (e.g. ssh ${REMOTE} 'uci show wireless')."
+  fi
+else
+  warn "setup-wireless-ap.sh not found — skipping wireless AP setup."
+fi
+
+# Step 6: Mark setup as complete (skip the first-run wizard)
 info "Marking setup as complete..."
 ssh_cmd "mkdir -p /etc/openwrt-travel-gui && touch /etc/openwrt-travel-gui/setup-complete"
 
-# Step 6: Enable service (starts on next boot or manual start)
+# Step 7: Enable service (starts on next boot or manual start)
 info "Enabling service..."
 ssh_cmd "/etc/init.d/openwrt-travel-gui enable"
 

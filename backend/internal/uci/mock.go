@@ -33,11 +33,13 @@ func (m *MockUCI) populate() {
 	m.setInternal("network", "lan", "ipaddr", "192.168.8.1")
 	m.setInternal("network", "lan", "netmask", "255.255.255.0")
 	m.setInternal("wireless", "radio0", "type", "mac80211")
+	m.setInternal("wireless", "radio0", "country", "US")
 	m.setInternal("wireless", "radio0", "channel", "6")
 	m.setInternal("wireless", "radio0", "band", "2g")
 	m.setInternal("wireless", "radio0", "htmode", "HT20")
 	m.setInternal("wireless", "radio0", "disabled", "0")
 	m.setInternal("wireless", "radio1", "type", "mac80211")
+	m.setInternal("wireless", "radio1", "country", "US")
 	m.setInternal("wireless", "radio1", "channel", "36")
 	m.setInternal("wireless", "radio1", "band", "5g")
 	m.setInternal("wireless", "radio1", "htmode", "VHT80")
@@ -46,12 +48,12 @@ func (m *MockUCI) populate() {
 	m.setInternal("wireless", "default_radio0", "mode", "ap")
 	m.setInternal("wireless", "default_radio0", "ssid", "OpenWrt-Travel")
 	m.setInternal("wireless", "default_radio0", "encryption", "psk2")
-	m.setInternal("wireless", "default_radio0", "key", "travel12345")
+	m.setInternal("wireless", "default_radio0", "key", "travelrouter")
 	m.setInternal("wireless", "default_radio1", "device", "radio1")
 	m.setInternal("wireless", "default_radio1", "mode", "ap")
 	m.setInternal("wireless", "default_radio1", "ssid", "OpenWrt-Travel-5G")
 	m.setInternal("wireless", "default_radio1", "encryption", "psk2")
-	m.setInternal("wireless", "default_radio1", "key", "travel12345")
+	m.setInternal("wireless", "default_radio1", "key", "travelrouter")
 	m.setInternal("wireless", "sta0", "device", "radio0")
 	m.setInternal("wireless", "sta0", "mode", "sta")
 	m.setInternal("wireless", "sta0", "ssid", "Hotel-WiFi")
@@ -71,6 +73,18 @@ func (m *MockUCI) populate() {
 	m.setInternal("firewall", "defaults", "input", "ACCEPT")
 	m.setInternal("firewall", "defaults", "output", "ACCEPT")
 	m.setInternal("firewall", "defaults", "forward", "REJECT")
+	m.setInternal("firewall", "zone_lan", "name", "lan")
+	m.setInternal("firewall", "zone_lan", "input", "ACCEPT")
+	m.setInternal("firewall", "zone_lan", "output", "ACCEPT")
+	m.setInternal("firewall", "zone_lan", "forward", "ACCEPT")
+	m.setInternal("firewall", "zone_lan", "network", "lan")
+	m.setInternal("firewall", "zone_wan", "name", "wan")
+	m.setInternal("firewall", "zone_wan", "input", "REJECT")
+	m.setInternal("firewall", "zone_wan", "output", "ACCEPT")
+	m.setInternal("firewall", "zone_wan", "forward", "DROP")
+	m.setInternal("firewall", "zone_wan", "masq", "1")
+	m.setInternal("firewall", "zone_wan", "mtu_fix", "1")
+	m.setInternal("firewall", "zone_wan", "network", "wan wan6")
 	m.setInternal("network", "wg0", "proto", "wireguard")
 	m.setInternal("network", "wg0", "private_key", "mock_private_key_base64")
 	m.setInternal("network", "wg0", "addresses", "10.0.0.2/24")
@@ -152,6 +166,17 @@ func (m *MockUCI) AddSection(config, section, stype string) error {
 		return fmt.Errorf("uci: section %s.%s already exists", config, section)
 	}
 	m.data[config][section] = map[string]string{".type": stype}
+	return nil
+}
+
+func (m *MockUCI) AddList(config, section, option, value string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.data[config] == nil || m.data[config][section] == nil {
+		return fmt.Errorf("uci: section not found %s.%s", config, section)
+	}
+	// Mock: store as single value (real UCI list can have multiple; we don't track list multiplicity)
+	m.data[config][section][option] = value
 	return nil
 }
 

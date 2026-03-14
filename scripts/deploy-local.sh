@@ -38,7 +38,7 @@ DO_RESTART=true
 RESTART_ONLY=false
 BINARY_ONLY=false
 IPK_PATH=""
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -187,6 +187,10 @@ deploy_package() {
 
 # ── Restart ───────────────────────────────────────────────────────────────────
 restart_service() {
+  # Clear the AP health check crash guard so the freshly deployed binary gets
+  # a clean attempt on startup. A manual redeploy is explicit permission to retry.
+  ssh_cmd "rm -f /etc/openwrt-travel-gui/ap-health-in-progress /etc/openwrt-travel-gui/autoreconnect-crash-guard" || true
+
   info "Restarting openwrt-travel-gui service..."
   ssh_cmd "/etc/init.d/openwrt-travel-gui restart 2>/dev/null || /etc/init.d/openwrt-travel-gui start 2>/dev/null || true"
 

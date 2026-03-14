@@ -39,3 +39,4 @@ Missing features:
 
 Needs validation (ignore for now):
 - I think we need to add this also to our startup script (install script / cleanup script): https://forum.openwrt.org/t/gl-inet-ax1800-new-router-openwrt-support/105163/794
+- https://openwrt.org/docs/techref/ubus?s[]=option&s[]=protocol

@@ -124,6 +124,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/firmware/upgrade',
       '/api/v1/system/ntp',
       '/api/v1/system/setup-complete',
+      '/api/v1/system/time-sync',
       '/api/v1/system/alerts',
       '/api/v1/network/status',
       '/api/v1/network/wan',

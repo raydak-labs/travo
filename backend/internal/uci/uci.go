@@ -8,5 +8,6 @@ type UCI interface {
 	GetSections(config string) (map[string]map[string]string, error)
 	Commit(config string) error
 	AddSection(config, section, stype string) error
+	AddList(config, section, option, value string) error
 	DeleteSection(config, section string) error
 }
