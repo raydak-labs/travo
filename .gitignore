@@ -53,3 +53,4 @@ pnpm-debug.log*
 # Misc
 *.tgz
 *.tar.gz
+.claude/settings.local.json
