@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -833,5 +834,183 @@ func TestSetAutoReconnect_Disable(t *testing.T) {
 	// Verify script was removed
 	if _, err := os.Stat(tmpDir + "/wifi-reconnect.sh"); err == nil {
 		t.Error("expected script to be removed")
+	}
+}
+
+func TestEnsureAPRunning_AlreadyHealthy(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fixed {
+		t.Error("expected no fixes when all APs are already healthy")
+	}
+}
+
+// TestEnsureAPRunning_DisabledAPSection verifies that disabled APs are left alone.
+// Disabled is an explicit user choice; re-enabling can crash the ath11k driver.
+func TestEnsureAPRunning_DisabledAPSection(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio1", "disabled", "1")
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fixed {
+		t.Error("expected no fix: disabled AP must not be re-enabled")
+	}
+	val, _ := u.Get("wireless", "default_radio1", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled to remain '1', got %q", val)
+	}
+}
+
+func TestEnsureAPRunning_EmptySSID(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "ssid", "")
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !fixed {
+		t.Error("expected fix for empty SSID")
+	}
+	val, _ := u.Get("wireless", "default_radio0", "ssid")
+	if val != DefaultAPSSID {
+		t.Errorf("expected ssid=%q after fix, got %q", DefaultAPSSID, val)
+	}
+}
+
+func TestEnsureAPRunning_MissingKeyOnEncryptedAP(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "key", "")
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !fixed {
+		t.Error("expected fix for missing key on encrypted AP")
+	}
+	val, _ := u.Get("wireless", "default_radio0", "key")
+	if val != DefaultAPKey {
+		t.Errorf("expected key=%q after fix, got %q", DefaultAPKey, val)
+	}
+}
+
+// TestEnsureAPRunning_DisabledRadio verifies that a disabled radio is left alone.
+// The health check does not touch disabled/enabled state of radios or APs.
+func TestEnsureAPRunning_DisabledRadio(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "radio1", "disabled", "1")
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fixed {
+		t.Error("expected no fix: disabled radio must not be re-enabled")
+	}
+	val, _ := u.Get("wireless", "radio1", "disabled")
+	if val != "1" {
+		t.Errorf("expected radio1 disabled to remain '1', got %q", val)
+	}
+}
+
+// TestEnsureAPRunning_FixesAllBrokenAPs verifies fixes applied across multiple APs.
+// default_radio0 disabled=1 → skipped entirely.
+// default_radio1 ssid="" → fixed.
+func TestEnsureAPRunning_FixesAllBrokenAPs(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "1") // disabled → skip entirely
+	_ = u.Set("wireless", "default_radio1", "ssid", "")      // enabled with empty SSID → fix
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !fixed {
+		t.Error("expected fix for default_radio1 empty SSID")
+	}
+	// default_radio0 must remain disabled (not touched)
+	val0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if val0 != "1" {
+		t.Errorf("expected default_radio0 disabled to remain '1', got %q", val0)
+	}
+	// default_radio1 SSID must be restored
+	val1, _ := u.Get("wireless", "default_radio1", "ssid")
+	if val1 != DefaultAPSSID {
+		t.Errorf("expected default_radio1 ssid=%q, got %q", DefaultAPSSID, val1)
+	}
+}
+
+func TestEnsureAPRunning_OpenAPNoKeyFix(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Open AP: no encryption, no key — this is a valid intentional configuration.
+	_ = u.Set("wireless", "default_radio0", "encryption", "")
+	_ = u.Set("wireless", "default_radio0", "key", "")
+
+	fixed, err := svc.EnsureAPRunning()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fixed {
+		t.Error("expected no fix for open AP with empty key")
+	}
+	val, _ := u.Get("wireless", "default_radio0", "key")
+	if val != "" {
+		t.Errorf("expected key to remain empty for open AP, got %q", val)
+	}
+}
+
+// errGetSectionsUCI wraps a real UCI but makes GetSections return an error.
+type errGetSectionsUCI struct {
+	uci.UCI
+}
+
+func (e *errGetSectionsUCI) GetSections(_ string) (map[string]map[string]string, error) {
+	return nil, errors.New("simulated GetSections failure")
+}
+
+func TestEnsureAPRunning_GetSectionsError(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	svc := NewWifiServiceWithReloader(&errGetSectionsUCI{uci.NewMockUCI()}, ub, &NoopWifiReloader{})
+
+	fixed, err := svc.EnsureAPRunning()
+	if err == nil {
+		t.Fatal("expected error when GetSections fails")
+	}
+	if fixed {
+		t.Error("expected fixed=false when GetSections fails")
+	}
+}
+
+// errCommitUCI wraps MockUCI but makes Commit return an error.
+type errCommitUCI struct {
+	*uci.MockUCI
+}
+
+func (e *errCommitUCI) Commit(_ string) error {
+	return errors.New("simulated Commit failure")
+}
+
+func TestEnsureAPRunning_CommitError(t *testing.T) {
+	base := uci.NewMockUCI()
+	// Empty SSID on an enabled AP triggers a fix → Commit → error.
+	_ = base.Set("wireless", "default_radio0", "ssid", "")
+
+	ub := ubus.NewMockUbus()
+	svc := NewWifiServiceWithReloader(&errCommitUCI{base}, ub, &NoopWifiReloader{})
+
+	fixed, err := svc.EnsureAPRunning()
+	if err == nil {
+		t.Fatal("expected error when Commit fails")
+	}
+	if fixed {
+		t.Error("expected fixed=false when Commit fails")
 	}
 }

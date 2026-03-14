@@ -70,6 +70,26 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	systemSvc := services.NewSystemService(ub, u, storage)
 	networkSvc := services.NewNetworkService(u, ub)
 	wifiSvc := services.NewWifiService(u, ub)
+
+	// Ensure WiFi AP is up on every startup/reboot.
+	// Runs in a background goroutine with a startup delay so the HTTP server is
+	// immediately available and so the WiFi subsystem (netifd/hostapd) has time
+	// to fully initialize before we call "wifi reload". Running it synchronously
+	// at boot causes a race: the backend starts only ~2s after wifi-scripts and
+	// an immediate reload interferes with ongoing AP/STA initialization.
+	// Skipped in mock mode — mock UCI state is already correctly configured.
+	if !cfg.MockMode {
+		go func() {
+			time.Sleep(30 * time.Second)
+			if fixed, err := wifiSvc.EnsureAPRunning(); err != nil {
+				log.Printf("WARNING: WiFi AP health check failed: %v", err)
+			} else if fixed {
+				log.Printf("WiFi AP health check: reset misconfigured APs to defaults (SSID: %q, password: %q)",
+					services.DefaultAPSSID, services.DefaultAPKey)
+			}
+		}()
+	}
+
 	vpnSvc := services.NewVpnService(u)
 	svcManager := services.NewServiceManager()
 	captiveSvc := services.NewCaptiveService(captiveProber)
