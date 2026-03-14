@@ -34,6 +34,8 @@
 
 ## 0. Bug List
 
+- [ ] Refresh in browser on subpaths does not work -> for example http://192.168.1.1/dashboard
+- [ ] request fails http://192.168.1.1/api/v1/system/timezone: {"error":"uci show system.system: uci: Entry not found"}
 - [ ] Toggles should also be bluish in dark mode (currently they are grey)
 - [ ] Links should be moved from services to system
 - [ ] Link for LUCI is wrong (with this program this is moved to :8080)
@@ -67,7 +69,7 @@
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
-- [ ] We need to ensure that WIFI is always enabled (as this is a travel router with mostly wifi access). So during boot the application has to ensure the wifi is enabled and running.
+- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes)
 - [ ] We can add options to disable wifi but those should be with clear warnings.
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)
@@ -262,6 +264,8 @@
 - [x] Timezone configuration
 - [x] Detect timezone mismatch between device and browser (GL.iNet style)
 - [x] NTP server configuration
+- [x] Browser time sync on login — before JWT is issued, client POSTs its clock to `/api/v1/system/time-sync`; if skew > 60s the router clock is corrected via `date -s` (fixes clock-skew login loop on devices without NTP access at first boot)
+- [ ] Time sync feature needs validations. Assume when we travel to other countries. Is this correctly covered?
 - [ ] 🔮 NTP sync status indicator
 
 ### 5.4 Password Management
@@ -395,7 +399,8 @@
 - [x] Build scripts (build.sh, deploy.sh)
 - [x] Install / uninstall scripts
 - [x] APK + opkg package manager auto-detection
-- [ ] Startup script ensures AP WiFi is up (so user can always connect)
+- [x] `setup-local.sh` — one-time fresh-device setup over SSH (moves LuCI to :8080, uploads init.d + UCI config, marks setup complete)
+- [x] AP WiFi health check at startup (ensures enabled APs have valid config; skips disabled APs)
 - [ ] Init script for auto-start on boot
 - [ ] CI/CD pipeline (build + test + package)
 - [ ] Size optimization audit (bundle size, Go binary strip)
