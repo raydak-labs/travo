@@ -89,6 +89,9 @@ func WifiSavedHandler(svc *services.WifiService) fiber.Handler {
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
+		if networks == nil {
+			networks = []models.SavedNetwork{}
+		}
 		return c.JSON(networks)
 	}
 }
