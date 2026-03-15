@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-12 (v27 — AdGuard config editor, hardware buttons, UI fixes)
+> **Last updated:** 2026-03-15 (v28 — Bug fixes, implementation plans, feature categorization)
 
 ---
 
@@ -37,7 +37,7 @@
 - [x] AdguardConfig button under Services: {"error":"reading AdGuard config: open /opt/AdGuardHome/AdGuardHome.yaml: no such file or directory"}
 - [x] request fails http://192.168.1.1/api/v1/system/timezone: {"error":"uci show system.system: uci: Entry not found"}
 - [x] Seeing in VPN view when wireguard is installed error calls like: {"error":"wg show failed: exit status 1"}
-- [ ] Toggles should also be bluish in dark mode (currently they are grey)
+- [x] Toggles should also be bluish in dark mode (currently they are grey)
 - [x] Links should be moved from services to system
 - [x] Link for LUCI is wrong (with this program this is moved to :8080)
 - [x] Adguard config viewer / editor does not work
@@ -61,7 +61,7 @@
 - [x] Priority ordering of saved networks (auto-connect preference)
 - [x] Auto-reconnect to known networks when connection drops
 - [x] Hidden network support (manual SSID entry)
-- [ ] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with optional “prefer 5 GHz” for the STA. See [Wifi dual-band bundling (plan)](../plans/wifi-dual-band-bundling.md).
+- [ ] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with optional "prefer 5 GHz" for the STA. See [WiFi dual-band bundling (plan)](../plans/wifi-dual-band-bundling.md).
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 
@@ -72,7 +72,7 @@
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
 - [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). We use `wifi up` only when an AP was re-enabled; SSID/key-only fixes are committed without running wifi. All wireless apply uses `wifi up`, not `wifi reload`, to avoid ath11k/IPQ6018 crash loops. Auto-reconnect cron script also uses `wifi up`.
-- [ ] We can add options to disable wifi but those should be with clear warnings.
+- [ ] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)
 
@@ -86,7 +86,7 @@
 ### 1.4 Multi-Radio Support
 
 - [x] Detect and enumerate all radio hardware (phy0, phy1, …)
-- [ ] Per-radio configuration (one for uplink, one for AP, etc.)
+- [ ] Per-radio configuration (one for uplink, one for AP, etc.). See [Implementation guide](../plans/implementation.md#14--multi-radio-per-radio-config).
 - [ ] Recommended configuration based on detected hardware
 - [ ] 🔮 Startup script to auto-discover radio setup and persist config
 
@@ -126,30 +126,30 @@
 
 ### 2.4 Data Usage Tracking
 
-- [ ] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether)
-- [ ] Data usage budget / cap with warning threshold
-- [ ] Reset counters (per-session, daily, manual)
+- [ ] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [ ] Data usage budget / cap with warning threshold. See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [ ] Reset counters (per-session, daily, manual). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
 - [x] Show data usage on dashboard (cumulative RX/TX since boot, human-readable format)
 
 ### 2.5 USB Tethering
 
-- [ ] Detect USB tethered device (phone sharing mobile data)
-- [ ] Auto-configure as WAN source
-- [ ] Show tethering status on dashboard
+- [ ] Detect USB tethered device (phone sharing mobile data). See [USB Tethering plan](../plans/usb-tethering.md).
+- [ ] Auto-configure as WAN source. See [USB Tethering plan](../plans/usb-tethering.md).
+- [ ] Show tethering status on dashboard. See [USB Tethering plan](../plans/usb-tethering.md).
 - [ ] 🔮 Bluetooth tethering
 
 ### 2.6 WAN Auto-Detection
 
 - [x] WAN connection type auto-detection (DHCP, PPPoE, static)
-- [ ] Detect ethernet cable plug-in and auto-switch to wired WAN
+- [ ] Detect ethernet cable plug-in and auto-switch to wired WAN. See [Implementation guide](../plans/implementation.md#26--detect-ethernet-cable-plug-in).
 - [x] Show active WAN source indicator on dashboard
 
 ### 2.7 Connection Failover
 
-- [ ] 🔮 Priority-based WAN source (Ethernet > WiFi > USB Tether)
-- [ ] 🔮 Health check via periodic ping (configurable target)
-- [ ] 🔮 Auto-switch to next source on failure
-- [ ] 🔮 Notification on failover event
+- [ ] 🔮 Priority-based WAN source (Ethernet > WiFi > USB Tether). See [Connection Failover plan](../plans/connection-failover.md).
+- [ ] 🔮 Health check via periodic ping (configurable target). See [Connection Failover plan](../plans/connection-failover.md).
+- [ ] 🔮 Auto-switch to next source on failure. See [Connection Failover plan](../plans/connection-failover.md).
+- [ ] 🔮 Notification on failover event. See [Connection Failover plan](../plans/connection-failover.md).
 
 ---
 
@@ -164,27 +164,27 @@
 - [x] Show connection status (handshake time, transfer stats)
 - [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
 - [x] Kill switch (block traffic if VPN drops)
-- [ ] Also install luci-proto-wireguard for wireguard
-- [ ] VPN probably needs own interfaces, zones, rules etc? Currently wireguard things nothing works. Added `docs/plans/wireguard_client_openwrt_25.12.md` as reference
-- [ ] Maybe add a button in VPN page to verify the configurations (which checks, interfaces, zones etc) and add and button to update/create the necessary things required for VPN.
-- [ ] Split tunneling (route only selected traffic through VPN)
-- [ ] VPN + AdGuard interplay configuration
+- [ ] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
+- [ ] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
+- [ ] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
+- [ ] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
+- [ ] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 
 ### 3.2 Tailscale
 
 - [x] Status endpoint (stub — returns not installed)
 - [x] Toggle endpoint (stub)
-- [ ] Actual Tailscale integration (login, device list, exit node)
-- [ ] Show Tailscale IP and connected peers
-- [ ] Exit node selection
+- [ ] Actual Tailscale integration (login, device list, exit node). See [Tailscale Integration plan](../plans/tailscale-integration.md).
+- [ ] Show Tailscale IP and connected peers. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-2--status--connected-peers).
+- [ ] Exit node selection. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-3--exit-node-selection).
 - [ ] 🔮 Tailscale SSH toggle
 
 ### 3.3 General VPN UX
 
 - [x] Grey out VPN options when packages not installed (link to Services page)
 - [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
-- [ ] Show VPN data usage on dashboard
-- [ ] DNS leak test (verify traffic routes through VPN correctly)
+- [ ] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
+- [ ] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
 - [ ] 🔮 OpenVPN support
 - [ ] 🔮 VPN speed test
 
@@ -207,24 +207,24 @@
 
 - [x] Status check (installed, running, version)
 - [x] Query statistics (total, blocked, percentage, avg response time)
-- [ ] Auto-configure after install (port, interfaces, DNS integration with dnsmasq)
+- [ ] Auto-configure after install (port, interfaces, DNS integration with dnsmasq). See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md).
 - [x] "AdGuard Home handles client requests" toggle (GL.iNet style, with VPN hint; defaults to off)
 - [x] Show if AdGuard is configured as default DNS for LAN
 - [x] Quick link to AdGuard web UI (with correct IP:port)
 - [x] Toggle DNS filtering on/off without stopping AdGuard
 - [x] AdGuard Home configuration editor (show/edit AdGuardHome.yaml with restart)
-- [ ] Configure AdGuard to work alongside VPN
+- [ ] Configure AdGuard to work alongside VPN. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 - [ ] 🔮 Blocklist management from travel router UI
 
 ### 4.3 WireGuard (as service)
 
 - [x] Install wireguard-tools package
-- [ ] Post-install setup wizard
+- [ ] Post-install setup wizard. See [Implementation guide](../plans/implementation.md#43--wireguard-post-install-wizard).
 
 ### 4.4 Tailscale (as service)
 
 - [x] Install tailscale package
-- [ ] Post-install authentication flow
+- [ ] Post-install authentication flow. See [Implementation guide](../plans/implementation.md#44--tailscale-post-install-auth-flow) and [Tailscale Integration plan](../plans/tailscale-integration.md#phase-1--authentication-flow).
 
 ### 4.5 Dynamic DNS
 
@@ -255,7 +255,8 @@
 ### 5.2 System Actions
 
 - [x] Reboot with confirmation dialog
-- [ ] Reboot actually working on device 🐛
+- [x] Reboot actually working on device
+- [ ] Shutdown button. See [Implementation guide](../plans/implementation.md#52--mark-reboot-as-working--add-shutdown).
 - [x] Firmware upgrade (upload sysupgrade image)
 - [x] Factory reset with confirmation
 - [x] Hostname change
@@ -270,8 +271,8 @@
 - [x] Detect timezone mismatch between device and browser (GL.iNet style)
 - [x] NTP server configuration
 - [x] Browser time sync on login — before JWT is issued, client POSTs its clock to `/api/v1/system/time-sync`; if skew > 60s the router clock is corrected via `date -s` (fixes clock-skew login loop on devices without NTP access at first boot)
-- [ ] lucy also has the function to sync with browser or sync with NTP server. Do we use the same?
-- [ ] Time sync feature needs validations. Assume when we travel to other countries. Is this correctly covered?
+- [ ] Auto-set timezone from browser on mismatch alert click. See [Implementation guide](../plans/implementation.md#53--auto-set-timezone-from-browser).
+- [ ] NTP manual sync button + travel timezone validation. See [Implementation guide](../plans/implementation.md#53--time-sync-travel-validation).
 - [ ] 🔮 NTP sync status indicator
 
 ### 5.4 Password Management
@@ -299,7 +300,7 @@
 - [x] Bandwidth chart (CPU/Memory over time, 15 data points)
 - [x] Network throughput chart (RX/TX bytes/sec)
 - [x] Per-interface traffic chart
-- [ ] Connection uptime log (internet available since / lost at — timeline of events)
+- [ ] Connection uptime log (internet available since / lost at — timeline of events). See [Implementation guide](../plans/implementation.md#62--connection-uptime-log).
 - [ ] 🔮 Historical data (store and display last hours/days)
 
 ### 6.3 Quick Actions
@@ -329,7 +330,7 @@
 - [x] Remember me toggle (localStorage vs sessionStorage)
 - [x] WebSocket auth via JWT query parameter
 - [x] Session timeout warning (toast 5 min before JWT expiry, auto-redirect on expiry)
-- [ ] HTTPS / TLS support
+- [ ] HTTPS / TLS support (low priority). See [Implementation guide](../plans/implementation.md#7--https--tls-support).
 - [ ] 🔮 Two-factor authentication
 - [ ] 🔮 IP-based access control
 
@@ -387,7 +388,7 @@
 - [x] Loading skeletons
 - [x] Error handling with toast notifications
 - [x] Tooltips / hover info for WiFi networks (signal details, channel, etc.)
-- [ ] Tooltips for technical fields (what is MTU? what is DHCP range?)
+- [ ] Tooltips for technical fields (what is MTU? what is DHCP range?). See [Implementation guide](../plans/implementation.md#12--tooltips-for-technical-fields).
 - [x] Onboarding / first-run setup wizard
 - [x] Connection status indicator in header (green/red dot)
 - [x] Actions dropdown menu in toolbar (Reboot, Logout)
@@ -407,20 +408,20 @@
 - [x] APK + opkg package manager auto-detection
 - [x] `setup-local.sh` — one-time fresh-device setup over SSH (moves LuCI to :8080, uploads init.d + UCI config, marks setup complete)
 - [x] AP WiFi health check at startup (ensures enabled APs have valid config; skips disabled APs)
-- [ ] Init script for auto-start on boot
-- [ ] CI/CD pipeline (build + test + package)
-- [ ] Size optimization audit (bundle size, Go binary strip)
+- [x] Init script for auto-start on boot (procd service, verified on device)
+- [ ] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
+- [ ] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
 - [ ] 🔮 Automatic updates mechanism
 
 ---
 
 ## 14. Hardware Buttons
 
-- [ ] Detect hardware buttons (identify available buttons via /sys/class/gpio or hotplug)
-- [ ] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.)
-- [ ] Button event handler via hotplug.d integration
+- [ ] Detect hardware buttons (identify available buttons via /etc/rc.button/). See [Hardware Buttons plan](../plans/hardware-buttons.md).
+- [ ] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.). See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-2--configure-button-actions).
+- [ ] Button event handler via hotplug.d integration. See [Hardware Buttons plan](../plans/hardware-buttons.md).
 - [ ] 🔮 Custom button action scripting
-- [ ] 🔮 Long-press vs short-press differentiation
+- [ ] 🔮 Long-press vs short-press differentiation. See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-4--long-press-vs-short-press-future).
 
 ---
 
