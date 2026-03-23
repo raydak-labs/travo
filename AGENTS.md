@@ -1,5 +1,9 @@
 # Agent Instructions
 
+## Tools & setup
+
+- everything should be installed via `mise`. See `.mise.toml`
+
 ## Project Plans
 
 The plan directory is `plans/`. Do NOT modify plan files.
