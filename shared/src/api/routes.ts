@@ -60,6 +60,7 @@ export const API_ROUTES = {
     macRandomize: '/api/v1/wifi/mac/randomize',
     guest: '/api/v1/wifi/guest',
     autoreconnect: '/api/v1/wifi/autoreconnect',
+    applyConfirm: '/api/v1/wifi/apply/confirm',
   },
   vpn: {
     status: '/api/v1/vpn/status',

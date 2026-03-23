@@ -244,7 +244,7 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 	return nil
 }
 
-const adguardConfigPath = "/etc/adguardhome/adguardhome.yaml"
+const adguardConfigPath = "/opt/AdGuardHome/AdGuardHome.yaml"
 
 // GetConfig reads the AdGuard Home YAML configuration file.
 func (s *AdGuardService) GetConfig() (string, error) {

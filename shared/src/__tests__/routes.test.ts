@@ -75,6 +75,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.macRandomize).toBe('/api/v1/wifi/mac/randomize');
     expect(API_ROUTES.wifi.guest).toBe('/api/v1/wifi/guest');
     expect(API_ROUTES.wifi.autoreconnect).toBe('/api/v1/wifi/autoreconnect');
+    expect(API_ROUTES.wifi.applyConfirm).toBe('/api/v1/wifi/apply/confirm');
   });
 
   it('has vpn routes matching backend', () => {
@@ -157,6 +158,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/mac/randomize',
       '/api/v1/wifi/guest',
       '/api/v1/wifi/autoreconnect',
+      '/api/v1/wifi/apply/confirm',
       '/api/v1/vpn/status',
       '/api/v1/vpn/killswitch',
       '/api/v1/vpn/wireguard',

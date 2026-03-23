@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -17,6 +18,44 @@ func newTestWifiService() (*WifiService, *uci.MockUCI) {
 	ub := ubus.NewMockUbus()
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
 	return svc, u
+}
+
+type fakeWirelessApplier struct {
+	startToken   string
+	startErr     error
+	confirmErr   error
+	applyErr     error
+	started      [][]string
+	confirmed    []string
+	appliedCalls int
+}
+
+func (f *fakeWirelessApplier) StartApply(configs []string) (string, error) {
+	f.started = append(f.started, append([]string(nil), configs...))
+	if f.startErr != nil {
+		return "", f.startErr
+	}
+	if f.startToken != "" {
+		return f.startToken, nil
+	}
+	return "session-123", nil
+}
+
+func (f *fakeWirelessApplier) Confirm(token string) error {
+	f.confirmed = append(f.confirmed, token)
+	return f.confirmErr
+}
+
+func (f *fakeWirelessApplier) ApplyAndConfirm(configs []string) error {
+	f.appliedCalls++
+	if f.applyErr != nil {
+		return f.applyErr
+	}
+	_, err := f.StartApply(configs)
+	if err != nil {
+		return err
+	}
+	return f.Confirm(f.startToken)
 }
 
 func TestWifiScan(t *testing.T) {
@@ -37,7 +76,7 @@ func TestWifiScan(t *testing.T) {
 func TestWifiConnect(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.Connect(models.WifiConfig{
+	_, err := svc.Connect(models.WifiConfig{
 		SSID: "Test-Network", Password: "testpass", Encryption: "psk2",
 	})
 	if err != nil {
@@ -67,13 +106,13 @@ func TestWifiGetConnection(t *testing.T) {
 func TestWifiSetMode(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.SetMode("sta")
+	_, err := svc.SetMode("client")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	val, _ := u.Get("wireless", "default_radio0", "mode")
-	if val != "sta" {
-		t.Errorf("expected mode 'sta', got %q", val)
+	val, _ := u.Get("wireless", "default_radio0", "disabled")
+	if val != "1" {
+		t.Errorf("expected default_radio0 disabled='1', got %q", val)
 	}
 }
 
@@ -95,7 +134,7 @@ func TestWifiGetSavedNetworks(t *testing.T) {
 func TestWifiDisconnect(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.Disconnect()
+	_, err := svc.Disconnect()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +148,7 @@ func TestWifiDisconnectThenReconnect(t *testing.T) {
 	svc, u := newTestWifiService()
 
 	// Disconnect
-	if err := svc.Disconnect(); err != nil {
+	if _, err := svc.Disconnect(); err != nil {
 		t.Fatalf("disconnect failed: %v", err)
 	}
 	val, _ := u.Get("wireless", "wifinet2", "disabled")
@@ -118,7 +157,7 @@ func TestWifiDisconnectThenReconnect(t *testing.T) {
 	}
 
 	// Reconnect
-	err := svc.Connect(models.WifiConfig{
+	_, err := svc.Connect(models.WifiConfig{
 		SSID: "New-Network", Password: "newpass123", Encryption: "psk2",
 	})
 	if err != nil {
@@ -144,7 +183,7 @@ func TestWifiDeleteNetwork(t *testing.T) {
 	}
 
 	// Delete the network
-	err = svc.DeleteNetwork("sta0")
+	_, err = svc.DeleteNetwork("sta0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -167,7 +206,7 @@ func TestWifiDisconnectFallsBackToUCI(t *testing.T) {
 	})
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
 
-	err := svc.Disconnect()
+	_, err := svc.Disconnect()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +228,7 @@ func TestWifiConnectFallsBackToUCI(t *testing.T) {
 	})
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
 
-	err := svc.Connect(models.WifiConfig{
+	_, err := svc.Connect(models.WifiConfig{
 		SSID: "New-Network", Password: "newpass123", Encryption: "psk2",
 	})
 	if err != nil {
@@ -208,7 +247,7 @@ func TestWifiConnectFallsBackToUCI(t *testing.T) {
 func TestWifiDeleteNetwork_EmptySection(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	err := svc.DeleteNetwork("")
+	_, err := svc.DeleteNetwork("")
 	if err == nil {
 		t.Error("expected error for empty section")
 	}
@@ -217,7 +256,7 @@ func TestWifiDeleteNetwork_EmptySection(t *testing.T) {
 func TestWifiConnectHiddenNetwork(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.Connect(models.WifiConfig{
+	_, err := svc.Connect(models.WifiConfig{
 		SSID: "Hidden-Net", Password: "secretpass", Encryption: "psk2", Hidden: true,
 	})
 	if err != nil {
@@ -236,7 +275,7 @@ func TestWifiConnectHiddenNetwork(t *testing.T) {
 func TestWifiConnectNonHiddenNetwork(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.Connect(models.WifiConfig{
+	_, err := svc.Connect(models.WifiConfig{
 		SSID: "Visible-Net", Password: "secretpass", Encryption: "psk2", Hidden: false,
 	})
 	if err != nil {
@@ -248,10 +287,61 @@ func TestWifiConnectNonHiddenNetwork(t *testing.T) {
 	}
 }
 
+func TestWifiConnect_NormalizesMissingNetworkToWwan(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "wifinet2", "network", "")
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Visible-Net", Password: "secretpass", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	val, _ := u.Get("wireless", "wifinet2", "network")
+	if val != "wwan" {
+		t.Errorf("expected network='wwan', got %q", val)
+	}
+}
+
+func TestWifiConnect_ReturnsPendingApplyWhenApplierConfigured(t *testing.T) {
+	svc, _ := newTestWifiService()
+	fake := &fakeWirelessApplier{startToken: "apply-123"}
+	svc.applier = fake
+
+	apply, err := svc.Connect(models.WifiConfig{
+		SSID: "Test-Network", Password: "testpass", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if apply == nil || apply.Token != "apply-123" {
+		t.Fatalf("expected pending apply token apply-123, got %#v", apply)
+	}
+	if len(fake.started) != 1 {
+		t.Fatalf("expected exactly one staged apply, got %d", len(fake.started))
+	}
+	if !slices.Contains(fake.started[0], "firewall") || !slices.Contains(fake.started[0], "dhcp") {
+		t.Errorf("expected staged apply configs to include firewall and dhcp, got %v", fake.started[0])
+	}
+}
+
+func TestWifiConnect_ReturnsApplyError(t *testing.T) {
+	svc, _ := newTestWifiService()
+	svc.applier = &fakeWirelessApplier{startErr: errors.New("apply failed")}
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Test-Network", Password: "testpass", Encryption: "psk2",
+	})
+	if err == nil || !strings.Contains(err.Error(), "apply failed") {
+		t.Fatalf("expected apply error, got %v", err)
+	}
+}
+
 func TestWifiDeleteNetwork_NonexistentSection(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	err := svc.DeleteNetwork("nonexistent")
+	_, err := svc.DeleteNetwork("nonexistent")
 	if err == nil {
 		t.Error("expected error for nonexistent section")
 	}
@@ -346,7 +436,7 @@ func TestGetAPConfigs(t *testing.T) {
 func TestSetAPConfig(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	err := svc.SetAPConfig("default_radio0", models.APConfig{
+	_, err := svc.SetAPConfig("default_radio0", models.APConfig{
 		SSID:       "MyTravelRouter",
 		Encryption: "psk2",
 		Key:        "newpassword123",
@@ -381,7 +471,7 @@ func TestSetAPConfig(t *testing.T) {
 func TestSetAPConfig_InvalidSection(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	err := svc.SetAPConfig("nonexistent", models.APConfig{
+	_, err := svc.SetAPConfig("nonexistent", models.APConfig{
 		SSID:       "Test",
 		Encryption: "none",
 		Enabled:    true,
@@ -391,10 +481,25 @@ func TestSetAPConfig_InvalidSection(t *testing.T) {
 	}
 }
 
+func TestSetAPConfig_ReturnsApplyError(t *testing.T) {
+	svc, _ := newTestWifiService()
+	svc.applier = &fakeWirelessApplier{startErr: errors.New("apply failed")}
+
+	_, err := svc.SetAPConfig("default_radio0", models.APConfig{
+		SSID:       "MyTravelRouter",
+		Encryption: "psk2",
+		Key:        "newpassword123",
+		Enabled:    true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "apply failed") {
+		t.Fatalf("expected apply error, got %v", err)
+	}
+}
+
 func TestSetMACAddress(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
+	_, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -413,8 +518,8 @@ func TestSetMACAddress_Reset(t *testing.T) {
 	svc, u := newTestWifiService()
 
 	// Set then reset
-	_ = svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
-	err := svc.SetMACAddress("")
+	_, _ = svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
+	_, err := svc.SetMACAddress("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -446,7 +551,7 @@ func TestGetMACAddresses(t *testing.T) {
 func TestRandomizeMAC(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	mac, err := svc.RandomizeMAC()
+	mac, _, err := svc.RandomizeMAC()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -481,11 +586,11 @@ func TestRandomizeMAC(t *testing.T) {
 func TestRandomizeMAC_UniquePerCall(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	mac1, err := svc.RandomizeMAC()
+	mac1, _, err := svc.RandomizeMAC()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	mac2, err := svc.RandomizeMAC()
+	mac2, _, err := svc.RandomizeMAC()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -510,7 +615,7 @@ func TestGetGuestWifi_NotConfigured(t *testing.T) {
 func TestSetGuestWifi_Enable(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.SetGuestWifi(models.GuestWifiConfig{
+	_, err := svc.SetGuestWifi(models.GuestWifiConfig{
 		Enabled:    true,
 		SSID:       "Guest-Travel",
 		Encryption: "psk2",
@@ -591,7 +696,7 @@ func TestSetGuestWifi_Disable(t *testing.T) {
 	svc, u := newTestWifiService()
 
 	// Enable first
-	_ = svc.SetGuestWifi(models.GuestWifiConfig{
+	_, _ = svc.SetGuestWifi(models.GuestWifiConfig{
 		Enabled:    true,
 		SSID:       "Guest-Travel",
 		Encryption: "psk2",
@@ -599,7 +704,7 @@ func TestSetGuestWifi_Disable(t *testing.T) {
 	})
 
 	// Disable
-	err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+	_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -621,9 +726,24 @@ func TestSetGuestWifi_Disable(t *testing.T) {
 func TestSetGuestWifi_DisableWhenNotConfigured(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+	_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSetGuestWifi_ReturnsApplyError(t *testing.T) {
+	svc, _ := newTestWifiService()
+	svc.applier = &fakeWirelessApplier{startErr: errors.New("apply failed")}
+
+	_, err := svc.SetGuestWifi(models.GuestWifiConfig{
+		Enabled:    true,
+		SSID:       "Guest-Travel",
+		Encryption: "psk2",
+		Key:        "guestpass123",
+	})
+	if err == nil || !strings.Contains(err.Error(), "apply failed") {
+		t.Fatalf("expected apply error, got %v", err)
 	}
 }
 
@@ -657,7 +777,7 @@ func TestGetRadioStatus_AllDisabled(t *testing.T) {
 func TestSetRadioEnabled_Disable(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	err := svc.SetRadioEnabled(false)
+	_, err := svc.SetRadioEnabled(false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -675,9 +795,9 @@ func TestSetRadioEnabled_Enable(t *testing.T) {
 	svc, u := newTestWifiService()
 
 	// First disable
-	_ = svc.SetRadioEnabled(false)
+	_, _ = svc.SetRadioEnabled(false)
 	// Then enable
-	err := svc.SetRadioEnabled(true)
+	_, err := svc.SetRadioEnabled(true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -688,6 +808,121 @@ func TestSetRadioEnabled_Enable(t *testing.T) {
 	}
 	if val1 != "0" {
 		t.Errorf("expected radio1 disabled='0', got %q", val1)
+	}
+}
+
+func TestSetRadioEnabled_UsesDynamicRadioDiscovery(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "radio2", "type", "mac80211")
+	_ = u.Set("wireless", "radio2", "band", "6g")
+	_ = u.Set("wireless", "radio2", "disabled", "0")
+
+	_, err := svc.SetRadioEnabled(false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	val2, _ := u.Get("wireless", "radio2", "disabled")
+	if val2 != "1" {
+		t.Errorf("expected radio2 disabled='1', got %q", val2)
+	}
+}
+
+func TestGetAPConfigs_DiscoversDynamicAPSections(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.AddSection("wireless", "travel_ap", "wifi-iface")
+	_ = u.Set("wireless", "travel_ap", "device", "radio1")
+	_ = u.Set("wireless", "travel_ap", "mode", "ap")
+	_ = u.Set("wireless", "travel_ap", "ssid", "Travel-Alt")
+	_ = u.Set("wireless", "travel_ap", "encryption", "psk2")
+	_ = u.Set("wireless", "travel_ap", "key", "travelrouter")
+
+	configs, err := svc.GetAPConfigs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	found := false
+	for _, cfg := range configs {
+		if cfg.Section == "travel_ap" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected dynamic AP section to be discovered, got %#v", configs)
+	}
+}
+
+func TestWifiSetMode_ClientDisablesAPsAndEnablesSTA(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	_ = u.Set("wireless", "default_radio1", "disabled", "0")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+
+	_, err := svc.SetMode("client")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	ap1, _ := u.Get("wireless", "default_radio1", "disabled")
+	sta, _ := u.Get("wireless", "sta0", "disabled")
+	if ap0 != "1" || ap1 != "1" || sta != "0" {
+		t.Fatalf("expected APs disabled and STA enabled, got ap0=%q ap1=%q sta=%q", ap0, ap1, sta)
+	}
+}
+
+func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
+	_ = u.Set("wireless", "default_radio1", "disabled", "1")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+
+	_, err := svc.SetMode("repeater")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	ap1, _ := u.Get("wireless", "default_radio1", "disabled")
+	sta, _ := u.Get("wireless", "sta0", "disabled")
+	if ap0 != "0" || ap1 != "0" || sta != "0" {
+		t.Fatalf("expected APs and STA enabled, got ap0=%q ap1=%q sta=%q", ap0, ap1, sta)
+	}
+}
+
+func TestWifiSetMode_InvalidMode(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	_, err := svc.SetMode("invalid")
+	if err == nil {
+		t.Fatal("expected invalid mode error")
+	}
+}
+
+func TestGetConnection_DerivesRepeaterMode(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	conn, err := svc.GetConnection()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.Mode != "repeater" {
+		t.Fatalf("expected repeater mode, got %q", conn.Mode)
+	}
+}
+
+func TestConfirmApply_DelegatesToApplier(t *testing.T) {
+	svc, _ := newTestWifiService()
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-456"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.confirmed) != 1 || fake.confirmed[0] != "session-456" {
+		t.Fatalf("expected confirm to be called for session-456, got %#v", fake.confirmed)
 	}
 }
 

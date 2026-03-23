@@ -171,6 +171,25 @@ func TestWifiDisconnectEndpoint(t *testing.T) {
 	}
 }
 
+func TestWifiApplyConfirmEndpoint(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]string{"token": "apply-123"})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/apply/confirm", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
 func TestWifiDeleteEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")

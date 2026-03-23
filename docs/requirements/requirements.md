@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-15 (v28 — Bug fixes, implementation plans, feature categorization)
+> **Last updated:** 2026-03-23 (v29 — WiFi review findings, bug fixes, implementation plans, feature categorization)
 
 ---
 
@@ -43,6 +43,12 @@
 - [x] Adguard config viewer / editor does not work
 - [x] VPN Overview in VPN tab is not useful. Remove
 - [x] Why is startup of this app logged as err in the logs? (errThu Mar 12 12:27:11 2026 daemon.err openwrt-travel-gui[12344]: 2026/03/12 12:27:11 Starting openwrt-travel-gui backend on :80 (mock=false))
+- [x] Wireless apply must keep LuCI-style rollback semantics: backend may start `uci apply` with rollback, but must not self-confirm immediately. Confirmation must come only after the frontend/browser proves the router is still reachable on the new WiFi settings.
+- [x] WiFi connect must normalize any reused STA section to `network=wwan` whenever the option is missing or not `wwan`, and must fail loudly if creating `network.wwan` or attaching it to the firewall `wan` zone fails. "Associated to upstream WiFi but no DHCP/internet" is not acceptable.
+- [x] WiFi mode switching must map UI modes (`client`, `ap`, `repeater`) to valid OpenWrt UCI structures. Writing invalid values like `mode=client` or `mode=repeater` into a `wifi-iface` section is forbidden; repeater mode must be modeled as STA + AP config, not a single iface mode string.
+- [x] Repeater wizard must preserve upstream band/radio choice and configure the intended AP sections explicitly on multi-radio hardware. Using only the first AP section is not sufficient for dual-band devices.
+- [x] AP, guest WiFi, and STA MAC update flows must return an error when runtime apply fails. Do not commit wireless changes, report success, and leave the device in a "saved in UCI but not actually active" state.
+- [x] WiFi/AP management must discover radios and AP sections dynamically instead of assuming `radio0`, `radio1`, `default_radio0..3`, or guest WiFi on `radio0`, so the UI still works after LuCI resets or on different hardware layouts.
 
 ## 1. WiFi Management
 
@@ -61,7 +67,8 @@
 - [x] Priority ordering of saved networks (auto-connect preference)
 - [x] Auto-reconnect to known networks when connection drops
 - [x] Hidden network support (manual SSID entry)
-- [ ] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with optional "prefer 5 GHz" for the STA. See [WiFi dual-band bundling (plan)](../plans/wifi-dual-band-bundling.md).
+- [x] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with band picker on connect and per-band signal display. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md).
+- [ ] **Automatic band switching** — Background monitor switches STA between 2.4 GHz and 5 GHz based on signal quality with configurable thresholds and hysteresis. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md#part-3-automatic-band-switching).
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 
@@ -71,7 +78,7 @@
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
-- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). We use `wifi up` only when an AP was re-enabled; SSID/key-only fixes are committed without running wifi. All wireless apply uses `wifi up`, not `wifi reload`, to avoid ath11k/IPQ6018 crash loops. Auto-reconnect cron script also uses `wifi up`.
+- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). Startup health commits repairs but does not auto-apply wireless changes that would require browser confirmation; the user applies them via LuCI Save & Apply or reboot. User-driven wireless changes use rpcd `uci apply` rollback with explicit browser confirmation. Auto-reconnect cron script still uses `wifi up`.
 - [ ] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)

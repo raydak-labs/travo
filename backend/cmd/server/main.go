@@ -77,32 +77,19 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	}
 
 	// Fix wireless UCI on startup (country/channel, missing SSID/key on existing APs,
-	// enable radios when AP enabled). Apply via apply+confirm so fixes take effect without reboot.
-	// Uses crash guard per AGENTS.md mandatory failsafe pattern.
+	// enable radios when AP enabled). Do not auto-apply on startup: there is no
+	// browser in the loop to confirm rpcd rollback safely, so we commit the repair
+	// and require LuCI Save & Apply or reboot for runtime activation.
 	if !cfg.MockMode {
 		go func() {
 			time.Sleep(30 * time.Second)
-			guardFile := "/etc/openwrt-travel-gui/ap-health-in-progress"
-			// If guard exists, a previous apply crashed — skip to avoid reboot loop.
-			if _, err := os.Stat(guardFile); err == nil {
-				log.Printf("WARNING: WiFi AP health guard file exists (%s) — skipping apply (previous run may have crashed). Remove guard and redeploy to retry.", guardFile)
-				return
-			}
 			fixed, needApply, err := wifiSvc.EnsureAPRunning()
 			if err != nil {
 				log.Printf("WARNING: WiFi AP health check failed: %v", err)
 				return
 			}
 			if fixed && needApply {
-				// Write guard before apply — cleared on success or by deploy-local.sh.
-				_ = os.MkdirAll("/etc/openwrt-travel-gui", 0750)
-				_ = os.WriteFile(guardFile, []byte("ap-health"), 0600)
-				if applyErr := wifiSvc.ApplyWireless(); applyErr != nil {
-					log.Printf("WiFi AP health: UCI fixes committed. Apply failed (use LuCI or reboot): %v", applyErr)
-				} else {
-					log.Printf("WiFi AP health: UCI fixes applied and confirmed.")
-					_ = os.Remove(guardFile)
-				}
+				log.Printf("WiFi AP health: UCI fixes committed. Runtime apply skipped on startup to preserve LuCI-style rollback safety; use LuCI Save & Apply or reboot.")
 			} else if fixed {
 				log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
 			}

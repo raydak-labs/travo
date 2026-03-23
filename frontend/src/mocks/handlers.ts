@@ -95,16 +95,26 @@ export const handlers = [
 
   http.post(API_ROUTES.wifi.connect, async ({ request }) => {
     const body = (await request.json()) as { ssid: string; password: string };
-    return HttpResponse.json({ success: true, ssid: body.ssid });
+    return HttpResponse.json({
+      status: 'ok',
+      apply: { pending: true, token: `apply-${body.ssid}`, rollback_timeout_seconds: 30 },
+    });
   }),
 
   http.post(API_ROUTES.wifi.disconnect, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.put(API_ROUTES.wifi.mode, async ({ request }) => {
     const body = (await request.json()) as { mode: string };
-    return HttpResponse.json({ success: true, mode: body.mode });
+    return HttpResponse.json({
+      status: 'ok',
+      apply: { pending: true, token: `apply-mode-${body.mode}`, rollback_timeout_seconds: 30 },
+    });
+  }),
+
+  http.post(API_ROUTES.wifi.applyConfirm, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.wifi.saved, () => {

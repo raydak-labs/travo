@@ -65,6 +65,14 @@ export interface APConfig {
   readonly section: string;
 }
 
+/** Group of scan results with same SSID and encryption (dual-band = one group) */
+export interface GroupedScanNetwork {
+  readonly ssid: string;
+  /** Encryption from scan (e.g. psk2, sae, none) */
+  readonly encryption: string;
+  readonly aps: readonly WifiScanResult[];
+}
+
 /** Type guard for WifiScanResult */
 export function isWifiScanResult(value: unknown): value is WifiScanResult {
   if (typeof value !== 'object' || value === null) return false;
@@ -89,12 +97,6 @@ export interface MACConfig {
 
 /** Request to set MAC address */
 export interface SetMACRequest {
-  readonly mac: string;
-}
-
-/** Response from randomize MAC endpoint */
-export interface RandomizeMACResponse {
-  readonly status: string;
   readonly mac: string;
 }
 
@@ -124,4 +126,22 @@ export interface NetworkPriorityRequest {
 /** Auto-reconnect configuration */
 export interface AutoReconnectConfig {
   readonly enabled: boolean;
+}
+
+/** Pending rollback apply state for a WiFi mutation */
+export interface WifiApplyState {
+  readonly pending: boolean;
+  readonly token?: string;
+  readonly rollback_timeout_seconds?: number;
+}
+
+/** Common WiFi mutation response */
+export interface WifiMutationResponse {
+  readonly status: string;
+  readonly apply?: WifiApplyState;
+}
+
+/** MAC randomize response */
+export interface RandomizeMACResponse extends WifiMutationResponse {
+  readonly mac: string;
 }
