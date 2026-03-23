@@ -1,6 +1,7 @@
 package services
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -9,12 +10,21 @@ import (
 
 // mockAlertChecker implements AlertChecker with configurable stats.
 type mockAlertChecker struct {
+	mu    sync.RWMutex
 	stats models.SystemStats
 	err   error
 }
 
 func (m *mockAlertChecker) GetSystemStats() (models.SystemStats, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.stats, m.err
+}
+
+func (m *mockAlertChecker) setStats(stats models.SystemStats) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stats = stats
 }
 
 func TestAlertService_NoAlertsWhenHealthy(t *testing.T) {
@@ -150,11 +160,19 @@ func TestAlertService_AlertClearsAndReRaises(t *testing.T) {
 	time.Sleep(30 * time.Millisecond)
 
 	// Condition clears
-	checker.stats.CPU.UsagePercent = 30
+	checker.setStats(models.SystemStats{
+		CPU:     models.CpuStats{UsagePercent: 30},
+		Memory:  models.MemoryStats{UsagePercent: 40},
+		Storage: models.StorageStats{UsagePercent: 50},
+	})
 	time.Sleep(30 * time.Millisecond)
 
 	// Condition returns
-	checker.stats.CPU.UsagePercent = 95
+	checker.setStats(models.SystemStats{
+		CPU:     models.CpuStats{UsagePercent: 95},
+		Memory:  models.MemoryStats{UsagePercent: 40},
+		Storage: models.StorageStats{UsagePercent: 50},
+	})
 	time.Sleep(30 * time.Millisecond)
 	svc.Stop()
 
