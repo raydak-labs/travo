@@ -97,7 +97,8 @@ cd "${IPK_DIR}"
 echo "2.0" > debian-binary
 (cd control && tar czf ../control.tar.gz .)
 (cd data && tar czf ../data.tar.gz .)
-tar czf "../../${PKG_NAME}_${VERSION}_${ARCH}.ipk" debian-binary control.tar.gz data.tar.gz
+# We are currently inside dist/ipk/, so ../ resolves to dist/.
+tar czf "../${PKG_NAME}_${VERSION}_${ARCH}.ipk" debian-binary control.tar.gz data.tar.gz
 cd ../..
 
 echo "✓ Package created: dist/${PKG_NAME}_${VERSION}_${ARCH}.ipk"

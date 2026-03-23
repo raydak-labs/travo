@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-23 (v29 — WiFi review findings, bug fixes, implementation plans, feature categorization)
+> **Last updated:** 2026-03-23 (v32 — add dedicated Clients tab feature request)
 
 ---
 
@@ -49,6 +49,13 @@
 - [x] Repeater wizard must preserve upstream band/radio choice and configure the intended AP sections explicitly on multi-radio hardware. Using only the first AP section is not sufficient for dual-band devices.
 - [x] AP, guest WiFi, and STA MAC update flows must return an error when runtime apply fails. Do not commit wireless changes, report success, and leave the device in a "saved in UCI but not actually active" state.
 - [x] WiFi/AP management must discover radios and AP sections dynamically instead of assuming `radio0`, `radio1`, `default_radio0..3`, or guest WiFi on `radio0`, so the UI still works after LuCI resets or on different hardware layouts.
+- [ ] 🐛 WireGuard should work out-of-the-box after service install + profile import/activate: runtime `wg0` must be created and status endpoints must not return success when tunnel is not actually up. See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [ ] 🐛 AdGuard should work out-of-the-box after install + DNS enable: backend install/running detection and DNS forwarding path must be functionally valid (no `nslookup` timeout after successful toggle). See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [ ] 🐛 WiFi page can incorrectly show "Repeater" as active when device is not actually in repeater mode; active mode indicator must reflect real UCI/runtime state.
+- [ ] 🐛 Saved STA networks must persist and not be removed unexpectedly; only the selected/active network should be connected at runtime while other saved profiles remain stored.
+- [ ] 🐛 Active WiFi network badge can display lock icon with `unknown` encryption/type; UI should show correct security label based on scan/connection metadata.
+- [ ] Add machine-readable API documentation generation (OpenAPI/Swagger) and expose docs endpoint from backend for agent/test automation use.
+- [ ] Document in `AGENTS.md` that the test device can expose/serve API docs endpoints for automation flows.
 
 ## 1. WiFi Management
 
@@ -120,6 +127,7 @@
 - [x] Traffic stats per client (RX/TX)
 - [x] Client hostname resolution (DHCP leases + /etc/hosts cross-reference)
 - [x] Block / kick a client
+- [ ] Dedicated **Clients** tab/page with structured per-client view (device identity, connection type/path, interface, signal/IP/MAC, activity), plus quick actions (set hostname alias, add static IP reservation, block/ban, unblock/kick). Should consolidate existing client actions into one focused workflow.
 - [ ] 🔮 Client bandwidth limiting (QoS per device)
 - [ ] 🔮 Parental controls / client group policies
 
