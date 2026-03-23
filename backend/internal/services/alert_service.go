@@ -3,6 +3,8 @@ package services
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,17 +18,44 @@ type AlertChecker interface {
 	GetSystemStats() (models.SystemStats, error)
 }
 
+// CarrierChecker reads whether a network interface has a physical link.
+type CarrierChecker interface {
+	// IsCarrierUp returns true when the ethernet carrier is detected (cable plugged in).
+	// Returns (false, nil) when the cable is unplugged, (false, err) when the state
+	// cannot be determined (e.g. interface does not exist).
+	IsCarrierUp(iface string) (bool, error)
+}
+
+// RealCarrierChecker reads carrier state from /sys/class/net/<iface>/carrier.
+type RealCarrierChecker struct{}
+
+// IsCarrierUp implements CarrierChecker using the Linux sysfs carrier file.
+func (r *RealCarrierChecker) IsCarrierUp(iface string) (bool, error) {
+	data, err := os.ReadFile("/sys/class/net/" + iface + "/carrier")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(data)) == "1", nil
+}
+
 // AlertService monitors system conditions and generates alerts.
 type AlertService struct {
-	checker       AlertChecker
-	mu            sync.RWMutex
-	alerts        []models.Alert
-	alertCh       chan models.Alert
-	stopCh        chan struct{}
-	CheckInterval time.Duration
+	checker        AlertChecker
+	carrierChecker CarrierChecker
+	mu             sync.RWMutex
+	alerts         []models.Alert
+	alertCh        chan models.Alert
+	stopCh         chan struct{}
+	CheckInterval  time.Duration
 
 	// Track active conditions to avoid duplicate alerts
 	activeConditions map[string]bool
+}
+
+// SetCarrierChecker enables ethernet carrier monitoring in the alert service.
+// Pass nil to disable (default).
+func (a *AlertService) SetCarrierChecker(cc CarrierChecker) {
+	a.carrierChecker = cc
 }
 
 // NewAlertService creates a new AlertService.
@@ -107,6 +136,19 @@ func (a *AlertService) checkConditions() {
 		a.raiseCondition("high_memory", "Memory usage is above 90%", "warning")
 	} else {
 		a.clearCondition("high_memory")
+	}
+
+	// Ethernet carrier (WAN cable plug/unplug)
+	if a.carrierChecker != nil {
+		up, err := a.carrierChecker.IsCarrierUp("eth0")
+		if err == nil {
+			if !up {
+				a.raiseCondition("eth_unplugged", "WAN ethernet cable is disconnected", "warning")
+			} else {
+				a.clearCondition("eth_unplugged")
+			}
+		}
+		// If err != nil the interface may not exist (e.g. USB-only WAN) — skip silently.
 	}
 }
 

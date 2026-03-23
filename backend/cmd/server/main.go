@@ -109,6 +109,9 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	captiveSvc := services.NewCaptiveService(captiveProber)
 	adguardSvc := services.NewAdGuardService()
 	alertSvc := services.NewAlertService(systemSvc)
+	if !cfg.MockMode {
+		alertSvc.SetCarrierChecker(&services.RealCarrierChecker{})
+	}
 	uptimeTracker := services.NewUptimeTracker(captiveProber)
 
 	// Token blocklist with cleanup goroutine

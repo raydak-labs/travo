@@ -255,6 +255,83 @@ func TestAlertService_AlertChannel(t *testing.T) {
 	svc.Stop()
 }
 
+// mockCarrierChecker implements CarrierChecker for testing.
+type mockCarrierChecker struct {
+	mu   sync.Mutex
+	up   bool
+	err  error
+}
+
+func (m *mockCarrierChecker) IsCarrierUp(iface string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.up, m.err
+}
+
+func (m *mockCarrierChecker) setState(up bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.up = up
+}
+
+func TestAlertService_EthUnpluggedAlert(t *testing.T) {
+	checker := &mockAlertChecker{
+		stats: models.SystemStats{
+			CPU:     models.CpuStats{UsagePercent: 10},
+			Memory:  models.MemoryStats{UsagePercent: 10},
+			Storage: models.StorageStats{UsagePercent: 10},
+		},
+	}
+	carrier := &mockCarrierChecker{up: false}
+	svc := NewAlertService(checker)
+	svc.SetCarrierChecker(carrier)
+	svc.CheckInterval = 10 * time.Millisecond
+
+	svc.Start()
+	time.Sleep(50 * time.Millisecond)
+	svc.Stop()
+
+	alerts := svc.GetAlerts()
+	found := false
+	for _, a := range alerts {
+		if a.Type == "eth_unplugged" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected eth_unplugged alert when carrier is down")
+	}
+}
+
+func TestAlertService_EthPluggedInClearsAlert(t *testing.T) {
+	checker := &mockAlertChecker{
+		stats: models.SystemStats{
+			CPU:     models.CpuStats{UsagePercent: 10},
+			Memory:  models.MemoryStats{UsagePercent: 10},
+			Storage: models.StorageStats{UsagePercent: 10},
+		},
+	}
+	carrier := &mockCarrierChecker{up: false}
+	svc := NewAlertService(checker)
+	svc.SetCarrierChecker(carrier)
+	svc.CheckInterval = 10 * time.Millisecond
+
+	svc.Start()
+	time.Sleep(30 * time.Millisecond)
+	carrier.setState(true) // cable plugged in
+	time.Sleep(30 * time.Millisecond)
+	svc.Stop()
+
+	// After plugging in, eth_unplugged should no longer be an active condition
+	svc.mu.RLock()
+	active := svc.activeConditions["eth_unplugged"]
+	svc.mu.RUnlock()
+	if active {
+		t.Error("expected eth_unplugged condition to be cleared after carrier comes up")
+	}
+}
+
 func TestAlertService_GetAlertsReturnsNewestFirst(t *testing.T) {
 	checker := &mockAlertChecker{
 		stats: models.SystemStats{},
