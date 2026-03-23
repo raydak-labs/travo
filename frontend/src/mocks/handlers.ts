@@ -488,4 +488,15 @@ export const handlers = [
   http.get(API_ROUTES.network.ddnsStatus, () => {
     return HttpResponse.json(mockDDNSStatus);
   }),
+
+  http.get(API_ROUTES.network.uptimeLog, () => {
+    const now = Date.now();
+    return HttpResponse.json([
+      { timestamp: now - 1000 * 60 * 2, state: 'connected' },
+      { timestamp: now - 1000 * 60 * 35, state: 'disconnected' },
+      { timestamp: now - 1000 * 60 * 40, state: 'connected' },
+      { timestamp: now - 1000 * 60 * 60 * 3, state: 'disconnected' },
+      { timestamp: now - 1000 * 60 * 60 * 3 - 1000 * 60 * 15, state: 'connected' },
+    ]);
+  }),
 ];

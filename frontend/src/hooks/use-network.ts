@@ -15,6 +15,7 @@ import type {
   DHCPReservation,
   DDNSConfig,
   DDNSStatus,
+  UptimeEvent,
 } from '@shared/index';
 
 export function useNetworkStatus() {
@@ -282,6 +283,14 @@ export function useDDNSStatus() {
     queryKey: ['network', 'ddnsStatus'],
     queryFn: () => apiClient.get<DDNSStatus>(API_ROUTES.network.ddnsStatus),
     refetchInterval: 30000,
+  });
+}
+
+export function useUptimeLog() {
+  return useQuery({
+    queryKey: ['network', 'uptimeLog'],
+    queryFn: () => apiClient.get<UptimeEvent[]>(API_ROUTES.network.uptimeLog),
+    refetchInterval: 60000,
   });
 }
 

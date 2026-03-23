@@ -87,7 +87,7 @@ describe('NetworkPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Internet Connectivity')).toBeInTheDocument();
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      expect(screen.getAllByText('Connected').length).toBeGreaterThanOrEqual(1);
     });
   });
 

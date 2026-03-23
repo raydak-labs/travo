@@ -45,6 +45,7 @@ export const API_ROUTES = {
     wanDetect: '/api/v1/network/wan/detect',
     ddns: '/api/v1/network/ddns',
     ddnsStatus: '/api/v1/network/ddns/status',
+    uptimeLog: '/api/v1/network/uptime-log',
   },
   wifi: {
     scan: '/api/v1/wifi/scan',

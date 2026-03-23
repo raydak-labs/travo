@@ -61,6 +61,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.interfaceState).toBe('/api/v1/network/interfaces/:name/state');
     expect(API_ROUTES.network.ddns).toBe('/api/v1/network/ddns');
     expect(API_ROUTES.network.ddnsStatus).toBe('/api/v1/network/ddns/status');
+    expect(API_ROUTES.network.uptimeLog).toBe('/api/v1/network/uptime-log');
   });
 
   it('has wifi routes matching backend', () => {
@@ -182,6 +183,7 @@ describe('API_ROUTES', () => {
       '/api/v1/captive/status',
       '/api/v1/adguard/dns',
       '/api/v1/adguard/config',
+      '/api/v1/network/uptime-log',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

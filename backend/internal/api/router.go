@@ -9,17 +9,18 @@ import (
 
 // Dependencies holds all service dependencies for API handlers.
 type Dependencies struct {
-	Auth           *auth.AuthService
-	Blocklist      *auth.TokenBlocklist
-	RateLimiter    *auth.RateLimiter
-	System         *services.SystemService
-	Network        *services.NetworkService
-	Wifi           *services.WifiService
-	Vpn            *services.VpnService
+	Auth          *auth.AuthService
+	Blocklist     *auth.TokenBlocklist
+	RateLimiter   *auth.RateLimiter
+	System        *services.SystemService
+	Network       *services.NetworkService
+	Wifi          *services.WifiService
+	Vpn           *services.VpnService
 	ServiceManager *services.ServiceManager
-	Captive        *services.CaptiveService
-	AdGuard        *services.AdGuardService
-	Alerts         *services.AlertService
+	Captive       *services.CaptiveService
+	AdGuard       *services.AdGuardService
+	Alerts        *services.AlertService
+	UptimeTracker *services.UptimeTracker
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -84,6 +85,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/network/ddns", GetDDNSConfigHandler(deps.Network))
 	v1.Put("/network/ddns", SetDDNSConfigHandler(deps.Network))
 	v1.Get("/network/ddns/status", GetDDNSStatusHandler(deps.Network))
+	v1.Get("/network/uptime-log", GetUptimeLogHandler(deps.UptimeTracker))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))

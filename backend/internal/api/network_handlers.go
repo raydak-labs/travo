@@ -434,6 +434,13 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	}
 }
 
+// GetUptimeLogHandler handles GET /api/v1/network/uptime-log.
+func GetUptimeLogHandler(tracker *services.UptimeTracker) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(tracker.GetUptimeLog())
+	}
+}
+
 // GetDDNSStatusHandler handles GET /api/v1/network/ddns/status.
 func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

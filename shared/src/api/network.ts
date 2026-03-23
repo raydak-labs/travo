@@ -1,3 +1,9 @@
+/** Single connectivity state transition event */
+export interface UptimeEvent {
+  readonly timestamp: number; // Unix milliseconds
+  readonly state: 'connected' | 'disconnected';
+}
+
 /** Network interface details */
 export interface NetworkInterface {
   readonly name: string;

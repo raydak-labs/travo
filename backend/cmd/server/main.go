@@ -26,13 +26,13 @@ var Version = "dev"
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
-	app, _, _ := setupAppWithConfig(cfg)
+	app, _, _, _ := setupAppWithConfig(cfg)
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, the WebSocket hub, and the alert service so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService) {
+// Returns the app, the WebSocket hub, the alert service, and the uptime tracker so the caller can manage their lifecycle.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker) {
 	app := fiber.New(fiber.Config{
 		AppName: "openwrt-travel-gui",
 	})
@@ -109,6 +109,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	captiveSvc := services.NewCaptiveService(captiveProber)
 	adguardSvc := services.NewAdGuardService()
 	alertSvc := services.NewAlertService(systemSvc)
+	uptimeTracker := services.NewUptimeTracker(captiveProber)
 
 	// Token blocklist with cleanup goroutine
 	blocklist := auth.NewTokenBlocklist()
@@ -142,6 +143,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		Captive:        captiveSvc,
 		AdGuard:        adguardSvc,
 		Alerts:         alertSvc,
+		UptimeTracker:  uptimeTracker,
 	}
 	api.SetupRoutes(app, deps)
 
@@ -151,6 +153,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	app.Get("/api/v1/ws", ws.Handler(hub, authSvc))
 	hub.Start()
 	alertSvc.Start()
+	uptimeTracker.Start()
 
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
@@ -161,7 +164,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc
+	return app, hub, alertSvc, uptimeTracker
 }
 
 func main() {
@@ -176,7 +179,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc := setupAppWithConfig(cfg)
+	app, hub, alertSvc, uptimeTracker := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -187,6 +190,7 @@ func main() {
 		log.Println("Shutting down server...")
 		hub.Stop()
 		alertSvc.Stop()
+		uptimeTracker.Stop()
 		if err := app.Shutdown(); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}
