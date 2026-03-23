@@ -45,6 +45,16 @@ func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// SystemShutdownHandler handles POST /api/v1/system/shutdown.
+func SystemShutdownHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if err := svc.Shutdown(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // SystemLogsHandler handles GET /api/v1/system/logs.
 func SystemLogsHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

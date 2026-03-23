@@ -43,6 +43,20 @@ export function useReboot() {
   });
 }
 
+export function useShutdown() {
+  return useMutation({
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.shutdown),
+    onSuccess: () => {
+      toast.success('Shutdown initiated', {
+        description: 'The device is powering off. You will need physical access to turn it back on.',
+      });
+    },
+    onError: (error) => {
+      toast.error('Failed to shut down', { description: error.message });
+    },
+  });
+}
+
 export function useFactoryReset() {
   return useMutation({
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.factoryReset),

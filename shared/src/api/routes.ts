@@ -12,6 +12,7 @@ export const API_ROUTES = {
     logs: '/api/v1/system/logs',
     kernelLogs: '/api/v1/system/logs/kernel',
     reboot: '/api/v1/system/reboot',
+    shutdown: '/api/v1/system/shutdown',
     hostname: '/api/v1/system/hostname',
     leds: '/api/v1/system/leds',
     ledsSchedule: '/api/v1/system/leds/schedule',

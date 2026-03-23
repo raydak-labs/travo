@@ -196,6 +196,16 @@ func (s *SystemService) Reboot() error {
 	return nil
 }
 
+// Shutdown initiates a system poweroff.
+// The call is async so the HTTP response returns before the system goes down.
+func (s *SystemService) Shutdown() error {
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		_ = exec.Command("poweroff").Run()
+	}()
+	return nil
+}
+
 // findSystemSection returns the UCI section name for the system-type section.
 // On real OpenWRT it's an anonymous section (e.g. cfg01e48a); in mocks it may be "system".
 func (s *SystemService) findSystemSection() (string, map[string]string, error) {

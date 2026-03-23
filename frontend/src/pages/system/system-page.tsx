@@ -41,6 +41,7 @@ import {
   useSystemInfo,
   useSystemStats,
   useReboot,
+  useShutdown,
   useFactoryReset,
   useChangePassword,
   useSetHostname,
@@ -88,6 +89,7 @@ export function SystemPage() {
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
   const { data: stats, isLoading: statsLoading } = useSystemStats();
   const rebootMutation = useReboot();
+  const shutdownMutation = useShutdown();
   const factoryResetMutation = useFactoryReset();
   const changePasswordMutation = useChangePassword();
   const setHostnameMutation = useSetHostname();
@@ -108,6 +110,7 @@ export function SystemPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firmwareInputRef = useRef<HTMLInputElement>(null);
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
+  const [showShutdownConfirm, setShowShutdownConfirm] = useState(false);
   const [showFactoryResetDialog, setShowFactoryResetDialog] = useState(false);
   const [showFirmwareDialog, setShowFirmwareDialog] = useState(false);
   const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
@@ -548,6 +551,41 @@ export function SystemPage() {
               Reboot
             </Button>
           )}
+
+          <div className="mt-4 border-t pt-4">
+            {showShutdownConfirm ? (
+              <div className="flex items-center gap-3">
+                <Badge variant="warning">Confirm shutdown?</Badge>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    shutdownMutation.mutate();
+                    setShowShutdownConfirm(false);
+                  }}
+                  disabled={shutdownMutation.isPending}
+                >
+                  {shutdownMutation.isPending ? 'Shutting down…' : 'Shut Down'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowShutdownConfirm(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setShowShutdownConfirm(true)}
+                >
+                  Shut Down
+                </Button>
+                <p className="mt-1 text-xs text-gray-500">
+                  Power off the device. You will need physical access to turn it back on.
+                </p>
+              </>
+            )}
+          </div>
 
           <div className="mt-4 border-t pt-4">
             <Button size="sm" variant="destructive" onClick={() => setShowFactoryResetDialog(true)}>

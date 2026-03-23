@@ -33,11 +33,12 @@ type SystemProbe interface {
 
 // serviceDefinition holds static config for a known service.
 type serviceDefinition struct {
-	ID          string
-	Name        string
-	Description string
-	Packages    []string // apk/opkg packages to install
-	InitName    string   // init.d script name (empty if no init script)
+	ID            string
+	Name          string
+	Description   string
+	Packages      []string // apk/opkg packages to install
+	DetectPackage string   // primary package for installed detection (defaults to Packages[0])
+	InitName      string   // init.d script name (empty if no init script)
 }
 
 var knownServices = []serviceDefinition{
@@ -49,9 +50,10 @@ var knownServices = []serviceDefinition{
 	},
 	{
 		ID: "wireguard", Name: "WireGuard",
-		Description: "Fast, modern VPN tunnel",
-		Packages:    []string{"wireguard-tools"},
-		InitName:    "", // managed via UCI/netifd, no init.d
+		Description:   "Fast, modern VPN tunnel",
+		Packages:      []string{"wireguard-tools", "kmod-wireguard", "luci-proto-wireguard"},
+		DetectPackage: "wireguard-tools", // kmod-wireguard may be built-in; detect by userspace tools
+		InitName:      "",                // managed via UCI/netifd, no init.d
 	},
 	{
 		ID: "tailscale", Name: "Tailscale",
@@ -146,7 +148,11 @@ func (sm *ServiceManager) buildInfo(def serviceDefinition) models.ServiceInfo {
 	}
 
 	installed := true
-	for _, pkg := range def.Packages {
+	detect := def.Packages
+	if def.DetectPackage != "" {
+		detect = []string{def.DetectPackage}
+	}
+	for _, pkg := range detect {
 		if !sm.pkg.IsInstalled(pkg) {
 			installed = false
 			break
