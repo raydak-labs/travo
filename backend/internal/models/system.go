@@ -127,3 +127,26 @@ type Alert struct {
 type AlertsResponse struct {
 	Alerts []Alert `json:"alerts"`
 }
+
+// ButtonAction is the action to perform when a hardware button is pressed.
+// Valid values: "none", "vpn_toggle", "wifi_toggle", "led_toggle", "reboot".
+type ButtonAction string
+
+const (
+	ButtonActionNone       ButtonAction = "none"
+	ButtonActionVPNToggle  ButtonAction = "vpn_toggle"
+	ButtonActionWifiToggle ButtonAction = "wifi_toggle"
+	ButtonActionLEDToggle  ButtonAction = "led_toggle"
+	ButtonActionReboot     ButtonAction = "reboot"
+)
+
+// HardwareButton describes a detected hardware button and its configured action.
+type HardwareButton struct {
+	Name   string       `json:"name"`   // button identifier, e.g. "reset", "wps"
+	Action ButtonAction `json:"action"` // configured action
+}
+
+// ButtonActionsRequest is the payload for PUT /api/v1/system/button-actions.
+type ButtonActionsRequest struct {
+	Buttons []HardwareButton `json:"buttons"`
+}

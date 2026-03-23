@@ -489,6 +489,17 @@ export const handlers = [
     return HttpResponse.json(mockDDNSStatus);
   }),
 
+  http.get(API_ROUTES.system.buttons, () => {
+    return HttpResponse.json([
+      { name: 'reset', action: 'none' },
+      { name: 'wps', action: 'none' },
+    ]);
+  }),
+
+  http.put(API_ROUTES.system.buttonActions, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.network.uptimeLog, () => {
     const now = Date.now();
     return HttpResponse.json([

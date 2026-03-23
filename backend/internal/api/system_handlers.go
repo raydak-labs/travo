@@ -333,3 +333,24 @@ func SystemAlertsHandler(svc *services.AlertService) fiber.Handler {
 		return c.JSON(models.AlertsResponse{Alerts: alerts})
 	}
 }
+
+// GetButtonsHandler handles GET /api/v1/system/buttons.
+func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(svc.GetHardwareButtons())
+	}
+}
+
+// SetButtonActionsHandler handles PUT /api/v1/system/button-actions.
+func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.ButtonActionsRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetButtonActions(req.Buttons); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

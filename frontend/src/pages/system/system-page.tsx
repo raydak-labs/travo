@@ -13,6 +13,7 @@ import {
   Zap,
   ExternalLink,
   FileEdit,
+  ToggleLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -57,10 +58,13 @@ import {
   useNTPConfig,
   useSetNTPConfig,
   useSyncNTP,
+  useHardwareButtons,
+  useSetButtonActions,
 } from '@/hooks/use-system';
 import { useServices, useAdGuardConfig, useSetAdGuardConfig } from '@/hooks/use-services';
 import { formatBytes, formatUptime } from '@/lib/utils';
 import { TIMEZONES } from '@/lib/timezones';
+import type { ButtonAction } from '@shared/index';
 
 export function SystemPage() {
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
@@ -82,6 +86,9 @@ export function SystemPage() {
   const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
   const setNTPMutation = useSetNTPConfig();
   const syncNTPMutation = useSyncNTP();
+  const { data: hardwareButtons = [] } = useHardwareButtons();
+  const setButtonActions = useSetButtonActions();
+  const [pendingButtonActions, setPendingButtonActions] = useState<Record<string, ButtonAction>>({});
   const { data: services = [] } = useServices();
   const adguardConfigQuery = useAdGuardConfig();
   const setAdGuardConfig = useSetAdGuardConfig();
@@ -981,6 +988,66 @@ export function SystemPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Hardware Buttons */}
+      {hardwareButtons.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Hardware Buttons</CardTitle>
+            <ToggleLeft className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-gray-500">
+              Configure what each physical button does when pressed.
+            </p>
+            {hardwareButtons.map((btn) => {
+              const currentAction =
+                pendingButtonActions[btn.name] ?? (btn.action as ButtonAction);
+              return (
+                <div key={btn.name} className="flex items-center justify-between gap-4">
+                  <span className="font-mono text-sm capitalize">{btn.name}</span>
+                  <Select
+                    value={currentAction}
+                    onValueChange={(val) =>
+                      setPendingButtonActions((prev) => ({
+                        ...prev,
+                        [btn.name]: val as ButtonAction,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Do nothing</SelectItem>
+                      <SelectItem value="vpn_toggle">Toggle VPN</SelectItem>
+                      <SelectItem value="wifi_toggle">Toggle WiFi</SelectItem>
+                      <SelectItem value="led_toggle">Toggle LEDs</SelectItem>
+                      <SelectItem value="reboot">Reboot</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })}
+            <Button
+              size="sm"
+              disabled={setButtonActions.isPending || Object.keys(pendingButtonActions).length === 0}
+              onClick={() => {
+                const merged = hardwareButtons.map((btn) => ({
+                  name: btn.name,
+                  action: (pendingButtonActions[btn.name] ?? btn.action) as ButtonAction,
+                }));
+                setButtonActions.mutate(
+                  { buttons: merged },
+                  { onSuccess: () => setPendingButtonActions({}) },
+                );
+              }}
+            >
+              {setButtonActions.isPending ? 'Saving…' : 'Save Button Actions'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={configEditorOpen} onOpenChange={setConfigEditorOpen}>
         <DialogContent className="max-w-2xl">

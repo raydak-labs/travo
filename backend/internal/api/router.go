@@ -58,6 +58,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
 	v1.Post("/system/time-sync", SyncTimeHandler())
 	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
+	v1.Get("/system/buttons", GetButtonsHandler(deps.System))
+	v1.Put("/system/button-actions", SetButtonActionsHandler(deps.System))
 
 	// Network routes
 	v1.Get("/network/status", NetworkStatusHandler(deps.Network))

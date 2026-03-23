@@ -79,7 +79,7 @@
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
 - [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). Startup health commits repairs but does not auto-apply wireless changes that would require browser confirmation; the user applies them via LuCI Save & Apply or reboot. User-driven wireless changes use rpcd `uci apply` rollback with explicit browser confirmation. Auto-reconnect cron script still uses `wifi up`.
-- [ ] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
+- [x] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
 - [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
 - [ ] 🔮 Scheduled WiFi (time-based on/off)
 
@@ -171,7 +171,7 @@
 - [x] Show connection status (handshake time, transfer stats)
 - [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
 - [x] Kill switch (block traffic if VPN drops)
-- [ ] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
+- [x] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
 - [ ] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
 - [ ] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
 - [ ] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
@@ -190,7 +190,7 @@
 
 - [x] Grey out VPN options when packages not installed (link to Services page)
 - [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
-- [ ] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
+- [x] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
 - [ ] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
 - [ ] 🔮 OpenVPN support
 - [ ] 🔮 VPN speed test
@@ -226,7 +226,7 @@
 ### 4.3 WireGuard (as service)
 
 - [x] Install wireguard-tools package
-- [ ] Post-install setup wizard. See [Implementation guide](../plans/implementation.md#43--wireguard-post-install-wizard).
+- [x] Post-install setup wizard. See [Implementation guide](../plans/implementation.md#43--wireguard-post-install-wizard).
 
 ### 4.4 Tailscale (as service)
 
@@ -263,7 +263,7 @@
 
 - [x] Reboot with confirmation dialog
 - [x] Reboot actually working on device
-- [ ] Shutdown button. See [Implementation guide](../plans/implementation.md#52--mark-reboot-as-working--add-shutdown).
+- [x] Shutdown button. See [Implementation guide](../plans/implementation.md#52--mark-reboot-as-working--add-shutdown).
 - [x] Firmware upgrade (upload sysupgrade image)
 - [x] Factory reset with confirmation
 - [x] Hostname change
@@ -278,8 +278,8 @@
 - [x] Detect timezone mismatch between device and browser (GL.iNet style)
 - [x] NTP server configuration
 - [x] Browser time sync on login — before JWT is issued, client POSTs its clock to `/api/v1/system/time-sync`; if skew > 60s the router clock is corrected via `date -s` (fixes clock-skew login loop on devices without NTP access at first boot)
-- [ ] Auto-set timezone from browser on mismatch alert click. See [Implementation guide](../plans/implementation.md#53--auto-set-timezone-from-browser).
-- [ ] NTP manual sync button + travel timezone validation. See [Implementation guide](../plans/implementation.md#53--time-sync-travel-validation).
+- [x] Auto-set timezone from browser on mismatch alert click. See [Implementation guide](../plans/implementation.md#53--auto-set-timezone-from-browser).
+- [x] NTP manual sync button + travel timezone validation. See [Implementation guide](../plans/implementation.md#53--time-sync-travel-validation).
 - [ ] 🔮 NTP sync status indicator
 
 ### 5.4 Password Management
@@ -307,7 +307,7 @@
 - [x] Bandwidth chart (CPU/Memory over time, 15 data points)
 - [x] Network throughput chart (RX/TX bytes/sec)
 - [x] Per-interface traffic chart
-- [ ] Connection uptime log (internet available since / lost at — timeline of events). See [Implementation guide](../plans/implementation.md#62--connection-uptime-log).
+- [x] Connection uptime log (internet available since / lost at — timeline of events). See [Implementation guide](../plans/implementation.md#62--connection-uptime-log).
 - [ ] 🔮 Historical data (store and display last hours/days)
 
 ### 6.3 Quick Actions
@@ -395,7 +395,7 @@
 - [x] Loading skeletons
 - [x] Error handling with toast notifications
 - [x] Tooltips / hover info for WiFi networks (signal details, channel, etc.)
-- [ ] Tooltips for technical fields (what is MTU? what is DHCP range?). See [Implementation guide](../plans/implementation.md#12--tooltips-for-technical-fields).
+- [x] Tooltips for technical fields (what is MTU? what is DHCP range?). See [Implementation guide](../plans/implementation.md#12--tooltips-for-technical-fields).
 - [x] Onboarding / first-run setup wizard
 - [x] Connection status indicator in header (green/red dot)
 - [x] Actions dropdown menu in toolbar (Reboot, Logout)

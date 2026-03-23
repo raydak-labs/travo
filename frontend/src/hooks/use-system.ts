@@ -14,6 +14,8 @@ import type {
   TimezoneConfig,
   NTPConfig,
   SetupStatus,
+  HardwareButton,
+  ButtonActionsRequest,
 } from '@shared/index';
 
 export function useSystemInfo() {
@@ -296,6 +298,28 @@ export function useSetNTPConfig() {
     },
     onError: (error) => {
       toast.error('Failed to update NTP configuration', { description: error.message });
+    },
+  });
+}
+
+export function useHardwareButtons() {
+  return useQuery({
+    queryKey: ['system', 'buttons'],
+    queryFn: () => apiClient.get<HardwareButton[]>(API_ROUTES.system.buttons),
+  });
+}
+
+export function useSetButtonActions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: ButtonActionsRequest) =>
+      apiClient.put<{ status: string }>(API_ROUTES.system.buttonActions, req),
+    onSuccess: () => {
+      toast.success('Button actions saved');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'buttons'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save button actions', { description: error.message });
     },
   });
 }

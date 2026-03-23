@@ -44,6 +44,8 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.system.timezone).toBe('/api/v1/system/timezone');
     expect(API_ROUTES.system.factoryReset).toBe('/api/v1/system/factory-reset');
     expect(API_ROUTES.system.shutdown).toBe('/api/v1/system/shutdown');
+    expect(API_ROUTES.system.buttons).toBe('/api/v1/system/buttons');
+    expect(API_ROUTES.system.buttonActions).toBe('/api/v1/system/button-actions');
   });
 
   it('has network routes matching backend', () => {
@@ -184,6 +186,8 @@ describe('API_ROUTES', () => {
       '/api/v1/adguard/dns',
       '/api/v1/adguard/config',
       '/api/v1/network/uptime-log',
+      '/api/v1/system/buttons',
+      '/api/v1/system/button-actions',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

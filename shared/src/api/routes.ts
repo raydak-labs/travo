@@ -26,6 +26,8 @@ export const API_ROUTES = {
     setupComplete: '/api/v1/system/setup-complete',
     timeSync: '/api/v1/system/time-sync',
     alerts: '/api/v1/system/alerts',
+    buttons: '/api/v1/system/buttons',
+    buttonActions: '/api/v1/system/button-actions',
   },
   network: {
     status: '/api/v1/network/status',

@@ -165,3 +165,17 @@ export interface Alert {
 export interface AlertsResponse {
   readonly alerts: readonly Alert[];
 }
+
+/** Valid hardware button actions */
+export type ButtonAction = 'none' | 'vpn_toggle' | 'wifi_toggle' | 'led_toggle' | 'reboot';
+
+/** A hardware button with its configured action */
+export interface HardwareButton {
+  readonly name: string;
+  readonly action: ButtonAction;
+}
+
+/** Payload for PUT /api/v1/system/button-actions */
+export interface ButtonActionsRequest {
+  readonly buttons: readonly HardwareButton[];
+}
