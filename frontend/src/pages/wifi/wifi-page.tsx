@@ -22,6 +22,13 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -95,6 +102,7 @@ export function WifiPage() {
   const setAutoReconnect = useSetAutoReconnect();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
   const [qrAP, setQrAP] = useState<APConfig | null>(null);
+  const [pendingDisableSection, setPendingDisableSection] = useState<string | null>(null);
   const [customMAC, setCustomMAC] = useState('');
   const [guestState, setGuestState] = useState<GuestFormState>({
     enabled: false,
@@ -473,18 +481,23 @@ export function WifiPage() {
                       <Button
                         size="sm"
                         disabled={setAP.isPending}
-                        onClick={() =>
-                          setAP.mutate({
-                            section: ap.section,
-                            config: {
-                              ...ap,
-                              ssid: form.ssid,
-                              encryption: form.encryption,
-                              key: form.key,
-                              enabled: form.enabled,
-                            },
-                          })
-                        }
+                        onClick={() => {
+                          // Warn before disabling an AP that was previously enabled
+                          if (ap.enabled && !form.enabled) {
+                            setPendingDisableSection(ap.section);
+                          } else {
+                            setAP.mutate({
+                              section: ap.section,
+                              config: {
+                                ...ap,
+                                ssid: form.ssid,
+                                encryption: form.encryption,
+                                key: form.key,
+                                enabled: form.enabled,
+                              },
+                            });
+                          }
+                        }}
                       >
                         {setAP.isPending ? 'Saving...' : 'Save'}
                       </Button>
@@ -707,6 +720,68 @@ export function WifiPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* AP Disable Confirmation Dialog */}
+      {pendingDisableSection && (() => {
+        const targetAP = apConfigs?.find((a) => a.section === pendingDisableSection);
+        const targetForm = apState[pendingDisableSection];
+        const activeAPCount = apConfigs?.filter((a) => {
+          const s = apState[a.section];
+          return s ? s.enabled : a.enabled;
+        }).length ?? 0;
+        const isLastActive = activeAPCount <= 1;
+        return (
+          <Dialog
+            open={pendingDisableSection !== null}
+            onOpenChange={(open) => !open && setPendingDisableSection(null)}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {isLastActive ? '⚠️ Disable Last Access Point?' : 'Disable Access Point?'}
+                </DialogTitle>
+              </DialogHeader>
+              {isLastActive ? (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  This is the <strong>only active access point</strong>. Disabling it will make the
+                  router unreachable via WiFi. You will need a wired connection or physical access to
+                  re-enable it.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Disabling this access point will disconnect all clients currently connected to it.
+                  Are you sure?
+                </p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPendingDisableSection(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (targetAP && targetForm) {
+                      setAP.mutate({
+                        section: pendingDisableSection,
+                        config: {
+                          ...targetAP,
+                          ssid: targetForm.ssid,
+                          encryption: targetForm.encryption,
+                          key: targetForm.key,
+                          enabled: false,
+                        },
+                      });
+                    }
+                    setPendingDisableSection(null);
+                  }}
+                >
+                  Disable
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
