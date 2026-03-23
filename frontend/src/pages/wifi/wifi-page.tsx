@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import {
   Dialog,
   DialogContent,
@@ -408,9 +409,10 @@ export function WifiPage() {
                     <div className="space-y-2">
                       <label
                         htmlFor={`ap-ssid-${ap.section}`}
-                        className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                        className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
                       >
                         SSID
+                        <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
                       </label>
                       <Input
                         id={`ap-ssid-${ap.section}`}
@@ -459,9 +461,10 @@ export function WifiPage() {
                       <div className="space-y-2">
                         <label
                           htmlFor={`ap-key-${ap.section}`}
-                          className="text-xs font-medium text-gray-600 dark:text-gray-400"
+                          className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
                         >
                           Password
+                          <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
                         </label>
                         <Input
                           id={`ap-key-${ap.section}`}

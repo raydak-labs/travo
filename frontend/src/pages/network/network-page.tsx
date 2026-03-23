@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import {
   Select,
   SelectContent,
@@ -384,7 +385,10 @@ export function NetworkPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs text-gray-500">Start Offset</label>
+                  <label className="flex items-center gap-1 text-xs text-gray-500">
+                    Start Offset
+                    <InfoTooltip text="First IP offset assigned to clients. Offset 100 on 192.168.1.x means the first assigned address is 192.168.1.100." />
+                  </label>
                   <Input
                     type="number"
                     min={2}
@@ -394,7 +398,10 @@ export function NetworkPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-gray-500">Pool Size</label>
+                  <label className="flex items-center gap-1 text-xs text-gray-500">
+                    Pool Size
+                    <InfoTooltip text="Maximum number of clients that can receive an IP address. E.g., 50 means up to 50 devices can connect." />
+                  </label>
                   <Input
                     type="number"
                     min={1}
@@ -405,7 +412,10 @@ export function NetworkPage() {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-gray-500">Lease Time</label>
+                <label className="flex items-center gap-1 text-xs text-gray-500">
+                  Lease Time
+                  <InfoTooltip text="How long a DHCP lease is valid before renewal. Shorter times reclaim IPs faster; longer times reduce DHCP traffic." />
+                </label>
                 <Select value={dhcpLease} onValueChange={setDhcpLease}>
                   <SelectTrigger>
                     <SelectValue />
@@ -489,7 +499,10 @@ export function NetworkPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs text-gray-500">Primary DNS</label>
+                      <label className="flex items-center gap-1 text-xs text-gray-500">
+                        Primary DNS
+                        <InfoTooltip text="DNS server that resolves domain names to IP addresses for all LAN clients. E.g., 8.8.8.8 (Google), 1.1.1.1 (Cloudflare), 9.9.9.9 (Quad9)." />
+                      </label>
                       <Input
                         value={dnsServer1}
                         onChange={(e) => setDnsServer1(e.target.value)}
