@@ -288,6 +288,15 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 	return s.uci.Commit("system")
 }
 
+// SyncNTP forces a one-shot NTP sync using ntpd.
+func (s *SystemService) SyncNTP() error {
+	out, err := exec.Command("ntpd", "-q", "-n", "-p", "pool.ntp.org").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ntp sync failed: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 // SetHostname changes the device hostname via UCI and applies it.
 func (s *SystemService) SetHostname(hostname string) error {
 	section, _, err := s.findSystemSection()

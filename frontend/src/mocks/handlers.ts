@@ -364,6 +364,10 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.post(API_ROUTES.system.ntpSync, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.post(API_ROUTES.system.factoryReset, () => {
     return HttpResponse.json({ status: 'ok' });
   }),

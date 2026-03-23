@@ -126,6 +126,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/factory-reset',
       '/api/v1/system/firmware/upgrade',
       '/api/v1/system/ntp',
+      '/api/v1/system/ntp/sync',
       '/api/v1/system/setup-complete',
       '/api/v1/system/time-sync',
       '/api/v1/system/alerts',

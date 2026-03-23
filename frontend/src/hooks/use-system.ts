@@ -273,6 +273,18 @@ export function useNTPConfig() {
   });
 }
 
+export function useSyncNTP() {
+  return useMutation({
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.ntpSync),
+    onSuccess: () => {
+      toast.success('NTP sync complete', { description: 'System clock synchronized with pool.ntp.org' });
+    },
+    onError: (error) => {
+      toast.error('NTP sync failed', { description: error.message });
+    },
+  });
+}
+
 export function useSetNTPConfig() {
   const queryClient = useQueryClient();
   return useMutation({

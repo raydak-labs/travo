@@ -266,6 +266,16 @@ func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// NTPSyncHandler handles POST /api/v1/system/ntp/sync.
+func NTPSyncHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if err := svc.SyncNTP(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetSetupCompleteHandler handles GET /api/v1/system/setup-complete.
 func GetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

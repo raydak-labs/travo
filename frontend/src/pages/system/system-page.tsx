@@ -56,34 +56,11 @@ import {
   useFirmwareUpgrade,
   useNTPConfig,
   useSetNTPConfig,
+  useSyncNTP,
 } from '@/hooks/use-system';
 import { useServices, useAdGuardConfig, useSetAdGuardConfig } from '@/hooks/use-services';
 import { formatBytes, formatUptime } from '@/lib/utils';
-
-const TIMEZONES = [
-  { zonename: 'UTC', timezone: 'UTC0' },
-  { zonename: 'Europe/London', timezone: 'GMT0BST,M3.5.0/1,M10.5.0' },
-  { zonename: 'Europe/Berlin', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
-  { zonename: 'Europe/Paris', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
-  { zonename: 'Europe/Rome', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
-  { zonename: 'Europe/Madrid', timezone: 'CET-1CEST,M3.5.0,M10.5.0/3' },
-  { zonename: 'Europe/Moscow', timezone: 'MSK-3' },
-  { zonename: 'America/New_York', timezone: 'EST5EDT,M3.2.0,M11.1.0' },
-  { zonename: 'America/Chicago', timezone: 'CST6CDT,M3.2.0,M11.1.0' },
-  { zonename: 'America/Denver', timezone: 'MST7MDT,M3.2.0,M11.1.0' },
-  { zonename: 'America/Los_Angeles', timezone: 'PST8PDT,M3.2.0,M11.1.0' },
-  { zonename: 'America/Sao_Paulo', timezone: '<-03>3' },
-  { zonename: 'Asia/Tokyo', timezone: 'JST-9' },
-  { zonename: 'Asia/Shanghai', timezone: 'CST-8' },
-  { zonename: 'Asia/Kolkata', timezone: 'IST-5:30' },
-  { zonename: 'Asia/Dubai', timezone: '<+04>-4' },
-  { zonename: 'Asia/Singapore', timezone: '<+08>-8' },
-  { zonename: 'Asia/Seoul', timezone: 'KST-9' },
-  { zonename: 'Australia/Sydney', timezone: 'AEST-10AEDT,M10.1.0,M4.1.0/3' },
-  { zonename: 'Pacific/Auckland', timezone: 'NZST-12NZDT,M9.5.0,M4.1.0/3' },
-  { zonename: 'Africa/Cairo', timezone: 'EET-2EEST,M4.5.5/0,M10.5.4/24' },
-  { zonename: 'Africa/Johannesburg', timezone: 'SAST-2' },
-] as const;
+import { TIMEZONES } from '@/lib/timezones';
 
 export function SystemPage() {
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
@@ -104,6 +81,7 @@ export function SystemPage() {
   const firmwareUpgrade = useFirmwareUpgrade();
   const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
   const setNTPMutation = useSetNTPConfig();
+  const syncNTPMutation = useSyncNTP();
   const { data: services = [] } = useServices();
   const adguardConfigQuery = useAdGuardConfig();
   const setAdGuardConfig = useSetAdGuardConfig();
@@ -443,13 +421,26 @@ export function SystemPage() {
                   </Button>
                 </div>
               </div>
-              <Button
-                onClick={() => setNTPMutation.mutate({ enabled: ntpEnabled, servers: ntpServers })}
-                disabled={setNTPMutation.isPending}
-                size="sm"
-              >
-                {setNTPMutation.isPending ? 'Saving…' : 'Save NTP Settings'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() =>
+                    setNTPMutation.mutate({ enabled: ntpEnabled, servers: ntpServers })
+                  }
+                  disabled={setNTPMutation.isPending}
+                  size="sm"
+                >
+                  {setNTPMutation.isPending ? 'Saving…' : 'Save NTP Settings'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => syncNTPMutation.mutate()}
+                  disabled={syncNTPMutation.isPending}
+                  title="Force a one-shot NTP sync with pool.ntp.org"
+                >
+                  {syncNTPMutation.isPending ? 'Syncing…' : 'Sync Now'}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

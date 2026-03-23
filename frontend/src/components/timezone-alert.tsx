@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTimezone } from '@/hooks/use-system';
+import { useTimezone, useSetTimezone } from '@/hooks/use-system';
+import { findTimezone } from '@/lib/timezones';
 
 const SESSION_KEY = 'timezone-alert-dismissed';
 
 export function TimezoneAlert() {
   const { data: deviceTz } = useTimezone();
+  const setTimezoneMutation = useSetTimezone();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(SESSION_KEY) === 'true');
 
@@ -19,6 +21,24 @@ export function TimezoneAlert() {
   const handleDismiss = () => {
     sessionStorage.setItem(SESSION_KEY, 'true');
     setDismissed(true);
+  };
+
+  const handleUpdate = () => {
+    const match = findTimezone(browserTz);
+    if (match) {
+      setTimezoneMutation.mutate(
+        { zonename: match.zonename, timezone: match.timezone },
+        {
+          onSuccess: () => {
+            sessionStorage.setItem(SESSION_KEY, 'true');
+            setDismissed(true);
+          },
+        },
+      );
+    } else {
+      // Browser timezone not in our known list — navigate to system page for manual selection
+      void navigate({ to: '/system' });
+    }
   };
 
   return (
@@ -35,9 +55,10 @@ export function TimezoneAlert() {
         variant="outline"
         size="sm"
         className="border-amber-400 text-amber-900 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900"
-        onClick={() => navigate({ to: '/system' })}
+        onClick={handleUpdate}
+        disabled={setTimezoneMutation.isPending}
       >
-        Update
+        {setTimezoneMutation.isPending ? 'Updating…' : 'Update'}
       </Button>
       <button
         type="button"

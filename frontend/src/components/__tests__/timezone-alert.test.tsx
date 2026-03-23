@@ -156,10 +156,41 @@ describe('TimezoneAlert', () => {
     vi.unstubAllGlobals();
   });
 
-  it('navigates to system page when Update is clicked', async () => {
+  it('auto-sets timezone and dismisses alert when browser timezone is known', async () => {
     const originalIntl = globalThis.Intl;
     const mockDateTimeFormat = vi.fn().mockImplementation(() => ({
       resolvedOptions: () => ({ timeZone: 'Asia/Tokyo' }),
+    }));
+    Object.assign(mockDateTimeFormat, originalIntl.DateTimeFormat);
+    vi.stubGlobal('Intl', { ...originalIntl, DateTimeFormat: mockDateTimeFormat });
+
+    server.use(
+      http.get(API_ROUTES.system.timezone, () =>
+        HttpResponse.json({ zonename: 'UTC', timezone: 'UTC0' }),
+      ),
+      http.put(API_ROUTES.system.timezone, () => HttpResponse.json({ status: 'ok' })),
+    );
+
+    renderWithProviders();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Update' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('navigates to system page when Update is clicked for unknown timezone', async () => {
+    const originalIntl = globalThis.Intl;
+    const mockDateTimeFormat = vi.fn().mockImplementation(() => ({
+      resolvedOptions: () => ({ timeZone: 'Pacific/Tahiti' }),
     }));
     Object.assign(mockDateTimeFormat, originalIntl.DateTimeFormat);
     vi.stubGlobal('Intl', { ...originalIntl, DateTimeFormat: mockDateTimeFormat });
