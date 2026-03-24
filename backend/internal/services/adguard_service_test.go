@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -540,5 +541,45 @@ func TestGetDNSStatus_HealthFields(t *testing.T) {
 	}
 	if status.DnsmasqForwardTarget != "127.0.0.1#5353" {
 		t.Errorf("expected DnsmasqForwardTarget='127.0.0.1#5353', got %q", status.DnsmasqForwardTarget)
+	}
+}
+
+func TestAutoConfigureWritesDefaultConfig(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	// No binary, no config file — fresh install.
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	// mkdir and AdGuard start commands must not fail.
+	mock.commands["mkdir -p /opt/AdGuardHome"] = struct{ output string; err error }{"", nil}
+
+	err := svc.AutoConfigure()
+	if err != nil {
+		t.Fatalf("AutoConfigure: %v", err)
+	}
+
+	content, ok := mock.fileContents[adguardConfigPath]
+	if !ok {
+		t.Fatal("expected AdGuardHome.yaml to be written")
+	}
+	if !strings.Contains(content, "port: 5353") {
+		t.Errorf("expected port 5353 in default config, got: %s", content)
+	}
+	if !strings.Contains(content, "bind_port: 3000") {
+		t.Errorf("expected bind_port 3000 in default config, got: %s", content)
+	}
+}
+
+func TestAutoConfigureSkipsExistingConfig(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	// Config file already exists.
+	mock.files[adguardConfigPath] = true
+	mock.fileContents[adguardConfigPath] = "existing: config\n"
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	_ = svc.AutoConfigure()
+
+	// The existing content must be preserved.
+	if content := mock.fileContents[adguardConfigPath]; content != "existing: config\n" {
+		t.Errorf("expected existing config to be preserved, got: %q", content)
 	}
 }

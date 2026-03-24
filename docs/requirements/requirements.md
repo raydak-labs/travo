@@ -222,7 +222,7 @@
 
 - [x] Status check (installed, running, version)
 - [x] Query statistics (total, blocked, percentage, avg response time)
-- [ ] Auto-configure after install (port, interfaces, DNS integration with dnsmasq). See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md).
+- [x] Auto-configure after install (port, interfaces, DNS integration with dnsmasq). See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md).
 - [x] "AdGuard Home handles client requests" toggle (GL.iNet style, with VPN hint; defaults to off)
 - [x] Show if AdGuard is configured as default DNS for LAN
 - [x] Quick link to AdGuard web UI (with correct IP:port)

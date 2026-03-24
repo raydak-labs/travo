@@ -308,6 +308,61 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 
 const adguardConfigPath = "/opt/AdGuardHome/AdGuardHome.yaml"
 
+// defaultAdGuardConfig is written on first install to give AdGuard sensible defaults:
+// web UI on port 3000, DNS listener on 5353 (dnsmasq-forwarding mode), DoH upstreams.
+const defaultAdGuardConfig = `bind_host: 0.0.0.0
+bind_port: 3000
+users: []
+auth_attempts: 5
+block_auth_min: 15
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: 5353
+  upstream_dns:
+    - https://dns.cloudflare.com/dns-query
+    - https://dns.google/dns-query
+  bootstrap_dns:
+    - 1.1.1.1
+    - 8.8.8.8
+  protection_enabled: true
+  blocking_mode: default
+filtering:
+  enabled: true
+  update_interval: 24
+  filters:
+    - enabled: true
+      url: https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt
+      name: AdGuard DNS filter
+      id: 1
+log_file: ""
+verbose: false
+`
+
+// AutoConfigure writes a default AdGuardHome.yaml (if the file doesn't already exist),
+// starts the adguardhome service, and enables dnsmasq forwarding to AdGuard.
+// Called automatically after successful package install.
+func (s *AdGuardService) AutoConfigure() error {
+	// Only write default config if config file doesn't already exist.
+	if !s.checker.FileExists(adguardConfigPath) {
+		// Ensure the config directory exists.
+		_, _ = s.checker.RunCommand("mkdir", "-p", "/opt/AdGuardHome")
+		if err := s.checker.WriteFile(adguardConfigPath, []byte(defaultAdGuardConfig), 0600); err != nil {
+			return fmt.Errorf("writing default AdGuard config: %w", err)
+		}
+	}
+
+	// Start the service if init script exists.
+	if s.checker.FileExists(adguardInitd) {
+		_, _ = s.checker.RunCommand(adguardInitd, "enable")
+		if _, err := s.checker.RunCommand(adguardInitd, "start"); err != nil {
+			return fmt.Errorf("starting AdGuard Home: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // GetConfig reads the AdGuard Home YAML configuration file.
 func (s *AdGuardService) GetConfig() (string, error) {
 	data, err := s.checker.ReadFile(adguardConfigPath)

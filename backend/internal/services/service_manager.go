@@ -65,11 +65,23 @@ var knownServices = []serviceDefinition{
 
 // ServiceManager manages installable services.
 type ServiceManager struct {
-	mu    sync.RWMutex
-	defs  []serviceDefinition
-	pkg   PackageManager
-	probe SystemProbe
-	cache map[string]models.ServiceInfo
+	mu              sync.RWMutex
+	defs            []serviceDefinition
+	pkg             PackageManager
+	probe           SystemProbe
+	cache           map[string]models.ServiceInfo
+	postInstallHooks map[string]func() error
+}
+
+// SetPostInstallHook registers a callback that runs after successful package install
+// for the given service ID. Useful for auto-configuration (e.g. AdGuard Home).
+func (sm *ServiceManager) SetPostInstallHook(serviceID string, hook func() error) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if sm.postInstallHooks == nil {
+		sm.postInstallHooks = make(map[string]func() error)
+	}
+	sm.postInstallHooks[serviceID] = hook
 }
 
 // NewServiceManager creates a ServiceManager that detects real system state.
@@ -189,6 +201,9 @@ func (sm *ServiceManager) Install(serviceID string) error {
 		}
 	}
 	sm.refreshOne(serviceID)
+	if hook, ok := sm.postInstallHooks[serviceID]; ok {
+		_ = hook() // Non-fatal: log but don't fail install
+	}
 	return nil
 }
 
@@ -228,6 +243,14 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 		}
 	}
 	sm.refreshOne(serviceID)
+	if hook, ok := sm.postInstallHooks[serviceID]; ok {
+		logFn("Running post-install configuration…")
+		if err := hook(); err != nil {
+			logFn(fmt.Sprintf("Post-install warning: %s", err.Error()))
+		} else {
+			logFn("Post-install configuration complete.")
+		}
+	}
 	return nil
 }
 
