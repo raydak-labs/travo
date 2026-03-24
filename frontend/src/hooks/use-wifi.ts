@@ -219,6 +219,26 @@ export function useRadios() {
   });
 }
 
+export function useSetRadioRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, role }: { name: string; role: string }) =>
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse>(
+          API_ROUTES.wifi.radioRole.replace(':name', name),
+          { role },
+        ),
+      ),
+    onSuccess: () => {
+      toast.success('Radio role updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update radio role', { description: error.message });
+    },
+  });
+}
+
 export function useSetRadioEnabled() {
   const queryClient = useQueryClient();
   return useMutation({

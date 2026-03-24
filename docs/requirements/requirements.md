@@ -100,8 +100,8 @@
 ### 1.4 Multi-Radio Support
 
 - [x] Detect and enumerate all radio hardware (phy0, phy1, …)
-- [ ] Per-radio configuration (one for uplink, one for AP, etc.). See [Implementation guide](../plans/implementation.md#14--multi-radio-per-radio-config).
-- [ ] Recommended configuration based on detected hardware
+- [x] Per-radio configuration (one for uplink, one for AP, etc.). See [Implementation guide](../plans/implementation.md#14--multi-radio-per-radio-config).
+- [x] Recommended configuration based on detected hardware
 - [ ] 🔮 Startup script to auto-discover radio setup and persist config
 
 ---
@@ -189,9 +189,9 @@
 
 - [x] Status endpoint (stub — returns not installed)
 - [x] Toggle endpoint (stub)
-- [ ] Actual Tailscale integration (login, device list, exit node). See [Tailscale Integration plan](../plans/tailscale-integration.md).
-- [ ] Show Tailscale IP and connected peers. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-2--status--connected-peers).
-- [ ] Exit node selection. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-3--exit-node-selection).
+- [x] Actual Tailscale integration (login, device list, exit node). See [Tailscale Integration plan](../plans/tailscale-integration.md).
+- [x] Show Tailscale IP and connected peers. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-2--status--connected-peers).
+- [x] Exit node selection. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-3--exit-node-selection).
 - [ ] 🔮 Tailscale SSH toggle
 
 ### 3.3 General VPN UX
@@ -239,7 +239,7 @@
 ### 4.4 Tailscale (as service)
 
 - [x] Install tailscale package
-- [ ] Post-install authentication flow. See [Implementation guide](../plans/implementation.md#44--tailscale-post-install-auth-flow) and [Tailscale Integration plan](../plans/tailscale-integration.md#phase-1--authentication-flow).
+- [x] Post-install authentication flow. See [Implementation guide](../plans/implementation.md#44--tailscale-post-install-auth-flow) and [Tailscale Integration plan](../plans/tailscale-integration.md#phase-1--authentication-flow).
 
 ### 4.5 Dynamic DNS
 

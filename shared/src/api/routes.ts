@@ -66,6 +66,7 @@ export const API_ROUTES = {
     savedPriority: '/api/v1/wifi/saved/priority',
     radio: '/api/v1/wifi/radio',
     radios: '/api/v1/wifi/radios',
+    radioRole: '/api/v1/wifi/radios/:name/role',
     ap: '/api/v1/wifi/ap',
     mac: '/api/v1/wifi/mac',
     macRandomize: '/api/v1/wifi/mac/randomize',

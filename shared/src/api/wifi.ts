@@ -100,6 +100,9 @@ export interface SetMACRequest {
   readonly mac: string;
 }
 
+/** Radio role: which modes are active on this radio hardware */
+export type RadioRole = 'ap' | 'sta' | 'both' | 'none';
+
 /** WiFi radio hardware info */
 export interface RadioInfo {
   readonly name: string;
@@ -108,6 +111,8 @@ export interface RadioInfo {
   readonly htmode: string;
   readonly type: string;
   readonly disabled: boolean;
+  /** Active role: ap, sta, both, or none */
+  readonly role: RadioRole;
 }
 
 /** Guest WiFi network configuration */

@@ -267,6 +267,22 @@ func GetRadiosHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// SetRadioRoleHandler handles PUT /api/v1/wifi/radios/:name/role.
+func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		radioName := c.Params("name")
+		var req models.RadioRoleRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		result, err := svc.SetRadioRole(radioName, req.Role)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(result)
+	}
+}
+
 // GetGuestWifiHandler handles GET /api/v1/wifi/guest.
 func GetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

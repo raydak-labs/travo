@@ -578,6 +578,7 @@ export const mockRadios: RadioInfo[] = [
     htmode: 'HE20',
     type: 'mac80211',
     disabled: false,
+    role: 'sta',
   },
   {
     name: 'radio1',
@@ -586,6 +587,7 @@ export const mockRadios: RadioInfo[] = [
     htmode: 'HE80',
     type: 'mac80211',
     disabled: false,
+    role: 'ap',
   },
 ];
 

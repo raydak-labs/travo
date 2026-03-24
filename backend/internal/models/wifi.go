@@ -74,4 +74,11 @@ type RadioInfo struct {
 	HTMode   string `json:"htmode"`
 	Type     string `json:"type"`
 	Disabled bool   `json:"disabled"`
+	// Role is the current active role of this radio: "ap", "sta", "both", or "none".
+	Role string `json:"role"`
+}
+
+// RadioRoleRequest is the request body for setting a radio's role.
+type RadioRoleRequest struct {
+	Role string `json:"role"`
 }

@@ -1024,6 +1024,25 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 	if err != nil {
 		return []models.RadioInfo{}, nil
 	}
+	// Build role map: for each radio name, detect active AP/STA ifaces.
+	type roleFlags struct{ ap, sta bool }
+	roles := map[string]roleFlags{}
+	for _, opts := range sections {
+		if opts["mode"] == "" || opts["type"] != "" {
+			continue // skip radio device sections
+		}
+		device := opts["device"]
+		if device == "" || opts["disabled"] == "1" {
+			continue
+		}
+		rf := roles[device]
+		if opts["mode"] == "ap" {
+			rf.ap = true
+		} else if opts["mode"] == "sta" {
+			rf.sta = true
+		}
+		roles[device] = rf
+	}
 	var radios []models.RadioInfo
 	for name, opts := range sections {
 		// wifi-device sections have a "type" option (e.g. "mac80211")
@@ -1037,6 +1056,16 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 				channel = v
 			}
 		}
+		rf := roles[name]
+		role := "none"
+		switch {
+		case rf.ap && rf.sta:
+			role = "both"
+		case rf.ap:
+			role = "ap"
+		case rf.sta:
+			role = "sta"
+		}
 		radios = append(radios, models.RadioInfo{
 			Name:     name,
 			Band:     opts["band"],
@@ -1044,9 +1073,98 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 			HTMode:   opts["htmode"],
 			Type:     devType,
 			Disabled: opts["disabled"] == "1",
+			Role:     role,
 		})
 	}
 	return radios, nil
+}
+
+// SetRadioRole assigns a role (ap/sta/both/none) to a specific radio.
+// It enables/disables existing iface sections and creates them if needed.
+func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult, error) {
+	switch role {
+	case "ap", "sta", "both", "none":
+	default:
+		return nil, fmt.Errorf("invalid role %q: must be ap, sta, both, or none", role)
+	}
+	enableAP := role == "ap" || role == "both"
+	enableSTA := role == "sta" || role == "both"
+
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect existing AP and STA sections for this radio.
+	var apSections, staSections []string
+	for name, opts := range sections {
+		if opts["device"] != radioName {
+			continue
+		}
+		switch opts["mode"] {
+		case "ap":
+			apSections = append(apSections, name)
+		case "sta":
+			staSections = append(staSections, name)
+		}
+	}
+
+	// Handle AP sections.
+	if enableAP && len(apSections) == 0 {
+		apName := "ap_" + radioName
+		if err := w.uci.AddSection("wireless", apName, "wifi-iface"); err != nil {
+			return nil, fmt.Errorf("creating AP section: %w", err)
+		}
+		_ = w.uci.Set("wireless", apName, "device", radioName)
+		_ = w.uci.Set("wireless", apName, "mode", "ap")
+		_ = w.uci.Set("wireless", apName, "ssid", "OpenWRT")
+		_ = w.uci.Set("wireless", apName, "encryption", "psk2")
+		_ = w.uci.Set("wireless", apName, "key", "changeme123")
+		_ = w.uci.Set("wireless", apName, "network", "lan")
+		apSections = append(apSections, apName)
+	}
+	for _, section := range apSections {
+		if err := w.setIfaceDisabled(section, !enableAP); err != nil {
+			return nil, err
+		}
+		if enableAP {
+			if err := w.ensureSectionRadioEnabled(section); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Handle STA sections.
+	if enableSTA && len(staSections) == 0 {
+		if err := w.ensureWwanNetwork(); err != nil {
+			return nil, fmt.Errorf("ensuring wwan network: %w", err)
+		}
+		staName := "sta_" + radioName
+		if err := w.uci.AddSection("wireless", staName, "wifi-iface"); err != nil {
+			return nil, fmt.Errorf("creating STA section: %w", err)
+		}
+		_ = w.uci.Set("wireless", staName, "device", radioName)
+		_ = w.uci.Set("wireless", staName, "mode", "sta")
+		_ = w.uci.Set("wireless", staName, "network", "wwan")
+		_ = w.uci.Set("wireless", staName, "ssid", "")
+		_ = w.uci.Set("wireless", staName, "disabled", "0")
+		staSections = append(staSections, staName)
+	}
+	for _, section := range staSections {
+		if err := w.setIfaceDisabled(section, !enableSTA); err != nil {
+			return nil, err
+		}
+		if enableSTA {
+			if err := w.ensureSectionRadioEnabled(section); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := w.uci.Commit("wireless"); err != nil {
+		return nil, err
+	}
+	return w.stageWirelessApply()
 }
 
 // GetAPConfigs returns the AP configuration for all radios.

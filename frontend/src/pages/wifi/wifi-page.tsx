@@ -56,6 +56,7 @@ import {
   useGuestWifi,
   useSetGuestWifi,
   useRadios,
+  useSetRadioRole,
   useAutoReconnect,
   useSetAutoReconnect,
 } from '@/hooks/use-wifi';
@@ -99,6 +100,7 @@ export function WifiPage() {
   const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
   const setGuestWifi = useSetGuestWifi();
   const { data: radios, isLoading: radiosLoading } = useRadios();
+  const setRadioRole = useSetRadioRole();
   const { data: autoReconnect } = useAutoReconnect();
   const setAutoReconnect = useSetAutoReconnect();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
@@ -176,17 +178,30 @@ export function WifiPage() {
                       : radio.band === '6g'
                         ? '6 GHz'
                         : radio.band;
+                // Recommended: 5 GHz = AP, 2.4 GHz = STA (optimal travel router config)
+                const recommendedRole = radio.band === '5g' ? 'ap' : radio.band === '2g' ? 'sta' : null;
+                const isRecommended = recommendedRole && radio.role === recommendedRole;
                 return (
                   <div
                     key={radio.name}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    className="flex items-center justify-between rounded-lg border p-3 gap-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <Radio className="h-4 w-4 text-gray-500" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {radio.name}
-                        </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Radio className="h-4 w-4 shrink-0 text-gray-500" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {radio.name}
+                          </p>
+                          {isRecommended && (
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                              Recommended
+                            </Badge>
+                          )}
+                          <Badge variant={radio.disabled ? 'destructive' : 'success'}>
+                            {radio.disabled ? 'Disabled' : 'Active'}
+                          </Badge>
+                        </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
                           <span>{bandLabel}</span>
                           <span>Ch {radio.channel}</span>
@@ -195,9 +210,21 @@ export function WifiPage() {
                         </div>
                       </div>
                     </div>
-                    <Badge variant={radio.disabled ? 'destructive' : 'success'}>
-                      {radio.disabled ? 'Disabled' : 'Active'}
-                    </Badge>
+                    <Select
+                      value={radio.role}
+                      onValueChange={(role) => setRadioRole.mutate({ name: radio.name, role })}
+                      disabled={setRadioRole.isPending}
+                    >
+                      <SelectTrigger className="w-32 shrink-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ap">AP only</SelectItem>
+                        <SelectItem value="sta">STA only</SelectItem>
+                        <SelectItem value="both">Both (repeater)</SelectItem>
+                        <SelectItem value="none">Disabled</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 );
               })}

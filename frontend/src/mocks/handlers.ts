@@ -125,6 +125,10 @@ export const handlers = [
     return HttpResponse.json(mockRadios);
   }),
 
+  http.put(`${API_ROUTES.wifi.radios}/:name/role`, () => {
+    return HttpResponse.json({ status: 'ok', pending: false });
+  }),
+
   http.delete(`${API_ROUTES.wifi.deleteSaved}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
