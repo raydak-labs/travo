@@ -22,6 +22,7 @@ type Dependencies struct {
 	Alerts         *services.AlertService
 	UptimeTracker  *services.UptimeTracker
 	DataUsage      *services.DataUsageService
+	USBTether      *services.USBTetheringService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -156,6 +157,11 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/network/data-usage/reset", ResetDataUsageHandler(deps.DataUsage))
 	v1.Get("/network/data-usage/budget", GetDataBudgetHandler(deps.DataUsage))
 	v1.Put("/network/data-usage/budget", SetDataBudgetHandler(deps.DataUsage))
+
+	// USB Tethering
+	v1.Get("/network/usb-tethering", GetUSBTetherStatusHandler(deps.USBTether))
+	v1.Post("/network/usb-tethering/configure", ConfigureUSBTetherHandler(deps.USBTether))
+	v1.Post("/network/usb-tethering/unconfigure", UnconfigureUSBTetherHandler(deps.USBTether))
 
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))

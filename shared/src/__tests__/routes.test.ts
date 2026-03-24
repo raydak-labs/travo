@@ -195,6 +195,9 @@ describe('API_ROUTES', () => {
       '/api/v1/network/data-usage',
       '/api/v1/network/data-usage/reset',
       '/api/v1/network/data-usage/budget',
+      '/api/v1/network/usb-tethering',
+      '/api/v1/network/usb-tethering/configure',
+      '/api/v1/network/usb-tethering/unconfigure',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

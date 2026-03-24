@@ -148,9 +148,9 @@
 
 ### 2.5 USB Tethering
 
-- [ ] Detect USB tethered device (phone sharing mobile data). See [USB Tethering plan](../plans/usb-tethering.md).
-- [ ] Auto-configure as WAN source. See [USB Tethering plan](../plans/usb-tethering.md).
-- [ ] Show tethering status on dashboard. See [USB Tethering plan](../plans/usb-tethering.md).
+- [x] Detect USB tethered device (phone sharing mobile data). See [USB Tethering plan](../plans/usb-tethering.md).
+- [x] Auto-configure as WAN source. See [USB Tethering plan](../plans/usb-tethering.md).
+- [x] Show tethering status on dashboard. See [USB Tethering plan](../plans/usb-tethering.md).
 - [ ] 🔮 Bluetooth tethering
 
 ### 2.6 WAN Auto-Detection

@@ -109,6 +109,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	captiveSvc := services.NewCaptiveService(captiveProber)
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
+	usbTetherSvc := services.NewUSBTetheringService()
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
@@ -155,6 +156,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		Alerts:         alertSvc,
 		UptimeTracker:  uptimeTracker,
 		DataUsage:      dataUsageSvc,
+		USBTether:      usbTetherSvc,
 	}
 	api.SetupRoutes(app, deps)
 

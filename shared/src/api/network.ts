@@ -162,6 +162,16 @@ export interface DataBudgetConfig {
   readonly budgets: readonly DataBudget[];
 }
 
+/** USB tethering detection and configuration status */
+export interface USBTetherStatus {
+  readonly detected: boolean;
+  readonly device_type: 'android' | 'ios' | 'unknown' | '';
+  readonly interface: string;
+  readonly is_up: boolean;
+  readonly ip_address: string;
+  readonly configured: boolean;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

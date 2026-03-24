@@ -51,6 +51,9 @@ export const API_ROUTES = {
     dataUsage: '/api/v1/network/data-usage',
     dataUsageReset: '/api/v1/network/data-usage/reset',
     dataUsageBudget: '/api/v1/network/data-usage/budget',
+    usbTethering: '/api/v1/network/usb-tethering',
+    usbTetheringConfigure: '/api/v1/network/usb-tethering/configure',
+    usbTetheringUnconfigure: '/api/v1/network/usb-tethering/unconfigure',
   },
   wifi: {
     scan: '/api/v1/wifi/scan',

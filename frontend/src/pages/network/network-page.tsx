@@ -52,6 +52,7 @@ import {
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
 import { DataUsageSection } from './data-usage-section';
+import { USBTetheringSection } from './usb-tethering-section';
 import { InterfaceTrafficCharts } from './interface-traffic-charts';
 import type { NetworkInterface } from '@shared/index';
 
@@ -972,6 +973,9 @@ export function NetworkPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* USB Tethering */}
+      <USBTetheringSection />
 
       {/* Data Usage Tracking */}
       <DataUsageSection />
