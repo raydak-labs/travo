@@ -183,7 +183,7 @@
 - [x] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
 - [x] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
 - [ ] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
-- [ ] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
+- [x] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 
 ### 3.2 Tailscale
 
@@ -228,7 +228,7 @@
 - [x] Quick link to AdGuard web UI (with correct IP:port)
 - [x] Toggle DNS filtering on/off without stopping AdGuard
 - [x] AdGuard Home configuration editor (show/edit AdGuardHome.yaml with restart)
-- [ ] Configure AdGuard to work alongside VPN. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
+- [x] Configure AdGuard to work alongside VPN. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 - [ ] 🔮 Blocklist management from travel router UI
 
 ### 4.3 WireGuard (as service)

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, Loader2, XCircle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, Loader2, XCircle, Info } from 'lucide-react';
 import { WireguardSection } from './wireguard-section';
 import { TailscaleSection } from './tailscale-section';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useDNSLeakTest, useVerifyWireGuard } from '@/hooks/use-vpn';
+import { useDNSLeakTest, useVerifyWireGuard, useWireguardStatus } from '@/hooks/use-vpn';
+import { useAdGuardDNS } from '@/hooks/use-services';
 import type { DNSLeakResult, VPNVerifyResult } from '@shared/index';
 
 function DNSLeakTestCard() {
@@ -190,6 +191,33 @@ function VerifyVPNCard() {
   );
 }
 
+function AdGuardVPNHint() {
+  const { data: wgStatus } = useWireguardStatus();
+  const { data: dnsStatus } = useAdGuardDNS();
+
+  const vpnActive = !!wgStatus?.interface;
+  const adguardDnsActive = dnsStatus?.enabled === true;
+
+  if (!vpnActive || !adguardDnsActive) return null;
+
+  return (
+    <div className="flex gap-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+      <div className="space-y-1">
+        <p className="font-medium text-blue-800 dark:text-blue-200">
+          WireGuard VPN and AdGuard DNS are both active
+        </p>
+        <p className="text-blue-700 dark:text-blue-300">
+          DNS queries from LAN clients are handled by AdGuard Home locally, then forwarded to your
+          configured upstream resolvers over the VPN tunnel. If your WireGuard profile specifies
+          custom DNS servers, consider adding them as upstream resolvers in AdGuard to ensure they
+          are used.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function VpnPage() {
   return (
     <div className="space-y-6">
@@ -198,6 +226,9 @@ export function VpnPage() {
 
       {/* Tailscale Section */}
       <TailscaleSection />
+
+      {/* VPN + AdGuard interplay hint */}
+      <AdGuardVPNHint />
 
       {/* Verify VPN */}
       <VerifyVPNCard />
