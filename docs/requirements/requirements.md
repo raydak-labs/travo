@@ -75,7 +75,7 @@
 - [x] Auto-reconnect to known networks when connection drops
 - [x] Hidden network support (manual SSID entry)
 - [x] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with band picker on connect and per-band signal display. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md).
-- [ ] **Automatic band switching** — Background monitor switches STA between 2.4 GHz and 5 GHz based on signal quality with configurable thresholds and hysteresis. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md#part-3-automatic-band-switching).
+- [x] **Automatic band switching** — Background monitor switches STA between 2.4 GHz and 5 GHz based on signal quality with configurable thresholds and hysteresis. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md#part-3-automatic-band-switching).
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 

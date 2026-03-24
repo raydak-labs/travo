@@ -1596,3 +1596,73 @@ func (w *WifiService) disableAutoReconnect() error {
 	os.Remove(w.reconnectScript)
 	return nil
 }
+
+// GetSTASignalInfo returns the active STA connection signal, SSID, and radio device.
+// Returns (ssid="", signalDBM=0, radio="") when no STA is connected.
+func (w *WifiService) GetSTASignalInfo() (ssid string, signalDBM int, radio string, err error) {
+	ifname, _, err := w.findSTADevice()
+	if err != nil || ifname == "" {
+		return "", 0, "", nil // not connected
+	}
+	resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": ifname})
+	if err != nil {
+		return "", 0, "", err
+	}
+	ssid, _ = resp["ssid"].(string)
+	if sig, ok := resp["signal"].(float64); ok {
+		signalDBM = int(sig)
+	}
+	// Determine current radio from UCI
+	section, _ := w.findSTASection()
+	if section != "" {
+		opts, _ := w.uci.GetAll("wireless", section)
+		radio = opts["device"]
+	}
+	return ssid, signalDBM, radio, nil
+}
+
+// ScanRadioForSSID scans the given radio and returns the best signal for the target SSID.
+// Returns (0, false, nil) when the SSID is not found on that radio.
+func (w *WifiService) ScanRadioForSSID(radioName, ssid string) (int, bool, error) {
+	resp, err := w.ubus.Call("iwinfo", "scan", map[string]interface{}{"device": radioName})
+	if err != nil {
+		return 0, false, err
+	}
+	results, _ := resp["results"].([]interface{})
+	bestSignal := -999
+	found := false
+	for _, r := range results {
+		rm, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if s, _ := rm["ssid"].(string); s != ssid {
+			continue
+		}
+		found = true
+		if sig, ok := rm["signal"].(float64); ok && int(sig) > bestSignal {
+			bestSignal = int(sig)
+		}
+	}
+	if !found {
+		return 0, false, nil
+	}
+	return bestSignal, true, nil
+}
+
+// SwitchSTAToRadio moves the active STA section to a different radio device and
+// applies the change. This is for automated background switches; it uses
+// applyWireless (ApplyAndConfirm) rather than the staged browser-confirm flow.
+func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
+	section, err := w.findSTASection()
+	if err != nil {
+		return fmt.Errorf("no STA section to switch: %w", err)
+	}
+	if err := w.uci.Set("wireless", section, "device", targetRadio); err != nil {
+		return fmt.Errorf("uci set device: %w", err)
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return fmt.Errorf("uci commit: %w", err)
+	}
+	return w.applyWireless()
+}

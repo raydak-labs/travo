@@ -9,20 +9,21 @@ import (
 
 // Dependencies holds all service dependencies for API handlers.
 type Dependencies struct {
-	Auth           *auth.AuthService
-	Blocklist      *auth.TokenBlocklist
-	RateLimiter    *auth.RateLimiter
-	System         *services.SystemService
-	Network        *services.NetworkService
-	Wifi           *services.WifiService
-	Vpn            *services.VpnService
-	ServiceManager *services.ServiceManager
-	Captive        *services.CaptiveService
-	AdGuard        *services.AdGuardService
-	Alerts         *services.AlertService
-	UptimeTracker  *services.UptimeTracker
-	DataUsage      *services.DataUsageService
-	USBTether      *services.USBTetheringService
+	Auth            *auth.AuthService
+	Blocklist       *auth.TokenBlocklist
+	RateLimiter     *auth.RateLimiter
+	System          *services.SystemService
+	Network         *services.NetworkService
+	Wifi            *services.WifiService
+	Vpn             *services.VpnService
+	ServiceManager  *services.ServiceManager
+	Captive         *services.CaptiveService
+	AdGuard         *services.AdGuardService
+	Alerts          *services.AlertService
+	UptimeTracker   *services.UptimeTracker
+	DataUsage       *services.DataUsageService
+	USBTether       *services.USBTetheringService
+	BandSwitching   *services.BandSwitchingService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -109,6 +110,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/wifi/ap/:section", SetAPConfigHandler(deps.Wifi))
 	v1.Get("/wifi/radios", GetRadiosHandler(deps.Wifi))
 	v1.Put("/wifi/radios/:name/role", SetRadioRoleHandler(deps.Wifi))
+	v1.Get("/wifi/band-switching", GetBandSwitchingHandler(deps.BandSwitching))
+	v1.Put("/wifi/band-switching", SetBandSwitchingHandler(deps.BandSwitching))
 	v1.Get("/wifi/mac", GetMACHandler(deps.Wifi))
 	v1.Put("/wifi/mac", SetMACHandler(deps.Wifi))
 	v1.Post("/wifi/mac/randomize", RandomizeMACHandler(deps.Wifi))

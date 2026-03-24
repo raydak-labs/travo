@@ -129,6 +129,32 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok', pending: false });
   }),
 
+  http.get(API_ROUTES.wifi.bandSwitching, () => {
+    return HttpResponse.json({
+      config: {
+        enabled: false,
+        preferred_band: '5g',
+        check_interval_sec: 10,
+        down_switch_threshold_dbm: -70,
+        down_switch_delay_sec: 30,
+        up_switch_threshold_dbm: -60,
+        up_switch_delay_sec: 60,
+        min_viable_signal_dbm: -80,
+      },
+      status: {
+        state: 'inactive',
+        current_band: '',
+        signal_dbm: 0,
+        weak_signal_secs: 0,
+        cooldown_sec: 0,
+      },
+    });
+  }),
+
+  http.put(API_ROUTES.wifi.bandSwitching, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.delete(`${API_ROUTES.wifi.deleteSaved}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
   }),

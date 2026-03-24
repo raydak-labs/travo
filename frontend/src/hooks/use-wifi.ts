@@ -16,6 +16,8 @@ import type {
   AutoReconnectConfig,
   RandomizeMACResponse,
   WifiMutationResponse,
+  BandSwitchConfig,
+  BandSwitchResponse,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -272,6 +274,28 @@ export function useSetAutoReconnect() {
     },
     onError: (error) => {
       toast.error('Failed to update auto-reconnect', { description: error.message });
+    },
+  });
+}
+
+export function useBandSwitching() {
+  return useQuery({
+    queryKey: ['wifi', 'band-switching'],
+    queryFn: () => apiClient.get<BandSwitchResponse>(API_ROUTES.wifi.bandSwitching),
+    refetchInterval: 10_000,
+  });
+}
+
+export function useSetBandSwitching() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: BandSwitchConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.bandSwitching, config),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'band-switching'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update band switching config', { description: error.message });
     },
   });
 }

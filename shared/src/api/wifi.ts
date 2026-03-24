@@ -115,6 +115,36 @@ export interface RadioInfo {
   readonly role: RadioRole;
 }
 
+/** Automatic band switching configuration */
+export interface BandSwitchConfig {
+  readonly enabled: boolean;
+  readonly preferred_band: string;
+  readonly check_interval_sec: number;
+  readonly down_switch_threshold_dbm: number;
+  readonly down_switch_delay_sec: number;
+  readonly up_switch_threshold_dbm: number;
+  readonly up_switch_delay_sec: number;
+  readonly min_viable_signal_dbm: number;
+}
+
+/** Band switching real-time monitoring status */
+export interface BandSwitchStatus {
+  /** State: inactive | monitoring | weak_signal | cooldown */
+  readonly state: string;
+  readonly current_band: string;
+  readonly signal_dbm: number;
+  readonly weak_signal_secs: number;
+  readonly cooldown_sec: number;
+  readonly last_switch_at?: string;
+  readonly last_switch_reason?: string;
+}
+
+/** Response from GET /wifi/band-switching */
+export interface BandSwitchResponse {
+  readonly config: BandSwitchConfig;
+  readonly status: BandSwitchStatus;
+}
+
 /** Guest WiFi network configuration */
 export interface GuestWifiConfig {
   readonly enabled: boolean;

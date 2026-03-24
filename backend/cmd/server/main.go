@@ -26,13 +26,13 @@ var Version = "dev"
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
-	app, _, _, _ := setupAppWithConfig(cfg)
+	app, _, _, _, _ := setupAppWithConfig(cfg)
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, the WebSocket hub, the alert service, and the uptime tracker so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker) {
+// Returns the app, the WebSocket hub, the alert service, the uptime tracker, and band switching service so the caller can manage their lifecycle.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService) {
 	app := fiber.New(fiber.Config{
 		AppName: "openwrt-travel-gui",
 	})
@@ -110,6 +110,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()
+	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/openwrt-travel-gui/band-switching.json")
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
@@ -157,6 +158,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		UptimeTracker:  uptimeTracker,
 		DataUsage:      dataUsageSvc,
 		USBTether:      usbTetherSvc,
+		BandSwitching:  bandSwitchSvc,
 	}
 	api.SetupRoutes(app, deps)
 
@@ -167,6 +169,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	hub.Start()
 	alertSvc.Start()
 	uptimeTracker.Start()
+	bandSwitchSvc.Start()
 
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
@@ -177,7 +180,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc, uptimeTracker
+	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc
 }
 
 func main() {
@@ -192,7 +195,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc, uptimeTracker := setupAppWithConfig(cfg)
+	app, hub, alertSvc, uptimeTracker, bandSwitchSvc := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -204,6 +207,7 @@ func main() {
 		hub.Stop()
 		alertSvc.Stop()
 		uptimeTracker.Stop()
+		bandSwitchSvc.Stop()
 		if err := app.Shutdown(); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}
