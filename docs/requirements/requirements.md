@@ -425,7 +425,7 @@
 - [x] AP WiFi health check at startup (ensures enabled APs have valid config; skips disabled APs)
 - [x] Init script for auto-start on boot (procd service, verified on device)
 - [x] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
-- [ ] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
+- [x] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
 - [ ] 🔮 Automatic updates mechanism
 
 ---

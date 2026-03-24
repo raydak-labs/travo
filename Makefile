@@ -7,7 +7,7 @@ dev:
 # Build frontend and backend
 build:
 	cd frontend && pnpm build
-	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server
+	cd backend && CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/server ./cmd/server
 
 # Run all tests (Go + Vitest)
 test:
@@ -56,6 +56,15 @@ deploy-local:
 # Start Docker dev environment
 docker-dev:
 	docker compose up
+
+# Report binary and bundle sizes
+size-audit:
+	@echo "=== Go binary ==="
+	@ls -lh backend/bin/server 2>/dev/null || echo "(not built — run 'make build' first)"
+	@echo "=== Frontend bundle (gzipped) ==="
+	@find frontend/dist/assets -name "*.js" -exec gzip -c {} \; 2>/dev/null | wc -c | awk '{printf "%.1f KB\n", $$1/1024}' || echo "(not built)"
+	@echo "=== Total dist size ==="
+	@du -sh frontend/dist 2>/dev/null || echo "(not built)"
 
 # Remove build artifacts
 clean:

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import {
   createRouter,
   createRoute,
@@ -7,18 +8,49 @@ import {
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/layout/app-shell';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { LoginPage } from '@/pages/login/login-page';
-import { DashboardPage } from '@/pages/dashboard/dashboard-page';
-import { WifiPage } from '@/pages/wifi/wifi-page';
-import { VpnPage } from '@/pages/vpn/vpn-page';
-import { ServicesPage } from '@/pages/services/services-page';
-import { NetworkPage } from '@/pages/network/network-page';
-import { ClientsPage } from '@/pages/clients/clients-page';
-import { SystemPage } from '@/pages/system/system-page';
-import { LogsPage } from '@/pages/logs/logs-page';
-import { SetupPage } from '@/pages/setup/setup-page';
 import { getToken } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
+
+// Eagerly loaded (always needed)
+import { LoginPage } from '@/pages/login/login-page';
+import { SetupPage } from '@/pages/setup/setup-page';
+
+// Lazy-loaded pages (loaded only when the route is first visited)
+const DashboardPage = lazy(() =>
+  import('@/pages/dashboard/dashboard-page').then((m) => ({ default: m.DashboardPage })),
+);
+const WifiPage = lazy(() =>
+  import('@/pages/wifi/wifi-page').then((m) => ({ default: m.WifiPage })),
+);
+const VpnPage = lazy(() =>
+  import('@/pages/vpn/vpn-page').then((m) => ({ default: m.VpnPage })),
+);
+const ServicesPage = lazy(() =>
+  import('@/pages/services/services-page').then((m) => ({ default: m.ServicesPage })),
+);
+const NetworkPage = lazy(() =>
+  import('@/pages/network/network-page').then((m) => ({ default: m.NetworkPage })),
+);
+const ClientsPage = lazy(() =>
+  import('@/pages/clients/clients-page').then((m) => ({ default: m.ClientsPage })),
+);
+const SystemPage = lazy(() =>
+  import('@/pages/system/system-page').then((m) => ({ default: m.SystemPage })),
+);
+const LogsPage = lazy(() =>
+  import('@/pages/logs/logs-page').then((m) => ({ default: m.LogsPage })),
+);
+
+/** Wraps a page in ErrorBoundary + Suspense for lazy loading. */
+function Page({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<div className="p-8 text-center text-gray-500 text-sm">Loading…</div>}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
 
 // Root route
 const rootRoute = createRootRoute({
@@ -93,9 +125,9 @@ const dashboardRoute = createRoute({
   path: '/dashboard',
   component: () => (
     <AppShell title="Dashboard">
-      <ErrorBoundary>
+      <Page>
         <DashboardPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -105,9 +137,9 @@ const wifiRoute = createRoute({
   path: '/wifi',
   component: () => (
     <AppShell title="WiFi">
-      <ErrorBoundary>
+      <Page>
         <WifiPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -117,9 +149,9 @@ const networkRoute = createRoute({
   path: '/network',
   component: () => (
     <AppShell title="Network">
-      <ErrorBoundary>
+      <Page>
         <NetworkPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -129,9 +161,9 @@ const clientsRoute = createRoute({
   path: '/clients',
   component: () => (
     <AppShell title="Clients">
-      <ErrorBoundary>
+      <Page>
         <ClientsPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -141,9 +173,9 @@ const vpnRoute = createRoute({
   path: '/vpn',
   component: () => (
     <AppShell title="VPN">
-      <ErrorBoundary>
+      <Page>
         <VpnPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -153,9 +185,9 @@ const servicesRoute = createRoute({
   path: '/services',
   component: () => (
     <AppShell title="Services">
-      <ErrorBoundary>
+      <Page>
         <ServicesPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -165,9 +197,9 @@ const systemRoute = createRoute({
   path: '/system',
   component: () => (
     <AppShell title="System">
-      <ErrorBoundary>
+      <Page>
         <SystemPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
@@ -177,9 +209,9 @@ const logsRoute = createRoute({
   path: '/logs',
   component: () => (
     <AppShell title="Logs">
-      <ErrorBoundary>
+      <Page>
         <LogsPage />
-      </ErrorBoundary>
+      </Page>
     </AppShell>
   ),
 });
