@@ -64,6 +64,12 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.ddns).toBe('/api/v1/network/ddns');
     expect(API_ROUTES.network.ddnsStatus).toBe('/api/v1/network/ddns/status');
     expect(API_ROUTES.network.uptimeLog).toBe('/api/v1/network/uptime-log');
+    expect(API_ROUTES.network.dataUsage).toBe('/api/v1/network/data-usage');
+    expect(API_ROUTES.network.dataUsageReset).toBe('/api/v1/network/data-usage/reset');
+    expect(API_ROUTES.network.dataUsageBudget).toBe('/api/v1/network/data-usage/budget');
+    expect(API_ROUTES.network.usbTethering).toBe('/api/v1/network/usb-tethering');
+    expect(API_ROUTES.network.usbTetheringConfigure).toBe('/api/v1/network/usb-tethering/configure');
+    expect(API_ROUTES.network.usbTetheringUnconfigure).toBe('/api/v1/network/usb-tethering/unconfigure');
   });
 
   it('has wifi routes matching backend', () => {
@@ -92,6 +98,8 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.wireguard.verify).toBe('/api/v1/vpn/wireguard/verify');
     expect(API_ROUTES.vpn.tailscale.status).toBe('/api/v1/vpn/tailscale');
     expect(API_ROUTES.vpn.tailscale.toggle).toBe('/api/v1/vpn/tailscale/toggle');
+    expect(API_ROUTES.vpn.tailscale.auth).toBe('/api/v1/vpn/tailscale/auth');
+    expect(API_ROUTES.vpn.tailscale.exitNode).toBe('/api/v1/vpn/tailscale/exit-node');
     expect(API_ROUTES.vpn.dnsLeakTest).toBe('/api/v1/vpn/dns-leak-test');
   });
 
@@ -176,6 +184,8 @@ describe('API_ROUTES', () => {
       '/api/v1/vpn/wireguard/profiles',
       '/api/v1/vpn/tailscale',
       '/api/v1/vpn/tailscale/toggle',
+      '/api/v1/vpn/tailscale/auth',
+      '/api/v1/vpn/tailscale/exit-node',
       '/api/v1/services',
       '/api/v1/services/:id/install',
       '/api/v1/services/:id/install/stream',

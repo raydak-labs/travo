@@ -178,3 +178,34 @@ export function useSetKillSwitch() {
     },
   });
 }
+
+export function useTailscaleAuth() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (authKey?: string) =>
+      apiClient.post<{ auth_url?: string; status: string }>(API_ROUTES.vpn.tailscale.auth, {
+        auth_key: authKey ?? '',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale'] });
+    },
+    onError: (error) => {
+      toast.error('Tailscale auth failed', { description: error.message });
+    },
+  });
+}
+
+export function useSetTailscaleExitNode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (nodeIP: string) =>
+      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { exit_node: nodeIP }),
+    onSuccess: () => {
+      toast.success('Exit node updated');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to set exit node', { description: error.message });
+    },
+  });
+}

@@ -203,6 +203,14 @@ export const handlers = [
     return HttpResponse.json({ success: true });
   }),
 
+  http.post(API_ROUTES.vpn.tailscale.auth, () => {
+    return HttpResponse.json({ status: 'ok', auth_url: '' });
+  }),
+
+  http.post(API_ROUTES.vpn.tailscale.exitNode, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.get(API_ROUTES.vpn.dnsLeakTest, () => {
     return HttpResponse.json({
       nameservers: ['10.0.0.1', '8.8.8.8'],

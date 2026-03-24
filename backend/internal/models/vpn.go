@@ -92,13 +92,26 @@ type VPNVerifyResult struct {
 	ForwardingOk bool `json:"forwarding_ok"`
 }
 
+// TailscalePeer represents a connected Tailscale peer.
+type TailscalePeer struct {
+	Hostname     string `json:"hostname"`
+	TailscaleIP  string `json:"tailscale_ip"`
+	OS           string `json:"os"`
+	Online       bool   `json:"online"`
+	ExitNode     bool   `json:"exit_node"`     // this peer is the active exit node
+	ExitNodeOption bool `json:"exit_node_option"` // this peer can be used as exit node
+	LastSeen     string `json:"last_seen"`
+}
+
 // TailscaleStatus represents Tailscale connection status.
 type TailscaleStatus struct {
-	Installed      bool    `json:"installed"`
-	Running        bool    `json:"running"`
-	LoggedIn       bool    `json:"logged_in"`
-	IPAddress      string  `json:"ip_address"`
-	Hostname       string  `json:"hostname"`
-	ExitNode       *string `json:"exit_node,omitempty"`
-	ExitNodeActive bool    `json:"exit_node_active"`
+	Installed      bool            `json:"installed"`
+	Running        bool            `json:"running"`
+	LoggedIn       bool            `json:"logged_in"`
+	IPAddress      string          `json:"ip_address"`
+	Hostname       string          `json:"hostname"`
+	ExitNode       *string         `json:"exit_node,omitempty"`
+	ExitNodeActive bool            `json:"exit_node_active"`
+	Peers          []TailscalePeer `json:"peers"`
+	AuthURL        string          `json:"auth_url,omitempty"` // set when login required
 }

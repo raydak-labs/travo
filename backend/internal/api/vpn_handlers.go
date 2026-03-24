@@ -106,6 +106,38 @@ func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 	}
 }
 
+// TailscaleAuthHandler handles POST /api/v1/vpn/tailscale/auth.
+// Starts `tailscale up` and returns the browser auth URL if login is required.
+func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			AuthKey string `json:"auth_key"`
+		}
+		_ = c.BodyParser(&body)
+		authURL, err := svc.StartTailscaleAuth(body.AuthKey)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"auth_url": authURL})
+	}
+}
+
+// SetTailscaleExitNodeHandler handles POST /api/v1/vpn/tailscale/exit-node.
+func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			NodeIP string `json:"node_ip"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetTailscaleExitNode(body.NodeIP); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // ImportWireguardHandler handles POST /api/v1/vpn/wireguard/import.
 func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {

@@ -368,13 +368,151 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	return result
 }
 
-// GetTailscaleStatus returns Tailscale status.
+// tailscaleStatusJSON is the subset of `tailscale status --json` we parse.
+type tailscaleStatusJSON struct {
+	BackendState string   `json:"BackendState"`
+	AuthURL      string   `json:"AuthURL"`
+	TailscaleIPs []string `json:"TailscaleIPs"`
+	Self         struct {
+		DNSName      string   `json:"DNSName"`
+		TailscaleIPs []string `json:"TailscaleIPs"`
+		Online       bool     `json:"Online"`
+	} `json:"Self"`
+	Peer map[string]struct {
+		DNSName        string   `json:"DNSName"`
+		OS             string   `json:"OS"`
+		Online         bool     `json:"Online"`
+		ExitNode       bool     `json:"ExitNode"`
+		ExitNodeOption bool     `json:"ExitNodeOption"`
+		TailscaleIPs   []string `json:"TailscaleIPs"`
+		LastSeen       string   `json:"LastSeen"`
+	} `json:"Peer"`
+}
+
+// isTailscaleInstalled checks whether the tailscale binary exists.
+func (v *VpnService) isTailscaleInstalled() bool {
+	_, err := v.cmd.Run("which", "tailscale")
+	return err == nil
+}
+
+// isTailscaleRunning checks whether tailscaled is running.
+func (v *VpnService) isTailscaleRunning() bool {
+	_, err := v.cmd.Run("/etc/init.d/tailscale", "status")
+	return err == nil
+}
+
+// GetTailscaleStatus returns Tailscale status, including peers when logged in.
 func (v *VpnService) GetTailscaleStatus() (models.TailscaleStatus, error) {
+	installed := v.isTailscaleInstalled()
+	if !installed {
+		return models.TailscaleStatus{
+			Installed: false,
+			Running:   false,
+			LoggedIn:  false,
+			Peers:     []models.TailscalePeer{},
+		}, nil
+	}
+
+	running := v.isTailscaleRunning()
+	if !running {
+		return models.TailscaleStatus{
+			Installed: true,
+			Running:   false,
+			LoggedIn:  false,
+			Peers:     []models.TailscalePeer{},
+		}, nil
+	}
+
+	raw, err := v.cmd.Run("tailscale", "status", "--json")
+	if err != nil {
+		return models.TailscaleStatus{Installed: true, Running: true, Peers: []models.TailscalePeer{}}, nil
+	}
+
+	var ts tailscaleStatusJSON
+	if err := json.Unmarshal(raw, &ts); err != nil {
+		return models.TailscaleStatus{Installed: true, Running: true, Peers: []models.TailscalePeer{}}, nil
+	}
+
+	loggedIn := ts.BackendState == "Running" || ts.BackendState == "Starting"
+
+	var ip string
+	if len(ts.Self.TailscaleIPs) > 0 {
+		ip = ts.Self.TailscaleIPs[0]
+	} else if len(ts.TailscaleIPs) > 0 {
+		ip = ts.TailscaleIPs[0]
+	}
+
+	hostname := strings.TrimSuffix(ts.Self.DNSName, ".")
+	if idx := strings.Index(hostname, "."); idx >= 0 {
+		hostname = hostname[:idx]
+	}
+
+	// Build peers list.
+	peers := make([]models.TailscalePeer, 0, len(ts.Peer))
+	for _, p := range ts.Peer {
+		var peerIP string
+		if len(p.TailscaleIPs) > 0 {
+			peerIP = p.TailscaleIPs[0]
+		}
+		peerHostname := strings.TrimSuffix(p.DNSName, ".")
+		if idx := strings.Index(peerHostname, "."); idx >= 0 {
+			peerHostname = peerHostname[:idx]
+		}
+		peers = append(peers, models.TailscalePeer{
+			Hostname:       peerHostname,
+			TailscaleIP:    peerIP,
+			OS:             p.OS,
+			Online:         p.Online,
+			ExitNode:       p.ExitNode,
+			ExitNodeOption: p.ExitNodeOption,
+			LastSeen:       p.LastSeen,
+		})
+	}
+
+	authURL := ""
+	if ts.BackendState == "NeedsLogin" || ts.AuthURL != "" {
+		authURL = ts.AuthURL
+	}
+
 	return models.TailscaleStatus{
-		Installed: false,
-		Running:   false,
-		LoggedIn:  false,
+		Installed: true,
+		Running:   true,
+		LoggedIn:  loggedIn,
+		IPAddress: ip,
+		Hostname:  hostname,
+		Peers:     peers,
+		AuthURL:   authURL,
 	}, nil
+}
+
+// StartTailscaleAuth runs `tailscale up` and returns the auth URL if login is required.
+func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
+	args := []string{"up", "--accept-routes"}
+	if authKey != "" {
+		args = append(args, "--auth-key="+authKey)
+	}
+	out, _ := v.cmd.Run("tailscale", args...)
+	combined := strings.TrimSpace(string(out))
+	// Extract URL from output like "To authenticate, visit:\n\thttps://login.tailscale.com/..."
+	for _, line := range strings.Split(combined, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "https://login.tailscale.com") || strings.HasPrefix(line, "https://tailscale.com") {
+			return line, nil
+		}
+	}
+	// Also check the status for an auth URL.
+	status, _ := v.GetTailscaleStatus()
+	return status.AuthURL, nil
+}
+
+// SetTailscaleExitNode sets or clears the Tailscale exit node.
+func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
+	if nodeIP == "" {
+		_, err := v.cmd.Run("tailscale", "set", "--exit-node=")
+		return err
+	}
+	_, err := v.cmd.Run("tailscale", "set", "--exit-node="+nodeIP, "--exit-node-allow-lan-access=true")
+	return err
 }
 
 // GetKillSwitch checks whether the VPN kill switch firewall rule exists.
@@ -447,10 +585,14 @@ func (v *VpnService) ImportWireguardConfig(confContent string) error {
 	return v.uci.Commit("network")
 }
 
-// ToggleTailscale enables or disables Tailscale.
-func (v *VpnService) ToggleTailscale(_ bool) error {
-	// Stub - tailscale not installed in mock
-	return nil
+// ToggleTailscale starts or stops the Tailscale daemon via init.d.
+func (v *VpnService) ToggleTailscale(enable bool) error {
+	if enable {
+		_, err := v.cmd.Run("/etc/init.d/tailscale", "start")
+		return err
+	}
+	_, err := v.cmd.Run("/etc/init.d/tailscale", "stop")
+	return err
 }
 
 // loadProfiles reads profiles from the JSON file.

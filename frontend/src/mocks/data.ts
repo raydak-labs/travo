@@ -334,8 +334,28 @@ export const mockTailscaleStatus: TailscaleStatus = {
   logged_in: true,
   ip_address: '100.100.1.42',
   hostname: 'gl-mt3000',
-  exit_node: 'us-east-1',
+  exit_node: '100.100.1.10',
   exit_node_active: true,
+  peers: [
+    {
+      hostname: 'laptop-home',
+      tailscale_ip: '100.100.1.10',
+      os: 'linux',
+      online: true,
+      exit_node: true,
+      exit_node_option: true,
+      last_seen: new Date().toISOString(),
+    },
+    {
+      hostname: 'phone-pixel',
+      tailscale_ip: '100.100.1.11',
+      os: 'android',
+      online: false,
+      exit_node: false,
+      exit_node_option: false,
+      last_seen: new Date(Date.now() - 3600000).toISOString(),
+    },
+  ],
 };
 
 export const mockWireguardStatus: WireGuardStatus = {

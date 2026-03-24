@@ -132,6 +132,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/vpn/killswitch", SetKillSwitchHandler(deps.Vpn))
 	v1.Get("/vpn/tailscale", GetTailscaleHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/toggle", ToggleTailscaleHandler(deps.Vpn))
+	v1.Post("/vpn/tailscale/auth", TailscaleAuthHandler(deps.Vpn))
+	v1.Post("/vpn/tailscale/exit-node", SetTailscaleExitNodeHandler(deps.Vpn))
 	v1.Get("/vpn/dns-leak-test", DNSLeakTestHandler(deps.Vpn))
 	v1.Get("/vpn/wireguard/verify", VerifyWireguardHandler(deps.Vpn))
 

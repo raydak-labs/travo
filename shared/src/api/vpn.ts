@@ -32,6 +32,16 @@ export interface WireguardPeer {
 }
 
 /** Tailscale status */
+export interface TailscalePeer {
+  readonly hostname: string;
+  readonly tailscale_ip: string;
+  readonly os: string;
+  readonly online: boolean;
+  readonly exit_node: boolean;
+  readonly exit_node_option: boolean;
+  readonly last_seen: string;
+}
+
 export interface TailscaleStatus {
   readonly installed: boolean;
   readonly running: boolean;
@@ -40,6 +50,8 @@ export interface TailscaleStatus {
   readonly hostname: string;
   readonly exit_node?: string;
   readonly exit_node_active: boolean;
+  readonly peers: readonly TailscalePeer[];
+  readonly auth_url?: string;
 }
 
 /** Live WireGuard peer status from `wg show` */
