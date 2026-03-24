@@ -86,6 +86,16 @@ export interface DNSLeakResult {
   readonly potentially_leaking: boolean;
 }
 
+/** WireGuard tunnel verification result */
+export interface VPNVerifyResult {
+  readonly interface_up: boolean;
+  readonly handshake_ok: boolean;
+  readonly latest_handshake: number;
+  readonly route_ok: boolean;
+  readonly firewall_zone_ok: boolean;
+  readonly forwarding_ok: boolean;
+}
+
 /** Type guard for VpnStatus */
 export function isVpnStatus(value: unknown): value is VpnStatus {
   if (typeof value !== 'object' || value === null) return false;

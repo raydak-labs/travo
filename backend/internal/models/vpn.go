@@ -76,6 +76,22 @@ type DNSLeakResult struct {
 	PotentiallyLeaking bool `json:"potentially_leaking"`
 }
 
+// VPNVerifyResult contains the result of verifying the WireGuard tunnel health.
+type VPNVerifyResult struct {
+	// InterfaceUp is true when wg0 exists and is in UP state.
+	InterfaceUp bool `json:"interface_up"`
+	// HandshakeOk is true when the most recent peer handshake is < 3 minutes old.
+	HandshakeOk bool `json:"handshake_ok"`
+	// LatestHandshake is the unix epoch of the most recent handshake (0 = never).
+	LatestHandshake int64 `json:"latest_handshake"`
+	// RouteOk is true when a default route via wg0 exists.
+	RouteOk bool `json:"route_ok"`
+	// FirewallZoneOk is true when the wg0 firewall zone exists in UCI.
+	FirewallZoneOk bool `json:"firewall_zone_ok"`
+	// ForwardingOk is true when a lan→wg0 firewall forwarding rule exists.
+	ForwardingOk bool `json:"forwarding_ok"`
+}
+
 // TailscaleStatus represents Tailscale connection status.
 type TailscaleStatus struct {
 	Installed      bool    `json:"installed"`

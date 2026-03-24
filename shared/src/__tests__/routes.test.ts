@@ -89,6 +89,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.wireguard.toggle).toBe('/api/v1/vpn/wireguard/toggle');
     expect(API_ROUTES.vpn.wireguard.status).toBe('/api/v1/vpn/wireguard/status');
     expect(API_ROUTES.vpn.wireguard.profiles).toBe('/api/v1/vpn/wireguard/profiles');
+    expect(API_ROUTES.vpn.wireguard.verify).toBe('/api/v1/vpn/wireguard/verify');
     expect(API_ROUTES.vpn.tailscale.status).toBe('/api/v1/vpn/tailscale');
     expect(API_ROUTES.vpn.tailscale.toggle).toBe('/api/v1/vpn/tailscale/toggle');
     expect(API_ROUTES.vpn.dnsLeakTest).toBe('/api/v1/vpn/dns-leak-test');
@@ -190,6 +191,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/buttons',
       '/api/v1/system/button-actions',
       '/api/v1/vpn/dns-leak-test',
+      '/api/v1/vpn/wireguard/verify',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

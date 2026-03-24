@@ -255,8 +255,8 @@ func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
 }
 
 // ToggleWireguard enables or disables WireGuard. When enabling, it also ensures
-// the UCI structure is correct, commits, brings up wg0, and verifies the tunnel
-// is live. Returns an error if the tunnel fails to come up (no false success).
+// the UCI structure is correct, creates firewall plumbing, commits, brings up wg0,
+// and verifies the tunnel is live. Returns an error if the tunnel fails to come up.
 func (v *VpnService) ToggleWireguard(enable bool) error {
 	val := "1"
 	if enable {
@@ -264,6 +264,10 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		// Normalize interface structure before enabling.
 		if err := v.ensureWireGuardInterface(); err != nil {
 			return fmt.Errorf("normalizing wg0 interface: %w", err)
+		}
+		// Ensure firewall zone and forwarding rules exist.
+		if err := v.setupWireGuardFirewall(); err != nil {
+			return fmt.Errorf("setting up WireGuard firewall: %w", err)
 		}
 	}
 	_ = v.uci.Set("network", "wg0", "disabled", val)
@@ -275,10 +279,93 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 		}
 	} else {
-		// Bring down the interface when disabling.
+		// Bring down the interface and clean up firewall plumbing when disabling.
 		_, _ = v.cmd.Run("ifdown", "wg0")
+		_ = v.teardownWireGuardFirewall()
 	}
 	return nil
+}
+
+// setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule
+// exist in UCI and commits the firewall config. Called when activating a WireGuard profile.
+func (v *VpnService) setupWireGuardFirewall() error {
+	// Ensure the wg0 zone exists.
+	if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
+		if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
+			return fmt.Errorf("creating wg0 firewall zone: %w", addErr)
+		}
+	}
+	_ = v.uci.Set("firewall", "wg0_zone", "name", "wg0")
+	_ = v.uci.Set("firewall", "wg0_zone", "network", "wg0")
+	_ = v.uci.Set("firewall", "wg0_zone", "input", "DROP")
+	_ = v.uci.Set("firewall", "wg0_zone", "output", "ACCEPT")
+	_ = v.uci.Set("firewall", "wg0_zone", "forward", "DROP")
+	_ = v.uci.Set("firewall", "wg0_zone", "masq", "1")
+	_ = v.uci.Set("firewall", "wg0_zone", "mtu_fix", "1")
+
+	// Ensure lan→wg0 forwarding exists.
+	if _, err := v.uci.GetAll("firewall", "wg0_fwd"); err != nil {
+		if addErr := v.uci.AddSection("firewall", "wg0_fwd", "forwarding"); addErr != nil {
+			return fmt.Errorf("creating wg0 forwarding rule: %w", addErr)
+		}
+	}
+	_ = v.uci.Set("firewall", "wg0_fwd", "src", "lan")
+	_ = v.uci.Set("firewall", "wg0_fwd", "dest", "wg0")
+
+	return v.uci.Commit("firewall")
+}
+
+// teardownWireGuardFirewall removes the wg0 firewall zone and forwarding rule from UCI.
+// Called when deactivating WireGuard. Errors are non-fatal (section may not exist).
+func (v *VpnService) teardownWireGuardFirewall() error {
+	_ = v.uci.DeleteSection("firewall", "wg0_zone")
+	_ = v.uci.DeleteSection("firewall", "wg0_fwd")
+	return v.uci.Commit("firewall")
+}
+
+// VerifyWireGuard checks the health of the WireGuard tunnel:
+// interface state, recent handshake, default route, and firewall plumbing.
+func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
+	result := models.VPNVerifyResult{}
+
+	// Check if wg0 interface is up.
+	out, err := v.cmd.Run("ip", "link", "show", "wg0")
+	if err == nil && strings.Contains(string(out), "state UP") {
+		result.InterfaceUp = true
+	}
+
+	// Check latest handshake from wg show dump.
+	dumpOut, dumpErr := v.cmd.Run("wg", "show", "wg0", "dump")
+	if dumpErr == nil {
+		if status, err := ParseWgDump(string(dumpOut)); err == nil && status != nil {
+			var latest int64
+			for _, peer := range status.Peers {
+				if peer.LatestHandshake > latest {
+					latest = peer.LatestHandshake
+				}
+			}
+			result.LatestHandshake = latest
+			if latest > 0 && time.Now().Unix()-latest < 180 {
+				result.HandshakeOk = true
+			}
+		}
+	}
+
+	// Check default route via wg0.
+	routeOut, routeErr := v.cmd.Run("ip", "route", "show", "default")
+	if routeErr == nil && strings.Contains(string(routeOut), "wg0") {
+		result.RouteOk = true
+	}
+
+	// Check firewall plumbing in UCI.
+	if opts, err := v.uci.GetAll("firewall", "wg0_zone"); err == nil && opts["name"] == "wg0" {
+		result.FirewallZoneOk = true
+	}
+	if opts, err := v.uci.GetAll("firewall", "wg0_fwd"); err == nil && opts["src"] == "lan" && opts["dest"] == "wg0" {
+		result.ForwardingOk = true
+	}
+
+	return result
 }
 
 // GetTailscaleStatus returns Tailscale status.
@@ -483,6 +570,11 @@ func (v *VpnService) ActivateProfile(id string) error {
 	// Apply the config via the existing import logic
 	if err := v.ImportWireguardConfig(target.Config); err != nil {
 		return fmt.Errorf("applying profile config: %w", err)
+	}
+
+	// Ensure firewall zone and forwarding rules exist.
+	if err := v.setupWireGuardFirewall(); err != nil {
+		return fmt.Errorf("setting up WireGuard firewall: %w", err)
 	}
 
 	// Mark only this profile as active

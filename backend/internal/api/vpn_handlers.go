@@ -233,3 +233,12 @@ func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
 		return c.JSON(result)
 	}
 }
+
+// VerifyWireguardHandler handles GET /api/v1/vpn/wireguard/verify.
+// Returns interface status, handshake recency, route check, and firewall plumbing state.
+func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result := svc.VerifyWireGuard()
+		return c.JSON(result)
+	}
+}

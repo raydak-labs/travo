@@ -156,7 +156,7 @@
 ### 2.6 WAN Auto-Detection
 
 - [x] WAN connection type auto-detection (DHCP, PPPoE, static)
-- [ ] Detect ethernet cable plug-in and auto-switch to wired WAN. See [Implementation guide](../plans/implementation.md#26--detect-ethernet-cable-plug-in).
+- [x] Detect ethernet cable plug-in and auto-switch to wired WAN. See [Implementation guide](../plans/implementation.md#26--detect-ethernet-cable-plug-in).
 - [x] Show active WAN source indicator on dashboard
 
 ### 2.7 Connection Failover
@@ -180,8 +180,8 @@
 - [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
 - [x] Kill switch (block traffic if VPN drops)
 - [x] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
-- [ ] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
-- [ ] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
+- [x] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
+- [x] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
 - [ ] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
 - [ ] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 

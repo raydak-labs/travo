@@ -131,6 +131,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/vpn/tailscale", GetTailscaleHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/toggle", ToggleTailscaleHandler(deps.Vpn))
 	v1.Get("/vpn/dns-leak-test", DNSLeakTestHandler(deps.Vpn))
+	v1.Get("/vpn/wireguard/verify", VerifyWireguardHandler(deps.Vpn))
 
 	// Services routes
 	v1.Get("/services", ListServicesHandler(deps.ServiceManager))

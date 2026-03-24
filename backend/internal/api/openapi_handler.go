@@ -369,6 +369,9 @@ var openAPISpec = map[string]interface{}{
 		"/vpn/dns-leak-test": map[string]interface{}{
 			"get": endpoint("DNSLeakTest", "Check whether DNS is leaking outside the VPN tunnel", true, nil, resp200("application/json", nil)),
 		},
+		"/vpn/wireguard/verify": map[string]interface{}{
+			"get": endpoint("VerifyWireGuard", "Verify WireGuard tunnel health: interface, handshake, route, firewall", true, nil, resp200("application/json", nil)),
+		},
 		// Services
 		"/services": map[string]interface{}{
 			"get": endpoint("ListServices", "List installable services with state (installed/running/stopped)", true, nil, resp200("application/json", nil)),

@@ -212,6 +212,17 @@ export const handlers = [
     });
   }),
 
+  http.get(API_ROUTES.vpn.wireguard.verify, () => {
+    return HttpResponse.json({
+      interface_up: true,
+      handshake_ok: true,
+      latest_handshake: Math.floor(Date.now() / 1000) - 60,
+      route_ok: true,
+      firewall_zone_ok: true,
+      forwarding_ok: true,
+    });
+  }),
+
   http.post(API_ROUTES.services.install, () => {
     return HttpResponse.json({ success: true });
   }),

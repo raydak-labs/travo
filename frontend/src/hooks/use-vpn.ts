@@ -10,6 +10,7 @@ import type {
   WireGuardProfile,
   KillSwitchStatus,
   DNSLeakResult,
+  VPNVerifyResult,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -150,6 +151,15 @@ export function useDNSLeakTest() {
     mutationFn: () => apiClient.get<DNSLeakResult>(API_ROUTES.vpn.dnsLeakTest),
     onError: (error) => {
       toast.error('DNS leak test failed', { description: error.message });
+    },
+  });
+}
+
+export function useVerifyWireGuard() {
+  return useMutation({
+    mutationFn: () => apiClient.get<VPNVerifyResult>(API_ROUTES.vpn.wireguard.verify),
+    onError: (error) => {
+      toast.error('VPN verification failed', { description: error.message });
     },
   });
 }
