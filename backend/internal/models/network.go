@@ -132,3 +132,38 @@ type DDNSStatus struct {
 	PublicIP   string `json:"public_ip"`
 	LastUpdate string `json:"last_update"`
 }
+
+// DataUsagePeriod holds RX/TX byte counts for a period.
+type DataUsagePeriod struct {
+	RXBytes int64 `json:"rx_bytes"`
+	TXBytes int64 `json:"tx_bytes"`
+}
+
+// DataUsageInterface holds traffic data for a single network interface.
+type DataUsageInterface struct {
+	Name  string          `json:"name"`
+	Label string          `json:"label"`
+	Today DataUsagePeriod `json:"today"`
+	Month DataUsagePeriod `json:"month"`
+	Total DataUsagePeriod `json:"total"`
+}
+
+// DataUsageStatus is the top-level response for the data usage endpoint.
+type DataUsageStatus struct {
+	// Available is false when vnstat is not installed; interfaces will be empty.
+	Available  bool                 `json:"available"`
+	Interfaces []DataUsageInterface `json:"interfaces"`
+}
+
+// DataBudget holds a monthly usage limit for a single interface.
+type DataBudget struct {
+	Interface             string  `json:"interface"`
+	MonthlyLimitBytes     int64   `json:"monthly_limit_bytes"`
+	WarningThresholdPct   float64 `json:"warning_threshold_pct"`
+	ResetDay              int     `json:"reset_day"`
+}
+
+// DataBudgetConfig holds all configured data budgets.
+type DataBudgetConfig struct {
+	Budgets []DataBudget `json:"budgets"`
+}

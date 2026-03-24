@@ -9,18 +9,19 @@ import (
 
 // Dependencies holds all service dependencies for API handlers.
 type Dependencies struct {
-	Auth          *auth.AuthService
-	Blocklist     *auth.TokenBlocklist
-	RateLimiter   *auth.RateLimiter
-	System        *services.SystemService
-	Network       *services.NetworkService
-	Wifi          *services.WifiService
-	Vpn           *services.VpnService
+	Auth           *auth.AuthService
+	Blocklist      *auth.TokenBlocklist
+	RateLimiter    *auth.RateLimiter
+	System         *services.SystemService
+	Network        *services.NetworkService
+	Wifi           *services.WifiService
+	Vpn            *services.VpnService
 	ServiceManager *services.ServiceManager
-	Captive       *services.CaptiveService
-	AdGuard       *services.AdGuardService
-	Alerts        *services.AlertService
-	UptimeTracker *services.UptimeTracker
+	Captive        *services.CaptiveService
+	AdGuard        *services.AdGuardService
+	Alerts         *services.AlertService
+	UptimeTracker  *services.UptimeTracker
+	DataUsage      *services.DataUsageService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -149,6 +150,12 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/adguard/dns", SetAdGuardDNSHandler(deps.AdGuard))
 	v1.Get("/adguard/config", GetAdGuardConfigHandler(deps.AdGuard))
 	v1.Put("/adguard/config", SetAdGuardConfigHandler(deps.AdGuard))
+
+	// Data usage tracking (requires vnstat)
+	v1.Get("/network/data-usage", GetDataUsageHandler(deps.DataUsage))
+	v1.Post("/network/data-usage/reset", ResetDataUsageHandler(deps.DataUsage))
+	v1.Get("/network/data-usage/budget", GetDataBudgetHandler(deps.DataUsage))
+	v1.Put("/network/data-usage/budget", SetDataBudgetHandler(deps.DataUsage))
 
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))

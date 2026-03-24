@@ -48,6 +48,9 @@ export const API_ROUTES = {
     ddns: '/api/v1/network/ddns',
     ddnsStatus: '/api/v1/network/ddns/status',
     uptimeLog: '/api/v1/network/uptime-log',
+    dataUsage: '/api/v1/network/data-usage',
+    dataUsageReset: '/api/v1/network/data-usage/reset',
+    dataUsageBudget: '/api/v1/network/data-usage/budget',
   },
   wifi: {
     scan: '/api/v1/wifi/scan',

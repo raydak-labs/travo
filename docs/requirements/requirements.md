@@ -141,9 +141,9 @@
 
 ### 2.4 Data Usage Tracking
 
-- [ ] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
-- [ ] Data usage budget / cap with warning threshold. See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
-- [ ] Reset counters (per-session, daily, manual). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [x] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [x] Data usage budget / cap with warning threshold. See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [x] Reset counters (per-session, daily, manual). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
 - [x] Show data usage on dashboard (cumulative RX/TX since boot, human-readable format)
 
 ### 2.5 USB Tethering

@@ -128,6 +128,40 @@ export interface DDNSStatus {
   readonly last_update: string;
 }
 
+/** RX/TX bytes for a specific time period */
+export interface DataUsagePeriod {
+  readonly rx_bytes: number;
+  readonly tx_bytes: number;
+}
+
+/** Traffic data for a single monitored network interface */
+export interface DataUsageInterface {
+  readonly name: string;
+  readonly label: string;
+  readonly today: DataUsagePeriod;
+  readonly month: DataUsagePeriod;
+  readonly total: DataUsagePeriod;
+}
+
+/** Top-level data usage response (available=false when vnstat not installed) */
+export interface DataUsageStatus {
+  readonly available: boolean;
+  readonly interfaces: readonly DataUsageInterface[];
+}
+
+/** Monthly usage budget for a single interface */
+export interface DataBudget {
+  readonly interface: string;
+  readonly monthly_limit_bytes: number;
+  readonly warning_threshold_pct: number;
+  readonly reset_day: number;
+}
+
+/** All configured data budgets */
+export interface DataBudgetConfig {
+  readonly budgets: readonly DataBudget[];
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

@@ -61,6 +61,13 @@ var knownServices = []serviceDefinition{
 		Packages:    []string{"tailscale"},
 		InitName:    "tailscale",
 	},
+	{
+		ID:          "vnstat",
+		Name:        "Data Usage (vnstat)",
+		Description: "Lightweight network traffic monitor with persistent counters",
+		Packages:    []string{"vnstat2"},
+		InitName:    "vnstat",
+	},
 }
 
 // ServiceManager manages installable services.

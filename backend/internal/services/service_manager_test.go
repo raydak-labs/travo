@@ -15,8 +15,8 @@ func TestListServices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(services) != 3 {
-		t.Errorf("expected 3 services, got %d", len(services))
+	if len(services) != 4 {
+		t.Errorf("expected 4 services, got %d", len(services))
 	}
 	for _, s := range services {
 		if s.State != "not_installed" {

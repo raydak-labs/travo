@@ -51,6 +51,7 @@ import {
 } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import { ClientsTable } from './clients-table';
+import { DataUsageSection } from './data-usage-section';
 import { InterfaceTrafficCharts } from './interface-traffic-charts';
 import type { NetworkInterface } from '@shared/index';
 
@@ -971,6 +972,9 @@ export function NetworkPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Data Usage Tracking */}
+      <DataUsageSection />
     </div>
   );
 }

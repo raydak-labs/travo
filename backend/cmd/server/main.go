@@ -108,10 +108,12 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	svcManager := services.NewServiceManager()
 	captiveSvc := services.NewCaptiveService(captiveProber)
 	adguardSvc := services.NewAdGuardService()
+	dataUsageSvc := services.NewDataUsageService()
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
 		svcManager.SetPostInstallHook("adguardhome", adguardSvc.AutoConfigure)
+		svcManager.SetPostInstallHook("vnstat", dataUsageSvc.AutoConfigureVnstat)
 	}
 	alertSvc := services.NewAlertService(systemSvc)
 	if !cfg.MockMode {
@@ -152,6 +154,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		AdGuard:        adguardSvc,
 		Alerts:         alertSvc,
 		UptimeTracker:  uptimeTracker,
+		DataUsage:      dataUsageSvc,
 	}
 	api.SetupRoutes(app, deps)
 

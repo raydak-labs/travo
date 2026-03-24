@@ -192,6 +192,9 @@ describe('API_ROUTES', () => {
       '/api/v1/system/button-actions',
       '/api/v1/vpn/dns-leak-test',
       '/api/v1/vpn/wireguard/verify',
+      '/api/v1/network/data-usage',
+      '/api/v1/network/data-usage/reset',
+      '/api/v1/network/data-usage/budget',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);
