@@ -30,22 +30,25 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	priorityPath := tmpDir + "/wifi-priorities.json"
 	autoReconnectPath := tmpDir + "/autoreconnect.json"
 	reconnectScriptPath := tmpDir + "/wifi-reconnect.sh"
+	bandSwitchConfigPath := tmpDir + "/band-switching.json"
 
 	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
+	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
 
 	deps := &Dependencies{
-		Auth:        authSvc,
-		Blocklist:   blocklist,
-		RateLimiter: rateLimiter,
-		System:      systemSvc,
-		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
-		Wifi:        services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath),
+		Auth:          authSvc,
+		Blocklist:     blocklist,
+		RateLimiter:   rateLimiter,
+		System:        systemSvc,
+		Network:       services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
+		Wifi:          wifiSvc,
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
 		}, profilesPath),
 		ServiceManager: services.NewServiceManager(),
 		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
 		Alerts:         services.NewAlertService(systemSvc),
+		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
 	}
 
 	app := fiber.New()
