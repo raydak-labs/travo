@@ -9,6 +9,7 @@ import type {
   WireGuardStatus,
   WireGuardProfile,
   KillSwitchStatus,
+  DNSLeakResult,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -141,6 +142,15 @@ export function useKillSwitch() {
   return useQuery({
     queryKey: ['vpn', 'killswitch'],
     queryFn: () => apiClient.get<KillSwitchStatus>(API_ROUTES.vpn.killswitch),
+  });
+}
+
+export function useDNSLeakTest() {
+  return useMutation({
+    mutationFn: () => apiClient.get<DNSLeakResult>(API_ROUTES.vpn.dnsLeakTest),
+    onError: (error) => {
+      toast.error('DNS leak test failed', { description: error.message });
+    },
   });
 }
 

@@ -81,6 +81,7 @@ export const API_ROUTES = {
       status: '/api/v1/vpn/tailscale',
       toggle: '/api/v1/vpn/tailscale/toggle',
     },
+    dnsLeakTest: '/api/v1/vpn/dns-leak-test',
   },
   services: {
     list: '/api/v1/services',

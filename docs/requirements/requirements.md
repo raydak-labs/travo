@@ -49,13 +49,13 @@
 - [x] Repeater wizard must preserve upstream band/radio choice and configure the intended AP sections explicitly on multi-radio hardware. Using only the first AP section is not sufficient for dual-band devices.
 - [x] AP, guest WiFi, and STA MAC update flows must return an error when runtime apply fails. Do not commit wireless changes, report success, and leave the device in a "saved in UCI but not actually active" state.
 - [x] WiFi/AP management must discover radios and AP sections dynamically instead of assuming `radio0`, `radio1`, `default_radio0..3`, or guest WiFi on `radio0`, so the UI still works after LuCI resets or on different hardware layouts.
-- [ ] 🐛 WireGuard should work out-of-the-box after service install + profile import/activate: runtime `wg0` must be created and status endpoints must not return success when tunnel is not actually up. See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
-- [ ] 🐛 AdGuard should work out-of-the-box after install + DNS enable: backend install/running detection and DNS forwarding path must be functionally valid (no `nslookup` timeout after successful toggle). See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
-- [ ] 🐛 WiFi page can incorrectly show "Repeater" as active when device is not actually in repeater mode; active mode indicator must reflect real UCI/runtime state.
-- [ ] 🐛 Saved STA networks must persist and not be removed unexpectedly; only the selected/active network should be connected at runtime while other saved profiles remain stored.
-- [ ] 🐛 Active WiFi network badge can display lock icon with `unknown` encryption/type; UI should show correct security label based on scan/connection metadata.
-- [ ] Add machine-readable API documentation generation (OpenAPI/Swagger) and expose docs endpoint from backend for agent/test automation use.
-- [ ] Document in `AGENTS.md` that the test device can expose/serve API docs endpoints for automation flows.
+- [x] 🐛 WireGuard should work out-of-the-box after service install + profile import/activate: runtime `wg0` must be created and status endpoints must not return success when tunnel is not actually up. See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [x] 🐛 AdGuard should work out-of-the-box after install + DNS enable: backend install/running detection and DNS forwarding path must be functionally valid (no `nslookup` timeout after successful toggle). See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [x] 🐛 WiFi page can incorrectly show "Repeater" as active when device is not actually in repeater mode; active mode indicator must reflect real UCI/runtime state.
+- [x] 🐛 Saved STA networks must persist and not be removed unexpectedly; only the selected/active network should be connected at runtime while other saved profiles remain stored.
+- [x] 🐛 Active WiFi network badge can display lock icon with `unknown` encryption/type; UI should show correct security label based on scan/connection metadata.
+- [x] Add machine-readable API documentation generation (OpenAPI/Swagger) and expose docs endpoint from backend for agent/test automation use.
+- [x] Document in `AGENTS.md` that the test device can expose/serve API docs endpoints for automation flows.
 
 ## 1. WiFi Management
 
@@ -127,7 +127,7 @@
 - [x] Traffic stats per client (RX/TX)
 - [x] Client hostname resolution (DHCP leases + /etc/hosts cross-reference)
 - [x] Block / kick a client
-- [ ] Dedicated **Clients** tab/page with structured per-client view (device identity, connection type/path, interface, signal/IP/MAC, activity), plus quick actions (set hostname alias, add static IP reservation, block/ban, unblock/kick). Should consolidate existing client actions into one focused workflow.
+- [x] Dedicated **Clients** tab/page with structured per-client view (device identity, connection type/path, interface, signal/IP/MAC, activity), plus quick actions (set hostname alias, add static IP reservation, block/ban, unblock/kick). Should consolidate existing client actions into one focused workflow.
 - [ ] 🔮 Client bandwidth limiting (QoS per device)
 - [ ] 🔮 Parental controls / client group policies
 
@@ -199,7 +199,7 @@
 - [x] Grey out VPN options when packages not installed (link to Services page)
 - [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
 - [x] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
-- [ ] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
+- [x] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
 - [ ] 🔮 OpenVPN support
 - [ ] 🔮 VPN speed test
 
@@ -424,7 +424,7 @@
 - [x] `setup-local.sh` — one-time fresh-device setup over SSH (moves LuCI to :8080, uploads init.d + UCI config, marks setup complete)
 - [x] AP WiFi health check at startup (ensures enabled APs have valid config; skips disabled APs)
 - [x] Init script for auto-start on boot (procd service, verified on device)
-- [ ] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
+- [x] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
 - [ ] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
 - [ ] 🔮 Automatic updates mechanism
 
@@ -432,9 +432,9 @@
 
 ## 14. Hardware Buttons
 
-- [ ] Detect hardware buttons (identify available buttons via /etc/rc.button/). See [Hardware Buttons plan](../plans/hardware-buttons.md).
-- [ ] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.). See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-2--configure-button-actions).
-- [ ] Button event handler via hotplug.d integration. See [Hardware Buttons plan](../plans/hardware-buttons.md).
+- [x] Detect hardware buttons (identify available buttons via /etc/rc.button/). See [Hardware Buttons plan](../plans/hardware-buttons.md).
+- [x] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.). See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-2--configure-button-actions).
+- [x] Button event handler via hotplug.d integration. See [Hardware Buttons plan](../plans/hardware-buttons.md).
 - [ ] 🔮 Custom button action scripting
 - [ ] 🔮 Long-press vs short-press differentiation. See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-4--long-press-vs-short-press-future).
 

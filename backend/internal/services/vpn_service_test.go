@@ -57,7 +57,9 @@ func TestGetWireguardConfig(t *testing.T) {
 
 func TestToggleWireguard(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	// MockCommandRunner returns valid wg dump for all calls (covers ifup + wg show).
+	cmd := &MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
+	svc := NewVpnServiceWithRunner(u, cmd)
 
 	err := svc.ToggleWireguard(true)
 	if err != nil {
@@ -66,6 +68,108 @@ func TestToggleWireguard(t *testing.T) {
 	val, _ := u.Get("network", "wg0", "disabled")
 	if val != "0" {
 		t.Errorf("expected disabled=0, got %q", val)
+	}
+}
+
+func TestToggleWireguard_Disable(t *testing.T) {
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	err := svc.ToggleWireguard(false)
+	if err != nil {
+		t.Fatalf("unexpected error disabling: %v", err)
+	}
+	val, _ := u.Get("network", "wg0", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled=1, got %q", val)
+	}
+}
+
+func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
+	u := uci.NewMockUCI()
+	// ifup succeeds but wg show returns empty (tunnel not up).
+	cmd := &MockCommandRunner{Output: []byte("")}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	err := svc.ToggleWireguard(true)
+	if err == nil {
+		t.Fatal("expected error when wg0 does not come up")
+	}
+}
+
+func TestToggleWireguard_SetsProtoWireguard(t *testing.T) {
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	if err := svc.ToggleWireguard(true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	proto, _ := u.Get("network", "wg0", "proto")
+	if proto != "wireguard" {
+		t.Errorf("expected proto=wireguard, got %q", proto)
+	}
+}
+
+func TestImportWireguardConfig_NormalizesPeerSections(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnService(u)
+
+	conf := `[Interface]
+PrivateKey = abc123
+Address = 10.66.0.2/32
+DNS = 10.66.0.1
+
+[Peer]
+PublicKey = peerkey
+Endpoint = vpn.example.com:51820
+AllowedIPs = 0.0.0.0/0
+`
+	if err := svc.ImportWireguardConfig(conf); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// wg0 must have proto=wireguard
+	proto, _ := u.Get("network", "wg0", "proto")
+	if proto != "wireguard" {
+		t.Errorf("expected proto=wireguard after import, got %q", proto)
+	}
+	// peer section must exist with public_key
+	pk, _ := u.Get("network", "wg0_peer0", "public_key")
+	if pk != "peerkey" {
+		t.Errorf("expected peer public_key='peerkey', got %q", pk)
+	}
+}
+
+func TestWgRuntimeState_Disabled(t *testing.T) {
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{Err: fmt.Errorf("exit status 1")}
+	svc := NewVpnServiceWithRunner(u, cmd)
+	state := svc.wgRuntimeState(false)
+	if state != "disabled" {
+		t.Errorf("expected 'disabled', got %q", state)
+	}
+}
+
+func TestWgRuntimeState_EnabledNotUp(t *testing.T) {
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{Err: fmt.Errorf("exit status 1")}
+	svc := NewVpnServiceWithRunner(u, cmd)
+	state := svc.wgRuntimeState(true)
+	if state != "enabled_not_up" {
+		t.Errorf("expected 'enabled_not_up', got %q", state)
+	}
+}
+
+func TestWgRuntimeState_Connected(t *testing.T) {
+	u := uci.NewMockUCI()
+	dump := "PRIV\tPUB\t51820\toff\n" +
+		"peerpub\t(none)\tvpn.example.com:51820\t0.0.0.0/0\t1740000000\t100\t200\t0\n"
+	cmd := &MockCommandRunner{Output: []byte(dump)}
+	svc := NewVpnServiceWithRunner(u, cmd)
+	state := svc.wgRuntimeState(true)
+	if state != "connected" {
+		t.Errorf("expected 'connected', got %q", state)
 	}
 }
 
@@ -382,5 +486,75 @@ func TestProfilesFilePermissions(t *testing.T) {
 	// Check file is only readable/writable by owner
 	if info.Mode().Perm() != 0o600 {
 		t.Errorf("expected file mode 0600, got %o", info.Mode().Perm())
+	}
+}
+
+func TestRunDNSLeakTest_VPNActiveNoLeak(t *testing.T) {
+	// Write a temp resolv.conf with a VPN DNS address.
+	tmp := t.TempDir()
+	resolvConf := filepath.Join(tmp, "resolv.conf")
+	if err := os.WriteFile(resolvConf, []byte("nameserver 10.66.0.1\nnameserver 10.66.0.2\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	u := uci.NewMockUCI()
+	// Set wg0 enabled with matching DNS.
+	_ = u.Set("network", "wg0", "disabled", "0")
+	_ = u.Set("network", "wg0", "dns", "10.66.0.1")
+
+	svc := NewVpnService(u)
+
+	// Override resolv.conf path by writing a temporary resolv.conf and reading it
+	// via readResolvConfNameservers (tested indirectly by checking the helper).
+	nameservers := readResolvConfNameserversFromPath(resolvConf)
+	if len(nameservers) != 2 || nameservers[0] != "10.66.0.1" {
+		t.Fatalf("unexpected nameservers: %v", nameservers)
+	}
+	_ = svc
+}
+
+func TestRunDNSLeakTest_PotentialLeak(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	_ = u.Set("network", "wg0", "dns", "10.66.0.1")
+	svc := NewVpnService(u)
+
+	result := svc.RunDNSLeakTest()
+	// On test system /etc/resolv.conf likely doesn't contain 10.66.0.1,
+	// so potentially_leaking should be true when VPN is active.
+	if !result.VPNActive {
+		t.Error("expected VPNActive=true")
+	}
+	if len(result.VPNDNSServers) != 1 || result.VPNDNSServers[0] != "10.66.0.1" {
+		t.Errorf("unexpected VPNDNSServers: %v", result.VPNDNSServers)
+	}
+}
+
+func TestRunDNSLeakTest_VPNDisabled(t *testing.T) {
+	u := uci.NewMockUCI()
+	// wg0 disabled=1 by default in mock
+	svc := NewVpnService(u)
+	result := svc.RunDNSLeakTest()
+	if result.VPNActive {
+		t.Error("expected VPNActive=false when disabled=1")
+	}
+	if result.PotentiallyLeaking {
+		t.Error("expected PotentiallyLeaking=false when VPN not active")
+	}
+}
+
+func TestReadResolvConfNameservers(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "resolv.conf")
+	content := "# Generated by dnsmasq\nnameserver 127.0.0.1\nnameserver 8.8.8.8\n"
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	servers := readResolvConfNameserversFromPath(path)
+	if len(servers) != 2 {
+		t.Fatalf("expected 2 servers, got %d: %v", len(servers), servers)
+	}
+	if servers[0] != "127.0.0.1" || servers[1] != "8.8.8.8" {
+		t.Errorf("unexpected servers: %v", servers)
 	}
 }

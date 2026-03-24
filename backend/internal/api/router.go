@@ -25,6 +25,9 @@ type Dependencies struct {
 
 // SetupRoutes registers all API routes under /api/v1/.
 func SetupRoutes(app *fiber.App, deps *Dependencies) {
+	// OpenAPI spec — served without auth for agent/automation use.
+	app.Get("/api/openapi.json", OpenAPIHandler())
+
 	v1 := app.Group("/api/v1")
 
 	// Auth routes (login does not require auth)
@@ -127,6 +130,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/vpn/killswitch", SetKillSwitchHandler(deps.Vpn))
 	v1.Get("/vpn/tailscale", GetTailscaleHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/toggle", ToggleTailscaleHandler(deps.Vpn))
+	v1.Get("/vpn/dns-leak-test", DNSLeakTestHandler(deps.Vpn))
 
 	// Services routes
 	v1.Get("/services", ListServicesHandler(deps.ServiceManager))

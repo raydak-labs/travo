@@ -225,3 +225,11 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// DNSLeakTestHandler handles GET /api/v1/vpn/dns-leak-test.
+func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result := svc.RunDNSLeakTest()
+		return c.JSON(result)
+	}
+}

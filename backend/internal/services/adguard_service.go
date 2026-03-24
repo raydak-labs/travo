@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -32,6 +33,8 @@ type AdGuardChecker interface {
 	ReadFile(path string) ([]byte, error)
 	// WriteFile writes contents to a file.
 	WriteFile(path string, data []byte, perm os.FileMode) error
+	// TCPProbe returns true if a TCP connection to addr (host:port) succeeds within timeout.
+	TCPProbe(addr string, timeout time.Duration) bool
 }
 
 // RealAdGuardChecker performs real OS operations.
@@ -76,6 +79,15 @@ func (r *RealAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMod
 	return os.WriteFile(path, data, perm)
 }
 
+func (r *RealAdGuardChecker) TCPProbe(addr string, timeout time.Duration) bool {
+	conn, err := net.DialTimeout("tcp", addr, timeout)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
 // AdGuardService provides status and statistics for AdGuard Home.
 type AdGuardService struct {
 	checker AdGuardChecker
@@ -91,9 +103,19 @@ func NewAdGuardServiceWithChecker(c AdGuardChecker) *AdGuardService {
 	return &AdGuardService{checker: c}
 }
 
-// IsInstalled returns true when the AdGuard Home binary exists on disk.
+// IsInstalled returns true when the AdGuard Home binary or init script exists,
+// OR when the process is already running. This avoids reporting installed=false
+// when AdGuard was installed via a non-standard path but is actively running.
 func (s *AdGuardService) IsInstalled() bool {
-	return s.checker.FileExists(adguardBinary)
+	if s.checker.FileExists(adguardBinary) {
+		return true
+	}
+	if s.checker.FileExists(adguardInitd) {
+		return true
+	}
+	// Fall back: if the process responds to the API, it's running (and installed).
+	_, err := s.checker.HTTPGet(adguardAPIBase + "/control/status")
+	return err == nil
 }
 
 // IsRunning returns true when the adguardhome service is currently active.
@@ -198,34 +220,74 @@ func dnsmasqServerEntry(port int) string {
 	return fmt.Sprintf("127.0.0.1#%d", port)
 }
 
-// GetDNSStatus checks whether dnsmasq is configured to forward to AdGuard.
+// probeAdGuardDNSListener returns true if the AdGuard DNS listener is accepting
+// TCP connections on the given port.
+func (s *AdGuardService) probeAdGuardDNSListener(port int) bool {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	return s.checker.TCPProbe(addr, 2*time.Second)
+}
+
+// probeResolver tries to resolve "example.com" via the local resolver and returns true on success.
+func (s *AdGuardService) probeResolver(_ int) bool {
+	_, err := s.checker.RunCommand("nslookup", "example.com", "127.0.0.1")
+	return err == nil
+}
+
+// GetDNSStatus checks whether dnsmasq is configured to forward to AdGuard,
+// and includes health checks for the DNS listener path.
 func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 	port := s.getDNSPort()
 	entry := dnsmasqServerEntry(port)
 
 	out, err := s.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].server")
-	if err != nil {
-		// No server option set means not enabled.
-		return models.AdGuardDNSStatus{Enabled: false, DNSPort: port}, nil
+
+	var forwardTarget string
+	var enabled bool
+	if err == nil {
+		enabled = strings.Contains(out, entry)
+		if enabled {
+			forwardTarget = entry
+		}
 	}
 
-	enabled := strings.Contains(out, entry)
-	return models.AdGuardDNSStatus{Enabled: enabled, DNSPort: port}, nil
+	status := models.AdGuardDNSStatus{
+		Enabled:              enabled,
+		DNSPort:              port,
+		DnsmasqForwardTarget: forwardTarget,
+		AdguardListenerReady: s.probeAdGuardDNSListener(port),
+	}
+	if status.AdguardListenerReady {
+		status.ResolverProbeOk = s.probeResolver(port)
+	}
+	return status, nil
 }
 
 // SetDNS enables or disables dnsmasq forwarding to AdGuard Home.
+// When enabling, it first verifies that AdGuard is running and its DNS listener
+// is reachable. If the pre-flight check fails, no dnsmasq changes are made and
+// the error is returned (safe: DNS resolution is never left in a broken state).
 func (s *AdGuardService) SetDNS(enabled bool) error {
 	port := s.getDNSPort()
 	entry := dnsmasqServerEntry(port)
 
 	if enabled {
-		// Remove any existing server list, then add AdGuard entry.
-		// Ignore error if option doesn't exist yet.
+		// Pre-flight: AdGuard must be running.
+		if !s.IsRunning() {
+			return fmt.Errorf("AdGuard Home is not running — start it before enabling DNS forwarding")
+		}
+		// Pre-flight: DNS listener must be reachable.
+		if !s.probeAdGuardDNSListener(port) {
+			return fmt.Errorf("AdGuard Home DNS listener is not ready on 127.0.0.1:%d — verify AdGuard config", port)
+		}
+
+		// Apply dnsmasq changes.
 		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
 		if _, err := s.checker.RunCommand("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", entry)); err != nil {
 			return fmt.Errorf("failed to set dnsmasq server: %w", err)
 		}
 		if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=1"); err != nil {
+			// Rollback: delete the server entry we just added.
+			_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
 			return fmt.Errorf("failed to set noresolv: %w", err)
 		}
 	} else {

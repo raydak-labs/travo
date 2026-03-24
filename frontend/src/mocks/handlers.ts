@@ -203,6 +203,15 @@ export const handlers = [
     return HttpResponse.json({ success: true });
   }),
 
+  http.get(API_ROUTES.vpn.dnsLeakTest, () => {
+    return HttpResponse.json({
+      nameservers: ['10.0.0.1', '8.8.8.8'],
+      vpn_dns_servers: ['10.66.0.1'],
+      vpn_active: true,
+      potentially_leaking: true,
+    });
+  }),
+
   http.post(API_ROUTES.services.install, () => {
     return HttpResponse.json({ success: true });
   }),

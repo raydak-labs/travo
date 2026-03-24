@@ -13,6 +13,7 @@ import { WifiPage } from '@/pages/wifi/wifi-page';
 import { VpnPage } from '@/pages/vpn/vpn-page';
 import { ServicesPage } from '@/pages/services/services-page';
 import { NetworkPage } from '@/pages/network/network-page';
+import { ClientsPage } from '@/pages/clients/clients-page';
 import { SystemPage } from '@/pages/system/system-page';
 import { LogsPage } from '@/pages/logs/logs-page';
 import { SetupPage } from '@/pages/setup/setup-page';
@@ -123,6 +124,18 @@ const networkRoute = createRoute({
   ),
 });
 
+const clientsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/clients',
+  component: () => (
+    <AppShell title="Clients">
+      <ErrorBoundary>
+        <ClientsPage />
+      </ErrorBoundary>
+    </AppShell>
+  ),
+});
+
 const vpnRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/vpn',
@@ -180,6 +193,7 @@ const routeTree = rootRoute.addChildren([
     dashboardRoute,
     wifiRoute,
     networkRoute,
+    clientsRoute,
     vpnRoute,
     servicesRoute,
     systemRoute,

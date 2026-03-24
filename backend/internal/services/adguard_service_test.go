@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 )
 
 // mockAdGuardChecker is a test double for AdGuardChecker.
@@ -19,6 +20,7 @@ type mockAdGuardChecker struct {
 		body []byte
 		err  error
 	}
+	tcpProbes map[string]bool // addr -> reachable
 }
 
 func newMockAdGuardChecker() *mockAdGuardChecker {
@@ -33,6 +35,7 @@ func newMockAdGuardChecker() *mockAdGuardChecker {
 			body []byte
 			err  error
 		}),
+		tcpProbes: make(map[string]bool),
 	}
 }
 
@@ -72,6 +75,10 @@ func (m *mockAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMod
 	m.fileContents[path] = string(data)
 	m.files[path] = true
 	return nil
+}
+
+func (m *mockAdGuardChecker) TCPProbe(addr string, _ time.Duration) bool {
+	return m.tcpProbes[addr]
 }
 
 func TestIsInstalled_True(t *testing.T) {
@@ -289,6 +296,14 @@ func TestSetDNS_Enable(t *testing.T) {
 	}{
 		body: []byte(`{"port":5353}`),
 	}
+	// Pre-flight: adguardhome init script exists (IsRunning checks this first).
+	mock.files["/etc/init.d/adguardhome"] = true
+	mock.commands["/etc/init.d/adguardhome status"] = struct {
+		output string
+		err    error
+	}{"running", nil}
+	// Pre-flight: DNS listener reachable on port 5353.
+	mock.tcpProbes["127.0.0.1:5353"] = true
 	// delete may fail (option not set yet), that's ok
 	mock.commands["uci delete dhcp.@dnsmasq[0].server"] = struct {
 		output string
@@ -428,5 +443,102 @@ bind_port: 3000`
 	// Verify the content was written
 	if written, ok := mock.fileContents["/opt/AdGuardHome/AdGuardHome.yaml"]; !ok || written != testContent {
 		t.Errorf("expected config to be written, got: %v", written)
+	}
+}
+
+func TestIsInstalled_ViaRunningProcess(t *testing.T) {
+	// Binary doesn't exist, init script doesn't exist,
+	// but the process responds to HTTP (running via non-standard install).
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/status"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"running":true}`),
+	}
+	svc := NewAdGuardServiceWithChecker(mock)
+	if !svc.IsInstalled() {
+		t.Error("expected IsInstalled()=true when process is responding to API")
+	}
+}
+
+func TestIsInstalled_ViaInitScript(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files["/etc/init.d/adguardhome"] = true
+	svc := NewAdGuardServiceWithChecker(mock)
+	if !svc.IsInstalled() {
+		t.Error("expected IsInstalled()=true when init script exists")
+	}
+}
+
+func TestSetDNS_Enable_FailsWhenNotRunning(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	// AdGuard not running (no init script, no HTTP response)
+	svc := NewAdGuardServiceWithChecker(mock)
+	err := svc.SetDNS(true)
+	if err == nil {
+		t.Fatal("expected error when AdGuard not running")
+	}
+}
+
+func TestSetDNS_Enable_FailsWhenListenerNotReady(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.files["/etc/init.d/adguardhome"] = true
+	mock.commands["/etc/init.d/adguardhome status"] = struct {
+		output string
+		err    error
+	}{"running", nil}
+	// TCP probe fails — DNS listener not ready.
+	mock.tcpProbes["127.0.0.1:5353"] = false
+	svc := NewAdGuardServiceWithChecker(mock)
+	err := svc.SetDNS(true)
+	if err == nil {
+		t.Fatal("expected error when DNS listener not ready")
+	}
+}
+
+func TestGetDNSStatus_HealthFields(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.commands["uci get dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"127.0.0.1#5353", nil}
+	mock.tcpProbes["127.0.0.1:5353"] = true
+	mock.commands["nslookup example.com 127.0.0.1"] = struct {
+		output string
+		err    error
+	}{"Address: 93.184.216.34", nil}
+	svc := NewAdGuardServiceWithChecker(mock)
+
+	status, err := svc.GetDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !status.AdguardListenerReady {
+		t.Error("expected AdguardListenerReady=true")
+	}
+	if !status.ResolverProbeOk {
+		t.Error("expected ResolverProbeOk=true")
+	}
+	if status.DnsmasqForwardTarget != "127.0.0.1#5353" {
+		t.Errorf("expected DnsmasqForwardTarget='127.0.0.1#5353', got %q", status.DnsmasqForwardTarget)
 	}
 }

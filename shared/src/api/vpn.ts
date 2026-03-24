@@ -10,6 +10,8 @@ export interface VpnStatus {
   readonly endpoint: string;
   readonly rx_bytes: number;
   readonly tx_bytes: number;
+  /** Fine-grained tunnel state: disabled | configured | enabled_not_up | up_no_handshake | connected */
+  readonly status_detail?: string;
 }
 
 /** WireGuard configuration */
@@ -70,6 +72,18 @@ export interface WireGuardProfile {
 /** VPN kill switch status */
 export interface KillSwitchStatus {
   readonly enabled: boolean;
+}
+
+/** DNS leak test result */
+export interface DNSLeakResult {
+  /** Nameservers from /etc/resolv.conf */
+  readonly nameservers: readonly string[];
+  /** DNS servers configured in the active WireGuard profile */
+  readonly vpn_dns_servers: readonly string[];
+  /** True when a VPN tunnel is enabled */
+  readonly vpn_active: boolean;
+  /** True when VPN is active but nameservers don't match VPN-configured DNS */
+  readonly potentially_leaking: boolean;
 }
 
 /** Type guard for VpnStatus */

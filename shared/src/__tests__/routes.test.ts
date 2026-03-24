@@ -91,6 +91,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.wireguard.profiles).toBe('/api/v1/vpn/wireguard/profiles');
     expect(API_ROUTES.vpn.tailscale.status).toBe('/api/v1/vpn/tailscale');
     expect(API_ROUTES.vpn.tailscale.toggle).toBe('/api/v1/vpn/tailscale/toggle');
+    expect(API_ROUTES.vpn.dnsLeakTest).toBe('/api/v1/vpn/dns-leak-test');
   });
 
   it('has services routes with :id parameter matching backend', () => {
@@ -188,6 +189,7 @@ describe('API_ROUTES', () => {
       '/api/v1/network/uptime-log',
       '/api/v1/system/buttons',
       '/api/v1/system/button-actions',
+      '/api/v1/vpn/dns-leak-test',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

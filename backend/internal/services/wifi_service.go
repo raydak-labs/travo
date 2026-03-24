@@ -54,6 +54,7 @@ type WifiService struct {
 	priorityFile      string
 	autoReconnectFile string
 	reconnectScript   string
+	modeFile          string
 }
 
 // uciApplyConfigs is the list of configs copied for staged apply+confirm.
@@ -63,6 +64,7 @@ var uciApplyConfigs = []string{"wireless", "network", "system", "firewall", "dhc
 const defaultPriorityFile = "/etc/openwrt-travel-gui/wifi-priorities.json"
 const defaultAutoReconnectFile = "/etc/openwrt-travel-gui/autoreconnect.json"
 const defaultReconnectScript = "/etc/openwrt-travel-gui/wifi-reconnect.sh"
+const defaultWifiModeFile = "/etc/openwrt-travel-gui/wifi-mode"
 
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
 // otherwise falls back to reloader (e.g. tests or when rpcd session is unavailable).
@@ -71,6 +73,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus) *WifiService {
 		uci: u, ubus: ub, reloader: &ShellWifiReloader{}, applier: NewRealUCIApplyConfirm(ub),
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
+		modeFile: defaultWifiModeFile,
 	}
 }
 
@@ -80,7 +83,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 	return &WifiService{
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
-		reconnectScript: defaultReconnectScript,
+		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
 	}
 }
 
@@ -89,7 +92,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 	return &WifiService{
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
-		reconnectScript: defaultReconnectScript,
+		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
 	}
 }
 
@@ -98,7 +101,16 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 	return &WifiService{
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
-		reconnectScript: rsFile,
+		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
+	}
+}
+
+// NewWifiServiceForTestingWithModeFile creates a WifiService with a custom mode file (for tests).
+func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd CommandRunner, pf, arFile, rsFile, modeFile string) *WifiService {
+	return &WifiService{
+		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
+		priorityFile: pf, autoReconnectFile: arFile,
+		reconnectScript: rsFile, modeFile: modeFile,
 	}
 }
 
@@ -185,6 +197,52 @@ func (w *WifiService) findSTASection() (string, error) {
 	return "", fmt.Errorf("no STA section found in UCI config")
 }
 
+// findSTASectionBySSID returns the UCI section name of a saved STA profile matching ssid, or error if not found.
+func (w *WifiService) findSTASectionBySSID(ssid string) (string, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "", fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	for name, opts := range sections {
+		if opts["mode"] == "sta" && opts["ssid"] == ssid {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("no STA section found for SSID %q", ssid)
+}
+
+// nextSTASectionName returns a unique UCI section name for a new STA profile (sta0, sta1, …).
+func (w *WifiService) nextSTASectionName() string {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "sta0"
+	}
+	for i := 0; ; i++ {
+		candidate := fmt.Sprintf("sta%d", i)
+		if _, exists := sections[candidate]; !exists {
+			return candidate
+		}
+	}
+}
+
+// disableOtherSTASections disables every STA wifi-iface except activeSection.
+// This ensures only one profile is connected at runtime while others remain saved.
+func (w *WifiService) disableOtherSTASections(activeSection string) error {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	for name, opts := range sections {
+		if name == activeSection || opts["mode"] != "sta" {
+			continue
+		}
+		if err := w.uci.Set("wireless", name, "disabled", "1"); err != nil {
+			return fmt.Errorf("disabling STA section %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
 // getWifiRadioNames returns UCI section names of all wifi-device (radio) sections.
 func (w *WifiService) getWifiRadioNames() ([]string, error) {
 	sections, err := w.uci.GetSections("wireless")
@@ -237,6 +295,17 @@ func (w *WifiService) ensureSectionRadioEnabled(section string) error {
 }
 
 func (w *WifiService) deriveWifiMode() string {
+	// Persisted mode is authoritative: "client" and "repeater" both have STA+AP
+	// enabled in UCI, so UCI-only detection can't distinguish them.
+	if w.modeFile != "" {
+		if data, err := os.ReadFile(w.modeFile); err == nil {
+			saved := strings.TrimSpace(string(data))
+			if saved == "client" || saved == "ap" || saved == "repeater" {
+				return saved
+			}
+		}
+	}
+	// Fall back to UCI detection (used before any explicit SetMode() call).
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "client"
@@ -394,6 +463,45 @@ func (w *WifiService) ApplyWireless() error {
 	return w.applyWireless()
 }
 
+// parseIwinfoEncryption parses the structured encryption map returned by iwinfo
+// (both from "scan" and "info" responses) into a normalized encryption string
+// (e.g. "psk2", "sae", "wep", "none").
+func parseIwinfoEncryption(encField interface{}) string {
+	encMap, ok := encField.(map[string]interface{})
+	if !ok {
+		// Fallback: plain string (e.g. UCI value stored directly).
+		if s, ok := encField.(string); ok && s != "" {
+			return s
+		}
+		return "none"
+	}
+	enabled, _ := encMap["enabled"].(bool)
+	if !enabled {
+		return "none"
+	}
+	if wpa, ok := encMap["wpa"].([]interface{}); ok {
+		authStr := ""
+		if auth, ok := encMap["authentication"].([]interface{}); ok && len(auth) > 0 {
+			authStr, _ = auth[0].(string)
+		}
+		wpaVer := 0
+		if len(wpa) > 0 {
+			wpaVer = int(wpa[len(wpa)-1].(float64))
+		}
+		switch {
+		case authStr == "sae":
+			return "sae"
+		case authStr == "psk" && wpaVer == 2:
+			return "psk2"
+		case authStr == "psk":
+			return "psk"
+		default:
+			return "psk2"
+		}
+	}
+	return "wep"
+}
+
 // parseScanResultItem builds a WifiScanResult from one iwinfo scan result map.
 // bandOverride (e.g. "2.4GHz", "5GHz") is used when the result has no band; empty means derive from channel/frequency.
 func parseScanResultItem(rm map[string]interface{}, bandOverride string) models.WifiScanResult {
@@ -404,36 +512,7 @@ func parseScanResultItem(rm map[string]interface{}, bandOverride string) models.
 	qual, _ := rm["quality"].(float64)
 	band, _ := rm["band"].(string)
 
-	enc := "none"
-	if encMap, ok := rm["encryption"].(map[string]interface{}); ok {
-		if enabled, ok := encMap["enabled"].(bool); ok && enabled {
-			if wpa, ok := encMap["wpa"].([]interface{}); ok {
-				if auth, ok := encMap["authentication"].([]interface{}); ok {
-					authStr := ""
-					if len(auth) > 0 {
-						authStr, _ = auth[0].(string)
-					}
-					wpaVer := 0
-					if len(wpa) > 0 {
-						wpaVer = int(wpa[len(wpa)-1].(float64))
-					}
-					if authStr == "sae" {
-						enc = "sae"
-					} else if authStr == "psk" && wpaVer == 2 {
-						enc = "psk2"
-					} else if authStr == "psk" {
-						enc = "psk"
-					} else {
-						enc = "psk2"
-					}
-				} else {
-					enc = "psk2"
-				}
-			} else {
-				enc = "wep"
-			}
-		}
-	}
+	enc := parseIwinfoEncryption(rm["encryption"])
 
 	if band == "" && bandOverride != "" {
 		band = bandOverride
@@ -567,22 +646,39 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 }
 
 // Connect connects to a WiFi network.
+// Each distinct SSID gets its own UCI section so saved profiles persist across connections.
+// All other STA sections are disabled (not deleted) when connecting to a new network.
 func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
-	_, section, err := w.findSTADevice()
-	if err != nil {
-		section, err = w.findSTASection()
-		if err != nil {
-			// No STA in UCI; create sta0 so user can connect (OpenWrt approach: STA only when connecting)
-			section, err = w.ensureSTASectionForScan()
-			if err != nil {
-				return nil, fmt.Errorf("no STA interface found: %w", err)
-			}
-		}
-	}
 	// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN
 	if err := w.ensureWwanNetwork(); err != nil {
 		return nil, err
 	}
+
+	// Find or create a dedicated UCI section for this SSID.
+	section, err := w.findSTASectionBySSID(config.SSID)
+	if err != nil {
+		// No saved profile for this SSID yet — allocate a new section.
+		section = w.nextSTASectionName()
+		sections, _ := w.uci.GetSections("wireless")
+		var firstRadio string
+		for name, opts := range sections {
+			if opts["type"] != "" {
+				firstRadio = name
+				break
+			}
+		}
+		if firstRadio == "" {
+			return nil, fmt.Errorf("no radio found in wireless config")
+		}
+		if err := w.uci.AddSection("wireless", section, "wifi-iface"); err != nil {
+			return nil, fmt.Errorf("creating STA section %s: %w", section, err)
+		}
+		_ = w.uci.Set("wireless", section, "device", firstRadio)
+		_ = w.uci.Set("wireless", section, "mode", "sta")
+		_ = w.uci.Set("wireless", section, "network", "wwan")
+	}
+
+	// Ensure wwan binding is correct.
 	if net, err := w.uci.Get("wireless", section, "network"); err != nil || net != "wwan" {
 		if err := w.uci.Set("wireless", section, "network", "wwan"); err != nil {
 			return nil, fmt.Errorf("setting STA network: %w", err)
@@ -623,6 +719,10 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 	}
 	if err := w.ensureSectionRadioEnabled(section); err != nil {
 		return nil, fmt.Errorf("enabling STA radio: %w", err)
+	}
+	// Disable all other saved STA profiles so only this one connects at runtime.
+	if err := w.disableOtherSTASections(section); err != nil {
+		return nil, err
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return nil, err
@@ -666,7 +766,7 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 	ch, _ := resp["channel"].(float64)
 	sig, _ := resp["signal"].(float64)
 	qual, _ := resp["quality"].(float64)
-	enc, _ := resp["encryption"].(string)
+	enc := parseIwinfoEncryption(resp["encryption"])
 	band, _ := resp["band"].(string)
 
 	conn := models.WifiConnection{
@@ -746,6 +846,11 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return nil, err
+	}
+	if w.modeFile != "" {
+		if err := os.MkdirAll(filepath.Dir(w.modeFile), 0750); err == nil {
+			_ = os.WriteFile(w.modeFile, []byte(mode), 0600)
+		}
 	}
 	return w.stageWirelessApply()
 }

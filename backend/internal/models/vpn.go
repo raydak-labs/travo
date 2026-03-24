@@ -9,6 +9,9 @@ type VpnStatus struct {
 	Endpoint       string `json:"endpoint"`
 	RxBytes        int64  `json:"rx_bytes"`
 	TxBytes        int64  `json:"tx_bytes"`
+	// StatusDetail provides fine-grained tunnel state:
+	// "disabled", "configured", "enabled_not_up", "up_no_handshake", "connected"
+	StatusDetail string `json:"status_detail,omitempty"`
 }
 
 // WireguardPeer represents a WireGuard peer.
@@ -58,6 +61,19 @@ type WireGuardProfile struct {
 // KillSwitchStatus represents the VPN kill switch state.
 type KillSwitchStatus struct {
 	Enabled bool `json:"enabled"`
+}
+
+// DNSLeakResult holds the result of a DNS leak test.
+type DNSLeakResult struct {
+	// Nameservers currently in /etc/resolv.conf (what the system resolves with).
+	Nameservers []string `json:"nameservers"`
+	// VPNDNSServers are the DNS servers configured in the active WireGuard profile.
+	VPNDNSServers []string `json:"vpn_dns_servers"`
+	// VPNActive is true when a VPN tunnel is enabled.
+	VPNActive bool `json:"vpn_active"`
+	// PotentiallyLeaking is true when VPN is active but none of the current
+	// nameservers match the VPN-configured DNS servers.
+	PotentiallyLeaking bool `json:"potentially_leaking"`
 }
 
 // TailscaleStatus represents Tailscale connection status.

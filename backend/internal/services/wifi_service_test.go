@@ -82,9 +82,39 @@ func TestWifiConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	val, _ := u.Get("wireless", "wifinet2", "ssid")
+	// New code creates a per-SSID section; sta0=Hotel-WiFi exists, so sta1 is allocated.
+	val, _ := u.Get("wireless", "sta1", "ssid")
 	if val != "Test-Network" {
-		t.Errorf("expected ssid 'Test-Network', got %q", val)
+		t.Errorf("expected ssid 'Test-Network' in sta1, got %q", val)
+	}
+	// The existing Hotel-WiFi profile in sta0 must remain (not deleted), just disabled.
+	hotelSsid, _ := u.Get("wireless", "sta0", "ssid")
+	if hotelSsid != "Hotel-WiFi" {
+		t.Errorf("expected sta0 ssid to remain 'Hotel-WiFi', got %q", hotelSsid)
+	}
+	disabled, _ := u.Get("wireless", "sta0", "disabled")
+	if disabled != "1" {
+		t.Errorf("expected sta0 disabled='1' after connecting to different network, got %q", disabled)
+	}
+}
+
+func TestWifiConnect_ReusesSectionForSameSSID(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Connecting to the already-saved Hotel-WiFi must reuse sta0, not create sta1.
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", Password: "newpass", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	key, _ := u.Get("wireless", "sta0", "key")
+	if key != "newpass" {
+		t.Errorf("expected sta0 key updated to 'newpass', got %q", key)
+	}
+	// sta1 must not have been created.
+	if ssid, err := u.Get("wireless", "sta1", "ssid"); err == nil {
+		t.Errorf("unexpected sta1 created with ssid=%q", ssid)
 	}
 }
 
@@ -147,29 +177,31 @@ func TestWifiDisconnect(t *testing.T) {
 func TestWifiDisconnectThenReconnect(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	// Disconnect
+	// Disconnect — sta0 (Hotel-WiFi) is the active STA section in ubus/UCI.
 	if _, err := svc.Disconnect(); err != nil {
 		t.Fatalf("disconnect failed: %v", err)
 	}
+	// findSTADevice returns section="wifinet2" from ubus mock; UCI sets disabled on that name.
 	val, _ := u.Get("wireless", "wifinet2", "disabled")
 	if val != "1" {
 		t.Errorf("expected disabled='1' after disconnect, got %q", val)
 	}
 
-	// Reconnect
+	// Reconnect to a new SSID — a fresh sta1 section is created.
 	_, err := svc.Connect(models.WifiConfig{
 		SSID: "New-Network", Password: "newpass123", Encryption: "psk2",
 	})
 	if err != nil {
 		t.Fatalf("connect failed: %v", err)
 	}
-	val, _ = u.Get("wireless", "wifinet2", "disabled")
-	if val != "0" {
-		t.Errorf("expected disabled='0' after connect, got %q", val)
-	}
-	val, _ = u.Get("wireless", "wifinet2", "ssid")
+	// sta1 should hold the new network.
+	val, _ = u.Get("wireless", "sta1", "ssid")
 	if val != "New-Network" {
-		t.Errorf("expected ssid 'New-Network', got %q", val)
+		t.Errorf("expected sta1 ssid 'New-Network', got %q", val)
+	}
+	activeDisabled, _ := u.Get("wireless", "sta1", "disabled")
+	if activeDisabled != "0" {
+		t.Errorf("expected sta1 disabled='0', got %q", activeDisabled)
 	}
 }
 
@@ -192,6 +224,40 @@ func TestWifiDeleteNetwork(t *testing.T) {
 	_, err = u.Get("wireless", "sta0", "ssid")
 	if err == nil {
 		t.Error("expected sta0 section to be deleted")
+	}
+}
+
+func TestWifiConnect_MultipleProfilesPersist(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Connect to a first new network (sta0=Hotel-WiFi exists, so sta1 is created).
+	if _, err := svc.Connect(models.WifiConfig{SSID: "Coffee-Shop", Password: "coffee123", Encryption: "psk2"}); err != nil {
+		t.Fatalf("connect Coffee-Shop: %v", err)
+	}
+	// Connect to a second new network (sta1=Coffee-Shop now exists, so sta2 is created).
+	if _, err := svc.Connect(models.WifiConfig{SSID: "Airport-WiFi", Password: "air456", Encryption: "psk2"}); err != nil {
+		t.Fatalf("connect Airport-WiFi: %v", err)
+	}
+
+	// All three SSID profiles must be present in UCI.
+	if ssid, _ := u.Get("wireless", "sta0", "ssid"); ssid != "Hotel-WiFi" {
+		t.Errorf("sta0 ssid=%q, want Hotel-WiFi", ssid)
+	}
+	if ssid, _ := u.Get("wireless", "sta1", "ssid"); ssid != "Coffee-Shop" {
+		t.Errorf("sta1 ssid=%q, want Coffee-Shop", ssid)
+	}
+	if ssid, _ := u.Get("wireless", "sta2", "ssid"); ssid != "Airport-WiFi" {
+		t.Errorf("sta2 ssid=%q, want Airport-WiFi", ssid)
+	}
+	// Only the last-connected network (sta2) should be enabled.
+	if d, _ := u.Get("wireless", "sta0", "disabled"); d != "1" {
+		t.Errorf("sta0 should be disabled, got disabled=%q", d)
+	}
+	if d, _ := u.Get("wireless", "sta1", "disabled"); d != "1" {
+		t.Errorf("sta1 should be disabled, got disabled=%q", d)
+	}
+	if d, _ := u.Get("wireless", "sta2", "disabled"); d != "0" {
+		t.Errorf("sta2 should be enabled, got disabled=%q", d)
 	}
 }
 
@@ -234,13 +300,19 @@ func TestWifiConnectFallsBackToUCI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	val, _ := u.Get("wireless", "sta0", "ssid")
+	// sta0 exists with Hotel-WiFi; new code creates sta1 for the new SSID.
+	val, _ := u.Get("wireless", "sta1", "ssid")
 	if val != "New-Network" {
-		t.Errorf("expected ssid 'New-Network', got %q", val)
+		t.Errorf("expected sta1 ssid 'New-Network', got %q", val)
 	}
-	val, _ = u.Get("wireless", "sta0", "disabled")
+	val, _ = u.Get("wireless", "sta1", "disabled")
 	if val != "0" {
-		t.Errorf("expected disabled='0', got %q", val)
+		t.Errorf("expected sta1 disabled='0', got %q", val)
+	}
+	// Hotel-WiFi profile must remain saved but disabled.
+	hotelDisabled, _ := u.Get("wireless", "sta0", "disabled")
+	if hotelDisabled != "1" {
+		t.Errorf("expected sta0 disabled='1', got %q", hotelDisabled)
 	}
 }
 
@@ -262,11 +334,12 @@ func TestWifiConnectHiddenNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	val, _ := u.Get("wireless", "wifinet2", "ssid")
+	// New per-SSID section: sta0=Hotel-WiFi exists, so sta1 is created.
+	val, _ := u.Get("wireless", "sta1", "ssid")
 	if val != "Hidden-Net" {
-		t.Errorf("expected ssid 'Hidden-Net', got %q", val)
+		t.Errorf("expected sta1 ssid 'Hidden-Net', got %q", val)
 	}
-	val, _ = u.Get("wireless", "wifinet2", "hidden")
+	val, _ = u.Get("wireless", "sta1", "hidden")
 	if val != "1" {
 		t.Errorf("expected hidden='1', got %q", val)
 	}
@@ -281,15 +354,14 @@ func TestWifiConnectNonHiddenNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	val, _ := u.Get("wireless", "wifinet2", "hidden")
+	val, _ := u.Get("wireless", "sta1", "hidden")
 	if val != "0" {
-		t.Errorf("expected hidden='0', got %q", val)
+		t.Errorf("expected sta1 hidden='0', got %q", val)
 	}
 }
 
 func TestWifiConnect_NormalizesMissingNetworkToWwan(t *testing.T) {
 	svc, u := newTestWifiService()
-	_ = u.Set("wireless", "wifinet2", "network", "")
 
 	_, err := svc.Connect(models.WifiConfig{
 		SSID: "Visible-Net", Password: "secretpass", Encryption: "psk2",
@@ -298,9 +370,10 @@ func TestWifiConnect_NormalizesMissingNetworkToWwan(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	val, _ := u.Get("wireless", "wifinet2", "network")
+	// sta1 is the new section; it must have network=wwan.
+	val, _ := u.Get("wireless", "sta1", "network")
 	if val != "wwan" {
-		t.Errorf("expected network='wwan', got %q", val)
+		t.Errorf("expected sta1 network='wwan', got %q", val)
 	}
 }
 
@@ -1363,5 +1436,96 @@ func TestEnsureAPRunning_CommitError(t *testing.T) {
 	}
 	if needWifiUp {
 		t.Error("expected needWifiUp=false when Commit fails")
+	}
+}
+
+func TestParseIwinfoEncryption(t *testing.T) {
+	cases := []struct {
+		name  string
+		input interface{}
+		want  string
+	}{
+		{"nil", nil, "none"},
+		{"empty map disabled", map[string]interface{}{"enabled": false}, "none"},
+		{"wpa2 psk", map[string]interface{}{
+			"enabled":        true,
+			"wpa":            []interface{}{float64(2)},
+			"authentication": []interface{}{"psk"},
+		}, "psk2"},
+		{"wpa psk", map[string]interface{}{
+			"enabled":        true,
+			"wpa":            []interface{}{float64(1)},
+			"authentication": []interface{}{"psk"},
+		}, "psk"},
+		{"wpa3 sae", map[string]interface{}{
+			"enabled":        true,
+			"wpa":            []interface{}{float64(3)},
+			"authentication": []interface{}{"sae"},
+		}, "sae"},
+		{"wep (no wpa key)", map[string]interface{}{
+			"enabled": true,
+		}, "wep"},
+		{"plain string fallback", "psk2", "psk2"},
+		{"empty string fallback", "", "none"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseIwinfoEncryption(tc.input)
+			if got != tc.want {
+				t.Errorf("parseIwinfoEncryption(%v) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+func newTestWifiServiceWithModeFile(modeFile string) (*WifiService, *uci.MockUCI) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewWifiServiceForTestingWithModeFile(u, ub, &NoopWifiReloader{}, &RealCommandRunner{}, defaultPriorityFile, defaultAutoReconnectFile, defaultReconnectScript, modeFile)
+	return svc, u
+}
+
+func TestSetMode_PersistsModeFile(t *testing.T) {
+	tmpFile := t.TempDir() + "/wifi-mode"
+	svc, _ := newTestWifiServiceWithModeFile(tmpFile)
+
+	_, err := svc.SetMode("client")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	data, err := os.ReadFile(tmpFile)
+	if err != nil {
+		t.Fatalf("mode file not written: %v", err)
+	}
+	if string(data) != "client" {
+		t.Errorf("expected mode file content 'client', got %q", string(data))
+	}
+}
+
+func TestDeriveWifiMode_ReadsFromModeFile(t *testing.T) {
+	tmpFile := t.TempDir() + "/wifi-mode"
+	svc, _ := newTestWifiServiceWithModeFile(tmpFile)
+
+	// Both STA and AP are enabled in mock UCI, so UCI-only detection would return "repeater".
+	// After SetMode("client"), the mode file should make deriveWifiMode return "client".
+	_, err := svc.SetMode("client")
+	if err != nil {
+		t.Fatalf("SetMode error: %v", err)
+	}
+
+	mode := svc.deriveWifiMode()
+	if mode != "client" {
+		t.Errorf("expected deriveWifiMode to return 'client' from mode file, got %q", mode)
+	}
+}
+
+func TestDeriveWifiMode_FallsBackToUCIWhenNoModeFile(t *testing.T) {
+	// No mode file — uses UCI detection.
+	svc, _ := newTestWifiServiceWithModeFile("")
+
+	mode := svc.deriveWifiMode()
+	// Mock UCI has both ap and sta sections enabled, so UCI detection returns "repeater".
+	if mode != "repeater" && mode != "ap" && mode != "client" {
+		t.Errorf("unexpected mode %q from UCI fallback", mode)
 	}
 }

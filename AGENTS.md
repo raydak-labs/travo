@@ -92,6 +92,27 @@ Guard file naming convention: `/etc/openwrt-travel-gui/<feature>-in-progress`
 
 **Rule:** If things would make implementing easier ask user if you can access the test device to execute command verify things on it. For example try replicating the flow via ssh/cli commands before implementing them blindly.
 
+## API Documentation Endpoint
+
+The backend exposes a machine-readable **OpenAPI 3.0** specification at:
+
+```
+GET /api/openapi.json
+```
+
+This endpoint requires **no authentication** and is available on the test device:
+
+```sh
+curl http://192.168.1.1/api/openapi.json
+```
+
+Use it for:
+- Generating typed API clients or test fixtures
+- Discovering all available `/api/v1/` routes without reading source code
+- Integration tests against the live device
+
+Authentication for protected endpoints: POST `/api/v1/auth/login` with `{"username":"root","password":"..."}` → use the returned `token` as `Authorization: Bearer <token>`.
+
 ## Commit / finish task
 
 - before you finish the task you must ensure the lint, tests and build are working (check Makefile for general things)
