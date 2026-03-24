@@ -1251,45 +1251,35 @@ func (w *WifiService) SetAPConfig(section string, config models.APConfig) (*Wire
 func (w *WifiService) GetMACAddresses() ([]models.MACConfig, error) {
 	var configs []models.MACConfig
 
-	// Get STA interface MAC
-	staSection := "sta0"
+	staSection, err := w.findSTASection()
+	if err != nil {
+		return configs, nil // No STA section; return empty (not an error)
+	}
 	staOpts, err := w.uci.GetAll("wireless", staSection)
 	if err != nil {
-		// Try wifinet2 as fallback section name
-		staSection = "wifinet2"
-		staOpts, err = w.uci.GetAll("wireless", staSection)
+		return configs, nil
 	}
-	if err == nil && staOpts["mode"] == "sta" {
-		currentMAC := ""
-		// Try reading from sysfs
-		data, readErr := os.ReadFile("/sys/class/net/phy0-sta0/address")
-		if readErr == nil {
+	currentMAC := ""
+	// Try reading from sysfs (ifname pattern: phy<N>-sta<N>)
+	if ifname, _, sysErr := w.findSTADevice(); sysErr == nil && ifname != "" {
+		if data, readErr := os.ReadFile("/sys/class/net/" + ifname + "/address"); readErr == nil {
 			currentMAC = strings.TrimSpace(string(data))
 		}
-		configs = append(configs, models.MACConfig{
-			Interface:  "sta",
-			CurrentMAC: currentMAC,
-			CustomMAC:  staOpts["macaddr"],
-		})
 	}
+	configs = append(configs, models.MACConfig{
+		Interface:  "sta",
+		CurrentMAC: currentMAC,
+		CustomMAC:  staOpts["macaddr"],
+	})
 
 	return configs, nil
 }
 
 // SetMACAddress sets a custom MAC address on the STA WiFi interface.
 func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
-	// Find STA section
-	staSection := "sta0"
-	opts, err := w.uci.GetAll("wireless", staSection)
-	if err != nil {
-		staSection = "wifinet2"
-		opts, err = w.uci.GetAll("wireless", staSection)
-	}
+	staSection, err := w.findSTASection()
 	if err != nil {
 		return nil, fmt.Errorf("STA interface not found")
-	}
-	if opts["mode"] != "sta" {
-		return nil, fmt.Errorf("section %s is not a STA interface", staSection)
 	}
 	if mac == "" {
 		// Reset: clear the macaddr option

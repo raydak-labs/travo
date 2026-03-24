@@ -26,13 +26,13 @@ var Version = "dev"
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
-	app, _, _, _, _ := setupAppWithConfig(cfg)
+	app, _, _, _, _, _ := setupAppWithConfig(cfg)
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, the WebSocket hub, the alert service, the uptime tracker, and band switching service so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService) {
+// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, and blocklist so the caller can manage their lifecycle.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist) {
 	app := fiber.New(fiber.Config{
 		AppName: "openwrt-travel-gui",
 	})
@@ -126,8 +126,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	// Token blocklist with cleanup goroutine
 	blocklist := auth.NewTokenBlocklist()
 	authSvc.SetBlocklist(blocklist)
-	stopCleanup := make(chan struct{})
-	blocklist.StartCleanup(5*time.Minute, stopCleanup)
+	blocklist.StartCleanup(5 * time.Minute)
 
 	// Rate limiter: 5 attempts per minute
 	rateLimiter := auth.NewRateLimiter(5, time.Minute)
@@ -180,7 +179,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc
+	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist
 }
 
 func main() {
@@ -195,7 +194,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc, uptimeTracker, bandSwitchSvc := setupAppWithConfig(cfg)
+	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -204,6 +203,7 @@ func main() {
 	go func() {
 		<-quit
 		log.Println("Shutting down server...")
+		blocklist.Stop()
 		hub.Stop()
 		alertSvc.Stop()
 		uptimeTracker.Stop()

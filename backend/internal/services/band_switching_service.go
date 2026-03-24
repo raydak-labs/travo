@@ -53,6 +53,7 @@ type BandSwitchingService struct {
 	config     BandSwitchConfig
 	status     BandSwitchStatus
 	stopCh     chan struct{}
+	stopOnce   sync.Once
 }
 
 // NewBandSwitchingService creates a new BandSwitchingService.
@@ -273,9 +274,9 @@ func (b *BandSwitchingService) Start() {
 	}()
 }
 
-// Stop stops the band switching monitor.
+// Stop stops the band switching monitor. Safe to call multiple times.
 func (b *BandSwitchingService) Stop() {
-	close(b.stopCh)
+	b.stopOnce.Do(func() { close(b.stopCh) })
 }
 
 func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {

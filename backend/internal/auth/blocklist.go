@@ -7,14 +7,17 @@ import (
 
 // TokenBlocklist maintains a set of blocked (revoked) JWT tokens.
 type TokenBlocklist struct {
-	mu     sync.RWMutex
-	tokens map[string]time.Time // token -> expiry
+	mu       sync.RWMutex
+	tokens   map[string]time.Time // token -> expiry
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewTokenBlocklist creates a new TokenBlocklist.
 func NewTokenBlocklist() *TokenBlocklist {
 	return &TokenBlocklist{
 		tokens: make(map[string]time.Time),
+		stopCh: make(chan struct{}),
 	}
 }
 
@@ -46,7 +49,8 @@ func (b *TokenBlocklist) Cleanup() {
 }
 
 // StartCleanup starts a goroutine that periodically cleans up expired tokens.
-func (b *TokenBlocklist) StartCleanup(interval time.Duration, stop <-chan struct{}) {
+// Call Stop() to shut it down.
+func (b *TokenBlocklist) StartCleanup(interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -54,9 +58,14 @@ func (b *TokenBlocklist) StartCleanup(interval time.Duration, stop <-chan struct
 			select {
 			case <-ticker.C:
 				b.Cleanup()
-			case <-stop:
+			case <-b.stopCh:
 				return
 			}
 		}
 	}()
+}
+
+// Stop stops the cleanup goroutine. Safe to call multiple times.
+func (b *TokenBlocklist) Stop() {
+	b.stopOnce.Do(func() { close(b.stopCh) })
 }
