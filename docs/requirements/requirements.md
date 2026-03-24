@@ -345,7 +345,7 @@
 - [x] Remember me toggle (localStorage vs sessionStorage)
 - [x] WebSocket auth via JWT query parameter
 - [x] Session timeout warning (toast 5 min before JWT expiry, auto-redirect on expiry)
-- [ ] HTTPS / TLS support (low priority). See [Implementation guide](../plans/implementation.md#7--https--tls-support).
+- [x] HTTPS / TLS support (low priority). See [Implementation guide](../plans/implementation.md#7--https--tls-support).
 - [ ] 🔮 Two-factor authentication
 - [ ] 🔮 IP-based access control
 

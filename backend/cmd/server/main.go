@@ -214,8 +214,23 @@ func main() {
 		log.Println("Server stopped")
 	}()
 
+	// If TLS is enabled, start HTTPS listener concurrently.
+	if cfg.TLSEnabled {
+		if err := config.EnsureTLSCert(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
+			log.Printf("WARNING: could not generate TLS certificate: %v", err)
+		} else {
+			tlsAddr := fmt.Sprintf(":%d", cfg.TLSPort)
+			log.Printf("Starting HTTPS listener on %s", tlsAddr)
+			go func() {
+				if err := app.ListenTLS(tlsAddr, cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
+					log.Printf("HTTPS listener stopped: %v", err)
+				}
+			}()
+		}
+	}
+
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("Starting openwrt-travel-gui backend on %s (mock=%v)", addr, cfg.MockMode)
+	log.Printf("Starting openwrt-travel-gui backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
 	if err := app.Listen(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
