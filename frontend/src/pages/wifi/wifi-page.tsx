@@ -6,15 +6,12 @@ import {
   Trash2,
   Radio,
   QrCode,
-  Shuffle,
-  RotateCcw,
-  ShieldCheck,
   Cpu,
   ChevronUp,
   ChevronDown,
 } from 'lucide-react';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
-import type { APConfig, GuestWifiConfig } from '@shared/index';
+import type { APConfig } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +39,9 @@ import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { WifiScanDialog } from './wifi-scan-dialog';
 import { WifiHiddenNetworkDialog } from './wifi-hidden-network-dialog';
+import { GuestNetworkCard } from './guest-network-card';
+import { MACAddressCard } from './mac-address-card';
+import { BandSwitchingCard } from './band-switching-card';
 import {
   useWifiConnection,
   useWifiDisconnect,
@@ -50,17 +50,10 @@ import {
   useSetNetworkPriority,
   useAPConfigs,
   useSetAPConfig,
-  useMACAddresses,
-  useSetMAC,
-  useRandomizeMAC,
-  useGuestWifi,
-  useSetGuestWifi,
   useRadios,
   useSetRadioRole,
   useAutoReconnect,
   useSetAutoReconnect,
-  useBandSwitching,
-  useSetBandSwitching,
 } from '@/hooks/use-wifi';
 
 interface APFormState {
@@ -70,24 +63,6 @@ interface APFormState {
   enabled: boolean;
 }
 
-interface GuestFormState {
-  enabled: boolean;
-  ssid: string;
-  encryption: string;
-  key: string;
-}
-
-function generateRandomMAC(): string {
-  const hex = () =>
-    Math.floor(Math.random() * 256)
-      .toString(16)
-      .padStart(2, '0');
-  const first = (Math.floor(Math.random() * 256) & 0xfe) | 0x02; // locally administered, unicast
-  return [first.toString(16).padStart(2, '0'), hex(), hex(), hex(), hex(), hex()].join(':');
-}
-
-const MAC_REGEX = /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/;
-
 export function WifiPage() {
   const { data: connection, isLoading: connectionLoading } = useWifiConnection();
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
@@ -96,27 +71,13 @@ export function WifiPage() {
   const deleteMutation = useWifiDelete();
   const priorityMutation = useSetNetworkPriority();
   const setAP = useSetAPConfig();
-  const { data: macAddresses, isLoading: macLoading } = useMACAddresses();
-  const setMAC = useSetMAC();
-  const randomizeMAC = useRandomizeMAC();
-  const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
-  const setGuestWifi = useSetGuestWifi();
   const { data: radios, isLoading: radiosLoading } = useRadios();
   const setRadioRole = useSetRadioRole();
   const { data: autoReconnect } = useAutoReconnect();
-  const { data: bandSwitchData } = useBandSwitching();
-  const setBandSwitching = useSetBandSwitching();
   const setAutoReconnect = useSetAutoReconnect();
   const [apState, setApState] = useState<Record<string, APFormState>>({});
   const [qrAP, setQrAP] = useState<APConfig | null>(null);
   const [pendingDisableSection, setPendingDisableSection] = useState<string | null>(null);
-  const [customMAC, setCustomMAC] = useState('');
-  const [guestState, setGuestState] = useState<GuestFormState>({
-    enabled: false,
-    ssid: '',
-    encryption: 'psk2',
-    key: '',
-  });
 
   useEffect(() => {
     if (apConfigs) {
@@ -132,23 +93,6 @@ export function WifiPage() {
       setApState(state);
     }
   }, [apConfigs]);
-
-  useEffect(() => {
-    if (macAddresses && macAddresses.length > 0) {
-      setCustomMAC(macAddresses[0].custom_mac || '');
-    }
-  }, [macAddresses]);
-
-  useEffect(() => {
-    if (guestWifi) {
-      setGuestState({
-        enabled: guestWifi.enabled,
-        ssid: guestWifi.ssid,
-        encryption: guestWifi.encryption || 'psk2',
-        key: guestWifi.key,
-      });
-    }
-  }, [guestWifi]);
 
   return (
     <div className="space-y-6">
@@ -554,274 +498,9 @@ export function WifiPage() {
         ap={qrAP}
       />
 
-      {/* Guest Network */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Guest Network</CardTitle>
-          <ShieldCheck className="h-4 w-4 text-gray-400" />
-        </CardHeader>
-        <CardContent>
-          {guestLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    Enable Guest WiFi
-                  </span>
-                  <p className="text-xs text-gray-500">
-                    Separate network (192.168.2.0/24) with client isolation
-                  </p>
-                </div>
-                <Switch
-                  id="guest-enabled"
-                  label="Enabled"
-                  checked={guestState.enabled}
-                  onChange={(e) =>
-                    setGuestState((prev) => ({ ...prev, enabled: e.target.checked }))
-                  }
-                />
-              </div>
-              {guestState.enabled && (
-                <div className="space-y-3 rounded-lg border p-4">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="guest-ssid"
-                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >
-                      SSID
-                    </label>
-                    <Input
-                      id="guest-ssid"
-                      value={guestState.ssid}
-                      onChange={(e) => setGuestState((prev) => ({ ...prev, ssid: e.target.value }))}
-                      placeholder="Guest network name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="guest-encryption"
-                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >
-                      Encryption
-                    </label>
-                    <Select
-                      value={guestState.encryption}
-                      onValueChange={(val) =>
-                        setGuestState((prev) => ({
-                          ...prev,
-                          encryption: val,
-                          key: val === 'none' ? '' : prev.key,
-                        }))
-                      }
-                    >
-                      <SelectTrigger id="guest-encryption">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None (Open)</SelectItem>
-                        <SelectItem value="psk2">WPA2-PSK</SelectItem>
-                        <SelectItem value="sae">WPA3-SAE</SelectItem>
-                        <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {guestState.encryption !== 'none' && (
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="guest-key"
-                        className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                      >
-                        Password
-                      </label>
-                      <Input
-                        id="guest-key"
-                        type="password"
-                        value={guestState.key}
-                        onChange={(e) =>
-                          setGuestState((prev) => ({ ...prev, key: e.target.value }))
-                        }
-                        placeholder="Minimum 8 characters"
-                      />
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    Client isolation is enabled — guests cannot see each other. Internet access
-                    only, no LAN access.
-                  </p>
-                </div>
-              )}
-              <Button
-                size="sm"
-                disabled={setGuestWifi.isPending}
-                onClick={() => setGuestWifi.mutate(guestState as GuestWifiConfig)}
-              >
-                {setGuestWifi.isPending ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* MAC Address Cloning */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">MAC Address Cloning</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {macLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : !macAddresses || macAddresses.length === 0 ? (
-            <p className="text-sm text-gray-500">No STA interface detected</p>
-          ) : (
-            <div className="space-y-4">
-              {macAddresses.map((mac) => (
-                <div key={mac.interface} className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">STA Interface</Badge>
-                    {mac.current_mac && (
-                      <span className="text-sm font-mono text-gray-600 dark:text-gray-400">
-                        Current: {mac.current_mac}
-                      </span>
-                    )}
-                  </div>
-                  {mac.custom_mac && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      Custom MAC active: {mac.custom_mac}
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="mac-input"
-                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >
-                      Custom MAC Address
-                    </label>
-                    <Input
-                      id="mac-input"
-                      value={customMAC}
-                      onChange={(e) => setCustomMAC(e.target.value)}
-                      placeholder="AA:BB:CC:DD:EE:FF"
-                      className="font-mono"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setCustomMAC(generateRandomMAC())}>
-                      <Shuffle className="h-4 w-4 mr-1" />
-                      Random
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={randomizeMAC.isPending}
-                      onClick={() => randomizeMAC.mutate()}
-                    >
-                      <Shuffle className="h-4 w-4 mr-1" />
-                      {randomizeMAC.isPending ? 'Randomizing...' : 'Randomize & Apply'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={
-                        setMAC.isPending || (customMAC !== '' && !MAC_REGEX.test(customMAC))
-                      }
-                      onClick={() => setMAC.mutate(customMAC)}
-                    >
-                      {setMAC.isPending ? 'Applying...' : 'Apply'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={setMAC.isPending}
-                      onClick={() => {
-                        setCustomMAC('');
-                        setMAC.mutate('');
-                      }}
-                    >
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Reset to Default
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Auto Band Switching */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Auto Band Switching</CardTitle>
-          <ChevronUp className="h-4 w-4 text-gray-400" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <p className="text-sm">Automatic band switching</p>
-              <p className="text-xs text-gray-500">
-                Switches between 2.4 GHz and 5 GHz based on signal quality
-              </p>
-            </div>
-            <Switch
-              id="band-switching-toggle"
-              label="Enable"
-              checked={bandSwitchData?.config.enabled ?? false}
-              onChange={(e) => {
-                if (bandSwitchData) {
-                  setBandSwitching.mutate({ ...bandSwitchData.config, enabled: e.target.checked });
-                }
-              }}
-              disabled={setBandSwitching.isPending}
-            />
-          </div>
-          {bandSwitchData?.config.enabled && (
-            <div className="rounded-md bg-gray-50 p-3 text-xs dark:bg-gray-900 space-y-2">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
-                <span>Preferred band</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {bandSwitchData.config.preferred_band === '5g' ? '5 GHz' : '2.4 GHz'}
-                </span>
-                <span>Switch away when below</span>
-                <span className="font-mono text-gray-900 dark:text-white">
-                  {bandSwitchData.config.down_switch_threshold_dbm} dBm for {bandSwitchData.config.down_switch_delay_sec}s
-                </span>
-                <span>Switch back when above</span>
-                <span className="font-mono text-gray-900 dark:text-white">
-                  {bandSwitchData.config.up_switch_threshold_dbm} dBm for {bandSwitchData.config.up_switch_delay_sec}s
-                </span>
-              </div>
-              {bandSwitchData.status.state !== 'inactive' && (
-                <div className="flex items-center gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-500">Status:</span>
-                  <Badge
-                    variant={bandSwitchData.status.state === 'monitoring' ? 'success' : 'outline'}
-                    className="text-xs"
-                  >
-                    {bandSwitchData.status.state}
-                  </Badge>
-                  {bandSwitchData.status.signal_dbm !== 0 && (
-                    <span className="font-mono text-gray-700 dark:text-gray-300">
-                      {bandSwitchData.status.signal_dbm} dBm ({bandSwitchData.status.current_band})
-                    </span>
-                  )}
-                  {bandSwitchData.status.weak_signal_secs > 0 && (
-                    <span className="text-amber-600">
-                      weak {bandSwitchData.status.weak_signal_secs}s / {bandSwitchData.config.down_switch_delay_sec}s
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <GuestNetworkCard />
+      <MACAddressCard />
+      <BandSwitchingCard />
 
       {/* AP Disable Confirmation Dialog */}
       {pendingDisableSection && (() => {
