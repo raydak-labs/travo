@@ -4,27 +4,38 @@
 # Supports both .ipk-based install (opkg/apk) and direct file copy.
 # Handles legacy SCP protocol for older OpenWrt/Dropbear SSH servers.
 #
+# Direct mode only updates:
+#   - /usr/bin/openwrt-travel-gui
+#   - files under /www/openwrt-travel-gui/ (extracted from frontend/dist; overwrites
+#     same paths, does not delete extra files left in that directory)
+# It does NOT remove or replace:
+#   - /etc/init.d/openwrt-travel-gui
+#   - /etc/config/openwrt-travel-gui
+#   - /etc/openwrt-travel-gui/* (profiles, guards, etc.)
+# If the service script is missing, port 80 will stay down until you run
+#   ./scripts/setup-local.sh [--no-luci-move]
+#
 # Usage:
 #   ./scripts/deploy-local.sh [options]
 #
 # Examples:
-#   # Quick deploy with defaults (direct copy, 192.168.1.1)
+#   # Default: build frontend + backend, then upload (direct copy, 192.168.1.1)
 #   ./scripts/deploy-local.sh
 #
-#   # Deploy .ipk via apk (OpenWrt 25.x+)
+#   # Skip build; upload existing dist/ + frontend/dist only
+#   ./scripts/deploy-local.sh --no-build
+#
+#   # Deploy .ipk via apk (OpenWrt 25.x+); still builds first by default
 #   ./scripts/deploy-local.sh --method apk
 #
 #   # Deploy to a different IP with legacy SCP
 #   ./scripts/deploy-local.sh --ip 10.0.0.1 --legacy-scp
 #
-#   # Build + deploy in one go
-#   ./scripts/deploy-local.sh --build
-#
-#   # Just restart the service (no file transfer)
+#   # Just restart the service (no build, no file transfer)
 #   ./scripts/deploy-local.sh --restart-only
 #
-#   # Backend-only: just build & upload the binary (skip frontend)
-#   ./scripts/deploy-local.sh --build --binary-only
+#   # Build + backend-only upload (skip frontend tarball)
+#   ./scripts/deploy-local.sh --binary-only
 
 set -euo pipefail
 
@@ -33,7 +44,7 @@ ROUTER_IP="192.168.1.1"
 ROUTER_USER="root"
 METHOD="direct"        # direct | opkg | apk
 LEGACY_SCP=true        # use -O flag for older dropbear
-DO_BUILD=false
+DO_BUILD=true
 DO_RESTART=true
 RESTART_ONLY=false
 BINARY_ONLY=false
@@ -58,7 +69,7 @@ Options:
   --ipk PATH           Path to .ipk file (auto-detected from dist/ if omitted)
   --legacy-scp         Use SCP legacy protocol (-O flag) for Dropbear (default: on)
   --no-legacy-scp      Disable legacy SCP flag
-  --build              Run build before deploying
+  --no-build           Skip build; use existing dist/ and frontend/dist
   --binary-only        Only upload the backend binary (skip frontend assets)
   --no-restart         Skip service restart after deploy
   --restart-only       Only restart the service (no file transfer)
@@ -80,7 +91,7 @@ while [[ $# -gt 0 ]]; do
     --ipk)          IPK_PATH="$2"; shift 2 ;;
     --legacy-scp)   LEGACY_SCP=true; shift ;;
     --no-legacy-scp) LEGACY_SCP=false; shift ;;
-    --build)        DO_BUILD=true; shift ;;
+    --no-build)     DO_BUILD=false; shift ;;
     --binary-only)  BINARY_ONLY=true; shift ;;
     --no-restart)   DO_RESTART=false; shift ;;
     --restart-only) RESTART_ONLY=true; shift ;;
@@ -109,6 +120,18 @@ check_connectivity() {
   if ! ssh_cmd "echo ok" >/dev/null 2>&1; then
     error "Cannot reach ${REMOTE} via SSH. Check IP, user, and SSH keys."
   fi
+}
+
+# Warn when direct deploy cannot start the app (init.d never uploaded by this script).
+warn_missing_service_script() {
+  if [[ "$METHOD" != "direct" ]]; then
+    return 0
+  fi
+  if ssh_cmd "test -x /etc/init.d/openwrt-travel-gui" 2>/dev/null; then
+    return 0
+  fi
+  warn "/etc/init.d/openwrt-travel-gui is missing or not executable on the router."
+  warn "deploy-local.sh does not install it. Run once: ./scripts/setup-local.sh [--no-luci-move]"
 }
 
 # ── Build ─────────────────────────────────────────────────────────────────────
@@ -140,7 +163,7 @@ do_build() {
 deploy_direct() {
   local binary="dist/openwrt-travel-gui"
 
-  [[ -f "$binary" ]] || error "Binary not found at $binary. Run with --build or 'make build-prod' first."
+  [[ -f "$binary" ]] || error "Binary not found at $binary. Run 'make build-prod' or remove --no-build."
 
   info "Stopping service..."
   ssh_cmd "/etc/init.d/openwrt-travel-gui stop 2>/dev/null || true"
@@ -151,7 +174,7 @@ deploy_direct() {
 
   if ! $BINARY_ONLY; then
     local frontend_dir="frontend/dist"
-    [[ -d "$frontend_dir" ]] || error "Frontend assets not found at $frontend_dir. Run with --build first."
+    [[ -d "$frontend_dir" ]] || error "Frontend assets not found at $frontend_dir. Run 'pnpm build' in frontend/ or remove --no-build."
     info "Uploading frontend assets..."
     ssh_cmd "mkdir -p /www/openwrt-travel-gui"
     COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/openwrt-travel-gui/"
@@ -171,7 +194,7 @@ deploy_package() {
   if [[ -z "$IPK_PATH" ]]; then
     IPK_PATH=$(ls -1t dist/*.ipk 2>/dev/null | head -1)
   fi
-  [[ -n "$IPK_PATH" && -f "$IPK_PATH" ]] || error "No .ipk found in dist/. Run with --build or 'make package' first."
+  [[ -n "$IPK_PATH" && -f "$IPK_PATH" ]] || error "No .ipk found in dist/. Run 'make package' or remove --no-build."
 
   local ipk_file
   ipk_file=$(basename "$IPK_PATH")
@@ -223,6 +246,7 @@ echo "  Method: ${METHOD}  |  Legacy SCP: ${LEGACY_SCP}  |  Binary only: ${BINAR
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 check_connectivity
+warn_missing_service_script
 
 if $RESTART_ONLY; then
   restart_service

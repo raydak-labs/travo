@@ -51,7 +51,7 @@ deploy:
 
 # Deploy locally via direct copy (fast iteration)
 deploy-local:
-	@bash scripts/deploy-local.sh --build $(DEPLOY_ARGS)
+	@bash scripts/deploy-local.sh $(DEPLOY_ARGS)
 
 # Start Docker dev environment
 docker-dev:
