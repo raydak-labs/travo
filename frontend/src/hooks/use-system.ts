@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getToken } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
 import type {
   SystemInfo,
@@ -54,7 +54,8 @@ export function useShutdown() {
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.shutdown),
     onSuccess: () => {
       toast.success('Shutdown initiated', {
-        description: 'The device is powering off. You will need physical access to turn it back on.',
+        description:
+          'The device is powering off. You will need physical access to turn it back on.',
       });
     },
     onError: (error) => {
@@ -179,7 +180,7 @@ export function useBackup() {
     mutationFn: async () => {
       const response = await fetch(API_ROUTES.system.backup, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token') || ''}`,
+          Authorization: `Bearer ${getToken() ?? ''}`,
         },
       });
       if (!response.ok) throw new Error('Backup failed');
@@ -208,7 +209,7 @@ export function useRestore() {
       const response = await fetch(API_ROUTES.system.restore, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token') || ''}`,
+          Authorization: `Bearer ${getToken() ?? ''}`,
         },
         body: formData,
       });
@@ -251,7 +252,7 @@ export function useFirmwareUpgrade() {
       const response = await fetch(API_ROUTES.system.firmwareUpgrade, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('openwrt-auth-token') || sessionStorage.getItem('openwrt-auth-token') || ''}`,
+          Authorization: `Bearer ${getToken() ?? ''}`,
         },
         body: formData,
       });
@@ -283,7 +284,9 @@ export function useSyncNTP() {
   return useMutation({
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.ntpSync),
     onSuccess: () => {
-      toast.success('NTP sync complete', { description: 'System clock synchronized with pool.ntp.org' });
+      toast.success('NTP sync complete', {
+        description: 'System clock synchronized with pool.ntp.org',
+      });
     },
     onError: (error) => {
       toast.error('NTP sync failed', { description: error.message });

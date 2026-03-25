@@ -14,9 +14,17 @@ When we implement things ensure that you update the feature sets or add features
 ## Project Structure
 
 This is a pnpm monorepo with:
+
 - `frontend/` — React + TypeScript + Vite + TailwindCSS
 - `backend/` — Go + Fiber
 - `shared/` — Shared TypeScript types
+
+## Frontend UI & theming
+
+- Dark mode is the `dark` class on `document.documentElement`, driven by `ThemeProvider` and an inline boot script in `frontend/index.html`. See `docs/ui-theming.md` for tokens and patterns.
+- **Do not** set explicit text colors (`text-gray-900`, hex, inline `color`, etc.) for ordinary copy unless there is no reasonable alternative—prefer inheriting from global `body` styles in `frontend/src/index.css` or using shared primitives (`CardTitle`, `CardDescription`, buttons) that already pair light/dark.
+- When you must set color, always provide **both** light and dark variants (e.g. `text-gray-500 dark:text-gray-400`). Charts and embedded SVGs may use the `--chart-*` CSS variables in `index.css` instead of hard-coded text fills.
+- **Exceptions** (explicit color allowed): status/semantic hues (success, error, links), charts, third-party widgets, badges, and contrast inside intentionally colored surfaces—still keep dark-mode variants where users can enable dark theme.
 
 ## Development
 
@@ -31,6 +39,7 @@ This is a pnpm monorepo with:
 ## Testing
 
 Follow TDD: write tests first, see them fail, write minimal code to pass.
+
 - Go tests: `cd backend && go test ./...`
 - Shared tests: `cd shared && pnpm test`
 - Frontend tests: `cd frontend && pnpm test`
@@ -107,6 +116,7 @@ curl http://192.168.1.1/api/openapi.json
 ```
 
 Use it for:
+
 - Generating typed API clients or test fixtures
 - Discovering all available `/api/v1/` routes without reading source code
 - Integration tests against the live device
