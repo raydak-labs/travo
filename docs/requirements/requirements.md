@@ -36,8 +36,8 @@
 
 These tasks define the next end-to-end work items in a deliberate order. When a task is implemented, mark its entry as `[x]` here and also update the matching checkbox in the feature section below.
 
-- [ ] Task 1 (12.3) Standardise form pattern for config cards (read-only view + `Edit` button)
-- [ ] Task 2 (12.2) Network page card grouping into **Status / Configuration / Advanced**
+- [x] Task 1 (12.3) Standardise form pattern for config cards (read-only view + `Edit` button)
+- [x] Task 2 (12.2) Network page card grouping into **Status / Configuration / Advanced**
 - [ ] Task 3 (8) Captive portal: auto-accept portal terms
 - [ ] Task 4 (7) Authentication: IP-based access control
 - [ ] Task 5 (7) Authentication: Two-factor authentication
@@ -457,7 +457,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 #### Network page (21 cards, 1008 lines — most complex page)
 
-- [ ] Group cards into tabbed/collapsible sections: **Status** (connectivity, WAN source, traffic charts, connected clients), **Configuration** (WAN, LAN, DHCP, DNS), **Advanced** (DDNS, firewall, port forwarding, IPv6, DoH, WoL, diagnostics, speed test, USB tethering). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-restructure).
+- [x] Group cards into tabbed/collapsible sections: **Status** (connectivity, WAN source, traffic charts, connected clients), **Configuration** (WAN, LAN, DHCP, DNS), **Advanced** (DDNS, firewall, port forwarding, IPv6, DoH, WoL, diagnostics, speed test, USB tethering). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-restructure).
 - [x] Move Connected Clients card from position 13 to the Status group (top of page)
 - [x] Merge Internet Connectivity badge into WAN Source card (save one full card for a single badge)
 - [x] Make firewall port-forward add-form responsive (currently hard 6-column grid breaks on mobile). See [UX Overhaul plan](../plans/ux-overhaul.md#mobile-form-fixes).
@@ -492,7 +492,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 ### 12.3 Consistency & Polish
 
 - [x] Standardise confirmation UX: all destructive actions (Reboot, Shutdown, Factory Reset, Firmware Upgrade, Restore) must use the Dialog component with explicit warning text — no `window.confirm()`, no inline badge-based confirmations. See [UX Overhaul plan](../plans/ux-overhaul.md#confirmation-standardisation).
-- [ ] Standardise form pattern: configuration cards should have a read-only view state with an Edit button, instead of permanently showing editable forms (Timezone, NTP, Password, Hardware Buttons are always in edit mode)
+- [x] Standardise form pattern: configuration cards should have a read-only view state with an Edit button, instead of permanently showing editable forms (Timezone, NTP, Password, Hardware Buttons are always in edit mode)
 - [x] Standardise empty states: use a consistent "no data" component across all cards instead of ad-hoc `<p className="text-sm text-gray-500">` strings
 - [x] Ensure `SystemStatsCard` shows a Skeleton on error instead of returning `null` (which collapses the grid cell)
 
