@@ -523,6 +523,18 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 ---
 
+## 15. VPN, Wi‑Fi stability, SQM, performance & AdGuard (field issues)
+
+- [ ] **WireGuard enable/error/runtime**: Enabling VPN from the UI shows an error while `wg0` still appears in LuCI; traffic does not use the tunnel. Align backend apply order with netifd/LuCI (interface, peer, firewall, routing). Ensure UCI objects LuCI expects exist before enable. Harden verification (avoid failing the whole operation when the interface is up but a handshake is still in progress).
+- [ ] **Single active VPN policy**: Only one VPN-style path may be active at a time across WireGuard, Tailscale (exit node / full-tunnel style use), and future providers. Enabling one must disable or demote others deterministically.
+- [ ] **Wi‑Fi SSID/password visibility after change**: After changing AP name/password via the GUI, clients do not see the network until the SSID is toggled in LuCI. Wireless confirm/apply path should fully restart or reload hostapd so the BSS reappears without manual LuCI steps.
+- [ ] **SQM / traffic shaping**: Offer SQM install (cake/fq_codel) with defaults suitable for most travel-router WANs; optional presets per scenario. Reference: [OpenWrt SQM](https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm).
+- [ ] **Backend CPU usage**: Investigate sustained high CPU from `openwrt-travel-gui` (e.g. WebSocket/ubus work while no clients are connected, service restart behaviour). Add safeguards: back off when idle, avoid redundant hot paths, document intentional monitors.
+- [ ] **AdGuard Home admin URLs from YAML**: Load bind host/port (and related listen settings) from `/etc/adguardhome/adguardhome.yaml` at backend startup so the UI shows correct links instead of hard-coded assumptions.
+- [ ] **Attended Sysupgrade preferences**: On install/setup set `uci set attendedsysupgrade.client.login_check_for_upgrades='1'` and commit so update checks follow project policy.
+
+---
+
 ## Performance & Size Constraints
 
 > Router devices have limited CPU, RAM (128–512 MB), and storage (16–128 MB flash).
