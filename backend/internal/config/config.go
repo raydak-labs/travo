@@ -12,12 +12,13 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Port        int
-	MockMode    bool
-	Password    string
-	JWTSecret   string
-	StaticDir   string
-	CorsOrigins string
+	Port              int
+	MockMode          bool
+	Password          string
+	JWTSecret         string
+	StaticDir         string
+	CorsOrigins       string
+	AllowedAdminCIDRs string
 	// TLS options
 	TLSEnabled  bool
 	TLSPort     int
@@ -28,16 +29,17 @@ type Config struct {
 // DefaultConfig returns config with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		Port:        3000,
-		MockMode:    false,
-		Password:    "admin",
-		JWTSecret:   generateRandomSecret(),
-		StaticDir:   "",
-		CorsOrigins: "*",
-		TLSEnabled:  false,
-		TLSPort:     443,
-		TLSCertFile: "/etc/openwrt-travel-gui/tls.crt",
-		TLSKeyFile:  "/etc/openwrt-travel-gui/tls.key",
+		Port:              3000,
+		MockMode:          false,
+		Password:          "admin",
+		JWTSecret:         generateRandomSecret(),
+		StaticDir:         "",
+		CorsOrigins:       "*",
+		AllowedAdminCIDRs: "",
+		TLSEnabled:        false,
+		TLSPort:           443,
+		TLSCertFile:       "/etc/openwrt-travel-gui/tls.crt",
+		TLSKeyFile:        "/etc/openwrt-travel-gui/tls.key",
 	}
 }
 
@@ -68,6 +70,9 @@ func LoadConfig(args []string) (Config, bool, error) {
 	if v := os.Getenv("CORS_ORIGINS"); v != "" {
 		cfg.CorsOrigins = v
 	}
+	if v := os.Getenv("ALLOWED_ADMIN_CIDRS"); v != "" {
+		cfg.AllowedAdminCIDRs = v
+	}
 	if v := os.Getenv("TLS_ENABLED"); v != "" {
 		cfg.TLSEnabled = strings.EqualFold(v, "true") || v == "1"
 	}
@@ -92,6 +97,7 @@ func LoadConfig(args []string) (Config, bool, error) {
 	jwtSecret := fs.String("jwt-secret", cfg.JWTSecret, "JWT signing secret")
 	staticDir := fs.String("static-dir", cfg.StaticDir, "Path to static frontend files")
 	corsOrigins := fs.String("cors-origins", cfg.CorsOrigins, "CORS allowed origins")
+	allowedCIDRs := fs.String("allowed-admin-cidrs", cfg.AllowedAdminCIDRs, "Comma-separated admin IP/CIDR allowlist (empty disables)")
 	showVersion := fs.Bool("version", false, "Print version and exit")
 	tlsEnabled := fs.Bool("tls", cfg.TLSEnabled, "Enable HTTPS/TLS listener")
 	tlsPort := fs.Int("tls-port", cfg.TLSPort, "HTTPS listen port")
@@ -108,6 +114,7 @@ func LoadConfig(args []string) (Config, bool, error) {
 	cfg.JWTSecret = *jwtSecret
 	cfg.StaticDir = *staticDir
 	cfg.CorsOrigins = *corsOrigins
+	cfg.AllowedAdminCIDRs = *allowedCIDRs
 	cfg.TLSEnabled = *tlsEnabled
 	cfg.TLSPort = *tlsPort
 	cfg.TLSCertFile = *tlsCert

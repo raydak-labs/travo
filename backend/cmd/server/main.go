@@ -44,6 +44,15 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		AllowHeaders: "Authorization,Content-Type",
 	}))
 
+	nets, err := auth.ParseCIDRList(cfg.AllowedAdminCIDRs)
+	if err != nil {
+		log.Fatalf("invalid ALLOWED_ADMIN_CIDRS: %v", err)
+	}
+	if len(nets) > 0 {
+		app.Use(auth.IPAllowlistMiddleware(nets))
+		log.Printf("Admin IP allowlist enabled (%d CIDR(s))", len(nets))
+	}
+
 	// Create UCI and Ubus backends
 	var u uci.UCI
 	var ub ubus.Ubus

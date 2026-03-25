@@ -39,7 +39,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Task 1 (12.3) Standardise form pattern for config cards (read-only view + `Edit` button)
 - [x] Task 2 (12.2) Network page card grouping into **Status / Configuration / Advanced**
 - [x] Task 3 (8) Captive portal: auto-accept portal terms
-- [ ] Task 4 (7) Authentication: IP-based access control
+- [x] Task 4 (7) Authentication: IP-based access control
 - [ ] Task 5 (7) Authentication: Two-factor authentication
 - [ ] Task 6 (13) Deployment: automatic updates mechanism
 - [ ] Task 7 (14) Hardware buttons: long-press vs short-press differentiation
@@ -380,7 +380,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Session timeout warning (toast 5 min before JWT expiry, auto-redirect on expiry)
 - [x] HTTPS / TLS support (low priority). See [Implementation guide](../plans/implementation.md#7--https--tls-support).
 - [ ] 🔮 Two-factor authentication
-- [ ] 🔮 IP-based access control
+- [x] IP-based access control (env `ALLOWED_ADMIN_CIDRS` / `--allowed-admin-cidrs`; loopback always allowed; exempt: `/api/health`, `/api/v1/auth/login`, `/api/v1/system/time-sync`)
 
 ---
 
