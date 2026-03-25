@@ -209,6 +209,9 @@ else
   warn "setup-wireless-ap.sh not found — skipping wireless AP setup."
 fi
 
+info "Attended Sysupgrade: set login_check_for_upgrades=1 (best effort)..."
+ssh_cmd "uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true"
+
 # Step 6: Mark setup as complete (skip the first-run wizard)
 info "Marking setup as complete..."
 ssh_cmd "mkdir -p /etc/openwrt-travel-gui && touch /etc/openwrt-travel-gui/setup-complete"

@@ -71,6 +71,7 @@ chmod +x /etc/init.d/openwrt-travel-gui
     rm -f /etc/uci-defaults/99-travel-gui-ports
 }
 /etc/init.d/openwrt-travel-gui start
+uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true
 EOF
 chmod +x "${IPK_DIR}/control/postinst"
 

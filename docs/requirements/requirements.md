@@ -531,7 +531,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [ ] **SQM / traffic shaping**: Offer SQM install (cake/fq_codel) with defaults suitable for most travel-router WANs; optional presets per scenario. Reference: [OpenWrt SQM](https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm).
 - [ ] **Backend CPU usage**: Investigate sustained high CPU from `openwrt-travel-gui` (e.g. WebSocket/ubus work while no clients are connected, service restart behaviour). Add safeguards: back off when idle, avoid redundant hot paths, document intentional monitors.
 - [ ] **AdGuard Home admin URLs from YAML**: Load bind host/port (and related listen settings) from `/etc/adguardhome/adguardhome.yaml` at backend startup so the UI shows correct links instead of hard-coded assumptions.
-- [ ] **Attended Sysupgrade preferences**: On install/setup set `uci set attendedsysupgrade.client.login_check_for_upgrades='1'` and commit so update checks follow project policy.
+- [x] **Attended Sysupgrade preferences**: On install/setup set `uci set attendedsysupgrade.client.login_check_for_upgrades='1'` and commit so update checks follow project policy.
 
 ---
 
