@@ -78,6 +78,7 @@ export function SystemPage() {
   const [editingHostname, setEditingHostname] = useState(false);
   const [hostnameValue, setHostnameValue] = useState('');
   const [selectedTz, setSelectedTz] = useState<string>('');
+  const [editingTimezone, setEditingTimezone] = useState(false);
   const [configEditorOpen, setConfigEditorOpen] = useState(false);
   const [configContent, setConfigContent] = useState('');
 
@@ -120,159 +121,165 @@ export function SystemPage() {
           At a Glance
         </h2>
         <div className="space-y-4">
-
-      {/* System Info (with Uptime merged in) */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">System Information</CardTitle>
-          <Server className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          {infoLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          ) : info ? (
-            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-              <div className="grid grid-cols-2 gap-2">
-                <span className="text-gray-500">Hostname</span>
-                <span className="flex items-center gap-1 text-gray-900 dark:text-white">
-                  {editingHostname ? (
-                    <form
-                      className="flex items-center gap-1"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (hostnameValue) {
-                          setHostnameMutation.mutate(
-                            { hostname: hostnameValue },
-                            {
-                              onSuccess: () => {
-                                setEditingHostname(false);
-                                refetchInfo();
-                              },
-                            },
-                          );
-                        }
-                      }}
-                    >
-                      <Input
-                        className="h-6 w-32 text-xs"
-                        value={hostnameValue}
-                        onChange={(e) => setHostnameValue(e.target.value)}
-                        autoFocus
-                      />
-                      <Button type="submit" size="sm" variant="ghost" className="h-6 px-1 text-xs">
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 px-1 text-xs"
-                        onClick={() => setEditingHostname(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </form>
-                  ) : (
-                    <>
-                      {info.hostname}
-                      <button
-                        className="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        onClick={() => {
-                          setHostnameValue(info.hostname);
-                          setEditingHostname(true);
-                        }}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    </>
-                  )}
-                </span>
-                <span className="text-gray-500">Model</span>
-                <span className="text-gray-900 dark:text-white">{info.model}</span>
-                <span className="text-gray-500">Firmware</span>
-                <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
-                <span className="text-gray-500">Kernel</span>
-                <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
-                <span className="text-gray-500">Uptime</span>
-                <span className="text-gray-900 dark:text-white">
-                  {formatUptime(info.uptime_seconds)}
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {/* System Stats */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">System Stats</CardTitle>
-          <Cpu className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {statsLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : stats ? (
-            <>
-              {/* CPU */}
-              <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-gray-700 dark:text-gray-300">CPU</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {stats.cpu.usage_percent.toFixed(1)}%
-                    {stats.cpu.temperature_celsius != null && (
-                      <span className="ml-2 text-gray-500">{stats.cpu.temperature_celsius}°C</span>
-                    )}
-                  </span>
+          {/* System Info (with Uptime merged in) */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">System Information</CardTitle>
+              <Server className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              {infoLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
                 </div>
-                <Progress value={stats.cpu.usage_percent} />
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
-                  {stats.cpu.cores} cores
-                </p>
-              </div>
-
-              {/* Memory */}
-              <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-gray-700 dark:text-gray-300">Memory</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {stats.memory.usage_percent.toFixed(1)}% ({formatBytes(stats.memory.used_bytes)}{' '}
-                    / {formatBytes(stats.memory.total_bytes)})
-                  </span>
-                </div>
-                <Progress value={stats.memory.usage_percent} />
-              </div>
-
-              {/* Storage */}
-              <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="text-gray-700 dark:text-gray-300">
-                    <span className="inline-flex items-center gap-1">
-                      <HardDrive className="h-3.5 w-3.5" />
-                      Storage
+              ) : info ? (
+                <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+                  <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-500">Hostname</span>
+                    <span className="flex items-center gap-1 text-gray-900 dark:text-white">
+                      {editingHostname ? (
+                        <form
+                          className="flex items-center gap-1"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (hostnameValue) {
+                              setHostnameMutation.mutate(
+                                { hostname: hostnameValue },
+                                {
+                                  onSuccess: () => {
+                                    setEditingHostname(false);
+                                    refetchInfo();
+                                  },
+                                },
+                              );
+                            }
+                          }}
+                        >
+                          <Input
+                            className="h-6 w-32 text-xs"
+                            value={hostnameValue}
+                            onChange={(e) => setHostnameValue(e.target.value)}
+                            autoFocus
+                          />
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1 text-xs"
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1 text-xs"
+                            onClick={() => setEditingHostname(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </form>
+                      ) : (
+                        <>
+                          {info.hostname}
+                          <button
+                            className="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            onClick={() => {
+                              setHostnameValue(info.hostname);
+                              setEditingHostname(true);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </>
+                      )}
                     </span>
-                  </span>
-                  <span className="text-gray-900 dark:text-white">
-                    {stats.storage.usage_percent.toFixed(1)}% (
-                    {formatBytes(stats.storage.used_bytes)} /{' '}
-                    {formatBytes(stats.storage.total_bytes)})
-                  </span>
+                    <span className="text-gray-500">Model</span>
+                    <span className="text-gray-900 dark:text-white">{info.model}</span>
+                    <span className="text-gray-500">Firmware</span>
+                    <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
+                    <span className="text-gray-500">Kernel</span>
+                    <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
+                    <span className="text-gray-500">Uptime</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {formatUptime(info.uptime_seconds)}
+                    </span>
+                  </div>
                 </div>
-                <Progress value={stats.storage.usage_percent} />
-              </div>
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
+              ) : null}
+            </CardContent>
+          </Card>
 
+          {/* System Stats */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">System Stats</CardTitle>
+              <Cpu className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {statsLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : stats ? (
+                <>
+                  {/* CPU */}
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">CPU</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.cpu.usage_percent.toFixed(1)}%
+                        {stats.cpu.temperature_celsius != null && (
+                          <span className="ml-2 text-gray-500">
+                            {stats.cpu.temperature_celsius}°C
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <Progress value={stats.cpu.usage_percent} />
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
+                      {stats.cpu.cores} cores
+                    </p>
+                  </div>
+
+                  {/* Memory */}
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">Memory</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.memory.usage_percent.toFixed(1)}% (
+                        {formatBytes(stats.memory.used_bytes)} /{' '}
+                        {formatBytes(stats.memory.total_bytes)})
+                      </span>
+                    </div>
+                    <Progress value={stats.memory.usage_percent} />
+                  </div>
+
+                  {/* Storage */}
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        <span className="inline-flex items-center gap-1">
+                          <HardDrive className="h-3.5 w-3.5" />
+                          Storage
+                        </span>
+                      </span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.storage.usage_percent.toFixed(1)}% (
+                        {formatBytes(stats.storage.used_bytes)} /{' '}
+                        {formatBytes(stats.storage.total_bytes)})
+                      </span>
+                    </div>
+                    <Progress value={stats.storage.usage_percent} />
+                  </div>
+                </>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -282,63 +289,100 @@ export function SystemPage() {
           Configuration
         </h2>
         <div className="space-y-4">
+          {/* Time & Timezone */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Time & Timezone</CardTitle>
+              <Clock className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              {tzLoading ? (
+                <Skeleton className="h-4 w-1/2" />
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+                    <div className="grid grid-cols-2 gap-2">
+                      <span className="text-gray-500">Timezone</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {timezoneConfig?.zonename || '—'}
+                      </span>
+                    </div>
+                  </div>
 
-      {/* Time & Timezone */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Time & Timezone</CardTitle>
-          <Clock className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          {tzLoading ? (
-            <Skeleton className="h-4 w-1/2" />
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-                <div className="grid grid-cols-2 gap-2">
-                  <span className="text-gray-500">Timezone</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {timezoneConfig?.zonename || '—'}
-                  </span>
+                  {editingTimezone ? (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-xs text-gray-500">Change Timezone</label>
+                        <Select value={selectedTz} onValueChange={setSelectedTz}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select timezone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIMEZONES.map((tz) => (
+                              <SelectItem key={tz.zonename} value={tz.zonename}>
+                                {tz.zonename}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          onClick={() => {
+                            const tz = TIMEZONES.find((t) => t.zonename === selectedTz);
+                            if (tz) {
+                              setTz.mutate(
+                                { zonename: tz.zonename, timezone: tz.timezone },
+                                { onSuccess: () => setEditingTimezone(false) },
+                              );
+                            }
+                          }}
+                          disabled={setTz.isPending || !selectedTz}
+                          size="sm"
+                        >
+                          {setTz.isPending ? 'Saving…' : 'Save Timezone'}
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (timezoneConfig?.zonename) setSelectedTz(timezoneConfig.zonename);
+                            setEditingTimezone(false);
+                          }}
+                          disabled={setTz.isPending}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (timezoneConfig?.zonename) setSelectedTz(timezoneConfig.zonename);
+                        setEditingTimezone(true);
+                      }}
+                      disabled={!timezoneConfig?.zonename || setTz.isPending}
+                    >
+                      Edit Timezone
+                    </Button>
+                  )}
                 </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-gray-500">Change Timezone</label>
-                <Select value={selectedTz} onValueChange={setSelectedTz}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMEZONES.map((tz) => (
-                      <SelectItem key={tz.zonename} value={tz.zonename}>
-                        {tz.zonename}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={() => {
-                  const tz = TIMEZONES.find((t) => t.zonename === selectedTz);
-                  if (tz) setTz.mutate({ zonename: tz.zonename, timezone: tz.timezone });
-                }}
-                disabled={setTz.isPending || !selectedTz}
-                size="sm"
-              >
-                {setTz.isPending ? 'Saving…' : 'Save Timezone'}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
 
-      <NTPConfigCard />
-      <ChangePasswordCard />
-      <HardwareButtonsCard />
-      <LEDControlCard />
-      <AlertThresholdsCard />
-      <SSHKeysCard />
-
+          <NTPConfigCard />
+          <ChangePasswordCard />
+          <HardwareButtonsCard />
+          <LEDControlCard />
+          <AlertThresholdsCard />
+          <SSHKeysCard />
         </div>
       </div>
 
@@ -348,55 +392,53 @@ export function SystemPage() {
           Maintenance
         </h2>
         <div className="space-y-4">
+          {/* Backup & Restore */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Backup & Restore</CardTitle>
+              <Download className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => backup.mutate()}
+                  disabled={backup.isPending}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {backup.isPending ? 'Creating backup…' : 'Download Backup'}
+                </Button>
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".tar.gz,.gz"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setPendingRestoreFile(file);
+                        setShowRestoreDialog(true);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={restore.isPending}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {restore.isPending ? 'Restoring…' : 'Restore from Backup'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Backup & Restore */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Backup & Restore</CardTitle>
-          <Download className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => backup.mutate()}
-              disabled={backup.isPending}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {backup.isPending ? 'Creating backup…' : 'Download Backup'}
-            </Button>
-            <div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".tar.gz,.gz"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setPendingRestoreFile(file);
-                    setShowRestoreDialog(true);
-                    e.target.value = '';
-                  }
-                }}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={restore.isPending}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {restore.isPending ? 'Restoring…' : 'Restore from Backup'}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <FirmwareUpgradeCard />
-
+          <FirmwareUpgradeCard />
         </div>
       </div>
 
