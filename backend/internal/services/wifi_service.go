@@ -140,7 +140,15 @@ func (w *WifiService) ConfirmApply(token string) error {
 	if w.applier == nil {
 		return nil
 	}
-	return w.applier.Confirm(token)
+	if err := w.applier.Confirm(token); err != nil {
+		return err
+	}
+	if w.reloader != nil {
+		if err := w.reloader.Reload(); err != nil {
+			return fmt.Errorf("uci confirm ok but wireless reload failed: %w", err)
+		}
+	}
+	return nil
 }
 
 // findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.
