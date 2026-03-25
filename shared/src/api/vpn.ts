@@ -122,3 +122,14 @@ export function isVpnStatus(value: unknown): value is VpnStatus {
     typeof v.tx_bytes === 'number'
   );
 }
+
+/** WireGuard split tunneling configuration */
+export interface SplitTunnelConfig {
+  readonly mode: 'all' | 'custom';
+  readonly routes: readonly string[];
+}
+
+/** Tailscale SSH status */
+export interface TailscaleSSHStatus {
+  readonly enabled: boolean;
+}

@@ -3,7 +3,10 @@ package services
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +15,41 @@ import (
 )
 
 const maxAlerts = 50
+const alertThresholdsFile = "/etc/openwrt-travel-gui/alert-thresholds.json"
+
+// defaultAlertThresholds returns the default threshold values.
+func defaultAlertThresholds() models.AlertThresholds {
+	return models.AlertThresholds{
+		StoragePercent: 90,
+		CPUPercent:     90,
+		MemoryPercent:  90,
+	}
+}
+
+// GetAlertThresholds reads thresholds from the config file, returning defaults if absent.
+func (a *AlertService) GetAlertThresholds() models.AlertThresholds {
+	data, err := os.ReadFile(alertThresholdsFile)
+	if err != nil {
+		return defaultAlertThresholds()
+	}
+	var t models.AlertThresholds
+	if err := json.Unmarshal(data, &t); err != nil {
+		return defaultAlertThresholds()
+	}
+	return t
+}
+
+// SetAlertThresholds persists thresholds to the config file.
+func (a *AlertService) SetAlertThresholds(t models.AlertThresholds) error {
+	if err := os.MkdirAll(filepath.Dir(alertThresholdsFile), 0750); err != nil {
+		return err
+	}
+	data, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(alertThresholdsFile, data, 0600)
+}
 
 // AlertChecker abstracts the system checks used by AlertService.
 type AlertChecker interface {
@@ -117,23 +155,25 @@ func (a *AlertService) checkConditions() {
 		return
 	}
 
-	// Storage > 90%
-	if stats.Storage.UsagePercent > 90 {
-		a.raiseCondition("storage_low", "Storage usage is above 90%", "warning")
+	thresholds := a.GetAlertThresholds()
+
+	// Storage above threshold
+	if stats.Storage.UsagePercent > thresholds.StoragePercent {
+		a.raiseCondition("storage_low", fmt.Sprintf("Storage usage is above %.0f%%", thresholds.StoragePercent), "warning")
 	} else {
 		a.clearCondition("storage_low")
 	}
 
-	// CPU > 90% sustained
-	if stats.CPU.UsagePercent > 90 {
-		a.raiseCondition("high_cpu", "CPU usage is above 90%", "warning")
+	// CPU above threshold
+	if stats.CPU.UsagePercent > thresholds.CPUPercent {
+		a.raiseCondition("high_cpu", fmt.Sprintf("CPU usage is above %.0f%%", thresholds.CPUPercent), "warning")
 	} else {
 		a.clearCondition("high_cpu")
 	}
 
-	// Memory > 90%
-	if stats.Memory.UsagePercent > 90 {
-		a.raiseCondition("high_memory", "Memory usage is above 90%", "warning")
+	// Memory above threshold
+	if stats.Memory.UsagePercent > thresholds.MemoryPercent {
+		a.raiseCondition("high_memory", fmt.Sprintf("Memory usage is above %.0f%%", thresholds.MemoryPercent), "warning")
 	} else {
 		a.clearCondition("high_memory")
 	}

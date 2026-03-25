@@ -185,3 +185,59 @@ export function isNetworkStatus(value: unknown): value is NetworkStatus {
     typeof v.internet_reachable === 'boolean'
   );
 }
+
+/** A summary of a UCI firewall zone */
+export interface FirewallZone {
+  readonly name: string;
+  readonly input: string;
+  readonly output: string;
+  readonly forward: string;
+  readonly network: readonly string[];
+}
+
+/** A DNAT port-forward rule */
+export interface PortForwardRule {
+  readonly id: string;
+  readonly name: string;
+  readonly protocol: string;
+  readonly src_dport: string;
+  readonly dest_ip: string;
+  readonly dest_port: string;
+  readonly enabled: boolean;
+}
+
+/** Request to add a port-forward rule */
+export type AddPortForwardRequest = Omit<PortForwardRule, 'id'>;
+
+/** Request to send a Wake-on-LAN magic packet */
+export interface WoLRequest {
+  readonly mac: string;
+  readonly interface?: string;
+}
+
+/** DNS-over-HTTPS configuration */
+export interface DoHConfig {
+  readonly enabled: boolean;
+  readonly provider: 'cloudflare' | 'google' | 'quad9' | 'custom';
+  readonly url: string;
+}
+
+/** IPv6 status and global addresses */
+export interface IPv6Status {
+  readonly enabled: boolean;
+  readonly addresses: readonly string[];
+}
+
+/** Request to run a network diagnostic */
+export interface DiagnosticsRequest {
+  readonly type: 'ping' | 'traceroute' | 'dns';
+  readonly target: string;
+}
+
+/** Result of a network diagnostic command */
+export interface DiagnosticsResult {
+  readonly type: string;
+  readonly target: string;
+  readonly output: string;
+  readonly error?: string;
+}

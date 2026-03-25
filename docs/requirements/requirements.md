@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-23 (v32 — add dedicated Clients tab feature request)
+> **Last updated:** 2026-03-25 (v33 — mark all implemented features complete: scheduled WiFi, band switching, DNS-over-HTTPS, split tunneling, Tailscale SSH, NTP sync, SSH keys, alert thresholds, diagnostics, speed test, MAC policy, firewall zones, port forwarding, IPv6, WoL, PWA offline indicator)
 
 ---
 
@@ -87,8 +87,8 @@
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
 - [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). Startup health commits repairs but does not auto-apply wireless changes that would require browser confirmation; the user applies them via LuCI Save & Apply or reboot. User-driven wireless changes use rpcd `uci apply` rollback with explicit browser confirmation. Auto-reconnect cron script still uses `wifi up`.
 - [x] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
-- [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
-- [ ] 🔮 Scheduled WiFi (time-based on/off)
+- [x] 🔮 Band steering (prefer 5 GHz when client supports it)
+- [x] 🔮 Scheduled WiFi (time-based on/off)
 
 ### 1.3 WiFi Modes
 
@@ -137,7 +137,7 @@
 - [x] View active DHCP leases with expiry
 - [x] Custom DNS servers for LAN
 - [x] Local DNS entries (hostname → IP mapping)
-- [ ] 🔮 DNS over HTTPS / DNS over TLS toggle
+- [x] 🔮 DNS over HTTPS / DNS over TLS toggle
 
 ### 2.4 Data Usage Tracking
 
@@ -182,7 +182,7 @@
 - [x] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
 - [x] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
 - [x] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
-- [ ] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
+- [x] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
 - [x] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 
 ### 3.2 Tailscale
@@ -192,7 +192,7 @@
 - [x] Actual Tailscale integration (login, device list, exit node). See [Tailscale Integration plan](../plans/tailscale-integration.md).
 - [x] Show Tailscale IP and connected peers. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-2--status--connected-peers).
 - [x] Exit node selection. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-3--exit-node-selection).
-- [ ] 🔮 Tailscale SSH toggle
+- [x] 🔮 Tailscale SSH toggle
 
 ### 3.3 General VPN UX
 
@@ -288,14 +288,14 @@
 - [x] Browser time sync on login — before JWT is issued, client POSTs its clock to `/api/v1/system/time-sync`; if skew > 60s the router clock is corrected via `date -s` (fixes clock-skew login loop on devices without NTP access at first boot)
 - [x] Auto-set timezone from browser on mismatch alert click. See [Implementation guide](../plans/implementation.md#53--auto-set-timezone-from-browser).
 - [x] NTP manual sync button + travel timezone validation. See [Implementation guide](../plans/implementation.md#53--time-sync-travel-validation).
-- [ ] 🔮 NTP sync status indicator
+- [x] 🔮 NTP sync status indicator
 
 ### 5.4 Password Management
 
 - [x] Login with password (bcrypt hashed)
 - [x] Change admin password from UI
 - [x] Password strength requirements
-- [ ] 🔮 SSH key management
+- [x] 🔮 SSH key management
 
 ---
 
@@ -332,7 +332,7 @@
 - [x] Dropdown panel showing recent alerts with severity indicators
 - [x] Toast notification on new alert
 - [x] Notification history via GET /api/v1/system/alerts (last 50 in memory)
-- [ ] 🔮 Configurable alert thresholds (e.g., storage < 10%)
+- [x] 🔮 Configurable alert thresholds (e.g., storage < 10%)
 
 ---
 
@@ -370,8 +370,8 @@
 - [x] Log level filtering
 - [x] Log search / filter
 - [x] Log export / download
-- [ ] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)
-- [ ] 🔮 Speed test (run from device to measure actual WAN throughput)
+- [x] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)
+- [x] 🔮 Speed test (run from device to measure actual WAN throughput)
 
 ---
 
@@ -380,19 +380,19 @@
 - [x] MAC address cloning (copy client MAC for hotel WiFi device registration)
 - [x] MAC address randomization / anonymization (generate random MAC per connection)
 - [x] Show current MAC per interface
-- [ ] 🔮 Per-network MAC policy (remember which MAC to use for which SSID)
+- [x] 🔮 Per-network MAC policy (remember which MAC to use for which SSID)
 
 ---
 
 ## 11. Advanced Networking
 
 - [ ] 🔮 mDNS / Bonjour forwarding (Chromecast, AirPlay across network segments)
-- [ ] 🔮 Firewall zone summary (WAN/LAN/VPN zone overview — not full rule editor)
-- [ ] 🔮 Port forwarding
+- [x] 🔮 Firewall zone summary (WAN/LAN/VPN zone overview — not full rule editor)
+- [x] 🔮 Port forwarding
 - [ ] 🔮 Custom routing rules
 - [ ] 🔮 VLAN configuration
-- [ ] 🔮 IPv6 support toggle and status
-- [ ] 🔮 Wake-on-LAN
+- [x] 🔮 IPv6 support toggle and status
+- [x] 🔮 Wake-on-LAN
 
 ---
 
@@ -411,7 +411,57 @@
 - [x] Dialog close button visible in dark mode
 - [x] Select component dark mode styling
 - [ ] 🔮 Multi-language support (i18n)
-- [ ] 🔮 PWA enhancements (offline indicator, app-like experience)
+- [x] 🔮 PWA enhancements (offline indicator, app-like experience)
+
+### 12.2 Information Architecture & Page Structure
+
+> The UI currently exposes every feature as a flat list of cards on each page.
+> Non-technical users face 10–22 cards per page with no grouping, collapsing,
+> or progressive disclosure. The changes below prioritise simplicity for daily
+> use while keeping power-user features accessible behind sub-menus or
+> expandable sections. See [UX Overhaul plan](../plans/ux-overhaul.md) for
+> full design rationale and implementation details.
+
+#### Network page (21 cards, 1008 lines — most complex page)
+
+- [ ] Group cards into tabbed/collapsible sections: **Status** (connectivity, WAN source, traffic charts, connected clients), **Configuration** (WAN, LAN, DHCP, DNS), **Advanced** (DDNS, firewall, port forwarding, IPv6, DoH, WoL, diagnostics, speed test, USB tethering). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-restructure).
+- [ ] Move Connected Clients card from position 13 to the Status group (top of page)
+- [ ] Merge Internet Connectivity badge into WAN Source card (save one full card for a single badge)
+- [ ] Make firewall port-forward add-form responsive (currently hard 6-column grid breaks on mobile). See [UX Overhaul plan](../plans/ux-overhaul.md#mobile-form-fixes).
+- [ ] Make DHCP reservation / DNS entry add-forms responsive (3–4 column grids with no breakpoints)
+- [x] Extract network-page.tsx inline sections into separate components (target: page file under 300 lines). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-extraction).
+
+#### System page (13+ cards, 1087 lines — second most complex)
+
+- [x] Reorder cards by frequency: **At-a-glance** (System Info + Uptime merged, Stats) at top, **Configuration** (Timezone, NTP, Password, SSH Keys, LED, Buttons, Alert Thresholds) in middle, **Danger Zone** (Firmware Upgrade, Factory Reset, Reboot, Shutdown) at bottom with a visual separator. See [UX Overhaul plan](../plans/ux-overhaul.md#system-page-restructure).
+- [x] Merge Uptime into System Information card (Uptime is currently a single-line standalone card)
+- [x] Move Quick Links from first position to bottom utility section
+- [x] Replace `window.confirm()` in Restore with a proper Dialog (only place in the app using native confirm)
+- [x] Make Reboot/Shutdown use full Dialog confirmation (currently inline badge + 2 small buttons — weaker than Factory Reset's modal)
+- [x] Replace raw `<input type="checkbox">` with `<Switch>` component for NTP enable and Firmware keep-settings toggles (inconsistent with LED schedule toggle)
+- [x] Extract large inline sections into separate components (LED 132 lines, Actions 113 lines, Firmware 103 lines, NTP 97 lines). See [UX Overhaul plan](../plans/ux-overhaul.md#system-page-extraction).
+
+#### WiFi page (10 cards, 572 lines)
+
+- [x] Group bottom 5 cards (Guest, MAC Address, MAC Policy, Band Switching, Schedule) into a collapsible "Advanced WiFi Settings" section — these are set-once features. See [UX Overhaul plan](../plans/ux-overhaul.md#wifi-page-restructure).
+- [ ] Hide mode-irrelevant sections: hide "Saved Networks" in pure AP mode, hide "Access Point Configuration" in pure STA mode
+- [x] Extract inline cards (Radio Hardware, Current Connection, Saved Networks, AP Config) into separate component files (currently 442 lines inline in wifi-page.tsx)
+
+#### Dashboard
+
+- [x] Move QuickActions above the charts (currently below fold, hard to discover). See [UX Overhaul plan](../plans/ux-overhaul.md#dashboard-improvements).
+- [x] Fix QuickActions label: "WiFi On" / "WiFi Off" describes state, not action — change to "Disable WiFi" / "Enable WiFi"
+- [x] Remove duplicate feedback: QuickActions uses inline ActionState icons AND hook-level Sonner toasts simultaneously — pick one
+- [x] Remove `window.confirm()` from QuickActions Reboot — use Dialog component (matches header pattern)
+- [x] Fix chart hardcoded hex colors for dark mode (tooltip bg `rgba(0,0,0,0.8)`, grid lines `#9ca3af`). See [UX Overhaul plan](../plans/ux-overhaul.md#dark-mode-chart-fix).
+- [ ] Show router hostname/model in header for multi-device disambiguation
+
+### 12.3 Consistency & Polish
+
+- [x] Standardise confirmation UX: all destructive actions (Reboot, Shutdown, Factory Reset, Firmware Upgrade, Restore) must use the Dialog component with explicit warning text — no `window.confirm()`, no inline badge-based confirmations. See [UX Overhaul plan](../plans/ux-overhaul.md#confirmation-standardisation).
+- [ ] Standardise form pattern: configuration cards should have a read-only view state with an Edit button, instead of permanently showing editable forms (Timezone, NTP, Password, Hardware Buttons are always in edit mode)
+- [ ] Standardise empty states: use a consistent "no data" component across all cards instead of ad-hoc `<p className="text-sm text-gray-500">` strings
+- [ ] Ensure `SystemStatsCard` shows a Skeleton on error instead of returning `null` (which collapses the grid cell)
 
 ---
 

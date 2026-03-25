@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -778,4 +779,104 @@ func parseLogOutput(source, output, service, level string) models.LogResponse {
 		Lines:  lines,
 		Total:  len(lines),
 	}
+}
+
+const authorizedKeysFile = "/etc/dropbear/authorized_keys"
+
+// GetSSHKeys returns all public keys from the authorized_keys file.
+func (s *SystemService) GetSSHKeys() (models.SSHKeysResponse, error) {
+	data, err := os.ReadFile(authorizedKeysFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return models.SSHKeysResponse{Keys: []models.SSHKey{}}, nil
+		}
+		return models.SSHKeysResponse{}, err
+	}
+	var keys []models.SSHKey
+	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		comment := ""
+		parts := strings.Fields(line)
+		if len(parts) >= 3 {
+			comment = strings.Join(parts[2:], " ")
+		}
+		keys = append(keys, models.SSHKey{Index: i, Comment: comment, Key: line})
+	}
+	if keys == nil {
+		keys = []models.SSHKey{}
+	}
+	return models.SSHKeysResponse{Keys: keys}, nil
+}
+
+// AddSSHKey appends a public key to the authorized_keys file.
+func (s *SystemService) AddSSHKey(key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return fmt.Errorf("key must not be empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(authorizedKeysFile), 0700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintln(f, key)
+	return err
+}
+
+// DeleteSSHKey removes the key at the given line index from authorized_keys.
+func (s *SystemService) DeleteSSHKey(index int) error {
+	data, err := os.ReadFile(authorizedKeysFile)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	if index < 0 || index >= len(lines) {
+		return fmt.Errorf("key index %d out of range", index)
+	}
+	lines = append(lines[:index], lines[index+1:]...)
+	return os.WriteFile(authorizedKeysFile, []byte(strings.Join(lines, "\n")), 0600)
+}
+
+const speedTestResultFile = "/tmp/openwrt-speed-test.json"
+
+// RunSpeedTest runs a basic speed test using wget and writes results.
+// On constrained hardware this performs a simple HTTP download measurement.
+func (s *SystemService) RunSpeedTest() (models.SpeedTestResult, error) {
+	result := models.SpeedTestResult{Server: "tele2.net (wget)"}
+
+	// Measure download: fetch a 1MB test file and time it
+	start := time.Now()
+	_, err := exec.Command("wget", "-O", "/dev/null", "--timeout=15",
+		"--no-check-certificate",
+		"http://speedtest.tele2.net/1MB.zip").CombinedOutput()
+	elapsed := time.Since(start).Seconds()
+	if err == nil && elapsed > 0 {
+		result.DownloadMbps = (1024 * 1024 * 8) / elapsed / 1e6
+	}
+
+	// Measure ping to 8.8.8.8
+	pingOut, err2 := exec.Command("ping", "-c", "4", "-W", "3", "8.8.8.8").CombinedOutput()
+	if err2 == nil {
+		for _, line := range strings.Split(string(pingOut), "\n") {
+			if strings.Contains(line, "avg") {
+				// "round-trip min/avg/max = X/Y/Z ms"
+				parts := strings.Split(line, "/")
+				if len(parts) >= 5 {
+					if v, err3 := strconv.ParseFloat(strings.TrimSpace(parts[4]), 64); err3 == nil {
+						result.PingMs = v
+					}
+				}
+			}
+		}
+	}
+
+	data, _ := json.Marshal(result)
+	_ = os.WriteFile(speedTestResultFile, data, 0600)
+	return result, nil
 }

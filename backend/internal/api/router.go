@@ -64,6 +64,12 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
 	v1.Post("/system/time-sync", SyncTimeHandler())
 	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
+	v1.Get("/system/alert-thresholds", GetAlertThresholdsHandler(deps.Alerts))
+	v1.Put("/system/alert-thresholds", SetAlertThresholdsHandler(deps.Alerts))
+	v1.Get("/system/ssh-keys", GetSSHKeysHandler(deps.System))
+	v1.Post("/system/ssh-keys", AddSSHKeyHandler(deps.System))
+	v1.Delete("/system/ssh-keys/:index", DeleteSSHKeyHandler(deps.System))
+	v1.Post("/system/speed-test", RunSpeedTestHandler(deps.System))
 	v1.Get("/system/buttons", GetButtonsHandler(deps.System))
 	v1.Put("/system/button-actions", SetButtonActionsHandler(deps.System))
 
@@ -94,6 +100,16 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/network/ddns", SetDDNSConfigHandler(deps.Network))
 	v1.Get("/network/ddns/status", GetDDNSStatusHandler(deps.Network))
 	v1.Get("/network/uptime-log", GetUptimeLogHandler(deps.UptimeTracker))
+	v1.Get("/network/firewall/zones", GetFirewallZonesHandler(deps.Network))
+	v1.Get("/network/firewall/port-forwards", GetPortForwardsHandler(deps.Network))
+	v1.Post("/network/firewall/port-forwards", AddPortForwardHandler(deps.Network))
+	v1.Delete("/network/firewall/port-forwards/:id", DeletePortForwardHandler(deps.Network))
+	v1.Post("/network/diagnostics", RunDiagnosticsHandler(deps.Network))
+	v1.Get("/network/doh", GetDoHConfigHandler(deps.Network))
+	v1.Put("/network/doh", SetDoHConfigHandler(deps.Network))
+	v1.Get("/network/ipv6", GetIPv6StatusHandler(deps.Network))
+	v1.Put("/network/ipv6", SetIPv6EnabledHandler(deps.Network))
+	v1.Post("/network/wol", SendWoLHandler(deps.Network))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))
@@ -120,6 +136,10 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/wifi/autoreconnect", GetAutoReconnectHandler(deps.Wifi))
 	v1.Put("/wifi/autoreconnect", SetAutoReconnectHandler(deps.Wifi))
 	v1.Post("/wifi/apply/confirm", ConfirmWifiApplyHandler(deps.Wifi))
+	v1.Get("/wifi/schedule", GetWiFiScheduleHandler(deps.Wifi))
+	v1.Put("/wifi/schedule", SetWiFiScheduleHandler(deps.Wifi))
+	v1.Get("/wifi/mac-policies", GetMACPoliciesHandler(deps.Wifi))
+	v1.Put("/wifi/mac-policies", SetMACPoliciesHandler(deps.Wifi))
 
 	// VPN routes
 	v1.Get("/vpn/status", VpnStatusHandler(deps.Vpn))
@@ -138,8 +158,12 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/vpn/tailscale/toggle", ToggleTailscaleHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/auth", TailscaleAuthHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/exit-node", SetTailscaleExitNodeHandler(deps.Vpn))
+	v1.Get("/vpn/tailscale/ssh", GetTailscaleSSHHandler(deps.Vpn))
+	v1.Put("/vpn/tailscale/ssh", SetTailscaleSSHHandler(deps.Vpn))
 	v1.Get("/vpn/dns-leak-test", DNSLeakTestHandler(deps.Vpn))
 	v1.Get("/vpn/wireguard/verify", VerifyWireguardHandler(deps.Vpn))
+	v1.Get("/vpn/split-tunnel", GetSplitTunnelHandler(deps.Vpn))
+	v1.Put("/vpn/split-tunnel", SetSplitTunnelHandler(deps.Vpn))
 
 	// Services routes
 	v1.Get("/services", ListServicesHandler(deps.ServiceManager))

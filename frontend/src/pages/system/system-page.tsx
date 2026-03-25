@@ -4,25 +4,18 @@ import {
   Cpu,
   HardDrive,
   Clock,
-  KeyRound,
   Pencil,
-  Lightbulb,
   Download,
   Upload,
-  AlertTriangle,
-  Zap,
   ExternalLink,
   FileEdit,
-  ToggleLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -30,6 +23,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { NTPConfigCard } from './ntp-config-card';
+import { LEDControlCard } from './led-control-card';
+import { FirmwareUpgradeCard } from './firmware-upgrade-card';
+import { ChangePasswordCard } from './change-password-card';
+import { HardwareButtonsCard } from './hardware-buttons-card';
 import {
   Dialog,
   DialogContent,
@@ -44,27 +42,18 @@ import {
   useReboot,
   useShutdown,
   useFactoryReset,
-  useChangePassword,
   useSetHostname,
-  useLEDStatus,
-  useSetLEDStealth,
-  useLEDSchedule,
-  useSetLEDSchedule,
   useTimezone,
   useSetTimezone,
   useBackup,
   useRestore,
-  useFirmwareUpgrade,
-  useNTPConfig,
-  useSetNTPConfig,
-  useSyncNTP,
-  useHardwareButtons,
-  useSetButtonActions,
 } from '@/hooks/use-system';
 import { useServices, useAdGuardConfig, useSetAdGuardConfig } from '@/hooks/use-services';
 import { formatBytes, formatUptime } from '@/lib/utils';
 import { TIMEZONES } from '@/lib/timezones';
-import type { ButtonAction } from '@shared/index';
+import { SSHKeysCard } from './ssh-keys-card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { AlertThresholdsCard } from './alert-thresholds-card';
 
 export function SystemPage() {
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
@@ -72,46 +61,23 @@ export function SystemPage() {
   const rebootMutation = useReboot();
   const shutdownMutation = useShutdown();
   const factoryResetMutation = useFactoryReset();
-  const changePasswordMutation = useChangePassword();
   const setHostnameMutation = useSetHostname();
-  const { data: ledStatus } = useLEDStatus();
-  const setLEDStealthMutation = useSetLEDStealth();
-  const { data: ledSchedule } = useLEDSchedule();
-  const setLEDScheduleMutation = useSetLEDSchedule();
   const { data: timezoneConfig, isLoading: tzLoading } = useTimezone();
   const setTz = useSetTimezone();
   const backup = useBackup();
   const restore = useRestore();
-  const firmwareUpgrade = useFirmwareUpgrade();
-  const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
-  const setNTPMutation = useSetNTPConfig();
-  const syncNTPMutation = useSyncNTP();
-  const { data: hardwareButtons = [] } = useHardwareButtons();
-  const setButtonActions = useSetButtonActions();
-  const [pendingButtonActions, setPendingButtonActions] = useState<Record<string, ButtonAction>>({});
   const { data: services = [] } = useServices();
   const adguardConfigQuery = useAdGuardConfig();
   const setAdGuardConfig = useSetAdGuardConfig();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const firmwareInputRef = useRef<HTMLInputElement>(null);
-  const [showRebootConfirm, setShowRebootConfirm] = useState(false);
-  const [showShutdownConfirm, setShowShutdownConfirm] = useState(false);
+  const [showRebootDialog, setShowRebootDialog] = useState(false);
+  const [showShutdownDialog, setShowShutdownDialog] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
   const [showFactoryResetDialog, setShowFactoryResetDialog] = useState(false);
-  const [showFirmwareDialog, setShowFirmwareDialog] = useState(false);
-  const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
-  const [keepSettings, setKeepSettings] = useState(true);
   const [editingHostname, setEditingHostname] = useState(false);
   const [hostnameValue, setHostnameValue] = useState('');
   const [selectedTz, setSelectedTz] = useState<string>('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [ntpEnabled, setNtpEnabled] = useState(true);
-  const [ntpServers, setNtpServers] = useState<string[]>([]);
-  const [ntpNewServer, setNtpNewServer] = useState('');
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
-  const [scheduleOnTime, setScheduleOnTime] = useState('07:00');
-  const [scheduleOffTime, setScheduleOffTime] = useState('22:00');
   const [configEditorOpen, setConfigEditorOpen] = useState(false);
   const [configContent, setConfigContent] = useState('');
 
@@ -120,21 +86,6 @@ export function SystemPage() {
       setSelectedTz(timezoneConfig.zonename);
     }
   }, [timezoneConfig]);
-
-  useEffect(() => {
-    if (ntpConfig) {
-      setNtpEnabled(ntpConfig.enabled);
-      setNtpServers([...ntpConfig.servers]);
-    }
-  }, [ntpConfig]);
-
-  useEffect(() => {
-    if (ledSchedule) {
-      setScheduleEnabled(ledSchedule.enabled);
-      if (ledSchedule.on_time) setScheduleOnTime(ledSchedule.on_time);
-      if (ledSchedule.off_time) setScheduleOffTime(ledSchedule.off_time);
-    }
-  }, [ledSchedule]);
 
   const adguardRunning = services.some((s) => s.id === 'adguardhome' && s.state === 'running');
   const adguardInstalled = services.some(
@@ -163,52 +114,14 @@ export function SystemPage() {
 
   return (
     <div className="space-y-6">
-      {/* Quick Links */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Quick Links</CardTitle>
-          <ExternalLink className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <a
-                href={`http://${window.location.hostname}:8080/cgi-bin/luci`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                LuCI Web Interface
-              </a>
-            </Button>
-            {adguardRunning && (
-              <Button size="sm" variant="outline" asChild>
-                <a
-                  href={`http://${window.location.hostname}:3000`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                  AdGuard Dashboard
-                </a>
-              </Button>
-            )}
-            {adguardInstalled && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleOpenConfigEditor}
-                disabled={adguardConfigQuery.isFetching}
-              >
-                <FileEdit className="mr-1.5 h-3.5 w-3.5" />
-                {adguardConfigQuery.isFetching ? 'Loading…' : 'AdGuard Config'}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── At a Glance ──────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          At a Glance
+        </h2>
+        <div className="space-y-4">
 
-      {/* System Info */}
+      {/* System Info (with Uptime merged in) */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">System Information</CardTitle>
@@ -283,173 +196,13 @@ export function SystemPage() {
                 <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
                 <span className="text-gray-500">Kernel</span>
                 <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
+                <span className="text-gray-500">Uptime</span>
+                <span className="text-gray-900 dark:text-white">
+                  {formatUptime(info.uptime_seconds)}
+                </span>
               </div>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
-
-      {/* Uptime */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Uptime</CardTitle>
-          <Clock className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          {infoLoading ? (
-            <Skeleton className="h-4 w-1/2" />
-          ) : info ? (
-            <p className="text-lg font-medium text-gray-900 dark:text-white">
-              {formatUptime(info.uptime_seconds)}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {/* Time & Timezone */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Time & Timezone</CardTitle>
-          <Clock className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          {tzLoading ? (
-            <Skeleton className="h-4 w-1/2" />
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-                <div className="grid grid-cols-2 gap-2">
-                  <span className="text-gray-500">Timezone</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {timezoneConfig?.zonename || '—'}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-gray-500">Change Timezone</label>
-                <Select value={selectedTz} onValueChange={setSelectedTz}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMEZONES.map((tz) => (
-                      <SelectItem key={tz.zonename} value={tz.zonename}>
-                        {tz.zonename}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={() => {
-                  const tz = TIMEZONES.find((t) => t.zonename === selectedTz);
-                  if (tz) setTz.mutate({ zonename: tz.zonename, timezone: tz.timezone });
-                }}
-                disabled={setTz.isPending || !selectedTz}
-                size="sm"
-              >
-                {setTz.isPending ? 'Saving…' : 'Save Timezone'}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* NTP Configuration */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">NTP Configuration</CardTitle>
-          <Clock className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          {ntpLoading ? (
-            <Skeleton className="h-4 w-1/2" />
-          ) : (
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={ntpEnabled}
-                  onChange={(e) => setNtpEnabled(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                Enable NTP time synchronization
-              </label>
-              <div className="space-y-2">
-                <label className="text-xs text-gray-500">NTP Servers</label>
-                {ntpServers.map((server, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <Input
-                      className="h-8 text-sm"
-                      value={server}
-                      onChange={(e) => {
-                        const updated = [...ntpServers];
-                        updated[idx] = e.target.value;
-                        setNtpServers(updated);
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 px-2 text-red-500 hover:text-red-700"
-                      onClick={() => setNtpServers(ntpServers.filter((_, i) => i !== idx))}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-                <div className="flex items-center gap-2">
-                  <Input
-                    className="h-8 text-sm"
-                    placeholder="Add NTP server address"
-                    value={ntpNewServer}
-                    onChange={(e) => setNtpNewServer(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && ntpNewServer.trim()) {
-                        e.preventDefault();
-                        setNtpServers([...ntpServers, ntpNewServer.trim()]);
-                        setNtpNewServer('');
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8"
-                    disabled={!ntpNewServer.trim()}
-                    onClick={() => {
-                      setNtpServers([...ntpServers, ntpNewServer.trim()]);
-                      setNtpNewServer('');
-                    }}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() =>
-                    setNTPMutation.mutate({ enabled: ntpEnabled, servers: ntpServers })
-                  }
-                  disabled={setNTPMutation.isPending}
-                  size="sm"
-                >
-                  {setNTPMutation.isPending ? 'Saving…' : 'Save NTP Settings'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => syncNTPMutation.mutate()}
-                  disabled={syncNTPMutation.isPending}
-                  title="Force a one-shot NTP sync with pool.ntp.org"
-                >
-                  {syncNTPMutation.isPending ? 'Syncing…' : 'Sync Now'}
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -520,252 +273,81 @@ export function SystemPage() {
         </CardContent>
       </Card>
 
-      {/* Actions */}
+        </div>
+      </div>
+
+      {/* ── Configuration ────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Configuration
+        </h2>
+        <div className="space-y-4">
+
+      {/* Time & Timezone */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Actions</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Time & Timezone</CardTitle>
+          <Clock className="h-4 w-4 text-gray-500" />
         </CardHeader>
         <CardContent>
-          {showRebootConfirm ? (
-            <div className="flex items-center gap-3">
-              <Badge variant="warning">Confirm reboot?</Badge>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => {
-                  rebootMutation.mutate();
-                  setShowRebootConfirm(false);
-                }}
-                disabled={rebootMutation.isPending}
-              >
-                {rebootMutation.isPending ? 'Rebooting…' : 'Reboot Now'}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowRebootConfirm(false)}>
-                Cancel
-              </Button>
-            </div>
+          {tzLoading ? (
+            <Skeleton className="h-4 w-1/2" />
           ) : (
-            <Button size="sm" variant="destructive" onClick={() => setShowRebootConfirm(true)}>
-              Reboot
-            </Button>
-          )}
-
-          <div className="mt-4 border-t pt-4">
-            {showShutdownConfirm ? (
-              <div className="flex items-center gap-3">
-                <Badge variant="warning">Confirm shutdown?</Badge>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => {
-                    shutdownMutation.mutate();
-                    setShowShutdownConfirm(false);
-                  }}
-                  disabled={shutdownMutation.isPending}
-                >
-                  {shutdownMutation.isPending ? 'Shutting down…' : 'Shut Down'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setShowShutdownConfirm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setShowShutdownConfirm(true)}
-                >
-                  Shut Down
-                </Button>
-                <p className="mt-1 text-xs text-gray-500">
-                  Power off the device. You will need physical access to turn it back on.
-                </p>
-              </>
-            )}
-          </div>
-
-          <div className="mt-4 border-t pt-4">
-            <Button size="sm" variant="destructive" onClick={() => setShowFactoryResetDialog(true)}>
-              Factory Reset
-            </Button>
-            <p className="mt-1 text-xs text-gray-500">
-              Erase all settings and restore factory defaults.
-            </p>
-          </div>
-
-          <Dialog open={showFactoryResetDialog} onOpenChange={setShowFactoryResetDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-red-600">
-                  <AlertTriangle className="h-5 w-5" />
-                  Factory Reset
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  This will <strong>erase all configuration changes</strong> and restore the device
-                  to factory defaults. The device will reboot.
-                </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  You will need to reconnect to the default WiFi network after the reset completes.
-                </p>
-                <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-                  <strong>This action cannot be undone.</strong>
+            <div className="space-y-4">
+              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="text-gray-500">Timezone</span>
+                  <span className="text-gray-900 dark:text-white">
+                    {timezoneConfig?.zonename || '—'}
+                  </span>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowFactoryResetDialog(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    factoryResetMutation.mutate();
-                    setShowFactoryResetDialog(false);
-                  }}
-                  disabled={factoryResetMutation.isPending}
-                >
-                  {factoryResetMutation.isPending ? 'Resetting…' : 'I understand, Factory Reset'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-500">Change Timezone</label>
+                <Select value={selectedTz} onValueChange={setSelectedTz}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONES.map((tz) => (
+                      <SelectItem key={tz.zonename} value={tz.zonename}>
+                        {tz.zonename}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => {
+                  const tz = TIMEZONES.find((t) => t.zonename === selectedTz);
+                  if (tz) setTz.mutate({ zonename: tz.zonename, timezone: tz.timezone });
+                }}
+                disabled={setTz.isPending || !selectedTz}
+                size="sm"
+              >
+                {setTz.isPending ? 'Saving…' : 'Save Timezone'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* LED Control */}
-      {ledStatus && ledStatus.led_count > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">LED Control</CardTitle>
-            <Lightbulb className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Stealth Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  {ledStatus.stealth_mode
-                    ? 'All LEDs are off — stealth mode active'
-                    : `${ledStatus.led_count} LED${ledStatus.led_count > 1 ? 's' : ''} active`}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant={ledStatus.stealth_mode ? 'default' : 'outline'}
-                disabled={setLEDStealthMutation.isPending}
-                onClick={() =>
-                  setLEDStealthMutation.mutate({ stealth_mode: !ledStatus.stealth_mode })
-                }
-              >
-                {ledStatus.stealth_mode ? 'Restore LEDs' : 'Go Stealth'}
-              </Button>
-            </div>
+      <NTPConfigCard />
+      <ChangePasswordCard />
+      <HardwareButtonsCard />
+      <LEDControlCard />
+      <AlertThresholdsCard />
+      <SSHKeysCard />
 
-            {/* Per-LED Status */}
-            {ledStatus.leds && ledStatus.leds.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-gray-500">Individual LEDs</p>
-                <div className="grid gap-1">
-                  {ledStatus.leds.map((led) => (
-                    <div
-                      key={led.name}
-                      className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-900"
-                    >
-                      <span className="text-xs text-gray-700 dark:text-gray-300">{led.name}</span>
-                      <Badge variant={led.brightness > 0 ? 'success' : 'secondary'}>
-                        {led.brightness > 0 ? 'On' : 'Off'}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        </div>
+      </div>
 
-            {/* LED Schedule */}
-            <div className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">LED Schedule</p>
-                  <p className="text-xs text-gray-500">
-                    Automatically turn LEDs on/off at set times
-                  </p>
-                </div>
-                <Switch
-                  id="led-schedule"
-                  label="Enable schedule"
-                  checked={scheduleEnabled}
-                  onChange={(e) => setScheduleEnabled(e.target.checked)}
-                />
-              </div>
-              {scheduleEnabled && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label
-                      htmlFor="led-on-time"
-                      className="text-xs text-gray-600 dark:text-gray-400 w-16"
-                    >
-                      LEDs On
-                    </label>
-                    <Input
-                      id="led-on-time"
-                      type="time"
-                      value={scheduleOnTime}
-                      onChange={(e) => setScheduleOnTime(e.target.value)}
-                      className="w-32"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label
-                      htmlFor="led-off-time"
-                      className="text-xs text-gray-600 dark:text-gray-400 w-16"
-                    >
-                      LEDs Off
-                    </label>
-                    <Input
-                      id="led-off-time"
-                      type="time"
-                      value={scheduleOffTime}
-                      onChange={(e) => setScheduleOffTime(e.target.value)}
-                      className="w-32"
-                    />
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={setLEDScheduleMutation.isPending}
-                    onClick={() =>
-                      setLEDScheduleMutation.mutate({
-                        enabled: scheduleEnabled,
-                        on_time: scheduleOnTime,
-                        off_time: scheduleOffTime,
-                      })
-                    }
-                  >
-                    {setLEDScheduleMutation.isPending ? 'Saving...' : 'Save Schedule'}
-                  </Button>
-                </div>
-              )}
-              {!scheduleEnabled && ledSchedule?.enabled && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={setLEDScheduleMutation.isPending}
-                  onClick={() =>
-                    setLEDScheduleMutation.mutate({
-                      enabled: false,
-                      on_time: '',
-                      off_time: '',
-                    })
-                  }
-                >
-                  Remove Schedule
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Maintenance ──────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Maintenance
+        </h2>
+        <div className="space-y-4">
 
       {/* Backup & Restore */}
       <Card>
@@ -793,13 +375,8 @@ export function SystemPage() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    if (
-                      window.confirm(
-                        'Restore this backup? Current configuration will be overwritten. A reboot will be needed to apply changes.',
-                      )
-                    ) {
-                      restore.mutate(file);
-                    }
+                    setPendingRestoreFile(file);
+                    setShowRestoreDialog(true);
                     e.target.value = '';
                   }
                 }}
@@ -818,236 +395,132 @@ export function SystemPage() {
         </CardContent>
       </Card>
 
-      {/* Change Password */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Firmware Upgrade</CardTitle>
-          <Zap className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+      <FirmwareUpgradeCard />
+
+        </div>
+      </div>
+
+      {/* ── Danger Zone ──────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-500 dark:text-red-400">
+          Danger Zone
+        </h2>
+        <Card className="border-red-200 dark:border-red-900">
+          <CardContent className="space-y-4 pt-4">
             <p className="text-xs text-gray-500">
-              Upload a sysupgrade firmware image (.bin) to flash the device.
+              These actions are irreversible or will cause a service interruption. Proceed with
+              caution.
             </p>
-            <div>
-              <input
-                type="file"
-                ref={firmwareInputRef}
-                accept=".bin"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setFirmwareFile(file);
-                  }
-                  e.target.value = '';
-                }}
-              />
-              <Button variant="outline" size="sm" onClick={() => firmwareInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" />
-                Select Firmware Image
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="destructive" onClick={() => setShowRebootDialog(true)}>
+                Reboot
               </Button>
-              {firmwareFile && (
-                <p className="mt-1 text-xs text-gray-700 dark:text-gray-300">
-                  Selected: {firmwareFile.name} ({formatBytes(firmwareFile.size)})
-                </p>
-              )}
+              <Button size="sm" variant="destructive" onClick={() => setShowShutdownDialog(true)}>
+                Shut Down
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setShowFactoryResetDialog(true)}
+              >
+                Factory Reset
+              </Button>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={keepSettings}
-                onChange={(e) => setKeepSettings(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              Keep current settings
-            </label>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={!firmwareFile || firmwareUpgrade.isPending}
-              onClick={() => setShowFirmwareDialog(true)}
-            >
-              <Zap className="mr-2 h-4 w-4" />
-              {firmwareUpgrade.isPending ? 'Flashing…' : 'Upload & Flash'}
-            </Button>
-          </div>
-
-          <Dialog open={showFirmwareDialog} onOpenChange={setShowFirmwareDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-red-600">
-                  <AlertTriangle className="h-5 w-5" />
-                  Firmware Upgrade
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  You are about to flash <strong>{firmwareFile?.name}</strong> onto the device.
-                  {keepSettings
-                    ? ' Current settings will be preserved.'
-                    : ' All settings will be erased.'}
-                </p>
-                <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
-                  <strong>Do not power off the device during the upgrade.</strong> The device will
-                  reboot automatically.
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowFirmwareDialog(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    if (firmwareFile) {
-                      firmwareUpgrade.mutate(
-                        { file: firmwareFile, keepSettings },
-                        {
-                          onSuccess: () => {
-                            setFirmwareFile(null);
-                          },
-                        },
-                      );
-                    }
-                    setShowFirmwareDialog(false);
-                  }}
-                  disabled={firmwareUpgrade.isPending}
-                >
-                  {firmwareUpgrade.isPending ? 'Flashing…' : 'Flash Firmware'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </CardContent>
-      </Card>
-
-      {/* Change Password */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Change Password</CardTitle>
-          <KeyRound className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (newPassword !== confirmPassword) return;
-              changePasswordMutation.mutate(
-                { current_password: currentPassword, new_password: newPassword },
-                {
-                  onSuccess: () => {
-                    setCurrentPassword('');
-                    setNewPassword('');
-                    setConfirmPassword('');
-                  },
-                },
-              );
-            }}
-          >
-            <Input
-              type="password"
-              placeholder="Current password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="New password (min 6 characters)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-            {newPassword && confirmPassword && newPassword !== confirmPassword && (
-              <p className="text-sm text-red-500">Passwords do not match</p>
-            )}
-            <Button
-              type="submit"
-              size="sm"
-              disabled={
-                changePasswordMutation.isPending ||
-                !currentPassword ||
-                !newPassword ||
-                newPassword !== confirmPassword ||
-                newPassword.length < 6
-              }
-            >
-              {changePasswordMutation.isPending ? 'Changing…' : 'Change Password'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Hardware Buttons */}
-      {hardwareButtons.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hardware Buttons</CardTitle>
-            <ToggleLeft className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent className="space-y-4">
             <p className="text-xs text-gray-500">
-              Configure what each physical button does when pressed.
+              Shut Down powers off the device — you will need physical access to turn it back on.
             </p>
-            {hardwareButtons.map((btn) => {
-              const currentAction =
-                pendingButtonActions[btn.name] ?? (btn.action as ButtonAction);
-              return (
-                <div key={btn.name} className="flex items-center justify-between gap-4">
-                  <span className="font-mono text-sm capitalize">{btn.name}</span>
-                  <Select
-                    value={currentAction}
-                    onValueChange={(val) =>
-                      setPendingButtonActions((prev) => ({
-                        ...prev,
-                        [btn.name]: val as ButtonAction,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Do nothing</SelectItem>
-                      <SelectItem value="vpn_toggle">Toggle VPN</SelectItem>
-                      <SelectItem value="wifi_toggle">Toggle WiFi</SelectItem>
-                      <SelectItem value="led_toggle">Toggle LEDs</SelectItem>
-                      <SelectItem value="reboot">Reboot</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-            })}
-            <Button
-              size="sm"
-              disabled={setButtonActions.isPending || Object.keys(pendingButtonActions).length === 0}
-              onClick={() => {
-                const merged = hardwareButtons.map((btn) => ({
-                  name: btn.name,
-                  action: (pendingButtonActions[btn.name] ?? btn.action) as ButtonAction,
-                }));
-                setButtonActions.mutate(
-                  { buttons: merged },
-                  { onSuccess: () => setPendingButtonActions({}) },
-                );
-              }}
-            >
-              {setButtonActions.isPending ? 'Saving…' : 'Save Button Actions'}
-            </Button>
           </CardContent>
         </Card>
-      )}
+      </div>
+
+      {/* ── Quick Links ──────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Quick Links
+        </h2>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" asChild>
+                <a
+                  href={`http://${window.location.hostname}:8080/cgi-bin/luci`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  LuCI Web Interface
+                </a>
+              </Button>
+              {adguardRunning && (
+                <Button size="sm" variant="outline" asChild>
+                  <a
+                    href={`http://${window.location.hostname}:3000`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    AdGuard Dashboard
+                  </a>
+                </Button>
+              )}
+              {adguardInstalled && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleOpenConfigEditor}
+                  disabled={adguardConfigQuery.isFetching}
+                >
+                  <FileEdit className="mr-1.5 h-3.5 w-3.5" />
+                  {adguardConfigQuery.isFetching ? 'Loading…' : 'AdGuard Config'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Dialogs */}
+      <ConfirmDialog
+        open={showRebootDialog}
+        onOpenChange={setShowRebootDialog}
+        title="Reboot System"
+        description="The router will reboot and be temporarily unreachable."
+        warningText="You will lose your connection for 30–60 seconds while the device restarts."
+        confirmLabel="Reboot Now"
+        isPending={rebootMutation.isPending}
+        onConfirm={() => {
+          rebootMutation.mutate();
+          setShowRebootDialog(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={showShutdownDialog}
+        onOpenChange={setShowShutdownDialog}
+        title="Shut Down"
+        description="The router will power off. You will need physical access to turn it back on."
+        warningText="This will make the router inaccessible until manually powered on."
+        confirmLabel="Shut Down"
+        isPending={shutdownMutation.isPending}
+        onConfirm={() => {
+          shutdownMutation.mutate();
+          setShowShutdownDialog(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={showFactoryResetDialog}
+        onOpenChange={setShowFactoryResetDialog}
+        title="Factory Reset"
+        description="This will erase all configuration and restore factory defaults. The device will reboot. You will need to reconnect to the default WiFi network."
+        warningText="This action cannot be undone."
+        confirmLabel="I understand, Factory Reset"
+        isPending={factoryResetMutation.isPending}
+        onConfirm={() => {
+          factoryResetMutation.mutate();
+          setShowFactoryResetDialog(false);
+        }}
+      />
 
       <Dialog open={configEditorOpen} onOpenChange={setConfigEditorOpen}>
         <DialogContent className="max-w-2xl">
@@ -1074,6 +547,26 @@ export function SystemPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={showRestoreDialog}
+        onOpenChange={(open) => {
+          setShowRestoreDialog(open);
+          if (!open) setPendingRestoreFile(null);
+        }}
+        title="Restore from Backup"
+        description="Current configuration will be overwritten. A reboot will be needed to apply changes."
+        warningText="This will replace all your current settings with the backup file."
+        confirmLabel="Restore"
+        isPending={restore.isPending}
+        onConfirm={() => {
+          if (pendingRestoreFile) {
+            restore.mutate(pendingRestoreFile);
+            setShowRestoreDialog(false);
+            setPendingRestoreFile(null);
+          }
+        }}
+      />
     </div>
   );
 }

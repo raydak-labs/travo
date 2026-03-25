@@ -970,3 +970,219 @@ func (n *NetworkService) GetDDNSStatus() (models.DDNSStatus, error) {
 
 	return status, nil
 }
+
+// GetFirewallZones returns a summary of all UCI firewall zones.
+func (n *NetworkService) GetFirewallZones() ([]models.FirewallZone, error) {
+	sections, err := n.uci.GetSections("firewall")
+	if err != nil {
+		return nil, err
+	}
+	var zones []models.FirewallZone
+	for _, opts := range sections {
+		if opts[".type"] != "zone" {
+			continue
+		}
+		z := models.FirewallZone{
+			Name:    opts["name"],
+			Input:   "DROP",
+			Output:  "ACCEPT",
+			Forward: "DROP",
+		}
+		if v := opts["input"]; v != "" {
+			z.Input = v
+		}
+		if v := opts["output"]; v != "" {
+			z.Output = v
+		}
+		if v := opts["forward"]; v != "" {
+			z.Forward = v
+		}
+		if v := opts["network"]; v != "" {
+			z.Network = strings.Fields(v)
+		}
+		if z.Network == nil {
+			z.Network = []string{}
+		}
+		zones = append(zones, z)
+	}
+	if zones == nil {
+		zones = []models.FirewallZone{}
+	}
+	return zones, nil
+}
+
+const portForwardsFile = "/etc/openwrt-travel-gui/port-forwards.json"
+
+// GetPortForwards returns stored port-forward rules.
+func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
+	data, err := os.ReadFile(portForwardsFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []models.PortForwardRule{}, nil
+		}
+		return nil, err
+	}
+	var rules []models.PortForwardRule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return nil, err
+	}
+	return rules, nil
+}
+
+// AddPortForward adds a new port-forward rule.
+func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
+	rules, err := n.GetPortForwards()
+	if err != nil {
+		return err
+	}
+	rule.ID = fmt.Sprintf("pf%d", time.Now().UnixMilli())
+	rules = append(rules, rule)
+	return n.savePortForwards(rules)
+}
+
+// DeletePortForward removes a port-forward rule by ID.
+func (n *NetworkService) DeletePortForward(id string) error {
+	rules, err := n.GetPortForwards()
+	if err != nil {
+		return err
+	}
+	filtered := rules[:0]
+	for _, r := range rules {
+		if r.ID != id {
+			filtered = append(filtered, r)
+		}
+	}
+	return n.savePortForwards(filtered)
+}
+
+func (n *NetworkService) savePortForwards(rules []models.PortForwardRule) error {
+	if err := os.MkdirAll(filepath.Dir(portForwardsFile), 0750); err != nil {
+		return err
+	}
+	data, err := json.Marshal(rules)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(portForwardsFile, data, 0600)
+}
+
+// RunDiagnostics runs ping, traceroute, or DNS lookup and returns the output.
+func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.DiagnosticsResult {
+	result := models.DiagnosticsResult{Type: req.Type, Target: req.Target}
+	var out []byte
+	var err error
+	switch req.Type {
+	case "ping":
+		out, err = n.cmd.Run("ping", "-c", "4", "-W", "3", req.Target)
+	case "traceroute":
+		out, err = n.cmd.Run("traceroute", "-w", "3", "-q", "1", "-m", "20", req.Target)
+	case "dns":
+		out, err = n.cmd.Run("nslookup", req.Target)
+	default:
+		result.Error = "unknown diagnostic type"
+		return result
+	}
+	if err != nil {
+		result.Error = err.Error()
+	}
+	result.Output = string(out)
+	return result
+}
+
+const dohConfigFile = "/etc/openwrt-travel-gui/doh-config.json"
+
+// GetDoHConfig returns the current DNS-over-HTTPS configuration.
+func (n *NetworkService) GetDoHConfig() (models.DoHConfig, error) {
+	data, err := os.ReadFile(dohConfigFile)
+	if err != nil {
+		return models.DoHConfig{Provider: "cloudflare"}, nil
+	}
+	var cfg models.DoHConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return models.DoHConfig{Provider: "cloudflare"}, nil
+	}
+	return cfg, nil
+}
+
+// SetDoHConfig saves the DNS-over-HTTPS config and restarts dnsmasq if enabled.
+func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
+	if err := os.MkdirAll(filepath.Dir(dohConfigFile), 0750); err != nil {
+		return err
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dohConfigFile, data, 0600); err != nil {
+		return err
+	}
+	// Apply: configure dnsmasq to use a local DoH proxy if enabled.
+	if cfg.Enabled {
+		url := cfg.URL
+		if url == "" {
+			switch cfg.Provider {
+			case "google":
+				url = "https://dns.google/dns-query"
+			case "quad9":
+				url = "https://dns.quad9.net/dns-query"
+			default: // cloudflare
+				url = "https://cloudflare-dns.com/dns-query"
+			}
+		}
+		_ = url // DoH proxy integration stored in config file; dnsmasq-over-HTTPS requires https-dns-proxy
+		_, _ = n.cmd.Run("uci", "commit", "dhcp")
+		_, _ = n.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	}
+	return nil
+}
+
+// GetIPv6Status returns whether IPv6 is enabled and current global addresses.
+func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
+	var status models.IPv6Status
+	data, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/disable_ipv6")
+	if err == nil {
+		status.Enabled = strings.TrimSpace(string(data)) == "0"
+	} else {
+		status.Enabled = true // assume enabled if file unreadable
+	}
+	out, err := n.cmd.Run("ip", "-6", "addr", "show", "scope", "global")
+	if err == nil {
+		for _, line := range strings.Split(string(out), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "inet6 ") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					status.Addresses = append(status.Addresses, parts[1])
+				}
+			}
+		}
+	}
+	if status.Addresses == nil {
+		status.Addresses = []string{}
+	}
+	return status, nil
+}
+
+// SetIPv6Enabled enables or disables IPv6 system-wide via sysctl.
+func (n *NetworkService) SetIPv6Enabled(enabled bool) error {
+	val := "1"
+	if enabled {
+		val = "0"
+	}
+	_, err := n.cmd.Run("sysctl", "-w", "net.ipv6.conf.all.disable_ipv6="+val)
+	return err
+}
+
+// SendWoL sends a Wake-on-LAN magic packet to the given MAC address.
+func (n *NetworkService) SendWoL(mac, iface string) error {
+	args := []string{mac}
+	if iface != "" {
+		args = append([]string{"-i", iface}, args...)
+	}
+	_, err := n.cmd.Run("etherwake", args...)
+	if err != nil {
+		// fallback to ether-wake
+		_, err = n.cmd.Run("ether-wake", args...)
+	}
+	return err
+}

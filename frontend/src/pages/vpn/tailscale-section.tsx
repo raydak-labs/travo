@@ -13,6 +13,8 @@ import {
   useToggleTailscale,
   useTailscaleAuth,
   useSetTailscaleExitNode,
+  useTailscaleSSH,
+  useSetTailscaleSSH,
 } from '@/hooks/use-vpn';
 import type { TailscalePeer } from '@shared/index';
 
@@ -99,6 +101,8 @@ export function TailscaleSection() {
   const { data: services = [] } = useServices();
   const toggleMutation = useToggleTailscale();
   const exitNodeMutation = useSetTailscaleExitNode();
+  const { data: sshStatus } = useTailscaleSSH();
+  const sshMutation = useSetTailscaleSSH();
 
   const tsService = services.find((s) => s.id === 'tailscale');
   const isInstalled = tsService ? tsService.state !== 'not_installed' : !!status;
@@ -193,6 +197,23 @@ export function TailscaleSection() {
                     </Button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* SSH toggle — only when logged in and running */}
+            {status.logged_in && status.running && (
+              <div className="flex items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800">
+                <div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Allow Tailscale SSH</span>
+                  <p className="text-xs text-gray-500">Let Tailscale manage SSH access from trusted devices</p>
+                </div>
+                <Switch
+                  id="tailscale-ssh"
+                  label="SSH"
+                  checked={sshStatus?.enabled ?? false}
+                  onChange={() => sshMutation.mutate(!(sshStatus?.enabled ?? false))}
+                  disabled={sshMutation.isPending}
+                />
               </div>
             )}
 

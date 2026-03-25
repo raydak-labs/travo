@@ -150,3 +150,59 @@ type HardwareButton struct {
 type ButtonActionsRequest struct {
 	Buttons []HardwareButton `json:"buttons"`
 }
+
+// WiFiSchedule holds the cron-based WiFi on/off schedule.
+type WiFiSchedule struct {
+	Enabled bool   `json:"enabled"`
+	OnTime  string `json:"on_time"`  // HH:MM, empty=disabled
+	OffTime string `json:"off_time"` // HH:MM, empty=disabled
+}
+
+// SplitTunnelConfig holds WireGuard split tunneling settings.
+type SplitTunnelConfig struct {
+	Mode   string   `json:"mode"`   // "all" or "custom"
+	Routes []string `json:"routes"` // CIDR ranges when mode=custom
+}
+
+// MACPolicy maps an SSID to a specific MAC address to use when connecting.
+type MACPolicy struct {
+	SSID string `json:"ssid"`
+	MAC  string `json:"mac"` // empty means use default
+}
+
+// MACPolicies holds all per-network MAC policies.
+type MACPolicies struct {
+	Policies []MACPolicy `json:"policies"`
+}
+
+// SSHKey holds a single authorized SSH public key.
+type SSHKey struct {
+	Index   int    `json:"index"`
+	Comment string `json:"comment"`
+	Key     string `json:"key"` // full public key line
+}
+
+// SSHKeysResponse lists all authorized SSH keys.
+type SSHKeysResponse struct {
+	Keys []SSHKey `json:"keys"`
+}
+
+// AddSSHKeyRequest contains the public key to add.
+type AddSSHKeyRequest struct {
+	Key string `json:"key"`
+}
+
+// SpeedTestResult holds the result of a speed test run.
+type SpeedTestResult struct {
+	DownloadMbps float64 `json:"download_mbps"`
+	UploadMbps   float64 `json:"upload_mbps"`
+	PingMs       float64 `json:"ping_ms"`
+	Server       string  `json:"server"`
+}
+
+// AlertThresholds holds configurable thresholds for system alerts.
+type AlertThresholds struct {
+	StoragePercent float64 `json:"storage_percent"`
+	CPUPercent     float64 `json:"cpu_percent"`
+	MemoryPercent  float64 `json:"memory_percent"`
+}

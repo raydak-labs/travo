@@ -88,6 +88,8 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.guest).toBe('/api/v1/wifi/guest');
     expect(API_ROUTES.wifi.autoreconnect).toBe('/api/v1/wifi/autoreconnect');
     expect(API_ROUTES.wifi.applyConfirm).toBe('/api/v1/wifi/apply/confirm');
+    expect(API_ROUTES.wifi.schedule).toBe('/api/v1/wifi/schedule');
+    expect(API_ROUTES.wifi.macPolicies).toBe('/api/v1/wifi/mac-policies');
   });
 
   it('has vpn routes matching backend', () => {
@@ -103,6 +105,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.tailscale.auth).toBe('/api/v1/vpn/tailscale/auth');
     expect(API_ROUTES.vpn.tailscale.exitNode).toBe('/api/v1/vpn/tailscale/exit-node');
     expect(API_ROUTES.vpn.dnsLeakTest).toBe('/api/v1/vpn/dns-leak-test');
+    expect(API_ROUTES.vpn.splitTunnel).toBe('/api/v1/vpn/split-tunnel');
   });
 
   it('has services routes with :id parameter matching backend', () => {
@@ -212,6 +215,19 @@ describe('API_ROUTES', () => {
       '/api/v1/network/usb-tethering',
       '/api/v1/network/usb-tethering/configure',
       '/api/v1/network/usb-tethering/unconfigure',
+      '/api/v1/wifi/schedule',
+      '/api/v1/wifi/mac-policies',
+      '/api/v1/vpn/split-tunnel',
+      '/api/v1/system/alert-thresholds',
+      '/api/v1/system/ssh-keys',
+      '/api/v1/system/speed-test',
+      '/api/v1/network/firewall/zones',
+      '/api/v1/network/firewall/port-forwards',
+      '/api/v1/network/diagnostics',
+      '/api/v1/network/doh',
+      '/api/v1/network/ipv6',
+      '/api/v1/network/wol',
+      '/api/v1/vpn/tailscale/ssh',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

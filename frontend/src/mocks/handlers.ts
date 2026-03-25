@@ -442,6 +442,14 @@ export const handlers = [
     return HttpResponse.json({ stealth_mode: false, led_count: 3 });
   }),
 
+  http.get(API_ROUTES.system.ledsSchedule, () => {
+    return HttpResponse.json({ enabled: false, on_time: '08:00', off_time: '22:00' });
+  }),
+
+  http.put(API_ROUTES.system.ledsSchedule, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.put(API_ROUTES.system.leds, async ({ request }) => {
     const body = (await request.json()) as { stealth_mode: boolean };
     return HttpResponse.json({ stealth_mode: body.stealth_mode, led_count: 3 });
@@ -622,5 +630,101 @@ export const handlers = [
       { timestamp: now - 1000 * 60 * 60 * 3, state: 'disconnected' },
       { timestamp: now - 1000 * 60 * 60 * 3 - 1000 * 60 * 15, state: 'connected' },
     ]);
+  }),
+
+  http.get(API_ROUTES.network.firewallZones, () => {
+    return HttpResponse.json({ zones: [] });
+  }),
+
+  http.get(API_ROUTES.network.portForwards, () => {
+    return HttpResponse.json({ rules: [] });
+  }),
+
+  http.post(API_ROUTES.network.portForwards, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.delete(`${API_ROUTES.network.portForwards}/:id`, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.network.diagnostics, () => {
+    return HttpResponse.json({ type: 'ping', target: '8.8.8.8', output: 'PING 8.8.8.8: 3 packets' });
+  }),
+
+  http.get(API_ROUTES.network.doh, () => {
+    return HttpResponse.json({ enabled: false, provider: 'cloudflare', url: '' });
+  }),
+
+  http.put(API_ROUTES.network.doh, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.network.ipv6, () => {
+    return HttpResponse.json({ enabled: false, mode: 'disabled', address: '', prefix: '' });
+  }),
+
+  http.put(API_ROUTES.network.ipv6, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.network.wol, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.system.alertThresholds, () => {
+    return HttpResponse.json({ storage_percent: 90, cpu_percent: 90, memory_percent: 90 });
+  }),
+
+  http.put(API_ROUTES.system.alertThresholds, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.system.sshKeys, () => {
+    return HttpResponse.json({ keys: [] });
+  }),
+
+  http.post(API_ROUTES.system.sshKeys, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.delete(`${API_ROUTES.system.sshKeys}/:index`, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.system.speedTest, () => {
+    return HttpResponse.json({ download_mbps: 50.0, upload_mbps: 20.0, ping_ms: 15.0, server: 'test' });
+  }),
+
+  http.get(API_ROUTES.vpn.tailscale.ssh, () => {
+    return HttpResponse.json({ enabled: false });
+  }),
+
+  http.put(API_ROUTES.vpn.tailscale.ssh, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.vpn.splitTunnel, () => {
+    return HttpResponse.json({ enabled: false, routes: [] });
+  }),
+
+  http.put(API_ROUTES.vpn.splitTunnel, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.wifi.schedule, () => {
+    return HttpResponse.json({ enabled: false, on_time: '07:00', off_time: '23:00', days: [] });
+  }),
+
+  http.put(API_ROUTES.wifi.schedule, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.wifi.macPolicies, () => {
+    return HttpResponse.json({ policies: [] });
+  }),
+
+  http.put(API_ROUTES.wifi.macPolicies, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 ];

@@ -366,3 +366,53 @@ func ConfirmWifiApplyHandler(svc *services.WifiService) fiber.Handler {
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
+
+// GetWiFiScheduleHandler handles GET /api/v1/wifi/schedule.
+func GetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		schedule, err := svc.GetWiFiSchedule()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(schedule)
+	}
+}
+
+// SetWiFiScheduleHandler handles PUT /api/v1/wifi/schedule.
+func SetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var schedule models.WiFiSchedule
+		if err := c.BodyParser(&schedule); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetWiFiSchedule(schedule); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetMACPoliciesHandler handles GET /api/v1/wifi/mac-policies.
+func GetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		policies, err := svc.GetMACPolicies()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(policies)
+	}
+}
+
+// SetMACPoliciesHandler handles PUT /api/v1/wifi/mac-policies.
+func SetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var policies models.MACPolicies
+		if err := c.BodyParser(&policies); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetMACPolicies(policies); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}

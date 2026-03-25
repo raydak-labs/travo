@@ -1656,3 +1656,76 @@ func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
 	}
 	return w.applyWireless()
 }
+
+const wifiSchedulePath = "/etc/openwrt-travel-gui/wifi-schedule.json"
+const wifiScheduleCronPath = "/etc/cron.d/openwrt-gui-wifi-schedule"
+
+// GetWiFiSchedule returns the current cron-based WiFi on/off schedule.
+func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
+	data, err := os.ReadFile(wifiSchedulePath)
+	if err != nil {
+		return models.WiFiSchedule{Enabled: false}, nil
+	}
+	var s models.WiFiSchedule
+	if err := json.Unmarshal(data, &s); err != nil {
+		return models.WiFiSchedule{Enabled: false}, nil
+	}
+	return s, nil
+}
+
+// SetWiFiSchedule saves the WiFi schedule and updates the cron file.
+func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
+	data, err := json.Marshal(schedule)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(wifiSchedulePath, data, 0o644); err != nil {
+		return err
+	}
+
+	if !schedule.Enabled || schedule.OnTime == "" || schedule.OffTime == "" {
+		_ = os.Remove(wifiScheduleCronPath)
+		return nil
+	}
+
+	onParts := strings.Split(schedule.OnTime, ":")
+	offParts := strings.Split(schedule.OffTime, ":")
+	if len(onParts) != 2 || len(offParts) != 2 {
+		return fmt.Errorf("invalid time format, expected HH:MM")
+	}
+
+	// cron format: MM HH * * * user command
+	cronContent := fmt.Sprintf("%s %s * * * root /sbin/wifi up\n%s %s * * * root /sbin/wifi down\n",
+		onParts[1], onParts[0], offParts[1], offParts[0])
+	return os.WriteFile(wifiScheduleCronPath, []byte(cronContent), 0o644)
+}
+
+const macPoliciesPath = "/etc/openwrt-travel-gui/mac-policies.json"
+
+// GetMACPolicies returns the saved per-network MAC policies.
+func (w *WifiService) GetMACPolicies() (models.MACPolicies, error) {
+	data, err := os.ReadFile(macPoliciesPath)
+	if err != nil {
+		return models.MACPolicies{Policies: []models.MACPolicy{}}, nil
+	}
+	var p models.MACPolicies
+	if err := json.Unmarshal(data, &p); err != nil {
+		return models.MACPolicies{Policies: []models.MACPolicy{}}, nil
+	}
+	return p, nil
+}
+
+// SetMACPolicies saves the per-network MAC policies.
+func (w *WifiService) SetMACPolicies(policies models.MACPolicies) error {
+	data, err := json.Marshal(policies)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(macPoliciesPath, data, 0o644)
+}

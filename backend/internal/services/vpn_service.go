@@ -791,3 +791,83 @@ func readResolvConfNameserversFromPath(path string) []string {
 	}
 	return servers
 }
+
+const splitTunnelPath = "/etc/openwrt-travel-gui/split-tunnel.json"
+
+// GetSplitTunnel returns the current WireGuard split tunnel configuration.
+func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
+	data, err := os.ReadFile(splitTunnelPath)
+	if err != nil {
+		return models.SplitTunnelConfig{Mode: "all"}, nil
+	}
+	var cfg models.SplitTunnelConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return models.SplitTunnelConfig{Mode: "all"}, nil
+	}
+	return cfg, nil
+}
+
+// SetSplitTunnel saves the split tunnel config and updates WireGuard allowed IPs in UCI.
+// mode "all" = route everything through VPN (0.0.0.0/0,::/0)
+// mode "custom" = only route specified CIDR ranges
+func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(splitTunnelPath, data, 0o644); err != nil {
+		return err
+	}
+
+	allowedIPs := "0.0.0.0/0,::/0"
+	if cfg.Mode == "custom" && len(cfg.Routes) > 0 {
+		allowedIPs = strings.Join(cfg.Routes, ",")
+	}
+
+	// Find peer sections and update allowed IPs.
+	out, err := v.cmd.Run("uci", "show", "network")
+	if err != nil {
+		return nil // WireGuard may not be configured
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.Contains(line, "=wireguard_") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				section := strings.TrimPrefix(parts[0], "network.")
+				_, _ = v.cmd.Run("uci", "set", "network."+section+".allowed_ips="+allowedIPs)
+			}
+		}
+	}
+	_, _ = v.cmd.Run("uci", "commit", "network")
+	return nil
+}
+
+// GetTailscaleSSHEnabled returns whether Tailscale SSH is enabled.
+func (v *VpnService) GetTailscaleSSHEnabled() (bool, error) {
+	out, err := v.cmd.Run("tailscale", "status", "--json")
+	if err != nil {
+		return false, nil // Tailscale not running
+	}
+	var status struct {
+		Prefs struct {
+			RunSSH bool `json:"RunSSH"`
+		} `json:"Prefs"`
+	}
+	if err := json.Unmarshal(out, &status); err != nil {
+		return false, nil
+	}
+	return status.Prefs.RunSSH, nil
+}
+
+// SetTailscaleSSHEnabled enables or disables Tailscale SSH.
+func (v *VpnService) SetTailscaleSSHEnabled(enabled bool) error {
+	arg := "--ssh=false"
+	if enabled {
+		arg = "--ssh"
+	}
+	_, err := v.cmd.Run("tailscale", "set", arg)
+	return err
+}

@@ -80,7 +80,7 @@ describe('SystemPage', () => {
     await waitFor(() => {
       expect(screen.getByText('CPU')).toBeInTheDocument();
       expect(screen.getByText('Memory')).toBeInTheDocument();
-      expect(screen.getByText(/Storage/)).toBeInTheDocument();
+      expect(screen.getAllByText(/Storage/).length).toBeGreaterThan(0);
     });
 
     await waitFor(() => {

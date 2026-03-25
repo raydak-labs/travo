@@ -18,6 +18,8 @@ import type {
   WifiMutationResponse,
   BandSwitchConfig,
   BandSwitchResponse,
+  WiFiSchedule,
+  MACPolicies,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -296,6 +298,50 @@ export function useSetBandSwitching() {
     },
     onError: (error) => {
       toast.error('Failed to update band switching config', { description: error.message });
+    },
+  });
+}
+
+export function useWiFiSchedule() {
+  return useQuery({
+    queryKey: ['wifi', 'schedule'],
+    queryFn: () => apiClient.get<WiFiSchedule>(API_ROUTES.wifi.schedule),
+  });
+}
+
+export function useSetWiFiSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (schedule: WiFiSchedule) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.schedule, schedule),
+    onSuccess: () => {
+      toast.success('WiFi schedule saved');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'schedule'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save WiFi schedule', { description: error.message });
+    },
+  });
+}
+
+export function useMACPolicies() {
+  return useQuery({
+    queryKey: ['wifi', 'macPolicies'],
+    queryFn: () => apiClient.get<MACPolicies>(API_ROUTES.wifi.macPolicies),
+  });
+}
+
+export function useSetMACPolicies() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (policies: MACPolicies) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.macPolicies, policies),
+    onSuccess: () => {
+      toast.success('MAC policies saved');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'macPolicies'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save MAC policies', { description: error.message });
     },
   });
 }

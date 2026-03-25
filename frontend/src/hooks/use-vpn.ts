@@ -11,6 +11,8 @@ import type {
   KillSwitchStatus,
   DNSLeakResult,
   VPNVerifyResult,
+  SplitTunnelConfig,
+  TailscaleSSHStatus,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -206,6 +208,50 @@ export function useSetTailscaleExitNode() {
     },
     onError: (error) => {
       toast.error('Failed to set exit node', { description: error.message });
+    },
+  });
+}
+
+export function useSplitTunnel() {
+  return useQuery({
+    queryKey: ['vpn', 'splitTunnel'],
+    queryFn: () => apiClient.get<SplitTunnelConfig>(API_ROUTES.vpn.splitTunnel),
+  });
+}
+
+export function useSetSplitTunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cfg: SplitTunnelConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.vpn.splitTunnel, cfg),
+    onSuccess: () => {
+      toast.success('Split tunnel config saved');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'splitTunnel'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save split tunnel config', { description: error.message });
+    },
+  });
+}
+
+export function useTailscaleSSH() {
+  return useQuery({
+    queryKey: ['vpn', 'tailscale', 'ssh'],
+    queryFn: () => apiClient.get<TailscaleSSHStatus>(API_ROUTES.vpn.tailscale.ssh),
+  });
+}
+
+export function useSetTailscaleSSH() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiClient.put<{ ok: boolean }>(API_ROUTES.vpn.tailscale.ssh, { enabled }),
+    onSuccess: () => {
+      toast.success('Tailscale SSH setting updated');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale', 'ssh'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update Tailscale SSH', { description: error.message });
     },
   });
 }

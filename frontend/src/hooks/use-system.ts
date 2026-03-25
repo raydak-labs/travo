@@ -16,6 +16,10 @@ import type {
   SetupStatus,
   HardwareButton,
   ButtonActionsRequest,
+  SSHKeysResponse,
+  AddSSHKeyRequest,
+  SpeedTestResult,
+  AlertThresholds,
 } from '@shared/index';
 
 export function useSystemInfo() {
@@ -337,6 +341,77 @@ export function useCompleteSetup() {
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.setupComplete),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['system', 'setup-complete'] });
+    },
+  });
+}
+
+export function useSSHKeys() {
+  return useQuery({
+    queryKey: ['system', 'ssh-keys'],
+    queryFn: async () => {
+      const res = await apiClient.get<SSHKeysResponse>(API_ROUTES.system.sshKeys);
+      return res.keys;
+    },
+  });
+}
+
+export function useAddSSHKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: AddSSHKeyRequest) =>
+      apiClient.post<{ ok: boolean }>(API_ROUTES.system.sshKeys, req),
+    onSuccess: () => {
+      toast.success('SSH key added');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to add SSH key', { description: error.message });
+    },
+  });
+}
+
+export function useDeleteSSHKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (index: number) =>
+      apiClient.del<{ ok: boolean }>(`${API_ROUTES.system.sshKeys}/${index}`),
+    onSuccess: () => {
+      toast.success('SSH key deleted');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete SSH key', { description: error.message });
+    },
+  });
+}
+
+export function useRunSpeedTest() {
+  return useMutation({
+    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.system.speedTest),
+    onError: (error) => {
+      toast.error('Speed test failed', { description: error.message });
+    },
+  });
+}
+
+export function useAlertThresholds() {
+  return useQuery({
+    queryKey: ['system', 'alert-thresholds'],
+    queryFn: () => apiClient.get<AlertThresholds>(API_ROUTES.system.alertThresholds),
+  });
+}
+
+export function useSetAlertThresholds() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (t: AlertThresholds) =>
+      apiClient.put<{ ok: boolean }>(API_ROUTES.system.alertThresholds, t),
+    onSuccess: () => {
+      toast.success('Alert thresholds saved');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'alert-thresholds'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save thresholds', { description: error.message });
     },
   });
 }

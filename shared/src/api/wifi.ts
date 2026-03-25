@@ -180,3 +180,21 @@ export interface WifiMutationResponse {
 export interface RandomizeMACResponse extends WifiMutationResponse {
   readonly mac: string;
 }
+
+/** WiFi on/off schedule (cron-based) */
+export interface WiFiSchedule {
+  readonly enabled: boolean;
+  readonly on_time: string;  // HH:MM
+  readonly off_time: string; // HH:MM
+}
+
+/** Per-network MAC address policy */
+export interface MACPolicy {
+  readonly ssid: string;
+  readonly mac: string;
+}
+
+/** Collection of per-network MAC policies */
+export interface MACPolicies {
+  readonly policies: readonly MACPolicy[];
+}

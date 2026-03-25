@@ -167,3 +167,56 @@ type DataBudget struct {
 type DataBudgetConfig struct {
 	Budgets []DataBudget `json:"budgets"`
 }
+
+// IPv6Status holds the current IPv6 configuration state.
+type IPv6Status struct {
+	Enabled   bool     `json:"enabled"`
+	Addresses []string `json:"addresses"`
+}
+
+// FirewallZone holds a summary of a UCI firewall zone.
+type FirewallZone struct {
+	Name    string   `json:"name"`
+	Input   string   `json:"input"`   // ACCEPT / REJECT / DROP
+	Output  string   `json:"output"`
+	Forward string   `json:"forward"`
+	Network []string `json:"network"`
+}
+
+// PortForwardRule holds a single DNAT port-forward rule.
+type PortForwardRule struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Protocol string `json:"protocol"` // tcp, udp, tcp+udp
+	SrcDPort string `json:"src_dport"` // external port/range
+	DestIP   string `json:"dest_ip"`
+	DestPort string `json:"dest_port"` // internal port (empty = same)
+	Enabled  bool   `json:"enabled"`
+}
+
+// WoLRequest asks the server to send a magic packet to a specific MAC address.
+type WoLRequest struct {
+	MAC       string `json:"mac"`
+	Interface string `json:"interface"` // optional, e.g. "br-lan"
+}
+
+// DoHConfig holds DNS-over-HTTPS settings.
+type DoHConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Provider string `json:"provider"` // "cloudflare", "google", "quad9", "custom"
+	URL      string `json:"url"`      // used when provider="custom"
+}
+
+// DiagnosticsRequest asks to run a network diagnostic tool.
+type DiagnosticsRequest struct {
+	Type   string `json:"type"`   // "ping", "traceroute", "dns"
+	Target string `json:"target"` // hostname or IP
+}
+
+// DiagnosticsResult holds the textual output of a diagnostic command.
+type DiagnosticsResult struct {
+	Type   string `json:"type"`
+	Target string `json:"target"`
+	Output string `json:"output"`
+	Error  string `json:"error,omitempty"`
+}
