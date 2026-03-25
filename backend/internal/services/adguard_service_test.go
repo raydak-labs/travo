@@ -550,14 +550,17 @@ func TestAutoConfigureWritesDefaultConfig(t *testing.T) {
 	svc := NewAdGuardServiceWithChecker(mock)
 
 	// mkdir and AdGuard start commands must not fail.
-	mock.commands["mkdir -p /opt/AdGuardHome"] = struct{ output string; err error }{"", nil}
+	mock.commands["mkdir -p /opt/AdGuardHome"] = struct {
+		output string
+		err    error
+	}{"", nil}
 
 	err := svc.AutoConfigure()
 	if err != nil {
 		t.Fatalf("AutoConfigure: %v", err)
 	}
 
-	content, ok := mock.fileContents[adguardConfigPath]
+	content, ok := mock.fileContents[adguardYAMLPathOpt]
 	if !ok {
 		t.Fatal("expected AdGuardHome.yaml to be written")
 	}
@@ -572,14 +575,14 @@ func TestAutoConfigureWritesDefaultConfig(t *testing.T) {
 func TestAutoConfigureSkipsExistingConfig(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	// Config file already exists.
-	mock.files[adguardConfigPath] = true
-	mock.fileContents[adguardConfigPath] = "existing: config\n"
+	mock.files[adguardYAMLPathOpt] = true
+	mock.fileContents[adguardYAMLPathOpt] = "existing: config\n"
 	svc := NewAdGuardServiceWithChecker(mock)
 
 	_ = svc.AutoConfigure()
 
 	// The existing content must be preserved.
-	if content := mock.fileContents[adguardConfigPath]; content != "existing: config\n" {
+	if content := mock.fileContents[adguardYAMLPathOpt]; content != "existing: config\n" {
 		t.Errorf("expected existing config to be preserved, got: %q", content)
 	}
 }

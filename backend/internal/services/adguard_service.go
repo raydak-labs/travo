@@ -12,13 +12,16 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	yaml "gopkg.in/yaml.v3"
 )
 
 const (
 	adguardBinary         = "/opt/AdGuardHome/AdGuardHome"
 	adguardInitd          = "/etc/init.d/adguardhome"
-	adguardAPIBase        = "http://127.0.0.1:3000"
+	adguardAPIBaseDefault = "http://127.0.0.1:3000"
 	adguardDefaultDNSPort = 5353
+	adguardYAMLPathUCI    = "/etc/adguardhome/adguardhome.yaml"
+	adguardYAMLPathOpt    = "/opt/AdGuardHome/AdGuardHome.yaml"
 )
 
 // AdGuardChecker abstracts filesystem/process checks for testability.
@@ -90,17 +93,84 @@ func (r *RealAdGuardChecker) TCPProbe(addr string, timeout time.Duration) bool {
 
 // AdGuardService provides status and statistics for AdGuard Home.
 type AdGuardService struct {
-	checker AdGuardChecker
+	checker        AdGuardChecker
+	httpAPIBase    string
+	yamlDNSPort    int
+	yamlSourcePath string
+}
+
+type adguardYAMLTop struct {
+	BindHost string `yaml:"bind_host"`
+	BindPort int    `yaml:"bind_port"`
+	DNS      struct {
+		Port int `yaml:"port"`
+	} `yaml:"dns"`
+}
+
+func normalizeAdGuardBindHost(h string) string {
+	h = strings.Trim(strings.TrimSpace(h), `"'`)
+	switch h {
+	case "", "0.0.0.0", "::", "[::]":
+		return "127.0.0.1"
+	default:
+		return h
+	}
+}
+
+func (s *AdGuardService) refreshEndpointsFromYAML() {
+	s.httpAPIBase = ""
+	s.yamlDNSPort = 0
+	s.yamlSourcePath = ""
+	var data []byte
+	var usedPath string
+	for _, p := range []string{adguardYAMLPathUCI, adguardYAMLPathOpt} {
+		b, err := s.checker.ReadFile(p)
+		if err == nil && len(b) > 0 {
+			data, usedPath = b, p
+			break
+		}
+	}
+	if len(data) == 0 {
+		s.httpAPIBase = adguardAPIBaseDefault
+		return
+	}
+	var y adguardYAMLTop
+	if err := yaml.Unmarshal(data, &y); err != nil {
+		s.httpAPIBase = adguardAPIBaseDefault
+		s.yamlSourcePath = usedPath
+		return
+	}
+	webPort := y.BindPort
+	if webPort <= 0 {
+		webPort = 3000
+	}
+	host := normalizeAdGuardBindHost(y.BindHost)
+	s.httpAPIBase = fmt.Sprintf("http://%s:%d", host, webPort)
+	s.yamlSourcePath = usedPath
+	if y.DNS.Port > 0 {
+		s.yamlDNSPort = y.DNS.Port
+	}
+}
+
+func (s *AdGuardService) apiBase() string {
+	if s != nil && s.httpAPIBase != "" {
+		return s.httpAPIBase
+	}
+	return adguardAPIBaseDefault
 }
 
 // NewAdGuardService creates a new AdGuardService with a real checker.
 func NewAdGuardService() *AdGuardService {
-	return &AdGuardService{checker: NewRealAdGuardChecker()}
+	s := &AdGuardService{checker: NewRealAdGuardChecker()}
+	s.refreshEndpointsFromYAML()
+	return s
 }
 
 // NewAdGuardServiceWithChecker creates a new AdGuardService with a custom checker (for tests).
 func NewAdGuardServiceWithChecker(c AdGuardChecker) *AdGuardService {
-	return &AdGuardService{checker: c}
+	s := &AdGuardService{checker: c}
+	s.refreshEndpointsFromYAML()
+	return s
 }
 
 // IsInstalled returns true when the AdGuard Home binary or init script exists,
@@ -113,8 +183,8 @@ func (s *AdGuardService) IsInstalled() bool {
 	if s.checker.FileExists(adguardInitd) {
 		return true
 	}
-	// Fall back: if the process responds to the API, it's running (and installed).
-	_, err := s.checker.HTTPGet(adguardAPIBase + "/control/status")
+	s.refreshEndpointsFromYAML()
+	_, err := s.checker.HTTPGet(s.apiBase() + "/control/status")
 	return err == nil
 }
 
@@ -163,9 +233,11 @@ type adguardStatusResponse struct {
 // GetStatus returns a combined AdGuardStatus with stats and protection state.
 func (s *AdGuardService) GetStatus() (models.AdGuardStatus, error) {
 	var result models.AdGuardStatus
+	s.refreshEndpointsFromYAML()
+	result.AdminURL = s.apiBase()
+	result.ConfigYAMLPath = s.yamlSourcePath
 
-	// Fetch protection status.
-	statusBody, err := s.checker.HTTPGet(adguardAPIBase + "/control/status")
+	statusBody, err := s.checker.HTTPGet(s.apiBase() + "/control/status")
 	if err != nil {
 		return result, fmt.Errorf("failed to reach AdGuard API: %w", err)
 	}
@@ -175,8 +247,7 @@ func (s *AdGuardService) GetStatus() (models.AdGuardStatus, error) {
 	}
 	result.Enabled = statusResp.ProtectionEnabled
 
-	// Fetch statistics.
-	statsBody, err := s.checker.HTTPGet(adguardAPIBase + "/control/stats")
+	statsBody, err := s.checker.HTTPGet(s.apiBase() + "/control/stats")
 	if err != nil {
 		return result, fmt.Errorf("failed to fetch stats: %w", err)
 	}
@@ -204,7 +275,11 @@ type adguardDNSInfoResponse struct {
 
 // getDNSPort returns the DNS port AdGuard listens on, or the default.
 func (s *AdGuardService) getDNSPort() int {
-	body, err := s.checker.HTTPGet(adguardAPIBase + "/control/dns_info")
+	s.refreshEndpointsFromYAML()
+	if s.yamlDNSPort > 0 {
+		return s.yamlDNSPort
+	}
+	body, err := s.checker.HTTPGet(s.apiBase() + "/control/dns_info")
 	if err != nil {
 		return adguardDefaultDNSPort
 	}
@@ -306,8 +381,6 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 	return nil
 }
 
-const adguardConfigPath = "/opt/AdGuardHome/AdGuardHome.yaml"
-
 // defaultAdGuardConfig is written on first install to give AdGuard sensible defaults:
 // web UI on port 3000, DNS listener on 5353 (dnsmasq-forwarding mode), DoH upstreams.
 const defaultAdGuardConfig = `bind_host: 0.0.0.0
@@ -343,16 +416,13 @@ verbose: false
 // starts the adguardhome service, and enables dnsmasq forwarding to AdGuard.
 // Called automatically after successful package install.
 func (s *AdGuardService) AutoConfigure() error {
-	// Only write default config if config file doesn't already exist.
-	if !s.checker.FileExists(adguardConfigPath) {
-		// Ensure the config directory exists.
+	if !s.checker.FileExists(adguardYAMLPathUCI) && !s.checker.FileExists(adguardYAMLPathOpt) {
 		_, _ = s.checker.RunCommand("mkdir", "-p", "/opt/AdGuardHome")
-		if err := s.checker.WriteFile(adguardConfigPath, []byte(defaultAdGuardConfig), 0600); err != nil {
+		if err := s.checker.WriteFile(adguardYAMLPathOpt, []byte(defaultAdGuardConfig), 0600); err != nil {
 			return fmt.Errorf("writing default AdGuard config: %w", err)
 		}
 	}
 
-	// Start the service if init script exists.
 	if s.checker.FileExists(adguardInitd) {
 		_, _ = s.checker.RunCommand(adguardInitd, "enable")
 		if _, err := s.checker.RunCommand(adguardInitd, "start"); err != nil {
@@ -360,25 +430,39 @@ func (s *AdGuardService) AutoConfigure() error {
 		}
 	}
 
+	s.refreshEndpointsFromYAML()
 	return nil
 }
 
 // GetConfig reads the AdGuard Home YAML configuration file.
 func (s *AdGuardService) GetConfig() (string, error) {
-	data, err := s.checker.ReadFile(adguardConfigPath)
-	if err != nil {
-		return "", fmt.Errorf("reading AdGuard config: %w", err)
+	var lastErr error
+	for _, p := range []string{adguardYAMLPathUCI, adguardYAMLPathOpt} {
+		data, err := s.checker.ReadFile(p)
+		if err == nil {
+			return string(data), nil
+		}
+		lastErr = err
 	}
-	return string(data), nil
+	if lastErr == nil {
+		lastErr = os.ErrNotExist
+	}
+	return "", fmt.Errorf("reading AdGuard config: %w", lastErr)
 }
 
 // SetConfig writes the AdGuard Home YAML configuration and restarts the service.
 func (s *AdGuardService) SetConfig(content string) error {
-	if err := s.checker.WriteFile(adguardConfigPath, []byte(content), 0600); err != nil {
+	s.refreshEndpointsFromYAML()
+	path := adguardYAMLPathOpt
+	if s.yamlSourcePath != "" {
+		path = s.yamlSourcePath
+	}
+	if err := s.checker.WriteFile(path, []byte(content), 0600); err != nil {
 		return fmt.Errorf("writing AdGuard config: %w", err)
 	}
 	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {
 		return fmt.Errorf("restarting AdGuard: %w", err)
 	}
+	s.refreshEndpointsFromYAML()
 	return nil
 }
