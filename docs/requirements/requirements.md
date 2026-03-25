@@ -32,6 +32,39 @@
 
 ---
 
+## Implementation Tasks (Sequential)
+
+These tasks define the next end-to-end work items in a deliberate order. When a task is implemented, mark its entry as `[x]` here and also update the matching checkbox in the feature section below.
+
+- [ ] Task 1 (12.3) Standardise form pattern for config cards (read-only view + `Edit` button)
+- [ ] Task 2 (12.2) Network page card grouping into **Status / Configuration / Advanced**
+- [ ] Task 3 (8) Captive portal: auto-accept portal terms
+- [ ] Task 4 (7) Authentication: IP-based access control
+- [ ] Task 5 (7) Authentication: Two-factor authentication
+- [ ] Task 6 (13) Deployment: automatic updates mechanism
+- [ ] Task 7 (14) Hardware buttons: long-press vs short-press differentiation
+- [ ] Task 8 (14) Hardware buttons: custom button action scripting
+- [ ] Task 9 (12) UX: multi-language support (i18n)
+- [ ] Task 10 (11) Advanced networking: mDNS / Bonjour forwarding
+- [ ] Task 11 (11) Advanced networking: VLAN configuration
+- [ ] Task 12 (11) Advanced networking: custom routing rules
+- [ ] Task 13 (6) Monitoring: historical data (store + display recent hours/days)
+- [ ] Task 14 (2.7) Network management: priority-based WAN failover (health check + auto-switch + notification)
+- [ ] Task 15 (2.5) USB/BT: Bluetooth tethering
+- [ ] Task 16 (1.3) WiFi modes: Mesh / WDS mode
+- [ ] Task 17 (1.4) Multi-radio: startup script to auto-discover radio setup and persist config
+- [ ] Task 18 (2.2) Clients: bandwidth limiting (QoS per device)
+- [ ] Task 19 (2.2) Clients: parental controls / client group policies
+- [ ] Task 20 (3.3) VPN: VPN speed test
+- [ ] Task 21 (3.3) VPN: OpenVPN support
+- [ ] Task 22 (4.2) AdGuard: blocklist management from the travel router UI
+- [ ] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
+- [ ] Task 24 (4.6) Future services: cloudflared (Cloudflare Tunnel)
+- [ ] Task 25 (4.6) Future services: SQM / QoS (traffic shaping)
+- [ ] Task 26 (4.6) Future services: Watchcat (connection watchdog)
+
+---
+
 ## 0. Bug List / smaller changes
 
 - [x] AdguardConfig button under Services: {"error":"reading AdGuard config: open /opt/AdGuardHome/AdGuardHome.yaml: no such file or directory"}
