@@ -4,10 +4,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
+
+func mockRunWireGuardEnableOK(name string, args ...string) ([]byte, error) {
+	switch name {
+	case "tailscale":
+		return nil, nil
+	case "ubus":
+		return []byte("{}"), nil
+	case "ifup", "ifdown":
+		return nil, nil
+	case "ip":
+		if len(args) >= 4 && args[0] == "link" && args[1] == "show" && args[2] == "dev" && args[3] == "wg0" {
+			return []byte("3: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN"), nil
+		}
+	case "wg":
+		return []byte("PRIV\tPUB\t51820\toff\n"), nil
+	}
+	return nil, fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
+}
 
 func TestGetVpnStatus(t *testing.T) {
 	u := uci.NewMockUCI()
@@ -57,8 +76,7 @@ func TestGetWireguardConfig(t *testing.T) {
 
 func TestToggleWireguard(t *testing.T) {
 	u := uci.NewMockUCI()
-	// MockCommandRunner returns valid wg dump for all calls (covers ifup + wg show).
-	cmd := &MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
+	cmd := &MockCommandRunner{RunFunc: mockRunWireGuardEnableOK}
 	svc := NewVpnServiceWithRunner(u, cmd)
 
 	err := svc.ToggleWireguard(true)
@@ -88,8 +106,16 @@ func TestToggleWireguard_Disable(t *testing.T) {
 
 func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
 	u := uci.NewMockUCI()
-	// ifup succeeds but wg show returns empty (tunnel not up).
-	cmd := &MockCommandRunner{Output: []byte("")}
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "tailscale", "ubus", "ifup":
+			return nil, nil
+		case "ip":
+			return []byte("3: wg0: state DOWN"), nil
+		default:
+			return nil, nil
+		}
+	}}
 	svc := NewVpnServiceWithRunner(u, cmd)
 
 	err := svc.ToggleWireguard(true)
@@ -100,7 +126,7 @@ func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
 
 func TestToggleWireguard_SetsProtoWireguard(t *testing.T) {
 	u := uci.NewMockUCI()
-	cmd := &MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
+	cmd := &MockCommandRunner{RunFunc: mockRunWireGuardEnableOK}
 	svc := NewVpnServiceWithRunner(u, cmd)
 
 	if err := svc.ToggleWireguard(true); err != nil {

@@ -81,15 +81,21 @@ func (v *VpnService) ensureWireGuardPeer(section string) error {
 	return nil
 }
 
-// applyAndVerifyWireGuard brings up wg0 via ifup and verifies the interface is
-// live using `wg show wg0 dump`. Returns an error if the tunnel is not up.
 func (v *VpnService) applyAndVerifyWireGuard() error {
+	_, _ = v.cmd.Run("ubus", "call", "network", "reload")
 	if _, err := v.cmd.Run("ifup", "wg0"); err != nil {
 		return fmt.Errorf("ifup wg0 failed: %w", err)
 	}
-	out, err := v.cmd.Run("wg", "show", "wg0", "dump")
-	if err != nil || strings.TrimSpace(string(out)) == "" {
-		return fmt.Errorf("wg0 is not up after apply: wg show wg0 dump returned no output")
+	linkOut, err := v.cmd.Run("ip", "link", "show", "dev", "wg0")
+	if err != nil {
+		return fmt.Errorf("wg0 not present after ifup: %w", err)
+	}
+	ls := string(linkOut)
+	if !strings.Contains(ls, "wg0") {
+		return fmt.Errorf("ip link show dev wg0 returned unexpected output")
+	}
+	if strings.Contains(ls, "state DOWN") {
+		return fmt.Errorf("wg0 interface is DOWN after ifup")
 	}
 	return nil
 }
@@ -261,11 +267,13 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 	val := "1"
 	if enable {
 		val = "0"
-		// Normalize interface structure before enabling.
+		_, _ = v.cmd.Run("tailscale", "set", "--exit-node=")
 		if err := v.ensureWireGuardInterface(); err != nil {
 			return fmt.Errorf("normalizing wg0 interface: %w", err)
 		}
-		// Ensure firewall zone and forwarding rules exist.
+		if err := v.ensureWireGuardPeer("wg0_peer0"); err != nil {
+			return fmt.Errorf("normalizing wg0 peer: %w", err)
+		}
 		if err := v.setupWireGuardFirewall(); err != nil {
 			return fmt.Errorf("setting up WireGuard firewall: %w", err)
 		}
