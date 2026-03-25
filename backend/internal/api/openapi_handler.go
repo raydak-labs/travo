@@ -422,6 +422,12 @@ var openAPISpec = map[string]interface{}{
 		"/captive/status": map[string]interface{}{
 			"get": endpoint("CaptiveStatus", "Detect captive portal and return redirect URL if present", true, nil, resp200("application/json", nil)),
 		},
+		"/captive/auto-accept": map[string]interface{}{
+			"post": endpoint("CaptiveAutoAccept", "Attempt common captive portal acceptance patterns", true,
+				body("application/json", obj("portal_url")),
+				resp200("application/json", nil),
+			),
+		},
 	},
 }
 

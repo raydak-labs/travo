@@ -38,7 +38,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 - [x] Task 1 (12.3) Standardise form pattern for config cards (read-only view + `Edit` button)
 - [x] Task 2 (12.2) Network page card grouping into **Status / Configuration / Advanced**
-- [ ] Task 3 (8) Captive portal: auto-accept portal terms
+- [x] Task 3 (8) Captive portal: auto-accept portal terms
 - [ ] Task 4 (7) Authentication: IP-based access control
 - [ ] Task 5 (7) Authentication: Two-factor authentication
 - [ ] Task 6 (13) Deployment: automatic updates mechanism
@@ -391,7 +391,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Banner on dashboard and WiFi page
 - [x] Auto-refresh every 30 seconds
 - [x] Open portal login in new tab (button in captive portal banner)
-- [ ] 🔮 Auto-accept portal terms (common portal patterns)
+- [x] Auto-accept portal terms (common portal patterns)
 
 ---
 

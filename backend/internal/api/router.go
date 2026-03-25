@@ -9,21 +9,21 @@ import (
 
 // Dependencies holds all service dependencies for API handlers.
 type Dependencies struct {
-	Auth            *auth.AuthService
-	Blocklist       *auth.TokenBlocklist
-	RateLimiter     *auth.RateLimiter
-	System          *services.SystemService
-	Network         *services.NetworkService
-	Wifi            *services.WifiService
-	Vpn             *services.VpnService
-	ServiceManager  *services.ServiceManager
-	Captive         *services.CaptiveService
-	AdGuard         *services.AdGuardService
-	Alerts          *services.AlertService
-	UptimeTracker   *services.UptimeTracker
-	DataUsage       *services.DataUsageService
-	USBTether       *services.USBTetheringService
-	BandSwitching   *services.BandSwitchingService
+	Auth           *auth.AuthService
+	Blocklist      *auth.TokenBlocklist
+	RateLimiter    *auth.RateLimiter
+	System         *services.SystemService
+	Network        *services.NetworkService
+	Wifi           *services.WifiService
+	Vpn            *services.VpnService
+	ServiceManager *services.ServiceManager
+	Captive        *services.CaptiveService
+	AdGuard        *services.AdGuardService
+	Alerts         *services.AlertService
+	UptimeTracker  *services.UptimeTracker
+	DataUsage      *services.DataUsageService
+	USBTether      *services.USBTetheringService
+	BandSwitching  *services.BandSwitchingService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -195,4 +195,5 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))
+	v1.Post("/captive/auto-accept", CaptiveAutoAcceptHandler(deps.Captive))
 }

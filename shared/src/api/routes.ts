@@ -119,6 +119,7 @@ export const API_ROUTES = {
   },
   captive: {
     status: '/api/v1/captive/status',
+    autoAccept: '/api/v1/captive/auto-accept',
   },
   adguard: {
     dns: '/api/v1/adguard/dns',
