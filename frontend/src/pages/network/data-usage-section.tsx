@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BarChart2, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -173,7 +174,7 @@ export function DataUsageSection() {
       </CardHeader>
       <CardContent className="space-y-3">
         {status.interfaces.length === 0 ? (
-          <p className="text-sm text-gray-500">No interfaces monitored yet.</p>
+          <EmptyState message="No interfaces monitored yet" />
         ) : (
           status.interfaces.map((iface) => (
             <div key={iface.name} className="space-y-2">

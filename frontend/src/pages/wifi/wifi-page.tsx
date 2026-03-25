@@ -10,6 +10,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -57,6 +58,11 @@ export function WifiPage() {
   const setAutoReconnect = useSetAutoReconnect();
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
+  // Hide STA-only sections in pure AP mode, hide AP-only sections in pure STA mode
+  const currentMode = connection?.mode;
+  const isPureAP = currentMode === 'ap';
+  const isPureSTA = currentMode === 'client';
+
   return (
     <div className="space-y-6">
       <CaptivePortalBanner />
@@ -77,7 +83,7 @@ export function WifiPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : !radios || radios.length === 0 ? (
-            <p className="text-sm text-gray-500">No radio hardware detected</p>
+            <EmptyState message="No radio hardware detected" />
           ) : (
             <div className="space-y-3">
               {radios.map((radio) => {
@@ -144,8 +150,8 @@ export function WifiPage() {
         </CardContent>
       </Card>
 
-      {/* Current Connection */}
-      <Card>
+      {/* Current Connection — hidden in pure AP mode */}
+      {!isPureAP && <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Current Connection</CardTitle>
           {connection?.connected ? (
@@ -193,7 +199,7 @@ export function WifiPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">Not connected to any WiFi network</p>
+              <EmptyState message="Not connected to any WiFi network" />
               <div className="flex gap-2">
                 <WifiScanDialog />
                 <WifiHiddenNetworkDialog />
@@ -201,10 +207,10 @@ export function WifiPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      {/* Saved Networks */}
-      <Card>
+      {/* Saved Networks — hidden in pure AP mode */}
+      {!isPureAP && <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Saved Networks</CardTitle>
         </CardHeader>
@@ -232,7 +238,7 @@ export function WifiPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : savedNetworks.length === 0 ? (
-            <p className="text-sm text-gray-500">No saved networks</p>
+            <EmptyState message="No saved networks" />
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
               {savedNetworks.map((network, index) => (
@@ -299,9 +305,10 @@ export function WifiPage() {
             </ul>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
-      <APConfigCard />
+      {/* AP Configuration — hidden in pure STA mode */}
+      {!isPureSTA && <APConfigCard />}
 
       {/* Advanced Settings (collapsible) */}
       <div>

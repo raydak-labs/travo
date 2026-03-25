@@ -1,4 +1,4 @@
-import { Info, Globe, Cable } from 'lucide-react';
+import { Info, Cable, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,39 +85,45 @@ export function WanStatusCard() {
   const { data: network, isLoading } = useNetworkStatus();
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Internet Connectivity</CardTitle>
-          <Globe className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">WAN Status</CardTitle>
+        <Cable className="h-4 w-4 text-gray-500" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Internet connectivity row */}
+        <div className="flex items-center gap-2">
           {isLoading ? (
             <Skeleton className="h-4 w-1/3" />
+          ) : network?.internet_reachable ? (
+            <>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                Internet Connected
+              </span>
+              <Badge variant="success">Online</Badge>
+            </>
           ) : (
-            <Badge variant={network?.internet_reachable ? 'success' : 'destructive'}>
-              {network?.internet_reachable ? 'Connected' : 'No Internet'}
-            </Badge>
+            <>
+              <XCircle className="h-4 w-4 text-red-500" />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                No Internet
+              </span>
+              <Badge variant="destructive">Offline</Badge>
+            </>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">WAN Source</CardTitle>
-          <Cable className="h-4 w-4 text-gray-500" />
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : (
-            <WanInterplay interfaces={network?.interfaces ?? []} />
-          )}
-        </CardContent>
-      </Card>
-    </>
+        {/* WAN source interplay */}
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : (
+          <WanInterplay interfaces={network?.interfaces ?? []} />
+        )}
+      </CardContent>
+    </Card>
   );
 }

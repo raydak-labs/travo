@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Package } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import {
@@ -83,7 +84,7 @@ export function ServicesPage() {
               ))}
             </div>
           ) : services.length === 0 ? (
-            <p className="text-sm text-gray-500">No services available</p>
+            <EmptyState message="No services available" />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {services.map((service) => (

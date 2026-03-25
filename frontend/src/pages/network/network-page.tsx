@@ -1,5 +1,6 @@
 import { useNetworkStatus, useBlockedClients } from '@/hooks/use-network';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Network } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ClientsTable } from './clients-table';
@@ -32,19 +33,7 @@ export function NetworkPage() {
     <div className="space-y-6">
       <WanStatusCard />
 
-      {/* Interface Traffic Charts */}
-      <InterfaceTrafficCharts />
-
-      <WanConfigCard />
-      <InterfacesCard />
-      <LanConfigCard />
-      <DhcpDnsCard />
-      <DdnsCard />
-      <DnsEntriesCard />
-      <DhcpReservationsCard />
-      <DhcpLeasesCard />
-
-      {/* Connected Clients */}
+      {/* Connected Clients — placed early for daily-use visibility */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Connected Clients</CardTitle>
@@ -60,10 +49,22 @@ export function NetworkPage() {
           ) : network?.clients && network.clients.length > 0 ? (
             <ClientsTable clients={network.clients} blockedMacs={blockedClients} />
           ) : (
-            <p className="text-sm text-gray-500">No clients connected</p>
+            <EmptyState message="No clients connected" />
           )}
         </CardContent>
       </Card>
+
+      {/* Interface Traffic Charts */}
+      <InterfaceTrafficCharts />
+
+      <WanConfigCard />
+      <InterfacesCard />
+      <LanConfigCard />
+      <DhcpDnsCard />
+      <DdnsCard />
+      <DnsEntriesCard />
+      <DhcpReservationsCard />
+      <DhcpLeasesCard />
 
       <UptimeLogCard />
 

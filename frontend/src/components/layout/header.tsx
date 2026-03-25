@@ -80,6 +80,13 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h1>
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
+        {/* Router hostname */}
+        {systemInfo?.hostname && (
+          <span className="hidden text-xs text-gray-500 sm:block dark:text-gray-400">
+            {systemInfo.hostname}
+          </span>
+        )}
+
         {/* Connection status indicator */}
         <span
           className={`inline-block h-2 w-2 rounded-full ${
@@ -87,7 +94,7 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
               ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]'
               : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]'
           }`}
-          title={isConnected ? 'Connected to router' : 'Connection lost'}
+          title={isConnected ? `Connected to ${systemInfo?.hostname ?? 'router'}` : 'Connection lost'}
         />
 
         {/* Notification bell */}

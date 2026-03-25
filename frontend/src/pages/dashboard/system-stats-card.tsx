@@ -26,7 +26,20 @@ export function SystemStatsCard() {
     );
   }
 
-  if (!stats) return null;
+  if (!stats) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">System Stats</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

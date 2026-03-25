@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Radio, QrCode } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,7 +68,7 @@ export function APConfigCard() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : !apConfigs || apConfigs.length === 0 ? (
-            <p className="text-sm text-gray-500">No access point radios detected</p>
+            <EmptyState message="No access point radios detected" />
           ) : (
             <div className="space-y-6">
               {apConfigs.map((ap) => {

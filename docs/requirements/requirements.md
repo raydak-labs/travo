@@ -425,10 +425,10 @@
 #### Network page (21 cards, 1008 lines — most complex page)
 
 - [ ] Group cards into tabbed/collapsible sections: **Status** (connectivity, WAN source, traffic charts, connected clients), **Configuration** (WAN, LAN, DHCP, DNS), **Advanced** (DDNS, firewall, port forwarding, IPv6, DoH, WoL, diagnostics, speed test, USB tethering). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-restructure).
-- [ ] Move Connected Clients card from position 13 to the Status group (top of page)
-- [ ] Merge Internet Connectivity badge into WAN Source card (save one full card for a single badge)
-- [ ] Make firewall port-forward add-form responsive (currently hard 6-column grid breaks on mobile). See [UX Overhaul plan](../plans/ux-overhaul.md#mobile-form-fixes).
-- [ ] Make DHCP reservation / DNS entry add-forms responsive (3–4 column grids with no breakpoints)
+- [x] Move Connected Clients card from position 13 to the Status group (top of page)
+- [x] Merge Internet Connectivity badge into WAN Source card (save one full card for a single badge)
+- [x] Make firewall port-forward add-form responsive (currently hard 6-column grid breaks on mobile). See [UX Overhaul plan](../plans/ux-overhaul.md#mobile-form-fixes).
+- [x] Make DHCP reservation / DNS entry add-forms responsive (3–4 column grids with no breakpoints)
 - [x] Extract network-page.tsx inline sections into separate components (target: page file under 300 lines). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-extraction).
 
 #### System page (13+ cards, 1087 lines — second most complex)
@@ -444,7 +444,7 @@
 #### WiFi page (10 cards, 572 lines)
 
 - [x] Group bottom 5 cards (Guest, MAC Address, MAC Policy, Band Switching, Schedule) into a collapsible "Advanced WiFi Settings" section — these are set-once features. See [UX Overhaul plan](../plans/ux-overhaul.md#wifi-page-restructure).
-- [ ] Hide mode-irrelevant sections: hide "Saved Networks" in pure AP mode, hide "Access Point Configuration" in pure STA mode
+- [x] Hide mode-irrelevant sections: hide "Saved Networks" in pure AP mode, hide "Access Point Configuration" in pure STA mode
 - [x] Extract inline cards (Radio Hardware, Current Connection, Saved Networks, AP Config) into separate component files (currently 442 lines inline in wifi-page.tsx)
 
 #### Dashboard
@@ -454,14 +454,14 @@
 - [x] Remove duplicate feedback: QuickActions uses inline ActionState icons AND hook-level Sonner toasts simultaneously — pick one
 - [x] Remove `window.confirm()` from QuickActions Reboot — use Dialog component (matches header pattern)
 - [x] Fix chart hardcoded hex colors for dark mode (tooltip bg `rgba(0,0,0,0.8)`, grid lines `#9ca3af`). See [UX Overhaul plan](../plans/ux-overhaul.md#dark-mode-chart-fix).
-- [ ] Show router hostname/model in header for multi-device disambiguation
+- [x] Show router hostname/model in header for multi-device disambiguation
 
 ### 12.3 Consistency & Polish
 
 - [x] Standardise confirmation UX: all destructive actions (Reboot, Shutdown, Factory Reset, Firmware Upgrade, Restore) must use the Dialog component with explicit warning text — no `window.confirm()`, no inline badge-based confirmations. See [UX Overhaul plan](../plans/ux-overhaul.md#confirmation-standardisation).
 - [ ] Standardise form pattern: configuration cards should have a read-only view state with an Edit button, instead of permanently showing editable forms (Timezone, NTP, Password, Hardware Buttons are always in edit mode)
-- [ ] Standardise empty states: use a consistent "no data" component across all cards instead of ad-hoc `<p className="text-sm text-gray-500">` strings
-- [ ] Ensure `SystemStatsCard` shows a Skeleton on error instead of returning `null` (which collapses the grid cell)
+- [x] Standardise empty states: use a consistent "no data" component across all cards instead of ad-hoc `<p className="text-sm text-gray-500">` strings
+- [x] Ensure `SystemStatsCard` shows a Skeleton on error instead of returning `null` (which collapses the grid cell)
 
 ---
 

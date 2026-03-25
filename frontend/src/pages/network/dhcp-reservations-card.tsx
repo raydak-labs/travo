@@ -70,7 +70,7 @@ export function DhcpReservationsCard() {
                 </table>
               </div>
             )}
-            <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+            <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
               <div className="space-y-1">
                 <label className="text-xs text-gray-500">Name</label>
                 <Input

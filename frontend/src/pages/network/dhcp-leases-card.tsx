@@ -1,5 +1,6 @@
 import { List } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDHCPLeases } from '@/hooks/use-network';
 
@@ -44,7 +45,7 @@ export function DhcpLeasesCard() {
             </table>
           </div>
         ) : (
-          <p className="text-sm text-gray-500">(No active leases)</p>
+          <EmptyState message="No active leases" />
         )}
       </CardContent>
     </Card>

@@ -1,5 +1,6 @@
 import { Power } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,7 +54,7 @@ export function InterfacesCard() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">No interfaces found</p>
+          <EmptyState message="No interfaces found" />
         )}
       </CardContent>
     </Card>

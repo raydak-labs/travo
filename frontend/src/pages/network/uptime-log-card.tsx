@@ -1,5 +1,6 @@
 import { Cable } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useUptimeLog } from '@/hooks/use-network';
 
 export function UptimeLogCard() {
@@ -13,7 +14,7 @@ export function UptimeLogCard() {
       </CardHeader>
       <CardContent>
         {!uptimeLog || uptimeLog.length === 0 ? (
-          <p className="text-sm text-gray-500">No connectivity events recorded yet.</p>
+          <EmptyState message="No connectivity events recorded yet" />
         ) : (
           <ol className="space-y-2">
             {uptimeLog.map((event, i) => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Shield, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,7 +116,7 @@ export function FirewallCard() {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No firewall zones found.</p>
+            <EmptyState message="No firewall zones found" />
           )}
         </div>
 
@@ -178,7 +179,7 @@ export function FirewallCard() {
               {/* Add form */}
               <div className="space-y-2">
                 <p className="text-xs text-gray-500">Add port forwarding rule</p>
-                <div className="grid grid-cols-[1fr_auto_1fr_1fr_1fr_auto] gap-2 items-end">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_auto_1fr_1fr_1fr_auto]">
                   <div className="space-y-1">
                     <label className="text-xs text-gray-500">Name</label>
                     <Input
@@ -190,7 +191,7 @@ export function FirewallCard() {
                   <div className="space-y-1">
                     <label className="text-xs text-gray-500">Protocol</label>
                     <Select value={protocol} onValueChange={setProtocol}>
-                      <SelectTrigger className="w-24">
+                      <SelectTrigger className="w-full lg:w-24">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -226,6 +227,7 @@ export function FirewallCard() {
                   </div>
                   <Button
                     size="sm"
+                    className="self-end"
                     onClick={handleAdd}
                     disabled={addRule.isPending || !canAdd}
                   >
