@@ -1,5 +1,6 @@
 import type { ServiceInfo, ServiceState } from '@shared/index';
 import { Shield, ShieldCheck, ShieldBan, Globe, ExternalLink } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -103,6 +104,11 @@ export function ServiceCard({
 
             {/* Action buttons */}
             <div className="mt-3 flex flex-wrap gap-2">
+              {service.id === 'tailscale' && service.state !== 'not_installed' && (
+                <Button size="sm" variant="outline" asChild>
+                  <Link to="/services/tailscale">Manage</Link>
+                </Button>
+              )}
               {service.state === 'not_installed' && (
                 <Button size="sm" disabled={isPending} onClick={() => onInstall(service.id)}>
                   {isPending ? 'Installing...' : 'Install'}

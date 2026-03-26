@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, Loader2, XCircle, Info } from 'lucide-react';
 import { WireguardSection } from './wireguard-section';
-import { TailscaleSection } from './tailscale-section';
 import { SplitTunnelCard } from './split-tunnel-card';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -227,9 +226,6 @@ export function VpnPage() {
 
       {/* Split Tunneling */}
       <SplitTunnelCard />
-
-      {/* Tailscale Section */}
-      <TailscaleSection />
 
       {/* VPN + AdGuard interplay hint */}
       <AdGuardVPNHint />

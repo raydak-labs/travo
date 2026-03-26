@@ -28,6 +28,9 @@ const VpnPage = lazy(() =>
 const ServicesPage = lazy(() =>
   import('@/pages/services/services-page').then((m) => ({ default: m.ServicesPage })),
 );
+const TailscalePage = lazy(() =>
+  import('@/pages/services/tailscale-page').then((m) => ({ default: m.TailscalePage })),
+);
 const NetworkPage = lazy(() =>
   import('@/pages/network/network-page').then((m) => ({ default: m.NetworkPage })),
 );
@@ -192,6 +195,18 @@ const servicesRoute = createRoute({
   ),
 });
 
+const tailscaleRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/services/tailscale',
+  component: () => (
+    <AppShell title="Services / Tailscale">
+      <Page>
+        <TailscalePage />
+      </Page>
+    </AppShell>
+  ),
+});
+
 const systemRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/system',
@@ -228,6 +243,7 @@ const routeTree = rootRoute.addChildren([
     clientsRoute,
     vpnRoute,
     servicesRoute,
+    tailscaleRoute,
     systemRoute,
     logsRoute,
   ]),

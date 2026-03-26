@@ -74,11 +74,7 @@ function AuthSection() {
           onChange={(e) => setAuthKey(e.target.value)}
           className="text-sm font-mono"
         />
-        <Button
-          size="sm"
-          onClick={() => authMutation.mutate(authKey || undefined)}
-          disabled={authMutation.isPending}
-        >
+        <Button size="sm" onClick={() => authMutation.mutate(authKey || undefined)} disabled={authMutation.isPending}>
           Authenticate
         </Button>
       </div>
@@ -117,10 +113,7 @@ export function TailscaleSection() {
         {!isInstalled ? (
           <div className="text-center py-4">
             <p className="text-sm text-gray-500 mb-2">Tailscale is not installed</p>
-            <Link
-              to="/services"
-              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-            >
+            <Link to="/services" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
               Install via Services →
             </Link>
           </div>
@@ -131,7 +124,6 @@ export function TailscaleSection() {
           </div>
         ) : status ? (
           <>
-            {/* Toggle */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700 dark:text-gray-300">Status</span>
@@ -149,7 +141,6 @@ export function TailscaleSection() {
               />
             </div>
 
-            {/* Auth flow when not logged in */}
             {!status.logged_in && status.running && (
               status.auth_url ? (
                 <a
@@ -165,7 +156,6 @@ export function TailscaleSection() {
               )
             )}
 
-            {/* Connected details */}
             {status.logged_in && (
               <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900 space-y-1">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -178,9 +168,7 @@ export function TailscaleSection() {
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                     <Wifi className="h-3 w-3 text-blue-500" />
                     <span className="text-gray-500 text-xs">Exit node:</span>
-                    <span className="font-mono text-xs text-gray-900 dark:text-white">
-                      {status.exit_node}
-                    </span>
+                    <span className="font-mono text-xs text-gray-900 dark:text-white">{status.exit_node}</span>
                     {status.exit_node_active && (
                       <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
                         Active
@@ -200,7 +188,6 @@ export function TailscaleSection() {
               </div>
             )}
 
-            {/* SSH toggle — only when logged in and running */}
             {status.logged_in && status.running && (
               <div className="flex items-center justify-between py-1 border-t border-gray-100 dark:border-gray-800">
                 <div>
@@ -217,12 +204,13 @@ export function TailscaleSection() {
               </div>
             )}
 
-            {/* Peers list */}
             {status.logged_in && status.peers && status.peers.length > 0 && (
               <div className="space-y-1">
                 <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
                   <Users className="h-3 w-3" />
-                  <span>{status.peers.length} peer{status.peers.length !== 1 ? 's' : ''}</span>
+                  <span>
+                    {status.peers.length} peer{status.peers.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
                   {status.peers.map((peer) => (
@@ -242,3 +230,4 @@ export function TailscaleSection() {
     </Card>
   );
 }
+
