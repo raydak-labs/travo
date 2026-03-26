@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 import { useServices } from '@/hooks/use-services';
 import {
   useWireguardConfig,
@@ -68,7 +69,18 @@ export function WireguardSection() {
   };
 
   return (
-    <Card className={!isInstalled ? 'opacity-60' : undefined}>
+    <>
+      <OperationProgressDialog
+        open={isToggling}
+        title={desiredEnabled ? 'Enabling WireGuard…' : 'Disabling WireGuard…'}
+        description="Applying network and firewall changes. This may take a few seconds."
+        details={[
+          'Updating UCI configuration',
+          'Applying changes via netifd',
+          desiredEnabled ? 'Bringing up wg0 and verifying status' : 'Tearing down wg0 and restoring uplink routing',
+        ]}
+      />
+      <Card className={!isInstalled ? 'opacity-60' : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">WireGuard</CardTitle>
         <Shield className="h-4 w-4 text-blue-500" />
@@ -321,5 +333,6 @@ export function WireguardSection() {
         )}
       </CardContent>
     </Card>
+    </>
   );
 }

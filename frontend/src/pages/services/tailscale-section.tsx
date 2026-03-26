@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 import { useServices } from '@/hooks/use-services';
 import {
   useTailscaleStatus,
@@ -104,7 +105,14 @@ export function TailscaleSection() {
   const isInstalled = tsService ? tsService.state !== 'not_installed' : !!status;
 
   return (
-    <Card className={!isInstalled ? 'opacity-60' : undefined}>
+    <>
+      <OperationProgressDialog
+        open={toggleMutation.isPending}
+        title={toggleMutation.variables ? 'Enabling Tailscale…' : 'Disabling Tailscale…'}
+        description="Starting or stopping the Tailscale service."
+        details={['Updating service state', 'Refreshing status']}
+      />
+      <Card className={!isInstalled ? 'opacity-60' : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Tailscale</CardTitle>
         <Globe className="h-4 w-4 text-blue-500" />
@@ -228,6 +236,7 @@ export function TailscaleSection() {
         ) : null}
       </CardContent>
     </Card>
+    </>
   );
 }
 
