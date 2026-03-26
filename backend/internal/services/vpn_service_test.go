@@ -122,6 +122,13 @@ func TestToggleWireguard_Disable(t *testing.T) {
 	if ifIdx < 0 || ubusIdx < 0 || ubusIdx < ifIdx {
 		t.Fatalf("expected ifdown before ubus reload, calls:\n%s", joined)
 	}
+	// Netifd-managed recovery should attempt to bring WAN back up.
+	if !strings.Contains(joined, "/sbin/ubus call network.interface.wan up") {
+		t.Fatalf("expected wan up call, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "/sbin/ubus call network.interface.wan6 up") {
+		t.Fatalf("expected wan6 up call, calls:\n%s", joined)
+	}
 }
 
 func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {

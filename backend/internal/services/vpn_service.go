@@ -486,6 +486,10 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		// Bring down the interface and clean up firewall plumbing when disabling.
 		_ = v.SetKillSwitch(false)
 		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+		// Netifd-managed recovery: bring WAN back up (best-effort) then reload network so
+		// routes/DNS are recomputed without the wg0 interface.
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan", "up")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan6", "up")
 		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 		time.Sleep(200 * time.Millisecond)
 		_ = v.teardownWireGuardFirewall()
