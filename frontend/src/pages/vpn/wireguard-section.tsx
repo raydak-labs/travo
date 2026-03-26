@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, ShieldAlert, Trash2, Play, Plus, Upload, Loader2 } from 'lucide-react';
+import { Shield, ShieldAlert, Trash2, Play, Plus, Upload, Loader2, FileUp } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
+import { Input } from '@/components/ui/input';
 import { useServices } from '@/hooks/use-services';
 import {
   useWireguardConfig,
@@ -46,6 +47,7 @@ export function WireguardSection() {
   const killSwitchMutation = useSetKillSwitch();
   const [configText, setConfigText] = useState('');
   const [profileName, setProfileName] = useState('');
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const wgStatus = vpnStatuses.find((v) => v.type === 'wireguard');
   const wgService = services.find((s) => s.id === 'wireguard');
@@ -67,6 +69,21 @@ export function WireguardSection() {
       },
     );
   };
+
+  async function handleFileUpload(file: File | null) {
+    setFileError(null);
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setConfigText(text);
+      if (!profileName.trim()) {
+        const base = file.name.replace(/\.conf$/i, '');
+        setProfileName(base || file.name);
+      }
+    } catch (e: unknown) {
+      setFileError(e instanceof Error ? e.message : 'Failed to read file');
+    }
+  }
 
   return (
     <>
@@ -305,13 +322,40 @@ export function WireguardSection() {
                   Import Profile
                 </div>
               </h4>
-              <input
-                type="text"
-                className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white mb-2"
+              <Input
+                id="wg-profile-name"
+                label="Profile name"
                 placeholder="Profile name (e.g. Home VPN, Travel, Work)"
                 value={profileName}
                 onChange={(e) => setProfileName(e.target.value)}
+                className="mb-2"
               />
+
+              <div className="mb-2 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => document.getElementById('wg-file')?.click()}
+                  type="button"
+                >
+                  <FileUp className="h-4 w-4" />
+                  Upload .conf
+                </Button>
+                <input
+                  id="wg-file"
+                  type="file"
+                  accept=".conf,text/plain"
+                  className="hidden"
+                  onChange={(e) => void handleFileUpload(e.target.files?.[0] ?? null)}
+                />
+                <span className="text-xs text-gray-500">or paste below</span>
+              </div>
+              {fileError && (
+                <p className="mb-2 text-sm text-red-600 dark:text-red-400" role="alert">
+                  {fileError}
+                </p>
+              )}
               <textarea
                 className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm font-mono dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 rows={4}
