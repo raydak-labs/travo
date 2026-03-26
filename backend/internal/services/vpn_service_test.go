@@ -14,6 +14,8 @@ func mockRunWireGuardEnableOK(name string, args ...string) ([]byte, error) {
 	switch name {
 	case "tailscale":
 		return nil, nil
+	case "/etc/init.d/firewall":
+		return nil, nil
 	case "ubus":
 		return []byte("{}"), nil
 	case "ifup", "ifdown":
@@ -163,7 +165,19 @@ AllowedIPs = 0.0.0.0/0
 	// peer section must exist with public_key
 	pk, _ := u.Get("network", "wg0_peer0", "public_key")
 	if pk != "peerkey" {
-		t.Errorf("expected peer public_key='peerkey', got %q", pk)
+		t.Errorf("expected peer public_key peerkey, got %q", pk)
+	}
+	host, _ := u.Get("network", "wg0_peer0", "endpoint_host")
+	if host != "vpn.example.com" {
+		t.Errorf("expected endpoint_host vpn.example.com, got %q", host)
+	}
+	port, _ := u.Get("network", "wg0_peer0", "endpoint_port")
+	if port != "51820" {
+		t.Errorf("expected endpoint_port 51820, got %q", port)
+	}
+	ra, _ := u.Get("network", "wg0_peer0", "route_allowed_ips")
+	if ra != "1" {
+		t.Errorf("expected route_allowed_ips 1, got %q", ra)
 	}
 }
 

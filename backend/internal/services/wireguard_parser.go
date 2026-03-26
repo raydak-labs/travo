@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -143,4 +144,36 @@ func ParseWireguardConfig(confContent string) (*WireguardParsedConfig, error) {
 	}
 
 	return result, nil
+}
+
+func SplitWireGuardEndpoint(endpoint string) (host, port string) {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return "", ""
+	}
+	const defaultPort = "51820"
+	if strings.HasPrefix(endpoint, "[") {
+		closeIdx := strings.Index(endpoint, "]")
+		if closeIdx > 1 {
+			host = endpoint[1:closeIdx]
+			rest := strings.TrimSpace(endpoint[closeIdx+1:])
+			if strings.HasPrefix(rest, ":") {
+				port = strings.TrimPrefix(rest, ":")
+			}
+			if port == "" {
+				port = defaultPort
+			}
+			return host, port
+		}
+	}
+	if h, p, err := net.SplitHostPort(endpoint); err == nil {
+		return h, p
+	}
+	if i := strings.LastIndex(endpoint, ":"); i > 0 {
+		candidate := endpoint[i+1:]
+		if _, err := strconv.Atoi(candidate); err == nil && candidate != "" {
+			return endpoint[:i], candidate
+		}
+	}
+	return endpoint, defaultPort
 }

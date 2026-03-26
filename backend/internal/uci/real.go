@@ -174,6 +174,21 @@ func (r *RealUCI) AddList(config, section, option, value string) error {
 	return nil
 }
 
+func (r *RealUCI) DeleteOption(config, section, option string) error {
+	if err := validateIdentifier("config", config); err != nil {
+		return err
+	}
+	if err := validateIdentifier("section", section); err != nil {
+		return err
+	}
+	if err := validateIdentifier("option", option); err != nil {
+		return err
+	}
+	key := fmt.Sprintf("%s.%s.%s", config, section, option)
+	_ = exec.Command("uci", "-q", "delete", key).Run()
+	return nil
+}
+
 func (r *RealUCI) DeleteSection(config, section string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
