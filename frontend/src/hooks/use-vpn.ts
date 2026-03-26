@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { refreshRouterState } from '@/lib/router-state-refresh';
 import { API_ROUTES } from '@shared/index';
 import type {
   VpnStatus,
@@ -60,6 +61,12 @@ export function useToggleWireguard() {
     onSuccess: (_data, enable) => {
       toast.success(`WireGuard ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'wireguard', 'status'],
+        ['network', 'status'],
+        ['network', 'dns'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to toggle WireGuard', { description: error.message });
@@ -82,6 +89,11 @@ export function useToggleTailscale() {
     onSuccess: (_data, enable) => {
       toast.success(`Tailscale ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'tailscale'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to toggle Tailscale', { description: error.message });
@@ -134,6 +146,11 @@ export function useActivateWireguardProfile() {
     onSuccess: () => {
       toast.success('WireGuard profile activated');
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'wireguard', 'status'],
+        ['vpn', 'wireguard', 'profiles'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to activate profile', { description: error.message });
