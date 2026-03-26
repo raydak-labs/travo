@@ -95,6 +95,8 @@ type VpnService struct {
 	profilesPath string // Path to wireguard_profiles.json
 }
 
+const vpnDnsSnapshotPath = "/etc/openwrt-travel-gui/vpn-dns-snapshot.json"
+
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
 	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/openwrt-travel-gui/wireguard_profiles.json"}
@@ -600,6 +602,7 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		return err
 	}
 	if enable {
+		_ = v.enableVpnDNSForwarding()
 		if err := v.applyAndVerifyWireGuard(); err != nil {
 			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 		}
@@ -607,6 +610,7 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		// Bring down the interface and clean up firewall plumbing when disabling.
 		_ = v.SetKillSwitch(false)
 		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+		_ = v.disableVpnDNSForwarding()
 		// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
 		// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
 		// route even though the uplink interface still shows “up”. We recover by
@@ -616,6 +620,132 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		v.restoreDefaultRouteAfterWireGuardDisable()
 		_ = v.teardownWireGuardFirewall()
 	}
+	return nil
+}
+
+type vpnDnsSnapshot struct {
+	NoResolv string   `json:"noresolv"`
+	Servers  []string `json:"servers"`
+}
+
+func (v *VpnService) readDnsmasqServers() []string {
+	out, err := v.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")
+	if err != nil {
+		return nil
+	}
+	s := strings.TrimSpace(string(out))
+	if s == "" {
+		return nil
+	}
+	// `uci get` returns a space-separated list for list options.
+	return strings.Fields(s)
+}
+
+func (v *VpnService) readDnsmasqNoResolv() string {
+	out, err := v.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].noresolv")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func (v *VpnService) writeVpnDnsSnapshot(snap vpnDnsSnapshot) error {
+	if err := os.MkdirAll(filepath.Dir(vpnDnsSnapshotPath), 0o755); err != nil {
+		return err
+	}
+	data, err := json.Marshal(snap)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(vpnDnsSnapshotPath, data, 0o600)
+}
+
+func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
+	data, err := os.ReadFile(vpnDnsSnapshotPath)
+	if err != nil {
+		return nil, err
+	}
+	var snap vpnDnsSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		return nil, err
+	}
+	return &snap, nil
+}
+
+func (v *VpnService) isDnsmasqForwardingToAdGuard(servers []string) bool {
+	for _, s := range servers {
+		// AdGuard integration uses 127.0.0.1#<port>
+		if strings.HasPrefix(s, "127.0.0.1#") {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *VpnService) wgConfiguredDNSServers() []string {
+	dns, err := v.uci.Get("network", "wg0", "dns")
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, s := range strings.Fields(strings.TrimSpace(dns)) {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (v *VpnService) enableVpnDNSForwarding() error {
+	vpnDNS := v.wgConfiguredDNSServers()
+	if len(vpnDNS) == 0 {
+		return nil
+	}
+
+	currentServers := v.readDnsmasqServers()
+	if v.isDnsmasqForwardingToAdGuard(currentServers) {
+		// Avoid clobbering AdGuard-managed dnsmasq settings.
+		return nil
+	}
+
+	// Snapshot current state (best-effort).
+	_ = v.writeVpnDnsSnapshot(vpnDnsSnapshot{
+		NoResolv: v.readDnsmasqNoResolv(),
+		Servers:  currentServers,
+	})
+
+	// Apply: forward to VPN DNS only.
+	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, s := range vpnDNS {
+		_, _ = v.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
+	}
+	_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=1")
+	_, _ = v.cmd.Run("uci", "commit", "dhcp")
+	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	return nil
+}
+
+func (v *VpnService) disableVpnDNSForwarding() error {
+	snap, err := v.loadVpnDnsSnapshot()
+	if err != nil {
+		// Nothing to restore.
+		return nil
+	}
+
+	// Restore previous servers/noresolv.
+	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, s := range snap.Servers {
+		_, _ = v.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
+	}
+	if snap.NoResolv != "" {
+		_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv="+snap.NoResolv)
+	} else {
+		_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=0")
+	}
+	_, _ = v.cmd.Run("uci", "commit", "dhcp")
+	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	_ = os.Remove(vpnDnsSnapshotPath)
 	return nil
 }
 
