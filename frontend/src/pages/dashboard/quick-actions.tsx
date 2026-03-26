@@ -28,6 +28,7 @@ export function QuickActions() {
   const radioEnabled = radioStatus?.enabled ?? true;
   const wg = vpnStatusList?.find((s) => s.type === 'wireguard');
   const vpnEnabled = wg?.enabled ?? false;
+  const desiredVpnEnabled = toggleWireguard.isPending ? toggleWireguard.variables : undefined;
 
   const handleRestartWifi = () => {
     if (wifiDisconnect.isPending || wifiReconnect.isPending) return;
@@ -103,7 +104,13 @@ export function QuickActions() {
               ) : (
                 <Shield className="mr-2 h-4 w-4" />
               )}
-              {vpnEnabled ? 'Disable VPN' : 'Enable VPN'}
+              {toggleWireguard.isPending
+                ? desiredVpnEnabled
+                  ? 'Enabling VPN…'
+                  : 'Disabling VPN…'
+                : vpnEnabled
+                  ? 'Disable VPN'
+                  : 'Enable VPN'}
             </Button>
             <Button
               variant="destructive"

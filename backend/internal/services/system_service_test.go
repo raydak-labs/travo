@@ -519,8 +519,8 @@ func TestSetButtonActions_GeneratesHotplugScript(t *testing.T) {
 	if !strings.Contains(script, "wps)") {
 		t.Error("expected script to contain 'wps)' case")
 	}
-	if !strings.Contains(script, "wg-quick") {
-		t.Error("expected script to contain wg-quick for vpn_toggle")
+	if !strings.Contains(script, "/sbin/ifup wg0") || !strings.Contains(script, "/sbin/ifdown wg0") {
+		t.Error("expected script to toggle wg0 via ifup/ifdown for vpn_toggle")
 	}
 	if !strings.Contains(script, "reboot") {
 		t.Error("expected script to contain reboot for reboot action")

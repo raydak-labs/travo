@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, ShieldAlert, Trash2, Play, Plus, Upload } from 'lucide-react';
+import { Shield, ShieldAlert, Trash2, Play, Plus, Upload, Loader2 } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +49,10 @@ export function WireguardSection() {
   const wgStatus = vpnStatuses.find((v) => v.type === 'wireguard');
   const wgService = services.find((s) => s.id === 'wireguard');
   const isInstalled = wgService ? wgService.state !== 'not_installed' : !!wgStatus;
+  const isToggling = toggleMutation.isPending;
+  const desiredEnabled = isToggling ? toggleMutation.variables : undefined;
+
+  const statusDetail = wgStatus?.status_detail;
 
   const handleAddProfile = () => {
     if (!profileName.trim() || !configText.trim()) return;
@@ -92,8 +96,20 @@ export function WireguardSection() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700 dark:text-gray-300">Status</span>
                 <Badge variant={wgStatus?.connected ? 'success' : 'outline'}>
-                  {wgStatus?.connected ? 'Connected' : 'Disconnected'}
+                  {isToggling
+                    ? desiredEnabled
+                      ? 'Enabling…'
+                      : 'Disabling…'
+                    : wgStatus?.connected
+                      ? 'Connected'
+                      : 'Disconnected'}
                 </Badge>
+                {isToggling && (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Applying changes…
+                  </span>
+                )}
               </div>
               <Switch
                 id="wireguard-toggle"
@@ -101,8 +117,21 @@ export function WireguardSection() {
                 checked={wgStatus?.enabled ?? false}
                 onChange={() => toggleMutation.mutate(!(wgStatus?.enabled ?? false))}
                 disabled={toggleMutation.isPending}
+                aria-busy={isToggling ? 'true' : undefined}
               />
             </div>
+
+            {/* Fine-grained state */}
+            {!!statusDetail && !isToggling && (
+              <div className="text-xs text-gray-500">
+                {statusDetail === 'disabled' && 'WireGuard is disabled.'}
+                {statusDetail === 'configured' && 'WireGuard is configured but not connected yet.'}
+                {statusDetail === 'enabled_not_up' &&
+                  'WireGuard is enabled but the interface is not up yet.'}
+                {statusDetail === 'up_no_handshake' &&
+                  'WireGuard interface is up, but handshake has not completed yet.'}
+              </div>
+            )}
 
             {/* Connection Details — live stats from wg show */}
             {wgStatus?.connected && wgLiveStatus && (wgLiveStatus.peers?.length ?? 0) > 0 && (

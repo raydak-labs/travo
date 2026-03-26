@@ -17,9 +17,9 @@ func mockRunWireGuardEnableOK(name string, args ...string) ([]byte, error) {
 		return nil, nil
 	case "/etc/init.d/firewall":
 		return nil, nil
-	case "ubus":
+	case "/sbin/ubus":
 		return []byte("{}"), nil
-	case "ifup", "ifdown":
+	case "/sbin/ifup", "/sbin/ifdown":
 		return nil, nil
 	case "/sbin/ip":
 		if len(args) >= 4 && args[0] == "link" && args[1] == "show" && args[2] == "dev" && args[3] == "wg0" {
@@ -94,7 +94,11 @@ func TestToggleWireguard(t *testing.T) {
 
 func TestToggleWireguard_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
-	cmd := &MockCommandRunner{}
+	var calls []string
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		return nil, nil
+	}}
 	svc := NewVpnServiceWithRunner(u, cmd)
 
 	err := svc.ToggleWireguard(false)
@@ -104,6 +108,19 @@ func TestToggleWireguard_Disable(t *testing.T) {
 	val, _ := u.Get("network", "wg0", "disabled")
 	if val != "1" {
 		t.Errorf("expected disabled=1, got %q", val)
+	}
+	joined := strings.Join(calls, "\n")
+	if !strings.Contains(joined, "/sbin/ifdown wg0") {
+		t.Fatalf("expected /sbin/ifdown wg0 to be called, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "/sbin/ubus call network reload") {
+		t.Fatalf("expected /sbin/ubus call network reload to be called, calls:\n%s", joined)
+	}
+	// Ensure we reload network after ifdown (helps restore routes/DNS state).
+	ifIdx := strings.Index(joined, "/sbin/ifdown wg0")
+	ubusIdx := strings.Index(joined, "/sbin/ubus call network reload")
+	if ifIdx < 0 || ubusIdx < 0 || ubusIdx < ifIdx {
+		t.Fatalf("expected ifdown before ubus reload, calls:\n%s", joined)
 	}
 }
 
@@ -115,7 +132,7 @@ func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		switch name {
-		case "tailscale", "ubus", "ifup", "/etc/init.d/firewall":
+		case "tailscale", "/sbin/ubus", "/sbin/ifup", "/etc/init.d/firewall":
 			return nil, nil
 		case "/usr/bin/wg":
 			return nil, fmt.Errorf("no interface")
@@ -130,6 +147,94 @@ func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
 	err := svc.ToggleWireguard(true)
 	if err == nil {
 		t.Fatal("expected error when wg0 does not come up")
+	}
+}
+
+func TestToggleWireguard_FailsPreflightWhenMissingPrivateKey(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "private_key", "")
+	called := 0
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		called++
+		// tailscale is best-effort and may still be invoked before preflight validation.
+		if name == "tailscale" || strings.HasSuffix(name, "/tailscale") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	err := svc.ToggleWireguard(true)
+	if err == nil {
+		t.Fatal("expected error when wg0 private_key is missing")
+	}
+	val, _ := u.Get("network", "wg0", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled to remain '1' on preflight failure, got %q", val)
+	}
+	_ = called
+}
+
+func TestToggleWireguard_FailsPreflightWhenMissingPeerPublicKey(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0_peer0", "public_key", "")
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "tailscale" || strings.HasSuffix(name, "/tailscale") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	err := svc.ToggleWireguard(true)
+	if err == nil {
+		t.Fatal("expected error when peer public_key is missing")
+	}
+	val, _ := u.Get("network", "wg0", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled to remain '1' on preflight failure, got %q", val)
+	}
+}
+
+func TestToggleWireguard_FailsPreflightWhenEndpointPortInvalid(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0_peer0", "endpoint_port", "abc")
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "tailscale" || strings.HasSuffix(name, "/tailscale") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	err := svc.ToggleWireguard(true)
+	if err == nil {
+		t.Fatal("expected error when endpoint port is invalid")
+	}
+	val, _ := u.Get("network", "wg0", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled to remain '1' on preflight failure, got %q", val)
+	}
+}
+
+func TestToggleWireguard_FailsPreflightWhenRouteAllowedIPsNotOne(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0_peer0", "route_allowed_ips", "0")
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "tailscale" || strings.HasSuffix(name, "/tailscale") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	err := svc.ToggleWireguard(true)
+	if err == nil {
+		t.Fatal("expected error when route_allowed_ips != 1")
+	}
+	val, _ := u.Get("network", "wg0", "disabled")
+	if val != "1" {
+		t.Errorf("expected disabled to remain '1' on preflight failure, got %q", val)
 	}
 }
 

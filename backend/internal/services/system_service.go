@@ -684,10 +684,11 @@ func buildButtonHotplugScript(buttons []models.HardwareButton) string {
 		sb.WriteString(fmt.Sprintf("  %s)\n", b.Name))
 		switch b.Action {
 		case models.ButtonActionVPNToggle:
-			sb.WriteString("    if wg show wg0 >/dev/null 2>&1; then\n")
-			sb.WriteString("      wg-quick down wg0 2>/dev/null || true\n")
+			// Use netifd-managed interface control; wg-quick is often absent on OpenWrt.
+			sb.WriteString("    if /sbin/ifstatus wg0 2>/dev/null | grep -q '\"up\": true'; then\n")
+			sb.WriteString("      /sbin/ifdown wg0 2>/dev/null || true\n")
 			sb.WriteString("    else\n")
-			sb.WriteString("      wg-quick up wg0 2>/dev/null || true\n")
+			sb.WriteString("      /sbin/ifup wg0 2>/dev/null || true\n")
 			sb.WriteString("    fi\n")
 		case models.ButtonActionWifiToggle:
 			sb.WriteString("    if iwinfo 2>/dev/null | grep -q '^'; then\n")

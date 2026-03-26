@@ -19,8 +19,61 @@ import (
 
 const openwrtIPBin = "/sbin/ip"
 const openwrtWgBin = "/usr/bin/wg"
+const openwrtUbusBin = "/sbin/ubus"
+const openwrtIfupBin = "/sbin/ifup"
+const openwrtIfdownBin = "/sbin/ifdown"
+const openwrtTailscaleBin = "/usr/sbin/tailscale"
+const openwrtTailscaleBinAlt = "/usr/bin/tailscale"
 
 var wireGuardVerifyTimeout = 12 * time.Second
+
+func tailscaleBin() string {
+	if _, err := os.Stat(openwrtTailscaleBin); err == nil {
+		return openwrtTailscaleBin
+	}
+	if _, err := os.Stat(openwrtTailscaleBinAlt); err == nil {
+		return openwrtTailscaleBinAlt
+	}
+	return "tailscale"
+}
+
+func (v *VpnService) validateWireGuardConfigForEnable() error {
+	wgOpts, err := v.uci.GetAll("network", "wg0")
+	if err != nil {
+		return fmt.Errorf("wireguard is not configured (missing network.wg0)")
+	}
+	if strings.TrimSpace(wgOpts["private_key"]) == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing wg0 private_key")
+	}
+
+	peerOpts, err := v.uci.GetAll("network", "wg0_peer0")
+	if err != nil {
+		return fmt.Errorf("wireguard config is incomplete: missing peer section wg0_peer0")
+	}
+	if strings.TrimSpace(peerOpts["public_key"]) == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing peer public_key")
+	}
+	endpoint := strings.TrimSpace(v.combinePeerEndpointFromUCI("wg0_peer0"))
+	if endpoint == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing peer endpoint")
+	}
+	host, portStr, splitErr := net.SplitHostPort(endpoint)
+	if splitErr != nil || strings.TrimSpace(host) == "" || strings.TrimSpace(portStr) == "" {
+		return fmt.Errorf("wireguard config is invalid: endpoint must be host:port (got %q)", endpoint)
+	}
+	port, convErr := strconv.Atoi(portStr)
+	if convErr != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("wireguard config is invalid: endpoint port must be 1-65535 (got %q)", portStr)
+	}
+
+	if strings.TrimSpace(peerOpts["allowed_ips"]) == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing peer allowed_ips")
+	}
+	if strings.TrimSpace(peerOpts["route_allowed_ips"]) != "1" {
+		return fmt.Errorf("wireguard config is incomplete: peer route_allowed_ips must be 1")
+	}
+	return nil
+}
 
 // CommandRunner abstracts command execution for testability.
 type CommandRunner interface {
@@ -181,15 +234,15 @@ func (v *VpnService) ensureWireGuardPeer(section string) error {
 }
 
 func (v *VpnService) applyAndVerifyWireGuard() error {
-	_, _ = v.cmd.Run("ubus", "call", "network", "reload")
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 	time.Sleep(300 * time.Millisecond)
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
 			time.Sleep(400 * time.Millisecond)
-			_, _ = v.cmd.Run("ubus", "call", "network", "reload")
+			_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 			time.Sleep(300 * time.Millisecond)
 		}
-		_, _ = v.cmd.Run("ifup", "wg0")
+		_, _ = v.cmd.Run(openwrtIfupBin, "wg0")
 	}
 	return v.waitForWireGuardRuntime(wireGuardVerifyTimeout)
 }
@@ -250,9 +303,10 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	var statuses []models.VpnStatus
 
 	// WireGuard — only include if configured
-	disabled, err := v.uci.Get("network", "wg0", "disabled")
+	opts, err := v.uci.GetAll("network", "wg0")
 	if err == nil {
 		// WireGuard is configured
+		disabled := opts["disabled"]
 		wgStatus := models.VpnStatus{Type: "wireguard"}
 		wgStatus.Enabled = disabled != "1"
 		wgStatus.StatusDetail = v.wgRuntimeState(wgStatus.Enabled)
@@ -406,12 +460,15 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 	val := "1"
 	if enable {
 		val = "0"
-		_, _ = v.cmd.Run("tailscale", "set", "--exit-node=")
+		_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 		if err := v.ensureWireGuardInterface(); err != nil {
 			return fmt.Errorf("normalizing wg0 interface: %w", err)
 		}
 		if err := v.ensureWireGuardPeer("wg0_peer0"); err != nil {
 			return fmt.Errorf("normalizing wg0 peer: %w", err)
+		}
+		if err := v.validateWireGuardConfigForEnable(); err != nil {
+			return err
 		}
 		if err := v.setupWireGuardFirewall(); err != nil {
 			return fmt.Errorf("setting up WireGuard firewall: %w", err)
@@ -428,9 +485,9 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 	} else {
 		// Bring down the interface and clean up firewall plumbing when disabling.
 		_ = v.SetKillSwitch(false)
-		_, _ = v.cmd.Run("ubus", "call", "network", "reload")
+		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 		time.Sleep(200 * time.Millisecond)
-		_, _ = v.cmd.Run("ifdown", "wg0")
 		_ = v.teardownWireGuardFirewall()
 	}
 	return nil
@@ -551,6 +608,13 @@ type tailscaleStatusJSON struct {
 
 // isTailscaleInstalled checks whether the tailscale binary exists.
 func (v *VpnService) isTailscaleInstalled() bool {
+	if _, err := os.Stat(openwrtTailscaleBin); err == nil {
+		return true
+	}
+	if _, err := os.Stat(openwrtTailscaleBinAlt); err == nil {
+		return true
+	}
+	// Fall back to PATH check for non-OpenWrt/dev environments.
 	_, err := v.cmd.Run("which", "tailscale")
 	return err == nil
 }
@@ -583,7 +647,7 @@ func (v *VpnService) GetTailscaleStatus() (models.TailscaleStatus, error) {
 		}, nil
 	}
 
-	raw, err := v.cmd.Run("tailscale", "status", "--json")
+	raw, err := v.cmd.Run(tailscaleBin(), "status", "--json")
 	if err != nil {
 		return models.TailscaleStatus{Installed: true, Running: true, Peers: []models.TailscalePeer{}}, nil
 	}
@@ -651,7 +715,7 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 	if authKey != "" {
 		args = append(args, "--auth-key="+authKey)
 	}
-	out, _ := v.cmd.Run("tailscale", args...)
+	out, _ := v.cmd.Run(tailscaleBin(), args...)
 	combined := strings.TrimSpace(string(out))
 	// Extract URL from output like "To authenticate, visit:\n\thttps://login.tailscale.com/..."
 	for _, line := range strings.Split(combined, "\n") {
@@ -668,10 +732,10 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 // SetTailscaleExitNode sets or clears the Tailscale exit node.
 func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
 	if nodeIP == "" {
-		_, err := v.cmd.Run("tailscale", "set", "--exit-node=")
+		_, err := v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 		return err
 	}
-	_, err := v.cmd.Run("tailscale", "set", "--exit-node="+nodeIP, "--exit-node-allow-lan-access=true")
+	_, err := v.cmd.Run(tailscaleBin(), "set", "--exit-node="+nodeIP, "--exit-node-allow-lan-access=true")
 	return err
 }
 
@@ -896,8 +960,9 @@ func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 	result.Nameservers = readResolvConfNameservers()
 
 	// 2. Check VPN status.
-	disabled, err := v.uci.Get("network", "wg0", "disabled")
-	result.VPNActive = err == nil && disabled != "1"
+	if opts, err := v.uci.GetAll("network", "wg0"); err == nil {
+		result.VPNActive = opts["disabled"] != "1"
+	}
 
 	// 3. Read VPN DNS servers from WireGuard UCI config.
 	if dns, err := v.uci.Get("network", "wg0", "dns"); err == nil && dns != "" {
@@ -1010,7 +1075,7 @@ func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
 
 // GetTailscaleSSHEnabled returns whether Tailscale SSH is enabled.
 func (v *VpnService) GetTailscaleSSHEnabled() (bool, error) {
-	out, err := v.cmd.Run("tailscale", "status", "--json")
+	out, err := v.cmd.Run(tailscaleBin(), "status", "--json")
 	if err != nil {
 		return false, nil // Tailscale not running
 	}
@@ -1031,6 +1096,6 @@ func (v *VpnService) SetTailscaleSSHEnabled(enabled bool) error {
 	if enabled {
 		arg = "--ssh"
 	}
-	_, err := v.cmd.Run("tailscale", "set", arg)
+	_, err := v.cmd.Run(tailscaleBin(), "set", arg)
 	return err
 }
