@@ -105,12 +105,12 @@ export function WireguardSection() {
             </div>
 
             {/* Connection Details — live stats from wg show */}
-            {wgStatus?.connected && wgLiveStatus && wgLiveStatus.peers.length > 0 && (
+            {wgStatus?.connected && wgLiveStatus && (wgLiveStatus.peers?.length ?? 0) > 0 && (
               <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
                 <h4 className="mb-2 font-medium text-gray-700 dark:text-gray-300">
                   Connection Status
                 </h4>
-                {wgLiveStatus.peers.map((peer) => (
+                {(wgLiveStatus.peers ?? []).map((peer) => (
                   <div key={peer.public_key} className="grid grid-cols-2 gap-2">
                     <span className="text-gray-500">Endpoint</span>
                     <span className="text-gray-900 dark:text-white">{peer.endpoint}</span>

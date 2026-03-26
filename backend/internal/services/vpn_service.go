@@ -17,6 +17,11 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
+const openwrtIPBin = "/sbin/ip"
+const openwrtWgBin = "/usr/bin/wg"
+
+var wireGuardVerifyTimeout = 12 * time.Second
+
 // CommandRunner abstracts command execution for testability.
 type CommandRunner interface {
 	Run(name string, args ...string) ([]byte, error)
@@ -178,30 +183,42 @@ func (v *VpnService) ensureWireGuardPeer(section string) error {
 func (v *VpnService) applyAndVerifyWireGuard() error {
 	_, _ = v.cmd.Run("ubus", "call", "network", "reload")
 	time.Sleep(300 * time.Millisecond)
-	var lastIfupErr error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
 			time.Sleep(400 * time.Millisecond)
 			_, _ = v.cmd.Run("ubus", "call", "network", "reload")
 			time.Sleep(300 * time.Millisecond)
 		}
-		_, lastIfupErr = v.cmd.Run("ifup", "wg0")
-		if lastIfupErr == nil {
-			break
+		_, _ = v.cmd.Run("ifup", "wg0")
+	}
+	return v.waitForWireGuardRuntime(wireGuardVerifyTimeout)
+}
+
+func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	var lastIPOut string
+	for time.Now().Before(deadline) {
+		if out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump"); err == nil {
+			s := strings.TrimSpace(string(out))
+			if s != "" {
+				if st, perr := ParseWgDump(s); perr == nil && st != nil {
+					return nil
+				}
+			}
 		}
+		if out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); err == nil {
+			ls := string(out)
+			if wireGuardIfaceLooksUp(ls) {
+				return nil
+			}
+			lastIPOut = strings.TrimSpace(ls)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
-	if lastIfupErr != nil {
-		return fmt.Errorf("ifup wg0 failed: %w", lastIfupErr)
+	if lastIPOut != "" {
+		return fmt.Errorf("wg0 did not become ready in time (last %s: %s)", openwrtIPBin, lastIPOut)
 	}
-	linkOut, err := v.cmd.Run("ip", "link", "show", "dev", "wg0")
-	if err != nil {
-		return fmt.Errorf("wg0 not present after ifup: %w", err)
-	}
-	ls := string(linkOut)
-	if !wireGuardIfaceLooksUp(ls) {
-		return fmt.Errorf("wg0 not usable after ifup (ip link: %s)", strings.TrimSpace(ls))
-	}
-	return nil
+	return fmt.Errorf("wg0 did not become ready in time (%s and %s did not succeed)", openwrtWgBin, openwrtIPBin)
 }
 
 // wgRuntimeState returns a fine-grained status detail string for the wg0 interface.
@@ -209,7 +226,7 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 	if !enabled {
 		return "disabled"
 	}
-	out, err := v.cmd.Run("wg", "show", "wg0", "dump")
+	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
 	if err != nil || strings.TrimSpace(string(out)) == "" {
 		return "enabled_not_up"
 	}
@@ -260,10 +277,10 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 // Line 1 (interface): private_key  public_key  listen_port  fwmark
 // Line 2+ (peers): public_key  preshared_key  endpoint  allowed_ips  latest_handshake_epoch  transfer_rx  transfer_tx  persistent_keepalive
 func (v *VpnService) GetWireGuardStatus() (*models.WireGuardStatus, error) {
-	out, err := v.cmd.Run("wg", "show", "wg0", "dump")
+	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
 	if err != nil {
 		// wg show fails with exit status 1 when interface doesn't exist (tunnel not active)
-		return &models.WireGuardStatus{}, nil
+		return &models.WireGuardStatus{Interface: "wg0", Peers: []models.WireGuardPeerStatus{}}, nil
 	}
 	return ParseWgDump(string(out))
 }
@@ -286,6 +303,7 @@ func ParseWgDump(dump string) (*models.WireGuardStatus, error) {
 		Interface:  "wg0",
 		PublicKey:  ifFields[1],
 		ListenPort: listenPort,
+		Peers:      []models.WireGuardPeerStatus{},
 	}
 
 	// Parse peer lines
@@ -409,6 +427,9 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		}
 	} else {
 		// Bring down the interface and clean up firewall plumbing when disabling.
+		_ = v.SetKillSwitch(false)
+		_, _ = v.cmd.Run("ubus", "call", "network", "reload")
+		time.Sleep(200 * time.Millisecond)
 		_, _ = v.cmd.Run("ifdown", "wg0")
 		_ = v.teardownWireGuardFirewall()
 	}
@@ -466,13 +487,13 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	result := models.VPNVerifyResult{}
 
 	// Check if wg0 interface is up.
-	out, err := v.cmd.Run("ip", "link", "show", "wg0")
+	out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0")
 	if err == nil && wireGuardIfaceLooksUp(string(out)) {
 		result.InterfaceUp = true
 	}
 
 	// Check latest handshake from wg show dump.
-	dumpOut, dumpErr := v.cmd.Run("wg", "show", "wg0", "dump")
+	dumpOut, dumpErr := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
 	if dumpErr == nil {
 		if status, err := ParseWgDump(string(dumpOut)); err == nil && status != nil {
 			var latest int64
@@ -489,8 +510,8 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	}
 
 	// Check default route via wg0.
-	routeOut, routeErr := v.cmd.Run("ip", "route", "show", "default")
-	route6Out, _ := v.cmd.Run("ip", "-6", "route", "show", "default")
+	routeOut, routeErr := v.cmd.Run(openwrtIPBin, "route", "show", "default")
+	route6Out, _ := v.cmd.Run(openwrtIPBin, "-6", "route", "show", "default")
 	combined := string(routeOut) + "\n" + string(route6Out)
 	if routeErr == nil && strings.Contains(combined, "wg0") {
 		result.RouteOk = true

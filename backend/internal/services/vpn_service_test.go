@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -20,11 +21,11 @@ func mockRunWireGuardEnableOK(name string, args ...string) ([]byte, error) {
 		return []byte("{}"), nil
 	case "ifup", "ifdown":
 		return nil, nil
-	case "ip":
+	case "/sbin/ip":
 		if len(args) >= 4 && args[0] == "link" && args[1] == "show" && args[2] == "dev" && args[3] == "wg0" {
 			return []byte("3: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN"), nil
 		}
-	case "wg":
+	case "/usr/bin/wg":
 		return []byte("PRIV\tPUB\t51820\toff\n"), nil
 	}
 	return nil, fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
@@ -107,12 +108,18 @@ func TestToggleWireguard_Disable(t *testing.T) {
 }
 
 func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
+	prev := wireGuardVerifyTimeout
+	wireGuardVerifyTimeout = 400 * time.Millisecond
+	t.Cleanup(func() { wireGuardVerifyTimeout = prev })
+
 	u := uci.NewMockUCI()
 	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		switch name {
-		case "tailscale", "ubus", "ifup":
+		case "tailscale", "ubus", "ifup", "/etc/init.d/firewall":
 			return nil, nil
-		case "ip":
+		case "/usr/bin/wg":
+			return nil, fmt.Errorf("no interface")
+		case "/sbin/ip":
 			return []byte("3: wg0: state DOWN"), nil
 		default:
 			return nil, nil
@@ -349,8 +356,11 @@ func TestGetWireGuardStatus_CommandError(t *testing.T) {
 	if status == nil {
 		t.Fatal("expected empty status, got nil")
 	}
-	if status.Interface != "" || status.PublicKey != "" || status.ListenPort != 0 || len(status.Peers) != 0 {
-		t.Errorf("expected empty status when tunnel not active, got: %+v", status)
+	if status.PublicKey != "" || status.ListenPort != 0 || len(status.Peers) != 0 {
+		t.Errorf("expected empty runtime status when tunnel not active, got: %+v", status)
+	}
+	if status.Interface != "wg0" {
+		t.Errorf("expected interface wg0 placeholder, got %q", status.Interface)
 	}
 }
 
@@ -672,15 +682,14 @@ type stubVerifyRunner struct{}
 
 func (s *stubVerifyRunner) Run(name string, args ...string) ([]byte, error) {
 	switch name {
-	case "ip":
-		if len(args) >= 3 && args[0] == "link" && args[1] == "show" {
+	case "/sbin/ip":
+		if len(args) >= 4 && args[0] == "link" && args[1] == "show" && args[2] == "dev" && args[3] == "wg0" {
 			return []byte("2: wg0: <POINTOPOINT,UP,LOWER_UP> mtu 1420 state UP mode DEFAULT"), nil
 		}
 		if len(args) >= 2 && args[0] == "route" {
 			return []byte("default via wg0 dev wg0 proto static"), nil
 		}
-	case "wg":
-		// Return a dump with a recent handshake (epoch very large = future, just for test).
+	case "/usr/bin/wg":
 		return []byte("PRIV\tPUB\t51820\toff\nPEERPUB\tnone\t1.2.3.4:51820\t0.0.0.0/0\t9999999999\t1000\t2000\t25\n"), nil
 	}
 	return nil, fmt.Errorf("stub: unhandled command %s %v", name, args)
