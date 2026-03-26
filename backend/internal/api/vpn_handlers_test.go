@@ -168,6 +168,100 @@ func TestGetWireguardProfiles_Returns200(t *testing.T) {
 	}
 }
 
+func TestToggleWireguard_EnabledField_TogglesOn(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]bool{"enabled": true})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/toggle", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+
+	req2, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/status", nil)
+	req2.Header.Set("Authorization", "Bearer "+token)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp2.Body)
+		t.Fatalf("expected 200, got %d, body: %s", resp2.StatusCode, b)
+	}
+	var statuses []map[string]interface{}
+	if err := json.NewDecoder(resp2.Body).Decode(&statuses); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	found := false
+	for _, s := range statuses {
+		if s["type"] == "wireguard" {
+			found = true
+			if s["enabled"] != true {
+				t.Errorf("expected wireguard enabled=true, got %v", s["enabled"])
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected wireguard status entry, got %v", statuses)
+	}
+}
+
+func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]bool{"enable": true})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/toggle", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+
+	req2, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/status", nil)
+	req2.Header.Set("Authorization", "Bearer "+token)
+	resp2, err := app.Test(req2, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp2.Body)
+		t.Fatalf("expected 200, got %d, body: %s", resp2.StatusCode, b)
+	}
+	var statuses []map[string]interface{}
+	if err := json.NewDecoder(resp2.Body).Decode(&statuses); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	found := false
+	for _, s := range statuses {
+		if s["type"] == "wireguard" {
+			found = true
+			if s["enabled"] != true {
+				t.Errorf("expected wireguard enabled=true, got %v", s["enabled"])
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected wireguard status entry, got %v", statuses)
+	}
+}
+
 func TestAddWireguardProfile_Returns201(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")

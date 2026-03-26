@@ -67,12 +67,19 @@ func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
 func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			Enable bool `json:"enable"`
+			Enabled *bool `json:"enabled"`
+			Enable  *bool `json:"enable"` // backward-compat for older clients
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.ToggleWireguard(body.Enable); err != nil {
+		enabled := false
+		if body.Enabled != nil {
+			enabled = *body.Enabled
+		} else if body.Enable != nil {
+			enabled = *body.Enable
+		}
+		if err := svc.ToggleWireguard(enabled); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -94,12 +101,19 @@ func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
 func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			Enable bool `json:"enable"`
+			Enabled *bool `json:"enabled"`
+			Enable  *bool `json:"enable"` // backward-compat for older clients
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.ToggleTailscale(body.Enable); err != nil {
+		enabled := false
+		if body.Enabled != nil {
+			enabled = *body.Enabled
+		} else if body.Enable != nil {
+			enabled = *body.Enable
+		}
+		if err := svc.ToggleTailscale(enabled); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})

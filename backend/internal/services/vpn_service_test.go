@@ -95,8 +95,23 @@ func TestToggleWireguard(t *testing.T) {
 func TestToggleWireguard_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
 	var calls []string
+	kernelDefault := false
 	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		calls = append(calls, name+" "+strings.Join(args, " "))
+		if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" && args[1] == "show" && args[2] == "default" {
+			if kernelDefault {
+				return []byte("default via 10.0.1.1 dev phy1-sta0"), nil
+			}
+			return []byte(""), nil
+		}
+		if name == "/sbin/ubus" && len(args) >= 4 && args[0] == "-S" && args[1] == "call" && args[2] == "network.interface" && args[3] == "dump" {
+			return []byte(`{"interface":[{"interface":"wwan","up":true,"route":[{"target":"0.0.0.0","mask":0,"nexthop":"10.0.1.1"}]}]}`), nil
+		}
+		if name == "/sbin/ubus" && len(args) >= 3 && args[0] == "call" && args[1] == "network.interface.wwan" && args[2] == "renew" {
+			// After a renew + reload we assume default route comes back.
+			kernelDefault = true
+			return []byte("{}"), nil
+		}
 		return nil, nil
 	}}
 	svc := NewVpnServiceWithRunner(u, cmd)
@@ -123,11 +138,14 @@ func TestToggleWireguard_Disable(t *testing.T) {
 		t.Fatalf("expected ifdown before ubus reload, calls:\n%s", joined)
 	}
 	// Netifd-managed recovery should attempt to bring WAN back up.
-	if !strings.Contains(joined, "/sbin/ubus call network.interface.wan up") {
-		t.Fatalf("expected wan up call, calls:\n%s", joined)
+	if !strings.Contains(joined, "/sbin/ip route show default") {
+		t.Fatalf("expected default route check, calls:\n%s", joined)
 	}
-	if !strings.Contains(joined, "/sbin/ubus call network.interface.wan6 up") {
-		t.Fatalf("expected wan6 up call, calls:\n%s", joined)
+	if !strings.Contains(joined, "/sbin/ubus -S call network.interface dump") {
+		t.Fatalf("expected uplink discovery via ubus dump, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "/sbin/ubus call network.interface.wwan renew") {
+		t.Fatalf("expected wwan renew attempt, calls:\n%s", joined)
 	}
 }
 

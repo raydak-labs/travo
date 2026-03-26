@@ -247,6 +247,127 @@ func (v *VpnService) applyAndVerifyWireGuard() error {
 	return v.waitForWireGuardRuntime(wireGuardVerifyTimeout)
 }
 
+func (v *VpnService) hasKernelDefaultRoute() bool {
+	out, err := v.cmd.Run(openwrtIPBin, "route", "show", "default")
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) != ""
+}
+
+func (v *VpnService) waitForKernelDefaultRoute(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if v.hasKernelDefaultRoute() {
+			return true
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return v.hasKernelDefaultRoute()
+}
+
+func (v *VpnService) uplinksFromUbusDump() []string {
+	out, err := v.cmd.Run(openwrtUbusBin, "-S", "call", "network.interface", "dump")
+	if err != nil || len(out) == 0 {
+		return nil
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil
+	}
+
+	ifaces, ok := raw["interface"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var res []string
+	for _, v := range ifaces {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := m["interface"].(string)
+		if name == "" || name == "wg0" || name == "lan" || name == "loopback" {
+			continue
+		}
+		up, _ := m["up"].(bool)
+		if !up {
+			continue
+		}
+		routes, ok := m["route"].([]interface{})
+		if !ok {
+			continue
+		}
+		hasDefault := false
+		for _, r := range routes {
+			rm, ok := r.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			target, _ := rm["target"].(string)
+			maskF, _ := rm["mask"].(float64) // JSON numbers decode as float64
+			if target == "0.0.0.0" && int(maskF) == 0 {
+				hasDefault = true
+				break
+			}
+		}
+		if hasDefault {
+			res = append(res, name)
+		}
+	}
+	return res
+}
+
+func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
+	// If the kernel already has a default route, don't touch uplinks.
+	if v.hasKernelDefaultRoute() {
+		return
+	}
+
+	// Prefer the interface(s) netifd reports as up with a default route. This is
+	// the best signal for the “active uplink” across WAN/WWAN/USB tether modes.
+	uplinks := v.uplinksFromUbusDump()
+	if len(uplinks) == 0 {
+		// Conservative fallback for common travel-router modes.
+		uplinks = []string{"wwan", "wan"}
+	}
+
+	// Phase 1: try DHCP renew + reload (least disruptive).
+	for _, ifname := range uplinks {
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname, "renew")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "renew")
+	}
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	// Allow netifd time to re-install routes.
+	if v.waitForKernelDefaultRoute(2 * time.Second) {
+		return
+	}
+
+	// Phase 2: force a down/up cycle + reload (more disruptive, but restores routes
+	// when netifd believes interface is already up while kernel route state is broken).
+	for _, ifname := range uplinks {
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname, "down")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname, "up")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "down")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "up")
+	}
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	if v.waitForKernelDefaultRoute(5 * time.Second) {
+		return
+	}
+
+	// Phase 3: netifd helper scripts (ifup/ifdown) as last resort. On some systems
+	// this re-triggers proto handlers more reliably than ubus down/up alone.
+	for _, ifname := range uplinks {
+		_, _ = v.cmd.Run(openwrtIfdownBin, ifname)
+		_, _ = v.cmd.Run(openwrtIfupBin, ifname)
+	}
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	_ = v.waitForKernelDefaultRoute(8 * time.Second)
+}
+
 func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastIPOut string
@@ -486,12 +607,13 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		// Bring down the interface and clean up firewall plumbing when disabling.
 		_ = v.SetKillSwitch(false)
 		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
-		// Netifd-managed recovery: bring WAN back up (best-effort) then reload network so
-		// routes/DNS are recomputed without the wg0 interface.
-		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan", "up")
-		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan6", "up")
+		// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
+		// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
+		// route even though the uplink interface still shows “up”. We recover by
+		// restoring the uplink default route (renew first, then down/up if needed).
 		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
+		v.restoreDefaultRouteAfterWireGuardDisable()
 		_ = v.teardownWireGuardFirewall()
 	}
 	return nil

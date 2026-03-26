@@ -89,6 +89,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] 🐛 Active WiFi network badge can display lock icon with `unknown` encryption/type; UI should show correct security label based on scan/connection metadata.
 - [x] Add machine-readable API documentation generation (OpenAPI/Swagger) and expose docs endpoint from backend for agent/test automation use.
 - [x] Document in `AGENTS.md` that the test device can expose/serve API docs endpoints for automation flows.
+- [x] 🐛 WireGuard: disabling WireGuard must restore internet connectivity (default route) and the toggle API must accept `enabled` (not only legacy `enable`). See [WireGuard disable breaks internet (plan)](../plans/2026-03-26-wireguard-disable-breaks-internet.md).
 
 ## 1. WiFi Management
 
