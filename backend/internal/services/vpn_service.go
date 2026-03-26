@@ -341,7 +341,7 @@ func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
 	}
 	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 	// Allow netifd time to re-install routes.
-	if v.waitForKernelDefaultRoute(2 * time.Second) {
+	if v.waitForKernelDefaultRoute(1 * time.Second) {
 		return
 	}
 
@@ -354,7 +354,7 @@ func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
 		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "up")
 	}
 	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-	if v.waitForKernelDefaultRoute(5 * time.Second) {
+	if v.waitForKernelDefaultRoute(2 * time.Second) {
 		return
 	}
 
@@ -365,7 +365,7 @@ func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
 		_, _ = v.cmd.Run(openwrtIfupBin, ifname)
 	}
 	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-	_ = v.waitForKernelDefaultRoute(8 * time.Second)
+	_ = v.waitForKernelDefaultRoute(3 * time.Second)
 }
 
 func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
@@ -612,7 +612,7 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		// route even though the uplink interface still shows “up”. We recover by
 		// restoring the uplink default route (renew first, then down/up if needed).
 		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(75 * time.Millisecond)
 		v.restoreDefaultRouteAfterWireGuardDisable()
 		_ = v.teardownWireGuardFirewall()
 	}
