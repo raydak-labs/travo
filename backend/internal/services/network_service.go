@@ -899,15 +899,21 @@ func (n *NetworkService) GetDDNSConfig() (models.DDNSConfig, error) {
 		// No ddns config — return defaults (disabled)
 		return models.DDNSConfig{}, nil
 	}
-	config := models.DDNSConfig{
+	svc := opts["service_name"]
+	updateURL := opts["update_url"]
+	// LuCI/custom setups often use update_url with empty or "-" service_name.
+	if updateURL != "" && (svc == "" || svc == "-") {
+		svc = "custom"
+	}
+	return models.DDNSConfig{
 		Enabled:    opts["enabled"] == "1",
-		Service:    opts["service_name"],
+		Service:    svc,
 		Domain:     opts["domain"],
 		Username:   opts["username"],
 		Password:   opts["password"],
 		LookupHost: opts["lookup_host"],
-	}
-	return config, nil
+		UpdateURL:  updateURL,
+	}, nil
 }
 
 // SetDDNSConfig writes the DDNS configuration to UCI and restarts ddns-scripts.
@@ -919,8 +925,16 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 	if err := n.uci.Set("ddns", "myddns", "enabled", enabled); err != nil {
 		return fmt.Errorf("setting ddns enabled: %w", err)
 	}
-	if err := n.uci.Set("ddns", "myddns", "service_name", config.Service); err != nil {
-		return fmt.Errorf("setting ddns service_name: %w", err)
+	if strings.EqualFold(strings.TrimSpace(config.Service), "custom") {
+		_ = n.uci.DeleteOption("ddns", "myddns", "service_name")
+		if err := n.uci.Set("ddns", "myddns", "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
+			return fmt.Errorf("setting ddns update_url: %w", err)
+		}
+	} else {
+		_ = n.uci.DeleteOption("ddns", "myddns", "update_url")
+		if err := n.uci.Set("ddns", "myddns", "service_name", config.Service); err != nil {
+			return fmt.Errorf("setting ddns service_name: %w", err)
+		}
 	}
 	if err := n.uci.Set("ddns", "myddns", "domain", config.Domain); err != nil {
 		return fmt.Errorf("setting ddns domain: %w", err)

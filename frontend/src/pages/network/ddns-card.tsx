@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/cn';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -25,6 +26,7 @@ export function DdnsCard() {
   const [ddnsUsername, setDdnsUsername] = useState('');
   const [ddnsPassword, setDdnsPassword] = useState('');
   const [ddnsLookupHost, setDdnsLookupHost] = useState('');
+  const [ddnsUpdateUrl, setDdnsUpdateUrl] = useState('');
 
   useEffect(() => {
     if (ddnsConfig) {
@@ -34,6 +36,7 @@ export function DdnsCard() {
       setDdnsUsername(ddnsConfig.username);
       setDdnsPassword(ddnsConfig.password);
       setDdnsLookupHost(ddnsConfig.lookup_host);
+      setDdnsUpdateUrl(ddnsConfig.update_url ?? '');
     }
   }, [ddnsConfig]);
 
@@ -83,7 +86,15 @@ export function DdnsCard() {
               <>
                 <div className="space-y-1">
                   <label className="text-xs text-gray-500">Provider</label>
-                  <Select value={ddnsService} onValueChange={setDdnsService}>
+                  <Select
+                    value={ddnsService}
+                    onValueChange={(v) => {
+                      setDdnsService(v);
+                      if (v !== 'custom') {
+                        setDdnsUpdateUrl('');
+                      }
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a DDNS provider" />
                     </SelectTrigger>
@@ -94,9 +105,28 @@ export function DdnsCard() {
                       <SelectItem value="freedns.afraid.org">FreeDNS</SelectItem>
                       <SelectItem value="dynu.com">Dynu</SelectItem>
                       <SelectItem value="desec.io">deSEC</SelectItem>
+                      <SelectItem value="custom">Custom (update URL)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {ddnsService === 'custom' && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-gray-500 dark:text-gray-400">Update URL</label>
+                    <textarea
+                      value={ddnsUpdateUrl}
+                      onChange={(e) => setDdnsUpdateUrl(e.target.value)}
+                      placeholder="https://example.com/update?hostname=[DOMAIN]&myip=[IP]"
+                      rows={3}
+                      className={cn(
+                        'flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500',
+                      )}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Use ddns-scripts placeholders such as [IP], [DOMAIN], [USERNAME], [PASSWORD] as required by your
+                      provider.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <label className="text-xs text-gray-500">Domain</label>
                   <Input
@@ -144,6 +174,7 @@ export function DdnsCard() {
                   username: ddnsUsername,
                   password: ddnsPassword,
                   lookup_host: ddnsLookupHost,
+                  update_url: ddnsService === 'custom' ? ddnsUpdateUrl : '',
                 })
               }
               disabled={setDDNS.isPending}

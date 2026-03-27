@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -420,11 +422,21 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if config.Enabled {
-			if config.Service == "" {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "service is required when DDNS is enabled"})
-			}
 			if config.Domain == "" {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "domain is required when DDNS is enabled"})
+			}
+			svc := strings.TrimSpace(config.Service)
+			if strings.EqualFold(svc, "custom") {
+				raw := strings.TrimSpace(config.UpdateURL)
+				if raw == "" {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "update_url is required for custom DDNS"})
+				}
+				u, err := url.Parse(raw)
+				if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "update_url must be a valid http(s) URL"})
+				}
+			} else if svc == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "service is required when DDNS is enabled"})
 			}
 		}
 		if err := svc.SetDDNSConfig(config); err != nil {

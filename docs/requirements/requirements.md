@@ -58,7 +58,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [ ] Task 20 (3.3) VPN: VPN speed test
 - [ ] Task 21 (3.3) VPN: OpenVPN support
 - [ ] Task 22 (4.2) AdGuard: blocklist management from the travel router UI
-- [ ] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
+- [x] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
 - [ ] Task 24 (4.6) Future services: cloudflared (Cloudflare Tunnel)
 - [ ] Task 25 (4.6) Future services: SQM / QoS (traffic shaping)
 - [ ] Task 26 (4.6) Future services: Watchcat (connection watchdog)
@@ -285,7 +285,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 - [x] DDNS provider configuration (DuckDNS, No-IP, Cloudflare, etc.)
 - [x] DDNS status indicator (current public IP, last update)
-- [ ] 🔮 Custom DDNS update URL
+- [x] Custom DDNS update URL
 
 ### 4.6 Future Services
 

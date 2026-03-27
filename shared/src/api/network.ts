@@ -119,6 +119,8 @@ export interface DDNSConfig {
   readonly username: string;
   readonly password: string;
   readonly lookup_host: string;
+  /** Custom ddns-scripts update URL when `service` is `"custom"` (OpenWrt UCI `update_url`). */
+  readonly update_url: string;
 }
 
 /** Dynamic DNS service status */

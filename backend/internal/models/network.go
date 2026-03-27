@@ -119,11 +119,12 @@ type DHCPReservation struct {
 // DDNSConfig holds Dynamic DNS provider configuration.
 type DDNSConfig struct {
 	Enabled    bool   `json:"enabled"`
-	Service    string `json:"service"`
+	Service    string `json:"service"` // built-in ddns-scripts service_name, or "custom" when using update_url
 	Domain     string `json:"domain"`
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	LookupHost string `json:"lookup_host"`
+	UpdateURL  string `json:"update_url"` // UCI update_url when Service is "custom"
 }
 
 // DDNSStatus holds the current DDNS service status.
