@@ -65,7 +65,8 @@ type KillSwitchStatus struct {
 
 // DNSLeakResult holds the result of a DNS leak test.
 type DNSLeakResult struct {
-	// Nameservers currently in /etc/resolv.conf (what the system resolves with).
+	// Nameservers are effective upstream DNS (resolv.conf, or dnsmasq server= when
+	// resolv only lists the local stub 127.0.0.1/::1).
 	Nameservers []string `json:"nameservers"`
 	// VPNDNSServers are the DNS servers configured in the active WireGuard profile.
 	VPNDNSServers []string `json:"vpn_dns_servers"`

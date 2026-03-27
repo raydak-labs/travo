@@ -88,7 +88,7 @@ export interface KillSwitchStatus {
 
 /** DNS leak test result */
 export interface DNSLeakResult {
-  /** Nameservers from /etc/resolv.conf */
+  /** Effective upstream nameservers (resolv.conf, or dnsmasq server= when resolv only lists local stub) */
   readonly nameservers: readonly string[];
   /** DNS servers configured in the active WireGuard profile */
   readonly vpn_dns_servers: readonly string[];

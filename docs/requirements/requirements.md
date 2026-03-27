@@ -237,7 +237,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Grey out VPN options when packages not installed (link to Services page)
 - [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
 - [x] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
-- [x] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
+- [x] DNS leak test (router-side: WireGuard DNS vs effective upstream — `/etc/resolv.conf` plus dnsmasq `server=` when resolv only lists the local stub). With VPN DNS configured, WireGuard enable **replaces** dnsmasq forwards with those IPs (previous list, e.g. AdGuard `127.0.0.1#5353`, is snapshotted and restored on VPN disable). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
 - [ ] Upload VPN profiles via file upload (UI) in addition to copy/paste (WireGuard `.conf` at minimum; future-proof for OpenVPN).
 - [ ] 🔮 OpenVPN support
 - [ ] 🔮 VPN speed test

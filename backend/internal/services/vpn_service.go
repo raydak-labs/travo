@@ -676,14 +676,22 @@ func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
 	return &snap, nil
 }
 
-func (v *VpnService) isDnsmasqForwardingToAdGuard(servers []string) bool {
-	for _, s := range servers {
-		// AdGuard integration uses 127.0.0.1#<port>
-		if strings.HasPrefix(s, "127.0.0.1#") {
-			return true
+// splitWireGuardDNSOption splits UCI network.wg0.dns. OpenWrt normally uses
+// space-separated values; some imports (or hand-edited UCI) use commas.
+func splitWireGuardDNSOption(dns string) []string {
+	dns = strings.TrimSpace(dns)
+	if dns == "" {
+		return nil
+	}
+	dns = strings.ReplaceAll(dns, ",", " ")
+	var out []string
+	for _, s := range strings.Fields(dns) {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
 		}
 	}
-	return false
+	return out
 }
 
 func (v *VpnService) wgConfiguredDNSServers() []string {
@@ -691,14 +699,7 @@ func (v *VpnService) wgConfiguredDNSServers() []string {
 	if err != nil {
 		return nil
 	}
-	var out []string
-	for _, s := range strings.Fields(strings.TrimSpace(dns)) {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
+	return splitWireGuardDNSOption(dns)
 }
 
 func (v *VpnService) enableVpnDNSForwarding() error {
@@ -708,12 +709,9 @@ func (v *VpnService) enableVpnDNSForwarding() error {
 	}
 
 	currentServers := v.readDnsmasqServers()
-	if v.isDnsmasqForwardingToAdGuard(currentServers) {
-		// Avoid clobbering AdGuard-managed dnsmasq settings.
-		return nil
-	}
-
-	// Snapshot current state (best-effort).
+	// Snapshot current dnsmasq (including AdGuard 127.0.0.1#5353) so we can restore
+	// on WireGuard disable. LAN DNS must forward to VPN DNS while the tunnel is up,
+	// otherwise queries would still go to AdGuard only.
 	_ = v.writeVpnDnsSnapshot(vpnDnsSnapshot{
 		NoResolv: v.readDnsmasqNoResolv(),
 		Servers:  currentServers,
@@ -1211,13 +1209,17 @@ func (v *VpnService) ActivateProfile(id string) error {
 	return v.saveProfiles(profiles)
 }
 
-// RunDNSLeakTest checks whether the system's active DNS servers match the VPN
-// configuration. A mismatch when the VPN is active suggests a DNS leak.
+// RunDNSLeakTest checks whether the router's effective DNS upstream (what dnsmasq
+// uses for LAN clients) matches the VPN-configured DNS when WireGuard is active.
+// On OpenWrt, /etc/resolv.conf usually lists only 127.0.0.1 (local dnsmasq) while
+// actual upstreams are in dhcp.@dnsmasq[0].server — we merge those so the test is
+// not a false positive when VPN DNS forwarding is applied.
 func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 	result := models.DNSLeakResult{}
 
-	// 1. Read /etc/resolv.conf for current system nameservers.
-	result.Nameservers = readResolvConfNameservers()
+	// 1. Effective upstream nameservers (resolv.conf + dnsmasq when resolv is loopback-only).
+	dnsmasqServers := v.readDnsmasqServers()
+	result.Nameservers = effectiveNameserversForMerge(readResolvConfNameservers(), dnsmasqServers)
 
 	// 2. Check VPN status.
 	if opts, err := v.uci.GetAll("network", "wg0"); err == nil {
@@ -1226,15 +1228,11 @@ func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 
 	// 3. Read VPN DNS servers from WireGuard UCI config.
 	if dns, err := v.uci.Get("network", "wg0", "dns"); err == nil && dns != "" {
-		for _, s := range strings.Split(dns, " ") {
-			s = strings.TrimSpace(s)
-			if s != "" {
-				result.VPNDNSServers = append(result.VPNDNSServers, s)
-			}
-		}
+		result.VPNDNSServers = splitWireGuardDNSOption(dns)
 	}
 
-	// 4. Check for potential leak: VPN active but DNS not routed through VPN.
+	// 4. Check for potential leak: VPN active but effective dnsmasq upstreams do not
+	// include WireGuard DNS (e.g. still forwarding only to AdGuard).
 	if result.VPNActive && len(result.VPNDNSServers) > 0 {
 		vpnDNSSet := make(map[string]bool, len(result.VPNDNSServers))
 		for _, s := range result.VPNDNSServers {
@@ -1253,8 +1251,57 @@ func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 	return result
 }
 
+func isLoopbackNameserver(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	return s == "127.0.0.1" || s == "::1" || s == "0:0:0:0:0:0:0:1"
+}
+
+// dnsmasqServerAddrToIP strips the #port suffix used by dnsmasq (e.g. 127.0.0.1#5353).
+func dnsmasqServerAddrToIP(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, "#"); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
+}
+
+// effectiveNameserversForMerge returns upstream DNS nameservers used for leak checks.
+// When resolv.conf only lists the local dnsmasq stub (127.0.0.1 / ::1), upstream
+// IPs come from dnsmasq server= list instead.
+func effectiveNameserversForMerge(resolv []string, dnsmasqServers []string) []string {
+	allLoopback := len(resolv) > 0
+	for _, ns := range resolv {
+		if !isLoopbackNameserver(ns) {
+			allLoopback = false
+			break
+		}
+	}
+	if len(resolv) == 0 {
+		allLoopback = true
+	}
+	if !allLoopback {
+		return resolv
+	}
+
+	var out []string
+	for _, s := range dnsmasqServers {
+		ip := dnsmasqServerAddrToIP(s)
+		if ip != "" {
+			out = append(out, ip)
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+	return resolv
+}
+
 // readResolvConfNameservers parses nameserver lines from /etc/resolv.conf.
-func readResolvConfNameservers() []string {
+// Overridable in tests (OpenWrt stub resolver vs dnsmasq upstream merge).
+var readResolvConfNameservers = func() []string {
 	return readResolvConfNameserversFromPath("/etc/resolv.conf")
 }
 

@@ -739,6 +739,158 @@ func TestReadResolvConfNameservers(t *testing.T) {
 	}
 }
 
+func TestEffectiveNameserversForMerge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		resolv    []string
+		dnsmasq   []string
+		wantFirst string
+		wantLen   int
+	}{
+		{
+			name:      "non_loopback_ignores_dnsmasq",
+			resolv:    []string{"8.8.8.8"},
+			dnsmasq:   []string{"10.66.0.1"},
+			wantFirst: "8.8.8.8",
+			wantLen:   1,
+		},
+		{
+			name:      "loopback_only_uses_dnsmasq",
+			resolv:    []string{"127.0.0.1"},
+			dnsmasq:   []string{"10.66.0.1", "10.66.0.2"},
+			wantFirst: "10.66.0.1",
+			wantLen:   2,
+		},
+		{
+			name:      "loopback_ipv6_only_uses_dnsmasq",
+			resolv:    []string{"::1"},
+			dnsmasq:   []string{"10.66.0.1"},
+			wantFirst: "10.66.0.1",
+			wantLen:   1,
+		},
+		{
+			name:      "empty_resolv_uses_dnsmasq",
+			resolv:    nil,
+			dnsmasq:   []string{"1.1.1.1"},
+			wantFirst: "1.1.1.1",
+			wantLen:   1,
+		},
+		{
+			name:      "strips_dnsmasq_hash_port",
+			resolv:    []string{"127.0.0.1"},
+			dnsmasq:   []string{"127.0.0.1#5353"},
+			wantFirst: "127.0.0.1",
+			wantLen:   1,
+		},
+		{
+			name:      "loopback_fallback_when_no_dnsmasq",
+			resolv:    []string{"127.0.0.1"},
+			dnsmasq:   nil,
+			wantFirst: "127.0.0.1",
+			wantLen:   1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := effectiveNameserversForMerge(tt.resolv, tt.dnsmasq)
+			if len(got) != tt.wantLen {
+				t.Fatalf("len=%d want %d: %v", len(got), tt.wantLen, got)
+			}
+			if tt.wantLen > 0 && got[0] != tt.wantFirst {
+				t.Errorf("first=%q want %q", got[0], tt.wantFirst)
+			}
+		})
+	}
+}
+
+func TestRunDNSLeakTest_OpenWrtLoopbackDnsmasqMatchesVPN(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	_ = u.Set("network", "wg0", "dns", "10.66.0.1")
+
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "uci" && len(args) >= 2 && args[0] == "get" && args[1] == "dhcp.@dnsmasq[0].server" {
+			return []byte("10.66.0.1\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected command")
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	// Simulate OpenWrt: resolv only lists local stub; upstream is dnsmasq server=.
+	old := readResolvConfNameservers
+	readResolvConfNameservers = func() []string {
+		return []string{"127.0.0.1"}
+	}
+	t.Cleanup(func() { readResolvConfNameservers = old })
+
+	result := svc.RunDNSLeakTest()
+	if !result.VPNActive {
+		t.Fatal("expected VPNActive=true")
+	}
+	if len(result.Nameservers) != 1 || result.Nameservers[0] != "10.66.0.1" {
+		t.Fatalf("expected effective nameserver 10.66.0.1, got %v", result.Nameservers)
+	}
+	if result.PotentiallyLeaking {
+		t.Fatal("expected PotentiallyLeaking=false when dnsmasq forwards to VPN DNS")
+	}
+}
+
+func TestSplitWireGuardDNSOption(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{"198.18.0.1,198.18.0.2", []string{"198.18.0.1", "198.18.0.2"}},
+		{"10.0.0.1 10.0.0.2", []string{"10.0.0.1", "10.0.0.2"}},
+		{"  1.1.1.1 , 8.8.8.8 ", []string{"1.1.1.1", "8.8.8.8"}},
+		{"", nil},
+	}
+	for _, tt := range tests {
+		got := splitWireGuardDNSOption(tt.in)
+		if len(got) != len(tt.want) {
+			t.Errorf("splitWireGuardDNSOption(%q) = %v; want %v", tt.in, got, tt.want)
+			continue
+		}
+		for i := range tt.want {
+			if got[i] != tt.want[i] {
+				t.Errorf("splitWireGuardDNSOption(%q)[%d] = %q; want %q", tt.in, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestRunDNSLeakTest_DnsmasqOnlyAdGuardWhileVPNDNSConfiguredLeaks(t *testing.T) {
+	// dnsmasq still forwards only to AdGuard while wg0 lists VPN DNS — LAN DNS is not using VPN DNS.
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	_ = u.Set("network", "wg0", "dns", "1.1.1.1")
+
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "uci" && len(args) >= 2 && args[0] == "get" && args[1] == "dhcp.@dnsmasq[0].server" {
+			return []byte("127.0.0.1#5353\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected command")
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	old := readResolvConfNameservers
+	readResolvConfNameservers = func() []string {
+		return []string{"127.0.0.1"}
+	}
+	t.Cleanup(func() { readResolvConfNameservers = old })
+
+	result := svc.RunDNSLeakTest()
+	if !result.VPNActive {
+		t.Fatal("expected VPNActive=true")
+	}
+	if !result.PotentiallyLeaking {
+		t.Fatal("expected PotentiallyLeaking=true when dnsmasq upstream is not VPN DNS")
+	}
+}
+
 func TestSetupWireGuardFirewall(t *testing.T) {
 	u := uci.NewMockUCI()
 	svc := NewVpnService(u)
