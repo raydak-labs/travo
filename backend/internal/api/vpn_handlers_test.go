@@ -411,3 +411,20 @@ func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
 		t.Errorf("expected enabled=true after setting, got %v", result["enabled"])
 	}
 }
+
+func TestRunWireGuardSpeedTest_Disabled_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/speed-test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}

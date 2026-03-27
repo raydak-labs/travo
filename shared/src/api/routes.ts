@@ -105,6 +105,7 @@ export const API_ROUTES = {
       ssh: '/api/v1/vpn/tailscale/ssh',
     },
     dnsLeakTest: '/api/v1/vpn/dns-leak-test',
+    speedTest: '/api/v1/vpn/speed-test',
     splitTunnel: '/api/v1/vpn/split-tunnel',
   },
   services: {

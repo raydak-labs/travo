@@ -959,6 +959,64 @@ func TestVerifyWireGuard(t *testing.T) {
 	// Just ensure the function runs without panic.
 }
 
+func TestRunWireGuardSpeedTest_WireGuardDisabled(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		return nil, fmt.Errorf("unexpected command: %s", name)
+	}})
+	_, err := svc.RunWireGuardSpeedTest()
+	if err == nil {
+		t.Fatal("expected error when wireguard disabled")
+	}
+}
+
+func TestRunWireGuardSpeedTest_InterfaceNotUp(t *testing.T) {
+	u := uci.NewMockUCI()
+	if err := u.Set("network", "wg0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "/sbin/ip" && len(args) >= 4 && args[0] == "link" {
+			return []byte(""), nil
+		}
+		return nil, fmt.Errorf("unexpected")
+	}})
+	_, err := svc.RunWireGuardSpeedTest()
+	if err == nil || !strings.Contains(err.Error(), "not up") {
+		t.Fatalf("expected not up error, got %v", err)
+	}
+}
+
+func TestRunWireGuardSpeedTest_Success(t *testing.T) {
+	u := uci.NewMockUCI()
+	if err := u.Set("network", "wg0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "/sbin/ip":
+			if len(args) >= 4 && args[0] == "link" && args[1] == "show" {
+				return []byte("2: wg0: <POINTOPOINT,UP,LOWER_UP> mtu 1420"), nil
+			}
+			if len(args) >= 2 && args[0] == "-4" {
+				return []byte("wg0    inet 10.0.0.2/32 scope global wg0\n"), nil
+			}
+		case "wget":
+			return nil, nil
+		case "ping":
+			return []byte("---\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected %s %v", name, args)
+	}})
+	res, err := svc.RunWireGuardSpeedTest()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if res.DownloadMbps <= 0 {
+		t.Errorf("expected download > 0, got %v", res.DownloadMbps)
+	}
+}
+
 // stubVerifyRunner returns canned output for ip/wg commands used by VerifyWireGuard.
 type stubVerifyRunner struct{}
 

@@ -369,6 +369,9 @@ var openAPISpec = map[string]interface{}{
 		"/vpn/dns-leak-test": map[string]interface{}{
 			"get": endpoint("DNSLeakTest", "Router-side check: WireGuard DNS vs effective upstream (resolv.conf; dnsmasq server= when resolv is loopback-only)", true, nil, resp200("application/json", nil)),
 		},
+		"/vpn/speed-test": map[string]interface{}{
+			"post": endpoint("RunWireGuardSpeedTest", "Download + ping speed test bound to WireGuard (wg0); requires tunnel enabled and up", true, nil, resp200("application/json", nil)),
+		},
 		"/vpn/wireguard/verify": map[string]interface{}{
 			"get": endpoint("VerifyWireGuard", "Verify WireGuard tunnel health: interface, handshake, route, firewall", true, nil, resp200("application/json", nil)),
 		},

@@ -55,7 +55,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [ ] Task 17 (1.4) Multi-radio: startup script to auto-discover radio setup and persist config
 - [ ] Task 18 (2.2) Clients: bandwidth limiting (QoS per device)
 - [ ] Task 19 (2.2) Clients: parental controls / client group policies
-- [ ] Task 20 (3.3) VPN: VPN speed test
+- [x] Task 20 (3.3) VPN: VPN speed test
 - [ ] Task 21 (3.3) VPN: OpenVPN support
 - [ ] Task 22 (4.2) AdGuard: blocklist management from the travel router UI
 - [x] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
@@ -240,7 +240,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] DNS leak test (router-side: WireGuard DNS vs effective upstream — `/etc/resolv.conf` plus dnsmasq `server=` when resolv only lists the local stub). With VPN DNS configured, WireGuard enable **replaces** dnsmasq forwards with those IPs (previous list, e.g. AdGuard `127.0.0.1#5353`, is snapshotted and restored on VPN disable). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
 - [x] Upload VPN profiles via file upload (UI) in addition to copy/paste (WireGuard `.conf` at minimum; future-proof for OpenVPN).
 - [ ] 🔮 OpenVPN support
-- [ ] 🔮 VPN speed test
+- [x] VPN speed test (WireGuard-bound download + ping via `wg0`; Network page keeps general WAN speed test)
 
 ---
 

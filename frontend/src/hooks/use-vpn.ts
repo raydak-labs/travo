@@ -14,6 +14,7 @@ import type {
   VPNVerifyResult,
   SplitTunnelConfig,
   TailscaleSSHStatus,
+  SpeedTestResult,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -170,6 +171,16 @@ export function useDNSLeakTest() {
     mutationFn: () => apiClient.get<DNSLeakResult>(API_ROUTES.vpn.dnsLeakTest),
     onError: (error) => {
       toast.error('DNS leak test failed', { description: error.message });
+    },
+  });
+}
+
+/** Speed test with download + ping bound to WireGuard (wg0); requires tunnel enabled and up. */
+export function useRunWireGuardSpeedTest() {
+  return useMutation({
+    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.vpn.speedTest),
+    onError: (error) => {
+      toast.error('VPN speed test failed', { description: error.message });
     },
   });
 }

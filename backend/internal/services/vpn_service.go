@@ -1219,6 +1219,85 @@ func (v *VpnService) ActivateProfile(id string) error {
 	return v.saveProfiles(profiles)
 }
 
+const wireGuardSpeedTestURL = "http://speedtest.tele2.net/1MB.zip"
+
+// wireGuardIPv4Address returns the first IPv4 address assigned to wg0 (from `ip -4 -o addr show`).
+func (v *VpnService) wireGuardIPv4Address() (string, error) {
+	out, err := v.cmd.Run(openwrtIPBin, "-4", "-o", "addr", "show", "dev", "wg0")
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		for i := 0; i < len(fields); i++ {
+			if fields[i] == "inet" && i+1 < len(fields) {
+				addr := fields[i+1]
+				if j := strings.Index(addr, "/"); j > 0 {
+					return addr[:j], nil
+				}
+				return addr, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no inet address on wg0")
+}
+
+// RunWireGuardSpeedTest measures download throughput and ping latency with traffic bound to the
+// WireGuard interface (wget --bind-address, ping -I wg0). Requires wg0 enabled and up with an IPv4.
+func (v *VpnService) RunWireGuardSpeedTest() (models.SpeedTestResult, error) {
+	result := models.SpeedTestResult{Server: "tele2.net via WireGuard (wget --bind-address)"}
+
+	opts, err := v.uci.GetAll("network", "wg0")
+	if err != nil {
+		return result, fmt.Errorf("wireguard is not configured")
+	}
+	if opts["disabled"] == "1" {
+		return result, fmt.Errorf("wireguard is disabled — enable the tunnel before running a VPN speed test")
+	}
+
+	linkOut, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0")
+	if err != nil || !wireGuardIfaceLooksUp(string(linkOut)) {
+		return result, fmt.Errorf("wireguard interface wg0 is not up")
+	}
+
+	bindIP, err := v.wireGuardIPv4Address()
+	if err != nil {
+		return result, fmt.Errorf("could not read IPv4 on wg0: %w", err)
+	}
+	if bindIP == "" {
+		return result, fmt.Errorf("no IPv4 address on wg0")
+	}
+
+	start := time.Now()
+	_, werr := v.cmd.Run("wget", "-O", "/dev/null", "--timeout=15",
+		"--no-check-certificate", "--bind-address="+bindIP,
+		wireGuardSpeedTestURL)
+	elapsed := time.Since(start).Seconds()
+	if werr == nil && elapsed > 0 {
+		result.DownloadMbps = (1024 * 1024 * 8) / elapsed / 1e6
+	}
+
+	pingOut, perr := v.cmd.Run("ping", "-I", "wg0", "-c", "4", "-W", "3", "8.8.8.8")
+	if perr == nil {
+		for _, line := range strings.Split(string(pingOut), "\n") {
+			if strings.Contains(line, "avg") {
+				parts := strings.Split(line, "/")
+				if len(parts) >= 5 {
+					if ms, err2 := strconv.ParseFloat(strings.TrimSpace(parts[4]), 64); err2 == nil {
+						result.PingMs = ms
+					}
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
 // RunDNSLeakTest checks whether the router's effective DNS upstream (what dnsmasq
 // uses for LAN clients) matches the VPN-configured DNS when WireGuard is active.
 // On OpenWrt, /etc/resolv.conf usually lists only 127.0.0.1 (local dnsmasq) while

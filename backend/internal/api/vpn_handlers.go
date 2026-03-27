@@ -285,6 +285,18 @@ func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
 	}
 }
 
+// RunWireGuardSpeedTestHandler handles POST /api/v1/vpn/speed-test.
+func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result, err := svc.RunWireGuardSpeedTest()
+		if err != nil {
+			// All current errors are preconditions (tunnel not usable for the test).
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(result)
+	}
+}
+
 // VerifyWireguardHandler handles GET /api/v1/vpn/wireguard/verify.
 // Returns interface status, handshake recency, route check, and firewall plumbing state.
 func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
