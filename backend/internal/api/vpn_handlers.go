@@ -140,12 +140,17 @@ func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
 func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			NodeIP string `json:"node_ip"`
+			NodeIP   string `json:"node_ip"`
+			ExitNode string `json:"exit_node"` // legacy / alternate key from older clients
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.SetTailscaleExitNode(body.NodeIP); err != nil {
+		ip := body.NodeIP
+		if ip == "" {
+			ip = body.ExitNode
+		}
+		if err := svc.SetTailscaleExitNode(ip); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})

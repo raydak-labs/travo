@@ -16,6 +16,7 @@ import {
   useSetTailscaleExitNode,
   useTailscaleSSH,
   useSetTailscaleSSH,
+  useVpnStatus,
 } from '@/hooks/use-vpn';
 import type { TailscalePeer } from '@shared/index';
 
@@ -95,6 +96,7 @@ function AuthSection() {
 
 export function TailscaleSection() {
   const { data: status, isLoading } = useTailscaleStatus();
+  const { data: vpnStatuses } = useVpnStatus();
   const { data: services = [] } = useServices();
   const toggleMutation = useToggleTailscale();
   const exitNodeMutation = useSetTailscaleExitNode();
@@ -103,6 +105,7 @@ export function TailscaleSection() {
 
   const tsService = services.find((s) => s.id === 'tailscale');
   const isInstalled = tsService ? tsService.state !== 'not_installed' : !!status;
+  const wireguardEnabled = vpnStatuses?.some((s) => s.type === 'wireguard' && s.enabled) ?? false;
 
   return (
     <>
@@ -111,6 +114,12 @@ export function TailscaleSection() {
         title={toggleMutation.variables ? 'Enabling Tailscale…' : 'Disabling Tailscale…'}
         description="Starting or stopping the Tailscale service."
         details={['Updating service state', 'Refreshing status']}
+      />
+      <OperationProgressDialog
+        open={exitNodeMutation.isPending}
+        title="Applying exit node…"
+        description="WireGuard may be turned off first, then Tailscale exit routing is updated."
+        details={['Single-VPN policy', 'Tailscale configuration', 'Refreshing status']}
       />
       <Card className={!isInstalled ? 'opacity-60' : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -214,6 +223,12 @@ export function TailscaleSection() {
 
             {status.logged_in && status.peers && status.peers.length > 0 && (
               <div className="space-y-1">
+                {wireguardEnabled && (
+                  <p className="text-sm rounded-md border border-amber-200 bg-amber-50/90 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/50">
+                    WireGuard is enabled. Using a Tailscale exit node turns WireGuard off first so only one
+                    full-tunnel VPN path runs at a time.
+                  </p>
+                )}
                 <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
                   <Users className="h-3 w-3" />
                   <span>

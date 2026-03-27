@@ -90,10 +90,10 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Add machine-readable API documentation generation (OpenAPI/Swagger) and expose docs endpoint from backend for agent/test automation use.
 - [x] Document in `AGENTS.md` that the test device can expose/serve API docs endpoints for automation flows.
 - [x] 🐛 WireGuard: disabling WireGuard must restore internet connectivity (default route) and the toggle API must accept `enabled` (not only legacy `enable`). See [WireGuard disable breaks internet (plan)](../plans/2026-03-26-wireguard-disable-breaks-internet.md).
-- [ ] 🐛 WiFi/VPN UI does not live-update after actions (connect/toggle/apply) — WiFi tab and VPN views can remain stale until manual reload. Fix state invalidation and/or add event-driven refresh. See [Live state refresh + WiFi saved network persistence plan](../plans/2026-03-26-live-state-refresh-and-wifi-saved-networks.md).
-- [ ] 🐛 WiFi: connecting to a new upstream AP causes previously saved upstream networks to disappear (profiles not persisted or accidentally deleted). See [Live state refresh + WiFi saved network persistence plan](../plans/2026-03-26-live-state-refresh-and-wifi-saved-networks.md).
-- [ ] VPN: verify whether disable latency is required; measure and remove avoidable blocking where possible. See [VPN disable latency + DNS forwarding plan](../plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md).
-- [ ] VPN: DNS forwarding should use VPN-configured DNS servers when VPN is enabled, and restore previous DNS forwarding when VPN is disabled. See [VPN disable latency + DNS forwarding plan](../plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md).
+- [x] 🐛 WiFi/VPN UI does not live-update after actions (connect/toggle/apply) — WiFi tab and VPN views can remain stale until manual reload. Fix state invalidation and/or add event-driven refresh. See [Live state refresh + WiFi saved network persistence plan](../plans/2026-03-26-live-state-refresh-and-wifi-saved-networks.md).
+- [x] 🐛 WiFi: connecting to a new upstream AP causes previously saved upstream networks to disappear (profiles not persisted or accidentally deleted). See [Live state refresh + WiFi saved network persistence plan](../plans/2026-03-26-live-state-refresh-and-wifi-saved-networks.md).
+- [x] VPN: verify whether disable latency is required; measure and remove avoidable blocking where possible. See [VPN disable latency + DNS forwarding plan](../plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md).
+- [x] VPN: DNS forwarding should use VPN-configured DNS servers when VPN is enabled, and restore previous DNS forwarding when VPN is disabled. See [VPN disable latency + DNS forwarding plan](../plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md).
 
 ## 1. WiFi Management
 
@@ -238,7 +238,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
 - [x] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
 - [x] DNS leak test (router-side: WireGuard DNS vs effective upstream — `/etc/resolv.conf` plus dnsmasq `server=` when resolv only lists the local stub). With VPN DNS configured, WireGuard enable **replaces** dnsmasq forwards with those IPs (previous list, e.g. AdGuard `127.0.0.1#5353`, is snapshotted and restored on VPN disable). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
-- [ ] Upload VPN profiles via file upload (UI) in addition to copy/paste (WireGuard `.conf` at minimum; future-proof for OpenVPN).
+- [x] Upload VPN profiles via file upload (UI) in addition to copy/paste (WireGuard `.conf` at minimum; future-proof for OpenVPN).
 - [ ] 🔮 OpenVPN support
 - [ ] 🔮 VPN speed test
 
@@ -279,7 +279,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 - [x] Install tailscale package
 - [x] Post-install authentication flow. See [Implementation guide](../plans/implementation.md#44--tailscale-post-install-auth-flow) and [Tailscale Integration plan](../plans/tailscale-integration.md#phase-1--authentication-flow).
-- [ ] UI navigation: move Tailscale out of the VPN page into a Services sub-menu (Services → Tailscale).
+- [x] UI navigation: move Tailscale out of the VPN page into a Services sub-menu (Services → Tailscale).
 
 ### 4.5 Dynamic DNS
 
@@ -502,7 +502,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Standardise form pattern: configuration cards should have a read-only view state with an Edit button, instead of permanently showing editable forms (Timezone, NTP, Password, Hardware Buttons are always in edit mode)
 - [x] Standardise empty states: use a consistent "no data" component across all cards instead of ad-hoc `<p className="text-sm text-gray-500">` strings
 - [x] Ensure `SystemStatsCard` shows a Skeleton on error instead of returning `null` (which collapses the grid cell)
-- [ ] Long-running enable/disable actions (VPN toggle, WiFi connect/apply, service start/stop): use a modal/popup progress UI with clearer “what is happening” details and elapsed time; keep the current page responsive while the operation runs.
+- [x] Long-running enable/disable actions (VPN toggle, WiFi connect/apply, service start/stop): use a modal/popup progress UI with clearer “what is happening” details and elapsed time; keep the current page responsive while the operation runs.
 
 ---
 
@@ -534,7 +534,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 ## 15. VPN, Wi‑Fi stability, SQM, performance & AdGuard (field issues)
 
 - [x] **WireGuard enable/error/runtime**: Enabling VPN from the UI shows an error while `wg0` still appears in LuCI; traffic does not use the tunnel. Align backend apply order with netifd/LuCI (interface, peer, firewall, routing). Ensure UCI objects LuCI expects exist before enable. Harden verification (avoid failing the whole operation when the interface is up but a handshake is still in progress).
-- [ ] **Single active VPN policy**: Only one VPN-style path may be active at a time across WireGuard, Tailscale (exit node / full-tunnel style use), and future providers. Enabling one must disable or demote others deterministically.
+- [x] **Single active VPN policy**: Only one VPN-style path may be active at a time across WireGuard, Tailscale (exit node / full-tunnel style use), and future providers. Enabling one must disable or demote others deterministically.
 - [x] **Wi‑Fi SSID/password visibility after change**: After changing AP name/password via the GUI, clients do not see the network until the SSID is toggled in LuCI. Wireless confirm/apply path should fully restart or reload hostapd so the BSS reappears without manual LuCI steps.
 - [ ] **SQM / traffic shaping**: Offer SQM install (cake/fq_codel) with defaults suitable for most travel-router WANs; optional presets per scenario. Reference: [OpenWrt SQM](https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm).
 - [x] **Backend CPU usage**: Investigate sustained high CPU from `openwrt-travel-gui` (e.g. WebSocket/ubus work while no clients are connected, service restart behaviour). Add safeguards: back off when idle, avoid redundant hot paths, document intentional monitors.

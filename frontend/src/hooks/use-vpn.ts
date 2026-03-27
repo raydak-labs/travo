@@ -218,10 +218,16 @@ export function useSetTailscaleExitNode() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (nodeIP: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { exit_node: nodeIP }),
+      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { node_ip: nodeIP }),
     onSuccess: () => {
       toast.success('Exit node updated');
-      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale'] });
+      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'wireguard', 'status'],
+        ['vpn', 'tailscale'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to set exit node', { description: error.message });

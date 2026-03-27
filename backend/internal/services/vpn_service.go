@@ -988,7 +988,17 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 }
 
 // SetTailscaleExitNode sets or clears the Tailscale exit node.
+// When a non-empty exit node is set, WireGuard is turned off first so only one
+// full-tunnel-style path is active (see requirements: single active VPN policy).
 func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
+	nodeIP = strings.TrimSpace(nodeIP)
+	if nodeIP != "" {
+		if opts, err := v.uci.GetAll("network", "wg0"); err == nil && opts["disabled"] != "1" {
+			if err := v.ToggleWireguard(false); err != nil {
+				return fmt.Errorf("disable WireGuard before using a Tailscale exit node: %w", err)
+			}
+		}
+	}
 	if nodeIP == "" {
 		_, err := v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 		return err
