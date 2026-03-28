@@ -5,18 +5,18 @@
 SSH into your OpenWRT router and run:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
+wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
 ```
 
 Or with options:
 
 ```sh
 # Install a specific version with a custom password, non-interactive
-wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | \
+wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
   sh -s -- --yes --version 1.0.0 --password mysecret
 
 # Skip AdGuard Home installation
-wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | \
+wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
   sh -s -- --no-adguard
 ```
 
@@ -39,12 +39,12 @@ The install script:
 ## Manual Installation from .ipk
 
 Download the `.ipk` for your architecture from
-[GitHub Releases](https://github.com/raydak-labs/hackathon-202603-ui-openwrt/releases):
+[GitHub Releases](https://github.com/raydak-labs/travo/releases):
 
 ```sh
 # On the router
 cd /tmp
-wget https://github.com/raydak-labs/hackathon-202603-ui-openwrt/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.ipk
+wget https://github.com/raydak-labs/travo/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.ipk
 opkg install travo_1.0.0_aarch64_cortex-a53.ipk
 ```
 
@@ -107,7 +107,7 @@ directly and restart:
 Run the uninstall script on the router:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh -s -- --uninstall
+wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh -s -- --uninstall
 ```
 
 Or if you have the repo cloned:

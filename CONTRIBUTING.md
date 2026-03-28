@@ -8,7 +8,7 @@ Thank you for your interest in contributing! Here's how to get started.
 2. **Clone** your fork locally:
    ```bash
    git clone https://github.com/YOUR_USERNAME/openwrt-travel-gui.git
-   cd hackathon-202603-ui-openwrt
+   cd travo
    ```
 3. **Install dependencies:**
    ```bash

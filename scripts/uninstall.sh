@@ -18,7 +18,7 @@ if [ -f "$INSTALL_SCRIPT" ]; then
 fi
 
 # Otherwise, download and run from GitHub
-GITHUB_REPO="${GITHUB_REPO:-raydak-labs/hackathon-202603-ui-openwrt}"
+GITHUB_REPO="${GITHUB_REPO:-raydak-labs/travo}"
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/main"
 
 _tmp_script="/tmp/travel-gui-install.sh"
