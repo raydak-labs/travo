@@ -2,7 +2,7 @@
 # install.sh — Install OpenWRT Travel GUI on a fresh OpenWRT system
 #
 # Usage:
-#   wget -O- https://raw.githubusercontent.com/travo/travo/main/scripts/install.sh | sh
+#   wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
 #   sh install.sh [OPTIONS]
 #
 # POSIX sh compatible — works with busybox ash on OpenWRT.
@@ -12,7 +12,7 @@ set -eu
 # ============================================================
 # Configuration — override these with environment variables
 # ============================================================
-GITHUB_REPO="${GITHUB_REPO:-travo/travo}"
+GITHUB_REPO="${GITHUB_REPO:-raydak-labs/hackathon-202603-ui-openwrt}"
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/main"
 GITHUB_API_BASE="https://api.github.com/repos/${GITHUB_REPO}"
 GITHUB_RELEASE_BASE="https://github.com/${GITHUB_REPO}/releases/download"
@@ -137,7 +137,7 @@ Examples:
   sh install.sh --no-adguard
 
   # Piped install (non-interactive, uses defaults)
-  wget -O- https://raw.githubusercontent.com/travo/travo/main/scripts/install.sh | sh
+  wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
 
   # Uninstall everything
   sh install.sh --uninstall
