@@ -57,7 +57,7 @@ export function HeaderNotificationsMenu() {
               alerts.slice(0, 20).map((alert) => (
                 <div
                   key={alert.id}
-                  className="flex items-start gap-2 border-b border-gray-100 px-3 py-2 last:border-b-0 dark:border-gray-800"
+                  className="flex items-start gap-2 border-b border-gray-100 px-3 py-2 last:border-b-0 dark:border-white/[0.08]"
                 >
                   <Badge
                     variant={headerAlertSeverityVariant[alert.severity] ?? 'default'}

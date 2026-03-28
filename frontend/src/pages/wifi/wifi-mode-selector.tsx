@@ -58,7 +58,7 @@ export function WifiModeSelector({ currentMode, onModeChange, isChanging }: Wifi
               'cursor-pointer transition-colors',
               mode === currentMode
                 ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950'
-                : 'hover:border-gray-300 dark:hover:border-gray-600',
+                : 'hover:border-gray-300 dark:border-white/10 dark:hover:border-white/20',
             )}
             onClick={() => handleSelect(mode)}
             role="button"

@@ -1,9 +1,11 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useNetworkStatus, useBlockedClients } from '@/hooks/use-network';
 import { NetworkPageAdvancedPanel } from '@/pages/network/network-page-advanced-panel';
 import { NetworkPageConfigurationPanel } from '@/pages/network/network-page-configuration-panel';
 import { NetworkPageStatusPanel } from '@/pages/network/network-page-status-panel';
 import { NetworkPageTabBar } from '@/pages/network/network-page-tab-bar';
+import { networkPathnameToTab, networkTabToPath } from '@/pages/network/network-path-utils';
 import type { NetworkSectionTab } from '@/pages/network/network-page-types';
 
 export function NetworkPage() {
@@ -19,7 +21,14 @@ export function NetworkPage() {
     advanced: `${baseId}-panel-advanced`,
   };
 
-  const [activeTab, setActiveTab] = useState<NetworkSectionTab>('status');
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const activeTab = networkPathnameToTab(pathname);
+
+  const onTabChange = (tab: NetworkSectionTab) => {
+    void navigate({ to: networkTabToPath(tab) });
+  };
+
   const { data: network, isLoading } = useNetworkStatus();
   const { data: blockedClients } = useBlockedClients();
 
@@ -27,7 +36,7 @@ export function NetworkPage() {
     <div className="space-y-4">
       <NetworkPageTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={onTabChange}
         tabIds={tabIds}
         panelIds={panelIds}
       />

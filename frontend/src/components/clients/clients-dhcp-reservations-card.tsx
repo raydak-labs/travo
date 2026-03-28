@@ -34,7 +34,7 @@ export function ClientsDhcpReservationsCard() {
                 {reservations.map((r) => (
                   <tr
                     key={r.section ?? r.mac}
-                    className="border-b border-gray-100 last:border-0 dark:border-gray-800"
+                    className="border-b border-gray-100 last:border-0 dark:border-white/[0.08]"
                   >
                     <td className="py-2 pr-4 text-gray-900 dark:text-white">{r.name}</td>
                     <td className="py-2 pr-4 font-mono text-xs text-gray-500">{r.mac}</td>

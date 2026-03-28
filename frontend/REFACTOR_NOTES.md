@@ -12,7 +12,7 @@
 
 ### Sidebar navigation (`components/layout/`)
 
-- **`nav-config.ts`** — Single source of truth for the sidebar: `NAV_ENTRIES` (leaf routes + collapsible groups), `isRouteActive()` for consistent active styling (including `/services` vs `/services/tailscale`), `flattenNavRoutes()` for the collapsed icon rail, and **localStorage** persistence for group open/closed state (`otg-sidebar-groups`).
+- **`nav-config.ts`** — `NAV_ENTRIES`: **WiFi** and **Network** are separate collapsible groups (each with sub-routes); **Clients** is a leaf. `isRouteActive()` uses **exact** path matching for every group child (so `/wifi` does not light up on `/wifi/advanced`), keeps `/services` vs `/services/tailscale` behavior, and `flattenNavRoutes()` for the collapsed icon rail; **localStorage** `otg-sidebar-groups`.
 - **`sidebar.tsx`** — Renders expanded navigation from `NAV_ENTRIES`, or a flat icon rail when the desktop sidebar is collapsed (not in the mobile drawer).
 - **`sidebar-nav-group.tsx`** — Collapsible category using shadcn `Collapsible` (Radix); sub-links are indented with a left border.
 - **`use-sidebar-collapsed.ts`** — Persists desktop **sidebar collapsed** state (`otg-sidebar-collapsed`).
@@ -93,8 +93,10 @@ The former monolithic **`system-page.tsx`** is split into focused sections (each
 - **`wifi-radio-hardware-card.tsx`** — Radio list, band labels, role `Select`.
 - **`wifi-current-connection-card.tsx`** — STA connection status, disconnect, scan / hidden-network dialogs (hooks colocated).
 - **`wifi-saved-networks-card.tsx`** — Auto-reconnect, priority reorder, delete saved networks.
-- **`wifi-advanced-settings-section.tsx`** — Collapsible “Advanced” block (guest, MAC, policy, band, schedule cards).
-- **`wifi-page.tsx`** — Mode gating (`isPureAP` / `isPureSTA`) and composition only (~30 lines).
+- **`wifi-page-tab-bar.tsx`**, **`wifi-page-types.ts`** — In-page tabs **Wireless** / **Advanced**, synced to `/wifi` and `/wifi/advanced`.
+- **`wifi-wireless-panel.tsx`** — Captive portal, mode, radios, STA connection/saved networks, AP config (mode gating).
+- **`wifi-advanced-panel.tsx`** — Guest WiFi, MAC, policy, band, schedule cards.
+- **`wifi-page.tsx`** — Tab state from router + composes tab bar and panels.
 - **`wifi-mode-options.ts`** — `WIFI_MODE_OPTIONS`, `getWifiModeLabel()` (`WifiModeCard`).
 - **`wifi-mode-switch-dialog.tsx`** — Confirm switch away from repeater path (`WifiModeCard`).
 - **`wifi-mode-card.tsx`** — Mode tiles, repeater wizard trigger, composes switch dialog.
@@ -181,7 +183,8 @@ Import path unchanged: `@/components/wifi/repeater-wizard` → **`index.tsx`**.
 - **`network-page-types.ts`** — `NetworkSectionTab` union.
 - **`network-page-tab-bar.tsx`** — Status / Configuration / Advanced tab strip (`aria-controls` wired to panels).
 - **`network-page-status-panel.tsx`**, **`network-page-configuration-panel.tsx`**, **`network-page-advanced-panel.tsx`** — Tab panel content.
-- **`network-page.tsx`** — Tab state, `useNetworkStatus` / `useBlockedClients`, composes panels.
+- **`network-path-utils.ts`** — Maps `/network`, `/network/configuration`, `/network/advanced` ↔ tab ids.
+- **`network-page.tsx`** — Tab changes call `navigate()`; `useNetworkStatus` / `useBlockedClients`; composes panels.
 - **`dhcp-pool-settings-card.tsx`** — DHCP pool RHF form (`useDHCPConfig`, `useSetDHCPConfig`).
 - **`dhcp-pool-form-fields.tsx`** — Start/limit inputs + lease `Select` (composed by `DhcpPoolSettingsCard`).
 - **`lan-dns-settings-card.tsx`** — LAN custom DNS RHF form (`useDNSConfig`, `useSetDNSConfig`). Unused duplicate `dns-config-card.tsx` removed.
@@ -228,6 +231,7 @@ Import path unchanged: `@/components/wifi/repeater-wizard` → **`index.tsx`**.
 ## Assumptions
 
 - **`/services`** highlights “Installed services” only when the path is exactly `/services`; Tailscale under `/services/tailscale` does not activate the parent link.
+- **WiFi** sidebar sub-routes: `/wifi` (Wireless), `/wifi/advanced` (Advanced). **Network** sub-routes: `/network` (Status), `/network/configuration`, `/network/advanced`. In-page tab bars stay in sync with these URLs.
 - Collapsed desktop sidebar shows a **flat icon list** (one icon per destination), not nested groups.
 
 ## Deferred / follow-up (optional)
@@ -271,11 +275,9 @@ ClientsPage
 └── ClientsDhcpReservationsCard
 
 WifiPage
-├── WifiModeCard, WifiRadioHardwareCard
-├── WifiCurrentConnectionCard (hidden pure AP)
-├── WifiSavedNetworksCard (hidden pure AP)
-├── APConfigCard (hidden pure STA)
-└── WifiAdvancedSettingsSection (collapsible)
+├── Tab bar → /wifi | /wifi/advanced
+├── Wireless panel → CaptivePortalBanner, WifiModeCard, radios, STA/AP cards
+└── Advanced panel → Guest, MAC, policy, band, schedule cards
 
 RepeaterWizard (folder)
 ├── useRepeaterWizard + Dialog shell (index.tsx)

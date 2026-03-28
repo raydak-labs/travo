@@ -60,7 +60,7 @@ export function WifiModeCard() {
                       'flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors',
                       isActive
                         ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:border-gray-700 dark:hover:bg-gray-900',
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-gray-900',
                       setMode.isPending && 'opacity-50 cursor-not-allowed',
                     )}
                   >

@@ -3,11 +3,12 @@ import {
   Activity,
   Globe,
   Monitor,
-  Network,
   ScrollText,
   Settings,
+  Settings2,
   Share2,
   Shield,
+  SlidersHorizontal,
   Users,
   Wifi,
 } from 'lucide-react';
@@ -43,14 +44,31 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   },
   {
     kind: 'group',
-    id: 'connectivity',
-    label: 'Connectivity',
-    icon: Network,
+    id: 'wifi',
+    label: 'WiFi',
+    icon: Wifi,
     items: [
-      { to: '/wifi', label: 'WiFi' },
-      { to: '/network', label: 'Network' },
-      { to: '/clients', label: 'Clients' },
+      { to: '/wifi', label: 'Wireless' },
+      { to: '/wifi/advanced', label: 'Advanced' },
     ],
+  },
+  {
+    kind: 'group',
+    id: 'network',
+    label: 'Network',
+    icon: Globe,
+    items: [
+      { to: '/network', label: 'Status' },
+      { to: '/network/configuration', label: 'Configuration' },
+      { to: '/network/advanced', label: 'Advanced' },
+    ],
+  },
+  {
+    kind: 'leaf',
+    id: 'clients',
+    to: '/clients',
+    label: 'Clients',
+    icon: Users,
   },
   {
     kind: 'leaf',
@@ -81,10 +99,17 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   },
 ] as const;
 
+const GROUP_CHILD_PATHS: ReadonlySet<string> = new Set(
+  NAV_ENTRIES.flatMap((e) => (e.kind === 'group' ? e.items.map((i) => i.to) : [])),
+);
+
 /** Icon per route for collapsed rail and group rows. */
 export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
   '/wifi': Wifi,
-  '/network': Globe,
+  '/wifi/advanced': SlidersHorizontal,
+  '/network': Activity,
+  '/network/configuration': Settings2,
+  '/network/advanced': Shield,
   '/clients': Users,
   '/services': Monitor,
   '/services/tailscale': Share2,
@@ -96,7 +121,8 @@ const STORAGE_KEY_GROUPS = 'otg-sidebar-groups';
 
 /** Default open state for groups (first visit). */
 const defaultOpen: Record<string, boolean> = {
-  connectivity: true,
+  wifi: true,
+  network: true,
   services: true,
   system: true,
 };
@@ -126,10 +152,16 @@ export function saveSidebarGroupState(id: string, open: boolean): void {
 
 /** Whether `pathname` should highlight the nav link for `navTo`. */
 export function isRouteActive(navTo: string, pathname: string): boolean {
+  let path = pathname;
+  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+
   if (navTo === '/services') {
-    return pathname === '/services';
+    return path === '/services';
   }
-  return pathname === navTo || pathname.startsWith(`${navTo}/`);
+  if (GROUP_CHILD_PATHS.has(navTo)) {
+    return path === navTo;
+  }
+  return path === navTo || path.startsWith(`${navTo}/`);
 }
 
 /** Flat list of routes for collapsed icon rail (one icon per destination). */

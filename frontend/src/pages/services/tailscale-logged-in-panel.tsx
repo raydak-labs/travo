@@ -59,7 +59,7 @@ export function TailscaleLoggedInPanel({
       </div>
 
       {status.running && (
-        <div className="flex items-center justify-between border-t border-gray-100 py-1 dark:border-gray-800">
+        <div className="flex items-center justify-between border-t border-gray-100 py-1 dark:border-white/[0.08]">
           <div>
             <span className="text-sm text-gray-700 dark:text-gray-300">Allow Tailscale SSH</span>
             <p className="text-xs text-gray-500">

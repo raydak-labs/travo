@@ -34,13 +34,13 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-gray-200 bg-white theme-transition dark:border-gray-800 dark:bg-gray-950',
+        'flex h-full flex-col border-r border-gray-200 bg-white theme-transition dark:border-white/10 dark:bg-gray-950',
         !inDrawer && 'transition-all duration-200',
         !inDrawer && (collapsed ? 'w-16' : 'w-56'),
         className,
       )}
     >
-      <div className="flex h-14 items-center justify-between border-b border-gray-200 px-3 dark:border-gray-800">
+      <div className="flex h-14 items-center justify-between border-b border-gray-200 px-3 dark:border-white/10">
         {(!collapsed || inDrawer) && (
           <span className="truncate text-sm font-bold text-gray-900 dark:text-white">
             OpenWRT Travel

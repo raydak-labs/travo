@@ -33,7 +33,10 @@ const mockUseIsMobile = vi.mocked(useIsMobile);
 const ROUTE_PATHS = [
   '/dashboard',
   '/wifi',
+  '/wifi/advanced',
   '/network',
+  '/network/configuration',
+  '/network/advanced',
   '/clients',
   '/vpn',
   '/services',
@@ -101,9 +104,12 @@ describe('Sidebar', () => {
     renderSidebar();
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Connectivity')).toBeInTheDocument();
       expect(screen.getByText('WiFi')).toBeInTheDocument();
+      expect(screen.getByText('Wireless')).toBeInTheDocument();
       expect(screen.getByText('Network')).toBeInTheDocument();
+      expect(screen.getByText('Status')).toBeInTheDocument();
+      expect(screen.getByText('Configuration')).toBeInTheDocument();
+      expect(screen.getAllByText('Advanced').length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText('Clients')).toBeInTheDocument();
       expect(screen.getByText('VPN')).toBeInTheDocument();
       expect(screen.getByText('Services')).toBeInTheDocument();
@@ -170,7 +176,7 @@ describe('Mobile Sidebar', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('WiFi'));
+    await user.click(screen.getByRole('link', { name: 'Wireless' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

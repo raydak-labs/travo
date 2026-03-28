@@ -17,7 +17,7 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
   const { data: systemInfo, isError: systemError } = useSystemInfo();
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 theme-transition sm:px-6 dark:border-gray-800 dark:bg-gray-950">
+    <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 theme-transition sm:px-6 dark:border-white/10 dark:bg-gray-950">
       <div className="flex items-center gap-3">
         {showMenuButton && (
           <Button

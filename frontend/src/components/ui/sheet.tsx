@@ -33,9 +33,9 @@ const SheetContent = forwardRef<
       className={cn(
         'fixed inset-y-0 z-50 flex h-full flex-col bg-white shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out dark:bg-gray-950',
         side === 'left' &&
-          'left-0 w-72 border-r border-gray-200 dark:border-gray-800 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
+          'left-0 w-72 border-r border-gray-200 dark:border-white/10 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
         side === 'right' &&
-          'right-0 w-72 border-l border-gray-200 dark:border-gray-800 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
+          'right-0 w-72 border-l border-gray-200 dark:border-white/10 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
         className,
       )}
       {...props}

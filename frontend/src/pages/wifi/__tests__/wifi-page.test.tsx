@@ -12,24 +12,29 @@ import {
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { WifiPage } from '../wifi-page';
 
-function renderWifiPage() {
+function renderWifiPage(initialPath = '/wifi') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   const rootRoute = createRootRoute({ component: Outlet });
 
+  const wifiAdvancedRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/wifi/advanced',
+    component: WifiPage,
+  });
   const wifiRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/wifi',
     component: WifiPage,
   });
 
-  const routeTree = rootRoute.addChildren([wifiRoute]);
+  const routeTree = rootRoute.addChildren([wifiAdvancedRoute, wifiRoute]);
 
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/wifi'] }),
+    history: createMemoryHistory({ initialEntries: [initialPath] }),
   });
 
   return render(

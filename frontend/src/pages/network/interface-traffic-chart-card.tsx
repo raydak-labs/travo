@@ -20,7 +20,7 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
   const txGradId = `tx-${name}`;
 
   return (
-    <div className="rounded-md border bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+    <div className="rounded-md border bg-white p-3 dark:border-white/10 dark:bg-gray-950">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-900 dark:text-white">
           {interfaceTrafficLabel(name)}

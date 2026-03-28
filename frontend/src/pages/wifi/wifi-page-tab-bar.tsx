@@ -1,20 +1,20 @@
 import { cn } from '@/lib/cn';
-import type { NetworkSectionTab } from '@/pages/network/network-page-types';
+import type { WifiSectionTab } from '@/pages/wifi/wifi-page-types';
 
-type NetworkPageTabBarProps = {
-  activeTab: NetworkSectionTab;
-  onTabChange: (tab: NetworkSectionTab) => void;
-  tabIds: Record<NetworkSectionTab, string>;
-  panelIds: Record<NetworkSectionTab, string>;
+type WifiPageTabBarProps = {
+  activeTab: WifiSectionTab;
+  onTabChange: (tab: WifiSectionTab) => void;
+  tabIds: Record<WifiSectionTab, string>;
+  panelIds: Record<WifiSectionTab, string>;
 };
 
-export function NetworkPageTabBar({
+export function WifiPageTabBar({
   activeTab,
   onTabChange,
   tabIds,
   panelIds,
-}: NetworkPageTabBarProps) {
-  const tabBtn = (tab: NetworkSectionTab, label: string) => (
+}: WifiPageTabBarProps) {
+  const tabBtn = (tab: WifiSectionTab, label: string) => (
     <button
       type="button"
       role="tab"
@@ -37,11 +37,10 @@ export function NetworkPageTabBar({
   return (
     <div
       role="tablist"
-      aria-label="Network page sections"
+      aria-label="WiFi page sections"
       className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-white/10 dark:bg-gray-900/40"
     >
-      {tabBtn('status', 'Status')}
-      {tabBtn('configuration', 'Configuration')}
+      {tabBtn('wireless', 'Wireless')}
       {tabBtn('advanced', 'Advanced')}
     </div>
   );

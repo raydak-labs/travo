@@ -28,7 +28,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
       : null;
 
   return (
-    <tr className="group border-b border-gray-100 dark:border-gray-800 last:border-0">
+    <tr className="group border-b border-gray-100 dark:border-white/[0.08] last:border-0">
       <td className="py-3 pr-4">
         <div className="group/alias">
           <ClientAliasCell

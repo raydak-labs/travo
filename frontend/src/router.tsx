@@ -72,10 +72,28 @@ const dashboardRoute = createRoute({
   component: shellPage('Dashboard', DashboardPage),
 });
 
+const wifiAdvancedRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/wifi/advanced',
+  component: shellPage('WiFi', WifiPage),
+});
+
 const wifiRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/wifi',
   component: shellPage('WiFi', WifiPage),
+});
+
+const networkConfigurationRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/network/configuration',
+  component: shellPage('Network', NetworkPage),
+});
+
+const networkAdvancedRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/network/advanced',
+  component: shellPage('Network', NetworkPage),
 });
 
 const networkRoute = createRoute({
@@ -126,7 +144,10 @@ const routeTree = rootRoute.addChildren([
   setupRoute,
   protectedRoute.addChildren([
     dashboardRoute,
+    wifiAdvancedRoute,
     wifiRoute,
+    networkConfigurationRoute,
+    networkAdvancedRoute,
     networkRoute,
     clientsRoute,
     vpnRoute,
