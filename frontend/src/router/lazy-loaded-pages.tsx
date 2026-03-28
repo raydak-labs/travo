@@ -27,3 +27,6 @@ export const SystemPage = lazy(() =>
 export const LogsPage = lazy(() =>
   import('@/pages/logs/logs-page').then((m) => ({ default: m.LogsPage })),
 );
+export const ExperimentalPage = lazy(() =>
+  import('@/pages/experimental/experimental-page').then((m) => ({ default: m.ExperimentalPage })),
+);

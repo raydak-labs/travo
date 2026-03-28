@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
+  FlaskConical,
   Globe,
   Monitor,
   ScrollText,
@@ -96,6 +97,13 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       { to: '/system', label: 'Settings' },
       { to: '/logs', label: 'Logs' },
     ],
+  },
+  {
+    kind: 'leaf',
+    id: 'experimental',
+    to: '/experimental',
+    label: 'Experimental',
+    icon: FlaskConical,
   },
 ] as const;
 

@@ -13,6 +13,7 @@ import { SetupPage } from '@/pages/setup/setup-page';
 import {
   ClientsPage,
   DashboardPage,
+  ExperimentalPage,
   LogsPage,
   NetworkPage,
   ServicesPage,
@@ -138,6 +139,12 @@ const logsRoute = createRoute({
   component: shellPage('Logs', LogsPage),
 });
 
+const experimentalRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/experimental',
+  component: shellPage('Experimental', ExperimentalPage),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -155,6 +162,7 @@ const routeTree = rootRoute.addChildren([
     tailscaleRoute,
     systemRoute,
     logsRoute,
+    experimentalRoute,
   ]),
 ]);
 
