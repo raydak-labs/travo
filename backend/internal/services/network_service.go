@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -20,21 +21,66 @@ type NetworkService struct {
 	ubus      ubus.Ubus
 	aliasFile string
 	cmd       CommandRunner
+
+	// wifiMACsMu guards wifiMACsSeen.
+	wifiMACsMu sync.Mutex
+	// wifiMACsSeen tracks MACs recently seen in WiFi station dumps, with the
+	// timestamp of their last appearance. Used to suppress "disconnected WiFi
+	// client appears as LAN" during the ARP cache staleness window.
+	wifiMACsSeen map[string]time.Time
+}
+
+// wifiMACTTL is how long a MAC stays in the wifiMACsSeen set after it was
+// last observed in a station dump. Once expired the device may reappear as
+// a wired LAN client if it reconnects that way.
+const wifiMACTTL = 5 * time.Minute
+
+func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
+	return &NetworkService{
+		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
+		wifiMACsSeen: make(map[string]time.Time),
+	}
 }
 
 // NewNetworkService creates a new NetworkService.
 func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json", cmd: &RealCommandRunner{}}
+	return newNetworkService(u, ub, "/etc/openwrt-travel-gui/aliases.json", &RealCommandRunner{})
 }
 
 // NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
 func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *NetworkService {
-	return &NetworkService{uci: u, ubus: ub, aliasFile: aliasFile, cmd: &RealCommandRunner{}}
+	return newNetworkService(u, ub, aliasFile, &RealCommandRunner{})
 }
 
 // NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
 func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
-	return &NetworkService{uci: u, ubus: ub, aliasFile: "/etc/openwrt-travel-gui/aliases.json", cmd: cmd}
+	return newNetworkService(u, ub, "/etc/openwrt-travel-gui/aliases.json", cmd)
+}
+
+// updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
+// dump results and returns a snapshot of MACs that were RECENTLY WiFi but are
+// not in the current wifiStats (i.e. they just disconnected). These must not be
+// counted as wired LAN clients while their ARP entry is still stale.
+func (n *NetworkService) updateKnownWifiMACs(wifiStats map[string]wifiClientStat) map[string]struct{} {
+	now := time.Now()
+	n.wifiMACsMu.Lock()
+	defer n.wifiMACsMu.Unlock()
+	for mac, lastSeen := range n.wifiMACsSeen {
+		if now.Sub(lastSeen) > wifiMACTTL {
+			delete(n.wifiMACsSeen, mac)
+		}
+	}
+	for mac := range wifiStats {
+		n.wifiMACsSeen[mac] = now
+	}
+	// Return only the MACs that were seen before but are absent now.
+	recent := make(map[string]struct{})
+	for mac := range n.wifiMACsSeen {
+		if _, current := wifiStats[mac]; !current {
+			recent[mac] = struct{}{}
+		}
+	}
+	return recent
 }
 
 // allowedInterfaces is the set of interface names that can be toggled.
@@ -190,14 +236,15 @@ func parseLeaseTime(s string, fallback float64) float64 {
 	return fallback
 }
 
-// dhcpLease holds expiry and hostname from a DHCP lease entry.
+// dhcpLease holds information from a DHCP lease entry.
 type dhcpLease struct {
+	IP       string
 	Expiry   int64
 	Hostname string
 }
 
-// parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of MAC → lease info.
-// Format: timestamp MAC IP hostname clientid
+// parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of uppercase MAC → lease info.
+// Format: <expiry_epoch> <mac> <ip> <hostname> [clientid]
 func parseDHCPLeasesFile() map[string]dhcpLease {
 	result := map[string]dhcpLease{}
 	data, err := os.ReadFile("/tmp/dhcp.leases")
@@ -214,11 +261,12 @@ func parseDHCPLeasesFile() map[string]dhcpLease {
 			continue
 		}
 		mac := strings.ToUpper(fields[1])
+		ip := fields[2]
 		hostname := fields[3]
 		if hostname == "*" {
 			hostname = ""
 		}
-		result[mac] = dhcpLease{Expiry: expiry, Hostname: hostname}
+		result[mac] = dhcpLease{IP: ip, Expiry: expiry, Hostname: hostname}
 	}
 	return result
 }
@@ -251,114 +299,157 @@ func parseEtcHosts() map[string]string {
 	return result
 }
 
-// fetchDHCPClients queries ubus for DHCP lease information with ARP fallback.
+// fetchDHCPClients builds the connected-client list.
+//
+// Strategy:
+//  1. iw station dump  → authoritative for currently-WiFi-associated MACs.
+//  2. /tmp/dhcp.leases → primary source for IP / hostname / connect-time.
+//     Only devices with a DHCP lease are shown as LAN clients; static-IP
+//     devices (e.g. the operator's own laptop) are intentionally excluded.
+//  3. ubus dhcp ipv4leases → used when available (some OpenWrt builds expose
+//     this); results undergo the same post-processing as the lease-file path.
+//  4. knownWifiMACs (in-memory TTL set) → prevents a just-disconnected WiFi
+//     device from temporarily appearing as a wired LAN client while its ARP
+//     entry is still flagged 0x2 (REACHABLE).
 func (n *NetworkService) fetchDHCPClients() []models.Client {
-	var clients []models.Client
 	leaseTimeSec := n.dhcpLeaseTimeSeconds()
 
-	// Try ubus dhcp ipv4leases first
-	data, err := n.ubus.Call("dhcp", "ipv4leases", nil)
-	if err == nil {
+	// ── 1. WiFi station dump ──────────────────────────────────────────────
+	wifiStats := n.getWifiClientStats()
+	// Update the persistent set and get back MACs that JUST left WiFi.
+	recentlyWifi := n.updateKnownWifiMACs(wifiStats)
+
+	// ── 2. ARP table: build lookup maps ──────────────────────────────────
+	type arpEntry struct{ flags, iface string }
+	ipToARP := make(map[string]arpEntry)  // ip  → {flags, iface}
+	macToIP := make(map[string]string)    // MAC → ip  (last wins on dup)
+	if raw, err := os.ReadFile("/proc/net/arp"); err == nil {
+		for _, line := range strings.Split(string(raw), "\n")[1:] {
+			f := strings.Fields(line)
+			if len(f) < 6 {
+				continue
+			}
+			ip, flags, mac, iface := f[0], f[2], strings.ToUpper(f[3]), f[5]
+			if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
+				continue
+			}
+			ipToARP[ip] = arpEntry{flags: flags, iface: iface}
+			macToIP[mac] = ip
+		}
+	}
+
+	// ── 3. Build a deduplicated client map (keyed by uppercase MAC) ───────
+	byMAC := make(map[string]models.Client)
+
+	connectedSinceFromLease := func(expiry int64) string {
+		if expiry <= 0 {
+			return ""
+		}
+		t := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
+		return t.UTC().Format(time.RFC3339)
+	}
+
+	// 3a. Try ubus dhcp ipv4leases (works on some builds).
+	if data, err := n.ubus.Call("dhcp", "ipv4leases", nil); err == nil {
 		if device, ok := data["device"].(map[string]interface{}); ok {
 			for ifaceName, ifaceData := range device {
-				ifaceMap, ok := ifaceData.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				leases, ok := ifaceMap["leases"].([]interface{})
-				if !ok {
-					continue
-				}
-				for _, lease := range leases {
-					lm, ok := lease.(map[string]interface{})
-					if !ok {
-						continue
-					}
+				ifaceMap, _ := ifaceData.(map[string]interface{})
+				leases, _ := ifaceMap["leases"].([]interface{})
+				for _, raw := range leases {
+					lm, _ := raw.(map[string]interface{})
 					ip, _ := lm["ip"].(string)
-					mac, _ := lm["mac"].(string)
+					mac := strings.ToUpper(fmt.Sprintf("%v", lm["mac"]))
 					hostname, _ := lm["hostname"].(string)
 					expires, _ := lm["expires"].(float64)
-
-					// Calculate connected_since from lease expiry.
-					// The "expires" field counts down from the lease time,
-					// so connected_since ≈ now - (leaseTime - expires).
-					var connectedSince string
-					if expires > 0 {
-						elapsed := leaseTimeSec - expires
-						if elapsed < 0 {
-							elapsed = 0
-						}
-						connSince := time.Now().Add(-time.Duration(elapsed) * time.Second)
-						connectedSince = connSince.UTC().Format(time.RFC3339)
+					elapsed := leaseTimeSec - expires
+					if elapsed < 0 {
+						elapsed = 0
 					}
-
-					clients = append(clients, models.Client{
+					var cs string
+					if expires > 0 {
+						cs = time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
+					}
+					byMAC[mac] = models.Client{
 						IPAddress: ip, MACAddress: mac,
 						Hostname: hostname, InterfaceName: ifaceName,
-						ConnectedSince: connectedSince,
-					})
-				}
-			}
-		}
-	}
-
-	// Fallback: read /tmp/dhcp.leases then ARP table if no ubus clients
-	if len(clients) == 0 {
-		dhcpLeases := parseDHCPLeasesFile()
-		arpData, err := os.ReadFile("/proc/net/arp")
-		if err == nil {
-			lines := strings.Split(string(arpData), "\n")
-			for _, line := range lines[1:] { // skip header
-				fields := strings.Fields(line)
-				if len(fields) < 6 {
-					continue
-				}
-				ip := fields[0]
-				mac := fields[3]
-				iface := fields[5]
-				if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
-					continue
-				}
-				if iface != "br-lan" {
-					continue
-				}
-				var connectedSince string
-				var hostname string
-				if lease, ok := dhcpLeases[strings.ToUpper(mac)]; ok {
-					hostname = lease.Hostname
-					if lease.Expiry > 0 {
-						connSince := time.Unix(lease.Expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
-						connectedSince = connSince.UTC().Format(time.RFC3339)
+						ConnectedSince: cs,
 					}
 				}
-				clients = append(clients, models.Client{
-					IPAddress: ip, MACAddress: mac,
-					Hostname:       hostname,
-					InterfaceName:  iface,
-					ConnectedSince: connectedSince,
-				})
 			}
 		}
 	}
 
-	// Resolve hostnames from /etc/hosts for clients missing a hostname.
+	// 3b. Fallback: ARP table for all reachable br-lan clients (used on most
+	//     OpenWrt builds). Includes both DHCP and static-IP devices — any
+	//     device with a live ARP entry is a legitimate LAN client.
+	if len(byMAC) == 0 {
+		dhcpForFallback := parseDHCPLeasesFile()
+		for ip, arp := range ipToARP {
+			if arp.iface != "br-lan" || arp.flags == "0x0" {
+				continue
+			}
+			mac := ""
+			// Reverse-look up MAC from the arp maps we already built.
+			for m, mip := range macToIP {
+				if mip == ip {
+					mac = m
+					break
+				}
+			}
+			if mac == "" {
+				continue
+			}
+			// WiFi-associated: will be enriched in step 3c below.
+			if _, isWifi := wifiStats[mac]; isWifi {
+				continue
+			}
+			// Just left WiFi: exclude until ARP expires or TTL elapses.
+			if _, recent := recentlyWifi[mac]; recent {
+				continue
+			}
+			lease := dhcpForFallback[mac]
+			byMAC[mac] = models.Client{
+				IPAddress:      ip,
+				MACAddress:     mac,
+				Hostname:       lease.Hostname,
+				InterfaceName:  "br-lan",
+				ConnectedSince: connectedSinceFromLease(lease.Expiry),
+			}
+		}
+	}
+
+	// 3c. Add all currently WiFi-associated clients (may not have a lease
+	//     yet if the device just connected, so we do this unconditionally).
+	dhcpLeases := parseDHCPLeasesFile()
+	for mac, stat := range wifiStats {
+		ip := macToIP[mac] // best-effort; empty for brand-new connections
+		lease := dhcpLeases[mac]
+		if ip == "" {
+			ip = lease.IP
+		}
+		hostname := lease.Hostname
+		c := models.Client{
+			IPAddress:      ip,
+			MACAddress:     mac,
+			Hostname:       hostname,
+			InterfaceName:  stat.IfaceName,
+			ConnectedSince: connectedSinceFromLease(lease.Expiry),
+			RxBytes:        stat.RxBytes,
+			TxBytes:        stat.TxBytes,
+		}
+		byMAC[mac] = c // always overwrite: WiFi stats are more authoritative
+	}
+
+	// ── 4. Resolve missing hostnames from /etc/hosts ──────────────────────
 	hostsMap := parseEtcHosts()
-	for i := range clients {
-		if clients[i].Hostname == "" {
-			if h, ok := hostsMap[clients[i].IPAddress]; ok {
-				clients[i].Hostname = h
+	clients := make([]models.Client, 0, len(byMAC))
+	for _, c := range byMAC {
+		if c.Hostname == "" {
+			if h, ok := hostsMap[c.IPAddress]; ok {
+				c.Hostname = h
 			}
 		}
-	}
-
-	// Merge WiFi per-client traffic stats
-	trafficStats := n.getWifiClientTraffic()
-	for i := range clients {
-		mac := strings.ToUpper(clients[i].MACAddress)
-		if stats, ok := trafficStats[mac]; ok {
-			clients[i].RxBytes = stats[0]
-			clients[i].TxBytes = stats[1]
-		}
+		clients = append(clients, c)
 	}
 
 	return clients
@@ -420,24 +511,31 @@ func parseIwDev(output string) []string {
 	return interfaces
 }
 
-// getWifiClientTraffic returns per-client traffic stats from WiFi station dumps.
-// Returns a map of uppercase MAC → [rxBytes, txBytes] from the client's perspective.
-func (n *NetworkService) getWifiClientTraffic() map[string][2]int64 {
-	result := make(map[string][2]int64)
+// wifiClientStat holds per-client WiFi traffic counters and the AP interface name.
+type wifiClientStat struct {
+	RxBytes   int64
+	TxBytes   int64
+	IfaceName string
+}
+
+// getWifiClientStats returns per-client WiFi stats (traffic + AP interface name).
+// Clients are keyed by uppercase MAC address.
+func (n *NetworkService) getWifiClientStats() map[string]wifiClientStat {
+	result := make(map[string]wifiClientStat)
 	iwDevOutput, err := n.cmd.Run("iw", "dev")
 	if err != nil {
 		return result
 	}
-	apIfaces := parseIwDev(string(iwDevOutput))
-	for _, iface := range apIfaces {
+	for _, iface := range parseIwDev(string(iwDevOutput)) {
 		dumpOutput, err := n.cmd.Run("iw", "dev", iface, "station", "dump")
 		if err != nil {
 			continue
 		}
 		for mac, stats := range parseStationDump(string(dumpOutput)) {
 			entry := result[mac]
-			entry[0] += stats[0]
-			entry[1] += stats[1]
+			entry.RxBytes += stats[0]
+			entry.TxBytes += stats[1]
+			entry.IfaceName = iface
 			result[mac] = entry
 		}
 	}

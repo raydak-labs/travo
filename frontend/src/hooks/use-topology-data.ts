@@ -80,7 +80,8 @@ export function useTopologyData(): TopologyData {
     (c) =>
       c.interface_name.startsWith('wlan') ||
       c.interface_name.startsWith('ath') ||
-      c.interface_name.includes('wifi'),
+      c.interface_name.includes('wifi') ||
+      c.interface_name.includes('-ap'),
   ).length;
   const lanClients = allClients.length - wlanClients;
 

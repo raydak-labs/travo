@@ -18,6 +18,10 @@ This installs the Travel GUI on port 80, AdGuard Home on port 3000 (DNS on 53),
 and moves LuCI to port 8080. See [docs/deployment.md](docs/deployment.md) for
 all options and manual install instructions.
 
+## General
+
+- UI / UX inspried by GLinet (https://medium.com/aimonks/gl-inet-slate-7-travel-router-a-review-920bddcea4ca)
+
 ## Architecture
 
 ```

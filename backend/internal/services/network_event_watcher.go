@@ -43,21 +43,25 @@ func (w *NoopEventWatcher) Ch() <-chan models.NetworkStatus {
 	return w.ch
 }
 
-// subprocessRunner abstracts launching `ubus listen`. Replaced in tests by chanRunner.
+// subprocessRunner abstracts launching `iw event`. Replaced in tests by chanRunner.
 type subprocessRunner interface {
 	// Lines returns a channel of raw output lines.
 	// It closes the channel when the subprocess exits or stopCh is closed.
 	Lines(stopCh <-chan struct{}) <-chan string
 }
 
-// realRunner launches `ubus listen` and streams stdout lines.
+// realRunner launches `iw event` and streams stdout lines.
+// `iw event` uses the kernel NL80211 interface and fires immediately when a
+// WiFi station associates or disassociates ("new station" / "del station").
+// `ubus listen` does NOT capture these events on OpenWrt because hostapd uses
+// ubus_notify() (subscriber model), not broadcast ubus_send_event().
 type realRunner struct{}
 
 func (r *realRunner) Lines(stopCh <-chan struct{}) <-chan string {
 	out := make(chan string)
 	go func() {
 		defer close(out)
-		cmd := exec.Command("ubus", "listen", "network.interface", "hostapd", "dhcp")
+		cmd := exec.Command("iw", "event")
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			return
@@ -87,20 +91,15 @@ func (r *realRunner) Lines(stopCh <-chan struct{}) <-chan string {
 	return out
 }
 
-// watchedPrefixes are the ubus namespaces we care about.
-var watchedPrefixes = []string{
-	`"network.interface"`,
-	`"hostapd.`,
-	`"dhcp"`,
-}
-
+// isWatched returns true for iw event lines that indicate a client or
+// interface state change worth re-snapshotting.
 func isWatched(line string) bool {
-	for _, prefix := range watchedPrefixes {
-		if strings.Contains(line, prefix) {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(line, "new station") ||
+		strings.Contains(line, "del station") ||
+		strings.Contains(line, "connected") ||
+		strings.Contains(line, "disconnected") ||
+		strings.Contains(line, "join") ||
+		strings.Contains(line, "leave")
 }
 
 // NetworkEventWatcher watches ubus events and emits NetworkStatus snapshots on change.
@@ -127,9 +126,15 @@ func newNetworkEventWatcherWithRunner(networkSvc *NetworkService, runner subproc
 func (w *NetworkEventWatcher) Ch() <-chan models.NetworkStatus { return w.ch }
 func (w *NetworkEventWatcher) Stop()                           { close(w.stopCh) }
 
+const pollInterval = 10 * time.Second
+
 func (w *NetworkEventWatcher) Start() {
 	// Emit an initial snapshot so the first WebSocket client gets data immediately.
 	w.emitSnapshot()
+
+	// Periodic ticker: guarantees updates even when iw event misses something.
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
 
 	backoff := time.Second
 	const maxBackoff = 30 * time.Second
@@ -137,16 +142,18 @@ func (w *NetworkEventWatcher) Start() {
 	for {
 		gotLine := false
 		lines := w.runner.Lines(w.stopCh)
-		var timer *time.Timer
+		var debounce *time.Timer
 
 	loop:
 		for {
 			select {
 			case <-w.stopCh:
-				if timer != nil {
-					timer.Stop()
+				if debounce != nil {
+					debounce.Stop()
 				}
 				return
+			case <-ticker.C:
+				w.emitSnapshot()
 			case line, ok := <-lines:
 				if !ok {
 					break loop
@@ -156,16 +163,16 @@ func (w *NetworkEventWatcher) Start() {
 					continue
 				}
 				// Debounce: reset a 300 ms timer on every watched event.
-				if timer != nil {
-					timer.Stop()
+				if debounce != nil {
+					debounce.Stop()
 				}
-				timer = time.AfterFunc(300*time.Millisecond, func() {
+				debounce = time.AfterFunc(300*time.Millisecond, func() {
 					w.emitSnapshot()
 				})
 			}
 		}
 
-		log.Printf("NetworkEventWatcher: ubus listen exited, restarting in %s", backoff)
+		log.Printf("NetworkEventWatcher: iw event exited, restarting in %s", backoff)
 		select {
 		case <-time.After(backoff):
 		case <-w.stopCh:
