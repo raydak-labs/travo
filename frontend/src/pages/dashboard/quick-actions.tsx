@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { RefreshCw, Shield, Power, Loader2, Wifi, WifiOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -12,6 +10,7 @@ import {
 } from '@/hooks/use-wifi';
 import { useToggleWireguard, useVpnStatus } from '@/hooks/use-vpn';
 import { useReboot } from '@/hooks/use-system';
+import { QuickActionsButtonRow } from '@/pages/dashboard/quick-actions-button-row';
 
 export function QuickActions() {
   const [showRebootDialog, setShowRebootDialog] = useState(false);
@@ -64,68 +63,19 @@ export function QuickActions() {
           <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleToggleRadio}
-              disabled={setRadioEnabled.isPending}
-            >
-              {setRadioEnabled.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : radioEnabled ? (
-                <Wifi className="mr-2 h-4 w-4" />
-              ) : (
-                <WifiOff className="mr-2 h-4 w-4" />
-              )}
-              {radioEnabled ? 'Disable WiFi' : 'Enable WiFi'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRestartWifi}
-              disabled={wifiRestarting}
-            >
-              {wifiRestarting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Restart WiFi
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleToggleVpn}
-              disabled={toggleWireguard.isPending}
-            >
-              {toggleWireguard.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Shield className="mr-2 h-4 w-4" />
-              )}
-              {toggleWireguard.isPending
-                ? desiredVpnEnabled
-                  ? 'Enabling VPN…'
-                  : 'Disabling VPN…'
-                : vpnEnabled
-                  ? 'Disable VPN'
-                  : 'Enable VPN'}
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowRebootDialog(true)}
-              disabled={reboot.isPending}
-            >
-              {reboot.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Power className="mr-2 h-4 w-4" />
-              )}
-              Reboot System
-            </Button>
-          </div>
+          <QuickActionsButtonRow
+            radioEnabled={radioEnabled}
+            setRadioPending={setRadioEnabled.isPending}
+            onToggleRadio={handleToggleRadio}
+            wifiRestarting={wifiRestarting}
+            onRestartWifi={handleRestartWifi}
+            vpnTogglePending={toggleWireguard.isPending}
+            desiredVpnEnabled={desiredVpnEnabled}
+            vpnEnabled={vpnEnabled}
+            onToggleVpn={handleToggleVpn}
+            rebootPending={reboot.isPending}
+            onOpenRebootDialog={() => setShowRebootDialog(true)}
+          />
         </CardContent>
       </Card>
 

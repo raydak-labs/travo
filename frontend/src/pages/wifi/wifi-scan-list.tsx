@@ -6,6 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
+import { formatWifiBandLabel, normalizeWifiBandKey } from '@/lib/wifi-band';
+import { groupScanNetworks, wifiScanApTooltip } from './wifi-scan-list-utils';
+import { WifiScanListPerBandSignals } from './wifi-scan-list-per-band-signals';
 
 interface WifiScanListProps {
   networks: WifiScanResult[];
@@ -17,82 +20,6 @@ interface WifiScanListProps {
   connectedBand?: string | null;
 }
 
-/** Normalize band string from API (e.g. "5GHz", "2.4GHz") or WifiBand to display label */
-function bandLabel(band: string): string {
-  const b = band.toLowerCase();
-  if (b === '2.4ghz' || b === '2.4g') return '2.4 GHz';
-  if (b === '5ghz' || b === '5g') return '5 GHz';
-  if (b === '6ghz' || b === '6g') return '6 GHz';
-  return band;
-}
-
-/** Normalize band to a key for grouping (2.4 vs 5 vs 6) */
-function bandKey(band: string): string {
-  const b = band.toLowerCase();
-  if (b === '2.4ghz' || b === '2.4g') return '2.4ghz';
-  if (b === '5ghz' || b === '5g') return '5ghz';
-  if (b === '6ghz' || b === '6g') return '6ghz';
-  return band;
-}
-
-function scanTooltip(ap: WifiScanResult): string {
-  return [
-    `Signal: ${ap.signal_percent}% (${ap.signal_dbm} dBm)`,
-    `Channel: ${ap.channel}`,
-    `Band: ${bandLabel(ap.band)}`,
-    `Encryption: ${ap.encryption === 'none' ? 'Open' : ap.encryption.toUpperCase()}`,
-    `BSSID: ${ap.bssid}`,
-  ].join('\n');
-}
-
-function groupNetworks(networks: WifiScanResult[]): GroupedScanNetwork[] {
-  const map = new Map<string, WifiScanResult[]>();
-  for (const n of networks) {
-    const key = `${n.ssid ?? '(hidden)'}\t${n.encryption}`;
-    const list = map.get(key) ?? [];
-    list.push(n);
-    map.set(key, list);
-  }
-  const groups: GroupedScanNetwork[] = [];
-  for (const aps of map.values()) {
-    const bySignal = [...aps].sort((a, b) => b.signal_dbm - a.signal_dbm);
-    groups.push({
-      ssid: bySignal[0].ssid ?? '(Hidden)',
-      encryption: bySignal[0].encryption,
-      aps: bySignal,
-    });
-  }
-  return groups.sort((a, b) => {
-    const bestA = Math.max(...a.aps.map((ap) => ap.signal_dbm));
-    const bestB = Math.max(...b.aps.map((ap) => ap.signal_dbm));
-    return bestB - bestA;
-  });
-}
-
-function PerBandSignals({ aps }: { aps: readonly WifiScanResult[] }) {
-  const byBand = new Map<string, WifiScanResult>();
-  for (const ap of aps) {
-    const k = bandKey(ap.band);
-    const existing = byBand.get(k);
-    if (!existing || ap.signal_dbm > existing.signal_dbm) byBand.set(k, ap);
-  }
-  const bands = Array.from(byBand.entries()).sort(([a], [b]) => a.localeCompare(b));
-  return (
-    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
-      {bands.map(([k, ap]) => (
-        <span key={k}>
-          {bandLabel(ap.band)}{' '}
-          <SignalStrengthIcon
-            signalPercent={ap.signal_percent}
-            className="inline-block h-3.5 w-3.5"
-          />{' '}
-          {ap.signal_dbm} dBm
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export function WifiScanList({
   networks,
   isLoading,
@@ -102,7 +29,7 @@ export function WifiScanList({
   connectedBand,
 }: WifiScanListProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const groups = groupNetworks(networks);
+  const groups = groupScanNetworks(networks);
 
   return (
     <div className="space-y-3">
@@ -126,7 +53,7 @@ export function WifiScanList({
         <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
           {groups.map((group) => {
             const bestSignal = Math.max(...group.aps.map((ap) => ap.signal_percent));
-            const bandCount = new Set(group.aps.map((ap) => bandKey(ap.band))).size;
+            const bandCount = new Set(group.aps.map((ap) => normalizeWifiBandKey(ap.band))).size;
             const isDualBand = bandCount > 1;
             const listKey = `${group.ssid}\t${group.encryption}`;
             const isExpanded = expandedKey === listKey;
@@ -136,7 +63,7 @@ export function WifiScanList({
               <li
                 key={listKey}
                 className="flex flex-col gap-2 py-3"
-                title={group.aps.map((ap) => scanTooltip(ap)).join('\n---\n')}
+                title={group.aps.map((ap) => wifiScanApTooltip(ap)).join('\n---\n')}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -146,19 +73,19 @@ export function WifiScanList({
                         {group.ssid || '(Hidden)'}
                         {isConnected && connectedBand && (
                           <span className="ml-1.5 text-xs font-normal text-green-600 dark:text-green-400">
-                            (Connected {bandLabel(connectedBand)})
+                            (Connected {formatWifiBandLabel(connectedBand)})
                           </span>
                         )}
                       </p>
-                      <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                         <SecurityBadge encryption={group.encryption} />
                         {isDualBand ? (
                           <Badge variant="outline">Dual-band</Badge>
                         ) : (
-                          <Badge variant="outline">{bandLabel(group.aps[0].band)}</Badge>
+                          <Badge variant="outline">{formatWifiBandLabel(group.aps[0].band)}</Badge>
                         )}
                       </div>
-                      <PerBandSignals aps={group.aps} />
+                      <WifiScanListPerBandSignals aps={group.aps} />
                     </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => onConnect(group)}>
@@ -183,8 +110,8 @@ export function WifiScanList({
                     {isExpanded && (
                       <ul className="ml-6 list-disc space-y-0.5 text-xs text-gray-600 dark:text-gray-400">
                         {group.aps.map((ap) => (
-                          <li key={`${ap.bssid}-${ap.channel}`} title={scanTooltip(ap)}>
-                            {bandLabel(ap.band)} · Ch {ap.channel} · {ap.signal_dbm} dBm ·{' '}
+                          <li key={`${ap.bssid}-${ap.channel}`} title={wifiScanApTooltip(ap)}>
+                            {formatWifiBandLabel(ap.band)} · Ch {ap.channel} · {ap.signal_dbm} dBm ·{' '}
                             {ap.bssid}
                           </li>
                         ))}

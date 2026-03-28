@@ -1,29 +1,9 @@
-import { Link, useMatchRoute } from '@tanstack/react-router';
+import { Link, useRouterState } from '@tanstack/react-router';
 import { cn } from '@/lib/cn';
-import {
-  Activity,
-  Globe,
-  Monitor,
-  ScrollText,
-  Settings,
-  Shield,
-  Wifi,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from 'lucide-react';
-
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: Activity },
-  { to: '/wifi', label: 'WiFi', icon: Wifi },
-  { to: '/network', label: 'Network', icon: Globe },
-  { to: '/clients', label: 'Clients', icon: Users },
-  { to: '/vpn', label: 'VPN', icon: Shield },
-  { to: '/services', label: 'Services', icon: Monitor },
-  { to: '/system', label: 'System', icon: Settings },
-  { to: '/logs', label: 'Logs', icon: ScrollText },
-] as const;
+import { NAV_ENTRIES, flattenNavRoutes, isRouteActive } from '@/components/layout/nav-config';
+import { SidebarNavGroup } from '@/components/layout/sidebar-nav-group';
+import { useSidebarGroups } from '@/components/layout/use-sidebar-groups';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -34,8 +14,22 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarProps) {
-  const matchRoute = useMatchRoute();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const inDrawer = !!onNavClick;
+  const { groupOpen, setGroup } = useSidebarGroups(pathname);
+
+  const linkClass = (active: boolean, rail: boolean) =>
+    cn(
+      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+      active
+        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white',
+      active && 'border-l-2 border-blue-600 dark:border-blue-400',
+      rail && 'justify-center px-0',
+    );
+
+  const collapsedRail = collapsed && !inDrawer;
+  const flat = flattenNavRoutes();
 
   return (
     <aside
@@ -48,10 +42,13 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
     >
       <div className="flex h-14 items-center justify-between border-b border-gray-200 px-3 dark:border-gray-800">
         {(!collapsed || inDrawer) && (
-          <span className="text-sm font-bold text-gray-900 dark:text-white">OpenWRT Travel</span>
+          <span className="truncate text-sm font-bold text-gray-900 dark:text-white">
+            OpenWRT Travel
+          </span>
         )}
         {inDrawer ? (
           <button
+            type="button"
             onClick={onToggle}
             aria-label="Close menu"
             className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -60,6 +57,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
           </button>
         ) : (
           <button
+            type="button"
             onClick={onToggle}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -69,29 +67,56 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
         )}
       </div>
 
-      <nav className="flex-1 space-y-1 p-2" role="navigation">
-        {navItems.map(({ to, label, icon: Icon }) => {
-          const isActive = !!matchRoute({ to, fuzzy: true });
-          return (
-            <Link
-              key={to}
-              to={to}
-              onClick={onNavClick}
-              className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white',
-                isActive && 'border-l-2 border-blue-600 dark:border-blue-400',
-                collapsed && !inDrawer && 'justify-center px-0',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {(!collapsed || inDrawer) && <span>{label}</span>}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2" role="navigation" aria-label="Main">
+        {collapsedRail ? (
+          <>
+            {flat.map(({ to, label, icon: Icon }) => {
+              const active = isRouteActive(to, pathname);
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  title={label}
+                  onClick={onNavClick}
+                  className={linkClass(active, true)}
+                >
+                  <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                </Link>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            {NAV_ENTRIES.map((entry) => {
+              if (entry.kind === 'leaf') {
+                const active = isRouteActive(entry.to, pathname);
+                const Icon = entry.icon;
+                return (
+                  <Link
+                    key={entry.id}
+                    to={entry.to}
+                    onClick={onNavClick}
+                    className={linkClass(active, false)}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                    <span>{entry.label}</span>
+                  </Link>
+                );
+              }
+
+              return (
+                <SidebarNavGroup
+                  key={entry.id}
+                  group={entry}
+                  pathname={pathname}
+                  open={groupOpen[entry.id] ?? true}
+                  onOpenChange={(o) => setGroup(entry.id, o)}
+                  onNavClick={onNavClick}
+                />
+              );
+            })}
+          </>
+        )}
       </nav>
     </aside>
   );

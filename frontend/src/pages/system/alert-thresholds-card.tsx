@@ -1,61 +1,57 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Bell } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAlertThresholds, useSetAlertThresholds } from '@/hooks/use-system';
-
-function ThresholdSlider({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-sm">
-        <span className="text-gray-700 dark:text-gray-300">{label}</span>
-        <span className="font-medium">{value}%</span>
-      </div>
-      <input
-        type="range"
-        min={50}
-        max={99}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-blue-600"
-      />
-    </div>
-  );
-}
+import {
+  alertThresholdsFormSchema,
+  type AlertThresholdsFormValues,
+} from '@/lib/schemas/system-forms';
+import { AlertThresholdSlider } from '@/pages/system/alert-threshold-slider';
 
 export function AlertThresholdsCard() {
   const { data, isLoading } = useAlertThresholds();
   const setThresholds = useSetAlertThresholds();
 
-  const [storage, setStorage] = useState(90);
-  const [cpu, setCpu] = useState(90);
-  const [memory, setMemory] = useState(90);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<AlertThresholdsFormValues>({
+    resolver: zodResolver(alertThresholdsFormSchema),
+    defaultValues: {
+      storage_percent: 90,
+      cpu_percent: 90,
+      memory_percent: 90,
+    },
+  });
 
   useEffect(() => {
     if (data) {
-      setStorage(data.storage_percent);
-      setCpu(data.cpu_percent);
-      setMemory(data.memory_percent);
+      reset({
+        storage_percent: data.storage_percent,
+        cpu_percent: data.cpu_percent,
+        memory_percent: data.memory_percent,
+      });
     }
-  }, [data]);
+  }, [data, reset]);
 
-  function handleSave() {
+  const storage = watch('storage_percent');
+  const cpu = watch('cpu_percent');
+  const memory = watch('memory_percent');
+
+  const onSubmit = (form: AlertThresholdsFormValues) => {
     setThresholds.mutate({
-      storage_percent: storage,
-      cpu_percent: cpu,
-      memory_percent: memory,
+      storage_percent: form.storage_percent,
+      cpu_percent: form.cpu_percent,
+      memory_percent: form.memory_percent,
     });
-  }
+  };
 
   return (
     <Card>
@@ -73,19 +69,36 @@ export function AlertThresholdsCard() {
             <Skeleton className="h-4 w-full" />
           </div>
         ) : (
-          <>
-            <ThresholdSlider label="Storage %" value={storage} onChange={setStorage} />
-            <ThresholdSlider label="CPU %" value={cpu} onChange={setCpu} />
-            <ThresholdSlider label="Memory %" value={memory} onChange={setMemory} />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+            <AlertThresholdSlider
+              label="Storage %"
+              fieldName="storage_percent"
+              value={storage}
+              register={register}
+            />
+            <AlertThresholdSlider
+              label="CPU %"
+              fieldName="cpu_percent"
+              value={cpu}
+              register={register}
+            />
+            <AlertThresholdSlider
+              label="Memory %"
+              fieldName="memory_percent"
+              value={memory}
+              register={register}
+            />
 
-            <Button
-              onClick={handleSave}
-              disabled={setThresholds.isPending}
-              size="sm"
-            >
+            {errors.storage_percent?.message ? (
+              <p className="text-sm text-red-500" role="alert">
+                {errors.storage_percent.message}
+              </p>
+            ) : null}
+
+            <Button type="submit" disabled={setThresholds.isPending} size="sm">
               {setThresholds.isPending ? 'Saving…' : 'Save Thresholds'}
             </Button>
-          </>
+          </form>
         )}
       </CardContent>
     </Card>

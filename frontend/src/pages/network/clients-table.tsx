@@ -1,11 +1,9 @@
-import { useState } from 'react';
-import { Pencil, Check, X, Zap, Ban, ShieldOff } from 'lucide-react';
+import { Zap, Ban, ShieldOff } from 'lucide-react';
 import type { Client } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ClientAliasCell } from '@/components/clients/client-alias-cell';
 import {
-  useSetClientAlias,
   useKickClient,
   useBlockClient,
   useUnblockClient,
@@ -14,77 +12,6 @@ import {
 interface ClientsTableProps {
   clients: readonly Client[];
   blockedMacs?: readonly string[];
-}
-
-function AliasCell({ client }: { client: Client }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(client.alias ?? '');
-  const setAlias = useSetClientAlias();
-
-  const displayName = client.alias || client.hostname || '—';
-
-  const handleSave = () => {
-    setAlias.mutate(
-      { mac: client.mac_address, alias: value },
-      {
-        onSuccess: () => setEditing(false),
-      },
-    );
-  };
-
-  const handleCancel = () => {
-    setValue(client.alias ?? '');
-    setEditing(false);
-  };
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSave();
-            if (e.key === 'Escape') handleCancel();
-          }}
-          className="h-7 w-32 text-sm"
-          placeholder="Alias"
-          autoFocus
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={handleSave}
-          disabled={setAlias.isPending}
-        >
-          <Check className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancel}>
-          <X className="h-3 w-3" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1">
-      <div>
-        <span className="text-gray-900 dark:text-white">{displayName}</span>
-        {client.alias && client.hostname && (
-          <span className="ml-1 text-xs text-gray-400">({client.hostname})</span>
-        )}
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 opacity-0 group-hover:opacity-100"
-        onClick={() => setEditing(true)}
-      >
-        <Pencil className="h-3 w-3" />
-      </Button>
-    </div>
-  );
 }
 
 export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
@@ -123,7 +50,7 @@ export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
             return (
               <tr key={client.mac_address} className="group">
                 <td className="py-2">
-                  <AliasCell client={client} />
+                  <ClientAliasCell client={client} />
                 </td>
                 <td className="py-2 text-gray-600 dark:text-gray-400">{client.ip_address}</td>
                 <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">

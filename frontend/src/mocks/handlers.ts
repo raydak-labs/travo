@@ -381,6 +381,10 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.post(API_ROUTES.system.timeSync, () => {
+    return HttpResponse.json({ ok: true, skew_seconds: 0 });
+  }),
+
   http.post(API_ROUTES.auth.login, async ({ request }) => {
     const body = (await request.json()) as { password: string };
     if (body.password === 'admin') {

@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -9,20 +8,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { streamRequest, type StreamEvent } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
+import { useInstallLogStream } from '@/pages/services/use-install-log-stream';
 
-type Action = 'install' | 'remove';
-type Status = 'streaming' | 'done' | 'error';
-
-interface InstallLogDialogProps {
+type InstallLogDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   serviceId: string;
   serviceName: string;
-  action: Action;
+  action: 'install' | 'remove';
   onComplete: () => void;
-}
+};
 
 export function InstallLogDialog({
   open,
@@ -32,59 +27,13 @@ export function InstallLogDialog({
   action,
   onComplete,
 }: InstallLogDialogProps) {
-  const [lines, setLines] = useState<string[]>([]);
-  const [status, setStatus] = useState<Status>('streaming');
-  const logRef = useRef<HTMLPreElement>(null);
-  const startedRef = useRef(false);
-
-  const appendLine = useCallback((line: string) => {
-    setLines((prev) => [...prev, line]);
-  }, []);
-
-  useEffect(() => {
-    if (!open || startedRef.current) return;
-    startedRef.current = true;
-    setLines([]);
-    setStatus('streaming');
-
-    const route =
-      action === 'install'
-        ? API_ROUTES.services.installStream.replace(':id', serviceId)
-        : API_ROUTES.services.removeStream.replace(':id', serviceId);
-
-    streamRequest(route, (event: StreamEvent) => {
-      if (event.type === 'log' && event.data) {
-        appendLine(event.data);
-      } else if (event.type === 'done') {
-        setStatus('done');
-      } else if (event.type === 'error') {
-        appendLine(`ERROR: ${event.data ?? 'Unknown error'}`);
-        setStatus('error');
-      }
-    }).catch((err: Error) => {
-      appendLine(`ERROR: ${err.message}`);
-      setStatus('error');
-    });
-
-    return () => {
-      startedRef.current = false;
-    };
-  }, [open, serviceId, action, appendLine]);
-
-  // Auto-scroll to bottom when new lines arrive
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [lines]);
-
-  const handleClose = () => {
-    if (status !== 'streaming') {
-      onComplete();
-      onOpenChange(false);
-      startedRef.current = false;
-    }
-  };
+  const { lines, status, logRef, handleClose } = useInstallLogStream({
+    open,
+    serviceId,
+    action,
+    onComplete,
+    onOpenChange,
+  });
 
   const title = action === 'install' ? `Installing ${serviceName}` : `Removing ${serviceName}`;
 

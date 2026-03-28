@@ -30,10 +30,22 @@ vi.mock('@/hooks/use-system', () => ({
 
 const mockUseIsMobile = vi.mocked(useIsMobile);
 
+const ROUTE_PATHS = [
+  '/dashboard',
+  '/wifi',
+  '/network',
+  '/clients',
+  '/vpn',
+  '/services',
+  '/services/tailscale',
+  '/system',
+  '/logs',
+] as const;
+
 function renderSidebar(currentPath = '/dashboard') {
   const rootRoute = createRootRoute({ component: Outlet });
 
-  const routes = ['/dashboard', '/wifi', '/network', '/vpn', '/services', '/system'].map((path) =>
+  const routes = ROUTE_PATHS.map((path) =>
     createRoute({
       getParentRoute: () => rootRoute,
       path,
@@ -56,7 +68,7 @@ function renderAppShellMobile(currentPath = '/dashboard') {
 
   const rootRoute = createRootRoute({ component: Outlet });
 
-  const routes = ['/dashboard', '/wifi', '/network', '/vpn', '/services', '/system'].map((path) =>
+  const routes = ROUTE_PATHS.map((path) =>
     createRoute({
       getParentRoute: () => rootRoute,
       path,
@@ -85,15 +97,21 @@ describe('Sidebar', () => {
     mockUseIsMobile.mockReturnValue(false);
   });
 
-  it('renders all navigation links', async () => {
+  it('renders category groups and leaf routes', async () => {
     renderSidebar();
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('Connectivity')).toBeInTheDocument();
       expect(screen.getByText('WiFi')).toBeInTheDocument();
       expect(screen.getByText('Network')).toBeInTheDocument();
+      expect(screen.getByText('Clients')).toBeInTheDocument();
       expect(screen.getByText('VPN')).toBeInTheDocument();
       expect(screen.getByText('Services')).toBeInTheDocument();
+      expect(screen.getByText('Installed services')).toBeInTheDocument();
+      expect(screen.getByText('Tailscale')).toBeInTheDocument();
       expect(screen.getByText('System')).toBeInTheDocument();
+      expect(screen.getByText('Settings')).toBeInTheDocument();
+      expect(screen.getByText('Logs')).toBeInTheDocument();
     });
   });
 
@@ -146,17 +164,14 @@ describe('Mobile Sidebar', () => {
       expect(screen.getByLabelText('Open menu')).toBeInTheDocument();
     });
 
-    // Open drawer
     await user.click(screen.getByLabelText('Open menu'));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    // Click a nav link
     await user.click(screen.getByText('WiFi'));
 
-    // Drawer should close (route changes, new AppShell mounts with mobileOpen=false)
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

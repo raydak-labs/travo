@@ -75,6 +75,21 @@ describe('LoginPage', () => {
     });
   });
 
+  it('shows validation when password is empty', async () => {
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Password is required')).toBeInTheDocument();
+    });
+  });
+
   it('renders remember me checkbox defaulting to checked', async () => {
     renderLoginPage();
     await waitFor(() => {
