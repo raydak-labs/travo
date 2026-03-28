@@ -1,7 +1,7 @@
 # Travo
 
 <p align="center">
-  <img src="logo.webp" alt="Travo logo" width="120" />
+  <img src="frontend/public/logo.webp" alt="Travo logo" width="120" />
 </p>
 
 A modern, mobile-first web UI for OpenWRT-based travel routers (GL.iNet Beryl AX MT3000, Slate AXT1800).
