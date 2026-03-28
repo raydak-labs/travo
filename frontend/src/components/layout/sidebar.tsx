@@ -42,9 +42,10 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
     >
       <div className="flex h-14 items-center justify-between border-b border-gray-200 px-3 dark:border-white/10">
         {(!collapsed || inDrawer) && (
-          <span className="truncate text-sm font-bold text-gray-900 dark:text-white">
-            OpenWRT Travel
-          </span>
+          <div className="flex min-w-0 items-center gap-2">
+            <img src="/logo.webp" alt="Travo" className="h-7 w-7 shrink-0 rounded" />
+            <span className="truncate text-sm font-bold text-gray-900 dark:text-white">Travo</span>
+          </div>
         )}
         {inDrawer ? (
           <button
