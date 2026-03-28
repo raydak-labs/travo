@@ -282,10 +282,13 @@ export function ExperimentalPage() {
   const loading = networkLoading || wifiLoading || sysLoading;
 
   // Connection states
+  // wan.type tells us the actual upstream medium (wan=ethernet, wifi, usb)
   const wan = network?.wan;
-  const ethernetUp = wan?.is_up ?? false;
-  const repeaterUp = (wifiConn?.connected && wifiConn.mode === 'client') ?? false;
-  const tetherUp = usbTether?.is_up ?? false;
+  const ethernetUp = (wan?.is_up && wan.type !== 'wifi' && wan.type !== 'usb') ?? false;
+  const repeaterUp =
+    (wan?.is_up && wan.type === 'wifi') ||
+    ((wifiConn?.connected && wifiConn.mode === 'client') ?? false);
+  const tetherUp = (wan?.is_up && wan.type === 'usb') || (usbTether?.is_up ?? false);
   const vpnActive = vpnStatus?.some((v) => v.connected) ?? false;
   const ipv6Enabled = ipv6Status?.enabled ?? false;
   const internetUp = network?.internet_reachable ?? false;
@@ -311,13 +314,13 @@ export function ExperimentalPage() {
       label: 'Repeater (WiFi)',
       icon: Wifi,
       connected: repeaterUp,
-      detail: repeaterUp ? wifiConn?.ssid : 'Disabled',
+      detail: repeaterUp ? (wifiConn?.ssid ?? wan?.ip_address) : 'Disabled',
     },
     {
       label: 'USB Tethering',
       icon: Smartphone,
       connected: tetherUp,
-      detail: tetherUp ? usbTether?.device_type || 'Connected' : 'No device',
+      detail: tetherUp ? (usbTether?.device_type || wan?.ip_address || 'Connected') : 'No device',
     },
     {
       label: 'Cellular',
