@@ -1,5 +1,5 @@
 #!/bin/sh
-# install.sh — Install OpenWRT Travel GUI on a fresh OpenWRT system
+# install.sh — Install Travo on a fresh OpenWRT system
 #
 # Usage:
 #   wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
@@ -113,7 +113,7 @@ done
 # ============================================================
 show_help() {
     cat <<'EOF'
-OpenWRT Travel GUI — Installer
+Travo — Installer
 
 Usage: install.sh [OPTIONS]
 
@@ -122,7 +122,7 @@ Options:
   --password PASSWORD Set the admin password (default: prompt or "admin")
   --no-adguard        Skip AdGuard Home installation
   --no-luci-move      Skip moving LuCI to port 8080
-  --uninstall         Remove Travel GUI and restore defaults
+  --uninstall         Remove Travo and restore defaults
   --yes, -y           Skip confirmation prompts
   --help, -h          Show this help message
 
@@ -290,11 +290,15 @@ preflight_checks() {
     fi
     success "Storage: ${_avail_kb:-unknown}KB available"
 
-    # 5. Verify opkg is available
-    if ! command -v opkg >/dev/null 2>&1; then
-        die "opkg not found — is this a standard OpenWRT installation?"
+    # 5. Detect package manager (OpenWrt 25+ uses apk, older uses opkg)
+    if command -v apk >/dev/null 2>&1; then
+        PKG_MGR="apk"
+    elif command -v opkg >/dev/null 2>&1; then
+        PKG_MGR="opkg"
+    else
+        die "No package manager found (apk or opkg) — is this a standard OpenWRT installation?"
     fi
-    success "opkg available"
+    success "Package manager: ${PKG_MGR}"
 }
 
 # ============================================================
@@ -308,7 +312,7 @@ do_install() {
 
     # Show summary
     echo ""
-    printf "${BOLD}=== OpenWRT Travel GUI Installer ===${NC}\n"
+    printf "${BOLD}=== Travo Installer ===${NC}\n"
     echo ""
     info "Version:       ${VERSION}"
     info "Architecture:  ${_arch}"
@@ -333,7 +337,11 @@ do_install() {
 
     # --- Step 2: Install .ipk ---
     info "Installing package..."
-    opkg install "$_ipk_file" || die "opkg install failed"
+    if [ "$PKG_MGR" = "apk" ]; then
+        apk add --allow-untrusted "$_ipk_file" || die "apk install failed"
+    else
+        opkg install "$_ipk_file" || die "opkg install failed"
+    fi
     success "Package installed"
 
     # --- Step 3: Set password ---
@@ -388,11 +396,11 @@ do_install() {
     echo ""
     printf "${GREEN}${BOLD}"
     echo "============================================"
-    echo " OpenWRT Travel GUI installed successfully!"
+    echo "        Travo installed successfully!"
     echo "============================================"
     printf "${NC}\n"
     echo ""
-    printf "  ${BLUE}Travel GUI:${NC}    http://${_lan_ip}\n"
+    printf "  ${BLUE}Travo:${NC}         http://${_lan_ip}\n"
     if [ "$_pw" != "admin" ]; then
         printf "  ${BLUE}Password:${NC}      (as configured)\n"
     else
@@ -413,10 +421,10 @@ do_install() {
 # Uninstall flow
 # ============================================================
 do_uninstall() {
-    printf "${BOLD}=== OpenWRT Travel GUI Uninstaller ===${NC}\n"
+    printf "${BOLD}=== Travo Uninstaller ===${NC}\n"
     echo ""
 
-    confirm "Remove Travel GUI and restore defaults?" || { info "Aborted."; exit 0; }
+    confirm "Remove Travo and restore defaults?" || { info "Aborted."; exit 0; }
 
     # --- Step 1: Stop and disable travel-gui ---
     if [ -x "/etc/init.d/${PKG_NAME}" ]; then
@@ -444,8 +452,12 @@ do_uninstall() {
         info "AdGuard Home not installed — skipping"
     fi
 
-    # --- Step 3: Remove opkg package ---
-    if opkg status "$PKG_NAME" 2>/dev/null | head -1 | grep -q "Package:"; then
+    # --- Step 3: Remove package ---
+    if command -v apk >/dev/null 2>&1 && apk info "$PKG_NAME" >/dev/null 2>&1; then
+        info "Removing ${PKG_NAME} package..."
+        apk del "$PKG_NAME" || warn "apk del had errors"
+        success "Package removed"
+    elif command -v opkg >/dev/null 2>&1 && opkg status "$PKG_NAME" 2>/dev/null | head -1 | grep -q "Package:"; then
         info "Removing ${PKG_NAME} package..."
         opkg remove "$PKG_NAME" || warn "opkg remove had errors"
         success "Package removed"
@@ -480,7 +492,7 @@ do_uninstall() {
     echo ""
     printf "${GREEN}${BOLD}"
     echo "============================================"
-    echo " OpenWRT Travel GUI removed successfully!"
+    echo " Travo removed successfully!"
     echo "============================================"
     printf "${NC}\n"
     echo ""
