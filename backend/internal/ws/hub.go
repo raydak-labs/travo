@@ -17,16 +17,22 @@ type Hub struct {
 	mu                sync.RWMutex
 	systemSvc         *services.SystemService
 	alertSvc          *services.AlertService
+	networkStatusCh   <-chan models.NetworkStatus
 	stopCh            chan struct{}
 	BroadcastInterval time.Duration
 }
 
 // NewHub creates a new WebSocket hub.
-func NewHub(systemSvc *services.SystemService, alertSvc *services.AlertService) *Hub {
+func NewHub(
+	systemSvc *services.SystemService,
+	alertSvc *services.AlertService,
+	networkStatusCh <-chan models.NetworkStatus,
+) *Hub {
 	return &Hub{
 		clients:           make(map[*websocket.Conn]bool),
 		systemSvc:         systemSvc,
 		alertSvc:          alertSvc,
+		networkStatusCh:   networkStatusCh,
 		stopCh:            make(chan struct{}),
 		BroadcastInterval: 2 * time.Second,
 	}
@@ -64,7 +70,7 @@ func (h *Hub) Broadcast(data []byte) {
 	}
 }
 
-// Start begins the periodic stats broadcast loop and alert forwarding.
+// Start begins the periodic stats broadcast loop and alert/network forwarding.
 func (h *Hub) Start() {
 	go func() {
 		ticker := time.NewTicker(h.BroadcastInterval)
@@ -75,6 +81,11 @@ func (h *Hub) Start() {
 			alertCh = h.alertSvc.AlertCh()
 		}
 
+		var networkStatusCh <-chan models.NetworkStatus
+		if h.networkStatusCh != nil {
+			networkStatusCh = h.networkStatusCh
+		}
+
 		for {
 			select {
 			case <-ticker.C:
@@ -82,6 +93,10 @@ func (h *Hub) Start() {
 			case alert, ok := <-alertCh:
 				if ok {
 					h.broadcastAlert(alert)
+				}
+			case ns, ok := <-networkStatusCh:
+				if ok {
+					h.broadcastNetworkStatus(ns)
 				}
 			case <-h.stopCh:
 				return
@@ -106,6 +121,21 @@ func (h *Hub) broadcastStats() {
 	msg := map[string]interface{}{
 		"type": "system_stats",
 		"data": stats,
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	h.Broadcast(data)
+}
+
+func (h *Hub) broadcastNetworkStatus(ns models.NetworkStatus) {
+	if h.ClientCount() == 0 {
+		return
+	}
+	msg := map[string]interface{}{
+		"type": "network_status",
+		"data": ns,
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {
