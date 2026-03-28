@@ -201,7 +201,8 @@ detect_lan_ip() {
     if [ -z "$_ip" ]; then
         _ip="192.168.1.1"
     fi
-    echo "$_ip"
+    # Strip CIDR prefix length (OpenWrt 25+ returns e.g. "192.168.1.1/24")
+    echo "${_ip%%/*}"
 }
 
 # Detect machine architecture and map to .ipk architecture string
