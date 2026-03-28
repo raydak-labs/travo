@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
@@ -26,10 +27,11 @@ import type {
   DiagnosticsResult,
 } from '@shared/index';
 
-export function useNetworkStatus() {
+export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus>>) {
   return useQuery({
     queryKey: ['network', 'status'],
     queryFn: () => apiClient.get<NetworkStatus>(API_ROUTES.network.status),
+    ...options,
   });
 }
 
