@@ -15,7 +15,7 @@ Provides an intuitive dashboard, WiFi management with hotel captive portal suppo
 SSH into your OpenWRT router and run:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | sh
+wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
 ```
 
 This installs the Travel GUI on port 80, AdGuard Home on port 3000 (DNS on 53),
@@ -79,8 +79,8 @@ all options and manual install instructions.
 
 ```bash
 # Clone the repository
-git clone https://github.com/openwrt-travel-gui/openwrt-travel-gui.git
-cd openwrt-travel-gui
+git clone https://github.com/raydak-labs/hackathon-202603-ui-openwrt.git
+cd hackathon-202603-ui-openwrt
 
 # Install Node dependencies (also generates MSW mock worker for dev mode)
 pnpm install
@@ -144,7 +144,7 @@ This installs the `.ipk`, moves LuCI to port 8080, and starts the travel GUI on 
 ## Project Structure
 
 ```
-openwrt-travel-gui/
+hackathon-202603-ui-openwrt/
 ├── frontend/          # React + TypeScript + Vite + TailwindCSS
 │   ├── src/
 │   │   ├── components/  # UI components
@@ -173,7 +173,7 @@ openwrt-travel-gui/
 ## Releases
 
 Pre-built binaries and `.ipk` packages for aarch64 and x86_64 are available on
-[GitHub Releases](https://github.com/openwrt-travel-gui/openwrt-travel-gui/releases).
+[GitHub Releases](https://github.com/raydak-labs/hackathon-202603-ui-openwrt/releases).
 
 To create a new release, tag and push:
 

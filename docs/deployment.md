@@ -5,18 +5,18 @@
 SSH into your OpenWRT router and run:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | sh
+wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
 ```
 
 Or with options:
 
 ```sh
 # Install a specific version with a custom password, non-interactive
-wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | \
+wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | \
   sh -s -- --yes --version 1.0.0 --password mysecret
 
 # Skip AdGuard Home installation
-wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | \
+wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | \
   sh -s -- --no-adguard
 ```
 
@@ -39,13 +39,13 @@ The install script:
 ## Manual Installation from .ipk
 
 Download the `.ipk` for your architecture from
-[GitHub Releases](https://github.com/openwrt-travel-gui/openwrt-travel-gui/releases):
+[GitHub Releases](https://github.com/raydak-labs/hackathon-202603-ui-openwrt/releases):
 
 ```sh
 # On the router
 cd /tmp
-wget https://github.com/openwrt-travel-gui/openwrt-travel-gui/releases/download/v1.0.0/openwrt-travel-gui_1.0.0_aarch64_cortex-a53.ipk
-opkg install openwrt-travel-gui_1.0.0_aarch64_cortex-a53.ipk
+wget https://github.com/raydak-labs/hackathon-202603-ui-openwrt/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.ipk
+opkg install travo_1.0.0_aarch64_cortex-a53.ipk
 ```
 
 After installing the `.ipk` manually, you still need to:
@@ -54,7 +54,7 @@ After installing the `.ipk` manually, you still need to:
 
 ## Configuration
 
-UCI config is at `/etc/config/openwrt-travel-gui`:
+UCI config is at `/etc/config/travo`:
 
 ```
 config travel_gui 'main'
@@ -67,24 +67,24 @@ config travel_gui 'main'
 ### Change password
 
 ```sh
-uci set openwrt-travel-gui.main.password='newpassword'
-uci commit openwrt-travel-gui
-/etc/init.d/openwrt-travel-gui restart
+uci set travo.main.password='newpassword'
+uci commit travo
+/etc/init.d/travo restart
 ```
 
 ### Change port
 
 ```sh
-uci set openwrt-travel-gui.main.port='8888'
-uci commit openwrt-travel-gui
-/etc/init.d/openwrt-travel-gui restart
+uci set travo.main.port='8888'
+uci commit travo
+/etc/init.d/travo restart
 ```
 
 ### Disable the service
 
 ```sh
-/etc/init.d/openwrt-travel-gui stop
-/etc/init.d/openwrt-travel-gui disable
+/etc/init.d/travo stop
+/etc/init.d/travo disable
 ```
 
 ## AdGuard Home
@@ -107,7 +107,7 @@ directly and restart:
 Run the uninstall script on the router:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | sh -s -- --uninstall
+wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh -s -- --uninstall
 ```
 
 Or if you have the repo cloned:
@@ -147,7 +147,7 @@ GOARCH=amd64 bash scripts/build.sh
 make build-all
 ```
 
-Output: `dist/openwrt-travel-gui`
+Output: `dist/travo`
 
 ### Create .ipk package
 
@@ -162,7 +162,7 @@ ARCH=x86_64 bash scripts/package-ipk.sh
 make package-all
 ```
 
-Output: `dist/openwrt-travel-gui_<version>_<arch>.ipk`
+Output: `dist/travo_<version>_<arch>.ipk`
 
 ### Deploy to router
 
@@ -183,11 +183,11 @@ make deploy ROUTER_IP=192.168.8.1
 
 | Issue                            | Solution                                                                                       |
 | -------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Binary won't start               | Check arch: `file /usr/bin/openwrt-travel-gui` — must match your device                        |
+| Binary won't start               | Check arch: `file /usr/bin/travo` — must match your device                        |
 | Port 80 conflict                 | Verify uhttpd moved: `uci get uhttpd.main.listen_http` should show `0.0.0.0:8080`              |
 | Can't reach LuCI                 | Access via `http://<router_ip>:8080` after install                                             |
-| Service not running              | Check logs: `logread -e openwrt-travel-gui`, restart: `/etc/init.d/openwrt-travel-gui restart` |
-| Permission denied                | `chmod +x /usr/bin/openwrt-travel-gui`                                                         |
+| Service not running              | Check logs: `logread -e travo`, restart: `/etc/init.d/travo restart` |
+| Permission denied                | `chmod +x /usr/bin/travo`                                                         |
 | AdGuard not blocking ads         | Verify DNS: `nslookup ads.example.com <router_ip>` — should return 0.0.0.0                     |
 | AdGuard UI not accessible        | Check service: `/etc/init.d/adguardhome status`, restart if needed                             |
 | Insufficient storage             | Need ~20 MB free; check with `df -h /`                                                         |

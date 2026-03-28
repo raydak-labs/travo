@@ -41,7 +41,7 @@ ssh root@192.168.1.1 '
   echo "=== release ==="; (cat /etc/openwrt_release 2>/dev/null || cat /etc/os-release 2>/dev/null)
   echo "=== uname ==="; uname -a
   echo "=== df -h ==="; df -h
-  echo "=== services ==="; /etc/init.d/openwrt-travel-gui status 2>/dev/null || true
+  echo "=== services ==="; /etc/init.d/travo status 2>/dev/null || true
   echo "=== uhttpd ports ==="; uci get uhttpd.main.listen_http; uci get uhttpd.main.listen_https
 ' > "$RUN_DIR/before/system.txt"
 ```
@@ -54,14 +54,14 @@ ssh root@192.168.1.1 '
   uci show wireless
   uci show firewall
   uci show dhcp
-  uci show openwrt-travel-gui 2>/dev/null || true
+  uci show travo 2>/dev/null || true
 ' > "$RUN_DIR/before/uci-show.txt"
 ```
 
 Optional full config archive:
 
 ```sh
-ssh root@192.168.1.1 'tar -czf - -C /etc/config network wireless firewall dhcp system uhttpd openwrt-travel-gui 2>/dev/null || true' \
+ssh root@192.168.1.1 'tar -czf - -C /etc/config network wireless firewall dhcp system uhttpd travo 2>/dev/null || true' \
   > "$RUN_DIR/before/etc-configs.tar.gz"
 ```
 
@@ -267,7 +267,7 @@ ssh root@192.168.1.1 'reboot'
 
 ```sh
 ssh root@192.168.1.1 '
-  ls -la /etc/openwrt-travel-gui 2>/dev/null || true
+  ls -la /etc/travo 2>/dev/null || true
   uci show network
   uci show wireless
   uci show firewall
@@ -284,7 +284,7 @@ ssh root@192.168.1.1 '
   uci show wireless
   uci show firewall
   uci show dhcp
-  uci show openwrt-travel-gui 2>/dev/null || true
+  uci show travo 2>/dev/null || true
 ' > "$RUN_DIR/after/uci-show.txt"
 ```
 
@@ -297,7 +297,7 @@ diff -u "$RUN_DIR/before/uci-show.txt" "$RUN_DIR/after/uci-show.txt" > "$RUN_DIR
 Also save backend logs:
 
 ```sh
-ssh root@192.168.1.1 'logread -e openwrt-travel-gui -l 500' > "$RUN_DIR/after/logread-openwrt-travel-gui.txt"
+ssh root@192.168.1.1 'logread -e travo -l 500' > "$RUN_DIR/after/logread-travo.txt"
 ```
 
 ## Troubleshooting Notes (from real run)

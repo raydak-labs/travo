@@ -78,7 +78,7 @@ ssh_cmd '
   echo "=== release ==="; (cat /etc/openwrt_release 2>/dev/null || cat /etc/os-release 2>/dev/null)
   echo "=== uname ==="; uname -a
   echo "=== df -h ==="; df -h
-  echo "=== travel-gui status ==="; /etc/init.d/openwrt-travel-gui status 2>/dev/null || true
+  echo "=== travel-gui status ==="; /etc/init.d/travo status 2>/dev/null || true
   echo "=== uhttpd ports ==="; uci get uhttpd.main.listen_http; uci get uhttpd.main.listen_https
 ' > "$RUN_DIR/before/system.txt"
 
@@ -87,7 +87,7 @@ ssh_cmd '
   uci show wireless
   uci show firewall
   uci show dhcp
-  uci show openwrt-travel-gui 2>/dev/null || true
+  uci show travo 2>/dev/null || true
 ' > "$RUN_DIR/before/uci-show.txt"
 
 curl -sS -m 10 -D "$RUN_DIR/before/health.headers" -o "$RUN_DIR/before/health.body" \
@@ -175,7 +175,7 @@ curl -sS -m 10 -H "Authorization: Bearer $TOKEN" \
 echo "== After snapshot =="
 ssh_cmd '
   echo "=== date ==="; date
-  echo "=== status ==="; /etc/init.d/openwrt-travel-gui status 2>/dev/null || true
+  echo "=== status ==="; /etc/init.d/travo status 2>/dev/null || true
   echo "=== uhttpd ports ==="; uci get uhttpd.main.listen_http; uci get uhttpd.main.listen_https
 ' > "$RUN_DIR/after/system.txt"
 
@@ -184,11 +184,11 @@ ssh_cmd '
   uci show wireless
   uci show firewall
   uci show dhcp
-  uci show openwrt-travel-gui 2>/dev/null || true
+  uci show travo 2>/dev/null || true
 ' > "$RUN_DIR/after/uci-show.txt"
 
 diff -u "$RUN_DIR/before/uci-show.txt" "$RUN_DIR/after/uci-show.txt" > "$RUN_DIR/uci.diff" || true
-ssh_cmd 'logread -e openwrt-travel-gui -l 500' > "$RUN_DIR/after/logread-openwrt-travel-gui.txt"
+ssh_cmd 'logread -e travo -l 500' > "$RUN_DIR/after/logread-travo.txt"
 
 HEALTH_OK=false
 UI_OK=false
