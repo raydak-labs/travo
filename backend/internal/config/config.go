@@ -38,8 +38,8 @@ func DefaultConfig() Config {
 		AllowedAdminCIDRs: "",
 		TLSEnabled:        false,
 		TLSPort:           443,
-		TLSCertFile:       "/etc/openwrt-travel-gui/tls.crt",
-		TLSKeyFile:        "/etc/openwrt-travel-gui/tls.key",
+		TLSCertFile:       "/etc/travo/tls.crt",
+		TLSKeyFile:        "/etc/travo/tls.key",
 	}
 }
 
@@ -89,7 +89,7 @@ func LoadConfig(args []string) (Config, bool, error) {
 	}
 
 	// Layer 3: CLI flags override env vars
-	fs := flag.NewFlagSet("openwrt-travel-gui", flag.ContinueOnError)
+	fs := flag.NewFlagSet("travo", flag.ContinueOnError)
 
 	port := fs.Int("port", cfg.Port, "HTTP listen port")
 	mock := fs.Bool("mock", cfg.MockMode, "Enable mock mode")

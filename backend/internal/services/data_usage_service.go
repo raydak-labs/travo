@@ -11,7 +11,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
-const dataBudgetConfigPath = "/etc/openwrt-travel-gui/data_budget.json"
+const dataBudgetConfigPath = "/etc/travo/data_budget.json"
 
 // interfaceLabels maps kernel interface names to human-readable labels.
 var interfaceLabels = map[string]string{
@@ -102,7 +102,7 @@ func (r *RealDataUsageRunner) ReadFile(path string) ([]byte, error) {
 }
 
 func (r *RealDataUsageRunner) WriteFile(path string, data []byte, perm os.FileMode) error {
-	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0755); err != nil {
+	if err := os.MkdirAll("/etc/travo", 0755); err != nil {
 		return err
 	}
 	return os.WriteFile(path, data, perm)

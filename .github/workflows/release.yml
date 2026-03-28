@@ -59,21 +59,21 @@ jobs:
         run: |
           go build \
             -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
-            -o "../dist/openwrt-travel-gui" \
+            -o "../dist/travo" \
             ./cmd/server
 
       - name: Build .ipk package
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
           ARCH: ${{ matrix.ipk_arch }}
-        run: bash .github/scripts/build-ipk.sh
+        run: bash scripts/package-ipk.sh
 
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          cp dist/openwrt-travel-gui \
-            "artifacts/openwrt-travel-gui-${{ steps.version.outputs.VERSION }}-${{ matrix.arch }}"
-          cp dist/openwrt-travel-gui_*.ipk artifacts/
+          cp dist/travo \
+            "artifacts/travo-${{ steps.version.outputs.VERSION }}-${{ matrix.arch }}"
+          cp dist/travo_*.ipk artifacts/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -128,7 +128,7 @@ jobs:
 
             | Architecture | Binary | IPK Package |
             |---|---|---|
-            | aarch64 (GL.iNet MT3000/AXT1800) | `openwrt-travel-gui-${{ steps.version.outputs.VERSION }}-aarch64` | `openwrt-travel-gui_${{ steps.version.outputs.VERSION }}_aarch64_cortex-a53.ipk` |
-            | x86_64 | `openwrt-travel-gui-${{ steps.version.outputs.VERSION }}-x86_64` | `openwrt-travel-gui_${{ steps.version.outputs.VERSION }}_x86_64.ipk` |
+            | aarch64 (GL.iNet MT3000/AXT1800) | `travo-${{ steps.version.outputs.VERSION }}-aarch64` | `travo_${{ steps.version.outputs.VERSION }}_aarch64_cortex-a53.ipk` |
+            | x86_64 | `travo-${{ steps.version.outputs.VERSION }}-x86_64` | `travo_${{ steps.version.outputs.VERSION }}_x86_64.ipk` |
 
             See [SHA256SUMS](SHA256SUMS) for checksums.

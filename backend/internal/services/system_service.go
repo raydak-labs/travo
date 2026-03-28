@@ -507,7 +507,7 @@ func (s *SystemService) FactoryReset() error {
 	return nil
 }
 
-const setupCompleteFlagPath = "/etc/openwrt-travel-gui/setup-complete"
+const setupCompleteFlagPath = "/etc/travo/setup-complete"
 
 // GetSetupComplete checks whether the first-run setup has been completed.
 func (s *SystemService) GetSetupComplete() models.SetupStatus {
@@ -529,8 +529,8 @@ func (s *SystemService) SetSetupComplete() error {
 }
 
 const (
-	buttonActionsDir  = "/etc/openwrt-travel-gui"
-	buttonActionsFile = "/etc/openwrt-travel-gui/button-actions.json"
+	buttonActionsDir  = "/etc/travo"
+	buttonActionsFile = "/etc/travo/button-actions.json"
 	hotplugScript     = "/etc/hotplug.d/button/50-gui-button-actions"
 	dtKeysDir         = "/sys/firmware/devicetree/base/keys"
 )

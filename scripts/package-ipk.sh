@@ -8,15 +8,15 @@ VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo "
 # Strip leading 'v' from version if present
 VERSION="${VERSION#v}"
 ARCH="${ARCH:-${1:-aarch64_cortex-a53}}"
-PKG_NAME="openwrt-travel-gui"
+PKG_NAME="travo"
 BUILD_DIR="dist"
 IPK_DIR="${BUILD_DIR}/ipk"
 
 echo "Packaging ${PKG_NAME} v${VERSION} for ${ARCH}..."
 
 # Verify binary exists
-if [ ! -f "${BUILD_DIR}/openwrt-travel-gui" ]; then
-    echo "Error: Binary not found at ${BUILD_DIR}/openwrt-travel-gui"
+if [ ! -f "${BUILD_DIR}/travo" ]; then
+    echo "Error: Binary not found at ${BUILD_DIR}/travo"
     echo "Run scripts/build.sh first."
     exit 1
 fi
@@ -33,18 +33,18 @@ mkdir -p "${IPK_DIR}/data/usr/bin"
 mkdir -p "${IPK_DIR}/data/etc/init.d"
 mkdir -p "${IPK_DIR}/data/etc/config"
 mkdir -p "${IPK_DIR}/data/etc/uci-defaults"
-mkdir -p "${IPK_DIR}/data/www/openwrt-travel-gui"
+mkdir -p "${IPK_DIR}/data/www/travo"
 mkdir -p "${IPK_DIR}/control"
 
 # Copy binary
-cp "${BUILD_DIR}/openwrt-travel-gui" "${IPK_DIR}/data/usr/bin/"
+cp "${BUILD_DIR}/travo" "${IPK_DIR}/data/usr/bin/"
 
 # Copy frontend assets
-cp -r frontend/dist/* "${IPK_DIR}/data/www/openwrt-travel-gui/"
+cp -r frontend/dist/* "${IPK_DIR}/data/www/travo/"
 
 # Copy config files
-cp packaging/openwrt/files/etc/init.d/openwrt-travel-gui "${IPK_DIR}/data/etc/init.d/"
-cp packaging/openwrt/files/etc/config/openwrt-travel-gui "${IPK_DIR}/data/etc/config/"
+cp packaging/openwrt/files/etc/init.d/travo "${IPK_DIR}/data/etc/init.d/"
+cp packaging/openwrt/files/etc/config/travo "${IPK_DIR}/data/etc/config/"
 cp packaging/openwrt/files/etc/uci-defaults/99-travel-gui-ports "${IPK_DIR}/data/etc/uci-defaults/"
 
 # Create control file
@@ -53,7 +53,7 @@ Package: ${PKG_NAME}
 Version: ${VERSION}
 Architecture: ${ARCH}
 Description: Modern web UI for OpenWRT travel routers
-Maintainer: openwrt-travel-gui contributors
+Maintainer: travo contributors
 Section: luci
 Priority: optional
 Depends: libc
@@ -62,15 +62,15 @@ EOF
 # Create postinst
 cat > "${IPK_DIR}/control/postinst" << 'EOF'
 #!/bin/sh
-chmod +x /usr/bin/openwrt-travel-gui
-chmod +x /etc/init.d/openwrt-travel-gui
-/etc/init.d/openwrt-travel-gui enable
+chmod +x /usr/bin/travo
+chmod +x /etc/init.d/travo
+/etc/init.d/travo enable
 # Apply UCI defaults
 [ -f /etc/uci-defaults/99-travel-gui-ports ] && {
     sh /etc/uci-defaults/99-travel-gui-ports
     rm -f /etc/uci-defaults/99-travel-gui-ports
 }
-/etc/init.d/openwrt-travel-gui start
+/etc/init.d/travo start
 uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true
 EOF
 chmod +x "${IPK_DIR}/control/postinst"
@@ -78,8 +78,8 @@ chmod +x "${IPK_DIR}/control/postinst"
 # Create prerm
 cat > "${IPK_DIR}/control/prerm" << 'EOF'
 #!/bin/sh
-/etc/init.d/openwrt-travel-gui stop 2>/dev/null
-/etc/init.d/openwrt-travel-gui disable 2>/dev/null
+/etc/init.d/travo stop 2>/dev/null
+/etc/init.d/travo disable 2>/dev/null
 # Restore uhttpd to default ports
 uci set uhttpd.main.listen_http='0.0.0.0:80'
 uci set uhttpd.main.listen_https='0.0.0.0:443'
@@ -90,7 +90,7 @@ chmod +x "${IPK_DIR}/control/prerm"
 
 # Create conffiles
 cat > "${IPK_DIR}/control/conffiles" << EOF
-/etc/config/openwrt-travel-gui
+/etc/config/travo
 EOF
 
 # Build ipk (nested tar.gz archives)

@@ -36,7 +36,7 @@ func setupApp() *fiber.App {
 // Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, blocklist, and event watcher so the caller can manage their lifecycle.
 func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist, services.EventWatcher) {
 	app := fiber.New(fiber.Config{
-		AppName: "openwrt-travel-gui",
+		AppName: "travo",
 	})
 
 	// CORS middleware
@@ -130,7 +130,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()
-	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/openwrt-travel-gui/band-switching.json")
+	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/travo/band-switching.json")
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
@@ -251,7 +251,7 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("Starting openwrt-travel-gui backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
+	log.Printf("Starting travo backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
 	if err := app.Listen(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

@@ -44,7 +44,7 @@ func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRun
 
 // NewNetworkService creates a new NetworkService.
 func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return newNetworkService(u, ub, "/etc/openwrt-travel-gui/aliases.json", &RealCommandRunner{})
+	return newNetworkService(u, ub, "/etc/travo/aliases.json", &RealCommandRunner{})
 }
 
 // NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
@@ -54,7 +54,7 @@ func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *
 
 // NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
 func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
-	return newNetworkService(u, ub, "/etc/openwrt-travel-gui/aliases.json", cmd)
+	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
 }
 
 // updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
@@ -1123,7 +1123,7 @@ func (n *NetworkService) GetFirewallZones() ([]models.FirewallZone, error) {
 	return zones, nil
 }
 
-const portForwardsFile = "/etc/openwrt-travel-gui/port-forwards.json"
+const portForwardsFile = "/etc/travo/port-forwards.json"
 
 // GetPortForwards returns stored port-forward rules.
 func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
@@ -1201,7 +1201,7 @@ func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.Di
 	return result
 }
 
-const dohConfigFile = "/etc/openwrt-travel-gui/doh-config.json"
+const dohConfigFile = "/etc/travo/doh-config.json"
 
 // GetDoHConfig returns the current DNS-over-HTTPS configuration.
 func (n *NetworkService) GetDoHConfig() (models.DoHConfig, error) {

@@ -32,9 +32,9 @@ build-prod:
 # Cross-compile for both aarch64 and x86_64
 build-all:
 	GOARCH=arm64 bash scripts/build.sh
-	cp dist/openwrt-travel-gui dist/openwrt-travel-gui-aarch64
+	cp dist/travo dist/travo-aarch64
 	GOARCH=amd64 bash scripts/build.sh
-	cp dist/openwrt-travel-gui dist/openwrt-travel-gui-x86_64
+	cp dist/travo dist/travo-x86_64
 
 # Create .ipk package for OpenWRT (default: aarch64)
 package:
@@ -42,12 +42,12 @@ package:
 
 # Create .ipk packages for both aarch64 and x86_64
 package-all: build-all
-	ARCH=aarch64_cortex-a53 bash -c 'cp dist/openwrt-travel-gui-aarch64 dist/openwrt-travel-gui && bash scripts/package-ipk.sh'
-	ARCH=x86_64 bash -c 'cp dist/openwrt-travel-gui-x86_64 dist/openwrt-travel-gui && bash scripts/package-ipk.sh'
+	ARCH=aarch64_cortex-a53 bash -c 'cp dist/travo-aarch64 dist/travo && bash scripts/package-ipk.sh'
+	ARCH=x86_64 bash -c 'cp dist/travo-x86_64 dist/travo && bash scripts/package-ipk.sh'
 
-# Deploy to OpenWRT device (requires ROUTER_IP)
+# Deploy to OpenWRT device via opkg (requires ROUTER_IP)
 deploy:
-	@bash scripts/deploy.sh $(ROUTER_IP)
+	@bash scripts/deploy-local.sh --mode opkg --ip $(ROUTER_IP)
 
 # Deploy locally via direct copy (fast iteration)
 deploy-local:
