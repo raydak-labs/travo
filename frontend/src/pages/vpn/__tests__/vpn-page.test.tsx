@@ -64,24 +64,12 @@ describe('VpnPage', () => {
     });
   });
 
-  it('shows Tailscale section', async () => {
-    renderVpnPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('Tailscale')).toBeInTheDocument();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Logged In')).toBeInTheDocument();
-    });
-  });
-
-  it('has toggle switches for WireGuard and Tailscale', async () => {
+  it('has toggle switches for WireGuard', async () => {
     renderVpnPage();
 
     await waitFor(() => {
       const toggles = screen.getAllByRole('checkbox');
-      expect(toggles.length).toBeGreaterThanOrEqual(2);
+      expect(toggles.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -91,15 +79,6 @@ describe('VpnPage', () => {
     await waitFor(() => {
       const matches = screen.getAllByText(/vpn\.example\.com:51820/);
       expect(matches.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  it('shows Tailscale IP and hostname', async () => {
-    renderVpnPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('100.100.1.42')).toBeInTheDocument();
-      expect(screen.getByText('gl-mt3000')).toBeInTheDocument();
     });
   });
 
@@ -171,10 +150,7 @@ describe('VpnPage', () => {
     renderVpnPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Tailscale is not installed')).toBeInTheDocument();
+      expect(screen.getByText('WireGuard')).toBeInTheDocument();
     });
-
-    const links = screen.getAllByText('Install via Services →');
-    expect(links.length).toBeGreaterThanOrEqual(1);
   });
 });

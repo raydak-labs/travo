@@ -1155,6 +1155,57 @@ func TestGetDDNSConfig(t *testing.T) {
 	if config.LookupHost != "myrouter.duckdns.org" {
 		t.Errorf("expected lookup_host 'myrouter.duckdns.org', got %q", config.LookupHost)
 	}
+	if config.UpdateURL != "" {
+		t.Errorf("expected empty update_url by default, got %q", config.UpdateURL)
+	}
+}
+
+func TestGetDDNSConfig_CustomUpdateURL(t *testing.T) {
+	u := uci.NewMockUCI()
+	if err := u.DeleteOption("ddns", "myddns", "service_name"); err != nil {
+		t.Fatalf("delete service_name: %v", err)
+	}
+	customURL := "https://dyn.example.com/nic/update?hostname=[DOMAIN]&myip=[IP]"
+	if err := u.Set("ddns", "myddns", "update_url", customURL); err != nil {
+		t.Fatalf("set update_url: %v", err)
+	}
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	config, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Service != "custom" {
+		t.Errorf("expected service 'custom', got %q", config.Service)
+	}
+	if config.UpdateURL != customURL {
+		t.Errorf("expected update_url %q, got %q", customURL, config.UpdateURL)
+	}
+}
+
+func TestGetDDNSConfig_CustomUpdateURL_ServiceDash(t *testing.T) {
+	u := uci.NewMockUCI()
+	if err := u.Set("ddns", "myddns", "service_name", "-"); err != nil {
+		t.Fatalf("set service_name: %v", err)
+	}
+	customURL := "https://dyn.example.com/update?ip=[IP]"
+	if err := u.Set("ddns", "myddns", "update_url", customURL); err != nil {
+		t.Fatalf("set update_url: %v", err)
+	}
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkService(u, ub)
+
+	config, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Service != "custom" {
+		t.Errorf("expected service 'custom', got %q", config.Service)
+	}
+	if config.UpdateURL != customURL {
+		t.Errorf("expected update_url %q, got %q", customURL, config.UpdateURL)
+	}
 }
 
 func TestSetDDNSConfig(t *testing.T) {
@@ -1201,6 +1252,107 @@ func TestSetDDNSConfig(t *testing.T) {
 	}
 	if config.LookupHost != "test.no-ip.org" {
 		t.Errorf("expected lookup_host 'test.no-ip.org', got %q", config.LookupHost)
+	}
+	if config.UpdateURL != "" {
+		t.Errorf("expected empty update_url for built-in provider, got %q", config.UpdateURL)
+	}
+}
+
+func TestSetDDNSConfig_CustomUpdateURL(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return []byte("ok"), nil
+		},
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	customURL := "https://provider.example/nic/update?hostname=[DOMAIN]&myip=[IP]"
+	newConfig := models.DDNSConfig{
+		Enabled:    true,
+		Service:    "custom",
+		Domain:     "home.example.com",
+		Username:   "user",
+		Password:   "pass",
+		LookupHost: "home.example.com",
+		UpdateURL:  customURL,
+	}
+	if err := svc.SetDDNSConfig(newConfig); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	config, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.Service != "custom" {
+		t.Errorf("expected service 'custom', got %q", config.Service)
+	}
+	if config.UpdateURL != customURL {
+		t.Errorf("expected update_url %q, got %q", customURL, config.UpdateURL)
+	}
+	opts, err := u.GetAll("ddns", "myddns")
+	if err != nil {
+		t.Fatalf("GetAll: %v", err)
+	}
+	if opts["service_name"] != "" {
+		t.Errorf("expected service_name removed for custom, got %q", opts["service_name"])
+	}
+	if opts["update_url"] != customURL {
+		t.Errorf("expected UCI update_url %q, got %q", customURL, opts["update_url"])
+	}
+}
+
+func TestSetDDNSConfig_FromCustomToBuiltInClearsUpdateURL(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return []byte("ok"), nil
+		},
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+
+	customURL := "https://provider.example/update"
+	if err := svc.SetDDNSConfig(models.DDNSConfig{
+		Enabled:    true,
+		Service:    "custom",
+		Domain:     "h.example.com",
+		Username:   "",
+		Password:   "",
+		LookupHost: "h.example.com",
+		UpdateURL:  customURL,
+	}); err != nil {
+		t.Fatalf("set custom: %v", err)
+	}
+	if err := svc.SetDDNSConfig(models.DDNSConfig{
+		Enabled:    true,
+		Service:    "duckdns.org",
+		Domain:     "x.duckdns.org",
+		Username:   "t",
+		Password:   "",
+		LookupHost: "x.duckdns.org",
+		UpdateURL:  "",
+	}); err != nil {
+		t.Fatalf("set duckdns: %v", err)
+	}
+	config, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if config.Service != "duckdns.org" {
+		t.Errorf("expected duckdns.org, got %q", config.Service)
+	}
+	if config.UpdateURL != "" {
+		t.Errorf("expected update_url cleared, got %q", config.UpdateURL)
+	}
+	opts, err := u.GetAll("ddns", "myddns")
+	if err != nil {
+		t.Fatalf("GetAll: %v", err)
+	}
+	if opts["update_url"] != "" {
+		t.Errorf("expected UCI update_url deleted, got %q", opts["update_url"])
 	}
 }
 

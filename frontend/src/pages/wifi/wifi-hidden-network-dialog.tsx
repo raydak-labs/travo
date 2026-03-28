@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Eye, EyeOff, WifiOff } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -9,39 +10,39 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useWifiConnect } from '@/hooks/use-wifi';
-
-const ENCRYPTION_OPTIONS = [
-  { value: 'psk2', label: 'WPA2 (PSK)' },
-  { value: 'sae', label: 'WPA3 (SAE)' },
-  { value: 'psk', label: 'WPA (PSK)' },
-  { value: 'none', label: 'Open (No Password)' },
-] as const;
+import {
+  wifiHiddenNetworkFormSchema,
+  type WifiHiddenNetworkFormValues,
+} from '@/lib/schemas/wifi-forms';
+import { wifiHiddenNetworkDefaultValues } from './wifi-hidden-network-constants';
+import { WifiHiddenNetworkDialogForm } from './wifi-hidden-network-dialog-form';
 
 export function WifiHiddenNetworkDialog() {
   const [open, setOpen] = useState(false);
-  const [ssid, setSsid] = useState('');
-  const [encryption, setEncryption] = useState('psk2');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
   const connectMutation = useWifiConnect();
 
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<WifiHiddenNetworkFormValues>({
+    resolver: zodResolver(wifiHiddenNetworkFormSchema),
+    defaultValues: wifiHiddenNetworkDefaultValues,
+    mode: 'onChange',
+  });
+
+  const encryption = watch('encryption');
   const needsPassword = encryption !== 'none';
+  const ssidValue = watch('ssid');
 
   function resetForm() {
-    setSsid('');
-    setEncryption('psk2');
-    setPassword('');
+    reset(wifiHiddenNetworkDefaultValues);
     setShowPassword(false);
-    setValidationError(null);
   }
 
   function handleOpen() {
@@ -49,28 +50,9 @@ export function WifiHiddenNetworkDialog() {
     setOpen(true);
   }
 
-  function validate(): boolean {
-    if (ssid.trim() === '') {
-      setValidationError('SSID is required');
-      return false;
-    }
-    if (needsPassword && password.length > 0 && password.length < 8) {
-      setValidationError('Password must be at least 8 characters');
-      return false;
-    }
-    if (needsPassword && password.length === 0) {
-      setValidationError('Password is required for encrypted networks');
-      return false;
-    }
-    setValidationError(null);
-    return true;
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
+  const onValidSubmit = (data: WifiHiddenNetworkFormValues) => {
     connectMutation.mutate(
-      { ssid: ssid.trim(), password, encryption, hidden: true },
+      { ssid: data.ssid.trim(), password: data.password, encryption: data.encryption, hidden: true },
       {
         onSuccess: () => {
           resetForm();
@@ -78,7 +60,12 @@ export function WifiHiddenNetworkDialog() {
         },
       },
     );
-  }
+  };
+
+  const errorMessage =
+    connectMutation.error && 'message' in connectMutation.error
+      ? String((connectMutation.error as { message: string }).message)
+      : null;
 
   return (
     <>
@@ -102,95 +89,20 @@ export function WifiHiddenNetworkDialog() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              id="hidden-ssid"
-              label="Network Name (SSID)"
-              type="text"
-              value={ssid}
-              onChange={(e) => {
-                setSsid(e.target.value);
-                if (validationError) setValidationError(null);
-              }}
-              placeholder="Enter network name"
-              autoFocus
-              aria-required="true"
-            />
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="hidden-encryption"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Encryption
-              </label>
-              <Select value={encryption} onValueChange={setEncryption}>
-                <SelectTrigger id="hidden-encryption">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ENCRYPTION_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {needsPassword && (
-              <div className="relative">
-                <Input
-                  id="hidden-password"
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (validationError) setValidationError(null);
-                  }}
-                  placeholder="Enter network password"
-                  aria-required="true"
-                  aria-invalid={validationError ? 'true' : undefined}
-                  aria-describedby={validationError ? 'hidden-password-error' : undefined}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            )}
-
-            {validationError && (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                {validationError}
-              </p>
-            )}
-
-            {connectMutation.error && (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                {connectMutation.error.message}
-              </p>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={connectMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={connectMutation.isPending || ssid.trim() === ''}>
-                {connectMutation.isPending ? 'Connecting...' : 'Connect'}
-              </Button>
-            </div>
-          </form>
+          <WifiHiddenNetworkDialogForm
+            register={register}
+            control={control}
+            handleSubmit={handleSubmit}
+            onValidSubmit={onValidSubmit}
+            errors={errors}
+            needsPassword={needsPassword}
+            showPassword={showPassword}
+            setShowPassword={setShowPassword}
+            ssidValue={ssidValue}
+            connectPending={connectMutation.isPending}
+            errorMessage={errorMessage}
+            onCancel={() => setOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </>

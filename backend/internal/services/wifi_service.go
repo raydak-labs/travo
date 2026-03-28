@@ -901,68 +901,43 @@ func (w *WifiService) ReorderNetworks(ssids []string) error {
 
 // GetSavedNetworks returns saved WiFi networks.
 func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
-	resp, err := w.ubus.Call("network.wireless", "status", nil)
-	if err != nil {
-		return []models.SavedNetwork{}, nil
-	}
-
 	priorities := w.loadPriorities()
 
 	var networks []models.SavedNetwork
-	for _, radioData := range resp {
-		radioMap, ok := radioData.(map[string]interface{})
-		if !ok {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return []models.SavedNetwork{}, nil
+	}
+	for section, opts := range sections {
+		if opts["mode"] != "sta" {
 			continue
 		}
-		ifaces, ok := radioMap["interfaces"].([]interface{})
-		if !ok {
+		ssid := strings.TrimSpace(opts["ssid"])
+		if ssid == "" {
 			continue
 		}
-		for _, iface := range ifaces {
-			ifaceMap, ok := iface.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			config, ok := ifaceMap["config"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			mode, _ := config["mode"].(string)
-			if mode != "sta" {
-				continue
-			}
-			ssid, _ := config["ssid"].(string)
-			encryption, _ := config["encryption"].(string)
+		disabled := strings.TrimSpace(opts["disabled"]) == "1"
 
-			section, _ := ifaceMap["section"].(string)
-			disabled := false
-			if section != "" {
-				if d, err := w.uci.Get("wireless", section, "disabled"); err == nil {
-					disabled = d == "1"
-				}
-			}
-
-			priority := 0
-			if p, ok := priorities[ssid]; ok {
-				priority = p
-			}
-
-			networks = append(networks, models.SavedNetwork{
-				SSID:        ssid,
-				Section:     section,
-				Encryption:  encryption,
-				Mode:        mode,
-				AutoConnect: !disabled,
-				Priority:    priority,
-			})
+		priority := 0
+		if p, ok := priorities[ssid]; ok {
+			priority = p
 		}
+
+		networks = append(networks, models.SavedNetwork{
+			SSID:        ssid,
+			Section:     section,
+			Encryption:  opts["encryption"],
+			Mode:        "sta",
+			AutoConnect: !disabled,
+			Priority:    priority,
+		})
 	}
 
 	// Sort by priority (lower number = higher priority), 0 means unset (goes last)
 	sort.Slice(networks, func(i, j int) bool {
 		pi, pj := networks[i].Priority, networks[j].Priority
 		if pi == 0 && pj == 0 {
-			return false
+			return networks[i].SSID < networks[j].SSID
 		}
 		if pi == 0 {
 			return false

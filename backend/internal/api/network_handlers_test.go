@@ -630,6 +630,87 @@ func TestSetDDNSConfig_MissingDomain_Returns400(t *testing.T) {
 	}
 }
 
+func TestSetDDNSConfig_Custom_Returns200(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"enabled":     true,
+		"service":     "custom",
+		"domain":      "router.example.com",
+		"username":    "u",
+		"password":    "p",
+		"lookup_host": "router.example.com",
+		"update_url":  "https://ddns.example.com/nic/update?hostname=[DOMAIN]&myip=[IP]",
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestSetDDNSConfig_Custom_MissingUpdateURL_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"enabled":     true,
+		"service":     "custom",
+		"domain":      "router.example.com",
+		"username":    "",
+		"password":    "",
+		"lookup_host": "router.example.com",
+		"update_url":  "",
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestSetDDNSConfig_Custom_InvalidURL_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"enabled":     true,
+		"service":     "custom",
+		"domain":      "router.example.com",
+		"username":    "",
+		"password":    "",
+		"lookup_host": "router.example.com",
+		"update_url":  "not-a-valid-url",
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
 func TestGetDDNSStatus_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")

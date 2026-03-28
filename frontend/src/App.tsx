@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { Toaster } from 'sonner';
-import { ThemeProvider, useTheme } from '@/components/layout/theme-provider';
+import { ThemeProvider } from '@/components/layout/theme-provider';
+import { useTheme } from '@/components/layout/use-theme';
 import { router } from '@/router';
 
 const queryClient = new QueryClient({

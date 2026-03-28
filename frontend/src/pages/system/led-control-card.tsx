@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Lightbulb } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { useLEDStatus, useSetLEDStealth, useLEDSchedule, useSetLEDSchedule } from '@/hooks/use-system';
+import { ledScheduleFormSchema, type LedScheduleFormValues } from '@/lib/schemas/system-forms';
+import { LedStealthStatusPanel } from './led-stealth-status-panel';
+import { LedScheduleForm } from './led-schedule-form';
 
 export function LEDControlCard() {
   const { data: ledStatus } = useLEDStatus();
@@ -13,17 +14,54 @@ export function LEDControlCard() {
   const { data: ledSchedule } = useLEDSchedule();
   const setLEDScheduleMutation = useSetLEDSchedule();
 
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
-  const [scheduleOnTime, setScheduleOnTime] = useState('07:00');
-  const [scheduleOffTime, setScheduleOffTime] = useState('22:00');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<LedScheduleFormValues>({
+    resolver: zodResolver(ledScheduleFormSchema),
+    defaultValues: {
+      enabled: false,
+      on_time: '07:00',
+      off_time: '22:00',
+    },
+  });
+
+  const scheduleEnabled = watch('enabled');
 
   useEffect(() => {
     if (ledSchedule) {
-      setScheduleEnabled(ledSchedule.enabled);
-      if (ledSchedule.on_time) setScheduleOnTime(ledSchedule.on_time);
-      if (ledSchedule.off_time) setScheduleOffTime(ledSchedule.off_time);
+      reset({
+        enabled: ledSchedule.enabled,
+        on_time: ledSchedule.on_time || '07:00',
+        off_time: ledSchedule.off_time || '22:00',
+      });
     }
-  }, [ledSchedule]);
+  }, [ledSchedule, reset]);
+
+  const onSaveSchedule = (data: LedScheduleFormValues) => {
+    setLEDScheduleMutation.mutate({
+      enabled: data.enabled,
+      on_time: data.on_time,
+      off_time: data.off_time,
+    });
+  };
+
+  const onRemoveSchedule = () => {
+    setLEDScheduleMutation.mutate(
+      { enabled: false, on_time: '', off_time: '' },
+      {
+        onSuccess: () =>
+          reset({
+            enabled: false,
+            on_time: '07:00',
+            off_time: '22:00',
+          }),
+      },
+    );
+  };
 
   if (!ledStatus || ledStatus.led_count === 0) return null;
 
@@ -34,123 +72,24 @@ export function LEDControlCard() {
         <Lightbulb className="h-4 w-4 text-gray-500" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Stealth Mode Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              {ledStatus.stealth_mode
-                ? 'All LEDs are off — stealth mode active'
-                : `${ledStatus.led_count} LED${ledStatus.led_count > 1 ? 's' : ''} active`}
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant={ledStatus.stealth_mode ? 'default' : 'outline'}
-            disabled={setLEDStealthMutation.isPending}
-            onClick={() =>
-              setLEDStealthMutation.mutate({ stealth_mode: !ledStatus.stealth_mode })
-            }
-          >
-            {ledStatus.stealth_mode ? 'Restore LEDs' : 'Go Stealth'}
-          </Button>
-        </div>
-
-        {/* Per-LED Status */}
-        {ledStatus.leds && ledStatus.leds.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-gray-500">Individual LEDs</p>
-            <div className="grid gap-1">
-              {ledStatus.leds.map((led) => (
-                <div
-                  key={led.name}
-                  className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-900"
-                >
-                  <span className="text-xs text-gray-700 dark:text-gray-300">{led.name}</span>
-                  <Badge variant={led.brightness > 0 ? 'success' : 'secondary'}>
-                    {led.brightness > 0 ? 'On' : 'Off'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* LED Schedule */}
-        <div className="space-y-3 rounded-lg border p-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">LED Schedule</p>
-              <p className="text-xs text-gray-500">
-                Automatically turn LEDs on/off at set times
-              </p>
-            </div>
-            <Switch
-              id="led-schedule"
-              label="Enable schedule"
-              checked={scheduleEnabled}
-              onChange={(e) => setScheduleEnabled(e.target.checked)}
-            />
-          </div>
-          {scheduleEnabled && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <label
-                  htmlFor="led-on-time"
-                  className="w-16 text-xs text-gray-600 dark:text-gray-400"
-                >
-                  LEDs On
-                </label>
-                <Input
-                  id="led-on-time"
-                  type="time"
-                  value={scheduleOnTime}
-                  onChange={(e) => setScheduleOnTime(e.target.value)}
-                  className="w-32"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <label
-                  htmlFor="led-off-time"
-                  className="w-16 text-xs text-gray-600 dark:text-gray-400"
-                >
-                  LEDs Off
-                </label>
-                <Input
-                  id="led-off-time"
-                  type="time"
-                  value={scheduleOffTime}
-                  onChange={(e) => setScheduleOffTime(e.target.value)}
-                  className="w-32"
-                />
-              </div>
-              <Button
-                size="sm"
-                disabled={setLEDScheduleMutation.isPending}
-                onClick={() =>
-                  setLEDScheduleMutation.mutate({
-                    enabled: scheduleEnabled,
-                    on_time: scheduleOnTime,
-                    off_time: scheduleOffTime,
-                  })
-                }
-              >
-                {setLEDScheduleMutation.isPending ? 'Saving...' : 'Save Schedule'}
-              </Button>
-            </div>
-          )}
-          {!scheduleEnabled && ledSchedule?.enabled && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={setLEDScheduleMutation.isPending}
-              onClick={() =>
-                setLEDScheduleMutation.mutate({ enabled: false, on_time: '', off_time: '' })
-              }
-            >
-              Remove Schedule
-            </Button>
-          )}
-        </div>
+        <LedStealthStatusPanel
+          ledStatus={ledStatus}
+          stealthPending={setLEDStealthMutation.isPending}
+          onToggleStealth={() =>
+            setLEDStealthMutation.mutate({ stealth_mode: !ledStatus.stealth_mode })
+          }
+        />
+        <LedScheduleForm
+          register={register}
+          handleSubmit={handleSubmit}
+          errors={errors}
+          scheduleEnabled={scheduleEnabled}
+          onSave={onSaveSchedule}
+          savePending={setLEDScheduleMutation.isPending}
+          serverScheduleActive={!!ledSchedule?.enabled}
+          onRemoveSchedule={onRemoveSchedule}
+          removePending={setLEDScheduleMutation.isPending}
+        />
       </CardContent>
     </Card>
   );

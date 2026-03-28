@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { refreshRouterState } from '@/lib/router-state-refresh';
 import { API_ROUTES } from '@shared/index';
 import type {
   VpnStatus,
@@ -13,6 +14,7 @@ import type {
   VPNVerifyResult,
   SplitTunnelConfig,
   TailscaleSSHStatus,
+  SpeedTestResult,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -60,6 +62,12 @@ export function useToggleWireguard() {
     onSuccess: (_data, enable) => {
       toast.success(`WireGuard ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'wireguard', 'status'],
+        ['network', 'status'],
+        ['network', 'dns'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to toggle WireGuard', { description: error.message });
@@ -82,6 +90,11 @@ export function useToggleTailscale() {
     onSuccess: (_data, enable) => {
       toast.success(`Tailscale ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'tailscale'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to toggle Tailscale', { description: error.message });
@@ -134,6 +147,11 @@ export function useActivateWireguardProfile() {
     onSuccess: () => {
       toast.success('WireGuard profile activated');
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'wireguard', 'status'],
+        ['vpn', 'wireguard', 'profiles'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to activate profile', { description: error.message });
@@ -153,6 +171,16 @@ export function useDNSLeakTest() {
     mutationFn: () => apiClient.get<DNSLeakResult>(API_ROUTES.vpn.dnsLeakTest),
     onError: (error) => {
       toast.error('DNS leak test failed', { description: error.message });
+    },
+  });
+}
+
+/** Speed test with download + ping bound to WireGuard (wg0); requires tunnel enabled and up. */
+export function useRunWireGuardSpeedTest() {
+  return useMutation({
+    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.vpn.speedTest),
+    onError: (error) => {
+      toast.error('VPN speed test failed', { description: error.message });
     },
   });
 }
@@ -201,10 +229,16 @@ export function useSetTailscaleExitNode() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (nodeIP: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { exit_node: nodeIP }),
+      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { node_ip: nodeIP }),
     onSuccess: () => {
       toast.success('Exit node updated');
-      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale'] });
+      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
+      void refreshRouterState(queryClient, [
+        ['vpn', 'status'],
+        ['vpn', 'wireguard', 'status'],
+        ['vpn', 'tailscale'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to set exit node', { description: error.message });

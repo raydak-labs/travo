@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Sidebar } from './sidebar';
+import { useSidebarCollapsed } from './use-sidebar-collapsed';
 import { Header } from './header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -12,7 +13,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, title }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
   useSessionTimeout();

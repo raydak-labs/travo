@@ -105,6 +105,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.tailscale.auth).toBe('/api/v1/vpn/tailscale/auth');
     expect(API_ROUTES.vpn.tailscale.exitNode).toBe('/api/v1/vpn/tailscale/exit-node');
     expect(API_ROUTES.vpn.dnsLeakTest).toBe('/api/v1/vpn/dns-leak-test');
+    expect(API_ROUTES.vpn.speedTest).toBe('/api/v1/vpn/speed-test');
     expect(API_ROUTES.vpn.splitTunnel).toBe('/api/v1/vpn/split-tunnel');
   });
 
@@ -210,6 +211,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/buttons',
       '/api/v1/system/button-actions',
       '/api/v1/vpn/dns-leak-test',
+      '/api/v1/vpn/speed-test',
       '/api/v1/vpn/wireguard/verify',
       '/api/v1/network/data-usage',
       '/api/v1/network/data-usage/reset',

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { finalizeWifiMutation } from '@/lib/wifi-apply';
+import { refreshRouterState } from '@/lib/router-state-refresh';
 import { API_ROUTES } from '@shared/index';
 import type {
   WifiScanResult,
@@ -51,6 +52,11 @@ export function useWifiConnect() {
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'connection'],
+        ['wifi', 'saved'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('WiFi connection failed', { description: error.message });
@@ -66,6 +72,11 @@ export function useWifiDisconnect() {
     onSuccess: () => {
       toast.success('Disconnected from WiFi');
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'connection'],
+        ['wifi', 'saved'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to disconnect', { description: error.message });
@@ -81,6 +92,12 @@ export function useWifiMode() {
     onSuccess: (_data, mode) => {
       toast.success(`WiFi mode changed to ${mode}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'connection'],
+        ['wifi', 'saved'],
+        ['wifi', 'ap'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to change WiFi mode', { description: error.message });
@@ -105,6 +122,7 @@ export function useWifiDelete() {
     onSuccess: () => {
       toast.success('Network removed');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });
+      void refreshRouterState(queryClient, [['wifi', 'saved']]);
     },
     onError: (error) => {
       toast.error('Failed to remove network', { description: error.message });
@@ -120,6 +138,7 @@ export function useSetNetworkPriority() {
     onSuccess: () => {
       toast.success('Network priority updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });
+      void refreshRouterState(queryClient, [['wifi', 'saved']]);
     },
     onError: (error) => {
       toast.error('Failed to update priority', { description: error.message });
@@ -236,6 +255,12 @@ export function useSetRadioRole() {
     onSuccess: () => {
       toast.success('Radio role updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'connection'],
+        ['wifi', 'radios'],
+        ['wifi', 'ap'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to update radio role', { description: error.message });
@@ -251,6 +276,11 @@ export function useSetRadioEnabled() {
     onSuccess: () => {
       toast.success('WiFi radio updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'connection'],
+        ['wifi', 'radios'],
+        ['network', 'status'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to update WiFi radio', { description: error.message });

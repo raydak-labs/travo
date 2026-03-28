@@ -95,8 +95,23 @@ func TestToggleWireguard(t *testing.T) {
 func TestToggleWireguard_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
 	var calls []string
+	kernelDefault := false
 	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		calls = append(calls, name+" "+strings.Join(args, " "))
+		if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" && args[1] == "show" && args[2] == "default" {
+			if kernelDefault {
+				return []byte("default via 10.0.1.1 dev phy1-sta0"), nil
+			}
+			return []byte(""), nil
+		}
+		if name == "/sbin/ubus" && len(args) >= 4 && args[0] == "-S" && args[1] == "call" && args[2] == "network.interface" && args[3] == "dump" {
+			return []byte(`{"interface":[{"interface":"wwan","up":true,"route":[{"target":"0.0.0.0","mask":0,"nexthop":"10.0.1.1"}]}]}`), nil
+		}
+		if name == "/sbin/ubus" && len(args) >= 3 && args[0] == "call" && args[1] == "network.interface.wwan" && args[2] == "renew" {
+			// After a renew + reload we assume default route comes back.
+			kernelDefault = true
+			return []byte("{}"), nil
+		}
 		return nil, nil
 	}}
 	svc := NewVpnServiceWithRunner(u, cmd)
@@ -123,11 +138,14 @@ func TestToggleWireguard_Disable(t *testing.T) {
 		t.Fatalf("expected ifdown before ubus reload, calls:\n%s", joined)
 	}
 	// Netifd-managed recovery should attempt to bring WAN back up.
-	if !strings.Contains(joined, "/sbin/ubus call network.interface.wan up") {
-		t.Fatalf("expected wan up call, calls:\n%s", joined)
+	if !strings.Contains(joined, "/sbin/ip route show default") {
+		t.Fatalf("expected default route check, calls:\n%s", joined)
 	}
-	if !strings.Contains(joined, "/sbin/ubus call network.interface.wan6 up") {
-		t.Fatalf("expected wan6 up call, calls:\n%s", joined)
+	if !strings.Contains(joined, "/sbin/ubus -S call network.interface dump") {
+		t.Fatalf("expected uplink discovery via ubus dump, calls:\n%s", joined)
+	}
+	if !strings.Contains(joined, "/sbin/ubus call network.interface.wwan renew") {
+		t.Fatalf("expected wwan renew attempt, calls:\n%s", joined)
 	}
 }
 
@@ -721,6 +739,158 @@ func TestReadResolvConfNameservers(t *testing.T) {
 	}
 }
 
+func TestEffectiveNameserversForMerge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		resolv    []string
+		dnsmasq   []string
+		wantFirst string
+		wantLen   int
+	}{
+		{
+			name:      "non_loopback_ignores_dnsmasq",
+			resolv:    []string{"8.8.8.8"},
+			dnsmasq:   []string{"10.66.0.1"},
+			wantFirst: "8.8.8.8",
+			wantLen:   1,
+		},
+		{
+			name:      "loopback_only_uses_dnsmasq",
+			resolv:    []string{"127.0.0.1"},
+			dnsmasq:   []string{"10.66.0.1", "10.66.0.2"},
+			wantFirst: "10.66.0.1",
+			wantLen:   2,
+		},
+		{
+			name:      "loopback_ipv6_only_uses_dnsmasq",
+			resolv:    []string{"::1"},
+			dnsmasq:   []string{"10.66.0.1"},
+			wantFirst: "10.66.0.1",
+			wantLen:   1,
+		},
+		{
+			name:      "empty_resolv_uses_dnsmasq",
+			resolv:    nil,
+			dnsmasq:   []string{"1.1.1.1"},
+			wantFirst: "1.1.1.1",
+			wantLen:   1,
+		},
+		{
+			name:      "strips_dnsmasq_hash_port",
+			resolv:    []string{"127.0.0.1"},
+			dnsmasq:   []string{"127.0.0.1#5353"},
+			wantFirst: "127.0.0.1",
+			wantLen:   1,
+		},
+		{
+			name:      "loopback_fallback_when_no_dnsmasq",
+			resolv:    []string{"127.0.0.1"},
+			dnsmasq:   nil,
+			wantFirst: "127.0.0.1",
+			wantLen:   1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := effectiveNameserversForMerge(tt.resolv, tt.dnsmasq)
+			if len(got) != tt.wantLen {
+				t.Fatalf("len=%d want %d: %v", len(got), tt.wantLen, got)
+			}
+			if tt.wantLen > 0 && got[0] != tt.wantFirst {
+				t.Errorf("first=%q want %q", got[0], tt.wantFirst)
+			}
+		})
+	}
+}
+
+func TestRunDNSLeakTest_OpenWrtLoopbackDnsmasqMatchesVPN(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	_ = u.Set("network", "wg0", "dns", "10.66.0.1")
+
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "uci" && len(args) >= 2 && args[0] == "get" && args[1] == "dhcp.@dnsmasq[0].server" {
+			return []byte("10.66.0.1\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected command")
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	// Simulate OpenWrt: resolv only lists local stub; upstream is dnsmasq server=.
+	old := readResolvConfNameservers
+	readResolvConfNameservers = func() []string {
+		return []string{"127.0.0.1"}
+	}
+	t.Cleanup(func() { readResolvConfNameservers = old })
+
+	result := svc.RunDNSLeakTest()
+	if !result.VPNActive {
+		t.Fatal("expected VPNActive=true")
+	}
+	if len(result.Nameservers) != 1 || result.Nameservers[0] != "10.66.0.1" {
+		t.Fatalf("expected effective nameserver 10.66.0.1, got %v", result.Nameservers)
+	}
+	if result.PotentiallyLeaking {
+		t.Fatal("expected PotentiallyLeaking=false when dnsmasq forwards to VPN DNS")
+	}
+}
+
+func TestSplitWireGuardDNSOption(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   string
+		want []string
+	}{
+		{"198.18.0.1,198.18.0.2", []string{"198.18.0.1", "198.18.0.2"}},
+		{"10.0.0.1 10.0.0.2", []string{"10.0.0.1", "10.0.0.2"}},
+		{"  1.1.1.1 , 8.8.8.8 ", []string{"1.1.1.1", "8.8.8.8"}},
+		{"", nil},
+	}
+	for _, tt := range tests {
+		got := splitWireGuardDNSOption(tt.in)
+		if len(got) != len(tt.want) {
+			t.Errorf("splitWireGuardDNSOption(%q) = %v; want %v", tt.in, got, tt.want)
+			continue
+		}
+		for i := range tt.want {
+			if got[i] != tt.want[i] {
+				t.Errorf("splitWireGuardDNSOption(%q)[%d] = %q; want %q", tt.in, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestRunDNSLeakTest_DnsmasqOnlyAdGuardWhileVPNDNSConfiguredLeaks(t *testing.T) {
+	// dnsmasq still forwards only to AdGuard while wg0 lists VPN DNS — LAN DNS is not using VPN DNS.
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	_ = u.Set("network", "wg0", "dns", "1.1.1.1")
+
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "uci" && len(args) >= 2 && args[0] == "get" && args[1] == "dhcp.@dnsmasq[0].server" {
+			return []byte("127.0.0.1#5353\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected command")
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	old := readResolvConfNameservers
+	readResolvConfNameservers = func() []string {
+		return []string{"127.0.0.1"}
+	}
+	t.Cleanup(func() { readResolvConfNameservers = old })
+
+	result := svc.RunDNSLeakTest()
+	if !result.VPNActive {
+		t.Fatal("expected VPNActive=true")
+	}
+	if !result.PotentiallyLeaking {
+		t.Fatal("expected PotentiallyLeaking=true when dnsmasq upstream is not VPN DNS")
+	}
+}
+
 func TestSetupWireGuardFirewall(t *testing.T) {
 	u := uci.NewMockUCI()
 	svc := NewVpnService(u)
@@ -787,6 +957,64 @@ func TestVerifyWireGuard(t *testing.T) {
 	}
 	// InterfaceUp / HandshakeOk / RouteOk depend on stub output (false in stub).
 	// Just ensure the function runs without panic.
+}
+
+func TestRunWireGuardSpeedTest_WireGuardDisabled(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		return nil, fmt.Errorf("unexpected command: %s", name)
+	}})
+	_, err := svc.RunWireGuardSpeedTest()
+	if err == nil {
+		t.Fatal("expected error when wireguard disabled")
+	}
+}
+
+func TestRunWireGuardSpeedTest_InterfaceNotUp(t *testing.T) {
+	u := uci.NewMockUCI()
+	if err := u.Set("network", "wg0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "/sbin/ip" && len(args) >= 4 && args[0] == "link" {
+			return []byte(""), nil
+		}
+		return nil, fmt.Errorf("unexpected")
+	}})
+	_, err := svc.RunWireGuardSpeedTest()
+	if err == nil || !strings.Contains(err.Error(), "not up") {
+		t.Fatalf("expected not up error, got %v", err)
+	}
+}
+
+func TestRunWireGuardSpeedTest_Success(t *testing.T) {
+	u := uci.NewMockUCI()
+	if err := u.Set("network", "wg0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "/sbin/ip":
+			if len(args) >= 4 && args[0] == "link" && args[1] == "show" {
+				return []byte("2: wg0: <POINTOPOINT,UP,LOWER_UP> mtu 1420"), nil
+			}
+			if len(args) >= 2 && args[0] == "-4" {
+				return []byte("wg0    inet 10.0.0.2/32 scope global wg0\n"), nil
+			}
+		case "wget":
+			return nil, nil
+		case "ping":
+			return []byte("---\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected %s %v", name, args)
+	}})
+	res, err := svc.RunWireGuardSpeedTest()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if res.DownloadMbps <= 0 {
+		t.Errorf("expected download > 0, got %v", res.DownloadMbps)
+	}
 }
 
 // stubVerifyRunner returns canned output for ip/wg commands used by VerifyWireGuard.

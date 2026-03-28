@@ -12,24 +12,38 @@ import {
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { NetworkPage } from '../network-page';
 
-function renderNetworkPage() {
+function renderNetworkPage(initialPath = '/network') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   const rootRoute = createRootRoute({ component: Outlet });
 
+  const networkConfigurationRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/network/configuration',
+    component: NetworkPage,
+  });
+  const networkAdvancedRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/network/advanced',
+    component: NetworkPage,
+  });
   const networkRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/network',
     component: NetworkPage,
   });
 
-  const routeTree = rootRoute.addChildren([networkRoute]);
+  const routeTree = rootRoute.addChildren([
+    networkConfigurationRoute,
+    networkAdvancedRoute,
+    networkRoute,
+  ]);
 
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/network'] }),
+    history: createMemoryHistory({ initialEntries: [initialPath] }),
   });
 
   return render(
@@ -56,7 +70,7 @@ describe('NetworkPage', () => {
   });
 
   it('renders LAN configuration', async () => {
-    renderNetworkPage();
+    renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
       expect(screen.getByText('LAN Configuration')).toBeInTheDocument();
@@ -75,7 +89,6 @@ describe('NetworkPage', () => {
     });
 
     await waitFor(() => {
-      // Clients with aliases show the alias as primary name
       expect(screen.getByText("John's Laptop")).toBeInTheDocument();
       expect(screen.getByText('iPhone-15')).toBeInTheDocument();
       expect(screen.getByText('Living Room iPad')).toBeInTheDocument();
@@ -100,7 +113,7 @@ describe('NetworkPage', () => {
   });
 
   it('renders auto-detect WAN type button', async () => {
-    renderNetworkPage();
+    renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
       expect(screen.getByText('Auto-detect WAN Type')).toBeInTheDocument();

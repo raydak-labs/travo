@@ -161,6 +161,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/vpn/tailscale/ssh", GetTailscaleSSHHandler(deps.Vpn))
 	v1.Put("/vpn/tailscale/ssh", SetTailscaleSSHHandler(deps.Vpn))
 	v1.Get("/vpn/dns-leak-test", DNSLeakTestHandler(deps.Vpn))
+	v1.Post("/vpn/speed-test", RunWireGuardSpeedTestHandler(deps.Vpn))
 	v1.Get("/vpn/wireguard/verify", VerifyWireguardHandler(deps.Vpn))
 	v1.Get("/vpn/split-tunnel", GetSplitTunnelHandler(deps.Vpn))
 	v1.Put("/vpn/split-tunnel", SetSplitTunnelHandler(deps.Vpn))

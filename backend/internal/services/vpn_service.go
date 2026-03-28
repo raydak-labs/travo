@@ -95,6 +95,8 @@ type VpnService struct {
 	profilesPath string // Path to wireguard_profiles.json
 }
 
+const vpnDnsSnapshotPath = "/etc/openwrt-travel-gui/vpn-dns-snapshot.json"
+
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
 	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/openwrt-travel-gui/wireguard_profiles.json"}
@@ -245,6 +247,127 @@ func (v *VpnService) applyAndVerifyWireGuard() error {
 		_, _ = v.cmd.Run(openwrtIfupBin, "wg0")
 	}
 	return v.waitForWireGuardRuntime(wireGuardVerifyTimeout)
+}
+
+func (v *VpnService) hasKernelDefaultRoute() bool {
+	out, err := v.cmd.Run(openwrtIPBin, "route", "show", "default")
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) != ""
+}
+
+func (v *VpnService) waitForKernelDefaultRoute(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if v.hasKernelDefaultRoute() {
+			return true
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return v.hasKernelDefaultRoute()
+}
+
+func (v *VpnService) uplinksFromUbusDump() []string {
+	out, err := v.cmd.Run(openwrtUbusBin, "-S", "call", "network.interface", "dump")
+	if err != nil || len(out) == 0 {
+		return nil
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil
+	}
+
+	ifaces, ok := raw["interface"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var res []string
+	for _, v := range ifaces {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := m["interface"].(string)
+		if name == "" || name == "wg0" || name == "lan" || name == "loopback" {
+			continue
+		}
+		up, _ := m["up"].(bool)
+		if !up {
+			continue
+		}
+		routes, ok := m["route"].([]interface{})
+		if !ok {
+			continue
+		}
+		hasDefault := false
+		for _, r := range routes {
+			rm, ok := r.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			target, _ := rm["target"].(string)
+			maskF, _ := rm["mask"].(float64) // JSON numbers decode as float64
+			if target == "0.0.0.0" && int(maskF) == 0 {
+				hasDefault = true
+				break
+			}
+		}
+		if hasDefault {
+			res = append(res, name)
+		}
+	}
+	return res
+}
+
+func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
+	// If the kernel already has a default route, don't touch uplinks.
+	if v.hasKernelDefaultRoute() {
+		return
+	}
+
+	// Prefer the interface(s) netifd reports as up with a default route. This is
+	// the best signal for the “active uplink” across WAN/WWAN/USB tether modes.
+	uplinks := v.uplinksFromUbusDump()
+	if len(uplinks) == 0 {
+		// Conservative fallback for common travel-router modes.
+		uplinks = []string{"wwan", "wan"}
+	}
+
+	// Phase 1: try DHCP renew + reload (least disruptive).
+	for _, ifname := range uplinks {
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname, "renew")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "renew")
+	}
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	// Allow netifd time to re-install routes.
+	if v.waitForKernelDefaultRoute(2 * time.Second) {
+		return
+	}
+
+	// Phase 2: force a down/up cycle + reload (more disruptive, but restores routes
+	// when netifd believes interface is already up while kernel route state is broken).
+	for _, ifname := range uplinks {
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname, "down")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname, "up")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "down")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface."+ifname+"6", "up")
+	}
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	if v.waitForKernelDefaultRoute(5 * time.Second) {
+		return
+	}
+
+	// Phase 3: netifd helper scripts (ifup/ifdown) as last resort. On some systems
+	// this re-triggers proto handlers more reliably than ubus down/up alone.
+	for _, ifname := range uplinks {
+		_, _ = v.cmd.Run(openwrtIfdownBin, ifname)
+		_, _ = v.cmd.Run(openwrtIfupBin, ifname)
+	}
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	_ = v.waitForKernelDefaultRoute(8 * time.Second)
 }
 
 func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
@@ -479,6 +602,7 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		return err
 	}
 	if enable {
+		_ = v.enableVpnDNSForwarding()
 		if err := v.applyAndVerifyWireGuard(); err != nil {
 			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 		}
@@ -486,14 +610,144 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		// Bring down the interface and clean up firewall plumbing when disabling.
 		_ = v.SetKillSwitch(false)
 		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
-		// Netifd-managed recovery: bring WAN back up (best-effort) then reload network so
-		// routes/DNS are recomputed without the wg0 interface.
-		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan", "up")
-		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan6", "up")
+		_ = v.disableVpnDNSForwarding()
+		// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
+		// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
+		// route even though the uplink interface still shows “up”. We recover by
+		// restoring the uplink default route (renew first, then down/up if needed).
 		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
+		v.restoreDefaultRouteAfterWireGuardDisable()
+		// Rock-solid semantics: do not report success if the device has no default route.
+		if !v.hasKernelDefaultRoute() {
+			return fmt.Errorf("WireGuard disabled but no default route was restored; internet may be down")
+		}
 		_ = v.teardownWireGuardFirewall()
 	}
+	return nil
+}
+
+type vpnDnsSnapshot struct {
+	NoResolv string   `json:"noresolv"`
+	Servers  []string `json:"servers"`
+}
+
+func (v *VpnService) readDnsmasqServers() []string {
+	out, err := v.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")
+	if err != nil {
+		return nil
+	}
+	s := strings.TrimSpace(string(out))
+	if s == "" {
+		return nil
+	}
+	// `uci get` returns a space-separated list for list options.
+	return strings.Fields(s)
+}
+
+func (v *VpnService) readDnsmasqNoResolv() string {
+	out, err := v.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].noresolv")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func (v *VpnService) writeVpnDnsSnapshot(snap vpnDnsSnapshot) error {
+	if err := os.MkdirAll(filepath.Dir(vpnDnsSnapshotPath), 0o755); err != nil {
+		return err
+	}
+	data, err := json.Marshal(snap)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(vpnDnsSnapshotPath, data, 0o600)
+}
+
+func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
+	data, err := os.ReadFile(vpnDnsSnapshotPath)
+	if err != nil {
+		return nil, err
+	}
+	var snap vpnDnsSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		return nil, err
+	}
+	return &snap, nil
+}
+
+// splitWireGuardDNSOption splits UCI network.wg0.dns. OpenWrt normally uses
+// space-separated values; some imports (or hand-edited UCI) use commas.
+func splitWireGuardDNSOption(dns string) []string {
+	dns = strings.TrimSpace(dns)
+	if dns == "" {
+		return nil
+	}
+	dns = strings.ReplaceAll(dns, ",", " ")
+	var out []string
+	for _, s := range strings.Fields(dns) {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (v *VpnService) wgConfiguredDNSServers() []string {
+	dns, err := v.uci.Get("network", "wg0", "dns")
+	if err != nil {
+		return nil
+	}
+	return splitWireGuardDNSOption(dns)
+}
+
+func (v *VpnService) enableVpnDNSForwarding() error {
+	vpnDNS := v.wgConfiguredDNSServers()
+	if len(vpnDNS) == 0 {
+		return nil
+	}
+
+	currentServers := v.readDnsmasqServers()
+	// Snapshot current dnsmasq (including AdGuard 127.0.0.1#5353) so we can restore
+	// on WireGuard disable. LAN DNS must forward to VPN DNS while the tunnel is up,
+	// otherwise queries would still go to AdGuard only.
+	_ = v.writeVpnDnsSnapshot(vpnDnsSnapshot{
+		NoResolv: v.readDnsmasqNoResolv(),
+		Servers:  currentServers,
+	})
+
+	// Apply: forward to VPN DNS only.
+	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, s := range vpnDNS {
+		_, _ = v.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
+	}
+	_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=1")
+	_, _ = v.cmd.Run("uci", "commit", "dhcp")
+	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	return nil
+}
+
+func (v *VpnService) disableVpnDNSForwarding() error {
+	snap, err := v.loadVpnDnsSnapshot()
+	if err != nil {
+		// Nothing to restore.
+		return nil
+	}
+
+	// Restore previous servers/noresolv.
+	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, s := range snap.Servers {
+		_, _ = v.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
+	}
+	if snap.NoResolv != "" {
+		_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv="+snap.NoResolv)
+	} else {
+		_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=0")
+	}
+	_, _ = v.cmd.Run("uci", "commit", "dhcp")
+	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	_ = os.Remove(vpnDnsSnapshotPath)
 	return nil
 }
 
@@ -734,7 +988,17 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 }
 
 // SetTailscaleExitNode sets or clears the Tailscale exit node.
+// When a non-empty exit node is set, WireGuard is turned off first so only one
+// full-tunnel-style path is active (see requirements: single active VPN policy).
 func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
+	nodeIP = strings.TrimSpace(nodeIP)
+	if nodeIP != "" {
+		if opts, err := v.uci.GetAll("network", "wg0"); err == nil && opts["disabled"] != "1" {
+			if err := v.ToggleWireguard(false); err != nil {
+				return fmt.Errorf("disable WireGuard before using a Tailscale exit node: %w", err)
+			}
+		}
+	}
 	if nodeIP == "" {
 		_, err := v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 		return err
@@ -955,13 +1219,96 @@ func (v *VpnService) ActivateProfile(id string) error {
 	return v.saveProfiles(profiles)
 }
 
-// RunDNSLeakTest checks whether the system's active DNS servers match the VPN
-// configuration. A mismatch when the VPN is active suggests a DNS leak.
+const wireGuardSpeedTestURL = "http://speedtest.tele2.net/1MB.zip"
+
+// wireGuardIPv4Address returns the first IPv4 address assigned to wg0 (from `ip -4 -o addr show`).
+func (v *VpnService) wireGuardIPv4Address() (string, error) {
+	out, err := v.cmd.Run(openwrtIPBin, "-4", "-o", "addr", "show", "dev", "wg0")
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		for i := 0; i < len(fields); i++ {
+			if fields[i] == "inet" && i+1 < len(fields) {
+				addr := fields[i+1]
+				if j := strings.Index(addr, "/"); j > 0 {
+					return addr[:j], nil
+				}
+				return addr, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no inet address on wg0")
+}
+
+// RunWireGuardSpeedTest measures download throughput and ping latency with traffic bound to the
+// WireGuard interface (wget --bind-address, ping -I wg0). Requires wg0 enabled and up with an IPv4.
+func (v *VpnService) RunWireGuardSpeedTest() (models.SpeedTestResult, error) {
+	result := models.SpeedTestResult{Server: "tele2.net via WireGuard (wget --bind-address)"}
+
+	opts, err := v.uci.GetAll("network", "wg0")
+	if err != nil {
+		return result, fmt.Errorf("wireguard is not configured")
+	}
+	if opts["disabled"] == "1" {
+		return result, fmt.Errorf("wireguard is disabled — enable the tunnel before running a VPN speed test")
+	}
+
+	linkOut, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0")
+	if err != nil || !wireGuardIfaceLooksUp(string(linkOut)) {
+		return result, fmt.Errorf("wireguard interface wg0 is not up")
+	}
+
+	bindIP, err := v.wireGuardIPv4Address()
+	if err != nil {
+		return result, fmt.Errorf("could not read IPv4 on wg0: %w", err)
+	}
+	if bindIP == "" {
+		return result, fmt.Errorf("no IPv4 address on wg0")
+	}
+
+	start := time.Now()
+	_, werr := v.cmd.Run("wget", "-O", "/dev/null", "--timeout=15",
+		"--no-check-certificate", "--bind-address="+bindIP,
+		wireGuardSpeedTestURL)
+	elapsed := time.Since(start).Seconds()
+	if werr == nil && elapsed > 0 {
+		result.DownloadMbps = (1024 * 1024 * 8) / elapsed / 1e6
+	}
+
+	pingOut, perr := v.cmd.Run("ping", "-I", "wg0", "-c", "4", "-W", "3", "8.8.8.8")
+	if perr == nil {
+		for _, line := range strings.Split(string(pingOut), "\n") {
+			if strings.Contains(line, "avg") {
+				parts := strings.Split(line, "/")
+				if len(parts) >= 5 {
+					if ms, err2 := strconv.ParseFloat(strings.TrimSpace(parts[4]), 64); err2 == nil {
+						result.PingMs = ms
+					}
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// RunDNSLeakTest checks whether the router's effective DNS upstream (what dnsmasq
+// uses for LAN clients) matches the VPN-configured DNS when WireGuard is active.
+// On OpenWrt, /etc/resolv.conf usually lists only 127.0.0.1 (local dnsmasq) while
+// actual upstreams are in dhcp.@dnsmasq[0].server — we merge those so the test is
+// not a false positive when VPN DNS forwarding is applied.
 func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 	result := models.DNSLeakResult{}
 
-	// 1. Read /etc/resolv.conf for current system nameservers.
-	result.Nameservers = readResolvConfNameservers()
+	// 1. Effective upstream nameservers (resolv.conf + dnsmasq when resolv is loopback-only).
+	dnsmasqServers := v.readDnsmasqServers()
+	result.Nameservers = effectiveNameserversForMerge(readResolvConfNameservers(), dnsmasqServers)
 
 	// 2. Check VPN status.
 	if opts, err := v.uci.GetAll("network", "wg0"); err == nil {
@@ -970,15 +1317,11 @@ func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 
 	// 3. Read VPN DNS servers from WireGuard UCI config.
 	if dns, err := v.uci.Get("network", "wg0", "dns"); err == nil && dns != "" {
-		for _, s := range strings.Split(dns, " ") {
-			s = strings.TrimSpace(s)
-			if s != "" {
-				result.VPNDNSServers = append(result.VPNDNSServers, s)
-			}
-		}
+		result.VPNDNSServers = splitWireGuardDNSOption(dns)
 	}
 
-	// 4. Check for potential leak: VPN active but DNS not routed through VPN.
+	// 4. Check for potential leak: VPN active but effective dnsmasq upstreams do not
+	// include WireGuard DNS (e.g. still forwarding only to AdGuard).
 	if result.VPNActive && len(result.VPNDNSServers) > 0 {
 		vpnDNSSet := make(map[string]bool, len(result.VPNDNSServers))
 		for _, s := range result.VPNDNSServers {
@@ -997,8 +1340,57 @@ func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 	return result
 }
 
+func isLoopbackNameserver(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	return s == "127.0.0.1" || s == "::1" || s == "0:0:0:0:0:0:0:1"
+}
+
+// dnsmasqServerAddrToIP strips the #port suffix used by dnsmasq (e.g. 127.0.0.1#5353).
+func dnsmasqServerAddrToIP(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, "#"); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
+}
+
+// effectiveNameserversForMerge returns upstream DNS nameservers used for leak checks.
+// When resolv.conf only lists the local dnsmasq stub (127.0.0.1 / ::1), upstream
+// IPs come from dnsmasq server= list instead.
+func effectiveNameserversForMerge(resolv []string, dnsmasqServers []string) []string {
+	allLoopback := len(resolv) > 0
+	for _, ns := range resolv {
+		if !isLoopbackNameserver(ns) {
+			allLoopback = false
+			break
+		}
+	}
+	if len(resolv) == 0 {
+		allLoopback = true
+	}
+	if !allLoopback {
+		return resolv
+	}
+
+	var out []string
+	for _, s := range dnsmasqServers {
+		ip := dnsmasqServerAddrToIP(s)
+		if ip != "" {
+			out = append(out, ip)
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+	return resolv
+}
+
 // readResolvConfNameservers parses nameserver lines from /etc/resolv.conf.
-func readResolvConfNameservers() []string {
+// Overridable in tests (OpenWrt stub resolver vs dnsmasq upstream merge).
+var readResolvConfNameservers = func() []string {
 	return readResolvConfNameserversFromPath("/etc/resolv.conf")
 }
 

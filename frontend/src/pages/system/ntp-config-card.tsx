@@ -1,11 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNTPConfig, useSetNTPConfig, useSyncNTP } from '@/hooks/use-system';
+import {
+  ntpConfigFormSchema,
+  ntpServerDraftSchema,
+  type NtpConfigFormValues,
+  type NtpServerDraftFormValues,
+} from '@/lib/schemas/system-forms';
+import { NtpConfigSummaryView } from './ntp-config-summary-view';
+import { NtpConfigEditForm } from './ntp-config-edit-form';
 
 export function NTPConfigCard() {
   const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
@@ -13,24 +20,80 @@ export function NTPConfigCard() {
   const syncNTPMutation = useSyncNTP();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [ntpEnabled, setNtpEnabled] = useState(true);
-  const [ntpServers, setNtpServers] = useState<string[]>([]);
-  const [ntpNewServer, setNtpNewServer] = useState('');
+
+  const addServerForm = useForm<NtpServerDraftFormValues>({
+    resolver: zodResolver(ntpServerDraftSchema),
+    defaultValues: { server: '' },
+    mode: 'onChange',
+  });
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<NtpConfigFormValues>({
+    resolver: zodResolver(ntpConfigFormSchema),
+    defaultValues: { enabled: true, servers: [] },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'servers',
+  });
+
+  const ntpEnabled = watch('enabled');
+  const serverFields = watch('servers');
+
+  const serversSummary = useMemo(() => {
+    const trimmed = serverFields.map((s) => s.value.trim()).filter(Boolean);
+    return trimmed.length > 0 ? trimmed.join(', ') : '—';
+  }, [serverFields]);
 
   useEffect(() => {
-    if (ntpConfig) {
-      setNtpEnabled(ntpConfig.enabled);
-      setNtpServers([...ntpConfig.servers]);
+    if (ntpConfig && !isEditing) {
+      reset({
+        enabled: ntpConfig.enabled,
+        servers: ntpConfig.servers.map((s) => ({ value: s })),
+      });
     }
-  }, [ntpConfig]);
+  }, [ntpConfig, isEditing, reset]);
+
+  const openEdit = () => {
+    if (ntpConfig) {
+      reset({
+        enabled: ntpConfig.enabled,
+        servers:
+          ntpConfig.servers.length > 0 ? ntpConfig.servers.map((s) => ({ value: s })) : [],
+      });
+    }
+    setIsEditing(true);
+  };
 
   const handleCancel = () => {
     if (ntpConfig) {
-      setNtpEnabled(ntpConfig.enabled);
-      setNtpServers([...ntpConfig.servers]);
+      reset({
+        enabled: ntpConfig.enabled,
+        servers: ntpConfig.servers.map((s) => ({ value: s })),
+      });
     }
-    setNtpNewServer('');
+    addServerForm.reset({ server: '' });
     setIsEditing(false);
+  };
+
+  const onSave = (data: NtpConfigFormValues) => {
+    const servers = data.servers.map((s) => s.value.trim()).filter(Boolean);
+    setNTPMutation.mutate(
+      { enabled: data.enabled, servers },
+      {
+        onSuccess: () => {
+          setIsEditing(false);
+          addServerForm.reset({ server: '' });
+        },
+      },
+    );
   };
 
   return (
@@ -45,152 +108,29 @@ export function NTPConfigCard() {
         ) : (
           <div className="space-y-4">
             {!isEditing ? (
-              <div className="space-y-3">
-                <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">NTP</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {ntpEnabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-
-                  <div className="mt-2">
-                    <div className="text-xs text-gray-500">Servers</div>
-                    <div className="mt-1 font-mono text-sm text-gray-900 dark:text-white">
-                      {ntpServers.length > 0 ? ntpServers.join(', ') : '—'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncNTPMutation.mutate()}
-                    disabled={syncNTPMutation.isPending}
-                    title="Force a one-shot NTP sync with pool.ntp.org"
-                  >
-                    {syncNTPMutation.isPending ? 'Syncing…' : 'Sync Now'}
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                    disabled={setNTPMutation.isPending}
-                    title="Edit NTP enablement and server list"
-                  >
-                    Edit NTP Settings
-                  </Button>
-                </div>
-              </div>
+              <NtpConfigSummaryView
+                ntpEnabled={ntpEnabled}
+                serversSummary={serversSummary}
+                onSync={() => syncNTPMutation.mutate()}
+                onEdit={openEdit}
+                syncPending={syncNTPMutation.isPending}
+                editDisabled={setNTPMutation.isPending}
+              />
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="ntp-enabled" className="text-sm text-gray-700 dark:text-gray-300">
-                    Enable NTP time synchronization
-                  </label>
-                  <Switch
-                    id="ntp-enabled"
-                    label="Enable NTP"
-                    checked={ntpEnabled}
-                    onChange={(e) => setNtpEnabled(e.target.checked)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs text-gray-500">NTP Servers</label>
-                  {ntpServers.map((server, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Input
-                        className="h-8 text-sm"
-                        value={server}
-                        onChange={(e) => {
-                          const updated = [...ntpServers];
-                          updated[idx] = e.target.value;
-                          setNtpServers(updated);
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 px-2 text-red-500 hover:text-red-700"
-                        onClick={() => setNtpServers(ntpServers.filter((_, i) => i !== idx))}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-
-                  <div className="flex items-center gap-2">
-                    <Input
-                      className="h-8 text-sm"
-                      placeholder="Add NTP server address"
-                      value={ntpNewServer}
-                      onChange={(e) => setNtpNewServer(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && ntpNewServer.trim()) {
-                          e.preventDefault();
-                          setNtpServers([...ntpServers, ntpNewServer.trim()]);
-                          setNtpNewServer('');
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8"
-                      disabled={!ntpNewServer.trim()}
-                      onClick={() => {
-                        setNtpServers([...ntpServers, ntpNewServer.trim()]);
-                        setNtpNewServer('');
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    onClick={() =>
-                      setNTPMutation.mutate(
-                        { enabled: ntpEnabled, servers: ntpServers },
-                        {
-                          onSuccess: () => {
-                            setIsEditing(false);
-                            setNtpNewServer('');
-                          },
-                        },
-                      )
-                    }
-                    disabled={setNTPMutation.isPending}
-                    size="sm"
-                  >
-                    {setNTPMutation.isPending ? 'Saving…' : 'Save NTP Settings'}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncNTPMutation.mutate()}
-                    disabled={syncNTPMutation.isPending}
-                    title="Force a one-shot NTP sync with pool.ntp.org"
-                  >
-                    {syncNTPMutation.isPending ? 'Syncing…' : 'Sync Now'}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCancel}
-                    disabled={setNTPMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+              <NtpConfigEditForm
+                register={register}
+                handleSubmit={handleSubmit}
+                errors={errors}
+                fields={fields}
+                append={append}
+                remove={remove}
+                addServerForm={addServerForm}
+                onSave={onSave}
+                onCancel={handleCancel}
+                onSync={() => syncNTPMutation.mutate()}
+                savePending={setNTPMutation.isPending}
+                syncPending={syncNTPMutation.isPending}
+              />
             )}
           </div>
         )}

@@ -1,23 +1,54 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { KeyRound } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useChangePassword } from '@/hooks/use-system';
+import {
+  changeAdminPasswordSchema,
+  type ChangeAdminPasswordFormValues,
+} from '@/lib/schemas/system-forms';
+import { ChangePasswordCardSummary } from '@/pages/system/change-password-card-summary';
+import { ChangePasswordEditFields } from '@/pages/system/change-password-edit-fields';
 
 export function ChangePasswordCard() {
   const changePasswordMutation = useChangePassword();
   const [isEditing, setIsEditing] = useState(false);
 
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangeAdminPasswordFormValues>({
+    resolver: zodResolver(changeAdminPasswordSchema),
+    defaultValues: {
+      current_password: '',
+      new_password: '',
+      confirm_password: '',
+    },
+    mode: 'onChange',
+  });
 
   const resetAndClose = () => {
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    reset({
+      current_password: '',
+      new_password: '',
+      confirm_password: '',
+    });
     setIsEditing(false);
+  };
+
+  const onSubmit = (data: ChangeAdminPasswordFormValues) => {
+    changePasswordMutation.mutate(
+      { current_password: data.current_password, new_password: data.new_password },
+      {
+        onSuccess: () => {
+          resetAndClose();
+        },
+      },
+    );
   };
 
   return (
@@ -29,71 +60,24 @@ export function ChangePasswordCard() {
 
       <CardContent>
         {!isEditing ? (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Update the admin password used to log in to the router GUI.
-            </p>
-            <div>
-              <Button size="sm" onClick={() => setIsEditing(true)}>
-                Edit Password
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (newPassword !== confirmPassword) return;
-              changePasswordMutation.mutate(
-                { current_password: currentPassword, new_password: newPassword },
-                {
-                  onSuccess: () => {
-                    resetAndClose();
-                  },
-                },
-              );
+          <ChangePasswordCardSummary
+            onEdit={() => {
+              reset({
+                current_password: '',
+                new_password: '',
+                confirm_password: '',
+              });
+              setIsEditing(true);
             }}
-          >
-            <Input
-              type="password"
-              placeholder="Current password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="New password (min 6 characters)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-
-            {newPassword && confirmPassword && newPassword !== confirmPassword && (
-              <p className="text-sm text-red-500">Passwords do not match</p>
-            )}
-
-            <div className="flex gap-2 flex-wrap items-center">
+          />
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
+            <ChangePasswordEditFields register={register} errors={errors} />
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="submit"
                 size="sm"
-                disabled={
-                  changePasswordMutation.isPending ||
-                  !currentPassword ||
-                  !newPassword ||
-                  newPassword !== confirmPassword ||
-                  newPassword.length < 6
-                }
+                disabled={changePasswordMutation.isPending || isSubmitting}
               >
                 {changePasswordMutation.isPending ? 'Changing…' : 'Change Password'}
               </Button>

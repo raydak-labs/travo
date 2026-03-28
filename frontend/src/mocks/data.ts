@@ -621,6 +621,7 @@ export const mockDDNSConfig: DDNSConfig = {
   username: '',
   password: '',
   lookup_host: '',
+  update_url: '',
 };
 
 export const mockDDNSStatus: DDNSStatus = {

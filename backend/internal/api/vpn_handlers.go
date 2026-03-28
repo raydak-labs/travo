@@ -67,12 +67,19 @@ func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
 func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			Enable bool `json:"enable"`
+			Enabled *bool `json:"enabled"`
+			Enable  *bool `json:"enable"` // backward-compat for older clients
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.ToggleWireguard(body.Enable); err != nil {
+		enabled := false
+		if body.Enabled != nil {
+			enabled = *body.Enabled
+		} else if body.Enable != nil {
+			enabled = *body.Enable
+		}
+		if err := svc.ToggleWireguard(enabled); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -94,12 +101,19 @@ func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
 func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			Enable bool `json:"enable"`
+			Enabled *bool `json:"enabled"`
+			Enable  *bool `json:"enable"` // backward-compat for older clients
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.ToggleTailscale(body.Enable); err != nil {
+		enabled := false
+		if body.Enabled != nil {
+			enabled = *body.Enabled
+		} else if body.Enable != nil {
+			enabled = *body.Enable
+		}
+		if err := svc.ToggleTailscale(enabled); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -126,12 +140,17 @@ func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
 func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			NodeIP string `json:"node_ip"`
+			NodeIP   string `json:"node_ip"`
+			ExitNode string `json:"exit_node"` // legacy / alternate key from older clients
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.SetTailscaleExitNode(body.NodeIP); err != nil {
+		ip := body.NodeIP
+		if ip == "" {
+			ip = body.ExitNode
+		}
+		if err := svc.SetTailscaleExitNode(ip); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
@@ -262,6 +281,18 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		result := svc.RunDNSLeakTest()
+		return c.JSON(result)
+	}
+}
+
+// RunWireGuardSpeedTestHandler handles POST /api/v1/vpn/speed-test.
+func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result, err := svc.RunWireGuardSpeedTest()
+		if err != nil {
+			// All current errors are preconditions (tunnel not usable for the test).
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
 		return c.JSON(result)
 	}
 }

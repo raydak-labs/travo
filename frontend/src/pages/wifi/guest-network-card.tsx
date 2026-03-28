@@ -1,47 +1,63 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { ShieldCheck } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useGuestWifi, useSetGuestWifi } from '@/hooks/use-wifi';
 import type { GuestWifiConfig } from '@shared/index';
-
-interface GuestFormState {
-  enabled: boolean;
-  ssid: string;
-  encryption: string;
-  key: string;
-}
+import { guestWifiFormSchema, type GuestWifiFormValues } from '@/lib/schemas/wifi-forms';
+import { normalizeGuestEncryption } from './guest-wifi-encryption';
+import { GuestWifiEnabledFields } from './guest-wifi-enabled-fields';
 
 export function GuestNetworkCard() {
   const { data: guestWifi, isLoading: guestLoading } = useGuestWifi();
   const setGuestWifi = useSetGuestWifi();
-  const [guestState, setGuestState] = useState<GuestFormState>({
-    enabled: false,
-    ssid: '',
-    encryption: 'psk2',
-    key: '',
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<GuestWifiFormValues>({
+    resolver: zodResolver(guestWifiFormSchema),
+    defaultValues: {
+      enabled: false,
+      ssid: '',
+      encryption: 'psk2',
+      key: '',
+    },
+    mode: 'onChange',
   });
+
+  const enabled = watch('enabled');
+  const encryption = watch('encryption');
 
   useEffect(() => {
     if (guestWifi) {
-      setGuestState({
+      reset({
         enabled: guestWifi.enabled,
         ssid: guestWifi.ssid,
-        encryption: guestWifi.encryption || 'psk2',
+        encryption: normalizeGuestEncryption(guestWifi.encryption),
         key: guestWifi.key,
       });
     }
-  }, [guestWifi]);
+  }, [guestWifi, reset]);
+
+  const onSave = (data: GuestWifiFormValues) => {
+    const payload: GuestWifiConfig = {
+      enabled: data.enabled,
+      ssid: data.enabled ? data.ssid.trim() : data.ssid,
+      encryption: data.encryption,
+      key: data.encryption === 'none' ? '' : data.key,
+    };
+    setGuestWifi.mutate(payload);
+  };
 
   return (
     <Card>
@@ -56,7 +72,7 @@ export function GuestNetworkCard() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -66,88 +82,21 @@ export function GuestNetworkCard() {
                   Separate network (192.168.2.0/24) with client isolation
                 </p>
               </div>
-              <Switch
-                id="guest-enabled"
-                label="Enabled"
-                checked={guestState.enabled}
-                onChange={(e) => setGuestState((prev) => ({ ...prev, enabled: e.target.checked }))}
-              />
+              <Switch id="guest-enabled" label="Enabled" {...register('enabled')} />
             </div>
-            {guestState.enabled && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="guest-ssid"
-                    className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                  >
-                    SSID
-                  </label>
-                  <Input
-                    id="guest-ssid"
-                    value={guestState.ssid}
-                    onChange={(e) => setGuestState((prev) => ({ ...prev, ssid: e.target.value }))}
-                    placeholder="Guest network name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="guest-encryption"
-                    className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                  >
-                    Encryption
-                  </label>
-                  <Select
-                    value={guestState.encryption}
-                    onValueChange={(val) =>
-                      setGuestState((prev) => ({
-                        ...prev,
-                        encryption: val,
-                        key: val === 'none' ? '' : prev.key,
-                      }))
-                    }
-                  >
-                    <SelectTrigger id="guest-encryption">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None (Open)</SelectItem>
-                      <SelectItem value="psk2">WPA2-PSK</SelectItem>
-                      <SelectItem value="sae">WPA3-SAE</SelectItem>
-                      <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {guestState.encryption !== 'none' && (
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="guest-key"
-                      className="text-xs font-medium text-gray-600 dark:text-gray-400"
-                    >
-                      Password
-                    </label>
-                    <Input
-                      id="guest-key"
-                      type="password"
-                      value={guestState.key}
-                      onChange={(e) => setGuestState((prev) => ({ ...prev, key: e.target.value }))}
-                      placeholder="Minimum 8 characters"
-                    />
-                  </div>
-                )}
-                <p className="text-xs text-gray-500">
-                  Client isolation is enabled — guests cannot see each other. Internet access only,
-                  no LAN access.
-                </p>
-              </div>
+            {enabled && (
+              <GuestWifiEnabledFields
+                register={register}
+                control={control}
+                errors={errors}
+                encryption={encryption}
+                setValue={setValue}
+              />
             )}
-            <Button
-              size="sm"
-              disabled={setGuestWifi.isPending}
-              onClick={() => setGuestWifi.mutate(guestState as GuestWifiConfig)}
-            >
+            <Button type="submit" size="sm" disabled={setGuestWifi.isPending}>
               {setGuestWifi.isPending ? 'Saving...' : 'Save'}
             </Button>
-          </div>
+          </form>
         )}
       </CardContent>
     </Card>

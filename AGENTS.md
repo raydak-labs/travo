@@ -8,8 +8,9 @@
 
 The plan directory is `plans/`. Do NOT modify plan files.
 
-The important file for the requirements is in `docs/requirements/requirements.md`.
-When we implement things ensure that you update the feature sets or add features to the document.
+The important file for **outstanding** requirements is `docs/requirements/requirements.md`.  
+Completed / historical checklists live in `docs/requirements/requirements_done.md`.  
+When we implement things, update the feature sets (mark items in the archive when done, trim or extend `requirements.md` as needed).
 
 ## Project Structure
 
