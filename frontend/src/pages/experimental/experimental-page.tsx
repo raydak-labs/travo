@@ -2,20 +2,10 @@ import { Cable, Wifi, Smartphone, Signal, Shield, Monitor, Router, CheckCircle2,
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNetworkStatus, useIPv6Status } from '@/hooks/use-network';
-import { useVpnStatus } from '@/hooks/use-vpn';
-import { useWifiConnection } from '@/hooks/use-wifi';
-import { useSystemInfo } from '@/hooks/use-system';
-import { useUSBTetherStatus } from '@/hooks/use-usb-tether';
+import { useTopologyData } from '@/hooks/use-topology-data';
+import type { SourceDef } from '@/hooks/use-topology-data';
 
 // ─── Topology diagram ────────────────────────────────────────────────────────
-
-interface SourceDef {
-  label: string;
-  icon: typeof Cable;
-  connected: boolean;
-  detail?: string;
-}
 
 interface ClientDef {
   label: string;
@@ -272,74 +262,24 @@ function SourceCard({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function ExperimentalPage() {
-  const { data: network, isLoading: networkLoading } = useNetworkStatus();
-  const { data: wifiConn, isLoading: wifiLoading } = useWifiConnection();
-  const { data: vpnStatus } = useVpnStatus();
-  const { data: sysInfo, isLoading: sysLoading } = useSystemInfo();
-  const { data: ipv6Status } = useIPv6Status();
-  const { data: usbTether } = useUSBTetherStatus();
-
-  const loading = networkLoading || wifiLoading || sysLoading;
-
-  // Connection states
-  // wan.type tells us the actual upstream medium (wan=ethernet, wifi, usb)
-  const wan = network?.wan;
-  const ethernetUp = (wan?.is_up && wan.type !== 'wifi' && wan.type !== 'usb') ?? false;
-  const repeaterUp =
-    (wan?.is_up && wan.type === 'wifi') ||
-    ((wifiConn?.connected && wifiConn.mode === 'client') ?? false);
-  const tetherUp = (wan?.is_up && wan.type === 'usb') || (usbTether?.is_up ?? false);
-  const vpnActive = vpnStatus?.some((v) => v.connected) ?? false;
-  const ipv6Enabled = ipv6Status?.enabled ?? false;
-  const internetUp = network?.internet_reachable ?? false;
-
-  // Client breakdown by interface type
-  const allClients = network?.clients ?? [];
-  const wlanClients = allClients.filter(
-    (c) =>
-      c.interface_name.startsWith('wlan') ||
-      c.interface_name.startsWith('ath') ||
-      c.interface_name.includes('wifi'),
-  ).length;
-  const lanClients = allClients.length - wlanClients;
-
-  const sources: SourceDef[] = [
-    {
-      label: 'Ethernet',
-      icon: Cable,
-      connected: ethernetUp,
-      detail: ethernetUp ? wan?.ip_address : undefined,
-    },
-    {
-      label: 'Repeater (WiFi)',
-      icon: Wifi,
-      connected: repeaterUp,
-      detail: repeaterUp ? (wifiConn?.ssid ?? wan?.ip_address) : 'Disabled',
-    },
-    {
-      label: 'USB Tethering',
-      icon: Smartphone,
-      connected: tetherUp,
-      detail: tetherUp ? (usbTether?.device_type || wan?.ip_address || 'Connected') : 'No device',
-    },
-    {
-      label: 'Cellular',
-      icon: Signal,
-      connected: false,
-      detail: 'No modem',
-    },
-  ];
-
-  const clients: ClientDef[] = [
-    { label: 'WLAN Clients', icon: Wifi, count: wlanClients },
-    { label: 'LAN Clients', icon: Cable, count: lanClients },
-  ];
-
-  const features = [
-    { label: 'IPv6', active: ipv6Enabled },
-    { label: 'VPN', active: vpnActive },
-    { label: 'Internet', active: internetUp },
-  ];
+  const {
+    sources,
+    clients,
+    features,
+    router,
+    loading,
+    ethernetUp,
+    repeaterUp,
+    tetherUp,
+    wan,
+    wifiConn,
+    usbTether,
+    sysInfo,
+    vpnActive,
+    ipv6Enabled,
+    internetUp,
+    allClients,
+  } = useTopologyData();
 
   return (
     <div className="space-y-6">
@@ -357,8 +297,8 @@ export function ExperimentalPage() {
       <TopologyDiagram
         sources={sources}
         clients={clients}
-        hostname={sysInfo?.hostname ?? ''}
-        model={sysInfo?.model ?? ''}
+        hostname={router.hostname}
+        model={router.model}
         features={features}
         loading={loading}
       />
@@ -454,7 +394,7 @@ export function ExperimentalPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {sysLoading ? (
+          {loading ? (
             <div className="grid gap-2 sm:grid-cols-3">
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-full" />

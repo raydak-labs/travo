@@ -88,7 +88,7 @@ export function WsProvider({ children }: { children: React.ReactNode }) {
   return <WsContext.Provider value={{ connected, subscribe }}>{children}</WsContext.Provider>;
 }
 
-/** Used by useWebSocket and useTopologyData to subscribe to typed WS messages. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useWsSubscribe() {
   return useContext(WsContext);
 }
