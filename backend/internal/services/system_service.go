@@ -507,7 +507,7 @@ func (s *SystemService) FactoryReset() error {
 	return nil
 }
 
-const setupCompleteFlagPath = "/etc/openwrt-travel-gui/setup-complete"
+const setupCompleteFlagPath = "/etc/travo/setup-complete"
 
 // GetSetupComplete checks whether the first-run setup has been completed.
 func (s *SystemService) GetSetupComplete() models.SetupStatus {
@@ -529,23 +529,45 @@ func (s *SystemService) SetSetupComplete() error {
 }
 
 const (
-	buttonActionsDir  = "/etc/openwrt-travel-gui"
-	buttonActionsFile = "/etc/openwrt-travel-gui/button-actions.json"
+	buttonActionsDir  = "/etc/travo"
+	buttonActionsFile = "/etc/travo/button-actions.json"
 	hotplugScript     = "/etc/hotplug.d/button/50-gui-button-actions"
-	rcButtonDir       = "/etc/rc.button"
+	dtKeysDir         = "/sys/firmware/devicetree/base/keys"
 )
+
+// detectButtonNames returns the physical button names for this device.
+// Primary source: devicetree /sys/firmware/devicetree/base/keys — each
+// sub-directory is a physical key; its "label" property is what OpenWrt
+// sets as $BUTTON in hotplug events.
+// /etc/rc.button ships generic stock scripts for every common button type
+// regardless of hardware, so it is intentionally not used.
+func detectButtonNames() []string {
+	entries, err := os.ReadDir(dtKeysDir)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		labelPath := filepath.Join(dtKeysDir, e.Name(), "label")
+		raw, err := os.ReadFile(labelPath)
+		if err != nil {
+			continue
+		}
+		// Devicetree strings are NUL-terminated; strip the trailing NUL.
+		label := strings.TrimRight(string(raw), "\x00")
+		if label != "" {
+			names = append(names, label)
+		}
+	}
+	return names
+}
 
 // GetHardwareButtons returns the detected hardware buttons with their configured actions.
 func (s *SystemService) GetHardwareButtons() []models.HardwareButton {
-	entries, err := os.ReadDir(rcButtonDir)
-	names := []string{}
-	if err == nil {
-		for _, e := range entries {
-			if !e.IsDir() {
-				names = append(names, e.Name())
-			}
-		}
-	}
+	names := detectButtonNames()
 	// Merge with configured actions
 	configured := s.loadButtonActions()
 	actionMap := make(map[string]models.ButtonAction, len(configured))

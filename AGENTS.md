@@ -58,7 +58,7 @@ Follow TDD: write tests first, see them fail, write minimal code to pass.
 Any automated action that modifies live system state (UCI commit + wifi reload,
 firewall rules, network interface changes, etc.) **MUST** use a crash guard:
 
-1. **Write a guard file** to persistent storage (`/etc/openwrt-travel-gui/`) in
+1. **Write a guard file** to persistent storage (`/etc/travo/`) in
    flash **before** executing the dangerous operation.
 2. **On next startup**, if the guard file exists, skip the operation entirely and
    log a warning — a previous run crashed the system and must not be retried.
@@ -96,7 +96,7 @@ is run; see `services/uci_apply.go` and `WifiService.applyWireless()`.
 **Rule:** If you implement any background goroutine or scheduled task that touches
 system state, it must follow this pattern. No exceptions.
 
-Guard file naming convention: `/etc/openwrt-travel-gui/<feature>-in-progress`
+Guard file naming convention: `/etc/travo/<feature>-in-progress`
 
 **Rule:** If implementing new zones or something ensure that all required firewall changes and required rules are implemented. Follow the existing default "WAN" things which we should use.
 

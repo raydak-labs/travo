@@ -2,7 +2,7 @@
 # install.sh — Install OpenWRT Travel GUI on a fresh OpenWRT system
 #
 # Usage:
-#   wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | sh
+#   wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
 #   sh install.sh [OPTIONS]
 #
 # POSIX sh compatible — works with busybox ash on OpenWRT.
@@ -12,11 +12,11 @@ set -eu
 # ============================================================
 # Configuration — override these with environment variables
 # ============================================================
-GITHUB_REPO="${GITHUB_REPO:-openwrt-travel-gui/openwrt-travel-gui}"
+GITHUB_REPO="${GITHUB_REPO:-raydak-labs/hackathon-202603-ui-openwrt}"
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/main"
 GITHUB_API_BASE="https://api.github.com/repos/${GITHUB_REPO}"
 GITHUB_RELEASE_BASE="https://github.com/${GITHUB_REPO}/releases/download"
-PKG_NAME="openwrt-travel-gui"
+PKG_NAME="travo"
 MIN_SPACE_KB=20480  # 20 MB
 
 # ============================================================
@@ -137,7 +137,7 @@ Examples:
   sh install.sh --no-adguard
 
   # Piped install (non-interactive, uses defaults)
-  wget -O- https://raw.githubusercontent.com/openwrt-travel-gui/openwrt-travel-gui/main/scripts/install.sh | sh
+  wget -O- https://raw.githubusercontent.com/raydak-labs/hackathon-202603-ui-openwrt/main/scripts/install.sh | sh
 
   # Uninstall everything
   sh install.sh --uninstall
@@ -474,8 +474,8 @@ do_uninstall() {
     uci commit "$PKG_NAME" 2>/dev/null || true
 
     # Clean leftover files
-    rm -rf /www/openwrt-travel-gui 2>/dev/null || true
-    rm -f /etc/config/openwrt-travel-gui 2>/dev/null || true
+    rm -rf /www/travo 2>/dev/null || true
+    rm -f /etc/config/travo 2>/dev/null || true
 
     echo ""
     printf "${GREEN}${BOLD}"

@@ -10,7 +10,7 @@ TARGET_OS="${GOOS:-${2:-linux}}"
 BUILD_DIR="dist"
 VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
-echo "Building openwrt-travel-gui v${VERSION} for ${TARGET_OS}/${TARGET_ARCH}..."
+echo "Building travo v${VERSION} for ${TARGET_OS}/${TARGET_ARCH}..."
 
 # Ensure dist dir exists
 mkdir -p "${BUILD_DIR}"
@@ -29,11 +29,11 @@ echo "→ Cross-compiling backend for ${TARGET_OS}/${TARGET_ARCH}..."
   cd backend
   CGO_ENABLED=0 GOOS=${TARGET_OS} GOARCH=${TARGET_ARCH} go build \
     -ldflags="-s -w -X main.Version=${VERSION}" \
-    -o "../${BUILD_DIR}/openwrt-travel-gui" \
+    -o "../${BUILD_DIR}/travo" \
     ./cmd/server
 )
 
 # Step 4: Show binary info
-ls -lh "${BUILD_DIR}/openwrt-travel-gui"
-echo "✓ Build complete: ${BUILD_DIR}/openwrt-travel-gui"
+ls -lh "${BUILD_DIR}/travo"
+echo "✓ Build complete: ${BUILD_DIR}/travo"
 echo "  Frontend assets preserved at frontend/dist/"

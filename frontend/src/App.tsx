@@ -3,6 +3,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { useTheme } from '@/components/layout/use-theme';
+import { WsProvider } from '@/lib/ws-context';
 import { router } from '@/router';
 
 const queryClient = new QueryClient({
@@ -23,8 +24,10 @@ function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-        <ThemedToaster />
+        <WsProvider>
+          <RouterProvider router={router} />
+          <ThemedToaster />
+        </WsProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

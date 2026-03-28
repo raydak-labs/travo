@@ -1,7 +1,7 @@
 {
-  "name": "OpenWRT Travel GUI",
-  "short_name": "Travel GUI",
-  "description": "A modern web interface for managing OpenWRT travel routers",
+  "name": "Travo",
+  "short_name": "Travo",
+  "description": "Travo — a modern web interface for managing OpenWRT travel routers",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",
@@ -13,6 +13,12 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
     }
   ]
 }

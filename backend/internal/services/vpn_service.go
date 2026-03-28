@@ -95,16 +95,16 @@ type VpnService struct {
 	profilesPath string // Path to wireguard_profiles.json
 }
 
-const vpnDnsSnapshotPath = "/etc/openwrt-travel-gui/vpn-dns-snapshot.json"
+const vpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
 
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
-	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/openwrt-travel-gui/wireguard_profiles.json"}
+	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/travo/wireguard_profiles.json"}
 }
 
 // NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
 func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
-	return &VpnService{uci: u, cmd: cmd, profilesPath: "/etc/openwrt-travel-gui/wireguard_profiles.json"}
+	return &VpnService{uci: u, cmd: cmd, profilesPath: "/etc/travo/wireguard_profiles.json"}
 }
 
 // NewVpnServiceWithProfilesPath creates a VpnService with a custom profiles path (for tests).
@@ -1413,7 +1413,7 @@ func readResolvConfNameserversFromPath(path string) []string {
 	return servers
 }
 
-const splitTunnelPath = "/etc/openwrt-travel-gui/split-tunnel.json"
+const splitTunnelPath = "/etc/travo/split-tunnel.json"
 
 // GetSplitTunnel returns the current WireGuard split tunnel configuration.
 func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
@@ -1436,7 +1436,7 @@ func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+	if err := os.MkdirAll("/etc/travo", 0o755); err != nil {
 		return err
 	}
 	if err := os.WriteFile(splitTunnelPath, data, 0o644); err != nil {

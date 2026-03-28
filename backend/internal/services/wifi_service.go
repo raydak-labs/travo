@@ -61,10 +61,10 @@ type WifiService struct {
 // Include the related network services that WiFi mutations can touch.
 var uciApplyConfigs = []string{"wireless", "network", "system", "firewall", "dhcp"}
 
-const defaultPriorityFile = "/etc/openwrt-travel-gui/wifi-priorities.json"
-const defaultAutoReconnectFile = "/etc/openwrt-travel-gui/autoreconnect.json"
-const defaultReconnectScript = "/etc/openwrt-travel-gui/wifi-reconnect.sh"
-const defaultWifiModeFile = "/etc/openwrt-travel-gui/wifi-mode"
+const defaultPriorityFile = "/etc/travo/wifi-priorities.json"
+const defaultAutoReconnectFile = "/etc/travo/autoreconnect.json"
+const defaultReconnectScript = "/etc/travo/wifi-reconnect.sh"
+const defaultWifiModeFile = "/etc/travo/wifi-mode"
 
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
 // otherwise falls back to reloader (e.g. tests or when rpcd session is unavailable).
@@ -1525,7 +1525,7 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 // Includes a crash guard: if a previous wifi up caused a crash/reboot, the guard
 // file will exist on next run and the script exits without retrying.
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
-	"GUARD=\"/etc/openwrt-travel-gui/autoreconnect-crash-guard\"\n" +
+	"GUARD=\"/etc/travo/autoreconnect-crash-guard\"\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
 	"IP=$(ubus call network.interface.wwan status 2>/dev/null | jsonfilter -e '@[\"ipv4-address\"][0].address' 2>/dev/null)\n" +
 	"if [ -n \"$IP\" ]; then\n    exit 0\nfi\n\n" +
@@ -1640,7 +1640,7 @@ func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
 	return w.applyWireless()
 }
 
-const wifiSchedulePath = "/etc/openwrt-travel-gui/wifi-schedule.json"
+const wifiSchedulePath = "/etc/travo/wifi-schedule.json"
 const wifiScheduleCronPath = "/etc/cron.d/openwrt-gui-wifi-schedule"
 
 // GetWiFiSchedule returns the current cron-based WiFi on/off schedule.
@@ -1662,7 +1662,7 @@ func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+	if err := os.MkdirAll("/etc/travo", 0o755); err != nil {
 		return err
 	}
 	if err := os.WriteFile(wifiSchedulePath, data, 0o644); err != nil {
@@ -1686,7 +1686,7 @@ func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 	return os.WriteFile(wifiScheduleCronPath, []byte(cronContent), 0o644)
 }
 
-const macPoliciesPath = "/etc/openwrt-travel-gui/mac-policies.json"
+const macPoliciesPath = "/etc/travo/mac-policies.json"
 
 // GetMACPolicies returns the saved per-network MAC policies.
 func (w *WifiService) GetMACPolicies() (models.MACPolicies, error) {
@@ -1707,7 +1707,7 @@ func (w *WifiService) SetMACPolicies(policies models.MACPolicies) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+	if err := os.MkdirAll("/etc/travo", 0o755); err != nil {
 		return err
 	}
 	return os.WriteFile(macPoliciesPath, data, 0o644)

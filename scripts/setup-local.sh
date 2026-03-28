@@ -8,7 +8,7 @@
 #   1. Moves LuCI (uhttpd) to port 8080 so travel-gui can use port 80
 #   2. Uploads the init.d service script
 #   3. Uploads the UCI config (password, port, etc.)
-#   4. Creates /www/openwrt-travel-gui
+#   4. Creates /www/travo
 #   5. Ensures initial wireless AP state (radios + default_radio0/1, default SSID/key)
 #   6. Enables the service (does not start — no binary yet)
 #
@@ -92,15 +92,15 @@ ssh_cmd() {
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-INITD_SRC="${REPO_ROOT}/packaging/openwrt/files/etc/init.d/openwrt-travel-gui"
-CONFIG_SRC="${REPO_ROOT}/packaging/openwrt/files/etc/config/openwrt-travel-gui"
+INITD_SRC="${REPO_ROOT}/packaging/openwrt/files/etc/init.d/travo"
+CONFIG_SRC="${REPO_ROOT}/packaging/openwrt/files/etc/config/travo"
 
 [[ -f "$INITD_SRC" ]] || error "init.d script not found at $INITD_SRC"
 [[ -f "$CONFIG_SRC" ]] || error "UCI config not found at $CONFIG_SRC"
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Setup openwrt-travel-gui → ${REMOTE}"
+echo "  Setup travo → ${REMOTE}"
 echo "  LuCI move: ${MOVE_LUCI}  |  Travel GUI password: ${PASSWORD}"
 if [[ -n "$WIFI_SSID_BASE" ]]; then
   echo "  WiFi AP SSID base: ${WIFI_SSID_BASE} (5G: ${WIFI_SSID_BASE}-5G)"
@@ -144,8 +144,8 @@ fi
 
 # Step 2: Upload init.d service script
 info "Uploading init.d service script..."
-scp_cmd "$INITD_SRC" "${REMOTE}:/etc/init.d/openwrt-travel-gui"
-ssh_cmd "chmod +x /etc/init.d/openwrt-travel-gui"
+scp_cmd "$INITD_SRC" "${REMOTE}:/etc/init.d/travo"
+ssh_cmd "chmod +x /etc/init.d/travo"
 
 # Step 3: Upload UCI config (with configured password)
 info "Uploading UCI config (password: ${PASSWORD})..."
@@ -153,11 +153,11 @@ info "Uploading UCI config (password: ${PASSWORD})..."
 TMPCONFIG=$(mktemp)
 trap 'rm -f "$TMPCONFIG"' EXIT
 sed "s/option password 'admin'/option password '${PASSWORD}'/" "$CONFIG_SRC" > "$TMPCONFIG"
-scp_cmd "$TMPCONFIG" "${REMOTE}:/etc/config/openwrt-travel-gui"
+scp_cmd "$TMPCONFIG" "${REMOTE}:/etc/config/travo"
 
 # Step 4: Create web asset directory
-info "Creating /www/openwrt-travel-gui..."
-ssh_cmd "mkdir -p /www/openwrt-travel-gui"
+info "Creating /www/travo..."
+ssh_cmd "mkdir -p /www/travo"
 
 # Step 5: Initial wireless AP state (radios + default_radio0 / default_radio1, no STA changes)
 info "Ensuring initial wireless AP state..."
@@ -214,11 +214,11 @@ ssh_cmd "uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/n
 
 # Step 6: Mark setup as complete (skip the first-run wizard)
 info "Marking setup as complete..."
-ssh_cmd "mkdir -p /etc/openwrt-travel-gui && touch /etc/openwrt-travel-gui/setup-complete"
+ssh_cmd "mkdir -p /etc/travo && touch /etc/travo/setup-complete"
 
 # Step 7: Enable service (starts on next boot or manual start)
 info "Enabling service..."
-ssh_cmd "/etc/init.d/openwrt-travel-gui enable"
+ssh_cmd "/etc/init.d/travo enable"
 
 echo ""
 echo -e "${GREEN}✓${NC} Device setup complete!"

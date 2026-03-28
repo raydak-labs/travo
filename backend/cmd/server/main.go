@@ -26,15 +26,17 @@ var Version = "dev"
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
-	app, _, _, _, _, _ := setupAppWithConfig(cfg)
+	app, _, _, _, _, _, netWatcher := setupAppWithConfig(cfg)
+	// Stop the watcher goroutine immediately — setupApp is only used in tests.
+	netWatcher.Stop()
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, and blocklist so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist) {
+// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, blocklist, and event watcher so the caller can manage their lifecycle.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist, services.EventWatcher) {
 	app := fiber.New(fiber.Config{
-		AppName: "openwrt-travel-gui",
+		AppName: "travo",
 	})
 
 	// CORS middleware
@@ -78,6 +80,15 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 
 	systemSvc := services.NewSystemService(ub, u, storage)
 	networkSvc := services.NewNetworkService(u, ub)
+
+	// Create event watcher (noop in mock mode to avoid running ubus on dev machines).
+	var netWatcher services.EventWatcher
+	if cfg.MockMode {
+		netWatcher = services.NewNoopEventWatcher()
+	} else {
+		netWatcher = services.NewNetworkEventWatcher(networkSvc)
+	}
+	go netWatcher.Start()
 	var wifiSvc *services.WifiService
 	if cfg.MockMode {
 		wifiSvc = services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{})
@@ -119,7 +130,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()
-	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/openwrt-travel-gui/band-switching.json")
+	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/travo/band-switching.json")
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
@@ -171,7 +182,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	api.SetupRoutes(app, deps)
 
 	// WebSocket (with auth from query parameter)
-	hub := ws.NewHub(systemSvc, alertSvc)
+	hub := ws.NewHub(systemSvc, alertSvc, netWatcher.Ch())
 	app.Use("/api/v1/ws", ws.UpgradeMiddleware(authSvc))
 	app.Get("/api/v1/ws", ws.Handler(hub, authSvc))
 	hub.Start()
@@ -188,7 +199,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist
+	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist, netWatcher
 }
 
 func main() {
@@ -203,7 +214,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist := setupAppWithConfig(cfg)
+	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist, netWatcher := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -214,6 +225,7 @@ func main() {
 		log.Println("Shutting down server...")
 		blocklist.Stop()
 		hub.Stop()
+		netWatcher.Stop()
 		alertSvc.Stop()
 		uptimeTracker.Stop()
 		bandSwitchSvc.Stop()
@@ -239,7 +251,7 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("Starting openwrt-travel-gui backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
+	log.Printf("Starting travo backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
 	if err := app.Listen(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

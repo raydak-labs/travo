@@ -18,7 +18,7 @@ const (
 	defaultUpSwitchDelaySec              = 60
 	defaultMinViableSignalDBm            = -80
 	bandSwitchCooldownSec                = 120
-	bandSwitchGuardFile                  = "/etc/openwrt-travel-gui/band-switch-in-progress"
+	bandSwitchGuardFile                  = "/etc/travo/band-switch-in-progress"
 )
 
 // BandSwitchConfig holds user-configurable parameters for automatic band switching.

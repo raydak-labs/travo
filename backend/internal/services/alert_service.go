@@ -15,7 +15,7 @@ import (
 )
 
 const maxAlerts = 50
-const alertThresholdsFile = "/etc/openwrt-travel-gui/alert-thresholds.json"
+const alertThresholdsFile = "/etc/travo/alert-thresholds.json"
 
 // defaultAlertThresholds returns the default threshold values.
 func defaultAlertThresholds() models.AlertThresholds {

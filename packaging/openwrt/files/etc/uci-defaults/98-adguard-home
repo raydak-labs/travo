@@ -7,7 +7,7 @@
 # the install from the web UI or on first network-available boot.
 
 FLAG_FILE="/tmp/.install-adguard"
-INSTALL_SCRIPT="/usr/share/openwrt-travel-gui/install-adguard.sh"
+INSTALL_SCRIPT="/usr/share/travo/install-adguard.sh"
 
 # Create the flag file so the travel-gui backend knows AdGuard installation
 # was requested but not yet completed.

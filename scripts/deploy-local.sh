@@ -1,17 +1,17 @@
 #!/bin/bash
-# Deploy openwrt-travel-gui to a local OpenWRT device via SSH/SCP.
+# Deploy travo to a local OpenWRT device via SSH/SCP.
 #
 # Supports both .ipk-based install (opkg/apk) and direct file copy.
 # Handles legacy SCP protocol for older OpenWrt/Dropbear SSH servers.
 #
 # Direct mode only updates:
-#   - /usr/bin/openwrt-travel-gui
-#   - files under /www/openwrt-travel-gui/ (extracted from frontend/dist; overwrites
+#   - /usr/bin/travo
+#   - files under /www/travo/ (extracted from frontend/dist; overwrites
 #     same paths, does not delete extra files left in that directory)
 # It does NOT remove or replace:
-#   - /etc/init.d/openwrt-travel-gui
-#   - /etc/config/openwrt-travel-gui
-#   - /etc/openwrt-travel-gui/* (profiles, guards, etc.)
+#   - /etc/init.d/travo
+#   - /etc/config/travo
+#   - /etc/travo/* (profiles, guards, etc.)
 # If the service script is missing, port 80 will stay down until you run
 #   ./scripts/setup-local.sh [--no-luci-move]
 #
@@ -127,10 +127,10 @@ warn_missing_service_script() {
   if [[ "$METHOD" != "direct" ]]; then
     return 0
   fi
-  if ssh_cmd "test -x /etc/init.d/openwrt-travel-gui" 2>/dev/null; then
+  if ssh_cmd "test -x /etc/init.d/travo" 2>/dev/null; then
     return 0
   fi
-  warn "/etc/init.d/openwrt-travel-gui is missing or not executable on the router."
+  warn "/etc/init.d/travo is missing or not executable on the router."
   warn "deploy-local.sh does not install it. Run once: ./scripts/setup-local.sh [--no-luci-move]"
 }
 
@@ -146,7 +146,7 @@ do_build() {
       cd backend
       CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH:-arm64} go build \
         -ldflags="-s -w -X main.Version=${version}" \
-        -o "../dist/openwrt-travel-gui" \
+        -o "../dist/travo" \
         ./cmd/server
     )
   else
@@ -161,23 +161,23 @@ do_build() {
 
 # ── Deploy: direct copy ──────────────────────────────────────────────────────
 deploy_direct() {
-  local binary="dist/openwrt-travel-gui"
+  local binary="dist/travo"
 
   [[ -f "$binary" ]] || error "Binary not found at $binary. Run 'make build-prod' or remove --no-build."
 
   info "Stopping service..."
-  ssh_cmd "/etc/init.d/openwrt-travel-gui stop 2>/dev/null || true"
+  ssh_cmd "/etc/init.d/travo stop 2>/dev/null || true"
 
   info "Uploading binary..."
-  scp_cmd "$binary" "${REMOTE}:/usr/bin/openwrt-travel-gui"
-  ssh_cmd "chmod +x /usr/bin/openwrt-travel-gui"
+  scp_cmd "$binary" "${REMOTE}:/usr/bin/travo"
+  ssh_cmd "chmod +x /usr/bin/travo"
 
   if ! $BINARY_ONLY; then
     local frontend_dir="frontend/dist"
     [[ -d "$frontend_dir" ]] || error "Frontend assets not found at $frontend_dir. Run 'pnpm build' in frontend/ or remove --no-build."
     info "Uploading frontend assets..."
-    ssh_cmd "mkdir -p /www/openwrt-travel-gui"
-    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/openwrt-travel-gui/"
+    ssh_cmd "mkdir -p /www/travo"
+    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/travo/"
   else
     info "Skipping frontend (--binary-only)."
   fi
@@ -212,10 +212,10 @@ deploy_package() {
 restart_service() {
   # Clear the AP health check crash guard so the freshly deployed binary gets
   # a clean attempt on startup. A manual redeploy is explicit permission to retry.
-  ssh_cmd "rm -f /etc/openwrt-travel-gui/ap-health-in-progress /etc/openwrt-travel-gui/autoreconnect-crash-guard" || true
+  ssh_cmd "rm -f /etc/travo/ap-health-in-progress /etc/travo/autoreconnect-crash-guard" || true
 
-  info "Restarting openwrt-travel-gui service..."
-  ssh_cmd "/etc/init.d/openwrt-travel-gui restart 2>/dev/null || /etc/init.d/openwrt-travel-gui start 2>/dev/null || true"
+  info "Restarting travo service..."
+  ssh_cmd "/etc/init.d/travo restart 2>/dev/null || /etc/init.d/travo start 2>/dev/null || true"
 
   # Give procd time to (re)start the process. On slower routers or after a
   # package install that triggers a reboot, the service may take longer.
@@ -225,7 +225,7 @@ restart_service() {
   # Retry up to 5 times (3s apart) in case procd is still initializing.
   local attempts=0
   while [[ $attempts -lt 5 ]]; do
-    if ssh_cmd "pgrep -f openwrt-travel-gui >/dev/null 2>&1"; then
+    if ssh_cmd "pgrep -f travo >/dev/null 2>&1"; then
       echo -e "${GREEN}✓${NC} Service is running."
       return 0
     fi
@@ -236,12 +236,12 @@ restart_service() {
     fi
   done
   warn "Service not detected after $((8 + 4 * 3))s. Check logs with:"
-  warn "  ssh root@${ROUTER_IP} 'logread | grep openwrt-travel-gui | tail -20'"
+  warn "  ssh root@${ROUTER_IP} 'logread | grep travo | tail -20'"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Deploy openwrt-travel-gui → ${REMOTE}"
+echo "  Deploy travo → ${REMOTE}"
 echo "  Method: ${METHOD}  |  Legacy SCP: ${LEGACY_SCP}  |  Binary only: ${BINARY_ONLY}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
