@@ -335,10 +335,23 @@ do_install() {
     fi
     success "Downloaded: $_ipk_file"
 
-    # --- Step 2: Install .ipk ---
+    # --- Step 2: Install ---
     info "Installing package..."
     if [ "$PKG_MGR" = "apk" ]; then
-        apk add --allow-untrusted "$_ipk_file" || die "apk install failed"
+        # OpenWrt 25+ uses Alpine APK which doesn't support the legacy .ipk format.
+        # Extract files directly from the .ipk (which is a gzipped tar of data.tar.gz).
+        _data_tar="/tmp/travo-data.tar.gz"
+        add_cleanup "$_data_tar"
+        tar -xzf "$_ipk_file" -C /tmp data.tar.gz && mv /tmp/data.tar.gz "$_data_tar" \
+            || die "Failed to extract data from .ipk"
+        tar -xzf "$_data_tar" -C / \
+            || die "Failed to install files from .ipk"
+        chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
+        # Run uci-defaults (LuCI port move etc.)
+        if [ -f /etc/uci-defaults/99-travel-gui-ports ]; then
+            sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports
+        fi
+        /etc/init.d/travo enable 2>/dev/null || true
     else
         opkg install "$_ipk_file" || die "opkg install failed"
     fi
@@ -453,16 +466,15 @@ do_uninstall() {
     fi
 
     # --- Step 3: Remove package ---
-    if command -v apk >/dev/null 2>&1 && apk info "$PKG_NAME" >/dev/null 2>&1; then
-        info "Removing ${PKG_NAME} package..."
-        apk del "$PKG_NAME" || warn "apk del had errors"
-        success "Package removed"
-    elif command -v opkg >/dev/null 2>&1 && opkg status "$PKG_NAME" 2>/dev/null | head -1 | grep -q "Package:"; then
+    if command -v opkg >/dev/null 2>&1 && opkg status "$PKG_NAME" 2>/dev/null | head -1 | grep -q "Package:"; then
         info "Removing ${PKG_NAME} package..."
         opkg remove "$PKG_NAME" || warn "opkg remove had errors"
         success "Package removed"
     else
-        info "${PKG_NAME} package not installed — skipping"
+        # Direct removal (apk systems or manual installs)
+        info "Removing ${PKG_NAME} files..."
+        rm -f /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
+        success "Files removed"
     fi
 
     # --- Step 4: Restore uhttpd to default ports ---
