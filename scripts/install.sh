@@ -290,15 +290,7 @@ preflight_checks() {
     fi
     success "Storage: ${_avail_kb:-unknown}KB available"
 
-    # 5. Detect package manager (OpenWrt 25+ uses apk, older uses opkg)
-    if command -v apk >/dev/null 2>&1; then
-        PKG_MGR="apk"
-    elif command -v opkg >/dev/null 2>&1; then
-        PKG_MGR="opkg"
-    else
-        die "No package manager found (apk or opkg) — is this a standard OpenWRT installation?"
-    fi
-    success "Package manager: ${PKG_MGR}"
+    success "Pre-flight OK"
 }
 
 # ============================================================
@@ -322,40 +314,28 @@ do_install() {
 
     confirm "Proceed with installation?" || { info "Aborted."; exit 0; }
 
-    # --- Step 1: Download .ipk ---
-    _ipk_file="/tmp/${PKG_NAME}_${VERSION}_${_arch}.ipk"
-    _ipk_url="${GITHUB_RELEASE_BASE}/v${VERSION}/${PKG_NAME}_${VERSION}_${_arch}.ipk"
+    # --- Step 1: Download tarball ---
+    _tarball="/tmp/${PKG_NAME}_${VERSION}_${_arch}.tar.gz"
+    _tarball_url="${GITHUB_RELEASE_BASE}/v${VERSION}/${PKG_NAME}_${VERSION}_${_arch}.tar.gz"
 
     info "Downloading ${PKG_NAME} v${VERSION}..."
-    download "$_ipk_url" "$_ipk_file" || die "Failed to download .ipk from ${_ipk_url}"
-    add_cleanup "$_ipk_file"
+    download "$_tarball_url" "$_tarball" || die "Failed to download from ${_tarball_url}"
+    add_cleanup "$_tarball"
 
-    if [ ! -s "$_ipk_file" ]; then
-        die "Downloaded .ipk file is empty — check version and architecture"
+    if [ ! -s "$_tarball" ]; then
+        die "Downloaded file is empty — check version and architecture"
     fi
-    success "Downloaded: $_ipk_file"
+    success "Downloaded: $_tarball"
 
-    # --- Step 2: Install ---
-    info "Installing package..."
-    if [ "$PKG_MGR" = "apk" ]; then
-        # OpenWrt 25+ uses Alpine APK which doesn't support the legacy .ipk format.
-        # Extract files directly from the .ipk (which is a gzipped tar of data.tar.gz).
-        _data_tar="/tmp/travo-data.tar.gz"
-        add_cleanup "$_data_tar"
-        tar -xzf "$_ipk_file" -C /tmp data.tar.gz && mv /tmp/data.tar.gz "$_data_tar" \
-            || die "Failed to extract data from .ipk"
-        tar -xzf "$_data_tar" -C / \
-            || die "Failed to install files from .ipk"
-        chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
-        # Run uci-defaults (LuCI port move etc.)
-        if [ -f /etc/uci-defaults/99-travel-gui-ports ]; then
-            sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports
-        fi
-        /etc/init.d/travo enable 2>/dev/null || true
-    else
-        opkg install "$_ipk_file" || die "opkg install failed"
+    # --- Step 2: Extract ---
+    info "Installing files..."
+    tar -xzf "$_tarball" -C / || die "Failed to extract tarball"
+    chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
+    if [ -f /etc/uci-defaults/99-travel-gui-ports ]; then
+        sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports
     fi
-    success "Package installed"
+    /etc/init.d/travo enable 2>/dev/null || true
+    success "Files installed"
 
     # --- Step 3: Set password ---
     _pw="$PASSWORD"
@@ -465,17 +445,14 @@ do_uninstall() {
         info "AdGuard Home not installed — skipping"
     fi
 
-    # --- Step 3: Remove package ---
-    if command -v opkg >/dev/null 2>&1 && opkg status "$PKG_NAME" 2>/dev/null | head -1 | grep -q "Package:"; then
-        info "Removing ${PKG_NAME} package..."
-        opkg remove "$PKG_NAME" || warn "opkg remove had errors"
-        success "Package removed"
-    else
-        # Direct removal (apk systems or manual installs)
-        info "Removing ${PKG_NAME} files..."
-        rm -f /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
-        success "Files removed"
+    # --- Step 3: Remove files ---
+    info "Removing ${PKG_NAME} files..."
+    rm -f /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
+    # Also clean up if previously installed via opkg
+    if command -v opkg >/dev/null 2>&1 && opkg status "$PKG_NAME" 2>/dev/null | grep -q "^Package:"; then
+        opkg remove "$PKG_NAME" 2>/dev/null || true
     fi
+    success "Files removed"
 
     # --- Step 4: Restore uhttpd to default ports ---
     _current_http="$(uci -q get uhttpd.main.listen_http 2>/dev/null || echo '')"

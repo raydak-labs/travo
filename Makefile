@@ -36,14 +36,14 @@ build-all:
 	GOARCH=amd64 bash scripts/build.sh
 	cp dist/travo dist/travo-x86_64
 
-# Create .ipk package for OpenWRT (default: aarch64)
+# Create install tarball for OpenWRT (default: aarch64)
 package:
-	@bash scripts/package-ipk.sh
+	@bash scripts/package-tarball.sh
 
-# Create .ipk packages for both aarch64 and x86_64
+# Create install tarballs for both aarch64 and x86_64
 package-all: build-all
-	ARCH=aarch64_cortex-a53 bash -c 'cp dist/travo-aarch64 dist/travo && bash scripts/package-ipk.sh'
-	ARCH=x86_64 bash -c 'cp dist/travo-x86_64 dist/travo && bash scripts/package-ipk.sh'
+	ARCH=aarch64_cortex-a53 bash -c 'cp dist/travo-aarch64 dist/travo && bash scripts/package-tarball.sh'
+	ARCH=x86_64 bash -c 'cp dist/travo-x86_64 dist/travo && bash scripts/package-tarball.sh'
 
 # Deploy to OpenWRT device via opkg (requires ROUTER_IP)
 deploy:
