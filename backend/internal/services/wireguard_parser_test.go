@@ -205,3 +205,20 @@ Endpoint = demo.wireguard.com:12912
 		t.Errorf("expected error about PublicKey, got: %v", err)
 	}
 }
+
+func TestSplitWireGuardEndpoint(t *testing.T) {
+	cases := []struct {
+		in, host, port string
+	}{
+		{"vpn.example.com:51820", "vpn.example.com", "51820"},
+		{"1.2.3.4:12345", "1.2.3.4", "12345"},
+		{"[2001:db8::1]:51820", "2001:db8::1", "51820"},
+		{"nohostyet", "nohostyet", "51820"},
+	}
+	for _, tc := range cases {
+		h, p := SplitWireGuardEndpoint(tc.in)
+		if h != tc.host || p != tc.port {
+			t.Fatalf("SplitWireGuardEndpoint(%q) = (%q,%q), want (%q,%q)", tc.in, h, p, tc.host, tc.port)
+		}
+	}
+}

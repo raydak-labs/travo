@@ -74,24 +74,24 @@ export function NetworkChart() {
               </defs>
               <XAxis
                 dataKey="time"
-                tick={{ fontSize: 10 }}
-                stroke="#9ca3af"
+                tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
+                stroke="var(--chart-grid)"
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={{ fontSize: 10 }}
-                stroke="#9ca3af"
+                tick={{ fontSize: 10, fill: 'var(--chart-axis)' }}
+                stroke="var(--chart-grid)"
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v: number) => formatRate(v)}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'rgba(0,0,0,0.8)',
-                  border: 'none',
+                  backgroundColor: 'var(--chart-tooltip-bg)',
+                  border: '1px solid var(--chart-tooltip-border)',
                   borderRadius: '6px',
-                  color: '#fff',
+                  color: 'var(--chart-tooltip-text)',
                   fontSize: '12px',
                 }}
                 formatter={(value: number) => formatRate(value)}

@@ -10,4 +10,5 @@ type UCI interface {
 	AddSection(config, section, stype string) error
 	AddList(config, section, option, value string) error
 	DeleteSection(config, section string) error
+	DeleteOption(config, section, option string) error
 }

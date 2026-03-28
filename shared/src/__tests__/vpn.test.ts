@@ -77,6 +77,7 @@ describe('TailscaleStatus', () => {
       ip_address: '100.64.0.1',
       hostname: 'my-router',
       exit_node_active: false,
+      peers: [],
     };
     expect(status.exit_node).toBeUndefined();
     expect(status.exit_node_active).toBe(false);
@@ -91,6 +92,7 @@ describe('TailscaleStatus', () => {
       hostname: 'my-router',
       exit_node: 'exit-node-1',
       exit_node_active: true,
+      peers: [],
     };
     expect(status.exit_node).toBe('exit-node-1');
   });

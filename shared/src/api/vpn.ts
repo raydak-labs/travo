@@ -10,6 +10,8 @@ export interface VpnStatus {
   readonly endpoint: string;
   readonly rx_bytes: number;
   readonly tx_bytes: number;
+  /** Fine-grained tunnel state: disabled | configured | enabled_not_up | up_no_handshake | connected */
+  readonly status_detail?: string;
 }
 
 /** WireGuard configuration */
@@ -30,6 +32,16 @@ export interface WireguardPeer {
 }
 
 /** Tailscale status */
+export interface TailscalePeer {
+  readonly hostname: string;
+  readonly tailscale_ip: string;
+  readonly os: string;
+  readonly online: boolean;
+  readonly exit_node: boolean;
+  readonly exit_node_option: boolean;
+  readonly last_seen: string;
+}
+
 export interface TailscaleStatus {
   readonly installed: boolean;
   readonly running: boolean;
@@ -38,6 +50,8 @@ export interface TailscaleStatus {
   readonly hostname: string;
   readonly exit_node?: string;
   readonly exit_node_active: boolean;
+  readonly peers: readonly TailscalePeer[];
+  readonly auth_url?: string;
 }
 
 /** Live WireGuard peer status from `wg show` */
@@ -72,6 +86,28 @@ export interface KillSwitchStatus {
   readonly enabled: boolean;
 }
 
+/** DNS leak test result */
+export interface DNSLeakResult {
+  /** Nameservers from /etc/resolv.conf */
+  readonly nameservers: readonly string[];
+  /** DNS servers configured in the active WireGuard profile */
+  readonly vpn_dns_servers: readonly string[];
+  /** True when a VPN tunnel is enabled */
+  readonly vpn_active: boolean;
+  /** True when VPN is active but nameservers don't match VPN-configured DNS */
+  readonly potentially_leaking: boolean;
+}
+
+/** WireGuard tunnel verification result */
+export interface VPNVerifyResult {
+  readonly interface_up: boolean;
+  readonly handshake_ok: boolean;
+  readonly latest_handshake: number;
+  readonly route_ok: boolean;
+  readonly firewall_zone_ok: boolean;
+  readonly forwarding_ok: boolean;
+}
+
 /** Type guard for VpnStatus */
 export function isVpnStatus(value: unknown): value is VpnStatus {
   if (typeof value !== 'object' || value === null) return false;
@@ -85,4 +121,15 @@ export function isVpnStatus(value: unknown): value is VpnStatus {
     typeof v.rx_bytes === 'number' &&
     typeof v.tx_bytes === 'number'
   );
+}
+
+/** WireGuard split tunneling configuration */
+export interface SplitTunnelConfig {
+  readonly mode: 'all' | 'custom';
+  readonly routes: readonly string[];
+}
+
+/** Tailscale SSH status */
+export interface TailscaleSSHStatus {
+  readonly enabled: boolean;
 }

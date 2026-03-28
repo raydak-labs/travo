@@ -21,11 +21,11 @@ export function DashboardPage() {
         <ClientsCard />
         <DataUsageCard />
       </div>
+      <QuickActions />
       <div className="grid gap-4 md:grid-cols-2">
         <BandwidthChart />
         <NetworkChart />
       </div>
-      <QuickActions />
     </div>
   );
 }

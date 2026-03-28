@@ -1,6 +1,6 @@
 # OpenWRT Travel Router GUI — Feature Requirements
 
-> **Last updated:** 2026-03-15 (v28 — Bug fixes, implementation plans, feature categorization)
+> **Last updated:** 2026-03-25 (v33 — mark all implemented features complete: scheduled WiFi, band switching, DNS-over-HTTPS, split tunneling, Tailscale SSH, NTP sync, SSH keys, alert thresholds, diagnostics, speed test, MAC policy, firewall zones, port forwarding, IPv6, WoL, PWA offline indicator)
 
 ---
 
@@ -32,6 +32,39 @@
 
 ---
 
+## Implementation Tasks (Sequential)
+
+These tasks define the next end-to-end work items in a deliberate order. When a task is implemented, mark its entry as `[x]` here and also update the matching checkbox in the feature section below.
+
+- [x] Task 1 (12.3) Standardise form pattern for config cards (read-only view + `Edit` button)
+- [x] Task 2 (12.2) Network page card grouping into **Status / Configuration / Advanced**
+- [x] Task 3 (8) Captive portal: auto-accept portal terms
+- [x] Task 4 (7) Authentication: IP-based access control
+- [ ] Task 5 (7) Authentication: Two-factor authentication
+- [ ] Task 6 (13) Deployment: automatic updates mechanism
+- [ ] Task 7 (14) Hardware buttons: long-press vs short-press differentiation
+- [ ] Task 8 (14) Hardware buttons: custom button action scripting
+- [ ] Task 9 (12) UX: multi-language support (i18n)
+- [ ] Task 10 (11) Advanced networking: mDNS / Bonjour forwarding
+- [ ] Task 11 (11) Advanced networking: VLAN configuration
+- [ ] Task 12 (11) Advanced networking: custom routing rules
+- [ ] Task 13 (6) Monitoring: historical data (store + display recent hours/days)
+- [ ] Task 14 (2.7) Network management: priority-based WAN failover (health check + auto-switch + notification)
+- [ ] Task 15 (2.5) USB/BT: Bluetooth tethering
+- [ ] Task 16 (1.3) WiFi modes: Mesh / WDS mode
+- [ ] Task 17 (1.4) Multi-radio: startup script to auto-discover radio setup and persist config
+- [ ] Task 18 (2.2) Clients: bandwidth limiting (QoS per device)
+- [ ] Task 19 (2.2) Clients: parental controls / client group policies
+- [ ] Task 20 (3.3) VPN: VPN speed test
+- [ ] Task 21 (3.3) VPN: OpenVPN support
+- [ ] Task 22 (4.2) AdGuard: blocklist management from the travel router UI
+- [ ] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
+- [ ] Task 24 (4.6) Future services: cloudflared (Cloudflare Tunnel)
+- [ ] Task 25 (4.6) Future services: SQM / QoS (traffic shaping)
+- [ ] Task 26 (4.6) Future services: Watchcat (connection watchdog)
+
+---
+
 ## 0. Bug List / smaller changes
 
 - [x] AdguardConfig button under Services: {"error":"reading AdGuard config: open /opt/AdGuardHome/AdGuardHome.yaml: no such file or directory"}
@@ -43,6 +76,19 @@
 - [x] Adguard config viewer / editor does not work
 - [x] VPN Overview in VPN tab is not useful. Remove
 - [x] Why is startup of this app logged as err in the logs? (errThu Mar 12 12:27:11 2026 daemon.err openwrt-travel-gui[12344]: 2026/03/12 12:27:11 Starting openwrt-travel-gui backend on :80 (mock=false))
+- [x] Wireless apply must keep LuCI-style rollback semantics: backend may start `uci apply` with rollback, but must not self-confirm immediately. Confirmation must come only after the frontend/browser proves the router is still reachable on the new WiFi settings.
+- [x] WiFi connect must normalize any reused STA section to `network=wwan` whenever the option is missing or not `wwan`, and must fail loudly if creating `network.wwan` or attaching it to the firewall `wan` zone fails. "Associated to upstream WiFi but no DHCP/internet" is not acceptable.
+- [x] WiFi mode switching must map UI modes (`client`, `ap`, `repeater`) to valid OpenWrt UCI structures. Writing invalid values like `mode=client` or `mode=repeater` into a `wifi-iface` section is forbidden; repeater mode must be modeled as STA + AP config, not a single iface mode string.
+- [x] Repeater wizard must preserve upstream band/radio choice and configure the intended AP sections explicitly on multi-radio hardware. Using only the first AP section is not sufficient for dual-band devices.
+- [x] AP, guest WiFi, and STA MAC update flows must return an error when runtime apply fails. Do not commit wireless changes, report success, and leave the device in a "saved in UCI but not actually active" state.
+- [x] WiFi/AP management must discover radios and AP sections dynamically instead of assuming `radio0`, `radio1`, `default_radio0..3`, or guest WiFi on `radio0`, so the UI still works after LuCI resets or on different hardware layouts.
+- [x] 🐛 WireGuard should work out-of-the-box after service install + profile import/activate: runtime `wg0` must be created and status endpoints must not return success when tunnel is not actually up. See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [x] 🐛 AdGuard should work out-of-the-box after install + DNS enable: backend install/running detection and DNS forwarding path must be functionally valid (no `nslookup` timeout after successful toggle). See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [x] 🐛 WiFi page can incorrectly show "Repeater" as active when device is not actually in repeater mode; active mode indicator must reflect real UCI/runtime state.
+- [x] 🐛 Saved STA networks must persist and not be removed unexpectedly; only the selected/active network should be connected at runtime while other saved profiles remain stored.
+- [x] 🐛 Active WiFi network badge can display lock icon with `unknown` encryption/type; UI should show correct security label based on scan/connection metadata.
+- [x] Add machine-readable API documentation generation (OpenAPI/Swagger) and expose docs endpoint from backend for agent/test automation use.
+- [x] Document in `AGENTS.md` that the test device can expose/serve API docs endpoints for automation flows.
 
 ## 1. WiFi Management
 
@@ -61,7 +107,8 @@
 - [x] Priority ordering of saved networks (auto-connect preference)
 - [x] Auto-reconnect to known networks when connection drops
 - [x] Hidden network support (manual SSID entry)
-- [ ] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with optional "prefer 5 GHz" for the STA. See [WiFi dual-band bundling (plan)](../plans/wifi-dual-band-bundling.md).
+- [x] **Dual-band scan bundling** — Show one row per SSID when the same network is advertised on 2.4 GHz and 5 GHz (macOS-style), with band picker on connect and per-band signal display. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md).
+- [x] **Automatic band switching** — Background monitor switches STA between 2.4 GHz and 5 GHz based on signal quality with configurable thresholds and hysteresis. See [WiFi dual-band bundling & band switching (plan)](../plans/wifi-dual-band-bundling.md#part-3-automatic-band-switching).
 
 ### 1.2 Access Point (AP — Own WiFi for clients)
 
@@ -71,10 +118,10 @@
 - [x] Enable/disable AP per radio
 - [x] Guest network with client isolation
 - [x] QR code for WiFi sharing (generate scannable QR with AP credentials)
-- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). We use `wifi up` only when an AP was re-enabled; SSID/key-only fixes are committed without running wifi. All wireless apply uses `wifi up`, not `wifi reload`, to avoid ath11k/IPQ6018 crash loops. Auto-reconnect cron script also uses `wifi up`.
-- [ ] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
-- [ ] 🔮 Band steering (prefer 5 GHz when client supports it)
-- [ ] 🔮 Scheduled WiFi (time-based on/off)
+- [x] At startup, ensure enabled AP sections have a valid SSID and key (health check fixes missing values, skips disabled APs to avoid ath11k driver crashes). Startup health commits repairs but does not auto-apply wireless changes that would require browser confirmation; the user applies them via LuCI Save & Apply or reboot. User-driven wireless changes use rpcd `uci apply` rollback with explicit browser confirmation. Auto-reconnect cron script still uses `wifi up`.
+- [x] AP disable with confirmation warnings (STA deletable without warning). See [Implementation guide](../plans/implementation.md#12--ap-disable-with-warnings).
+- [x] 🔮 Band steering (prefer 5 GHz when client supports it)
+- [x] 🔮 Scheduled WiFi (time-based on/off)
 
 ### 1.3 WiFi Modes
 
@@ -86,8 +133,8 @@
 ### 1.4 Multi-Radio Support
 
 - [x] Detect and enumerate all radio hardware (phy0, phy1, …)
-- [ ] Per-radio configuration (one for uplink, one for AP, etc.). See [Implementation guide](../plans/implementation.md#14--multi-radio-per-radio-config).
-- [ ] Recommended configuration based on detected hardware
+- [x] Per-radio configuration (one for uplink, one for AP, etc.). See [Implementation guide](../plans/implementation.md#14--multi-radio-per-radio-config).
+- [x] Recommended configuration based on detected hardware
 - [ ] 🔮 Startup script to auto-discover radio setup and persist config
 
 ---
@@ -113,6 +160,7 @@
 - [x] Traffic stats per client (RX/TX)
 - [x] Client hostname resolution (DHCP leases + /etc/hosts cross-reference)
 - [x] Block / kick a client
+- [x] Dedicated **Clients** tab/page with structured per-client view (device identity, connection type/path, interface, signal/IP/MAC, activity), plus quick actions (set hostname alias, add static IP reservation, block/ban, unblock/kick). Should consolidate existing client actions into one focused workflow.
 - [ ] 🔮 Client bandwidth limiting (QoS per device)
 - [ ] 🔮 Parental controls / client group policies
 
@@ -122,26 +170,26 @@
 - [x] View active DHCP leases with expiry
 - [x] Custom DNS servers for LAN
 - [x] Local DNS entries (hostname → IP mapping)
-- [ ] 🔮 DNS over HTTPS / DNS over TLS toggle
+- [x] 🔮 DNS over HTTPS / DNS over TLS toggle
 
 ### 2.4 Data Usage Tracking
 
-- [ ] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
-- [ ] Data usage budget / cap with warning threshold. See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
-- [ ] Reset counters (per-session, daily, manual). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [x] Track cumulative RX/TX per WAN source (Ethernet, WiFi, USB Tether). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [x] Data usage budget / cap with warning threshold. See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
+- [x] Reset counters (per-session, daily, manual). See [Data Usage Tracking plan](../plans/data-usage-tracking.md).
 - [x] Show data usage on dashboard (cumulative RX/TX since boot, human-readable format)
 
 ### 2.5 USB Tethering
 
-- [ ] Detect USB tethered device (phone sharing mobile data). See [USB Tethering plan](../plans/usb-tethering.md).
-- [ ] Auto-configure as WAN source. See [USB Tethering plan](../plans/usb-tethering.md).
-- [ ] Show tethering status on dashboard. See [USB Tethering plan](../plans/usb-tethering.md).
+- [x] Detect USB tethered device (phone sharing mobile data). See [USB Tethering plan](../plans/usb-tethering.md).
+- [x] Auto-configure as WAN source. See [USB Tethering plan](../plans/usb-tethering.md).
+- [x] Show tethering status on dashboard. See [USB Tethering plan](../plans/usb-tethering.md).
 - [ ] 🔮 Bluetooth tethering
 
 ### 2.6 WAN Auto-Detection
 
 - [x] WAN connection type auto-detection (DHCP, PPPoE, static)
-- [ ] Detect ethernet cable plug-in and auto-switch to wired WAN. See [Implementation guide](../plans/implementation.md#26--detect-ethernet-cable-plug-in).
+- [x] Detect ethernet cable plug-in and auto-switch to wired WAN. See [Implementation guide](../plans/implementation.md#26--detect-ethernet-cable-plug-in).
 - [x] Show active WAN source indicator on dashboard
 
 ### 2.7 Connection Failover
@@ -164,27 +212,27 @@
 - [x] Show connection status (handshake time, transfer stats)
 - [x] Multiple WireGuard profiles (save, switch, delete VPN configurations)
 - [x] Kill switch (block traffic if VPN drops)
-- [ ] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
-- [ ] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
-- [ ] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
-- [ ] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
-- [ ] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
+- [x] Also install luci-proto-wireguard for wireguard. See [Implementation guide](../plans/implementation.md#31--install-luci-proto-wireguard).
+- [x] VPN needs own interfaces, zones, rules. See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md).
+- [x] Verify button to check VPN config (interfaces, zones, routes). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-3--verify-vpn-button).
+- [x] Split tunneling (route only selected traffic through VPN). See [WireGuard Full Networking plan](../plans/wireguard-full-networking.md#phase-5--split-tunneling-future).
+- [x] VPN + AdGuard interplay configuration. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 
 ### 3.2 Tailscale
 
 - [x] Status endpoint (stub — returns not installed)
 - [x] Toggle endpoint (stub)
-- [ ] Actual Tailscale integration (login, device list, exit node). See [Tailscale Integration plan](../plans/tailscale-integration.md).
-- [ ] Show Tailscale IP and connected peers. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-2--status--connected-peers).
-- [ ] Exit node selection. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-3--exit-node-selection).
-- [ ] 🔮 Tailscale SSH toggle
+- [x] Actual Tailscale integration (login, device list, exit node). See [Tailscale Integration plan](../plans/tailscale-integration.md).
+- [x] Show Tailscale IP and connected peers. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-2--status--connected-peers).
+- [x] Exit node selection. See [Tailscale Integration plan](../plans/tailscale-integration.md#phase-3--exit-node-selection).
+- [x] 🔮 Tailscale SSH toggle
 
 ### 3.3 General VPN UX
 
 - [x] Grey out VPN options when packages not installed (link to Services page)
 - [x] Backend loads installed-service state at startup; UI reads cached state (no dynamic per-page checks)
-- [ ] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
-- [ ] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
+- [x] Show VPN data usage on dashboard. See [Implementation guide](../plans/implementation.md#33--vpn-data-usage-on-dashboard).
+- [x] DNS leak test (verify traffic routes through VPN correctly). See [Implementation guide](../plans/implementation.md#33--dns-leak-test).
 - [ ] 🔮 OpenVPN support
 - [ ] 🔮 VPN speed test
 
@@ -207,24 +255,24 @@
 
 - [x] Status check (installed, running, version)
 - [x] Query statistics (total, blocked, percentage, avg response time)
-- [ ] Auto-configure after install (port, interfaces, DNS integration with dnsmasq). See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md).
+- [x] Auto-configure after install (port, interfaces, DNS integration with dnsmasq). See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md).
 - [x] "AdGuard Home handles client requests" toggle (GL.iNet style, with VPN hint; defaults to off)
 - [x] Show if AdGuard is configured as default DNS for LAN
 - [x] Quick link to AdGuard web UI (with correct IP:port)
 - [x] Toggle DNS filtering on/off without stopping AdGuard
 - [x] AdGuard Home configuration editor (show/edit AdGuardHome.yaml with restart)
-- [ ] Configure AdGuard to work alongside VPN. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
+- [x] Configure AdGuard to work alongside VPN. See [AdGuard Auto-Configure plan](../plans/adguard-auto-configure.md#phase-3--vpn--adguard-interplay).
 - [ ] 🔮 Blocklist management from travel router UI
 
 ### 4.3 WireGuard (as service)
 
 - [x] Install wireguard-tools package
-- [ ] Post-install setup wizard. See [Implementation guide](../plans/implementation.md#43--wireguard-post-install-wizard).
+- [x] Post-install setup wizard. See [Implementation guide](../plans/implementation.md#43--wireguard-post-install-wizard).
 
 ### 4.4 Tailscale (as service)
 
 - [x] Install tailscale package
-- [ ] Post-install authentication flow. See [Implementation guide](../plans/implementation.md#44--tailscale-post-install-auth-flow) and [Tailscale Integration plan](../plans/tailscale-integration.md#phase-1--authentication-flow).
+- [x] Post-install authentication flow. See [Implementation guide](../plans/implementation.md#44--tailscale-post-install-auth-flow) and [Tailscale Integration plan](../plans/tailscale-integration.md#phase-1--authentication-flow).
 
 ### 4.5 Dynamic DNS
 
@@ -256,7 +304,7 @@
 
 - [x] Reboot with confirmation dialog
 - [x] Reboot actually working on device
-- [ ] Shutdown button. See [Implementation guide](../plans/implementation.md#52--mark-reboot-as-working--add-shutdown).
+- [x] Shutdown button. See [Implementation guide](../plans/implementation.md#52--mark-reboot-as-working--add-shutdown).
 - [x] Firmware upgrade (upload sysupgrade image)
 - [x] Factory reset with confirmation
 - [x] Hostname change
@@ -271,16 +319,16 @@
 - [x] Detect timezone mismatch between device and browser (GL.iNet style)
 - [x] NTP server configuration
 - [x] Browser time sync on login — before JWT is issued, client POSTs its clock to `/api/v1/system/time-sync`; if skew > 60s the router clock is corrected via `date -s` (fixes clock-skew login loop on devices without NTP access at first boot)
-- [ ] Auto-set timezone from browser on mismatch alert click. See [Implementation guide](../plans/implementation.md#53--auto-set-timezone-from-browser).
-- [ ] NTP manual sync button + travel timezone validation. See [Implementation guide](../plans/implementation.md#53--time-sync-travel-validation).
-- [ ] 🔮 NTP sync status indicator
+- [x] Auto-set timezone from browser on mismatch alert click. See [Implementation guide](../plans/implementation.md#53--auto-set-timezone-from-browser).
+- [x] NTP manual sync button + travel timezone validation. See [Implementation guide](../plans/implementation.md#53--time-sync-travel-validation).
+- [x] 🔮 NTP sync status indicator
 
 ### 5.4 Password Management
 
 - [x] Login with password (bcrypt hashed)
 - [x] Change admin password from UI
 - [x] Password strength requirements
-- [ ] 🔮 SSH key management
+- [x] 🔮 SSH key management
 
 ---
 
@@ -300,7 +348,7 @@
 - [x] Bandwidth chart (CPU/Memory over time, 15 data points)
 - [x] Network throughput chart (RX/TX bytes/sec)
 - [x] Per-interface traffic chart
-- [ ] Connection uptime log (internet available since / lost at — timeline of events). See [Implementation guide](../plans/implementation.md#62--connection-uptime-log).
+- [x] Connection uptime log (internet available since / lost at — timeline of events). See [Implementation guide](../plans/implementation.md#62--connection-uptime-log).
 - [ ] 🔮 Historical data (store and display last hours/days)
 
 ### 6.3 Quick Actions
@@ -317,7 +365,7 @@
 - [x] Dropdown panel showing recent alerts with severity indicators
 - [x] Toast notification on new alert
 - [x] Notification history via GET /api/v1/system/alerts (last 50 in memory)
-- [ ] 🔮 Configurable alert thresholds (e.g., storage < 10%)
+- [x] 🔮 Configurable alert thresholds (e.g., storage < 10%)
 
 ---
 
@@ -330,9 +378,9 @@
 - [x] Remember me toggle (localStorage vs sessionStorage)
 - [x] WebSocket auth via JWT query parameter
 - [x] Session timeout warning (toast 5 min before JWT expiry, auto-redirect on expiry)
-- [ ] HTTPS / TLS support (low priority). See [Implementation guide](../plans/implementation.md#7--https--tls-support).
+- [x] HTTPS / TLS support (low priority). See [Implementation guide](../plans/implementation.md#7--https--tls-support).
 - [ ] 🔮 Two-factor authentication
-- [ ] 🔮 IP-based access control
+- [x] IP-based access control (env `ALLOWED_ADMIN_CIDRS` / `--allowed-admin-cidrs`; loopback always allowed; exempt: `/api/health`, `/api/v1/auth/login`, `/api/v1/system/time-sync`)
 
 ---
 
@@ -343,7 +391,7 @@
 - [x] Banner on dashboard and WiFi page
 - [x] Auto-refresh every 30 seconds
 - [x] Open portal login in new tab (button in captive portal banner)
-- [ ] 🔮 Auto-accept portal terms (common portal patterns)
+- [x] Auto-accept portal terms (common portal patterns)
 
 ---
 
@@ -355,8 +403,8 @@
 - [x] Log level filtering
 - [x] Log search / filter
 - [x] Log export / download
-- [ ] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)
-- [ ] 🔮 Speed test (run from device to measure actual WAN throughput)
+- [x] 🔮 Network diagnostics (ping, traceroute, DNS lookup from device)
+- [x] 🔮 Speed test (run from device to measure actual WAN throughput)
 
 ---
 
@@ -365,19 +413,19 @@
 - [x] MAC address cloning (copy client MAC for hotel WiFi device registration)
 - [x] MAC address randomization / anonymization (generate random MAC per connection)
 - [x] Show current MAC per interface
-- [ ] 🔮 Per-network MAC policy (remember which MAC to use for which SSID)
+- [x] 🔮 Per-network MAC policy (remember which MAC to use for which SSID)
 
 ---
 
 ## 11. Advanced Networking
 
 - [ ] 🔮 mDNS / Bonjour forwarding (Chromecast, AirPlay across network segments)
-- [ ] 🔮 Firewall zone summary (WAN/LAN/VPN zone overview — not full rule editor)
-- [ ] 🔮 Port forwarding
+- [x] 🔮 Firewall zone summary (WAN/LAN/VPN zone overview — not full rule editor)
+- [x] 🔮 Port forwarding
 - [ ] 🔮 Custom routing rules
 - [ ] 🔮 VLAN configuration
-- [ ] 🔮 IPv6 support toggle and status
-- [ ] 🔮 Wake-on-LAN
+- [x] 🔮 IPv6 support toggle and status
+- [x] 🔮 Wake-on-LAN
 
 ---
 
@@ -388,7 +436,7 @@
 - [x] Loading skeletons
 - [x] Error handling with toast notifications
 - [x] Tooltips / hover info for WiFi networks (signal details, channel, etc.)
-- [ ] Tooltips for technical fields (what is MTU? what is DHCP range?). See [Implementation guide](../plans/implementation.md#12--tooltips-for-technical-fields).
+- [x] Tooltips for technical fields (what is MTU? what is DHCP range?). See [Implementation guide](../plans/implementation.md#12--tooltips-for-technical-fields).
 - [x] Onboarding / first-run setup wizard
 - [x] Connection status indicator in header (green/red dot)
 - [x] Actions dropdown menu in toolbar (Reboot, Logout)
@@ -396,7 +444,57 @@
 - [x] Dialog close button visible in dark mode
 - [x] Select component dark mode styling
 - [ ] 🔮 Multi-language support (i18n)
-- [ ] 🔮 PWA enhancements (offline indicator, app-like experience)
+- [x] 🔮 PWA enhancements (offline indicator, app-like experience)
+
+### 12.2 Information Architecture & Page Structure
+
+> The UI currently exposes every feature as a flat list of cards on each page.
+> Non-technical users face 10–22 cards per page with no grouping, collapsing,
+> or progressive disclosure. The changes below prioritise simplicity for daily
+> use while keeping power-user features accessible behind sub-menus or
+> expandable sections. See [UX Overhaul plan](../plans/ux-overhaul.md) for
+> full design rationale and implementation details.
+
+#### Network page (21 cards, 1008 lines — most complex page)
+
+- [x] Group cards into tabbed/collapsible sections: **Status** (connectivity, WAN source, traffic charts, connected clients), **Configuration** (WAN, LAN, DHCP, DNS), **Advanced** (DDNS, firewall, port forwarding, IPv6, DoH, WoL, diagnostics, speed test, USB tethering). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-restructure).
+- [x] Move Connected Clients card from position 13 to the Status group (top of page)
+- [x] Merge Internet Connectivity badge into WAN Source card (save one full card for a single badge)
+- [x] Make firewall port-forward add-form responsive (currently hard 6-column grid breaks on mobile). See [UX Overhaul plan](../plans/ux-overhaul.md#mobile-form-fixes).
+- [x] Make DHCP reservation / DNS entry add-forms responsive (3–4 column grids with no breakpoints)
+- [x] Extract network-page.tsx inline sections into separate components (target: page file under 300 lines). See [UX Overhaul plan](../plans/ux-overhaul.md#network-page-extraction).
+
+#### System page (13+ cards, 1087 lines — second most complex)
+
+- [x] Reorder cards by frequency: **At-a-glance** (System Info + Uptime merged, Stats) at top, **Configuration** (Timezone, NTP, Password, SSH Keys, LED, Buttons, Alert Thresholds) in middle, **Danger Zone** (Firmware Upgrade, Factory Reset, Reboot, Shutdown) at bottom with a visual separator. See [UX Overhaul plan](../plans/ux-overhaul.md#system-page-restructure).
+- [x] Merge Uptime into System Information card (Uptime is currently a single-line standalone card)
+- [x] Move Quick Links from first position to bottom utility section
+- [x] Replace `window.confirm()` in Restore with a proper Dialog (only place in the app using native confirm)
+- [x] Make Reboot/Shutdown use full Dialog confirmation (currently inline badge + 2 small buttons — weaker than Factory Reset's modal)
+- [x] Replace raw `<input type="checkbox">` with `<Switch>` component for NTP enable and Firmware keep-settings toggles (inconsistent with LED schedule toggle)
+- [x] Extract large inline sections into separate components (LED 132 lines, Actions 113 lines, Firmware 103 lines, NTP 97 lines). See [UX Overhaul plan](../plans/ux-overhaul.md#system-page-extraction).
+
+#### WiFi page (10 cards, 572 lines)
+
+- [x] Group bottom 5 cards (Guest, MAC Address, MAC Policy, Band Switching, Schedule) into a collapsible "Advanced WiFi Settings" section — these are set-once features. See [UX Overhaul plan](../plans/ux-overhaul.md#wifi-page-restructure).
+- [x] Hide mode-irrelevant sections: hide "Saved Networks" in pure AP mode, hide "Access Point Configuration" in pure STA mode
+- [x] Extract inline cards (Radio Hardware, Current Connection, Saved Networks, AP Config) into separate component files (currently 442 lines inline in wifi-page.tsx)
+
+#### Dashboard
+
+- [x] Move QuickActions above the charts (currently below fold, hard to discover). See [UX Overhaul plan](../plans/ux-overhaul.md#dashboard-improvements).
+- [x] Fix QuickActions label: "WiFi On" / "WiFi Off" describes state, not action — change to "Disable WiFi" / "Enable WiFi"
+- [x] Remove duplicate feedback: QuickActions uses inline ActionState icons AND hook-level Sonner toasts simultaneously — pick one
+- [x] Remove `window.confirm()` from QuickActions Reboot — use Dialog component (matches header pattern)
+- [x] Fix chart hardcoded hex colors for dark mode (tooltip bg `rgba(0,0,0,0.8)`, grid lines `#9ca3af`). See [UX Overhaul plan](../plans/ux-overhaul.md#dark-mode-chart-fix).
+- [x] Show router hostname/model in header for multi-device disambiguation
+
+### 12.3 Consistency & Polish
+
+- [x] Standardise confirmation UX: all destructive actions (Reboot, Shutdown, Factory Reset, Firmware Upgrade, Restore) must use the Dialog component with explicit warning text — no `window.confirm()`, no inline badge-based confirmations. See [UX Overhaul plan](../plans/ux-overhaul.md#confirmation-standardisation).
+- [x] Standardise form pattern: configuration cards should have a read-only view state with an Edit button, instead of permanently showing editable forms (Timezone, NTP, Password, Hardware Buttons are always in edit mode)
+- [x] Standardise empty states: use a consistent "no data" component across all cards instead of ad-hoc `<p className="text-sm text-gray-500">` strings
+- [x] Ensure `SystemStatsCard` shows a Skeleton on error instead of returning `null` (which collapses the grid cell)
 
 ---
 
@@ -409,19 +507,31 @@
 - [x] `setup-local.sh` — one-time fresh-device setup over SSH (moves LuCI to :8080, uploads init.d + UCI config, marks setup complete)
 - [x] AP WiFi health check at startup (ensures enabled APs have valid config; skips disabled APs)
 - [x] Init script for auto-start on boot (procd service, verified on device)
-- [ ] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
-- [ ] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
+- [x] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
+- [x] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
 - [ ] 🔮 Automatic updates mechanism
 
 ---
 
 ## 14. Hardware Buttons
 
-- [ ] Detect hardware buttons (identify available buttons via /etc/rc.button/). See [Hardware Buttons plan](../plans/hardware-buttons.md).
-- [ ] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.). See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-2--configure-button-actions).
-- [ ] Button event handler via hotplug.d integration. See [Hardware Buttons plan](../plans/hardware-buttons.md).
+- [x] Detect hardware buttons (identify available buttons via /etc/rc.button/). See [Hardware Buttons plan](../plans/hardware-buttons.md).
+- [x] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.). See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-2--configure-button-actions).
+- [x] Button event handler via hotplug.d integration. See [Hardware Buttons plan](../plans/hardware-buttons.md).
 - [ ] 🔮 Custom button action scripting
 - [ ] 🔮 Long-press vs short-press differentiation. See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-4--long-press-vs-short-press-future).
+
+---
+
+## 15. VPN, Wi‑Fi stability, SQM, performance & AdGuard (field issues)
+
+- [x] **WireGuard enable/error/runtime**: Enabling VPN from the UI shows an error while `wg0` still appears in LuCI; traffic does not use the tunnel. Align backend apply order with netifd/LuCI (interface, peer, firewall, routing). Ensure UCI objects LuCI expects exist before enable. Harden verification (avoid failing the whole operation when the interface is up but a handshake is still in progress).
+- [ ] **Single active VPN policy**: Only one VPN-style path may be active at a time across WireGuard, Tailscale (exit node / full-tunnel style use), and future providers. Enabling one must disable or demote others deterministically.
+- [x] **Wi‑Fi SSID/password visibility after change**: After changing AP name/password via the GUI, clients do not see the network until the SSID is toggled in LuCI. Wireless confirm/apply path should fully restart or reload hostapd so the BSS reappears without manual LuCI steps.
+- [ ] **SQM / traffic shaping**: Offer SQM install (cake/fq_codel) with defaults suitable for most travel-router WANs; optional presets per scenario. Reference: [OpenWrt SQM](https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm).
+- [x] **Backend CPU usage**: Investigate sustained high CPU from `openwrt-travel-gui` (e.g. WebSocket/ubus work while no clients are connected, service restart behaviour). Add safeguards: back off when idle, avoid redundant hot paths, document intentional monitors.
+- [x] **AdGuard Home admin URLs from YAML**: Load bind host/port (and related listen settings) from `/etc/adguardhome/adguardhome.yaml` at backend startup so the UI shows correct links instead of hard-coded assumptions.
+- [x] **Attended Sysupgrade preferences**: On install/setup set `uci set attendedsysupgrade.client.login_check_for_upgrades='1'` and commit so update checks follow project policy.
 
 ---
 

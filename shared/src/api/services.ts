@@ -18,6 +18,8 @@ export interface AdGuardStatus {
   readonly blocked_queries: number;
   readonly block_percentage: number;
   readonly avg_response_ms: number;
+  readonly admin_url?: string;
+  readonly config_yaml_path?: string;
 }
 
 /** AdGuard DNS forwarding status */

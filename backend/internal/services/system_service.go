@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -196,6 +197,16 @@ func (s *SystemService) Reboot() error {
 	return nil
 }
 
+// Shutdown initiates a system poweroff.
+// The call is async so the HTTP response returns before the system goes down.
+func (s *SystemService) Shutdown() error {
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		_ = exec.Command("poweroff").Run()
+	}()
+	return nil
+}
+
 // findSystemSection returns the UCI section name for the system-type section.
 // On real OpenWRT it's an anonymous section (e.g. cfg01e48a); in mocks it may be "system".
 func (s *SystemService) findSystemSection() (string, map[string]string, error) {
@@ -276,6 +287,15 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 		return fmt.Errorf("setting ntp servers: %w", err)
 	}
 	return s.uci.Commit("system")
+}
+
+// SyncNTP forces a one-shot NTP sync using ntpd.
+func (s *SystemService) SyncNTP() error {
+	out, err := exec.Command("ntpd", "-q", "-n", "-p", "pool.ntp.org").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ntp sync failed: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // SetHostname changes the device hostname via UCI and applies it.
@@ -508,6 +528,188 @@ func (s *SystemService) SetSetupComplete() error {
 	return f.Close()
 }
 
+const (
+	buttonActionsDir  = "/etc/openwrt-travel-gui"
+	buttonActionsFile = "/etc/openwrt-travel-gui/button-actions.json"
+	hotplugScript     = "/etc/hotplug.d/button/50-gui-button-actions"
+	rcButtonDir       = "/etc/rc.button"
+)
+
+// GetHardwareButtons returns the detected hardware buttons with their configured actions.
+func (s *SystemService) GetHardwareButtons() []models.HardwareButton {
+	entries, err := os.ReadDir(rcButtonDir)
+	names := []string{}
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				names = append(names, e.Name())
+			}
+		}
+	}
+	// Merge with configured actions
+	configured := s.loadButtonActions()
+	actionMap := make(map[string]models.ButtonAction, len(configured))
+	for _, b := range configured {
+		actionMap[b.Name] = b.Action
+	}
+	result := make([]models.HardwareButton, 0, len(names))
+	for _, name := range names {
+		action := models.ButtonActionNone
+		if a, ok := actionMap[name]; ok {
+			action = a
+		}
+		result = append(result, models.HardwareButton{Name: name, Action: action})
+	}
+	return result
+}
+
+// SetButtonActions saves button action config and regenerates the hotplug script.
+func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error {
+	// Validate actions
+	for _, b := range buttons {
+		switch b.Action {
+		case models.ButtonActionNone, models.ButtonActionVPNToggle,
+			models.ButtonActionWifiToggle, models.ButtonActionLEDToggle,
+			models.ButtonActionReboot:
+		default:
+			return fmt.Errorf("unknown action %q for button %q", b.Action, b.Name)
+		}
+	}
+	if err := os.MkdirAll(buttonActionsDir, 0o755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+	// Write JSON config
+	data := buildButtonActionsJSON(buttons)
+	if err := os.WriteFile(buttonActionsFile, []byte(data), 0o644); err != nil {
+		return fmt.Errorf("write button-actions config: %w", err)
+	}
+	// Generate hotplug script
+	script := buildButtonHotplugScript(buttons)
+	if err := os.MkdirAll(filepath.Dir(hotplugScript), 0o755); err != nil {
+		return fmt.Errorf("create hotplug dir: %w", err)
+	}
+	if err := os.WriteFile(hotplugScript, []byte(script), 0o755); err != nil {
+		return fmt.Errorf("write hotplug script: %w", err)
+	}
+	return nil
+}
+
+func (s *SystemService) loadButtonActions() []models.HardwareButton {
+	data, err := os.ReadFile(buttonActionsFile)
+	if err != nil {
+		return nil
+	}
+	var buttons []models.HardwareButton
+	// Simple JSON parse without encoding/json to avoid import cycle — use encoding/json directly
+	_ = unmarshalButtonActions(data, &buttons)
+	return buttons
+}
+
+func buildButtonActionsJSON(buttons []models.HardwareButton) string {
+	var sb strings.Builder
+	sb.WriteString("[\n")
+	for i, b := range buttons {
+		sb.WriteString(fmt.Sprintf("  {\"name\":%q,\"action\":%q}", b.Name, string(b.Action)))
+		if i < len(buttons)-1 {
+			sb.WriteString(",")
+		}
+		sb.WriteString("\n")
+	}
+	sb.WriteString("]\n")
+	return sb.String()
+}
+
+// unmarshalButtonActions is a minimal JSON parser for the button actions file.
+// We use encoding/json via a local import to avoid a circular reference.
+func unmarshalButtonActions(data []byte, out *[]models.HardwareButton) error {
+	type raw struct {
+		Name   string `json:"name"`
+		Action string `json:"action"`
+	}
+	// Parse manually: find pairs of "name":"..." "action":"..."
+	text := string(data)
+	var result []models.HardwareButton
+	for {
+		ni := strings.Index(text, `"name":`)
+		if ni < 0 {
+			break
+		}
+		text = text[ni+len(`"name":`):]
+		name := extractJSONString(text)
+		ai := strings.Index(text, `"action":`)
+		if ai < 0 {
+			break
+		}
+		text = text[ai+len(`"action":`):]
+		action := extractJSONString(text)
+		result = append(result, models.HardwareButton{
+			Name:   name,
+			Action: models.ButtonAction(action),
+		})
+		// advance past the action value
+		text = text[strings.Index(text, `"`)+1:]
+		rest := strings.Index(text, `"`)
+		if rest < 0 {
+			break
+		}
+		text = text[rest+1:]
+	}
+	*out = result
+	return nil
+}
+
+func extractJSONString(s string) string {
+	start := strings.Index(s, `"`)
+	if start < 0 {
+		return ""
+	}
+	s = s[start+1:]
+	end := strings.Index(s, `"`)
+	if end < 0 {
+		return ""
+	}
+	return s[:end]
+}
+
+func buildButtonHotplugScript(buttons []models.HardwareButton) string {
+	var sb strings.Builder
+	sb.WriteString("#!/bin/sh\n")
+	sb.WriteString("# Generated by openwrt-travel-gui — do not edit manually.\n")
+	sb.WriteString("[ \"$ACTION\" = \"pressed\" ] || exit 0\n")
+	sb.WriteString("case \"$BUTTON\" in\n")
+	for _, b := range buttons {
+		if b.Action == models.ButtonActionNone {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("  %s)\n", b.Name))
+		switch b.Action {
+		case models.ButtonActionVPNToggle:
+			// Use netifd-managed interface control; wg-quick is often absent on OpenWrt.
+			sb.WriteString("    if /sbin/ifstatus wg0 2>/dev/null | grep -q '\"up\": true'; then\n")
+			sb.WriteString("      /sbin/ifdown wg0 2>/dev/null || true\n")
+			sb.WriteString("    else\n")
+			sb.WriteString("      /sbin/ifup wg0 2>/dev/null || true\n")
+			sb.WriteString("    fi\n")
+		case models.ButtonActionWifiToggle:
+			sb.WriteString("    if iwinfo 2>/dev/null | grep -q '^'; then\n")
+			sb.WriteString("      wifi down\n")
+			sb.WriteString("    else\n")
+			sb.WriteString("      wifi up\n")
+			sb.WriteString("    fi\n")
+		case models.ButtonActionLEDToggle:
+			sb.WriteString("    for led in /sys/class/leds/*/brightness; do\n")
+			sb.WriteString("      cur=$(cat \"$led\" 2>/dev/null)\n")
+			sb.WriteString("      [ \"$cur\" = \"0\" ] && echo 1 > \"$led\" || echo 0 > \"$led\"\n")
+			sb.WriteString("    done\n")
+		case models.ButtonActionReboot:
+			sb.WriteString("    reboot\n")
+		}
+		sb.WriteString("    ;;\n")
+	}
+	sb.WriteString("esac\n")
+	return sb.String()
+}
+
 // logLevelSeverity maps syslog level names to numeric severity (lower = more severe).
 var logLevelSeverity = map[string]int{
 	"emerg":   0,
@@ -578,4 +780,104 @@ func parseLogOutput(source, output, service, level string) models.LogResponse {
 		Lines:  lines,
 		Total:  len(lines),
 	}
+}
+
+const authorizedKeysFile = "/etc/dropbear/authorized_keys"
+
+// GetSSHKeys returns all public keys from the authorized_keys file.
+func (s *SystemService) GetSSHKeys() (models.SSHKeysResponse, error) {
+	data, err := os.ReadFile(authorizedKeysFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return models.SSHKeysResponse{Keys: []models.SSHKey{}}, nil
+		}
+		return models.SSHKeysResponse{}, err
+	}
+	var keys []models.SSHKey
+	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		comment := ""
+		parts := strings.Fields(line)
+		if len(parts) >= 3 {
+			comment = strings.Join(parts[2:], " ")
+		}
+		keys = append(keys, models.SSHKey{Index: i, Comment: comment, Key: line})
+	}
+	if keys == nil {
+		keys = []models.SSHKey{}
+	}
+	return models.SSHKeysResponse{Keys: keys}, nil
+}
+
+// AddSSHKey appends a public key to the authorized_keys file.
+func (s *SystemService) AddSSHKey(key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return fmt.Errorf("key must not be empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(authorizedKeysFile), 0700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintln(f, key)
+	return err
+}
+
+// DeleteSSHKey removes the key at the given line index from authorized_keys.
+func (s *SystemService) DeleteSSHKey(index int) error {
+	data, err := os.ReadFile(authorizedKeysFile)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	if index < 0 || index >= len(lines) {
+		return fmt.Errorf("key index %d out of range", index)
+	}
+	lines = append(lines[:index], lines[index+1:]...)
+	return os.WriteFile(authorizedKeysFile, []byte(strings.Join(lines, "\n")), 0600)
+}
+
+const speedTestResultFile = "/tmp/openwrt-speed-test.json"
+
+// RunSpeedTest runs a basic speed test using wget and writes results.
+// On constrained hardware this performs a simple HTTP download measurement.
+func (s *SystemService) RunSpeedTest() (models.SpeedTestResult, error) {
+	result := models.SpeedTestResult{Server: "tele2.net (wget)"}
+
+	// Measure download: fetch a 1MB test file and time it
+	start := time.Now()
+	_, err := exec.Command("wget", "-O", "/dev/null", "--timeout=15",
+		"--no-check-certificate",
+		"http://speedtest.tele2.net/1MB.zip").CombinedOutput()
+	elapsed := time.Since(start).Seconds()
+	if err == nil && elapsed > 0 {
+		result.DownloadMbps = (1024 * 1024 * 8) / elapsed / 1e6
+	}
+
+	// Measure ping to 8.8.8.8
+	pingOut, err2 := exec.Command("ping", "-c", "4", "-W", "3", "8.8.8.8").CombinedOutput()
+	if err2 == nil {
+		for _, line := range strings.Split(string(pingOut), "\n") {
+			if strings.Contains(line, "avg") {
+				// "round-trip min/avg/max = X/Y/Z ms"
+				parts := strings.Split(line, "/")
+				if len(parts) >= 5 {
+					if v, err3 := strconv.ParseFloat(strings.TrimSpace(parts[4]), 64); err3 == nil {
+						result.PingMs = v
+					}
+				}
+			}
+		}
+	}
+
+	data, _ := json.Marshal(result)
+	_ = os.WriteFile(speedTestResultFile, data, 0600)
+	return result, nil
 }

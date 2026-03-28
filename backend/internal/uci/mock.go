@@ -85,13 +85,17 @@ func (m *MockUCI) populate() {
 	m.setInternal("firewall", "zone_wan", "masq", "1")
 	m.setInternal("firewall", "zone_wan", "mtu_fix", "1")
 	m.setInternal("firewall", "zone_wan", "network", "wan wan6")
+	m.setInternal("network", "wg0", ".type", "interface")
 	m.setInternal("network", "wg0", "proto", "wireguard")
 	m.setInternal("network", "wg0", "private_key", "mock_private_key_base64")
 	m.setInternal("network", "wg0", "addresses", "10.0.0.2/24")
 	m.setInternal("network", "wg0", "dns", "1.1.1.1")
 	m.setInternal("network", "wg0", "disabled", "1")
+	m.setInternal("network", "wg0_peer0", ".type", "wireguard_wg0")
 	m.setInternal("network", "wg0_peer0", "public_key", "mock_peer_public_key_base64")
-	m.setInternal("network", "wg0_peer0", "endpoint", "vpn.example.com:51820")
+	m.setInternal("network", "wg0_peer0", "endpoint_host", "vpn.example.com")
+	m.setInternal("network", "wg0_peer0", "endpoint_port", "51820")
+	m.setInternal("network", "wg0_peer0", "route_allowed_ips", "1")
 	m.setInternal("network", "wg0_peer0", "allowed_ips", "0.0.0.0/0")
 	m.setInternal("ddns", "myddns", "enabled", "0")
 	m.setInternal("ddns", "myddns", "service_name", "duckdns.org")
@@ -178,6 +182,18 @@ func (m *MockUCI) AddList(config, section, option, value string) error {
 	// Mock: store as single value (real UCI list can have multiple; we don't track list multiplicity)
 	m.data[config][section][option] = value
 	return nil
+}
+
+func (m *MockUCI) DeleteOption(config, section, option string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if c, ok := m.data[config]; ok {
+		if s, ok := c[section]; ok {
+			delete(s, option)
+			return nil
+		}
+	}
+	return fmt.Errorf("uci: section not found %s.%s", config, section)
 }
 
 func (m *MockUCI) DeleteSection(config, section string) error {

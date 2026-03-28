@@ -127,3 +127,82 @@ type Alert struct {
 type AlertsResponse struct {
 	Alerts []Alert `json:"alerts"`
 }
+
+// ButtonAction is the action to perform when a hardware button is pressed.
+// Valid values: "none", "vpn_toggle", "wifi_toggle", "led_toggle", "reboot".
+type ButtonAction string
+
+const (
+	ButtonActionNone       ButtonAction = "none"
+	ButtonActionVPNToggle  ButtonAction = "vpn_toggle"
+	ButtonActionWifiToggle ButtonAction = "wifi_toggle"
+	ButtonActionLEDToggle  ButtonAction = "led_toggle"
+	ButtonActionReboot     ButtonAction = "reboot"
+)
+
+// HardwareButton describes a detected hardware button and its configured action.
+type HardwareButton struct {
+	Name   string       `json:"name"`   // button identifier, e.g. "reset", "wps"
+	Action ButtonAction `json:"action"` // configured action
+}
+
+// ButtonActionsRequest is the payload for PUT /api/v1/system/button-actions.
+type ButtonActionsRequest struct {
+	Buttons []HardwareButton `json:"buttons"`
+}
+
+// WiFiSchedule holds the cron-based WiFi on/off schedule.
+type WiFiSchedule struct {
+	Enabled bool   `json:"enabled"`
+	OnTime  string `json:"on_time"`  // HH:MM, empty=disabled
+	OffTime string `json:"off_time"` // HH:MM, empty=disabled
+}
+
+// SplitTunnelConfig holds WireGuard split tunneling settings.
+type SplitTunnelConfig struct {
+	Mode   string   `json:"mode"`   // "all" or "custom"
+	Routes []string `json:"routes"` // CIDR ranges when mode=custom
+}
+
+// MACPolicy maps an SSID to a specific MAC address to use when connecting.
+type MACPolicy struct {
+	SSID string `json:"ssid"`
+	MAC  string `json:"mac"` // empty means use default
+}
+
+// MACPolicies holds all per-network MAC policies.
+type MACPolicies struct {
+	Policies []MACPolicy `json:"policies"`
+}
+
+// SSHKey holds a single authorized SSH public key.
+type SSHKey struct {
+	Index   int    `json:"index"`
+	Comment string `json:"comment"`
+	Key     string `json:"key"` // full public key line
+}
+
+// SSHKeysResponse lists all authorized SSH keys.
+type SSHKeysResponse struct {
+	Keys []SSHKey `json:"keys"`
+}
+
+// AddSSHKeyRequest contains the public key to add.
+type AddSSHKeyRequest struct {
+	Key string `json:"key"`
+}
+
+// SpeedTestResult holds the result of a speed test run.
+type SpeedTestResult struct {
+	DownloadMbps float64 `json:"download_mbps"`
+	UploadMbps   float64 `json:"upload_mbps"`
+	PingMs       float64 `json:"ping_ms"`
+	Server       string  `json:"server"`
+}
+
+// AlertThresholds holds configurable thresholds for system alerts.
+type AlertThresholds struct {
+	StoragePercent float64 `json:"storage_percent"`
+	CPUPercent     float64 `json:"cpu_percent"`
+	MemoryPercent  float64 `json:"memory_percent"`
+}

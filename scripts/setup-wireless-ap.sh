@@ -5,6 +5,10 @@
 # Does not remove or modify STA (client) configs. Does NOT run "wifi" or "wifi up".
 # If apply is used, host must call uci confirm within timeout. See AGENTS.md.
 # Runs on the OpenWRT device (ash).
+#
+# Optional environment (set by setup-local.sh):
+#   SETUP_WIFI_SSID — base SSID: non-5g radio uses this; 5g uses ${SETUP_WIFI_SSID}-5G
+#   SETUP_WIFI_KEY  — WPA2 key for every AP (default remains travelrouter if unset)
 
 set -e
 
@@ -16,6 +20,17 @@ DEFAULT_CHANNEL="auto"
 DEFAULT_SSID_24="OpenWrt-Travel"
 DEFAULT_SSID_5G="OpenWrt-Travel-5G"
 DEFAULT_KEY="travelrouter"
+
+# Optional overrides from setup-local.sh (env on device):
+# SETUP_WIFI_SSID — base name: 2.4 GHz AP uses this, 5 GHz uses "${SETUP_WIFI_SSID}-5G"
+# SETUP_WIFI_KEY    — WPA key shared by all APs (if unset, DEFAULT_KEY stays)
+if [ -n "${SETUP_WIFI_SSID:-}" ]; then
+  DEFAULT_SSID_24="$SETUP_WIFI_SSID"
+  DEFAULT_SSID_5G="${SETUP_WIFI_SSID}-5G"
+fi
+if [ -n "${SETUP_WIFI_KEY:-}" ]; then
+  DEFAULT_KEY="$SETUP_WIFI_KEY"
+fi
 
 # --- Phase 1: Remove all AP (mode=ap) entries, keep STA and wifi-device ---
 log "Phase 1: finding AP sections to remove..."

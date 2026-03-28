@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatBytes } from '@/lib/utils';
 
 export function VpnStatusCard() {
   const { data, isLoading } = useQuery({
@@ -50,7 +51,15 @@ export function VpnStatusCard() {
               <Switch checked={vpn.enabled} readOnly aria-label="Toggle VPN" />
             </div>
             {vpn.connected && (
-              <p className="text-sm text-gray-600 dark:text-gray-400">{vpn.endpoint}</p>
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{vpn.endpoint}</p>
+                {(vpn.rx_bytes > 0 || vpn.tx_bytes > 0) && (
+                  <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>↓ {formatBytes(vpn.rx_bytes)}</span>
+                    <span>↑ {formatBytes(vpn.tx_bytes)}</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (

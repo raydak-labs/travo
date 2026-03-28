@@ -4,6 +4,7 @@ import { Header } from './header';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSessionTimeout } from '@/hooks/use-session-timeout';
+import { OfflineBanner } from '@/components/offline-banner';
 
 interface AppShellProps {
   children: ReactNode;
@@ -37,6 +38,7 @@ export function AppShell({ children, title }: AppShellProps) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header title={title} showMenuButton={isMobile} onMenuToggle={() => setMobileOpen(true)} />
+        <OfflineBanner />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="animate-page-fade-in">{children}</div>
         </main>

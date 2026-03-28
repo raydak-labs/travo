@@ -25,3 +25,28 @@
     border-color 0.2s ease,
     color 0.15s ease;
 }
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+  .dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+}
+
+/* Chart colour tokens — respond to dark mode */
+:root {
+  --chart-grid: #e5e7eb;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #e5e7eb;
+  --chart-tooltip-text: #111827;
+  --chart-axis: #9ca3af;
+}
+.dark {
+  --chart-grid: #374151;
+  --chart-tooltip-bg: #1f2937;
+  --chart-tooltip-border: #374151;
+  --chart-tooltip-text: #f9fafb;
+  --chart-axis: #6b7280;
+}

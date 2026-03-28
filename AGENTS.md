@@ -1,5 +1,9 @@
 # Agent Instructions
 
+## Tools & setup
+
+- everything should be installed via `mise`. See `.mise.toml`
+
 ## Project Plans
 
 The plan directory is `plans/`. Do NOT modify plan files.
@@ -10,9 +14,17 @@ When we implement things ensure that you update the feature sets or add features
 ## Project Structure
 
 This is a pnpm monorepo with:
+
 - `frontend/` — React + TypeScript + Vite + TailwindCSS
 - `backend/` — Go + Fiber
 - `shared/` — Shared TypeScript types
+
+## Frontend UI & theming
+
+- Dark mode is the `dark` class on `document.documentElement`, driven by `ThemeProvider` and an inline boot script in `frontend/index.html`. See `docs/ui-theming.md` for tokens and patterns.
+- **Do not** set explicit text colors (`text-gray-900`, hex, inline `color`, etc.) for ordinary copy unless there is no reasonable alternative—prefer inheriting from global `body` styles in `frontend/src/index.css` or using shared primitives (`CardTitle`, `CardDescription`, buttons) that already pair light/dark.
+- When you must set color, always provide **both** light and dark variants (e.g. `text-gray-500 dark:text-gray-400`). Charts and embedded SVGs may use the `--chart-*` CSS variables in `index.css` instead of hard-coded text fills.
+- **Exceptions** (explicit color allowed): status/semantic hues (success, error, links), charts, third-party widgets, badges, and contrast inside intentionally colored surfaces—still keep dark-mode variants where users can enable dark theme.
 
 ## Development
 
@@ -27,6 +39,7 @@ This is a pnpm monorepo with:
 ## Testing
 
 Follow TDD: write tests first, see them fail, write minimal code to pass.
+
 - Go tests: `cd backend && go test ./...`
 - Shared tests: `cd shared && pnpm test`
 - Frontend tests: `cd frontend && pnpm test`
@@ -87,6 +100,28 @@ Guard file naming convention: `/etc/openwrt-travel-gui/<feature>-in-progress`
 **Rule:** If implementing new zones or something ensure that all required firewall changes and required rules are implemented. Follow the existing default "WAN" things which we should use.
 
 **Rule:** If things would make implementing easier ask user if you can access the test device to execute command verify things on it. For example try replicating the flow via ssh/cli commands before implementing them blindly.
+
+## API Documentation Endpoint
+
+The backend exposes a machine-readable **OpenAPI 3.0** specification at:
+
+```
+GET /api/openapi.json
+```
+
+This endpoint requires **no authentication** and is available on the test device:
+
+```sh
+curl http://192.168.1.1/api/openapi.json
+```
+
+Use it for:
+
+- Generating typed API clients or test fixtures
+- Discovering all available `/api/v1/` routes without reading source code
+- Integration tests against the live device
+
+Authentication for protected endpoints: POST `/api/v1/auth/login` with `{"username":"root","password":"..."}` → use the returned `token` as `Authorization: Bearer <token>`.
 
 ## Commit / finish task
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
-import type { WifiScanResult } from '@shared/index';
+import type { GroupedScanNetwork } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,25 +11,26 @@ import {
 } from '@/components/ui/dialog';
 import { WifiScanList } from './wifi-scan-list';
 import { WifiConnectDialog } from './wifi-connect-dialog';
-import { useWifiScan, useWifiConnect } from '@/hooks/use-wifi';
+import { useWifiScan, useWifiConnect, useWifiConnection } from '@/hooks/use-wifi';
 
 export function WifiScanDialog() {
   const [open, setOpen] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState<WifiScanResult | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<GroupedScanNetwork | null>(null);
   const { data: scanResults = [], isLoading, refetch } = useWifiScan(!open ? false : true);
+  const { data: connection } = useWifiConnection();
   const connectMutation = useWifiConnect();
 
-  function handleOpen() {
-    setOpen(true);
-    void refetch();
-  }
-
-  function handleConnect(ssid: string, password: string) {
+  function handleConnect(ssid: string, password: string, band?: string) {
     connectMutation.mutate(
-      { ssid, password },
+      {
+        ssid,
+        password,
+        encryption: selectedGroup?.encryption,
+        band: band ?? undefined,
+      },
       {
         onSuccess: () => {
-          setSelectedNetwork(null);
+          setSelectedGroup(null);
           setOpen(false);
         },
       },
@@ -38,7 +39,13 @@ export function WifiScanDialog() {
 
   return (
     <>
-      <Button onClick={handleOpen} size="sm">
+      <Button
+        onClick={() => {
+          setOpen(true);
+          void refetch();
+        }}
+        size="sm"
+      >
         <Search className="mr-1.5 h-3.5 w-3.5" />
         Scan Networks
       </Button>
@@ -50,13 +57,13 @@ export function WifiScanDialog() {
             <DialogDescription>Select a network to connect to.</DialogDescription>
           </DialogHeader>
 
-          {selectedNetwork ? (
+          {selectedGroup ? (
             <WifiConnectDialog
-              network={selectedNetwork}
+              group={selectedGroup}
               isConnecting={connectMutation.isPending}
               error={connectMutation.error?.message ?? null}
               onConnect={handleConnect}
-              onCancel={() => setSelectedNetwork(null)}
+              onCancel={() => setSelectedGroup(null)}
               embedded
             />
           ) : (
@@ -64,7 +71,9 @@ export function WifiScanDialog() {
               networks={scanResults}
               isLoading={isLoading}
               onRefresh={() => void refetch()}
-              onConnect={setSelectedNetwork}
+              onConnect={setSelectedGroup}
+              connectedSSID={connection?.connected ? connection.ssid : null}
+              connectedBand={connection?.band ?? null}
             />
           )}
         </DialogContent>

@@ -71,6 +71,7 @@ chmod +x /etc/init.d/openwrt-travel-gui
     rm -f /etc/uci-defaults/99-travel-gui-ports
 }
 /etc/init.d/openwrt-travel-gui start
+uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true
 EOF
 chmod +x "${IPK_DIR}/control/postinst"
 
@@ -97,7 +98,8 @@ cd "${IPK_DIR}"
 echo "2.0" > debian-binary
 (cd control && tar czf ../control.tar.gz .)
 (cd data && tar czf ../data.tar.gz .)
-tar czf "../../${PKG_NAME}_${VERSION}_${ARCH}.ipk" debian-binary control.tar.gz data.tar.gz
+# We are currently inside dist/ipk/, so ../ resolves to dist/.
+tar czf "../${PKG_NAME}_${VERSION}_${ARCH}.ipk" debian-binary control.tar.gz data.tar.gz
 cd ../..
 
 echo "✓ Package created: dist/${PKG_NAME}_${VERSION}_${ARCH}.ipk"

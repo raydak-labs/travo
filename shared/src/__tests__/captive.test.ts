@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isCaptivePortalStatus, type CaptivePortalStatus } from '../api/captive';
+import {
+  isCaptivePortalStatus,
+  isCaptiveAutoAcceptResult,
+  type CaptivePortalStatus,
+  type CaptiveAutoAcceptResult,
+} from '../api/captive';
 
 describe('CaptivePortalStatus', () => {
   it('validates correct status without portal_url', () => {
@@ -29,5 +34,24 @@ describe('CaptivePortalStatus', () => {
   it('rejects wrong types', () => {
     expect(isCaptivePortalStatus({ detected: 'yes', can_reach_internet: true })).toBe(false);
     expect(isCaptivePortalStatus({ detected: true, can_reach_internet: 'yes' })).toBe(false);
+  });
+});
+
+describe('CaptiveAutoAcceptResult', () => {
+  it('validates correct payload', () => {
+    const res: CaptiveAutoAcceptResult = {
+      ok: true,
+      message: 'done',
+      detected: false,
+      can_reach_internet: true,
+      attempts: 1,
+    };
+    expect(isCaptiveAutoAcceptResult(res)).toBe(true);
+  });
+
+  it('rejects invalid data', () => {
+    expect(isCaptiveAutoAcceptResult(null)).toBe(false);
+    expect(isCaptiveAutoAcceptResult({})).toBe(false);
+    expect(isCaptiveAutoAcceptResult({ ok: true })).toBe(false);
   });
 });

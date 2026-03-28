@@ -1,6 +1,7 @@
 package services
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -9,12 +10,21 @@ import (
 
 // mockAlertChecker implements AlertChecker with configurable stats.
 type mockAlertChecker struct {
+	mu    sync.RWMutex
 	stats models.SystemStats
 	err   error
 }
 
 func (m *mockAlertChecker) GetSystemStats() (models.SystemStats, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.stats, m.err
+}
+
+func (m *mockAlertChecker) setStats(stats models.SystemStats) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stats = stats
 }
 
 func TestAlertService_NoAlertsWhenHealthy(t *testing.T) {
@@ -150,11 +160,19 @@ func TestAlertService_AlertClearsAndReRaises(t *testing.T) {
 	time.Sleep(30 * time.Millisecond)
 
 	// Condition clears
-	checker.stats.CPU.UsagePercent = 30
+	checker.setStats(models.SystemStats{
+		CPU:     models.CpuStats{UsagePercent: 30},
+		Memory:  models.MemoryStats{UsagePercent: 40},
+		Storage: models.StorageStats{UsagePercent: 50},
+	})
 	time.Sleep(30 * time.Millisecond)
 
 	// Condition returns
-	checker.stats.CPU.UsagePercent = 95
+	checker.setStats(models.SystemStats{
+		CPU:     models.CpuStats{UsagePercent: 95},
+		Memory:  models.MemoryStats{UsagePercent: 40},
+		Storage: models.StorageStats{UsagePercent: 50},
+	})
 	time.Sleep(30 * time.Millisecond)
 	svc.Stop()
 
@@ -235,6 +253,83 @@ func TestAlertService_AlertChannel(t *testing.T) {
 	}
 
 	svc.Stop()
+}
+
+// mockCarrierChecker implements CarrierChecker for testing.
+type mockCarrierChecker struct {
+	mu   sync.Mutex
+	up   bool
+	err  error
+}
+
+func (m *mockCarrierChecker) IsCarrierUp(iface string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.up, m.err
+}
+
+func (m *mockCarrierChecker) setState(up bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.up = up
+}
+
+func TestAlertService_EthUnpluggedAlert(t *testing.T) {
+	checker := &mockAlertChecker{
+		stats: models.SystemStats{
+			CPU:     models.CpuStats{UsagePercent: 10},
+			Memory:  models.MemoryStats{UsagePercent: 10},
+			Storage: models.StorageStats{UsagePercent: 10},
+		},
+	}
+	carrier := &mockCarrierChecker{up: false}
+	svc := NewAlertService(checker)
+	svc.SetCarrierChecker(carrier)
+	svc.CheckInterval = 10 * time.Millisecond
+
+	svc.Start()
+	time.Sleep(50 * time.Millisecond)
+	svc.Stop()
+
+	alerts := svc.GetAlerts()
+	found := false
+	for _, a := range alerts {
+		if a.Type == "eth_unplugged" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected eth_unplugged alert when carrier is down")
+	}
+}
+
+func TestAlertService_EthPluggedInClearsAlert(t *testing.T) {
+	checker := &mockAlertChecker{
+		stats: models.SystemStats{
+			CPU:     models.CpuStats{UsagePercent: 10},
+			Memory:  models.MemoryStats{UsagePercent: 10},
+			Storage: models.StorageStats{UsagePercent: 10},
+		},
+	}
+	carrier := &mockCarrierChecker{up: false}
+	svc := NewAlertService(checker)
+	svc.SetCarrierChecker(carrier)
+	svc.CheckInterval = 10 * time.Millisecond
+
+	svc.Start()
+	time.Sleep(30 * time.Millisecond)
+	carrier.setState(true) // cable plugged in
+	time.Sleep(30 * time.Millisecond)
+	svc.Stop()
+
+	// After plugging in, eth_unplugged should no longer be an active condition
+	svc.mu.RLock()
+	active := svc.activeConditions["eth_unplugged"]
+	svc.mu.RUnlock()
+	if active {
+		t.Error("expected eth_unplugged condition to be cleared after carrier comes up")
+	}
 }
 
 func TestAlertService_GetAlertsReturnsNewestFirst(t *testing.T) {

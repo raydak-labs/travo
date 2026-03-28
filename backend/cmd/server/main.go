@@ -26,13 +26,13 @@ var Version = "dev"
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
-	app, _, _ := setupAppWithConfig(cfg)
+	app, _, _, _, _, _ := setupAppWithConfig(cfg)
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, the WebSocket hub, and the alert service so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService) {
+// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, and blocklist so the caller can manage their lifecycle.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist) {
 	app := fiber.New(fiber.Config{
 		AppName: "openwrt-travel-gui",
 	})
@@ -43,6 +43,15 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders: "Authorization,Content-Type",
 	}))
+
+	nets, err := auth.ParseCIDRList(cfg.AllowedAdminCIDRs)
+	if err != nil {
+		log.Fatalf("invalid ALLOWED_ADMIN_CIDRS: %v", err)
+	}
+	if len(nets) > 0 {
+		app.Use(auth.IPAllowlistMiddleware(nets))
+		log.Printf("Admin IP allowlist enabled (%d CIDR(s))", len(nets))
+	}
 
 	// Create UCI and Ubus backends
 	var u uci.UCI
@@ -77,32 +86,19 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	}
 
 	// Fix wireless UCI on startup (country/channel, missing SSID/key on existing APs,
-	// enable radios when AP enabled). Apply via apply+confirm so fixes take effect without reboot.
-	// Uses crash guard per AGENTS.md mandatory failsafe pattern.
+	// enable radios when AP enabled). Do not auto-apply on startup: there is no
+	// browser in the loop to confirm rpcd rollback safely, so we commit the repair
+	// and require LuCI Save & Apply or reboot for runtime activation.
 	if !cfg.MockMode {
 		go func() {
 			time.Sleep(30 * time.Second)
-			guardFile := "/etc/openwrt-travel-gui/ap-health-in-progress"
-			// If guard exists, a previous apply crashed — skip to avoid reboot loop.
-			if _, err := os.Stat(guardFile); err == nil {
-				log.Printf("WARNING: WiFi AP health guard file exists (%s) — skipping apply (previous run may have crashed). Remove guard and redeploy to retry.", guardFile)
-				return
-			}
 			fixed, needApply, err := wifiSvc.EnsureAPRunning()
 			if err != nil {
 				log.Printf("WARNING: WiFi AP health check failed: %v", err)
 				return
 			}
 			if fixed && needApply {
-				// Write guard before apply — cleared on success or by deploy-local.sh.
-				_ = os.MkdirAll("/etc/openwrt-travel-gui", 0750)
-				_ = os.WriteFile(guardFile, []byte("ap-health"), 0600)
-				if applyErr := wifiSvc.ApplyWireless(); applyErr != nil {
-					log.Printf("WiFi AP health: UCI fixes committed. Apply failed (use LuCI or reboot): %v", applyErr)
-				} else {
-					log.Printf("WiFi AP health: UCI fixes applied and confirmed.")
-					_ = os.Remove(guardFile)
-				}
+				log.Printf("WiFi AP health: UCI fixes committed. Runtime apply skipped on startup to preserve LuCI-style rollback safety; use LuCI Save & Apply or reboot.")
 			} else if fixed {
 				log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
 			}
@@ -121,13 +117,25 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	svcManager := services.NewServiceManager()
 	captiveSvc := services.NewCaptiveService(captiveProber)
 	adguardSvc := services.NewAdGuardService()
+	dataUsageSvc := services.NewDataUsageService()
+	usbTetherSvc := services.NewUSBTetheringService()
+	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/openwrt-travel-gui/band-switching.json")
+
+	// Register post-install hook: auto-configure AdGuard Home after package install.
+	if !cfg.MockMode {
+		svcManager.SetPostInstallHook("adguardhome", adguardSvc.AutoConfigure)
+		svcManager.SetPostInstallHook("vnstat", dataUsageSvc.AutoConfigureVnstat)
+	}
 	alertSvc := services.NewAlertService(systemSvc)
+	if !cfg.MockMode {
+		alertSvc.SetCarrierChecker(&services.RealCarrierChecker{})
+	}
+	uptimeTracker := services.NewUptimeTracker(captiveProber)
 
 	// Token blocklist with cleanup goroutine
 	blocklist := auth.NewTokenBlocklist()
 	authSvc.SetBlocklist(blocklist)
-	stopCleanup := make(chan struct{})
-	blocklist.StartCleanup(5*time.Minute, stopCleanup)
+	blocklist.StartCleanup(5 * time.Minute)
 
 	// Rate limiter: 5 attempts per minute
 	rateLimiter := auth.NewRateLimiter(5, time.Minute)
@@ -155,6 +163,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		Captive:        captiveSvc,
 		AdGuard:        adguardSvc,
 		Alerts:         alertSvc,
+		UptimeTracker:  uptimeTracker,
+		DataUsage:      dataUsageSvc,
+		USBTether:      usbTetherSvc,
+		BandSwitching:  bandSwitchSvc,
 	}
 	api.SetupRoutes(app, deps)
 
@@ -164,6 +176,8 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	app.Get("/api/v1/ws", ws.Handler(hub, authSvc))
 	hub.Start()
 	alertSvc.Start()
+	uptimeTracker.Start()
+	bandSwitchSvc.Start()
 
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
@@ -174,7 +188,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc
+	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist
 }
 
 func main() {
@@ -189,7 +203,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc := setupAppWithConfig(cfg)
+	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -198,16 +212,34 @@ func main() {
 	go func() {
 		<-quit
 		log.Println("Shutting down server...")
+		blocklist.Stop()
 		hub.Stop()
 		alertSvc.Stop()
+		uptimeTracker.Stop()
+		bandSwitchSvc.Stop()
 		if err := app.Shutdown(); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}
 		log.Println("Server stopped")
 	}()
 
+	// If TLS is enabled, start HTTPS listener concurrently.
+	if cfg.TLSEnabled {
+		if err := config.EnsureTLSCert(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
+			log.Printf("WARNING: could not generate TLS certificate: %v", err)
+		} else {
+			tlsAddr := fmt.Sprintf(":%d", cfg.TLSPort)
+			log.Printf("Starting HTTPS listener on %s", tlsAddr)
+			go func() {
+				if err := app.ListenTLS(tlsAddr, cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
+					log.Printf("HTTPS listener stopped: %v", err)
+				}
+			}()
+		}
+	}
+
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("Starting openwrt-travel-gui backend on %s (mock=%v)", addr, cfg.MockMode)
+	log.Printf("Starting openwrt-travel-gui backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
 	if err := app.Listen(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

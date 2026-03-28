@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WifiConnectDialog } from '../wifi-connect-dialog';
-import type { WifiScanResult } from '@shared/index';
+import type { WifiScanResult, GroupedScanNetwork } from '@shared/index';
 
 const mockNetwork: WifiScanResult = {
   ssid: 'TestNetwork',
@@ -14,11 +14,17 @@ const mockNetwork: WifiScanResult = {
   band: '2.4ghz',
 };
 
+const mockGroup: GroupedScanNetwork = {
+  ssid: 'TestNetwork',
+  encryption: 'wpa2',
+  aps: [mockNetwork],
+};
+
 describe('WifiConnectDialog', () => {
   it('renders SSID and password input', () => {
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={false}
         error={null}
         onConnect={vi.fn()}
@@ -35,7 +41,7 @@ describe('WifiConnectDialog', () => {
 
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={false}
         error={null}
         onConnect={vi.fn()}
@@ -59,7 +65,7 @@ describe('WifiConnectDialog', () => {
 
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={false}
         error={null}
         onConnect={onConnect}
@@ -70,15 +76,19 @@ describe('WifiConnectDialog', () => {
     await user.type(screen.getByLabelText('Password'), 'mypassword');
     await user.click(screen.getByRole('button', { name: 'Connect' }));
 
-    expect(onConnect).toHaveBeenCalledWith('TestNetwork', 'mypassword');
+    expect(onConnect).toHaveBeenCalledWith('TestNetwork', 'mypassword', '2.4ghz');
   });
 
   it('does not require password for open networks', () => {
-    const openNetwork: WifiScanResult = { ...mockNetwork, encryption: 'none' };
+    const openGroup: GroupedScanNetwork = {
+      ssid: 'OpenNet',
+      encryption: 'none',
+      aps: [{ ...mockNetwork, ssid: 'OpenNet', encryption: 'none' }],
+    };
 
     render(
       <WifiConnectDialog
-        network={openNetwork}
+        group={openGroup}
         isConnecting={false}
         error={null}
         onConnect={vi.fn()}
@@ -93,7 +103,7 @@ describe('WifiConnectDialog', () => {
   it('shows error message on failure', () => {
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={false}
         error="Connection failed"
         onConnect={vi.fn()}
@@ -107,7 +117,7 @@ describe('WifiConnectDialog', () => {
   it('shows connecting state', () => {
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={true}
         error={null}
         onConnect={vi.fn()}
@@ -124,7 +134,7 @@ describe('WifiConnectDialog', () => {
 
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={false}
         error={null}
         onConnect={onConnect}
@@ -144,7 +154,7 @@ describe('WifiConnectDialog', () => {
 
     render(
       <WifiConnectDialog
-        network={mockNetwork}
+        group={mockGroup}
         isConnecting={false}
         error={null}
         onConnect={vi.fn()}

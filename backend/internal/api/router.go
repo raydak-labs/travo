@@ -20,10 +20,17 @@ type Dependencies struct {
 	Captive        *services.CaptiveService
 	AdGuard        *services.AdGuardService
 	Alerts         *services.AlertService
+	UptimeTracker  *services.UptimeTracker
+	DataUsage      *services.DataUsageService
+	USBTether      *services.USBTetheringService
+	BandSwitching  *services.BandSwitchingService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
 func SetupRoutes(app *fiber.App, deps *Dependencies) {
+	// OpenAPI spec — served without auth for agent/automation use.
+	app.Get("/api/openapi.json", OpenAPIHandler())
+
 	v1 := app.Group("/api/v1")
 
 	// Auth routes (login does not require auth)
@@ -38,6 +45,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/system/logs", SystemLogsHandler(deps.System))
 	v1.Get("/system/logs/kernel", SystemKernelLogsHandler(deps.System))
 	v1.Post("/system/reboot", SystemRebootHandler(deps.System))
+	v1.Post("/system/shutdown", SystemShutdownHandler(deps.System))
 	v1.Post("/system/factory-reset", FactoryResetHandler(deps.System))
 	v1.Put("/system/hostname", SetHostnameHandler(deps.System))
 	v1.Get("/system/leds", GetLEDStatusHandler(deps.System))
@@ -51,10 +59,19 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/firmware/upgrade", FirmwareUpgradeHandler(deps.System))
 	v1.Get("/system/ntp", GetNTPConfigHandler(deps.System))
 	v1.Put("/system/ntp", SetNTPConfigHandler(deps.System))
+	v1.Post("/system/ntp/sync", NTPSyncHandler(deps.System))
 	v1.Get("/system/setup-complete", GetSetupCompleteHandler(deps.System))
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
 	v1.Post("/system/time-sync", SyncTimeHandler())
 	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
+	v1.Get("/system/alert-thresholds", GetAlertThresholdsHandler(deps.Alerts))
+	v1.Put("/system/alert-thresholds", SetAlertThresholdsHandler(deps.Alerts))
+	v1.Get("/system/ssh-keys", GetSSHKeysHandler(deps.System))
+	v1.Post("/system/ssh-keys", AddSSHKeyHandler(deps.System))
+	v1.Delete("/system/ssh-keys/:index", DeleteSSHKeyHandler(deps.System))
+	v1.Post("/system/speed-test", RunSpeedTestHandler(deps.System))
+	v1.Get("/system/buttons", GetButtonsHandler(deps.System))
+	v1.Put("/system/button-actions", SetButtonActionsHandler(deps.System))
 
 	// Network routes
 	v1.Get("/network/status", NetworkStatusHandler(deps.Network))
@@ -82,6 +99,17 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/network/ddns", GetDDNSConfigHandler(deps.Network))
 	v1.Put("/network/ddns", SetDDNSConfigHandler(deps.Network))
 	v1.Get("/network/ddns/status", GetDDNSStatusHandler(deps.Network))
+	v1.Get("/network/uptime-log", GetUptimeLogHandler(deps.UptimeTracker))
+	v1.Get("/network/firewall/zones", GetFirewallZonesHandler(deps.Network))
+	v1.Get("/network/firewall/port-forwards", GetPortForwardsHandler(deps.Network))
+	v1.Post("/network/firewall/port-forwards", AddPortForwardHandler(deps.Network))
+	v1.Delete("/network/firewall/port-forwards/:id", DeletePortForwardHandler(deps.Network))
+	v1.Post("/network/diagnostics", RunDiagnosticsHandler(deps.Network))
+	v1.Get("/network/doh", GetDoHConfigHandler(deps.Network))
+	v1.Put("/network/doh", SetDoHConfigHandler(deps.Network))
+	v1.Get("/network/ipv6", GetIPv6StatusHandler(deps.Network))
+	v1.Put("/network/ipv6", SetIPv6EnabledHandler(deps.Network))
+	v1.Post("/network/wol", SendWoLHandler(deps.Network))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))
@@ -97,6 +125,9 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/wifi/ap", GetAPConfigHandler(deps.Wifi))
 	v1.Put("/wifi/ap/:section", SetAPConfigHandler(deps.Wifi))
 	v1.Get("/wifi/radios", GetRadiosHandler(deps.Wifi))
+	v1.Put("/wifi/radios/:name/role", SetRadioRoleHandler(deps.Wifi))
+	v1.Get("/wifi/band-switching", GetBandSwitchingHandler(deps.BandSwitching))
+	v1.Put("/wifi/band-switching", SetBandSwitchingHandler(deps.BandSwitching))
 	v1.Get("/wifi/mac", GetMACHandler(deps.Wifi))
 	v1.Put("/wifi/mac", SetMACHandler(deps.Wifi))
 	v1.Post("/wifi/mac/randomize", RandomizeMACHandler(deps.Wifi))
@@ -104,6 +135,11 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/wifi/guest", SetGuestWifiHandler(deps.Wifi))
 	v1.Get("/wifi/autoreconnect", GetAutoReconnectHandler(deps.Wifi))
 	v1.Put("/wifi/autoreconnect", SetAutoReconnectHandler(deps.Wifi))
+	v1.Post("/wifi/apply/confirm", ConfirmWifiApplyHandler(deps.Wifi))
+	v1.Get("/wifi/schedule", GetWiFiScheduleHandler(deps.Wifi))
+	v1.Put("/wifi/schedule", SetWiFiScheduleHandler(deps.Wifi))
+	v1.Get("/wifi/mac-policies", GetMACPoliciesHandler(deps.Wifi))
+	v1.Put("/wifi/mac-policies", SetMACPoliciesHandler(deps.Wifi))
 
 	// VPN routes
 	v1.Get("/vpn/status", VpnStatusHandler(deps.Vpn))
@@ -120,6 +156,14 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/vpn/killswitch", SetKillSwitchHandler(deps.Vpn))
 	v1.Get("/vpn/tailscale", GetTailscaleHandler(deps.Vpn))
 	v1.Post("/vpn/tailscale/toggle", ToggleTailscaleHandler(deps.Vpn))
+	v1.Post("/vpn/tailscale/auth", TailscaleAuthHandler(deps.Vpn))
+	v1.Post("/vpn/tailscale/exit-node", SetTailscaleExitNodeHandler(deps.Vpn))
+	v1.Get("/vpn/tailscale/ssh", GetTailscaleSSHHandler(deps.Vpn))
+	v1.Put("/vpn/tailscale/ssh", SetTailscaleSSHHandler(deps.Vpn))
+	v1.Get("/vpn/dns-leak-test", DNSLeakTestHandler(deps.Vpn))
+	v1.Get("/vpn/wireguard/verify", VerifyWireguardHandler(deps.Vpn))
+	v1.Get("/vpn/split-tunnel", GetSplitTunnelHandler(deps.Vpn))
+	v1.Put("/vpn/split-tunnel", SetSplitTunnelHandler(deps.Vpn))
 
 	// Services routes
 	v1.Get("/services", ListServicesHandler(deps.ServiceManager))
@@ -138,6 +182,18 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/adguard/config", GetAdGuardConfigHandler(deps.AdGuard))
 	v1.Put("/adguard/config", SetAdGuardConfigHandler(deps.AdGuard))
 
+	// Data usage tracking (requires vnstat)
+	v1.Get("/network/data-usage", GetDataUsageHandler(deps.DataUsage))
+	v1.Post("/network/data-usage/reset", ResetDataUsageHandler(deps.DataUsage))
+	v1.Get("/network/data-usage/budget", GetDataBudgetHandler(deps.DataUsage))
+	v1.Put("/network/data-usage/budget", SetDataBudgetHandler(deps.DataUsage))
+
+	// USB Tethering
+	v1.Get("/network/usb-tethering", GetUSBTetherStatusHandler(deps.USBTether))
+	v1.Post("/network/usb-tethering/configure", ConfigureUSBTetherHandler(deps.USBTether))
+	v1.Post("/network/usb-tethering/unconfigure", UnconfigureUSBTetherHandler(deps.USBTether))
+
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))
+	v1.Post("/captive/auto-accept", CaptiveAutoAcceptHandler(deps.Captive))
 }

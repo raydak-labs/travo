@@ -96,6 +96,9 @@ func (h *Hub) Stop() {
 }
 
 func (h *Hub) broadcastStats() {
+	if h.ClientCount() == 0 {
+		return
+	}
 	stats, err := h.systemSvc.GetSystemStats()
 	if err != nil {
 		return

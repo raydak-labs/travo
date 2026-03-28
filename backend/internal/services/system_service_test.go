@@ -505,6 +505,61 @@ func TestSetSetupComplete_CreatesFlag(t *testing.T) {
 	}
 }
 
+func TestSetButtonActions_GeneratesHotplugScript(t *testing.T) {
+	dir := t.TempDir()
+	// Override paths via a temp dir (we test the helpers directly)
+	buttons := []models.HardwareButton{
+		{Name: "reset", Action: models.ButtonActionVPNToggle},
+		{Name: "wps", Action: models.ButtonActionReboot},
+	}
+	script := buildButtonHotplugScript(buttons)
+	if !strings.Contains(script, "reset)") {
+		t.Error("expected script to contain 'reset)' case")
+	}
+	if !strings.Contains(script, "wps)") {
+		t.Error("expected script to contain 'wps)' case")
+	}
+	if !strings.Contains(script, "/sbin/ifup wg0") || !strings.Contains(script, "/sbin/ifdown wg0") {
+		t.Error("expected script to toggle wg0 via ifup/ifdown for vpn_toggle")
+	}
+	if !strings.Contains(script, "reboot") {
+		t.Error("expected script to contain reboot for reboot action")
+	}
+	_ = dir
+}
+
+func TestSetButtonActions_NoneSkipped(t *testing.T) {
+	buttons := []models.HardwareButton{
+		{Name: "reset", Action: models.ButtonActionNone},
+	}
+	script := buildButtonHotplugScript(buttons)
+	// "reset)" should not appear since action is none
+	if strings.Contains(script, "reset)") {
+		t.Error("expected 'none' action buttons to be omitted from hotplug script")
+	}
+}
+
+func TestBuildButtonActionsJSON_RoundTrip(t *testing.T) {
+	original := []models.HardwareButton{
+		{Name: "reset", Action: models.ButtonActionWifiToggle},
+		{Name: "wps", Action: models.ButtonActionLEDToggle},
+	}
+	json := buildButtonActionsJSON(original)
+	var parsed []models.HardwareButton
+	if err := unmarshalButtonActions([]byte(json), &parsed); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if len(parsed) != len(original) {
+		t.Fatalf("expected %d buttons, got %d", len(original), len(parsed))
+	}
+	for i, b := range original {
+		if parsed[i].Name != b.Name || parsed[i].Action != b.Action {
+			t.Errorf("button %d: expected {%s, %s}, got {%s, %s}",
+				i, b.Name, b.Action, parsed[i].Name, parsed[i].Action)
+		}
+	}
+}
+
 func TestGetTimezone_MissingSection(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()

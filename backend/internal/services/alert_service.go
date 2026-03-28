@@ -3,6 +3,11 @@ package services
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,23 +15,85 @@ import (
 )
 
 const maxAlerts = 50
+const alertThresholdsFile = "/etc/openwrt-travel-gui/alert-thresholds.json"
+
+// defaultAlertThresholds returns the default threshold values.
+func defaultAlertThresholds() models.AlertThresholds {
+	return models.AlertThresholds{
+		StoragePercent: 90,
+		CPUPercent:     90,
+		MemoryPercent:  90,
+	}
+}
+
+// GetAlertThresholds reads thresholds from the config file, returning defaults if absent.
+func (a *AlertService) GetAlertThresholds() models.AlertThresholds {
+	data, err := os.ReadFile(alertThresholdsFile)
+	if err != nil {
+		return defaultAlertThresholds()
+	}
+	var t models.AlertThresholds
+	if err := json.Unmarshal(data, &t); err != nil {
+		return defaultAlertThresholds()
+	}
+	return t
+}
+
+// SetAlertThresholds persists thresholds to the config file.
+func (a *AlertService) SetAlertThresholds(t models.AlertThresholds) error {
+	if err := os.MkdirAll(filepath.Dir(alertThresholdsFile), 0750); err != nil {
+		return err
+	}
+	data, err := json.Marshal(t)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(alertThresholdsFile, data, 0600)
+}
 
 // AlertChecker abstracts the system checks used by AlertService.
 type AlertChecker interface {
 	GetSystemStats() (models.SystemStats, error)
 }
 
+// CarrierChecker reads whether a network interface has a physical link.
+type CarrierChecker interface {
+	// IsCarrierUp returns true when the ethernet carrier is detected (cable plugged in).
+	// Returns (false, nil) when the cable is unplugged, (false, err) when the state
+	// cannot be determined (e.g. interface does not exist).
+	IsCarrierUp(iface string) (bool, error)
+}
+
+// RealCarrierChecker reads carrier state from /sys/class/net/<iface>/carrier.
+type RealCarrierChecker struct{}
+
+// IsCarrierUp implements CarrierChecker using the Linux sysfs carrier file.
+func (r *RealCarrierChecker) IsCarrierUp(iface string) (bool, error) {
+	data, err := os.ReadFile("/sys/class/net/" + iface + "/carrier")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(data)) == "1", nil
+}
+
 // AlertService monitors system conditions and generates alerts.
 type AlertService struct {
-	checker       AlertChecker
-	mu            sync.RWMutex
-	alerts        []models.Alert
-	alertCh       chan models.Alert
-	stopCh        chan struct{}
-	CheckInterval time.Duration
+	checker        AlertChecker
+	carrierChecker CarrierChecker
+	mu             sync.RWMutex
+	alerts         []models.Alert
+	alertCh        chan models.Alert
+	stopCh         chan struct{}
+	CheckInterval  time.Duration
 
 	// Track active conditions to avoid duplicate alerts
 	activeConditions map[string]bool
+}
+
+// SetCarrierChecker enables ethernet carrier monitoring in the alert service.
+// Pass nil to disable (default).
+func (a *AlertService) SetCarrierChecker(cc CarrierChecker) {
+	a.carrierChecker = cc
 }
 
 // NewAlertService creates a new AlertService.
@@ -88,25 +155,40 @@ func (a *AlertService) checkConditions() {
 		return
 	}
 
-	// Storage > 90%
-	if stats.Storage.UsagePercent > 90 {
-		a.raiseCondition("storage_low", "Storage usage is above 90%", "warning")
+	thresholds := a.GetAlertThresholds()
+
+	// Storage above threshold
+	if stats.Storage.UsagePercent > thresholds.StoragePercent {
+		a.raiseCondition("storage_low", fmt.Sprintf("Storage usage is above %.0f%%", thresholds.StoragePercent), "warning")
 	} else {
 		a.clearCondition("storage_low")
 	}
 
-	// CPU > 90% sustained
-	if stats.CPU.UsagePercent > 90 {
-		a.raiseCondition("high_cpu", "CPU usage is above 90%", "warning")
+	// CPU above threshold
+	if stats.CPU.UsagePercent > thresholds.CPUPercent {
+		a.raiseCondition("high_cpu", fmt.Sprintf("CPU usage is above %.0f%%", thresholds.CPUPercent), "warning")
 	} else {
 		a.clearCondition("high_cpu")
 	}
 
-	// Memory > 90%
-	if stats.Memory.UsagePercent > 90 {
-		a.raiseCondition("high_memory", "Memory usage is above 90%", "warning")
+	// Memory above threshold
+	if stats.Memory.UsagePercent > thresholds.MemoryPercent {
+		a.raiseCondition("high_memory", fmt.Sprintf("Memory usage is above %.0f%%", thresholds.MemoryPercent), "warning")
 	} else {
 		a.clearCondition("high_memory")
+	}
+
+	// Ethernet carrier (WAN cable plug/unplug)
+	if a.carrierChecker != nil {
+		up, err := a.carrierChecker.IsCarrierUp("eth0")
+		if err == nil {
+			if !up {
+				a.raiseCondition("eth_unplugged", "WAN ethernet cable is disconnected", "warning")
+			} else {
+				a.clearCondition("eth_unplugged")
+			}
+		}
+		// If err != nil the interface may not exist (e.g. USB-only WAN) — skip silently.
 	}
 }
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, getToken } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
 import type {
   SystemInfo,
@@ -14,6 +14,12 @@ import type {
   TimezoneConfig,
   NTPConfig,
   SetupStatus,
+  HardwareButton,
+  ButtonActionsRequest,
+  SSHKeysResponse,
+  AddSSHKeyRequest,
+  SpeedTestResult,
+  AlertThresholds,
 } from '@shared/index';
 
 export function useSystemInfo() {
@@ -39,6 +45,21 @@ export function useReboot() {
     },
     onError: (error) => {
       toast.error('Failed to reboot', { description: error.message });
+    },
+  });
+}
+
+export function useShutdown() {
+  return useMutation({
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.shutdown),
+    onSuccess: () => {
+      toast.success('Shutdown initiated', {
+        description:
+          'The device is powering off. You will need physical access to turn it back on.',
+      });
+    },
+    onError: (error) => {
+      toast.error('Failed to shut down', { description: error.message });
     },
   });
 }
@@ -159,7 +180,7 @@ export function useBackup() {
     mutationFn: async () => {
       const response = await fetch(API_ROUTES.system.backup, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token') || ''}`,
+          Authorization: `Bearer ${getToken() ?? ''}`,
         },
       });
       if (!response.ok) throw new Error('Backup failed');
@@ -188,7 +209,7 @@ export function useRestore() {
       const response = await fetch(API_ROUTES.system.restore, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token') || ''}`,
+          Authorization: `Bearer ${getToken() ?? ''}`,
         },
         body: formData,
       });
@@ -231,7 +252,7 @@ export function useFirmwareUpgrade() {
       const response = await fetch(API_ROUTES.system.firmwareUpgrade, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('openwrt-auth-token') || sessionStorage.getItem('openwrt-auth-token') || ''}`,
+          Authorization: `Bearer ${getToken() ?? ''}`,
         },
         body: formData,
       });
@@ -259,6 +280,20 @@ export function useNTPConfig() {
   });
 }
 
+export function useSyncNTP() {
+  return useMutation({
+    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.ntpSync),
+    onSuccess: () => {
+      toast.success('NTP sync complete', {
+        description: 'System clock synchronized with pool.ntp.org',
+      });
+    },
+    onError: (error) => {
+      toast.error('NTP sync failed', { description: error.message });
+    },
+  });
+}
+
 export function useSetNTPConfig() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -270,6 +305,28 @@ export function useSetNTPConfig() {
     },
     onError: (error) => {
       toast.error('Failed to update NTP configuration', { description: error.message });
+    },
+  });
+}
+
+export function useHardwareButtons() {
+  return useQuery({
+    queryKey: ['system', 'buttons'],
+    queryFn: () => apiClient.get<HardwareButton[]>(API_ROUTES.system.buttons),
+  });
+}
+
+export function useSetButtonActions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: ButtonActionsRequest) =>
+      apiClient.put<{ status: string }>(API_ROUTES.system.buttonActions, req),
+    onSuccess: () => {
+      toast.success('Button actions saved');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'buttons'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save button actions', { description: error.message });
     },
   });
 }
@@ -287,6 +344,77 @@ export function useCompleteSetup() {
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.setupComplete),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['system', 'setup-complete'] });
+    },
+  });
+}
+
+export function useSSHKeys() {
+  return useQuery({
+    queryKey: ['system', 'ssh-keys'],
+    queryFn: async () => {
+      const res = await apiClient.get<SSHKeysResponse>(API_ROUTES.system.sshKeys);
+      return res.keys;
+    },
+  });
+}
+
+export function useAddSSHKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (req: AddSSHKeyRequest) =>
+      apiClient.post<{ ok: boolean }>(API_ROUTES.system.sshKeys, req),
+    onSuccess: () => {
+      toast.success('SSH key added');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to add SSH key', { description: error.message });
+    },
+  });
+}
+
+export function useDeleteSSHKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (index: number) =>
+      apiClient.del<{ ok: boolean }>(`${API_ROUTES.system.sshKeys}/${index}`),
+    onSuccess: () => {
+      toast.success('SSH key deleted');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to delete SSH key', { description: error.message });
+    },
+  });
+}
+
+export function useRunSpeedTest() {
+  return useMutation({
+    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.system.speedTest),
+    onError: (error) => {
+      toast.error('Speed test failed', { description: error.message });
+    },
+  });
+}
+
+export function useAlertThresholds() {
+  return useQuery({
+    queryKey: ['system', 'alert-thresholds'],
+    queryFn: () => apiClient.get<AlertThresholds>(API_ROUTES.system.alertThresholds),
+  });
+}
+
+export function useSetAlertThresholds() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (t: AlertThresholds) =>
+      apiClient.put<{ ok: boolean }>(API_ROUTES.system.alertThresholds, t),
+    onSuccess: () => {
+      toast.success('Alert thresholds saved');
+      void queryClient.invalidateQueries({ queryKey: ['system', 'alert-thresholds'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save thresholds', { description: error.message });
     },
   });
 }

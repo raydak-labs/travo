@@ -25,6 +25,7 @@ vi.mock('@/hooks/use-alerts', () => ({
 vi.mock('@/hooks/use-system', () => ({
   useSystemInfo: vi.fn(() => ({ data: null, isError: false })),
   useReboot: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useShutdown: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 const mockUseIsMobile = vi.mocked(useIsMobile);

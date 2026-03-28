@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, LogOut, Menu, Bell, RotateCcw, MoreVertical } from 'lucide-react';
+import { Sun, Moon, LogOut, Menu, Bell, RotateCcw, MoreVertical, PowerOff } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAlerts } from '@/hooks/use-alerts';
-import { useSystemInfo, useReboot } from '@/hooks/use-system';
+import { useSystemInfo, useReboot, useShutdown } from '@/hooks/use-system';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,9 +38,11 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
   const { alerts, unreadCount, markAllRead } = useAlerts();
   const { data: systemInfo, isError: systemError } = useSystemInfo();
   const rebootMutation = useReboot();
+  const shutdownMutation = useShutdown();
   const [showPanel, setShowPanel] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showRebootConfirm, setShowRebootConfirm] = useState(false);
+  const [showShutdownConfirm, setShowShutdownConfirm] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +80,13 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h1>
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
+        {/* Router hostname */}
+        {systemInfo?.hostname && (
+          <span className="hidden text-xs text-gray-500 sm:block dark:text-gray-400">
+            {systemInfo.hostname}
+          </span>
+        )}
+
         {/* Connection status indicator */}
         <span
           className={`inline-block h-2 w-2 rounded-full ${
@@ -85,7 +94,7 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
               ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]'
               : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]'
           }`}
-          title={isConnected ? 'Connected to router' : 'Connection lost'}
+          title={isConnected ? `Connected to ${systemInfo?.hostname ?? 'router'}` : 'Connection lost'}
         />
 
         {/* Notification bell */}
@@ -172,6 +181,16 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 onClick={() => {
                   setShowActionsMenu(false);
+                  setShowShutdownConfirm(true);
+                }}
+              >
+                <PowerOff className="h-4 w-4" />
+                Shut Down Router
+              </button>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => {
+                  setShowActionsMenu(false);
                   logout();
                 }}
               >
@@ -209,6 +228,33 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
               }}
             >
               {rebootMutation.isPending ? 'Rebooting...' : 'Reboot'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shutdown confirmation dialog */}
+      <Dialog open={showShutdownConfirm} onOpenChange={setShowShutdownConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Shut Down Router?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            The device will power off completely. You will need physical access to turn it back on.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShutdownConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={shutdownMutation.isPending}
+              onClick={() => {
+                shutdownMutation.mutate();
+                setShowShutdownConfirm(false);
+              }}
+            >
+              {shutdownMutation.isPending ? 'Shutting down...' : 'Shut Down'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -434,6 +434,13 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	}
 }
 
+// GetUptimeLogHandler handles GET /api/v1/network/uptime-log.
+func GetUptimeLogHandler(tracker *services.UptimeTracker) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(tracker.GetUptimeLog())
+	}
+}
+
 // GetDDNSStatusHandler handles GET /api/v1/network/ddns/status.
 func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -442,5 +449,130 @@ func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(status)
+	}
+}
+
+// GetFirewallZonesHandler handles GET /api/v1/network/firewall/zones.
+func GetFirewallZonesHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		zones, err := svc.GetFirewallZones()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"zones": zones})
+	}
+}
+
+// GetPortForwardsHandler handles GET /api/v1/network/firewall/port-forwards.
+func GetPortForwardsHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		rules, err := svc.GetPortForwards()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"rules": rules})
+	}
+}
+
+// AddPortForwardHandler handles POST /api/v1/network/firewall/port-forwards.
+func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var rule models.PortForwardRule
+		if err := c.BodyParser(&rule); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.AddPortForward(rule); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{"ok": true})
+	}
+}
+
+// DeletePortForwardHandler handles DELETE /api/v1/network/firewall/port-forwards/:id.
+func DeletePortForwardHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		if err := svc.DeletePortForward(id); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
+	}
+}
+
+// RunDiagnosticsHandler handles POST /api/v1/network/diagnostics.
+func RunDiagnosticsHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.DiagnosticsRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		result := svc.RunDiagnostics(req)
+		return c.JSON(result)
+	}
+}
+
+// GetDoHConfigHandler handles GET /api/v1/network/doh.
+func GetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		cfg, err := svc.GetDoHConfig()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(cfg)
+	}
+}
+
+// SetDoHConfigHandler handles PUT /api/v1/network/doh.
+func SetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var cfg models.DoHConfig
+		if err := c.BodyParser(&cfg); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.SetDoHConfig(cfg); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
+	}
+}
+
+// GetIPv6StatusHandler handles GET /api/v1/network/ipv6.
+func GetIPv6StatusHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		status, err := svc.GetIPv6Status()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(status)
+	}
+}
+
+// SetIPv6EnabledHandler handles PUT /api/v1/network/ipv6.
+func SetIPv6EnabledHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.SetIPv6Enabled(req.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
+	}
+}
+
+// SendWoLHandler handles POST /api/v1/network/wol.
+func SendWoLHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.WoLRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.SendWoL(req.MAC, req.Interface); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
 	}
 }

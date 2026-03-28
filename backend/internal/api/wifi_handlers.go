@@ -9,6 +9,18 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
+func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
+	resp := fiber.Map{"status": "ok"}
+	if apply != nil {
+		resp["apply"] = fiber.Map{
+			"pending":                  true,
+			"token":                    apply.Token,
+			"rollback_timeout_seconds": apply.RollbackTimeoutSeconds,
+		}
+	}
+	return resp
+}
+
 // WifiScanHandler handles GET /api/v1/wifi/scan.
 func WifiScanHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -38,20 +50,22 @@ func WifiConnectHandler(svc *services.WifiService) fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters for WPA networks"})
 		}
 
-		if err := svc.Connect(config); err != nil {
+		apply, err := svc.Connect(config)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
 // WifiDisconnectHandler handles POST /api/v1/wifi/disconnect.
 func WifiDisconnectHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		if err := svc.Disconnect(); err != nil {
+		apply, err := svc.Disconnect()
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
@@ -75,10 +89,11 @@ func WifiSetModeHandler(svc *services.WifiService) fiber.Handler {
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.SetMode(body.Mode); err != nil {
+		apply, err := svc.SetMode(body.Mode)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
@@ -103,10 +118,11 @@ func WifiDeleteHandler(svc *services.WifiService) fiber.Handler {
 		if section == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section parameter is required"})
 		}
-		if err := svc.DeleteNetwork(section); err != nil {
+		apply, err := svc.DeleteNetwork(section)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
@@ -130,10 +146,11 @@ func SetRadioEnabledHandler(svc *services.WifiService) fiber.Handler {
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if err := svc.SetRadioEnabled(body.Enabled); err != nil {
+		apply, err := svc.SetRadioEnabled(body.Enabled)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
@@ -169,10 +186,11 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 		if config.Encryption != "" && config.Encryption != "none" && len(config.Key) < 8 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters"})
 		}
-		if err := svc.SetAPConfig(section, config); err != nil {
+		apply, err := svc.SetAPConfig(section, config)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
@@ -198,21 +216,24 @@ func SetMACHandler(svc *services.WifiService) fiber.Handler {
 		if req.MAC != "" && !isValidMAC(req.MAC) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format (expected XX:XX:XX:XX:XX:XX)"})
 		}
-		if err := svc.SetMACAddress(req.MAC); err != nil {
+		apply, err := svc.SetMACAddress(req.MAC)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
 // RandomizeMACHandler handles POST /api/v1/wifi/mac/randomize.
 func RandomizeMACHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		mac, err := svc.RandomizeMAC()
+		mac, apply, err := svc.RandomizeMAC()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok", "mac": mac})
+		resp := wifiMutationResponse(apply)
+		resp["mac"] = mac
+		return c.JSON(resp)
 	}
 }
 
@@ -246,6 +267,22 @@ func GetRadiosHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// SetRadioRoleHandler handles PUT /api/v1/wifi/radios/:name/role.
+func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		radioName := c.Params("name")
+		var req models.RadioRoleRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		result, err := svc.SetRadioRole(radioName, req.Role)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(result)
+	}
+}
+
 // GetGuestWifiHandler handles GET /api/v1/wifi/guest.
 func GetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -276,10 +313,11 @@ func SetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters"})
 			}
 		}
-		if err := svc.SetGuestWifi(cfg); err != nil {
+		apply, err := svc.SetGuestWifi(cfg)
+		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(wifiMutationResponse(apply))
 	}
 }
 
@@ -304,6 +342,75 @@ func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetAutoReconnect(body.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// ConfirmWifiApplyHandler handles POST /api/v1/wifi/apply/confirm.
+func ConfirmWifiApplyHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Token string `json:"token"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if strings.TrimSpace(body.Token) == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "token is required"})
+		}
+		if err := svc.ConfirmApply(body.Token); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetWiFiScheduleHandler handles GET /api/v1/wifi/schedule.
+func GetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		schedule, err := svc.GetWiFiSchedule()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(schedule)
+	}
+}
+
+// SetWiFiScheduleHandler handles PUT /api/v1/wifi/schedule.
+func SetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var schedule models.WiFiSchedule
+		if err := c.BodyParser(&schedule); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetWiFiSchedule(schedule); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetMACPoliciesHandler handles GET /api/v1/wifi/mac-policies.
+func GetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		policies, err := svc.GetMACPolicies()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(policies)
+	}
+}
+
+// SetMACPoliciesHandler handles PUT /api/v1/wifi/mac-policies.
+func SetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var policies models.MACPolicies
+		if err := c.BodyParser(&policies); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetMACPolicies(policies); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})

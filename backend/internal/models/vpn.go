@@ -9,6 +9,9 @@ type VpnStatus struct {
 	Endpoint       string `json:"endpoint"`
 	RxBytes        int64  `json:"rx_bytes"`
 	TxBytes        int64  `json:"tx_bytes"`
+	// StatusDetail provides fine-grained tunnel state:
+	// "disabled", "configured", "enabled_not_up", "up_no_handshake", "connected"
+	StatusDetail string `json:"status_detail,omitempty"`
 }
 
 // WireguardPeer represents a WireGuard peer.
@@ -60,13 +63,55 @@ type KillSwitchStatus struct {
 	Enabled bool `json:"enabled"`
 }
 
+// DNSLeakResult holds the result of a DNS leak test.
+type DNSLeakResult struct {
+	// Nameservers currently in /etc/resolv.conf (what the system resolves with).
+	Nameservers []string `json:"nameservers"`
+	// VPNDNSServers are the DNS servers configured in the active WireGuard profile.
+	VPNDNSServers []string `json:"vpn_dns_servers"`
+	// VPNActive is true when a VPN tunnel is enabled.
+	VPNActive bool `json:"vpn_active"`
+	// PotentiallyLeaking is true when VPN is active but none of the current
+	// nameservers match the VPN-configured DNS servers.
+	PotentiallyLeaking bool `json:"potentially_leaking"`
+}
+
+// VPNVerifyResult contains the result of verifying the WireGuard tunnel health.
+type VPNVerifyResult struct {
+	// InterfaceUp is true when wg0 exists and is in UP state.
+	InterfaceUp bool `json:"interface_up"`
+	// HandshakeOk is true when the most recent peer handshake is < 3 minutes old.
+	HandshakeOk bool `json:"handshake_ok"`
+	// LatestHandshake is the unix epoch of the most recent handshake (0 = never).
+	LatestHandshake int64 `json:"latest_handshake"`
+	// RouteOk is true when a default route via wg0 exists.
+	RouteOk bool `json:"route_ok"`
+	// FirewallZoneOk is true when the wg0 firewall zone exists in UCI.
+	FirewallZoneOk bool `json:"firewall_zone_ok"`
+	// ForwardingOk is true when a lan→wg0 firewall forwarding rule exists.
+	ForwardingOk bool `json:"forwarding_ok"`
+}
+
+// TailscalePeer represents a connected Tailscale peer.
+type TailscalePeer struct {
+	Hostname     string `json:"hostname"`
+	TailscaleIP  string `json:"tailscale_ip"`
+	OS           string `json:"os"`
+	Online       bool   `json:"online"`
+	ExitNode     bool   `json:"exit_node"`     // this peer is the active exit node
+	ExitNodeOption bool `json:"exit_node_option"` // this peer can be used as exit node
+	LastSeen     string `json:"last_seen"`
+}
+
 // TailscaleStatus represents Tailscale connection status.
 type TailscaleStatus struct {
-	Installed      bool    `json:"installed"`
-	Running        bool    `json:"running"`
-	LoggedIn       bool    `json:"logged_in"`
-	IPAddress      string  `json:"ip_address"`
-	Hostname       string  `json:"hostname"`
-	ExitNode       *string `json:"exit_node,omitempty"`
-	ExitNodeActive bool    `json:"exit_node_active"`
+	Installed      bool            `json:"installed"`
+	Running        bool            `json:"running"`
+	LoggedIn       bool            `json:"logged_in"`
+	IPAddress      string          `json:"ip_address"`
+	Hostname       string          `json:"hostname"`
+	ExitNode       *string         `json:"exit_node,omitempty"`
+	ExitNodeActive bool            `json:"exit_node_active"`
+	Peers          []TailscalePeer `json:"peers"`
+	AuthURL        string          `json:"auth_url,omitempty"` // set when login required
 }

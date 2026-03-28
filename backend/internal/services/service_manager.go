@@ -33,11 +33,12 @@ type SystemProbe interface {
 
 // serviceDefinition holds static config for a known service.
 type serviceDefinition struct {
-	ID          string
-	Name        string
-	Description string
-	Packages    []string // apk/opkg packages to install
-	InitName    string   // init.d script name (empty if no init script)
+	ID            string
+	Name          string
+	Description   string
+	Packages      []string // apk/opkg packages to install
+	DetectPackage string   // primary package for installed detection (defaults to Packages[0])
+	InitName      string   // init.d script name (empty if no init script)
 }
 
 var knownServices = []serviceDefinition{
@@ -49,9 +50,10 @@ var knownServices = []serviceDefinition{
 	},
 	{
 		ID: "wireguard", Name: "WireGuard",
-		Description: "Fast, modern VPN tunnel",
-		Packages:    []string{"wireguard-tools"},
-		InitName:    "", // managed via UCI/netifd, no init.d
+		Description:   "Fast, modern VPN tunnel",
+		Packages:      []string{"wireguard-tools", "kmod-wireguard", "luci-proto-wireguard"},
+		DetectPackage: "wireguard-tools", // kmod-wireguard may be built-in; detect by userspace tools
+		InitName:      "",                // managed via UCI/netifd, no init.d
 	},
 	{
 		ID: "tailscale", Name: "Tailscale",
@@ -59,15 +61,34 @@ var knownServices = []serviceDefinition{
 		Packages:    []string{"tailscale"},
 		InitName:    "tailscale",
 	},
+	{
+		ID:          "vnstat",
+		Name:        "Data Usage (vnstat)",
+		Description: "Lightweight network traffic monitor with persistent counters",
+		Packages:    []string{"vnstat2"},
+		InitName:    "vnstat",
+	},
 }
 
 // ServiceManager manages installable services.
 type ServiceManager struct {
-	mu    sync.RWMutex
-	defs  []serviceDefinition
-	pkg   PackageManager
-	probe SystemProbe
-	cache map[string]models.ServiceInfo
+	mu              sync.RWMutex
+	defs            []serviceDefinition
+	pkg             PackageManager
+	probe           SystemProbe
+	cache           map[string]models.ServiceInfo
+	postInstallHooks map[string]func() error
+}
+
+// SetPostInstallHook registers a callback that runs after successful package install
+// for the given service ID. Useful for auto-configuration (e.g. AdGuard Home).
+func (sm *ServiceManager) SetPostInstallHook(serviceID string, hook func() error) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if sm.postInstallHooks == nil {
+		sm.postInstallHooks = make(map[string]func() error)
+	}
+	sm.postInstallHooks[serviceID] = hook
 }
 
 // NewServiceManager creates a ServiceManager that detects real system state.
@@ -146,7 +167,11 @@ func (sm *ServiceManager) buildInfo(def serviceDefinition) models.ServiceInfo {
 	}
 
 	installed := true
-	for _, pkg := range def.Packages {
+	detect := def.Packages
+	if def.DetectPackage != "" {
+		detect = []string{def.DetectPackage}
+	}
+	for _, pkg := range detect {
 		if !sm.pkg.IsInstalled(pkg) {
 			installed = false
 			break
@@ -183,6 +208,9 @@ func (sm *ServiceManager) Install(serviceID string) error {
 		}
 	}
 	sm.refreshOne(serviceID)
+	if hook, ok := sm.postInstallHooks[serviceID]; ok {
+		_ = hook() // Non-fatal: log but don't fail install
+	}
 	return nil
 }
 
@@ -222,6 +250,14 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 		}
 	}
 	sm.refreshOne(serviceID)
+	if hook, ok := sm.postInstallHooks[serviceID]; ok {
+		logFn("Running post-install configuration…")
+		if err := hook(); err != nil {
+			logFn(fmt.Sprintf("Post-install warning: %s", err.Error()))
+		} else {
+			logFn("Post-install configuration complete.")
+		}
+	}
 	return nil
 }
 

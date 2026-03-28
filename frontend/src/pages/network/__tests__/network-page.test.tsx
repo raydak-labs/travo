@@ -86,8 +86,8 @@ describe('NetworkPage', () => {
     renderNetworkPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Internet Connectivity')).toBeInTheDocument();
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      expect(screen.getByText('WAN Status')).toBeInTheDocument();
+      expect(screen.getByText('Internet Connected')).toBeInTheDocument();
     });
   });
 

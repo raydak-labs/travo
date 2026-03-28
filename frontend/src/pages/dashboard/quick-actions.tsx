@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { RefreshCw, Shield, Power, Loader2, Check, X, Wifi, WifiOff } from 'lucide-react';
+import { RefreshCw, Shield, Power, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   useWifiDisconnect,
   useWifiConnect,
@@ -12,13 +13,8 @@ import {
 import { useToggleWireguard, useVpnStatus } from '@/hooks/use-vpn';
 import { useReboot } from '@/hooks/use-system';
 
-type ActionState = 'idle' | 'loading' | 'success' | 'error';
-
 export function QuickActions() {
-  const [wifiState, setWifiState] = useState<ActionState>('idle');
-  const [wifiRadioState, setWifiRadioState] = useState<ActionState>('idle');
-  const [vpnState, setVpnState] = useState<ActionState>('idle');
-  const [rebootState, setRebootState] = useState<ActionState>('idle');
+  const [showRebootDialog, setShowRebootDialog] = useState(false);
 
   const { data: wifiConnection } = useWifiConnection();
   const { data: vpnStatusList } = useVpnStatus();
@@ -29,156 +25,120 @@ export function QuickActions() {
   const setRadioEnabled = useSetRadioEnabled();
   const reboot = useReboot();
 
-  const resetState = (setter: (s: ActionState) => void) => {
-    setTimeout(() => setter('idle'), 2000);
-  };
+  const radioEnabled = radioStatus?.enabled ?? true;
+  const wg = vpnStatusList?.find((s) => s.type === 'wireguard');
+  const vpnEnabled = wg?.enabled ?? false;
+  const desiredVpnEnabled = toggleWireguard.isPending ? toggleWireguard.variables : undefined;
 
   const handleRestartWifi = () => {
-    if (wifiState === 'loading') return;
-    setWifiState('loading');
+    if (wifiDisconnect.isPending || wifiReconnect.isPending) return;
     wifiDisconnect.mutate(undefined, {
       onSuccess: () => {
         if (wifiConnection?.ssid) {
-          wifiReconnect.mutate(
-            { ssid: wifiConnection.ssid, password: '' },
-            {
-              onSuccess: () => {
-                setWifiState('success');
-                resetState(setWifiState);
-              },
-              onError: () => {
-                setWifiState('error');
-                resetState(setWifiState);
-              },
-            },
-          );
-        } else {
-          setWifiState('success');
-          resetState(setWifiState);
+          wifiReconnect.mutate({ ssid: wifiConnection.ssid, password: '' });
         }
-      },
-      onError: () => {
-        setWifiState('error');
-        resetState(setWifiState);
       },
     });
   };
 
   const handleToggleVpn = () => {
-    if (vpnState === 'loading') return;
-    setVpnState('loading');
-    const wg = vpnStatusList?.find((s) => s.type === 'wireguard');
-    const newState = !(wg?.enabled ?? false);
-    toggleWireguard.mutate(newState, {
-      onSuccess: () => {
-        setVpnState('success');
-        resetState(setVpnState);
-      },
-      onError: () => {
-        setVpnState('error');
-        resetState(setVpnState);
-      },
-    });
+    toggleWireguard.mutate(!vpnEnabled);
+  };
+
+  const handleToggleRadio = () => {
+    setRadioEnabled.mutate(!radioEnabled);
   };
 
   const handleReboot = () => {
-    if (rebootState === 'loading') return;
-    if (!window.confirm('Are you sure you want to reboot the system?')) return;
-    setRebootState('loading');
     reboot.mutate(undefined, {
-      onSuccess: () => {
-        setRebootState('success');
-        resetState(setRebootState);
-      },
-      onError: () => {
-        setRebootState('error');
-        resetState(setRebootState);
-      },
+      onSuccess: () => setShowRebootDialog(false),
     });
   };
 
-  const radioEnabled = radioStatus?.enabled ?? true;
-
-  const handleToggleRadio = () => {
-    if (wifiRadioState === 'loading') return;
-    setWifiRadioState('loading');
-    setRadioEnabled.mutate(!radioEnabled, {
-      onSuccess: () => {
-        setWifiRadioState('success');
-        resetState(setWifiRadioState);
-      },
-      onError: () => {
-        setWifiRadioState('error');
-        resetState(setWifiRadioState);
-      },
-    });
-  };
-
-  function stateIcon(state: ActionState, defaultIcon: React.ReactNode) {
-    switch (state) {
-      case 'loading':
-        return <Loader2 className="mr-2 h-4 w-4 animate-spin" />;
-      case 'success':
-        return <Check className="mr-2 h-4 w-4 text-green-500" />;
-      case 'error':
-        return <X className="mr-2 h-4 w-4 text-red-500" />;
-      default:
-        return defaultIcon;
-    }
-  }
+  const wifiRestarting = wifiDisconnect.isPending || wifiReconnect.isPending;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleToggleRadio}
-            disabled={wifiRadioState === 'loading'}
-          >
-            {stateIcon(
-              wifiRadioState,
-              radioEnabled ? (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleRadio}
+              disabled={setRadioEnabled.isPending}
+            >
+              {setRadioEnabled.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : radioEnabled ? (
                 <Wifi className="mr-2 h-4 w-4" />
               ) : (
                 <WifiOff className="mr-2 h-4 w-4" />
-              ),
-            )}
-            {wifiRadioState === 'loading' ? 'Toggling...' : radioEnabled ? 'WiFi On' : 'WiFi Off'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRestartWifi}
-            disabled={wifiState === 'loading'}
-          >
-            {stateIcon(wifiState, <RefreshCw className="mr-2 h-4 w-4" />)}
-            {wifiState === 'loading' ? 'Restarting...' : 'Restart WiFi'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleToggleVpn}
-            disabled={vpnState === 'loading'}
-          >
-            {stateIcon(vpnState, <Shield className="mr-2 h-4 w-4" />)}
-            {vpnState === 'loading' ? 'Toggling...' : 'Toggle VPN'}
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleReboot}
-            disabled={rebootState === 'loading'}
-          >
-            {stateIcon(rebootState, <Power className="mr-2 h-4 w-4" />)}
-            {rebootState === 'loading' ? 'Rebooting...' : 'Reboot System'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+              )}
+              {radioEnabled ? 'Disable WiFi' : 'Enable WiFi'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRestartWifi}
+              disabled={wifiRestarting}
+            >
+              {wifiRestarting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Restart WiFi
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleVpn}
+              disabled={toggleWireguard.isPending}
+            >
+              {toggleWireguard.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Shield className="mr-2 h-4 w-4" />
+              )}
+              {toggleWireguard.isPending
+                ? desiredVpnEnabled
+                  ? 'Enabling VPN…'
+                  : 'Disabling VPN…'
+                : vpnEnabled
+                  ? 'Disable VPN'
+                  : 'Enable VPN'}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowRebootDialog(true)}
+              disabled={reboot.isPending}
+            >
+              {reboot.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Power className="mr-2 h-4 w-4" />
+              )}
+              Reboot System
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={showRebootDialog}
+        onOpenChange={setShowRebootDialog}
+        title="Reboot System"
+        description="The router will reboot and be temporarily unreachable."
+        warningText="You will lose your connection for 30–60 seconds while the device restarts."
+        confirmLabel="Reboot Now"
+        isPending={reboot.isPending}
+        onConfirm={handleReboot}
+      />
+    </>
   );
 }

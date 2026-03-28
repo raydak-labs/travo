@@ -45,6 +45,16 @@ func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// SystemShutdownHandler handles POST /api/v1/system/shutdown.
+func SystemShutdownHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if err := svc.Shutdown(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // SystemLogsHandler handles GET /api/v1/system/logs.
 func SystemLogsHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -256,6 +266,16 @@ func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// NTPSyncHandler handles POST /api/v1/system/ntp/sync.
+func NTPSyncHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if err := svc.SyncNTP(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // GetSetupCompleteHandler handles GET /api/v1/system/setup-complete.
 func GetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -311,5 +331,97 @@ func SystemAlertsHandler(svc *services.AlertService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		alerts := svc.GetAlerts()
 		return c.JSON(models.AlertsResponse{Alerts: alerts})
+	}
+}
+
+// GetButtonsHandler handles GET /api/v1/system/buttons.
+func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(svc.GetHardwareButtons())
+	}
+}
+
+// SetButtonActionsHandler handles PUT /api/v1/system/button-actions.
+func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.ButtonActionsRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetButtonActions(req.Buttons); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetSSHKeysHandler handles GET /api/v1/system/ssh-keys.
+func GetSSHKeysHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		resp, err := svc.GetSSHKeys()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(resp)
+	}
+}
+
+// AddSSHKeyHandler handles POST /api/v1/system/ssh-keys.
+func AddSSHKeyHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req models.AddSSHKeyRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.AddSSHKey(req.Key); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{"ok": true})
+	}
+}
+
+// DeleteSSHKeyHandler handles DELETE /api/v1/system/ssh-keys/:index.
+func DeleteSSHKeyHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		index, err := c.ParamsInt("index")
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid index"})
+		}
+		if err := svc.DeleteSSHKey(index); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
+	}
+}
+
+// RunSpeedTestHandler handles POST /api/v1/system/speed-test.
+func RunSpeedTestHandler(svc *services.SystemService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result, err := svc.RunSpeedTest()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(result)
+	}
+}
+
+// GetAlertThresholdsHandler handles GET /api/v1/system/alert-thresholds.
+func GetAlertThresholdsHandler(svc *services.AlertService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(svc.GetAlertThresholds())
+	}
+}
+
+// SetAlertThresholdsHandler handles PUT /api/v1/system/alert-thresholds.
+func SetAlertThresholdsHandler(svc *services.AlertService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var t models.AlertThresholds
+		if err := c.BodyParser(&t); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.SetAlertThresholds(t); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
 	}
 }

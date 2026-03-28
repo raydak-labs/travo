@@ -43,6 +43,9 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.system.kernelLogs).toBe('/api/v1/system/logs/kernel');
     expect(API_ROUTES.system.timezone).toBe('/api/v1/system/timezone');
     expect(API_ROUTES.system.factoryReset).toBe('/api/v1/system/factory-reset');
+    expect(API_ROUTES.system.shutdown).toBe('/api/v1/system/shutdown');
+    expect(API_ROUTES.system.buttons).toBe('/api/v1/system/buttons');
+    expect(API_ROUTES.system.buttonActions).toBe('/api/v1/system/button-actions');
   });
 
   it('has network routes matching backend', () => {
@@ -60,6 +63,13 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.interfaceState).toBe('/api/v1/network/interfaces/:name/state');
     expect(API_ROUTES.network.ddns).toBe('/api/v1/network/ddns');
     expect(API_ROUTES.network.ddnsStatus).toBe('/api/v1/network/ddns/status');
+    expect(API_ROUTES.network.uptimeLog).toBe('/api/v1/network/uptime-log');
+    expect(API_ROUTES.network.dataUsage).toBe('/api/v1/network/data-usage');
+    expect(API_ROUTES.network.dataUsageReset).toBe('/api/v1/network/data-usage/reset');
+    expect(API_ROUTES.network.dataUsageBudget).toBe('/api/v1/network/data-usage/budget');
+    expect(API_ROUTES.network.usbTethering).toBe('/api/v1/network/usb-tethering');
+    expect(API_ROUTES.network.usbTetheringConfigure).toBe('/api/v1/network/usb-tethering/configure');
+    expect(API_ROUTES.network.usbTetheringUnconfigure).toBe('/api/v1/network/usb-tethering/unconfigure');
   });
 
   it('has wifi routes matching backend', () => {
@@ -71,10 +81,15 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.saved).toBe('/api/v1/wifi/saved');
     expect(API_ROUTES.wifi.radio).toBe('/api/v1/wifi/radio');
     expect(API_ROUTES.wifi.radios).toBe('/api/v1/wifi/radios');
+    expect(API_ROUTES.wifi.radioRole).toBe('/api/v1/wifi/radios/:name/role');
+    expect(API_ROUTES.wifi.bandSwitching).toBe('/api/v1/wifi/band-switching');
     expect(API_ROUTES.wifi.mac).toBe('/api/v1/wifi/mac');
     expect(API_ROUTES.wifi.macRandomize).toBe('/api/v1/wifi/mac/randomize');
     expect(API_ROUTES.wifi.guest).toBe('/api/v1/wifi/guest');
     expect(API_ROUTES.wifi.autoreconnect).toBe('/api/v1/wifi/autoreconnect');
+    expect(API_ROUTES.wifi.applyConfirm).toBe('/api/v1/wifi/apply/confirm');
+    expect(API_ROUTES.wifi.schedule).toBe('/api/v1/wifi/schedule');
+    expect(API_ROUTES.wifi.macPolicies).toBe('/api/v1/wifi/mac-policies');
   });
 
   it('has vpn routes matching backend', () => {
@@ -84,8 +99,13 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.wireguard.toggle).toBe('/api/v1/vpn/wireguard/toggle');
     expect(API_ROUTES.vpn.wireguard.status).toBe('/api/v1/vpn/wireguard/status');
     expect(API_ROUTES.vpn.wireguard.profiles).toBe('/api/v1/vpn/wireguard/profiles');
+    expect(API_ROUTES.vpn.wireguard.verify).toBe('/api/v1/vpn/wireguard/verify');
     expect(API_ROUTES.vpn.tailscale.status).toBe('/api/v1/vpn/tailscale');
     expect(API_ROUTES.vpn.tailscale.toggle).toBe('/api/v1/vpn/tailscale/toggle');
+    expect(API_ROUTES.vpn.tailscale.auth).toBe('/api/v1/vpn/tailscale/auth');
+    expect(API_ROUTES.vpn.tailscale.exitNode).toBe('/api/v1/vpn/tailscale/exit-node');
+    expect(API_ROUTES.vpn.dnsLeakTest).toBe('/api/v1/vpn/dns-leak-test');
+    expect(API_ROUTES.vpn.splitTunnel).toBe('/api/v1/vpn/split-tunnel');
   });
 
   it('has services routes with :id parameter matching backend', () => {
@@ -100,6 +120,7 @@ describe('API_ROUTES', () => {
 
   it('has captive routes matching backend', () => {
     expect(API_ROUTES.captive.status).toBe('/api/v1/captive/status');
+    expect(API_ROUTES.captive.autoAccept).toBe('/api/v1/captive/auto-accept');
   });
 
   it('covers all backend endpoints', () => {
@@ -114,6 +135,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/logs',
       '/api/v1/system/logs/kernel',
       '/api/v1/system/reboot',
+      '/api/v1/system/shutdown',
       '/api/v1/system/hostname',
       '/api/v1/system/leds',
       '/api/v1/system/leds/schedule',
@@ -123,6 +145,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/factory-reset',
       '/api/v1/system/firmware/upgrade',
       '/api/v1/system/ntp',
+      '/api/v1/system/ntp/sync',
       '/api/v1/system/setup-complete',
       '/api/v1/system/time-sync',
       '/api/v1/system/alerts',
@@ -152,11 +175,14 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/saved/priority',
       '/api/v1/wifi/radio',
       '/api/v1/wifi/radios',
+      '/api/v1/wifi/radios/:name/role',
+      '/api/v1/wifi/band-switching',
       '/api/v1/wifi/ap',
       '/api/v1/wifi/mac',
       '/api/v1/wifi/mac/randomize',
       '/api/v1/wifi/guest',
       '/api/v1/wifi/autoreconnect',
+      '/api/v1/wifi/apply/confirm',
       '/api/v1/vpn/status',
       '/api/v1/vpn/killswitch',
       '/api/v1/vpn/wireguard',
@@ -166,6 +192,8 @@ describe('API_ROUTES', () => {
       '/api/v1/vpn/wireguard/profiles',
       '/api/v1/vpn/tailscale',
       '/api/v1/vpn/tailscale/toggle',
+      '/api/v1/vpn/tailscale/auth',
+      '/api/v1/vpn/tailscale/exit-node',
       '/api/v1/services',
       '/api/v1/services/:id/install',
       '/api/v1/services/:id/install/stream',
@@ -175,8 +203,33 @@ describe('API_ROUTES', () => {
       '/api/v1/services/:id/stop',
       '/api/v1/services/:id/autostart',
       '/api/v1/captive/status',
+      '/api/v1/captive/auto-accept',
       '/api/v1/adguard/dns',
       '/api/v1/adguard/config',
+      '/api/v1/network/uptime-log',
+      '/api/v1/system/buttons',
+      '/api/v1/system/button-actions',
+      '/api/v1/vpn/dns-leak-test',
+      '/api/v1/vpn/wireguard/verify',
+      '/api/v1/network/data-usage',
+      '/api/v1/network/data-usage/reset',
+      '/api/v1/network/data-usage/budget',
+      '/api/v1/network/usb-tethering',
+      '/api/v1/network/usb-tethering/configure',
+      '/api/v1/network/usb-tethering/unconfigure',
+      '/api/v1/wifi/schedule',
+      '/api/v1/wifi/mac-policies',
+      '/api/v1/vpn/split-tunnel',
+      '/api/v1/system/alert-thresholds',
+      '/api/v1/system/ssh-keys',
+      '/api/v1/system/speed-test',
+      '/api/v1/network/firewall/zones',
+      '/api/v1/network/firewall/port-forwards',
+      '/api/v1/network/diagnostics',
+      '/api/v1/network/doh',
+      '/api/v1/network/ipv6',
+      '/api/v1/network/wol',
+      '/api/v1/vpn/tailscale/ssh',
     ];
 
     const definedRoutes = getAllRoutes(API_ROUTES);

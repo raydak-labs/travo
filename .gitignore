@@ -54,3 +54,8 @@ pnpm-debug.log*
 *.tgz
 *.tar.gz
 .claude/settings.local.json
+
+tmp/
+test/integration/.wifi_pass
+test/integration/tmp/
+test/integration/wireguard-profiles/

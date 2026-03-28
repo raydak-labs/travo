@@ -132,3 +132,91 @@ type DDNSStatus struct {
 	PublicIP   string `json:"public_ip"`
 	LastUpdate string `json:"last_update"`
 }
+
+// DataUsagePeriod holds RX/TX byte counts for a period.
+type DataUsagePeriod struct {
+	RXBytes int64 `json:"rx_bytes"`
+	TXBytes int64 `json:"tx_bytes"`
+}
+
+// DataUsageInterface holds traffic data for a single network interface.
+type DataUsageInterface struct {
+	Name  string          `json:"name"`
+	Label string          `json:"label"`
+	Today DataUsagePeriod `json:"today"`
+	Month DataUsagePeriod `json:"month"`
+	Total DataUsagePeriod `json:"total"`
+}
+
+// DataUsageStatus is the top-level response for the data usage endpoint.
+type DataUsageStatus struct {
+	// Available is false when vnstat is not installed; interfaces will be empty.
+	Available  bool                 `json:"available"`
+	Interfaces []DataUsageInterface `json:"interfaces"`
+}
+
+// DataBudget holds a monthly usage limit for a single interface.
+type DataBudget struct {
+	Interface             string  `json:"interface"`
+	MonthlyLimitBytes     int64   `json:"monthly_limit_bytes"`
+	WarningThresholdPct   float64 `json:"warning_threshold_pct"`
+	ResetDay              int     `json:"reset_day"`
+}
+
+// DataBudgetConfig holds all configured data budgets.
+type DataBudgetConfig struct {
+	Budgets []DataBudget `json:"budgets"`
+}
+
+// IPv6Status holds the current IPv6 configuration state.
+type IPv6Status struct {
+	Enabled   bool     `json:"enabled"`
+	Addresses []string `json:"addresses"`
+}
+
+// FirewallZone holds a summary of a UCI firewall zone.
+type FirewallZone struct {
+	Name    string   `json:"name"`
+	Input   string   `json:"input"`   // ACCEPT / REJECT / DROP
+	Output  string   `json:"output"`
+	Forward string   `json:"forward"`
+	Network []string `json:"network"`
+}
+
+// PortForwardRule holds a single DNAT port-forward rule.
+type PortForwardRule struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Protocol string `json:"protocol"` // tcp, udp, tcp+udp
+	SrcDPort string `json:"src_dport"` // external port/range
+	DestIP   string `json:"dest_ip"`
+	DestPort string `json:"dest_port"` // internal port (empty = same)
+	Enabled  bool   `json:"enabled"`
+}
+
+// WoLRequest asks the server to send a magic packet to a specific MAC address.
+type WoLRequest struct {
+	MAC       string `json:"mac"`
+	Interface string `json:"interface"` // optional, e.g. "br-lan"
+}
+
+// DoHConfig holds DNS-over-HTTPS settings.
+type DoHConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Provider string `json:"provider"` // "cloudflare", "google", "quad9", "custom"
+	URL      string `json:"url"`      // used when provider="custom"
+}
+
+// DiagnosticsRequest asks to run a network diagnostic tool.
+type DiagnosticsRequest struct {
+	Type   string `json:"type"`   // "ping", "traceroute", "dns"
+	Target string `json:"target"` // hostname or IP
+}
+
+// DiagnosticsResult holds the textual output of a diagnostic command.
+type DiagnosticsResult struct {
+	Type   string `json:"type"`
+	Target string `json:"target"`
+	Output string `json:"output"`
+	Error  string `json:"error,omitempty"`
+}

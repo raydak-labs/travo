@@ -1,3 +1,9 @@
+/** Single connectivity state transition event */
+export interface UptimeEvent {
+  readonly timestamp: number; // Unix milliseconds
+  readonly state: 'connected' | 'disconnected';
+}
+
 /** Network interface details */
 export interface NetworkInterface {
   readonly name: string;
@@ -122,6 +128,50 @@ export interface DDNSStatus {
   readonly last_update: string;
 }
 
+/** RX/TX bytes for a specific time period */
+export interface DataUsagePeriod {
+  readonly rx_bytes: number;
+  readonly tx_bytes: number;
+}
+
+/** Traffic data for a single monitored network interface */
+export interface DataUsageInterface {
+  readonly name: string;
+  readonly label: string;
+  readonly today: DataUsagePeriod;
+  readonly month: DataUsagePeriod;
+  readonly total: DataUsagePeriod;
+}
+
+/** Top-level data usage response (available=false when vnstat not installed) */
+export interface DataUsageStatus {
+  readonly available: boolean;
+  readonly interfaces: readonly DataUsageInterface[];
+}
+
+/** Monthly usage budget for a single interface */
+export interface DataBudget {
+  readonly interface: string;
+  readonly monthly_limit_bytes: number;
+  readonly warning_threshold_pct: number;
+  readonly reset_day: number;
+}
+
+/** All configured data budgets */
+export interface DataBudgetConfig {
+  readonly budgets: readonly DataBudget[];
+}
+
+/** USB tethering detection and configuration status */
+export interface USBTetherStatus {
+  readonly detected: boolean;
+  readonly device_type: 'android' | 'ios' | 'unknown' | '';
+  readonly interface: string;
+  readonly is_up: boolean;
+  readonly ip_address: string;
+  readonly configured: boolean;
+}
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;
@@ -134,4 +184,60 @@ export function isNetworkStatus(value: unknown): value is NetworkStatus {
     Array.isArray(v.clients) &&
     typeof v.internet_reachable === 'boolean'
   );
+}
+
+/** A summary of a UCI firewall zone */
+export interface FirewallZone {
+  readonly name: string;
+  readonly input: string;
+  readonly output: string;
+  readonly forward: string;
+  readonly network: readonly string[];
+}
+
+/** A DNAT port-forward rule */
+export interface PortForwardRule {
+  readonly id: string;
+  readonly name: string;
+  readonly protocol: string;
+  readonly src_dport: string;
+  readonly dest_ip: string;
+  readonly dest_port: string;
+  readonly enabled: boolean;
+}
+
+/** Request to add a port-forward rule */
+export type AddPortForwardRequest = Omit<PortForwardRule, 'id'>;
+
+/** Request to send a Wake-on-LAN magic packet */
+export interface WoLRequest {
+  readonly mac: string;
+  readonly interface?: string;
+}
+
+/** DNS-over-HTTPS configuration */
+export interface DoHConfig {
+  readonly enabled: boolean;
+  readonly provider: 'cloudflare' | 'google' | 'quad9' | 'custom';
+  readonly url: string;
+}
+
+/** IPv6 status and global addresses */
+export interface IPv6Status {
+  readonly enabled: boolean;
+  readonly addresses: readonly string[];
+}
+
+/** Request to run a network diagnostic */
+export interface DiagnosticsRequest {
+  readonly type: 'ping' | 'traceroute' | 'dns';
+  readonly target: string;
+}
+
+/** Result of a network diagnostic command */
+export interface DiagnosticsResult {
+  readonly type: string;
+  readonly target: string;
+  readonly output: string;
+  readonly error?: string;
 }

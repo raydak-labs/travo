@@ -9,14 +9,20 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 )
 
-// UCIApplyConfirm applies UCI config changes using rpcd's apply+confirm flow
+// UCIApplyConfirm stages UCI config changes using rpcd's apply+confirm flow
 // (same as LuCI Save & Apply), so a rollback window exists and the device
-// can revert if it crashes before confirm. Use this instead of "wifi up" or
-// direct reload for wireless to avoid ath11k soft-brick risk.
+// can revert if it crashes before confirm. User-driven wireless flows should
+// start apply first and confirm only after the browser proves the router is
+// still reachable on the new settings.
 type UCIApplyConfirm interface {
-	// ApplyAndConfirm commits staged UCI by: session login, copy configs to
-	// session dir, uci apply (rollback timeout), uci confirm. configs are
-	// names like "wireless", "network", "system".
+	// StartApply commits staged UCI by: session login, copy configs to session
+	// dir, uci apply (rollback timeout). Returns the rpcd session ID used for
+	// later confirm. Configs are names like "wireless", "network", "system".
+	StartApply(configs []string) (string, error)
+	// Confirm finalizes a previously started apply session.
+	Confirm(sessionID string) error
+	// ApplyAndConfirm is retained for guarded internal flows that still need a
+	// synchronous apply on the router itself.
 	ApplyAndConfirm(configs []string) error
 }
 
@@ -36,24 +42,24 @@ func NewRealUCIApplyConfirm(ub ubus.Ubus) *RealUCIApplyConfirm {
 	return &RealUCIApplyConfirm{ubus: ub}
 }
 
-// ApplyAndConfirm implements UCIApplyConfirm.
-func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
+// StartApply stages an rpcd rollback apply and returns the session ID.
+func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	if len(configs) == 0 {
-		return nil
+		return "", nil
 	}
 	sid, err := r.sessionLogin()
 	if err != nil || sid == "" {
-		return fmt.Errorf("uci apply: no session (login failed): %w", err)
+		return "", fmt.Errorf("uci apply: no session (login failed): %w", err)
 	}
 	sessionDir := filepath.Join(rpcdRunDir, "uci-"+sid)
 	if err := os.MkdirAll(sessionDir, 0700); err != nil {
-		return fmt.Errorf("uci apply: mkdir session dir: %w", err)
+		return "", fmt.Errorf("uci apply: mkdir session dir: %w", err)
 	}
 	for _, name := range configs {
 		src := filepath.Join(etcConfigDir, name)
 		dst := filepath.Join(sessionDir, name)
 		if err := copyFile(src, dst); err != nil {
-			return fmt.Errorf("uci apply: copy %s: %w", name, err)
+			return "", fmt.Errorf("uci apply: copy %s: %w", name, err)
 		}
 	}
 	applyArgs := map[string]interface{}{
@@ -62,15 +68,32 @@ func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
 		"timeout":          uciApplyRollbackTimeout,
 	}
 	if _, err := r.ubus.Call("uci", "apply", applyArgs); err != nil {
-		return fmt.Errorf("uci apply: %w", err)
+		return "", fmt.Errorf("uci apply: %w", err)
+	}
+	return sid, nil
+}
+
+// Confirm finalizes a previously started apply session.
+func (r *RealUCIApplyConfirm) Confirm(sessionID string) error {
+	if sessionID == "" {
+		return fmt.Errorf("uci confirm: empty session id")
 	}
 	confirmArgs := map[string]interface{}{
-		"ubus_rpc_session": sid,
+		"ubus_rpc_session": sessionID,
 	}
 	if _, err := r.ubus.Call("uci", "confirm", confirmArgs); err != nil {
 		return fmt.Errorf("uci confirm: %w", err)
 	}
 	return nil
+}
+
+// ApplyAndConfirm implements UCIApplyConfirm.
+func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
+	sid, err := r.StartApply(configs)
+	if err != nil {
+		return err
+	}
+	return r.Confirm(sid)
 }
 
 func (r *RealUCIApplyConfirm) sessionLogin() (string, error) {
@@ -129,6 +152,16 @@ func copyFile(src, dst string) error {
 
 // NoopUCIApplyConfirm does nothing (for tests).
 type NoopUCIApplyConfirm struct{}
+
+// StartApply is a no-op.
+func (NoopUCIApplyConfirm) StartApply(_ []string) (string, error) {
+	return "", nil
+}
+
+// Confirm is a no-op.
+func (NoopUCIApplyConfirm) Confirm(_ string) error {
+	return nil
+}
 
 // ApplyAndConfirm is a no-op.
 func (NoopUCIApplyConfirm) ApplyAndConfirm(_ []string) error {

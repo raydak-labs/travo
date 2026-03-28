@@ -106,6 +106,38 @@ func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 	}
 }
 
+// TailscaleAuthHandler handles POST /api/v1/vpn/tailscale/auth.
+// Starts `tailscale up` and returns the browser auth URL if login is required.
+func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			AuthKey string `json:"auth_key"`
+		}
+		_ = c.BodyParser(&body)
+		authURL, err := svc.StartTailscaleAuth(body.AuthKey)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"auth_url": authURL})
+	}
+}
+
+// SetTailscaleExitNodeHandler handles POST /api/v1/vpn/tailscale/exit-node.
+func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			NodeIP string `json:"node_ip"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetTailscaleExitNode(body.NodeIP); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // ImportWireguardHandler handles POST /api/v1/vpn/wireguard/import.
 func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -223,5 +255,77 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// DNSLeakTestHandler handles GET /api/v1/vpn/dns-leak-test.
+func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result := svc.RunDNSLeakTest()
+		return c.JSON(result)
+	}
+}
+
+// VerifyWireguardHandler handles GET /api/v1/vpn/wireguard/verify.
+// Returns interface status, handshake recency, route check, and firewall plumbing state.
+func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result := svc.VerifyWireGuard()
+		return c.JSON(result)
+	}
+}
+
+// GetSplitTunnelHandler handles GET /api/v1/vpn/split-tunnel.
+func GetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		cfg, err := svc.GetSplitTunnel()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(cfg)
+	}
+}
+
+// SetSplitTunnelHandler handles PUT /api/v1/vpn/split-tunnel.
+func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var cfg models.SplitTunnelConfig
+		if err := c.BodyParser(&cfg); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if cfg.Mode != "all" && cfg.Mode != "custom" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mode must be 'all' or 'custom'"})
+		}
+		if err := svc.SetSplitTunnel(cfg); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// GetTailscaleSSHHandler handles GET /api/v1/vpn/tailscale/ssh.
+func GetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		enabled, err := svc.GetTailscaleSSHEnabled()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"enabled": enabled})
+	}
+}
+
+// SetTailscaleSSHHandler handles PUT /api/v1/vpn/tailscale/ssh.
+func SetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		if err := svc.SetTailscaleSSHEnabled(req.Enabled); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"ok": true})
 	}
 }

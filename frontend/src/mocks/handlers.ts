@@ -95,16 +95,26 @@ export const handlers = [
 
   http.post(API_ROUTES.wifi.connect, async ({ request }) => {
     const body = (await request.json()) as { ssid: string; password: string };
-    return HttpResponse.json({ success: true, ssid: body.ssid });
+    return HttpResponse.json({
+      status: 'ok',
+      apply: { pending: true, token: `apply-${body.ssid}`, rollback_timeout_seconds: 30 },
+    });
   }),
 
   http.post(API_ROUTES.wifi.disconnect, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.put(API_ROUTES.wifi.mode, async ({ request }) => {
     const body = (await request.json()) as { mode: string };
-    return HttpResponse.json({ success: true, mode: body.mode });
+    return HttpResponse.json({
+      status: 'ok',
+      apply: { pending: true, token: `apply-mode-${body.mode}`, rollback_timeout_seconds: 30 },
+    });
+  }),
+
+  http.post(API_ROUTES.wifi.applyConfirm, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.wifi.saved, () => {
@@ -113,6 +123,36 @@ export const handlers = [
 
   http.get(API_ROUTES.wifi.radios, () => {
     return HttpResponse.json(mockRadios);
+  }),
+
+  http.put(`${API_ROUTES.wifi.radios}/:name/role`, () => {
+    return HttpResponse.json({ status: 'ok', pending: false });
+  }),
+
+  http.get(API_ROUTES.wifi.bandSwitching, () => {
+    return HttpResponse.json({
+      config: {
+        enabled: false,
+        preferred_band: '5g',
+        check_interval_sec: 10,
+        down_switch_threshold_dbm: -70,
+        down_switch_delay_sec: 30,
+        up_switch_threshold_dbm: -60,
+        up_switch_delay_sec: 60,
+        min_viable_signal_dbm: -80,
+      },
+      status: {
+        state: 'inactive',
+        current_band: '',
+        signal_dbm: 0,
+        weak_signal_secs: 0,
+        cooldown_sec: 0,
+      },
+    });
+  }),
+
+  http.put(API_ROUTES.wifi.bandSwitching, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.delete(`${API_ROUTES.wifi.deleteSaved}/:section`, () => {
@@ -191,6 +231,34 @@ export const handlers = [
 
   http.post(API_ROUTES.vpn.tailscale.toggle, () => {
     return HttpResponse.json({ success: true });
+  }),
+
+  http.post(API_ROUTES.vpn.tailscale.auth, () => {
+    return HttpResponse.json({ status: 'ok', auth_url: '' });
+  }),
+
+  http.post(API_ROUTES.vpn.tailscale.exitNode, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.vpn.dnsLeakTest, () => {
+    return HttpResponse.json({
+      nameservers: ['10.0.0.1', '8.8.8.8'],
+      vpn_dns_servers: ['10.66.0.1'],
+      vpn_active: true,
+      potentially_leaking: true,
+    });
+  }),
+
+  http.get(API_ROUTES.vpn.wireguard.verify, () => {
+    return HttpResponse.json({
+      interface_up: true,
+      handshake_ok: true,
+      latest_handshake: Math.floor(Date.now() / 1000) - 60,
+      route_ok: true,
+      firewall_zone_ok: true,
+      forwarding_ok: true,
+    });
   }),
 
   http.post(API_ROUTES.services.install, () => {
@@ -350,6 +418,14 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.post(API_ROUTES.system.shutdown, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.post(API_ROUTES.system.ntpSync, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
   http.post(API_ROUTES.system.factoryReset, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
@@ -364,6 +440,14 @@ export const handlers = [
 
   http.get(API_ROUTES.system.leds, () => {
     return HttpResponse.json({ stealth_mode: false, led_count: 3 });
+  }),
+
+  http.get(API_ROUTES.system.ledsSchedule, () => {
+    return HttpResponse.json({ enabled: false, on_time: '08:00', off_time: '22:00' });
+  }),
+
+  http.put(API_ROUTES.system.ledsSchedule, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.put(API_ROUTES.system.leds, async ({ request }) => {
@@ -469,5 +553,178 @@ export const handlers = [
   }),
   http.get(API_ROUTES.network.ddnsStatus, () => {
     return HttpResponse.json(mockDDNSStatus);
+  }),
+
+  http.get(API_ROUTES.system.buttons, () => {
+    return HttpResponse.json([
+      { name: 'reset', action: 'none' },
+      { name: 'wps', action: 'none' },
+    ]);
+  }),
+
+  http.put(API_ROUTES.system.buttonActions, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.network.usbTethering, () => {
+    return HttpResponse.json({ detected: false, device_type: '', interface: '', is_up: false, ip_address: '', configured: false });
+  }),
+
+  http.post(API_ROUTES.network.usbTetheringConfigure, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.post(API_ROUTES.network.usbTetheringUnconfigure, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.network.dataUsage, () => {
+    return HttpResponse.json({
+      available: true,
+      interfaces: [
+        {
+          name: 'eth0',
+          label: 'Ethernet WAN',
+          today: { rx_bytes: 52428800, tx_bytes: 15728640 },
+          month: { rx_bytes: 2147483648, tx_bytes: 536870912 },
+          total: { rx_bytes: 10737418240, tx_bytes: 2684354560 },
+        },
+        {
+          name: 'wwan0',
+          label: 'WiFi Uplink',
+          today: { rx_bytes: 10485760, tx_bytes: 3145728 },
+          month: { rx_bytes: 8589934592, tx_bytes: 1073741824 },
+          total: { rx_bytes: 21474836480, tx_bytes: 5368709120 },
+        },
+      ],
+    });
+  }),
+
+  http.get(API_ROUTES.network.dataUsageBudget, () => {
+    return HttpResponse.json({
+      budgets: [
+        {
+          interface: 'wwan0',
+          monthly_limit_bytes: 10737418240,
+          warning_threshold_pct: 80,
+          reset_day: 1,
+        },
+      ],
+    });
+  }),
+
+  http.put(API_ROUTES.network.dataUsageBudget, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.post(API_ROUTES.network.dataUsageReset, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.network.uptimeLog, () => {
+    const now = Date.now();
+    return HttpResponse.json([
+      { timestamp: now - 1000 * 60 * 2, state: 'connected' },
+      { timestamp: now - 1000 * 60 * 35, state: 'disconnected' },
+      { timestamp: now - 1000 * 60 * 40, state: 'connected' },
+      { timestamp: now - 1000 * 60 * 60 * 3, state: 'disconnected' },
+      { timestamp: now - 1000 * 60 * 60 * 3 - 1000 * 60 * 15, state: 'connected' },
+    ]);
+  }),
+
+  http.get(API_ROUTES.network.firewallZones, () => {
+    return HttpResponse.json({ zones: [] });
+  }),
+
+  http.get(API_ROUTES.network.portForwards, () => {
+    return HttpResponse.json({ rules: [] });
+  }),
+
+  http.post(API_ROUTES.network.portForwards, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.delete(`${API_ROUTES.network.portForwards}/:id`, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.network.diagnostics, () => {
+    return HttpResponse.json({ type: 'ping', target: '8.8.8.8', output: 'PING 8.8.8.8: 3 packets' });
+  }),
+
+  http.get(API_ROUTES.network.doh, () => {
+    return HttpResponse.json({ enabled: false, provider: 'cloudflare', url: '' });
+  }),
+
+  http.put(API_ROUTES.network.doh, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.network.ipv6, () => {
+    return HttpResponse.json({ enabled: false, mode: 'disabled', address: '', prefix: '' });
+  }),
+
+  http.put(API_ROUTES.network.ipv6, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.network.wol, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.system.alertThresholds, () => {
+    return HttpResponse.json({ storage_percent: 90, cpu_percent: 90, memory_percent: 90 });
+  }),
+
+  http.put(API_ROUTES.system.alertThresholds, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.system.sshKeys, () => {
+    return HttpResponse.json({ keys: [] });
+  }),
+
+  http.post(API_ROUTES.system.sshKeys, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.delete(`${API_ROUTES.system.sshKeys}/:index`, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.system.speedTest, () => {
+    return HttpResponse.json({ download_mbps: 50.0, upload_mbps: 20.0, ping_ms: 15.0, server: 'test' });
+  }),
+
+  http.get(API_ROUTES.vpn.tailscale.ssh, () => {
+    return HttpResponse.json({ enabled: false });
+  }),
+
+  http.put(API_ROUTES.vpn.tailscale.ssh, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.vpn.splitTunnel, () => {
+    return HttpResponse.json({ enabled: false, routes: [] });
+  }),
+
+  http.put(API_ROUTES.vpn.splitTunnel, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(API_ROUTES.wifi.schedule, () => {
+    return HttpResponse.json({ enabled: false, on_time: '07:00', off_time: '23:00', days: [] });
+  }),
+
+  http.put(API_ROUTES.wifi.schedule, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.wifi.macPolicies, () => {
+    return HttpResponse.json({ policies: [] });
+  }),
+
+  http.put(API_ROUTES.wifi.macPolicies, () => {
+    return HttpResponse.json({ status: 'ok' });
   }),
 ];

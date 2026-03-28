@@ -12,23 +12,34 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Port        int
-	MockMode    bool
-	Password    string
-	JWTSecret   string
-	StaticDir   string
-	CorsOrigins string
+	Port              int
+	MockMode          bool
+	Password          string
+	JWTSecret         string
+	StaticDir         string
+	CorsOrigins       string
+	AllowedAdminCIDRs string
+	// TLS options
+	TLSEnabled  bool
+	TLSPort     int
+	TLSCertFile string
+	TLSKeyFile  string
 }
 
 // DefaultConfig returns config with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		Port:        3000,
-		MockMode:    false,
-		Password:    "admin",
-		JWTSecret:   generateRandomSecret(),
-		StaticDir:   "",
-		CorsOrigins: "*",
+		Port:              3000,
+		MockMode:          false,
+		Password:          "admin",
+		JWTSecret:         generateRandomSecret(),
+		StaticDir:         "",
+		CorsOrigins:       "*",
+		AllowedAdminCIDRs: "",
+		TLSEnabled:        false,
+		TLSPort:           443,
+		TLSCertFile:       "/etc/openwrt-travel-gui/tls.crt",
+		TLSKeyFile:        "/etc/openwrt-travel-gui/tls.key",
 	}
 }
 
@@ -59,6 +70,23 @@ func LoadConfig(args []string) (Config, bool, error) {
 	if v := os.Getenv("CORS_ORIGINS"); v != "" {
 		cfg.CorsOrigins = v
 	}
+	if v := os.Getenv("ALLOWED_ADMIN_CIDRS"); v != "" {
+		cfg.AllowedAdminCIDRs = v
+	}
+	if v := os.Getenv("TLS_ENABLED"); v != "" {
+		cfg.TLSEnabled = strings.EqualFold(v, "true") || v == "1"
+	}
+	if v := os.Getenv("TLS_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.TLSPort = p
+		}
+	}
+	if v := os.Getenv("TLS_CERT"); v != "" {
+		cfg.TLSCertFile = v
+	}
+	if v := os.Getenv("TLS_KEY"); v != "" {
+		cfg.TLSKeyFile = v
+	}
 
 	// Layer 3: CLI flags override env vars
 	fs := flag.NewFlagSet("openwrt-travel-gui", flag.ContinueOnError)
@@ -69,7 +97,12 @@ func LoadConfig(args []string) (Config, bool, error) {
 	jwtSecret := fs.String("jwt-secret", cfg.JWTSecret, "JWT signing secret")
 	staticDir := fs.String("static-dir", cfg.StaticDir, "Path to static frontend files")
 	corsOrigins := fs.String("cors-origins", cfg.CorsOrigins, "CORS allowed origins")
+	allowedCIDRs := fs.String("allowed-admin-cidrs", cfg.AllowedAdminCIDRs, "Comma-separated admin IP/CIDR allowlist (empty disables)")
 	showVersion := fs.Bool("version", false, "Print version and exit")
+	tlsEnabled := fs.Bool("tls", cfg.TLSEnabled, "Enable HTTPS/TLS listener")
+	tlsPort := fs.Int("tls-port", cfg.TLSPort, "HTTPS listen port")
+	tlsCert := fs.String("tls-cert", cfg.TLSCertFile, "TLS certificate file path")
+	tlsKey := fs.String("tls-key", cfg.TLSKeyFile, "TLS private key file path")
 
 	if err := fs.Parse(args); err != nil {
 		return Config{}, false, fmt.Errorf("parsing flags: %w", err)
@@ -81,6 +114,11 @@ func LoadConfig(args []string) (Config, bool, error) {
 	cfg.JWTSecret = *jwtSecret
 	cfg.StaticDir = *staticDir
 	cfg.CorsOrigins = *corsOrigins
+	cfg.AllowedAdminCIDRs = *allowedCIDRs
+	cfg.TLSEnabled = *tlsEnabled
+	cfg.TLSPort = *tlsPort
+	cfg.TLSCertFile = *tlsCert
+	cfg.TLSKeyFile = *tlsKey
 
 	return cfg, *showVersion, nil
 }

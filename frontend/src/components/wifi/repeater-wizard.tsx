@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Wifi, Radio, CheckCircle2, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
-import type { WifiScanResult } from '@shared/index';
+import type { WifiScanResult, GroupedScanNetwork } from '@shared/index';
 import {
   Dialog,
   DialogContent,
@@ -92,16 +92,17 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
     onOpenChange(isOpen);
   }
 
-  function handleSelectNetwork(network: WifiScanResult) {
-    setSelectedNetwork(network);
+  function handleSelectNetwork(group: GroupedScanNetwork) {
+    const first = group.aps[0];
+    setSelectedNetwork(first);
     setUpstream({
-      ssid: network.ssid,
+      ssid: group.ssid,
       password: '',
-      encryption: network.encryption,
+      encryption: group.encryption,
     });
     setApConfig((prev) => ({
       ...prev,
-      ssid: prev.sameAsUpstream ? network.ssid : prev.ssid,
+      ssid: prev.sameAsUpstream ? group.ssid : prev.ssid,
     }));
   }
 
@@ -132,21 +133,23 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
         ssid: upstream.ssid,
         password: upstream.password,
         encryption: upstream.encryption,
+        band: selectedNetwork?.band,
       });
 
       // Step 3: Configure AP(s)
       if (apConfigs && apConfigs.length > 0) {
-        const ap = apConfigs[0];
-        await setAPMutation.mutateAsync({
-          section: ap.section,
-          config: {
-            ...ap,
-            ssid: effectiveAPSSID,
-            encryption: effectiveAPEncryption,
-            key: effectiveAPKey,
-            enabled: true,
-          },
-        });
+        for (const ap of apConfigs) {
+          await setAPMutation.mutateAsync({
+            section: ap.section,
+            config: {
+              ...ap,
+              ssid: effectiveAPSSID,
+              encryption: effectiveAPEncryption,
+              key: effectiveAPKey,
+              enabled: true,
+            },
+          });
+        }
       }
 
       setDone(true);

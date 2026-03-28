@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { API_ROUTES } from '@shared/index';
 import type {
   WifiScanResult,
@@ -14,6 +15,11 @@ import type {
   NetworkPriorityRequest,
   AutoReconnectConfig,
   RandomizeMACResponse,
+  WifiMutationResponse,
+  BandSwitchConfig,
+  BandSwitchResponse,
+  WiFiSchedule,
+  MACPolicies,
 } from '@shared/index';
 
 export function useWifiScan(enabled = true) {
@@ -39,13 +45,12 @@ export function useWifiConnect() {
       password: string;
       encryption?: string;
       hidden?: boolean;
-    }) => apiClient.post<{ status: string }>(API_ROUTES.wifi.connect, params),
+      /** Preferred band for dual-band networks (2.4ghz, 5ghz, 6ghz) */
+      band?: string;
+    }) => finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.connect, params)),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
-      // Delay refetch so the wireless subsystem has time to apply changes after wifi reload
-      setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      }, 3000);
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
     },
     onError: (error) => {
       toast.error('WiFi connection failed', { description: error.message });
@@ -56,13 +61,11 @@ export function useWifiConnect() {
 export function useWifiDisconnect() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.wifi.disconnect),
+    mutationFn: () =>
+      finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.disconnect)),
     onSuccess: () => {
       toast.success('Disconnected from WiFi');
-      // Delay refetch so the wireless subsystem has time to apply changes after wifi reload
-      setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      }, 2000);
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
     },
     onError: (error) => {
       toast.error('Failed to disconnect', { description: error.message });
@@ -74,7 +77,7 @@ export function useWifiMode() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (mode: WifiMode) =>
-      apiClient.put<{ success: boolean; mode: string }>(API_ROUTES.wifi.mode, { mode }),
+      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mode, { mode })),
     onSuccess: (_data, mode) => {
       toast.success(`WiFi mode changed to ${mode}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
@@ -96,7 +99,9 @@ export function useWifiDelete() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (section: string) =>
-      apiClient.del<{ status: string }>(`${API_ROUTES.wifi.deleteSaved}/${section}`),
+      finalizeWifiMutation(
+        apiClient.del<WifiMutationResponse>(`${API_ROUTES.wifi.deleteSaved}/${section}`),
+      ),
     onSuccess: () => {
       toast.success('Network removed');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });
@@ -133,7 +138,9 @@ export function useSetAPConfig() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ section, config }: { section: string; config: APConfig }) =>
-      apiClient.put<{ status: string }>(`${API_ROUTES.wifi.ap}/${section}`, config),
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse>(`${API_ROUTES.wifi.ap}/${section}`, config),
+      ),
     onSuccess: () => {
       toast.success('AP configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'ap'] });
@@ -154,7 +161,8 @@ export function useMACAddresses() {
 export function useSetMAC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mac: string) => apiClient.put<{ status: string }>(API_ROUTES.wifi.mac, { mac }),
+    mutationFn: (mac: string) =>
+      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mac, { mac })),
     onSuccess: () => {
       toast.success('MAC address updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });
@@ -168,7 +176,7 @@ export function useSetMAC() {
 export function useRandomizeMAC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize),
+    mutationFn: () => finalizeWifiMutation(apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize)),
     onSuccess: (data) => {
       toast.success(`MAC randomized to ${data.mac}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });
@@ -190,7 +198,7 @@ export function useSetGuestWifi() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (cfg: GuestWifiConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.wifi.guest, cfg),
+      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.guest, cfg)),
     onSuccess: () => {
       toast.success('Guest WiFi updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'guest'] });
@@ -215,11 +223,31 @@ export function useRadios() {
   });
 }
 
+export function useSetRadioRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, role }: { name: string; role: string }) =>
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse>(
+          API_ROUTES.wifi.radioRole.replace(':name', name),
+          { role },
+        ),
+      ),
+    onSuccess: () => {
+      toast.success('Radio role updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update radio role', { description: error.message });
+    },
+  });
+}
+
 export function useSetRadioEnabled() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enabled: boolean) =>
-      apiClient.put<{ status: string }>(API_ROUTES.wifi.radio, { enabled }),
+      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.radio, { enabled })),
     onSuccess: () => {
       toast.success('WiFi radio updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
@@ -248,6 +276,72 @@ export function useSetAutoReconnect() {
     },
     onError: (error) => {
       toast.error('Failed to update auto-reconnect', { description: error.message });
+    },
+  });
+}
+
+export function useBandSwitching() {
+  return useQuery({
+    queryKey: ['wifi', 'band-switching'],
+    queryFn: () => apiClient.get<BandSwitchResponse>(API_ROUTES.wifi.bandSwitching),
+    refetchInterval: 10_000,
+  });
+}
+
+export function useSetBandSwitching() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: BandSwitchConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.bandSwitching, config),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'band-switching'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update band switching config', { description: error.message });
+    },
+  });
+}
+
+export function useWiFiSchedule() {
+  return useQuery({
+    queryKey: ['wifi', 'schedule'],
+    queryFn: () => apiClient.get<WiFiSchedule>(API_ROUTES.wifi.schedule),
+  });
+}
+
+export function useSetWiFiSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (schedule: WiFiSchedule) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.schedule, schedule),
+    onSuccess: () => {
+      toast.success('WiFi schedule saved');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'schedule'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save WiFi schedule', { description: error.message });
+    },
+  });
+}
+
+export function useMACPolicies() {
+  return useQuery({
+    queryKey: ['wifi', 'macPolicies'],
+    queryFn: () => apiClient.get<MACPolicies>(API_ROUTES.wifi.macPolicies),
+  });
+}
+
+export function useSetMACPolicies() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (policies: MACPolicies) =>
+      apiClient.put<{ status: string }>(API_ROUTES.wifi.macPolicies, policies),
+    onSuccess: () => {
+      toast.success('MAC policies saved');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'macPolicies'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save MAC policies', { description: error.message });
     },
   });
 }

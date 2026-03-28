@@ -1,7 +1,17 @@
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Package } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   useServices,
   useInstallService,
@@ -30,6 +40,8 @@ export function ServicesPage() {
   const queryClient = useQueryClient();
 
   const [streamAction, setStreamAction] = useState<StreamAction | null>(null);
+  const [showWireguardWizard, setShowWireguardWizard] = useState(false);
+  const navigate = useNavigate();
 
   const isPending =
     installMutation.isPending ||
@@ -48,8 +60,13 @@ export function ServicesPage() {
   };
 
   const handleStreamComplete = () => {
+    const justInstalledWireguard =
+      streamAction?.serviceId === 'wireguard' && streamAction?.action === 'install';
     setStreamAction(null);
     void queryClient.invalidateQueries({ queryKey: ['services'] });
+    if (justInstalledWireguard) {
+      setShowWireguardWizard(true);
+    }
   };
 
   return (
@@ -67,7 +84,7 @@ export function ServicesPage() {
               ))}
             </div>
           ) : services.length === 0 ? (
-            <p className="text-sm text-gray-500">No services available</p>
+            <EmptyState message="No services available" />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {services.map((service) => (
@@ -98,6 +115,34 @@ export function ServicesPage() {
           onComplete={handleStreamComplete}
         />
       )}
+
+      {/* WireGuard post-install wizard */}
+      <Dialog open={showWireguardWizard} onOpenChange={setShowWireguardWizard}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>WireGuard Installed!</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            WireGuard has been installed. Would you like to set up a VPN configuration now?
+          </p>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setShowWireguardWizard(false)}
+            >
+              Later
+            </Button>
+            <Button
+              onClick={() => {
+                setShowWireguardWizard(false);
+                void navigate({ to: '/vpn' });
+              }}
+            >
+              Import .conf File
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

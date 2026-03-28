@@ -18,6 +18,7 @@
 # Examples:
 #   ./scripts/setup-local.sh
 #   ./scripts/setup-local.sh --ip 10.0.0.1 --password mysecret
+#   ./scripts/setup-local.sh --wifi-ssid MyRoute --wifi-password 'same-for-all-aps'
 #   ./scripts/setup-local.sh --no-luci-move
 
 set -euo pipefail
@@ -28,6 +29,9 @@ ROUTER_USER="root"
 PASSWORD="admin"
 MOVE_LUCI=true
 LEGACY_SCP=true
+# Optional WiFi AP naming (if unset, setup-wireless-ap.sh keeps OpenWrt-Travel / OpenWrt-Travel-5G + default key)
+WIFI_SSID_BASE=""
+WIFI_AP_KEY=""
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -45,6 +49,8 @@ Options:
   --ip IP              Router IP address (default: 192.168.1.1)
   --user USER          SSH user (default: root)
   --password PASSWORD  Admin password for travel-gui (default: admin)
+  --wifi-ssid NAME     Base SSID for APs: 2.4 GHz = NAME, 5 GHz = NAME-5G (default: OpenWrt-Travel / OpenWrt-Travel-5G)
+  --wifi-password KEY  WPA2 key for all APs (default: travelrouter from setup-wireless-ap.sh)
   --no-luci-move       Skip moving LuCI to port 8080
   --legacy-scp         Use SCP legacy protocol (-O flag) for Dropbear (default: on)
   --no-legacy-scp      Disable legacy SCP flag
@@ -58,6 +64,8 @@ while [[ $# -gt 0 ]]; do
     --ip)            ROUTER_IP="$2"; shift 2 ;;
     --user)          ROUTER_USER="$2"; shift 2 ;;
     --password)      PASSWORD="$2"; shift 2 ;;
+    --wifi-ssid)     WIFI_SSID_BASE="$2"; shift 2 ;;
+    --wifi-password) WIFI_AP_KEY="$2"; shift 2 ;;
     --no-luci-move)  MOVE_LUCI=false; shift ;;
     --legacy-scp)    LEGACY_SCP=true; shift ;;
     --no-legacy-scp) LEGACY_SCP=false; shift ;;
@@ -93,7 +101,17 @@ CONFIG_SRC="${REPO_ROOT}/packaging/openwrt/files/etc/config/openwrt-travel-gui"
 # ── Main ──────────────────────────────────────────────────────────────────────
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Setup openwrt-travel-gui → ${REMOTE}"
-echo "  LuCI move: ${MOVE_LUCI}  |  Password: ${PASSWORD}"
+echo "  LuCI move: ${MOVE_LUCI}  |  Travel GUI password: ${PASSWORD}"
+if [[ -n "$WIFI_SSID_BASE" ]]; then
+  echo "  WiFi AP SSID base: ${WIFI_SSID_BASE} (5G: ${WIFI_SSID_BASE}-5G)"
+else
+  echo "  WiFi AP SSID: default (OpenWrt-Travel / OpenWrt-Travel-5G)"
+fi
+if [[ -n "$WIFI_AP_KEY" ]]; then
+  echo "  WiFi AP key: (custom)"
+else
+  echo "  WiFi AP key: default (travelrouter)"
+fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 info "Checking connectivity to ${REMOTE}..."
@@ -155,7 +173,14 @@ if [[ -f "$WIRELESS_SCRIPT" ]]; then
     UCI_SID=$(echo "$LUCI_AUTH" | sed -n 's/.*"result":"\([^"]*\)".*/\1/p' | head -1)
   fi
   scp_cmd "$WIRELESS_SCRIPT" "${REMOTE}:/tmp/setup-wireless-ap.sh"
-  WIRELESS_OUT=$(ssh_cmd "UCI_APPLY_SID=${UCI_SID:-} sh /tmp/setup-wireless-ap.sh 2>&1; rm -f /tmp/setup-wireless-ap.sh" || true)
+  WIRELESS_ENV=""
+  if [[ -n "$WIFI_SSID_BASE" ]]; then
+    WIRELESS_ENV+="SETUP_WIFI_SSID=$(printf '%q' "$WIFI_SSID_BASE") "
+  fi
+  if [[ -n "$WIFI_AP_KEY" ]]; then
+    WIRELESS_ENV+="SETUP_WIFI_KEY=$(printf '%q' "$WIFI_AP_KEY") "
+  fi
+  WIRELESS_OUT=$(ssh_cmd "${WIRELESS_ENV}UCI_APPLY_SID=${UCI_SID:-} sh /tmp/setup-wireless-ap.sh 2>&1; rm -f /tmp/setup-wireless-ap.sh" || true)
   echo "$WIRELESS_OUT" | grep -E '^\[setup-wireless\]' || true
   if echo "$WIRELESS_OUT" | grep -q 'UCI_APPLY_SESSION='; then
     UCI_SID=$(echo "$WIRELESS_OUT" | grep 'UCI_APPLY_SESSION=' | tail -1 | sed 's/^.*UCI_APPLY_SESSION=//')
@@ -184,6 +209,9 @@ else
   warn "setup-wireless-ap.sh not found — skipping wireless AP setup."
 fi
 
+info "Attended Sysupgrade: set login_check_for_upgrades=1 (best effort)..."
+ssh_cmd "uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true"
+
 # Step 6: Mark setup as complete (skip the first-run wizard)
 info "Marking setup as complete..."
 ssh_cmd "mkdir -p /etc/openwrt-travel-gui && touch /etc/openwrt-travel-gui/setup-complete"
@@ -197,5 +225,5 @@ echo -e "${GREEN}✓${NC} Device setup complete!"
 echo "  LuCI:       http://${ROUTER_IP}:8080/"
 echo ""
 echo "  Next step: deploy the app with:"
-echo "    ./scripts/deploy-local.sh --build"
+echo "    ./scripts/deploy-local.sh"
 echo ""

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,64 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
+
+const openwrtIPBin = "/sbin/ip"
+const openwrtWgBin = "/usr/bin/wg"
+const openwrtUbusBin = "/sbin/ubus"
+const openwrtIfupBin = "/sbin/ifup"
+const openwrtIfdownBin = "/sbin/ifdown"
+const openwrtTailscaleBin = "/usr/sbin/tailscale"
+const openwrtTailscaleBinAlt = "/usr/bin/tailscale"
+
+var wireGuardVerifyTimeout = 12 * time.Second
+
+func tailscaleBin() string {
+	if _, err := os.Stat(openwrtTailscaleBin); err == nil {
+		return openwrtTailscaleBin
+	}
+	if _, err := os.Stat(openwrtTailscaleBinAlt); err == nil {
+		return openwrtTailscaleBinAlt
+	}
+	return "tailscale"
+}
+
+func (v *VpnService) validateWireGuardConfigForEnable() error {
+	wgOpts, err := v.uci.GetAll("network", "wg0")
+	if err != nil {
+		return fmt.Errorf("wireguard is not configured (missing network.wg0)")
+	}
+	if strings.TrimSpace(wgOpts["private_key"]) == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing wg0 private_key")
+	}
+
+	peerOpts, err := v.uci.GetAll("network", "wg0_peer0")
+	if err != nil {
+		return fmt.Errorf("wireguard config is incomplete: missing peer section wg0_peer0")
+	}
+	if strings.TrimSpace(peerOpts["public_key"]) == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing peer public_key")
+	}
+	endpoint := strings.TrimSpace(v.combinePeerEndpointFromUCI("wg0_peer0"))
+	if endpoint == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing peer endpoint")
+	}
+	host, portStr, splitErr := net.SplitHostPort(endpoint)
+	if splitErr != nil || strings.TrimSpace(host) == "" || strings.TrimSpace(portStr) == "" {
+		return fmt.Errorf("wireguard config is invalid: endpoint must be host:port (got %q)", endpoint)
+	}
+	port, convErr := strconv.Atoi(portStr)
+	if convErr != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("wireguard config is invalid: endpoint port must be 1-65535 (got %q)", portStr)
+	}
+
+	if strings.TrimSpace(peerOpts["allowed_ips"]) == "" {
+		return fmt.Errorf("wireguard config is incomplete: missing peer allowed_ips")
+	}
+	if strings.TrimSpace(peerOpts["route_allowed_ips"]) != "1" {
+		return fmt.Errorf("wireguard config is incomplete: peer route_allowed_ips must be 1")
+	}
+	return nil
+}
 
 // CommandRunner abstracts command execution for testability.
 type CommandRunner interface {
@@ -51,21 +110,209 @@ func NewVpnServiceWithProfilesPath(u uci.UCI, cmd CommandRunner, profilesPath st
 	return &VpnService{uci: u, cmd: cmd, profilesPath: profilesPath}
 }
 
+func wireGuardIfaceLooksUp(linkShowOutput string) bool {
+	out := strings.TrimSpace(linkShowOutput)
+	if out == "" || !strings.Contains(out, "wg0") {
+		return false
+	}
+	if strings.Contains(strings.ToLower(out), "state down") {
+		return false
+	}
+	return true
+}
+
+func (v *VpnService) reloadFirewall() {
+	_, _ = v.cmd.Run("/etc/init.d/firewall", "reload")
+}
+
+func (v *VpnService) combinePeerEndpointFromUCI(section string) string {
+	host, errH := v.uci.Get("network", section, "endpoint_host")
+	port, errP := v.uci.Get("network", section, "endpoint_port")
+	if errH == nil && errP == nil && host != "" && port != "" {
+		return net.JoinHostPort(host, port)
+	}
+	if ep, err := v.uci.Get("network", section, "endpoint"); err == nil && ep != "" {
+		return ep
+	}
+	if errH == nil && host != "" {
+		if errP == nil && port != "" {
+			return net.JoinHostPort(host, port)
+		}
+		return net.JoinHostPort(host, "51820")
+	}
+	return ""
+}
+
+func (v *VpnService) setWireGuardAddresses(address string) error {
+	_ = v.uci.DeleteOption("network", "wg0", "addresses")
+	addr := strings.TrimSpace(address)
+	if addr == "" {
+		return nil
+	}
+	for _, part := range strings.Split(addr, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if err := v.uci.AddList("network", "wg0", "addresses", part); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *VpnService) applyWireGuardPeerParsed(section string, peer WireguardParsedPeer) error {
+	if err := v.ensureWireGuardInterface(); err != nil {
+		return err
+	}
+	if err := v.ensureWireGuardPeer(section); err != nil {
+		return err
+	}
+	_ = v.uci.DeleteOption("network", section, "endpoint")
+	_ = v.uci.DeleteOption("network", section, "endpoint_host")
+	_ = v.uci.DeleteOption("network", section, "endpoint_port")
+	_ = v.uci.DeleteOption("network", section, "allowed_ips")
+	_ = v.uci.Set("network", section, "public_key", peer.PublicKey)
+	if peer.PresharedKey != "" {
+		_ = v.uci.Set("network", section, "preshared_key", peer.PresharedKey)
+	}
+	host, port := SplitWireGuardEndpoint(peer.Endpoint)
+	if host != "" {
+		_ = v.uci.Set("network", section, "endpoint_host", host)
+		_ = v.uci.Set("network", section, "endpoint_port", port)
+	}
+	_ = v.uci.Set("network", section, "route_allowed_ips", "1")
+	if peer.PersistentKeepalive > 0 {
+		_ = v.uci.Set("network", section, "persistent_keepalive", strconv.Itoa(peer.PersistentKeepalive))
+	} else if peer.Endpoint != "" {
+		_ = v.uci.Set("network", section, "persistent_keepalive", "25")
+	}
+	allowed := strings.TrimSpace(peer.AllowedIPs)
+	if allowed == "" {
+		allowed = "0.0.0.0/0,::/0"
+	}
+	for _, cidr := range strings.Split(allowed, ",") {
+		cidr = strings.TrimSpace(cidr)
+		if cidr == "" {
+			continue
+		}
+		if err := v.uci.AddList("network", section, "allowed_ips", cidr); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensureWireGuardInterface normalizes the network.wg0 UCI section so it has the
+// correct type (interface) and proto (wireguard). This must be called before
+// writing WireGuard-specific options, because UCI Set on a missing or wrong-typed
+// section silently fails on some OpenWrt builds.
+func (v *VpnService) ensureWireGuardInterface() error {
+	opts, err := v.uci.GetAll("network", "wg0")
+	if err != nil {
+		// Section doesn't exist: create it.
+		if addErr := v.uci.AddSection("network", "wg0", "interface"); addErr != nil {
+			return fmt.Errorf("creating network.wg0 section: %w", addErr)
+		}
+	} else if opts[".type"] != "interface" {
+		// Wrong section type — delete and recreate is the safe approach, but
+		// in practice just ensuring proto is set should be enough to overwrite.
+		_ = opts
+	}
+	return v.uci.Set("network", "wg0", "proto", "wireguard")
+}
+
+// ensureWireGuardPeer normalizes a peer section. Peer sections must have type
+// "wireguard_wg0" so netifd binds them to the wg0 interface.
+func (v *VpnService) ensureWireGuardPeer(section string) error {
+	if _, err := v.uci.GetAll("network", section); err != nil {
+		if addErr := v.uci.AddSection("network", section, "wireguard_wg0"); addErr != nil {
+			return fmt.Errorf("creating peer section %s: %w", section, addErr)
+		}
+	}
+	return nil
+}
+
+func (v *VpnService) applyAndVerifyWireGuard() error {
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	time.Sleep(300 * time.Millisecond)
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(400 * time.Millisecond)
+			_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+			time.Sleep(300 * time.Millisecond)
+		}
+		_, _ = v.cmd.Run(openwrtIfupBin, "wg0")
+	}
+	return v.waitForWireGuardRuntime(wireGuardVerifyTimeout)
+}
+
+func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	var lastIPOut string
+	for time.Now().Before(deadline) {
+		if out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump"); err == nil {
+			s := strings.TrimSpace(string(out))
+			if s != "" {
+				if st, perr := ParseWgDump(s); perr == nil && st != nil {
+					return nil
+				}
+			}
+		}
+		if out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); err == nil {
+			ls := string(out)
+			if wireGuardIfaceLooksUp(ls) {
+				return nil
+			}
+			lastIPOut = strings.TrimSpace(ls)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if lastIPOut != "" {
+		return fmt.Errorf("wg0 did not become ready in time (last %s: %s)", openwrtIPBin, lastIPOut)
+	}
+	return fmt.Errorf("wg0 did not become ready in time (%s and %s did not succeed)", openwrtWgBin, openwrtIPBin)
+}
+
+// wgRuntimeState returns a fine-grained status detail string for the wg0 interface.
+func (v *VpnService) wgRuntimeState(enabled bool) string {
+	if !enabled {
+		return "disabled"
+	}
+	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
+	if err != nil || strings.TrimSpace(string(out)) == "" {
+		return "enabled_not_up"
+	}
+	status, parseErr := ParseWgDump(string(out))
+	if parseErr != nil || status == nil {
+		return "enabled_not_up"
+	}
+	for _, peer := range status.Peers {
+		if peer.LatestHandshake > 0 {
+			return "connected"
+		}
+	}
+	if len(status.Peers) > 0 {
+		return "up_no_handshake"
+	}
+	return "configured"
+}
+
 // GetVpnStatus returns all VPN connection statuses.
 func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	var statuses []models.VpnStatus
 
 	// WireGuard — only include if configured
-	disabled, err := v.uci.Get("network", "wg0", "disabled")
+	opts, err := v.uci.GetAll("network", "wg0")
 	if err == nil {
 		// WireGuard is configured
+		disabled := opts["disabled"]
 		wgStatus := models.VpnStatus{Type: "wireguard"}
 		wgStatus.Enabled = disabled != "1"
-		wgStatus.Connected = wgStatus.Enabled
+		wgStatus.StatusDetail = v.wgRuntimeState(wgStatus.Enabled)
+		wgStatus.Connected = wgStatus.StatusDetail == "connected"
 		if wgStatus.Enabled {
-			if endpoint, err := v.uci.Get("network", "wg0_peer0", "endpoint"); err == nil {
-				wgStatus.Endpoint = endpoint
-			}
+			wgStatus.Endpoint = v.combinePeerEndpointFromUCI("wg0_peer0")
 		}
 		statuses = append(statuses, wgStatus)
 	}
@@ -84,10 +331,10 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 // Line 1 (interface): private_key  public_key  listen_port  fwmark
 // Line 2+ (peers): public_key  preshared_key  endpoint  allowed_ips  latest_handshake_epoch  transfer_rx  transfer_tx  persistent_keepalive
 func (v *VpnService) GetWireGuardStatus() (*models.WireGuardStatus, error) {
-	out, err := v.cmd.Run("wg", "show", "wg0", "dump")
+	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
 	if err != nil {
 		// wg show fails with exit status 1 when interface doesn't exist (tunnel not active)
-		return &models.WireGuardStatus{}, nil
+		return &models.WireGuardStatus{Interface: "wg0", Peers: []models.WireGuardPeerStatus{}}, nil
 	}
 	return ParseWgDump(string(out))
 }
@@ -110,6 +357,7 @@ func ParseWgDump(dump string) (*models.WireGuardStatus, error) {
 		Interface:  "wg0",
 		PublicKey:  ifFields[1],
 		ListenPort: listenPort,
+		Peers:      []models.WireGuardPeerStatus{},
 	}
 
 	// Parse peer lines
@@ -161,7 +409,7 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	if err == nil {
 		peer := models.WireguardPeer{
 			PublicKey: peerOpts["public_key"],
-			Endpoint:  peerOpts["endpoint"],
+			Endpoint:  v.combinePeerEndpointFromUCI("wg0_peer0"),
 		}
 		if ips, ok := peerOpts["allowed_ips"]; ok && ips != "" {
 			peer.AllowedIPs = strings.Split(ips, ",")
@@ -174,35 +422,325 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 
 // SetWireguardConfig updates the WireGuard configuration.
 func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
+	if err := v.ensureWireGuardInterface(); err != nil {
+		return err
+	}
 	if config.PrivateKey != "" {
 		_ = v.uci.Set("network", "wg0", "private_key", config.PrivateKey)
 	}
 	if config.Address != "" {
-		_ = v.uci.Set("network", "wg0", "addresses", config.Address)
+		if err := v.setWireGuardAddresses(config.Address); err != nil {
+			return err
+		}
 	}
 	if len(config.DNS) > 0 {
 		_ = v.uci.Set("network", "wg0", "dns", strings.Join(config.DNS, " "))
 	}
+	if len(config.Peers) > 0 {
+		p := config.Peers[0]
+		parsed := WireguardParsedPeer{
+			PublicKey:  p.PublicKey,
+			Endpoint:   p.Endpoint,
+			AllowedIPs: strings.Join(p.AllowedIPs, ","),
+		}
+		if p.PresharedKey != nil {
+			parsed.PresharedKey = *p.PresharedKey
+		}
+		if err := v.applyWireGuardPeerParsed("wg0_peer0", parsed); err != nil {
+			return err
+		}
+	}
 	return v.uci.Commit("network")
 }
 
-// ToggleWireguard enables or disables WireGuard.
+// ToggleWireguard enables or disables WireGuard. When enabling, it also ensures
+// the UCI structure is correct, creates firewall plumbing, commits, brings up wg0,
+// and verifies the tunnel is live. Returns an error if the tunnel fails to come up.
 func (v *VpnService) ToggleWireguard(enable bool) error {
 	val := "1"
 	if enable {
 		val = "0"
+		_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
+		if err := v.ensureWireGuardInterface(); err != nil {
+			return fmt.Errorf("normalizing wg0 interface: %w", err)
+		}
+		if err := v.ensureWireGuardPeer("wg0_peer0"); err != nil {
+			return fmt.Errorf("normalizing wg0 peer: %w", err)
+		}
+		if err := v.validateWireGuardConfigForEnable(); err != nil {
+			return err
+		}
+		if err := v.setupWireGuardFirewall(); err != nil {
+			return fmt.Errorf("setting up WireGuard firewall: %w", err)
+		}
 	}
 	_ = v.uci.Set("network", "wg0", "disabled", val)
-	return v.uci.Commit("network")
+	if err := v.uci.Commit("network"); err != nil {
+		return err
+	}
+	if enable {
+		if err := v.applyAndVerifyWireGuard(); err != nil {
+			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
+		}
+	} else {
+		// Bring down the interface and clean up firewall plumbing when disabling.
+		_ = v.SetKillSwitch(false)
+		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+		// Netifd-managed recovery: bring WAN back up (best-effort) then reload network so
+		// routes/DNS are recomputed without the wg0 interface.
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan", "up")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network.interface.wan6", "up")
+		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+		time.Sleep(200 * time.Millisecond)
+		_ = v.teardownWireGuardFirewall()
+	}
+	return nil
 }
 
-// GetTailscaleStatus returns Tailscale status.
+// setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule
+// exist in UCI and commits the firewall config. Called when activating a WireGuard profile.
+func (v *VpnService) setupWireGuardFirewall() error {
+	// Ensure the wg0 zone exists.
+	if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
+		if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
+			return fmt.Errorf("creating wg0 firewall zone: %w", addErr)
+		}
+	}
+	_ = v.uci.Set("firewall", "wg0_zone", "name", "wg0")
+	_ = v.uci.Set("firewall", "wg0_zone", "network", "wg0")
+	_ = v.uci.Set("firewall", "wg0_zone", "input", "DROP")
+	_ = v.uci.Set("firewall", "wg0_zone", "output", "ACCEPT")
+	_ = v.uci.Set("firewall", "wg0_zone", "forward", "DROP")
+	_ = v.uci.Set("firewall", "wg0_zone", "masq", "1")
+	_ = v.uci.Set("firewall", "wg0_zone", "mtu_fix", "1")
+
+	// Ensure lan→wg0 forwarding exists.
+	if _, err := v.uci.GetAll("firewall", "wg0_fwd"); err != nil {
+		if addErr := v.uci.AddSection("firewall", "wg0_fwd", "forwarding"); addErr != nil {
+			return fmt.Errorf("creating wg0 forwarding rule: %w", addErr)
+		}
+	}
+	_ = v.uci.Set("firewall", "wg0_fwd", "src", "lan")
+	_ = v.uci.Set("firewall", "wg0_fwd", "dest", "wg0")
+
+	if err := v.uci.Commit("firewall"); err != nil {
+		return err
+	}
+	v.reloadFirewall()
+	return nil
+}
+
+// teardownWireGuardFirewall removes the wg0 firewall zone and forwarding rule from UCI.
+// Called when deactivating WireGuard. Errors are non-fatal (section may not exist).
+func (v *VpnService) teardownWireGuardFirewall() error {
+	_ = v.uci.DeleteSection("firewall", "wg0_zone")
+	_ = v.uci.DeleteSection("firewall", "wg0_fwd")
+	if err := v.uci.Commit("firewall"); err != nil {
+		return err
+	}
+	v.reloadFirewall()
+	return nil
+}
+
+// VerifyWireGuard checks the health of the WireGuard tunnel:
+// interface state, recent handshake, default route, and firewall plumbing.
+func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
+	result := models.VPNVerifyResult{}
+
+	// Check if wg0 interface is up.
+	out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0")
+	if err == nil && wireGuardIfaceLooksUp(string(out)) {
+		result.InterfaceUp = true
+	}
+
+	// Check latest handshake from wg show dump.
+	dumpOut, dumpErr := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
+	if dumpErr == nil {
+		if status, err := ParseWgDump(string(dumpOut)); err == nil && status != nil {
+			var latest int64
+			for _, peer := range status.Peers {
+				if peer.LatestHandshake > latest {
+					latest = peer.LatestHandshake
+				}
+			}
+			result.LatestHandshake = latest
+			if latest > 0 && time.Now().Unix()-latest < 180 {
+				result.HandshakeOk = true
+			}
+		}
+	}
+
+	// Check default route via wg0.
+	routeOut, routeErr := v.cmd.Run(openwrtIPBin, "route", "show", "default")
+	route6Out, _ := v.cmd.Run(openwrtIPBin, "-6", "route", "show", "default")
+	combined := string(routeOut) + "\n" + string(route6Out)
+	if routeErr == nil && strings.Contains(combined, "wg0") {
+		result.RouteOk = true
+	}
+
+	// Check firewall plumbing in UCI.
+	if opts, err := v.uci.GetAll("firewall", "wg0_zone"); err == nil && opts["name"] == "wg0" {
+		result.FirewallZoneOk = true
+	}
+	if opts, err := v.uci.GetAll("firewall", "wg0_fwd"); err == nil && opts["src"] == "lan" && opts["dest"] == "wg0" {
+		result.ForwardingOk = true
+	}
+
+	return result
+}
+
+// tailscaleStatusJSON is the subset of `tailscale status --json` we parse.
+type tailscaleStatusJSON struct {
+	BackendState string   `json:"BackendState"`
+	AuthURL      string   `json:"AuthURL"`
+	TailscaleIPs []string `json:"TailscaleIPs"`
+	Self         struct {
+		DNSName      string   `json:"DNSName"`
+		TailscaleIPs []string `json:"TailscaleIPs"`
+		Online       bool     `json:"Online"`
+	} `json:"Self"`
+	Peer map[string]struct {
+		DNSName        string   `json:"DNSName"`
+		OS             string   `json:"OS"`
+		Online         bool     `json:"Online"`
+		ExitNode       bool     `json:"ExitNode"`
+		ExitNodeOption bool     `json:"ExitNodeOption"`
+		TailscaleIPs   []string `json:"TailscaleIPs"`
+		LastSeen       string   `json:"LastSeen"`
+	} `json:"Peer"`
+}
+
+// isTailscaleInstalled checks whether the tailscale binary exists.
+func (v *VpnService) isTailscaleInstalled() bool {
+	if _, err := os.Stat(openwrtTailscaleBin); err == nil {
+		return true
+	}
+	if _, err := os.Stat(openwrtTailscaleBinAlt); err == nil {
+		return true
+	}
+	// Fall back to PATH check for non-OpenWrt/dev environments.
+	_, err := v.cmd.Run("which", "tailscale")
+	return err == nil
+}
+
+// isTailscaleRunning checks whether tailscaled is running.
+func (v *VpnService) isTailscaleRunning() bool {
+	_, err := v.cmd.Run("/etc/init.d/tailscale", "status")
+	return err == nil
+}
+
+// GetTailscaleStatus returns Tailscale status, including peers when logged in.
 func (v *VpnService) GetTailscaleStatus() (models.TailscaleStatus, error) {
+	installed := v.isTailscaleInstalled()
+	if !installed {
+		return models.TailscaleStatus{
+			Installed: false,
+			Running:   false,
+			LoggedIn:  false,
+			Peers:     []models.TailscalePeer{},
+		}, nil
+	}
+
+	running := v.isTailscaleRunning()
+	if !running {
+		return models.TailscaleStatus{
+			Installed: true,
+			Running:   false,
+			LoggedIn:  false,
+			Peers:     []models.TailscalePeer{},
+		}, nil
+	}
+
+	raw, err := v.cmd.Run(tailscaleBin(), "status", "--json")
+	if err != nil {
+		return models.TailscaleStatus{Installed: true, Running: true, Peers: []models.TailscalePeer{}}, nil
+	}
+
+	var ts tailscaleStatusJSON
+	if err := json.Unmarshal(raw, &ts); err != nil {
+		return models.TailscaleStatus{Installed: true, Running: true, Peers: []models.TailscalePeer{}}, nil
+	}
+
+	loggedIn := ts.BackendState == "Running" || ts.BackendState == "Starting"
+
+	var ip string
+	if len(ts.Self.TailscaleIPs) > 0 {
+		ip = ts.Self.TailscaleIPs[0]
+	} else if len(ts.TailscaleIPs) > 0 {
+		ip = ts.TailscaleIPs[0]
+	}
+
+	hostname := strings.TrimSuffix(ts.Self.DNSName, ".")
+	if idx := strings.Index(hostname, "."); idx >= 0 {
+		hostname = hostname[:idx]
+	}
+
+	// Build peers list.
+	peers := make([]models.TailscalePeer, 0, len(ts.Peer))
+	for _, p := range ts.Peer {
+		var peerIP string
+		if len(p.TailscaleIPs) > 0 {
+			peerIP = p.TailscaleIPs[0]
+		}
+		peerHostname := strings.TrimSuffix(p.DNSName, ".")
+		if idx := strings.Index(peerHostname, "."); idx >= 0 {
+			peerHostname = peerHostname[:idx]
+		}
+		peers = append(peers, models.TailscalePeer{
+			Hostname:       peerHostname,
+			TailscaleIP:    peerIP,
+			OS:             p.OS,
+			Online:         p.Online,
+			ExitNode:       p.ExitNode,
+			ExitNodeOption: p.ExitNodeOption,
+			LastSeen:       p.LastSeen,
+		})
+	}
+
+	authURL := ""
+	if ts.BackendState == "NeedsLogin" || ts.AuthURL != "" {
+		authURL = ts.AuthURL
+	}
+
 	return models.TailscaleStatus{
-		Installed: false,
-		Running:   false,
-		LoggedIn:  false,
+		Installed: true,
+		Running:   true,
+		LoggedIn:  loggedIn,
+		IPAddress: ip,
+		Hostname:  hostname,
+		Peers:     peers,
+		AuthURL:   authURL,
 	}, nil
+}
+
+// StartTailscaleAuth runs `tailscale up` and returns the auth URL if login is required.
+func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
+	args := []string{"up", "--accept-routes"}
+	if authKey != "" {
+		args = append(args, "--auth-key="+authKey)
+	}
+	out, _ := v.cmd.Run(tailscaleBin(), args...)
+	combined := strings.TrimSpace(string(out))
+	// Extract URL from output like "To authenticate, visit:\n\thttps://login.tailscale.com/..."
+	for _, line := range strings.Split(combined, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "https://login.tailscale.com") || strings.HasPrefix(line, "https://tailscale.com") {
+			return line, nil
+		}
+	}
+	// Also check the status for an auth URL.
+	status, _ := v.GetTailscaleStatus()
+	return status.AuthURL, nil
+}
+
+// SetTailscaleExitNode sets or clears the Tailscale exit node.
+func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
+	if nodeIP == "" {
+		_, err := v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
+		return err
+	}
+	_, err := v.cmd.Run(tailscaleBin(), "set", "--exit-node="+nodeIP, "--exit-node-allow-lan-access=true")
+	return err
 }
 
 // GetKillSwitch checks whether the VPN kill switch firewall rule exists.
@@ -229,47 +767,60 @@ func (v *VpnService) SetKillSwitch(enabled bool) error {
 		// Remove the firewall rule; ignore error if it doesn't exist.
 		_ = v.uci.DeleteSection("firewall", "vpn_killswitch")
 	}
-	return v.uci.Commit("firewall")
+	if err := v.uci.Commit("firewall"); err != nil {
+		return err
+	}
+	v.reloadFirewall()
+	return nil
 }
 
-// ImportWireguardConfig parses a .conf file and applies it via UCI.
+// ImportWireguardConfig parses a .conf file, normalizes the UCI structure,
+// applies the config, and verifies the tunnel comes up.
 func (v *VpnService) ImportWireguardConfig(confContent string) error {
 	parsed, err := ParseWireguardConfig(confContent)
 	if err != nil {
 		return err
 	}
 
-	// Apply interface settings
+	// Normalize wg0 UCI structure before writing values.
+	if err := v.ensureWireGuardInterface(); err != nil {
+		return fmt.Errorf("normalizing wg0 interface: %w", err)
+	}
+
 	_ = v.uci.Set("network", "wg0", "private_key", parsed.Interface.PrivateKey)
 	if parsed.Interface.Address != "" {
-		_ = v.uci.Set("network", "wg0", "addresses", parsed.Interface.Address)
+		if err := v.setWireGuardAddresses(parsed.Interface.Address); err != nil {
+			return err
+		}
 	}
 	if parsed.Interface.DNS != "" {
 		_ = v.uci.Set("network", "wg0", "dns", parsed.Interface.DNS)
 	}
+	if parsed.Interface.ListenPort > 0 {
+		_ = v.uci.Set("network", "wg0", "listen_port", strconv.Itoa(parsed.Interface.ListenPort))
+	}
+	if parsed.Interface.MTU > 0 {
+		_ = v.uci.Set("network", "wg0", "mtu", strconv.Itoa(parsed.Interface.MTU))
+	}
 
-	// Apply first peer (extend if needed)
 	for i, peer := range parsed.Peers {
 		section := fmt.Sprintf("wg0_peer%d", i)
-		_ = v.uci.Set("network", section, "public_key", peer.PublicKey)
-		if peer.Endpoint != "" {
-			_ = v.uci.Set("network", section, "endpoint", peer.Endpoint)
-		}
-		if peer.AllowedIPs != "" {
-			_ = v.uci.Set("network", section, "allowed_ips", peer.AllowedIPs)
-		}
-		if peer.PresharedKey != "" {
-			_ = v.uci.Set("network", section, "preshared_key", peer.PresharedKey)
+		if err := v.applyWireGuardPeerParsed(section, peer); err != nil {
+			return fmt.Errorf("applying peer section %s: %w", section, err)
 		}
 	}
 
 	return v.uci.Commit("network")
 }
 
-// ToggleTailscale enables or disables Tailscale.
-func (v *VpnService) ToggleTailscale(_ bool) error {
-	// Stub - tailscale not installed in mock
-	return nil
+// ToggleTailscale starts or stops the Tailscale daemon via init.d.
+func (v *VpnService) ToggleTailscale(enable bool) error {
+	if enable {
+		_, err := v.cmd.Run("/etc/init.d/tailscale", "start")
+		return err
+	}
+	_, err := v.cmd.Run("/etc/init.d/tailscale", "stop")
+	return err
 }
 
 // loadProfiles reads profiles from the JSON file.
@@ -391,10 +942,164 @@ func (v *VpnService) ActivateProfile(id string) error {
 		return fmt.Errorf("applying profile config: %w", err)
 	}
 
+	// Ensure firewall zone and forwarding rules exist.
+	if err := v.setupWireGuardFirewall(); err != nil {
+		return fmt.Errorf("setting up WireGuard firewall: %w", err)
+	}
+
 	// Mark only this profile as active
 	for i := range profiles {
 		profiles[i].Active = profiles[i].ID == id
 	}
 
 	return v.saveProfiles(profiles)
+}
+
+// RunDNSLeakTest checks whether the system's active DNS servers match the VPN
+// configuration. A mismatch when the VPN is active suggests a DNS leak.
+func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
+	result := models.DNSLeakResult{}
+
+	// 1. Read /etc/resolv.conf for current system nameservers.
+	result.Nameservers = readResolvConfNameservers()
+
+	// 2. Check VPN status.
+	if opts, err := v.uci.GetAll("network", "wg0"); err == nil {
+		result.VPNActive = opts["disabled"] != "1"
+	}
+
+	// 3. Read VPN DNS servers from WireGuard UCI config.
+	if dns, err := v.uci.Get("network", "wg0", "dns"); err == nil && dns != "" {
+		for _, s := range strings.Split(dns, " ") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				result.VPNDNSServers = append(result.VPNDNSServers, s)
+			}
+		}
+	}
+
+	// 4. Check for potential leak: VPN active but DNS not routed through VPN.
+	if result.VPNActive && len(result.VPNDNSServers) > 0 {
+		vpnDNSSet := make(map[string]bool, len(result.VPNDNSServers))
+		for _, s := range result.VPNDNSServers {
+			vpnDNSSet[s] = true
+		}
+		leaking := true
+		for _, ns := range result.Nameservers {
+			if vpnDNSSet[ns] {
+				leaking = false
+				break
+			}
+		}
+		result.PotentiallyLeaking = leaking
+	}
+
+	return result
+}
+
+// readResolvConfNameservers parses nameserver lines from /etc/resolv.conf.
+func readResolvConfNameservers() []string {
+	return readResolvConfNameserversFromPath("/etc/resolv.conf")
+}
+
+// readResolvConfNameserversFromPath parses nameserver lines from the given file.
+func readResolvConfNameserversFromPath(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var servers []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "nameserver ") {
+			ns := strings.TrimSpace(strings.TrimPrefix(line, "nameserver "))
+			if ns != "" {
+				servers = append(servers, ns)
+			}
+		}
+	}
+	return servers
+}
+
+const splitTunnelPath = "/etc/openwrt-travel-gui/split-tunnel.json"
+
+// GetSplitTunnel returns the current WireGuard split tunnel configuration.
+func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
+	data, err := os.ReadFile(splitTunnelPath)
+	if err != nil {
+		return models.SplitTunnelConfig{Mode: "all"}, nil
+	}
+	var cfg models.SplitTunnelConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return models.SplitTunnelConfig{Mode: "all"}, nil
+	}
+	return cfg, nil
+}
+
+// SetSplitTunnel saves the split tunnel config and updates WireGuard allowed IPs in UCI.
+// mode "all" = route everything through VPN (0.0.0.0/0,::/0)
+// mode "custom" = only route specified CIDR ranges
+func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll("/etc/openwrt-travel-gui", 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(splitTunnelPath, data, 0o644); err != nil {
+		return err
+	}
+
+	allowedParts := []string{"0.0.0.0/0", "::/0"}
+	if cfg.Mode == "custom" && len(cfg.Routes) > 0 {
+		allowedParts = cfg.Routes
+	}
+	sections, err := v.uci.GetSections("network")
+	if err != nil {
+		return err
+	}
+	for name, opts := range sections {
+		if strings.HasPrefix(opts[".type"], "wireguard_") {
+			_ = v.uci.DeleteOption("network", name, "allowed_ips")
+			for _, cidr := range allowedParts {
+				cidr = strings.TrimSpace(cidr)
+				if cidr == "" {
+					continue
+				}
+				if err := v.uci.AddList("network", name, "allowed_ips", cidr); err != nil {
+					return err
+				}
+			}
+			_ = v.uci.Set("network", name, "route_allowed_ips", "1")
+		}
+	}
+	return v.uci.Commit("network")
+}
+
+// GetTailscaleSSHEnabled returns whether Tailscale SSH is enabled.
+func (v *VpnService) GetTailscaleSSHEnabled() (bool, error) {
+	out, err := v.cmd.Run(tailscaleBin(), "status", "--json")
+	if err != nil {
+		return false, nil // Tailscale not running
+	}
+	var status struct {
+		Prefs struct {
+			RunSSH bool `json:"RunSSH"`
+		} `json:"Prefs"`
+	}
+	if err := json.Unmarshal(out, &status); err != nil {
+		return false, nil
+	}
+	return status.Prefs.RunSSH, nil
+}
+
+// SetTailscaleSSHEnabled enables or disables Tailscale SSH.
+func (v *VpnService) SetTailscaleSSHEnabled(enabled bool) error {
+	arg := "--ssh=false"
+	if enabled {
+		arg = "--ssh"
+	}
+	_, err := v.cmd.Run(tailscaleBin(), "set", arg)
+	return err
 }

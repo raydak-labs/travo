@@ -9,6 +9,10 @@ import type {
   WireGuardStatus,
   WireGuardProfile,
   KillSwitchStatus,
+  DNSLeakResult,
+  VPNVerifyResult,
+  SplitTunnelConfig,
+  TailscaleSSHStatus,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -144,6 +148,24 @@ export function useKillSwitch() {
   });
 }
 
+export function useDNSLeakTest() {
+  return useMutation({
+    mutationFn: () => apiClient.get<DNSLeakResult>(API_ROUTES.vpn.dnsLeakTest),
+    onError: (error) => {
+      toast.error('DNS leak test failed', { description: error.message });
+    },
+  });
+}
+
+export function useVerifyWireGuard() {
+  return useMutation({
+    mutationFn: () => apiClient.get<VPNVerifyResult>(API_ROUTES.vpn.wireguard.verify),
+    onError: (error) => {
+      toast.error('VPN verification failed', { description: error.message });
+    },
+  });
+}
+
 export function useSetKillSwitch() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -155,6 +177,81 @@ export function useSetKillSwitch() {
     },
     onError: (error) => {
       toast.error('Failed to update kill switch', { description: error.message });
+    },
+  });
+}
+
+export function useTailscaleAuth() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (authKey?: string) =>
+      apiClient.post<{ auth_url?: string; status: string }>(API_ROUTES.vpn.tailscale.auth, {
+        auth_key: authKey ?? '',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale'] });
+    },
+    onError: (error) => {
+      toast.error('Tailscale auth failed', { description: error.message });
+    },
+  });
+}
+
+export function useSetTailscaleExitNode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (nodeIP: string) =>
+      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { exit_node: nodeIP }),
+    onSuccess: () => {
+      toast.success('Exit node updated');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to set exit node', { description: error.message });
+    },
+  });
+}
+
+export function useSplitTunnel() {
+  return useQuery({
+    queryKey: ['vpn', 'splitTunnel'],
+    queryFn: () => apiClient.get<SplitTunnelConfig>(API_ROUTES.vpn.splitTunnel),
+  });
+}
+
+export function useSetSplitTunnel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (cfg: SplitTunnelConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.vpn.splitTunnel, cfg),
+    onSuccess: () => {
+      toast.success('Split tunnel config saved');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'splitTunnel'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save split tunnel config', { description: error.message });
+    },
+  });
+}
+
+export function useTailscaleSSH() {
+  return useQuery({
+    queryKey: ['vpn', 'tailscale', 'ssh'],
+    queryFn: () => apiClient.get<TailscaleSSHStatus>(API_ROUTES.vpn.tailscale.ssh),
+  });
+}
+
+export function useSetTailscaleSSH() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiClient.put<{ ok: boolean }>(API_ROUTES.vpn.tailscale.ssh, { enabled }),
+    onSuccess: () => {
+      toast.success('Tailscale SSH setting updated');
+      void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale', 'ssh'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update Tailscale SSH', { description: error.message });
     },
   });
 }

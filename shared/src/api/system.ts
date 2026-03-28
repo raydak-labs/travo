@@ -165,3 +165,49 @@ export interface Alert {
 export interface AlertsResponse {
   readonly alerts: readonly Alert[];
 }
+
+/** Valid hardware button actions */
+export type ButtonAction = 'none' | 'vpn_toggle' | 'wifi_toggle' | 'led_toggle' | 'reboot';
+
+/** A hardware button with its configured action */
+export interface HardwareButton {
+  readonly name: string;
+  readonly action: ButtonAction;
+}
+
+/** Payload for PUT /api/v1/system/button-actions */
+export interface ButtonActionsRequest {
+  readonly buttons: readonly HardwareButton[];
+}
+
+/** A single authorized SSH public key */
+export interface SSHKey {
+  readonly index: number;
+  readonly comment: string;
+  readonly key: string;
+}
+
+/** Response from GET /api/v1/system/ssh-keys */
+export interface SSHKeysResponse {
+  readonly keys: readonly SSHKey[];
+}
+
+/** Request to add a new SSH key */
+export interface AddSSHKeyRequest {
+  readonly key: string;
+}
+
+/** Result from POST /api/v1/system/speed-test */
+export interface SpeedTestResult {
+  readonly download_mbps: number;
+  readonly upload_mbps: number;
+  readonly ping_ms: number;
+  readonly server: string;
+}
+
+/** Configurable alert thresholds */
+export interface AlertThresholds {
+  readonly storage_percent: number;
+  readonly cpu_percent: number;
+  readonly memory_percent: number;
+}
