@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 func TestSetWireguard_InvalidPrivateKey_Returns400(t *testing.T) {
@@ -20,7 +22,7 @@ func TestSetWireguard_InvalidPrivateKey_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/wireguard", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -49,7 +51,7 @@ func TestSetWireguard_InvalidEndpoint_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/wireguard", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -78,7 +80,7 @@ func TestSetWireguard_InvalidAllowedIPs_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/wireguard", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -108,7 +110,7 @@ func TestSetWireguard_ValidConfig_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/wireguard", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -125,7 +127,7 @@ func TestGetWireguardStatus_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/wireguard/status", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -157,7 +159,7 @@ func TestGetWireguardProfiles_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/wireguard/profiles", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -176,7 +178,7 @@ func TestToggleWireguard_EnabledField_TogglesOn(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/toggle", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -188,7 +190,7 @@ func TestToggleWireguard_EnabledField_TogglesOn(t *testing.T) {
 
 	req2, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/status", nil)
 	req2.Header.Set("Authorization", "Bearer "+token)
-	resp2, err := app.Test(req2, -1)
+	resp2, err := app.Test(req2, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -223,7 +225,7 @@ func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/toggle", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -235,7 +237,7 @@ func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
 
 	req2, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/status", nil)
 	req2.Header.Set("Authorization", "Bearer "+token)
-	resp2, err := app.Test(req2, -1)
+	resp2, err := app.Test(req2, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -273,7 +275,7 @@ func TestAddWireguardProfile_Returns201(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/profiles", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -294,7 +296,7 @@ func TestAddWireguardProfile_MissingName_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/profiles", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -314,7 +316,7 @@ func TestAddWireguardProfile_MissingConfig_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/profiles", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -330,7 +332,7 @@ func TestDeleteWireguardProfile_NotFound_Returns404(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/vpn/wireguard/profiles/nonexistent", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -347,7 +349,7 @@ func TestActivateWireguardProfile_NotFound_Returns400(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/profiles/nonexistent/activate", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -364,7 +366,7 @@ func TestGetKillSwitch_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/killswitch", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -390,7 +392,7 @@ func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/killswitch", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -403,7 +405,7 @@ func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
 	// Verify it was enabled
 	req2, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/killswitch", nil)
 	req2.Header.Set("Authorization", "Bearer "+token)
-	resp2, _ := app.Test(req2, -1)
+	resp2, _ := app.Test(req2, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	defer resp2.Body.Close()
 	var result map[string]interface{}
 	_ = json.NewDecoder(resp2.Body).Decode(&result)
@@ -418,7 +420,7 @@ func TestRunWireGuardSpeedTest_Disabled_Returns400(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/speed-test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

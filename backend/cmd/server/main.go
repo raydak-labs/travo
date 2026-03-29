@@ -5,11 +5,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/static"
 
 	"github.com/openwrt-travel-gui/backend/internal/api"
 	"github.com/openwrt-travel-gui/backend/internal/auth"
@@ -23,6 +25,24 @@ import (
 // Version is set at build time via -ldflags "-X main.Version=..."
 var Version = "dev"
 
+func splitCORSOrigins(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return []string{"*"}
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"*"}
+	}
+	return out
+}
+
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
@@ -35,15 +55,13 @@ func setupApp() *fiber.App {
 // setupAppWithConfig creates and configures the Fiber application with the given config.
 // Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, blocklist, and event watcher so the caller can manage their lifecycle.
 func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist, services.EventWatcher) {
-	app := fiber.New(fiber.Config{
-		AppName: "travo",
-	})
+	app := fiber.New(fiber.Config{AppName: "travo"})
 
 	// CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: cfg.CorsOrigins,
-		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders: "Authorization,Content-Type",
+		AllowOrigins: splitCORSOrigins(cfg.CorsOrigins),
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{"Authorization", "Content-Type"},
 	}))
 
 	nets, err := auth.ParseCIDRList(cfg.AllowedAdminCIDRs)
@@ -155,7 +173,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	app.Use(authSvc.Middleware())
 
 	// Health check endpoint (excluded from auth in middleware)
-	app.Get("/api/health", func(c *fiber.Ctx) error {
+	app.Get("/api/health", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status": "ok",
 		})
@@ -192,9 +210,9 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
-		app.Static("/", cfg.StaticDir)
+		app.Use("/", static.New(cfg.StaticDir))
 		// SPA catch-all: serve index.html for non-API routes that don't match static files
-		app.Get("/*", func(c *fiber.Ctx) error {
+		app.Get("/*", func(c fiber.Ctx) error {
 			return c.SendFile(cfg.StaticDir + "/index.html")
 		})
 	}
@@ -243,7 +261,10 @@ func main() {
 			tlsAddr := fmt.Sprintf(":%d", cfg.TLSPort)
 			log.Printf("Starting HTTPS listener on %s", tlsAddr)
 			go func() {
-				if err := app.ListenTLS(tlsAddr, cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
+				if err := app.Listen(tlsAddr, fiber.ListenConfig{
+					CertFile:    cfg.TLSCertFile,
+					CertKeyFile: cfg.TLSKeyFile,
+				}); err != nil {
 					log.Printf("HTTPS listener stopped: %v", err)
 				}
 			}()

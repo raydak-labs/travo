@@ -1,4 +1,10 @@
-import { Controller, type Control, type FieldErrors, type UseFormRegister, type UseFormSetValue } from 'react-hook-form';
+import {
+  Controller,
+  type Control,
+  type FieldErrors,
+  type UseFormRegister,
+  type UseFormSetValue,
+} from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -81,7 +87,10 @@ export function GuestWifiEnabledFields({
       </div>
       {encryption !== 'none' && (
         <div className="space-y-2">
-          <label htmlFor="guest-key" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          <label
+            htmlFor="guest-key"
+            className="text-xs font-medium text-gray-600 dark:text-gray-400"
+          >
             Password
           </label>
           <Input

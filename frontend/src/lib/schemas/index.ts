@@ -60,10 +60,7 @@ export {
   type DataBudgetFormValues,
 } from './network-forms';
 
-export {
-  clientAliasFormSchema,
-  type ClientAliasFormValues,
-} from './clients-forms';
+export { clientAliasFormSchema, type ClientAliasFormValues } from './clients-forms';
 
 export {
   wireguardProfileImportFormSchema,
@@ -74,7 +71,4 @@ export {
   type SplitTunnelFormValues,
 } from './vpn-forms';
 
-export {
-  logsFilterFormSchema,
-  type LogsFilterFormValues,
-} from './logs-forms';
+export { logsFilterFormSchema, type LogsFilterFormValues } from './logs-forms';

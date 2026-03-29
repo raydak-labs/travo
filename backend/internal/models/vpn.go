@@ -95,13 +95,13 @@ type VPNVerifyResult struct {
 
 // TailscalePeer represents a connected Tailscale peer.
 type TailscalePeer struct {
-	Hostname     string `json:"hostname"`
-	TailscaleIP  string `json:"tailscale_ip"`
-	OS           string `json:"os"`
-	Online       bool   `json:"online"`
-	ExitNode     bool   `json:"exit_node"`     // this peer is the active exit node
-	ExitNodeOption bool `json:"exit_node_option"` // this peer can be used as exit node
-	LastSeen     string `json:"last_seen"`
+	Hostname       string `json:"hostname"`
+	TailscaleIP    string `json:"tailscale_ip"`
+	OS             string `json:"os"`
+	Online         bool   `json:"online"`
+	ExitNode       bool   `json:"exit_node"`        // this peer is the active exit node
+	ExitNodeOption bool   `json:"exit_node_option"` // this peer can be used as exit node
+	LastSeen       string `json:"last_seen"`
 }
 
 // TailscaleStatus represents Tailscale connection status.

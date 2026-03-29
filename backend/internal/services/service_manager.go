@@ -72,11 +72,11 @@ var knownServices = []serviceDefinition{
 
 // ServiceManager manages installable services.
 type ServiceManager struct {
-	mu              sync.RWMutex
-	defs            []serviceDefinition
-	pkg             PackageManager
-	probe           SystemProbe
-	cache           map[string]models.ServiceInfo
+	mu               sync.RWMutex
+	defs             []serviceDefinition
+	pkg              PackageManager
+	probe            SystemProbe
+	cache            map[string]models.ServiceInfo
 	postInstallHooks map[string]func() error
 }
 

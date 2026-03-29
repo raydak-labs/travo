@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
 // ListServicesHandler handles GET /api/v1/services.
 func ListServicesHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		list, err := sm.ListServices()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -23,7 +23,7 @@ func ListServicesHandler(sm *services.ServiceManager) fiber.Handler {
 
 // InstallServiceHandler handles POST /api/v1/services/:id/install.
 func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Install(id); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -34,7 +34,7 @@ func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
 
 // RemoveServiceHandler handles POST /api/v1/services/:id/remove.
 func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Remove(id); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -45,7 +45,7 @@ func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
 
 // StartServiceHandler handles POST /api/v1/services/:id/start.
 func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Start(id); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -56,7 +56,7 @@ func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
 
 // StopServiceHandler handles POST /api/v1/services/:id/stop.
 func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Stop(id); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -67,12 +67,12 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 
 // SetAutoStartHandler handles POST /api/v1/services/:id/autostart.
 func SetAutoStartHandler(mgr *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		var body struct {
 			Enabled bool `json:"enabled"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := mgr.SetAutoStart(id, body.Enabled); err != nil {
@@ -98,12 +98,12 @@ func writeStreamEvent(w *bufio.Writer, evt streamLogEvent) {
 // InstallServiceStreamHandler handles POST /api/v1/services/:id/install/stream.
 // Returns NDJSON with real-time install output.
 func InstallServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		c.Set("Content-Type", "application/x-ndjson")
 		c.Set("Cache-Control", "no-cache")
 		c.Set("X-Content-Type-Options", "nosniff")
-		c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		c.RequestCtx().SetBodyStreamWriter(func(w *bufio.Writer) {
 			logFn := func(line string) {
 				writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
 			}
@@ -120,12 +120,12 @@ func InstallServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
 // RemoveServiceStreamHandler handles POST /api/v1/services/:id/remove/stream.
 // Returns NDJSON with real-time remove output.
 func RemoveServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		c.Set("Content-Type", "application/x-ndjson")
 		c.Set("Cache-Control", "no-cache")
 		c.Set("X-Content-Type-Options", "nosniff")
-		c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		c.RequestCtx().SetBodyStreamWriter(func(w *bufio.Writer) {
 			logFn := func(line string) {
 				writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
 			}
@@ -138,3 +138,5 @@ func RemoveServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
 		return nil
 	}
 }
+
+// fiber:context-methods migrated

@@ -62,12 +62,7 @@ export function QuickActionsButtonRow({
             ? 'Disable VPN'
             : 'Enable VPN'}
       </Button>
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={onOpenRebootDialog}
-        disabled={rebootPending}
-      >
+      <Button variant="destructive" size="sm" onClick={onOpenRebootDialog} disabled={rebootPending}>
         {rebootPending ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         ) : (

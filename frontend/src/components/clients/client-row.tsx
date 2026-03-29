@@ -2,11 +2,7 @@ import { Zap, Ban, ShieldOff, BookmarkPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ClientAliasCell } from './client-alias-cell';
-import {
-  useKickClient,
-  useBlockClient,
-  useUnblockClient,
-} from '@/hooks/use-network';
+import { useKickClient, useBlockClient, useUnblockClient } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 import type { Client } from '@shared/index';
 
@@ -61,7 +57,9 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
         <div className="text-xs">
           <span className="text-blue-600 dark:text-blue-400">↓ {formatBytes(client.rx_bytes)}</span>
           {' / '}
-          <span className="text-orange-600 dark:text-orange-400">↑ {formatBytes(client.tx_bytes)}</span>
+          <span className="text-orange-600 dark:text-orange-400">
+            ↑ {formatBytes(client.tx_bytes)}
+          </span>
         </div>
       </td>
       <td className="py-3 text-right">

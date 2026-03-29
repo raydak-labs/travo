@@ -3,7 +3,10 @@ package main
 import (
 	"io"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 func TestHealthEndpoint(t *testing.T) {
@@ -16,7 +19,7 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("failed to perform request: %v", err)
 	}
@@ -27,10 +30,10 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
 	}
 
-	// Assert: content type should be JSON
+	// Assert: content type should be JSON (Fiber v3 may append charset)
 	contentType := resp.Header.Get("Content-Type")
-	if contentType != "application/json" {
-		t.Errorf("expected content-type application/json, got %s", contentType)
+	if !strings.HasPrefix(contentType, "application/json") {
+		t.Errorf("expected content-type application/json..., got %s", contentType)
 	}
 
 	// Assert: body should be {"status":"ok"}
@@ -50,7 +53,7 @@ func TestHealthEndpointMethod(t *testing.T) {
 
 	// POST to health should return 405
 	req, _ := http.NewRequest(http.MethodPost, "/api/health", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("failed to perform request: %v", err)
 	}

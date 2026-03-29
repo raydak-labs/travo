@@ -6,9 +6,7 @@ function sleep(ms: number) {
 
 async function refetchAll(queryClient: QueryClient, queryKeys: Array<readonly unknown[]>) {
   await Promise.all(
-    queryKeys.map((queryKey) =>
-      queryClient.refetchQueries({ queryKey, type: 'active' }),
-    ),
+    queryKeys.map((queryKey) => queryClient.refetchQueries({ queryKey, type: 'active' })),
   );
 }
 
@@ -34,4 +32,3 @@ export async function refreshRouterState(
     await refetchAll(queryClient, queryKeys);
   }
 }
-

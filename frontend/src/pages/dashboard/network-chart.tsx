@@ -62,7 +62,7 @@ export function NetworkChart() {
                   color: 'var(--chart-tooltip-text)',
                   fontSize: '12px',
                 }}
-                formatter={(value: number) => formatRate(value)}
+                formatter={(value) => formatRate(Number(value ?? 0))}
               />
               <Area
                 type="monotone"

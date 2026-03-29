@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,21 +7,20 @@ import { APRadioSection } from './ap-radio-section';
 
 export function APConfigCard() {
   const { data: apConfigs, isLoading: apLoading } = useAPConfigs();
-  const [enabledBySection, setEnabledBySection] = useState<Record<string, boolean>>({});
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
 
   const handleEnabledChange = useCallback((section: string, enabled: boolean) => {
-    setEnabledBySection((prev) => ({ ...prev, [section]: enabled }));
+    setSectionOverrides((prev) => ({ ...prev, [section]: enabled }));
   }, []);
 
-  useEffect(() => {
-    if (apConfigs) {
-      const m: Record<string, boolean> = {};
-      for (const a of apConfigs) {
-        m[a.section] = a.enabled;
-      }
-      setEnabledBySection(m);
+  const enabledBySection = useMemo(() => {
+    if (!apConfigs) return {};
+    const m: Record<string, boolean> = {};
+    for (const a of apConfigs) {
+      m[a.section] = sectionOverrides[a.section] ?? a.enabled;
     }
-  }, [apConfigs]);
+    return m;
+  }, [apConfigs, sectionOverrides]);
 
   const activeEnabledCount = useMemo(() => {
     if (!apConfigs) return 0;

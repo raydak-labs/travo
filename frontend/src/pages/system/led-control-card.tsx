@@ -3,7 +3,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lightbulb } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useLEDStatus, useSetLEDStealth, useLEDSchedule, useSetLEDSchedule } from '@/hooks/use-system';
+import {
+  useLEDStatus,
+  useSetLEDStealth,
+  useLEDSchedule,
+  useSetLEDSchedule,
+} from '@/hooks/use-system';
 import { ledScheduleFormSchema, type LedScheduleFormValues } from '@/lib/schemas/system-forms';
 import { LedStealthStatusPanel } from './led-stealth-status-panel';
 import { LedScheduleForm } from './led-schedule-form';

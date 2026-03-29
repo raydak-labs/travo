@@ -20,10 +20,7 @@ export function LoginFormFields({
   return (
     <>
       <div className="space-y-2">
-        <label
-          htmlFor="password"
-          className="text-sm font-medium text-gray-700 dark:text-gray-300"
-        >
+        <label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Password
         </label>
         <Input

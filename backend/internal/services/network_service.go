@@ -321,8 +321,8 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 
 	// ── 2. ARP table: build lookup maps ──────────────────────────────────
 	type arpEntry struct{ flags, iface string }
-	ipToARP := make(map[string]arpEntry)  // ip  → {flags, iface}
-	macToIP := make(map[string]string)    // MAC → ip  (last wins on dup)
+	ipToARP := make(map[string]arpEntry) // ip  → {flags, iface}
+	macToIP := make(map[string]string)   // MAC → ip  (last wins on dup)
 	if raw, err := os.ReadFile("/proc/net/arp"); err == nil {
 		for _, line := range strings.Split(string(raw), "\n")[1:] {
 			f := strings.Fields(line)

@@ -99,7 +99,11 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 rounded-lg border p-4" noValidate>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-3 rounded-lg border p-4"
+        noValidate
+      >
         <ApRadioFormFields
           ap={ap}
           bandLabel={bandLabel}

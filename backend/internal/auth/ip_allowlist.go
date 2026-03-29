@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 func ParseCIDRList(raw string) ([]*net.IPNet, error) {
@@ -50,7 +50,7 @@ func isLoopbackIP(ip net.IP) bool {
 	return ip.IsLoopback()
 }
 
-func clientIP(c *fiber.Ctx) net.IP {
+func clientIP(c fiber.Ctx) net.IP {
 	return net.ParseIP(strings.TrimSpace(c.IP()))
 }
 
@@ -83,7 +83,7 @@ func shouldBypassIPAllowlist(path string) bool {
 }
 
 func IPAllowlistMiddleware(nets []*net.IPNet) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if len(nets) == 0 {
 			return c.Next()
 		}

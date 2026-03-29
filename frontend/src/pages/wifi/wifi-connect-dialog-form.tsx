@@ -59,7 +59,12 @@ export function WifiConnectDialogForm({
                   key={band}
                   className="flex cursor-pointer items-center gap-2 rounded border p-2 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-950/30"
                 >
-                  <input type="radio" className="h-4 w-4" value={band} {...register('selectedBand')} />
+                  <input
+                    type="radio"
+                    className="h-4 w-4"
+                    value={band}
+                    {...register('selectedBand')}
+                  />
                   <span className="text-sm text-gray-900 dark:text-white">
                     {formatWifiBandLabel(band)} ({dbm} dBm, {signalQuality(dbm)})
                   </span>

@@ -41,7 +41,8 @@ export function WifiRadioHardwareCard() {
                     : radio.band === '6g'
                       ? '6 GHz'
                       : radio.band;
-              const recommendedRole = radio.band === '5g' ? 'ap' : radio.band === '2g' ? 'sta' : null;
+              const recommendedRole =
+                radio.band === '5g' ? 'ap' : radio.band === '2g' ? 'sta' : null;
               const isRecommended = recommendedRole && radio.role === recommendedRole;
               return (
                 <div

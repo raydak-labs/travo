@@ -15,15 +15,15 @@ const dataBudgetConfigPath = "/etc/travo/data_budget.json"
 
 // interfaceLabels maps kernel interface names to human-readable labels.
 var interfaceLabels = map[string]string{
-	"eth0":   "Ethernet WAN",
-	"eth1":   "Ethernet WAN",
-	"wan":    "Ethernet WAN",
-	"wwan0":  "WiFi Uplink",
-	"wwan":   "WiFi Uplink",
-	"usb0":   "USB Tether",
-	"usb1":   "USB Tether",
-	"wg0":    "WireGuard VPN",
-	"tun0":   "VPN Tunnel",
+	"eth0":  "Ethernet WAN",
+	"eth1":  "Ethernet WAN",
+	"wan":   "Ethernet WAN",
+	"wwan0": "WiFi Uplink",
+	"wwan":  "WiFi Uplink",
+	"usb0":  "USB Tether",
+	"usb1":  "USB Tether",
+	"wg0":   "WireGuard VPN",
+	"tun0":  "VPN Tunnel",
 }
 
 func interfaceLabel(name string) string {
@@ -39,8 +39,8 @@ type vnstatRoot struct {
 }
 
 type vnstatInterface struct {
-	Name    string         `json:"name"`
-	Traffic vnstatTraffic  `json:"traffic"`
+	Name    string        `json:"name"`
+	Traffic vnstatTraffic `json:"traffic"`
 }
 
 type vnstatTraffic struct {

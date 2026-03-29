@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 func TestSystemInfoEndpoint(t *testing.T) {
@@ -16,7 +18,7 @@ func TestSystemInfoEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -40,7 +42,7 @@ func TestSystemStatsEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/stats", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -64,7 +66,7 @@ func TestReboot_ReturnsOk(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/reboot", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -87,7 +89,7 @@ func TestFactoryReset_ReturnsError(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/factory-reset", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -104,7 +106,7 @@ func TestFirmwareUpgrade_NoFile(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/firmware/upgrade", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -127,7 +129,7 @@ func TestFirmwareUpgrade_InvalidExtension(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/firmware/upgrade", body)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -151,7 +153,7 @@ func TestFirmwareUpgrade_ValidFile(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/firmware/upgrade", body)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -169,7 +171,7 @@ func TestGetNTPConfig(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/ntp", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -198,7 +200,7 @@ func TestSetNTPConfig(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/system/ntp", strings.NewReader(payload))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -215,7 +217,7 @@ func TestGetSetupComplete(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/setup-complete", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

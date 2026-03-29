@@ -2,7 +2,11 @@ import { Smartphone, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useUSBTetherStatus, useConfigureUSBTether, useUnconfigureUSBTether } from '@/hooks/use-usb-tether';
+import {
+  useUSBTetherStatus,
+  useConfigureUSBTether,
+  useUnconfigureUSBTether,
+} from '@/hooks/use-usb-tether';
 
 export function USBTetheringSection() {
   const { data: status } = useUSBTetherStatus();
@@ -24,13 +28,24 @@ export function USBTetheringSection() {
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
               <span className="text-sm font-medium">
-                {status.device_type === 'android' ? 'Android' : status.device_type === 'ios' ? 'iOS' : 'USB'} device detected
+                {status.device_type === 'android'
+                  ? 'Android'
+                  : status.device_type === 'ios'
+                    ? 'iOS'
+                    : 'USB'}{' '}
+                device detected
               </span>
-              <Badge variant="outline" className="font-mono text-xs">{status.interface}</Badge>
+              <Badge variant="outline" className="font-mono text-xs">
+                {status.interface}
+              </Badge>
               {status.is_up ? (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">Up</Badge>
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                  Up
+                </Badge>
               ) : (
-                <Badge variant="secondary" className="text-xs">Down</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  Down
+                </Badge>
               )}
             </div>
             {status.ip_address && (

@@ -3,10 +3,7 @@ import { z } from 'zod';
 /** Import WireGuard profile from pasted config or uploaded .conf. */
 export const wireguardProfileImportFormSchema = z.object({
   name: z.string().trim().min(1, 'Profile name is required'),
-  config: z
-    .string()
-    .trim()
-    .min(1, 'Add a WireGuard config (paste or upload a .conf file)'),
+  config: z.string().trim().min(1, 'Add a WireGuard config (paste or upload a .conf file)'),
 });
 
 export type WireguardProfileImportFormValues = z.infer<typeof wireguardProfileImportFormSchema>;

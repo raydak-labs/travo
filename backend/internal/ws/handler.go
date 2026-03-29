@@ -1,8 +1,8 @@
 package ws
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/websocket/v2"
+	"github.com/gofiber/contrib/v3/websocket"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 )
@@ -24,7 +24,7 @@ func Handler(hub *Hub, authSvc *auth.AuthService) fiber.Handler {
 
 // UpgradeMiddleware checks if the request is a WebSocket upgrade and validates JWT token.
 func UpgradeMiddleware(authSvc *auth.AuthService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if !websocket.IsWebSocketUpgrade(c) {
 			return fiber.ErrUpgradeRequired
 		}

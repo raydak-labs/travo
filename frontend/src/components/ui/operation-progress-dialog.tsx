@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 interface OperationProgressDialogProps {
   open: boolean;
@@ -9,9 +15,14 @@ interface OperationProgressDialogProps {
   details?: string[];
 }
 
-export function OperationProgressDialog({ open, title, description, details }: OperationProgressDialogProps) {
+export function OperationProgressDialog({
+  open,
+  title,
+  description,
+  details,
+}: OperationProgressDialogProps) {
   const [startedAt] = useState(() => (open ? Date.now() : 0));
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!open) return;
@@ -49,4 +60,3 @@ export function OperationProgressDialog({ open, title, description, details }: O
     </Dialog>
   );
 }
-

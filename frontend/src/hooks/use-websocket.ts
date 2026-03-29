@@ -31,11 +31,13 @@ export function useWebSocket() {
     Record<string, InterfaceDataPoint[]>
   >({});
 
-  // Clear stale chart data when the connection drops.
+  // Clear stale chart data when the connection drops (deferred to avoid sync setState in effect).
   useEffect(() => {
     if (!connected) {
-      setDataPoints([]);
-      setInterfaceDataPoints({});
+      queueMicrotask(() => {
+        setDataPoints([]);
+        setInterfaceDataPoints({});
+      });
     }
   }, [connected]);
 
@@ -71,8 +73,7 @@ export function useWebSocket() {
             };
             const existing = updated[key] ?? [];
             const next = [...existing, ifPoint];
-            updated[key] =
-              next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
+            updated[key] = next.length > MAX_POINTS ? next.slice(next.length - MAX_POINTS) : next;
           }
           return updated;
         });

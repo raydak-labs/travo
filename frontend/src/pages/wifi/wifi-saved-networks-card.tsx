@@ -29,7 +29,9 @@ export function WifiSavedNetworksCard() {
       <CardContent>
         <div className="mb-4 flex items-center justify-between rounded-lg border p-3">
           <div className="space-y-0.5">
-            <span className="text-sm font-medium text-gray-900 dark:text-white">Auto-Reconnect</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              Auto-Reconnect
+            </span>
             <p className="text-xs text-gray-500">
               Automatically reconnect to saved networks when connection drops
             </p>
@@ -72,7 +74,10 @@ export function WifiSavedNetworksCard() {
                     onClick={() => {
                       const ssids = savedNetworks.map((n) => n.ssid);
                       const newSsids = [...ssids];
-                      [newSsids[index - 1], newSsids[index]] = [newSsids[index], newSsids[index - 1]];
+                      [newSsids[index - 1], newSsids[index]] = [
+                        newSsids[index],
+                        newSsids[index - 1],
+                      ];
                       priorityMutation.mutate({ ssids: newSsids });
                     }}
                     disabled={index === 0 || priorityMutation.isPending}

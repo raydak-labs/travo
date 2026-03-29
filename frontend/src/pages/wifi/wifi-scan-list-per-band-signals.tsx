@@ -19,7 +19,10 @@ export function WifiScanListPerBandSignals({ aps }: WifiScanListPerBandSignalsPr
       {bands.map(([k, ap]) => (
         <span key={k}>
           {formatWifiBandLabel(ap.band)}{' '}
-          <SignalStrengthIcon signalPercent={ap.signal_percent} className="inline-block h-3.5 w-3.5" />{' '}
+          <SignalStrengthIcon
+            signalPercent={ap.signal_percent}
+            className="inline-block h-3.5 w-3.5"
+          />{' '}
           {ap.signal_dbm} dBm
         </span>
       ))}

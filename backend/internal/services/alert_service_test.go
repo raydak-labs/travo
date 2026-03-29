@@ -257,9 +257,9 @@ func TestAlertService_AlertChannel(t *testing.T) {
 
 // mockCarrierChecker implements CarrierChecker for testing.
 type mockCarrierChecker struct {
-	mu   sync.Mutex
-	up   bool
-	err  error
+	mu  sync.Mutex
+	up  bool
+	err error
 }
 
 func (m *mockCarrierChecker) IsCarrierUp(iface string) (bool, error) {

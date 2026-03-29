@@ -17,12 +17,12 @@ const usbTetherUCIName = "usbtether"
 
 // USBTetherStatus holds the detected USB tethering state.
 type USBTetherStatus struct {
-	Detected    bool   `json:"detected"`
-	DeviceType  string `json:"device_type"` // "android", "ios", or "unknown"
-	Interface   string `json:"interface"`
-	IsUp        bool   `json:"is_up"`
-	IPAddress   string `json:"ip_address"`
-	Configured  bool   `json:"configured"` // true when UCI usbtether interface exists
+	Detected   bool   `json:"detected"`
+	DeviceType string `json:"device_type"` // "android", "ios", or "unknown"
+	Interface  string `json:"interface"`
+	IsUp       bool   `json:"is_up"`
+	IPAddress  string `json:"ip_address"`
+	Configured bool   `json:"configured"` // true when UCI usbtether interface exists
 }
 
 // USBTetherRunner abstracts OS calls for testability.

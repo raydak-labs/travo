@@ -29,11 +29,7 @@ export function LedScheduleForm({
   removePending,
 }: LedScheduleFormProps) {
   return (
-    <form
-      onSubmit={handleSubmit(onSave)}
-      className="space-y-3 rounded-lg border p-3"
-      noValidate
-    >
+    <form onSubmit={handleSubmit(onSave)} className="space-y-3 rounded-lg border p-3" noValidate>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">LED Schedule</p>

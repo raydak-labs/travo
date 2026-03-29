@@ -106,9 +106,7 @@ export function WanStatusCard() {
           ) : (
             <>
               <XCircle className="h-4 w-4 text-red-500" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                No Internet
-              </span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">No Internet</span>
               <Badge variant="destructive">Offline</Badge>
             </>
           )}

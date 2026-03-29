@@ -13,7 +13,10 @@ type WireguardPostInstallDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function WireguardPostInstallDialog({ open, onOpenChange }: WireguardPostInstallDialogProps) {
+export function WireguardPostInstallDialog({
+  open,
+  onOpenChange,
+}: WireguardPostInstallDialogProps) {
   const navigate = useNavigate();
 
   return (

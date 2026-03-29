@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 func TestGetBandSwitchingHandler(t *testing.T) {
@@ -14,7 +16,7 @@ func TestGetBandSwitchingHandler(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/band-switching", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -55,7 +57,7 @@ func TestSetBandSwitchingHandler(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/band-switching", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -81,7 +83,7 @@ func TestSetBandSwitchingHandler_InvalidBody(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/band-switching", bytes.NewReader([]byte("not-json")))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -101,7 +103,7 @@ func TestSetRadioRoleHandler(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/radios/radio0/role", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -128,7 +130,7 @@ func TestSetRadioRoleHandler_InvalidRole(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/radios/radio0/role", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

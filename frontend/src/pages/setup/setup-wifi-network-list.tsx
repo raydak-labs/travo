@@ -23,8 +23,16 @@ export function SetupWifiNetworkList({
   return (
     <>
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Available Networks</span>
-        <Button type="button" variant="outline" size="sm" onClick={() => onRescan()} disabled={scanning}>
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Available Networks
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onRescan()}
+          disabled={scanning}
+        >
           <RefreshCw className={`mr-1 h-3 w-3 ${scanning ? 'animate-spin' : ''}`} />
           Scan
         </Button>
@@ -63,9 +71,7 @@ export function SetupWifiNetworkList({
                   </div>
                   <div className="flex items-center gap-2">
                     {network.encryption !== 'none' && <Lock className="h-3 w-3 text-gray-400" />}
-                    <Badge variant={tier >= 3 ? 'default' : 'secondary'}>
-                      {tier}/4
-                    </Badge>
+                    <Badge variant={tier >= 3 ? 'default' : 'secondary'}>{tier}/4</Badge>
                   </div>
                 </button>
               );

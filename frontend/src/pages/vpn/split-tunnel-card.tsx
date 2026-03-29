@@ -11,12 +11,7 @@ export function SplitTunnelCard() {
   const { data: splitTunnel, isLoading } = useSplitTunnel();
   const setSplitTunnel = useSetSplitTunnel();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-  } = useForm<SplitTunnelFormValues>({
+  const { register, handleSubmit, reset, watch } = useForm<SplitTunnelFormValues>({
     resolver: zodResolver(splitTunnelFormSchema),
     defaultValues: { mode: 'all', routes_text: '' },
     mode: 'onChange',

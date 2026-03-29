@@ -39,7 +39,9 @@ export function TailscaleLoggedInPanel({
           <div className="mt-2 flex items-center gap-2 border-t border-gray-200 pt-2 dark:border-gray-700">
             <Wifi className="h-3 w-3 text-blue-500" />
             <span className="text-xs text-gray-500">Exit node:</span>
-            <span className="font-mono text-xs text-gray-900 dark:text-white">{status.exit_node}</span>
+            <span className="font-mono text-xs text-gray-900 dark:text-white">
+              {status.exit_node}
+            </span>
             {status.exit_node_active && (
               <Badge className="bg-green-100 text-xs text-green-800 dark:bg-green-900 dark:text-green-200">
                 Active
@@ -80,8 +82,8 @@ export function TailscaleLoggedInPanel({
         <div className="space-y-1">
           {wireguardEnabled && (
             <p className="rounded-md border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm dark:border-amber-800 dark:bg-amber-950/50">
-              WireGuard is enabled. Using a Tailscale exit node turns WireGuard off first so only one
-              full-tunnel VPN path runs at a time.
+              WireGuard is enabled. Using a Tailscale exit node turns WireGuard off first so only
+              one full-tunnel VPN path runs at a time.
             </p>
           )}
           <div className="mb-1 flex items-center gap-1 text-xs text-gray-500">

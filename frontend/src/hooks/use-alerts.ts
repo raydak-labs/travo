@@ -30,6 +30,7 @@ export function useAlerts() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const connectRef = useRef<() => void>(() => {});
 
   // Fetch history on mount
   useQuery({
@@ -72,7 +73,7 @@ export function useAlerts() {
 
       ws.onclose = () => {
         if (mountedRef.current) {
-          reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+          reconnectTimer.current = setTimeout(() => connectRef.current(), RECONNECT_DELAY);
         }
       };
 
@@ -81,10 +82,14 @@ export function useAlerts() {
       };
     } catch {
       if (mountedRef.current) {
-        reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+        reconnectTimer.current = setTimeout(() => connectRef.current(), RECONNECT_DELAY);
       }
     }
   }, [addAlert]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     mountedRef.current = true;

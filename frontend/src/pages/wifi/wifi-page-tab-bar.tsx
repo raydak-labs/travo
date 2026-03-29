@@ -8,12 +8,7 @@ type WifiPageTabBarProps = {
   panelIds: Record<WifiSectionTab, string>;
 };
 
-export function WifiPageTabBar({
-  activeTab,
-  onTabChange,
-  tabIds,
-  panelIds,
-}: WifiPageTabBarProps) {
+export function WifiPageTabBar({ activeTab, onTabChange, tabIds, panelIds }: WifiPageTabBarProps) {
   const tabBtn = (tab: WifiSectionTab, label: string) => (
     <button
       type="button"

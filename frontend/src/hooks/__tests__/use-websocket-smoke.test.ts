@@ -19,9 +19,9 @@ let mockWsInstance: {
 };
 
 beforeEach(() => {
-  vi.stubGlobal(
-    'WebSocket',
-    vi.fn().mockImplementation(() => {
+  class WebSocketCtor {
+    constructor(...args: unknown[]) {
+      void args;
       mockWsInstance = {
         onopen: null,
         onmessage: null,
@@ -29,9 +29,10 @@ beforeEach(() => {
         onerror: null,
         close: vi.fn(),
       };
-      return mockWsInstance;
-    }),
-  );
+      return mockWsInstance as unknown as WebSocket;
+    }
+  }
+  vi.stubGlobal('WebSocket', WebSocketCtor as unknown as typeof WebSocket);
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -73,7 +74,7 @@ describe('useWebSocket (after WsContext migration)', () => {
     expect(result.current.dataPoints[0].cpu).toBe(42);
   });
 
-  it('clears dataPoints when WS disconnects', () => {
+  it('clears dataPoints when WS disconnects', async () => {
     const { result } = renderHook(() => useWebSocket(), { wrapper });
 
     // Establish connection so connected transitions true → false on close
@@ -86,8 +87,9 @@ describe('useWebSocket (after WsContext migration)', () => {
     });
     expect(result.current.dataPoints).toHaveLength(1);
 
-    act(() => {
+    await act(async () => {
       mockWsInstance.onclose?.({} as CloseEvent);
+      await Promise.resolve();
     });
 
     expect(result.current.dataPoints).toHaveLength(0);

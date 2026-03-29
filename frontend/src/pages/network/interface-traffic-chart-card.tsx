@@ -66,7 +66,7 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
                 color: '#fff',
                 fontSize: '11px',
               }}
-              formatter={(value: number) => formatRate(value)}
+              formatter={(value) => formatRate(Number(value ?? 0))}
             />
             <Area
               type="monotone"

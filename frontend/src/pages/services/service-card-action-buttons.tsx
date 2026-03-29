@@ -37,24 +37,43 @@ export function ServiceCardActionButtons({
           <Button size="sm" disabled={isPending} onClick={() => onStart(service.id)}>
             {isPending ? 'Starting...' : 'Start'}
           </Button>
-          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => onRemove(service.id)}>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => onRemove(service.id)}
+          >
             Remove
           </Button>
         </>
       )}
       {service.state === 'running' && (
         <>
-          <Button size="sm" variant="outline" disabled={isPending} onClick={() => onStop(service.id)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => onStop(service.id)}
+          >
             {isPending ? 'Stopping...' : 'Stop'}
           </Button>
-          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => onRemove(service.id)}>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => onRemove(service.id)}
+          >
             Remove
           </Button>
         </>
       )}
       {service.id === 'adguardhome' && service.state === 'running' && (
         <Button size="sm" variant="outline" asChild>
-          <a href={`http://${window.location.hostname}:3000`} target="_blank" rel="noopener noreferrer">
+          <a
+            href={`http://${window.location.hostname}:3000`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
             Open Dashboard
           </a>
@@ -65,7 +84,12 @@ export function ServiceCardActionButtons({
           <Button size="sm" disabled={isPending} onClick={() => onStart(service.id)}>
             Restart
           </Button>
-          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => onRemove(service.id)}>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={isPending}
+            onClick={() => onRemove(service.id)}
+          >
             Remove
           </Button>
         </>

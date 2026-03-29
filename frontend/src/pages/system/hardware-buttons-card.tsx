@@ -67,7 +67,9 @@ export function HardwareButtonsCard() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <p className="text-xs text-gray-500">Configure what each physical button does when pressed.</p>
+        <p className="text-xs text-gray-500">
+          Configure what each physical button does when pressed.
+        </p>
 
         {!isEditing ? (
           <HardwareButtonsSummaryView

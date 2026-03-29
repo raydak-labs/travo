@@ -68,8 +68,7 @@ export function useTopologyData(): TopologyData {
   const repeaterUp =
     (wan?.is_up === true && wan.type === 'wifi') ||
     (wifiConn?.connected === true && wifiConn.mode === 'client');
-  const tetherUp =
-    (wan?.is_up === true && wan.type === 'usb') || (usbTether?.is_up === true);
+  const tetherUp = (wan?.is_up === true && wan.type === 'usb') || usbTether?.is_up === true;
 
   const vpnActive = vpnStatus?.some((v) => v.connected) ?? false;
   const ipv6Enabled = ipv6Status?.enabled ?? false;
@@ -97,17 +96,13 @@ export function useTopologyData(): TopologyData {
         label: 'Repeater (WiFi)',
         icon: Wifi,
         connected: repeaterUp,
-        detail: repeaterUp
-          ? (wifiConn?.ssid ?? wan?.ip_address ?? undefined)
-          : 'Disabled',
+        detail: repeaterUp ? (wifiConn?.ssid ?? wan?.ip_address ?? undefined) : 'Disabled',
       },
       {
         label: 'USB Tethering',
         icon: Smartphone,
         connected: tetherUp,
-        detail: tetherUp
-          ? (usbTether?.device_type || wan?.ip_address || 'Connected')
-          : 'No device',
+        detail: tetherUp ? usbTether?.device_type || wan?.ip_address || 'Connected' : 'No device',
       },
       {
         label: 'Cellular',

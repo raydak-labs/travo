@@ -11,20 +11,22 @@ export function useSidebarGroups(pathname: string) {
   const [groupOpen, setGroupOpen] = useState(loadSidebarGroupState);
 
   useEffect(() => {
-    setGroupOpen((prev) => {
-      let next = { ...prev };
-      let changed = false;
-      for (const entry of NAV_ENTRIES) {
-        if (entry.kind === 'group') {
-          const childActive = entry.items.some((item) => isRouteActive(item.to, pathname));
-          if (childActive && !next[entry.id]) {
-            next = { ...next, [entry.id]: true };
-            changed = true;
-            saveSidebarGroupState(entry.id, true);
+    queueMicrotask(() => {
+      setGroupOpen((prev) => {
+        let next = { ...prev };
+        let changed = false;
+        for (const entry of NAV_ENTRIES) {
+          if (entry.kind === 'group') {
+            const childActive = entry.items.some((item) => isRouteActive(item.to, pathname));
+            if (childActive && !next[entry.id]) {
+              next = { ...next, [entry.id]: true };
+              changed = true;
+              saveSidebarGroupState(entry.id, true);
+            }
           }
         }
-      }
-      return changed ? next : prev;
+        return changed ? next : prev;
+      });
     });
   }, [pathname]);
 

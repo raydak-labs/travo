@@ -32,26 +32,28 @@ export function useInstallLogStream({
   useEffect(() => {
     if (!open || startedRef.current) return;
     startedRef.current = true;
-    setLines([]);
-    setStatus('streaming');
 
     const route =
       action === 'install'
         ? API_ROUTES.services.installStream.replace(':id', serviceId)
         : API_ROUTES.services.removeStream.replace(':id', serviceId);
 
-    streamRequest(route, (event: StreamEvent) => {
-      if (event.type === 'log' && event.data) {
-        appendLine(event.data);
-      } else if (event.type === 'done') {
-        setStatus('done');
-      } else if (event.type === 'error') {
-        appendLine(`ERROR: ${event.data ?? 'Unknown error'}`);
+    queueMicrotask(() => {
+      setLines([]);
+      setStatus('streaming');
+      streamRequest(route, (event: StreamEvent) => {
+        if (event.type === 'log' && event.data) {
+          appendLine(event.data);
+        } else if (event.type === 'done') {
+          setStatus('done');
+        } else if (event.type === 'error') {
+          appendLine(`ERROR: ${event.data ?? 'Unknown error'}`);
+          setStatus('error');
+        }
+      }).catch((err: Error) => {
+        appendLine(`ERROR: ${err.message}`);
         setStatus('error');
-      }
-    }).catch((err: Error) => {
-      appendLine(`ERROR: ${err.message}`);
-      setStatus('error');
+      });
     });
 
     return () => {

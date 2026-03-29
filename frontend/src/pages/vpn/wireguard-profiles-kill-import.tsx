@@ -83,7 +83,9 @@ export function WireguardProfilesKillImport({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-orange-500" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Kill Switch</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Kill Switch
+            </span>
           </div>
           <Switch
             id="killswitch-toggle"

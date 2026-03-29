@@ -2,10 +2,7 @@ import { useMemo, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { GroupedScanNetwork } from '@shared/index';
-import {
-  createWifiConnectFormSchema,
-  type WifiConnectFormValues,
-} from '@/lib/schemas/wifi-forms';
+import { createWifiConnectFormSchema, type WifiConnectFormValues } from '@/lib/schemas/wifi-forms';
 import {
   buildBandOptionsFromGroup,
   pickDefaultBandFromOptions,

@@ -21,8 +21,8 @@ export function VpnAdguardHint() {
         <p className="text-blue-700 dark:text-blue-300">
           DNS queries from LAN clients are handled by AdGuard Home locally, then forwarded to your
           configured upstream resolvers over the VPN tunnel. If your WireGuard profile specifies
-          custom DNS servers, consider adding them as upstream resolvers in AdGuard to ensure they are
-          used.
+          custom DNS servers, consider adding them as upstream resolvers in AdGuard to ensure they
+          are used.
         </p>
       </div>
     </div>

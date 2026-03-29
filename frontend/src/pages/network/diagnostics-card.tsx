@@ -5,10 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useRunDiagnostics } from '@/hooks/use-network';
-import {
-  diagnosticsFormSchema,
-  type DiagnosticsFormValues,
-} from '@/lib/schemas/network-forms';
+import { diagnosticsFormSchema, type DiagnosticsFormValues } from '@/lib/schemas/network-forms';
 
 type DiagType = 'ping' | 'traceroute' | 'dns';
 

@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
@@ -11,7 +11,7 @@ import (
 
 // VpnStatusHandler handles GET /api/v1/vpn/status.
 func VpnStatusHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		statuses, err := svc.GetVpnStatus()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -22,7 +22,7 @@ func VpnStatusHandler(svc *services.VpnService) fiber.Handler {
 
 // GetWireguardHandler handles GET /api/v1/vpn/wireguard.
 func GetWireguardHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetWireguardConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -33,9 +33,9 @@ func GetWireguardHandler(svc *services.VpnService) fiber.Handler {
 
 // SetWireguardHandler handles PUT /api/v1/vpn/wireguard.
 func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.WireguardConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
@@ -65,12 +65,12 @@ func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
 
 // ToggleWireguardHandler handles POST /api/v1/vpn/wireguard/toggle.
 func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled *bool `json:"enabled"`
 			Enable  *bool `json:"enable"` // backward-compat for older clients
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		enabled := false
@@ -88,7 +88,7 @@ func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
 
 // GetTailscaleHandler handles GET /api/v1/vpn/tailscale.
 func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := svc.GetTailscaleStatus()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -99,12 +99,12 @@ func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
 
 // ToggleTailscaleHandler handles POST /api/v1/vpn/tailscale/toggle.
 func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled *bool `json:"enabled"`
 			Enable  *bool `json:"enable"` // backward-compat for older clients
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		enabled := false
@@ -123,11 +123,11 @@ func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 // TailscaleAuthHandler handles POST /api/v1/vpn/tailscale/auth.
 // Starts `tailscale up` and returns the browser auth URL if login is required.
 func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			AuthKey string `json:"auth_key"`
 		}
-		_ = c.BodyParser(&body)
+		_ = c.Bind().Body(&body)
 		authURL, err := svc.StartTailscaleAuth(body.AuthKey)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -138,12 +138,12 @@ func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
 
 // SetTailscaleExitNodeHandler handles POST /api/v1/vpn/tailscale/exit-node.
 func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			NodeIP   string `json:"node_ip"`
 			ExitNode string `json:"exit_node"` // legacy / alternate key from older clients
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		ip := body.NodeIP
@@ -159,11 +159,11 @@ func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 
 // ImportWireguardHandler handles POST /api/v1/vpn/wireguard/import.
 func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Config string `json:"config"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if body.Config == "" {
@@ -178,7 +178,7 @@ func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 
 // GetWireguardStatusHandler handles GET /api/v1/vpn/wireguard/status.
 func GetWireguardStatusHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := svc.GetWireGuardStatus()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -189,7 +189,7 @@ func GetWireguardStatusHandler(svc *services.VpnService) fiber.Handler {
 
 // GetWireguardProfilesHandler handles GET /api/v1/vpn/wireguard/profiles.
 func GetWireguardProfilesHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		profiles, err := svc.GetProfiles()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -200,12 +200,12 @@ func GetWireguardProfilesHandler(svc *services.VpnService) fiber.Handler {
 
 // AddWireguardProfileHandler handles POST /api/v1/vpn/wireguard/profiles.
 func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Name   string `json:"name"`
 			Config string `json:"config"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if body.Name == "" {
@@ -224,7 +224,7 @@ func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 
 // DeleteWireguardProfileHandler handles DELETE /api/v1/vpn/wireguard/profiles/:id.
 func DeleteWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if id == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "profile id is required"})
@@ -238,7 +238,7 @@ func DeleteWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 
 // ActivateWireguardProfileHandler handles POST /api/v1/vpn/wireguard/profiles/:id/activate.
 func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if id == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "profile id is required"})
@@ -252,7 +252,7 @@ func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 
 // GetKillSwitchHandler handles GET /api/v1/vpn/killswitch.
 func GetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := svc.GetKillSwitch()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -263,11 +263,11 @@ func GetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 
 // SetKillSwitchHandler handles PUT /api/v1/vpn/killswitch.
 func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled bool `json:"enabled"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetKillSwitch(body.Enabled); err != nil {
@@ -279,7 +279,7 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 
 // DNSLeakTestHandler handles GET /api/v1/vpn/dns-leak-test.
 func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		result := svc.RunDNSLeakTest()
 		return c.JSON(result)
 	}
@@ -287,7 +287,7 @@ func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
 
 // RunWireGuardSpeedTestHandler handles POST /api/v1/vpn/speed-test.
 func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		result, err := svc.RunWireGuardSpeedTest()
 		if err != nil {
 			// All current errors are preconditions (tunnel not usable for the test).
@@ -300,7 +300,7 @@ func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
 // VerifyWireguardHandler handles GET /api/v1/vpn/wireguard/verify.
 // Returns interface status, handshake recency, route check, and firewall plumbing state.
 func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		result := svc.VerifyWireGuard()
 		return c.JSON(result)
 	}
@@ -308,7 +308,7 @@ func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
 
 // GetSplitTunnelHandler handles GET /api/v1/vpn/split-tunnel.
 func GetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetSplitTunnel()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -319,9 +319,9 @@ func GetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 
 // SetSplitTunnelHandler handles PUT /api/v1/vpn/split-tunnel.
 func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var cfg models.SplitTunnelConfig
-		if err := c.BodyParser(&cfg); err != nil {
+		if err := c.Bind().Body(&cfg); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if cfg.Mode != "all" && cfg.Mode != "custom" {
@@ -336,7 +336,7 @@ func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 
 // GetTailscaleSSHHandler handles GET /api/v1/vpn/tailscale/ssh.
 func GetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		enabled, err := svc.GetTailscaleSSHEnabled()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -347,11 +347,11 @@ func GetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
 
 // SetTailscaleSSHHandler handles PUT /api/v1/vpn/tailscale/ssh.
 func SetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req struct {
 			Enabled bool `json:"enabled"`
 		}
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.SetTailscaleSSHEnabled(req.Enabled); err != nil {

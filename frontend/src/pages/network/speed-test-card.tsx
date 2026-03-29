@@ -18,11 +18,7 @@ export function SpeedTestCard() {
           Measures download speed from the router using a 10 MB test file from Cloudflare.
         </p>
 
-        <Button
-          size="sm"
-          onClick={() => speedTest.mutate()}
-          disabled={speedTest.isPending}
-        >
+        <Button size="sm" onClick={() => speedTest.mutate()} disabled={speedTest.isPending}>
           {speedTest.isPending ? 'Running…' : 'Run Speed Test'}
         </Button>
 

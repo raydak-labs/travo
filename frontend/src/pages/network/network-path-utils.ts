@@ -8,7 +8,9 @@ export function networkPathnameToTab(pathname: string): NetworkSectionTab {
   return 'status';
 }
 
-export function networkTabToPath(tab: NetworkSectionTab): '/network' | '/network/configuration' | '/network/advanced' {
+export function networkTabToPath(
+  tab: NetworkSectionTab,
+): '/network' | '/network/configuration' | '/network/advanced' {
   if (tab === 'configuration') return '/network/configuration';
   if (tab === 'advanced') return '/network/advanced';
   return '/network';

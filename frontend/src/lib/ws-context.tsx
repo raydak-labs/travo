@@ -21,6 +21,7 @@ export function WsProvider({ children }: { children: React.ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -51,7 +52,7 @@ export function WsProvider({ children }: { children: React.ReactNode }) {
       ws.onclose = () => {
         if (mountedRef.current) {
           setConnected(false);
-          reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+          reconnectTimer.current = setTimeout(() => connectRef.current(), RECONNECT_DELAY);
         }
       };
 
@@ -60,10 +61,14 @@ export function WsProvider({ children }: { children: React.ReactNode }) {
       };
     } catch {
       if (mountedRef.current) {
-        reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+        reconnectTimer.current = setTimeout(() => connectRef.current(), RECONNECT_DELAY);
       }
     }
   }, []);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     mountedRef.current = true;

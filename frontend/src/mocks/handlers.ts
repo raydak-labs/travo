@@ -571,7 +571,14 @@ export const handlers = [
   }),
 
   http.get(API_ROUTES.network.usbTethering, () => {
-    return HttpResponse.json({ detected: false, device_type: '', interface: '', is_up: false, ip_address: '', configured: false });
+    return HttpResponse.json({
+      detected: false,
+      device_type: '',
+      interface: '',
+      is_up: false,
+      ip_address: '',
+      configured: false,
+    });
   }),
 
   http.post(API_ROUTES.network.usbTetheringConfigure, () => {
@@ -653,7 +660,11 @@ export const handlers = [
   }),
 
   http.post(API_ROUTES.network.diagnostics, () => {
-    return HttpResponse.json({ type: 'ping', target: '8.8.8.8', output: 'PING 8.8.8.8: 3 packets' });
+    return HttpResponse.json({
+      type: 'ping',
+      target: '8.8.8.8',
+      output: 'PING 8.8.8.8: 3 packets',
+    });
   }),
 
   http.get(API_ROUTES.network.doh, () => {
@@ -697,7 +708,12 @@ export const handlers = [
   }),
 
   http.post(API_ROUTES.system.speedTest, () => {
-    return HttpResponse.json({ download_mbps: 50.0, upload_mbps: 20.0, ping_ms: 15.0, server: 'test' });
+    return HttpResponse.json({
+      download_mbps: 50.0,
+      upload_mbps: 20.0,
+      ping_ms: 15.0,
+      server: 'test',
+    });
   }),
 
   http.get(API_ROUTES.vpn.tailscale.ssh, () => {

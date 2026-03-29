@@ -63,9 +63,7 @@ export const macPolicyAddFormSchema = z
 
 export type MacPolicyAddFormValues = z.infer<typeof macPolicyAddFormSchema>;
 
-const timeHHMM = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a valid time (HH:MM)');
+const timeHHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a valid time (HH:MM)');
 
 /** WiFi on/off schedule (cron-backed). */
 export const wifiScheduleFormSchema = z.object({

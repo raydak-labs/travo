@@ -3,11 +3,7 @@ import type { Client } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ClientAliasCell } from '@/components/clients/client-alias-cell';
-import {
-  useKickClient,
-  useBlockClient,
-  useUnblockClient,
-} from '@/hooks/use-network';
+import { useKickClient, useBlockClient, useUnblockClient } from '@/hooks/use-network';
 
 interface ClientsTableProps {
   clients: readonly Client[];

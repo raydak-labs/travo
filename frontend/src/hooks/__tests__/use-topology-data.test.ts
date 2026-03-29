@@ -72,10 +72,10 @@ function makeWan(type: string, up: boolean): NetworkStatus['wan'] {
 
 describe('useTopologyData — connection type derivation', () => {
   const cases = [
-    { wanType: 'wan',  wanUp: true,  ethernet: true,  repeater: false, tether: false },
-    { wanType: 'wifi', wanUp: true,  ethernet: false, repeater: true,  tether: false },
-    { wanType: 'usb',  wanUp: true,  ethernet: false, repeater: false, tether: true  },
-    { wanType: 'wan',  wanUp: false, ethernet: false, repeater: false, tether: false },
+    { wanType: 'wan', wanUp: true, ethernet: true, repeater: false, tether: false },
+    { wanType: 'wifi', wanUp: true, ethernet: false, repeater: true, tether: false },
+    { wanType: 'usb', wanUp: true, ethernet: false, repeater: false, tether: true },
+    { wanType: 'wan', wanUp: false, ethernet: false, repeater: false, tether: false },
   ];
 
   cases.forEach(({ wanType, wanUp, ethernet, repeater, tether }) => {

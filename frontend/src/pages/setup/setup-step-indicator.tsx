@@ -1,8 +1,7 @@
 import { CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Progress } from '@/components/ui/progress';
-
-export const SETUP_STEPS = ['Welcome', 'Password', 'WiFi', 'Access Point', 'Complete'] as const;
+import { SETUP_STEPS } from '@/pages/setup/setup-step-constants';
 
 export function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
@@ -14,7 +13,8 @@ export function StepIndicator({ current, total }: { current: number; total: numb
               className={cn(
                 'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
                 i < current && 'bg-blue-600 text-white',
-                i === current && 'border-2 border-blue-600 bg-blue-50 text-blue-600 dark:bg-blue-950',
+                i === current &&
+                  'border-2 border-blue-600 bg-blue-50 text-blue-600 dark:bg-blue-950',
                 i > current && 'border-2 border-gray-300 text-gray-400 dark:border-gray-600',
               )}
             >

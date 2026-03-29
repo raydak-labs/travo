@@ -65,8 +65,7 @@ export function NTPConfigCard() {
     if (ntpConfig) {
       reset({
         enabled: ntpConfig.enabled,
-        servers:
-          ntpConfig.servers.length > 0 ? ntpConfig.servers.map((s) => ({ value: s })) : [],
+        servers: ntpConfig.servers.length > 0 ? ntpConfig.servers.map((s) => ({ value: s })) : [],
       });
     }
     setIsEditing(true);
