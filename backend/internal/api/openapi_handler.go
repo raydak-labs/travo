@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // openAPISpec is the OpenAPI 3.0 specification for the openwrt-travel-gui backend.
@@ -500,7 +500,7 @@ func init() {
 
 // OpenAPIHandler serves the OpenAPI 3.0 specification as JSON.
 func OpenAPIHandler() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		c.Set("Content-Type", "application/json")
 		return c.Send(openAPIJSON)
 	}

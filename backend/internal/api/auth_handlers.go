@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -11,7 +11,7 @@ import (
 
 // LoginHandler handles POST /api/v1/auth/login.
 func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		ip := c.IP()
 
 		// Check rate limit before processing
@@ -20,7 +20,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 		}
 
 		var req models.LoginRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
@@ -47,7 +47,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 
 // LogoutHandler handles POST /api/v1/auth/logout.
 func LogoutHandler(authSvc *auth.AuthService, bl *auth.TokenBlocklist) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader != "" && bl != nil {
 			parts := strings.SplitN(authHeader, " ", 2)
@@ -65,7 +65,7 @@ func LogoutHandler(authSvc *auth.AuthService, bl *auth.TokenBlocklist) fiber.Han
 
 // SessionHandler handles GET /api/v1/auth/session.
 func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		_ = authSvc
 		return c.JSON(fiber.Map{"valid": true})
 	}
@@ -73,9 +73,9 @@ func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
 
 // ChangePasswordHandler handles PUT /api/v1/auth/password.
 func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.ChangePasswordRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := authSvc.ChangePassword(req.CurrentPassword, req.NewPassword); err != nil {

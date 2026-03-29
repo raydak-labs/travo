@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -115,7 +115,7 @@ func (a *AuthService) ChangePassword(currentPassword, newPassword string) error 
 
 // Middleware returns a Fiber middleware that checks for a valid Bearer token.
 func (a *AuthService) Middleware() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		path := c.Path()
 
 		if !strings.HasPrefix(path, "/api/") || path == "/api/health" || path == "/api/v1/auth/login" || path == "/api/v1/ws" || path == "/api/v1/system/time-sync" {

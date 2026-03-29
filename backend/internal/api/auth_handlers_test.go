@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/services"
@@ -36,12 +36,12 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
 
 	deps := &Dependencies{
-		Auth:          authSvc,
-		Blocklist:     blocklist,
-		RateLimiter:   rateLimiter,
-		System:        systemSvc,
-		Network:       services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
-		Wifi:          wifiSvc,
+		Auth:        authSvc,
+		Blocklist:   blocklist,
+		RateLimiter: rateLimiter,
+		System:      systemSvc,
+		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
+		Wifi:        wifiSvc,
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
 		}, profilesPath),
@@ -55,7 +55,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	app.Use(authSvc.Middleware())
 
 	// Health endpoint (excluded from auth)
-	app.Get("/api/health", func(c *fiber.Ctx) error {
+	app.Get("/api/health", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
@@ -68,7 +68,7 @@ func TestLoginSuccess(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"password": "admin"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestLoginWrongPassword(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"password": "wrong"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestLoginWrongPassword(t *testing.T) {
 func TestProtectedRouteWithoutToken(t *testing.T) {
 	app, _ := setupTestApp()
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestProtectedRouteWithToken(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestLogoutBlocksToken(t *testing.T) {
 	// Verify the token works first
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestLogoutBlocksToken(t *testing.T) {
 	// Logout
 	req, _ = http.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err = app.Test(req, -1)
+	resp, err = app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("logout request failed: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestLogoutBlocksToken(t *testing.T) {
 	// Verify the token is now blocked
 	req, _ = http.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err = app.Test(req, -1)
+	resp, err = app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestLoginRateLimited(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{"password": "wrong"})
 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 		if err != nil {
 			t.Fatalf("request %d failed: %v", i, err)
 		}
@@ -189,7 +189,7 @@ func TestLoginRateLimited(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"password": "wrong"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("rate limited request failed: %v", err)
 	}

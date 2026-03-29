@@ -158,10 +158,10 @@ type DataUsageStatus struct {
 
 // DataBudget holds a monthly usage limit for a single interface.
 type DataBudget struct {
-	Interface             string  `json:"interface"`
-	MonthlyLimitBytes     int64   `json:"monthly_limit_bytes"`
-	WarningThresholdPct   float64 `json:"warning_threshold_pct"`
-	ResetDay              int     `json:"reset_day"`
+	Interface           string  `json:"interface"`
+	MonthlyLimitBytes   int64   `json:"monthly_limit_bytes"`
+	WarningThresholdPct float64 `json:"warning_threshold_pct"`
+	ResetDay            int     `json:"reset_day"`
 }
 
 // DataBudgetConfig holds all configured data budgets.
@@ -178,7 +178,7 @@ type IPv6Status struct {
 // FirewallZone holds a summary of a UCI firewall zone.
 type FirewallZone struct {
 	Name    string   `json:"name"`
-	Input   string   `json:"input"`   // ACCEPT / REJECT / DROP
+	Input   string   `json:"input"` // ACCEPT / REJECT / DROP
 	Output  string   `json:"output"`
 	Forward string   `json:"forward"`
 	Network []string `json:"network"`
@@ -188,7 +188,7 @@ type FirewallZone struct {
 type PortForwardRule struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Protocol string `json:"protocol"` // tcp, udp, tcp+udp
+	Protocol string `json:"protocol"`  // tcp, udp, tcp+udp
 	SrcDPort string `json:"src_dport"` // external port/range
 	DestIP   string `json:"dest_ip"`
 	DestPort string `json:"dest_port"` // internal port (empty = same)

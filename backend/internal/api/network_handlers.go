@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
@@ -13,7 +13,7 @@ import (
 
 // NetworkStatusHandler handles GET /api/v1/network/status.
 func NetworkStatusHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := svc.GetNetworkStatus()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -24,7 +24,7 @@ func NetworkStatusHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetWanConfigHandler handles GET /api/v1/network/wan.
 func GetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetWanConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -35,7 +35,7 @@ func GetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // DetectWanTypeHandler handles GET /api/v1/network/wan/detect.
 func DetectWanTypeHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		result, err := svc.DetectWanType()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -46,9 +46,9 @@ func DetectWanTypeHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetWanConfigHandler handles PUT /api/v1/network/wan.
 func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.WanConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
@@ -91,13 +91,13 @@ func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetInterfaceStateHandler handles POST /api/v1/network/interfaces/:name/state.
 func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		name := c.Params("name")
 		if name == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "interface name is required"})
 		}
 		var req models.SetInterfaceStateRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetInterfaceState(name, req.Up); err != nil {
@@ -112,7 +112,7 @@ func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDNSConfigHandler handles GET /api/v1/network/dns.
 func GetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetDNSConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -123,9 +123,9 @@ func GetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetDNSConfigHandler handles PUT /api/v1/network/dns.
 func SetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.DNSConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if config.UseCustomDNS {
@@ -147,7 +147,7 @@ func SetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetClientsHandler handles GET /api/v1/network/clients.
 func GetClientsHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		clients, err := svc.GetClients()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -158,7 +158,7 @@ func GetClientsHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDHCPConfigHandler handles GET /api/v1/network/dhcp.
 func GetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetDHCPConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -169,9 +169,9 @@ func GetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetDHCPConfigHandler handles PUT /api/v1/network/dhcp.
 func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.DHCPConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
@@ -198,7 +198,7 @@ func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDHCPLeasesHandler handles GET /api/v1/network/dhcp/leases.
 func GetDHCPLeasesHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		leases := svc.GetDHCPLeases()
 		return c.JSON(leases)
 	}
@@ -206,9 +206,9 @@ func GetDHCPLeasesHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetClientAliasHandler handles PUT /api/v1/network/clients/alias.
 func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.SetAliasRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if req.MAC == "" {
@@ -226,7 +226,7 @@ func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDNSEntriesHandler handles GET /api/v1/network/dns/entries.
 func GetDNSEntriesHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		entries, err := svc.GetDNSEntries()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -237,9 +237,9 @@ func GetDNSEntriesHandler(svc *services.NetworkService) fiber.Handler {
 
 // AddDNSEntryHandler handles POST /api/v1/network/dns/entries.
 func AddDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var entry models.DNSEntry
-		if err := c.BodyParser(&entry); err != nil {
+		if err := c.Bind().Body(&entry); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if entry.Name == "" {
@@ -263,7 +263,7 @@ func AddDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 
 // DeleteDNSEntryHandler handles DELETE /api/v1/network/dns/entries/:section.
 func DeleteDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section is required"})
@@ -277,7 +277,7 @@ func DeleteDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDHCPReservationsHandler handles GET /api/v1/network/dhcp/reservations.
 func GetDHCPReservationsHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		reservations, err := svc.GetDHCPReservations()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -288,9 +288,9 @@ func GetDHCPReservationsHandler(svc *services.NetworkService) fiber.Handler {
 
 // AddDHCPReservationHandler handles POST /api/v1/network/dhcp/reservations.
 func AddDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var reservation models.DHCPReservation
-		if err := c.BodyParser(&reservation); err != nil {
+		if err := c.Bind().Body(&reservation); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if reservation.Name == "" {
@@ -320,7 +320,7 @@ func AddDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 
 // DeleteDHCPReservationHandler handles DELETE /api/v1/network/dhcp/reservations/:section.
 func DeleteDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section is required"})
@@ -334,9 +334,9 @@ func DeleteDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 
 // KickClientHandler handles POST /api/v1/network/clients/kick.
 func KickClientHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if req.MAC == "" {
@@ -354,9 +354,9 @@ func KickClientHandler(svc *services.NetworkService) fiber.Handler {
 
 // BlockClientHandler handles POST /api/v1/network/clients/block.
 func BlockClientHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if req.MAC == "" {
@@ -374,9 +374,9 @@ func BlockClientHandler(svc *services.NetworkService) fiber.Handler {
 
 // UnblockClientHandler handles POST /api/v1/network/clients/unblock.
 func UnblockClientHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if req.MAC == "" {
@@ -394,7 +394,7 @@ func UnblockClientHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetBlockedClientsHandler handles GET /api/v1/network/clients/blocked.
 func GetBlockedClientsHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		blocked, err := svc.GetBlockedClients()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -405,7 +405,7 @@ func GetBlockedClientsHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDDNSConfigHandler handles GET /api/v1/network/ddns.
 func GetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetDDNSConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -416,9 +416,9 @@ func GetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetDDNSConfigHandler handles PUT /api/v1/network/ddns.
 func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.DDNSConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if config.Enabled {
@@ -448,14 +448,14 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetUptimeLogHandler handles GET /api/v1/network/uptime-log.
 func GetUptimeLogHandler(tracker *services.UptimeTracker) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(tracker.GetUptimeLog())
 	}
 }
 
 // GetDDNSStatusHandler handles GET /api/v1/network/ddns/status.
 func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := svc.GetDDNSStatus()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -466,7 +466,7 @@ func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetFirewallZonesHandler handles GET /api/v1/network/firewall/zones.
 func GetFirewallZonesHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		zones, err := svc.GetFirewallZones()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -477,7 +477,7 @@ func GetFirewallZonesHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetPortForwardsHandler handles GET /api/v1/network/firewall/port-forwards.
 func GetPortForwardsHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		rules, err := svc.GetPortForwards()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -488,9 +488,9 @@ func GetPortForwardsHandler(svc *services.NetworkService) fiber.Handler {
 
 // AddPortForwardHandler handles POST /api/v1/network/firewall/port-forwards.
 func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var rule models.PortForwardRule
-		if err := c.BodyParser(&rule); err != nil {
+		if err := c.Bind().Body(&rule); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.AddPortForward(rule); err != nil {
@@ -502,7 +502,7 @@ func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
 
 // DeletePortForwardHandler handles DELETE /api/v1/network/firewall/port-forwards/:id.
 func DeletePortForwardHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := svc.DeletePortForward(id); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -513,9 +513,9 @@ func DeletePortForwardHandler(svc *services.NetworkService) fiber.Handler {
 
 // RunDiagnosticsHandler handles POST /api/v1/network/diagnostics.
 func RunDiagnosticsHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.DiagnosticsRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		result := svc.RunDiagnostics(req)
@@ -525,7 +525,7 @@ func RunDiagnosticsHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetDoHConfigHandler handles GET /api/v1/network/doh.
 func GetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetDoHConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -536,9 +536,9 @@ func GetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetDoHConfigHandler handles PUT /api/v1/network/doh.
 func SetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var cfg models.DoHConfig
-		if err := c.BodyParser(&cfg); err != nil {
+		if err := c.Bind().Body(&cfg); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.SetDoHConfig(cfg); err != nil {
@@ -550,7 +550,7 @@ func SetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
 
 // GetIPv6StatusHandler handles GET /api/v1/network/ipv6.
 func GetIPv6StatusHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := svc.GetIPv6Status()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -561,11 +561,11 @@ func GetIPv6StatusHandler(svc *services.NetworkService) fiber.Handler {
 
 // SetIPv6EnabledHandler handles PUT /api/v1/network/ipv6.
 func SetIPv6EnabledHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req struct {
 			Enabled bool `json:"enabled"`
 		}
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.SetIPv6Enabled(req.Enabled); err != nil {
@@ -577,9 +577,9 @@ func SetIPv6EnabledHandler(svc *services.NetworkService) fiber.Handler {
 
 // SendWoLHandler handles POST /api/v1/network/wol.
 func SendWoLHandler(svc *services.NetworkService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.WoLRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.SendWoL(req.MAC, req.Interface); err != nil {

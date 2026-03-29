@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 func TestNetworkStatusEndpoint(t *testing.T) {
@@ -14,7 +16,7 @@ func TestNetworkStatusEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/status", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -42,7 +44,7 @@ func TestSetWanConfig_InvalidType_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -66,7 +68,7 @@ func TestSetWanConfig_InvalidIP_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -88,7 +90,7 @@ func TestSetWanConfig_InvalidMTU_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -105,7 +107,7 @@ func TestDetectWanTypeEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/wan/detect", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -138,7 +140,7 @@ func TestSetWanConfig_InvalidDNS_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -159,7 +161,7 @@ func TestSetWanConfig_ValidDHCP_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -176,7 +178,7 @@ func TestGetDHCPReservations_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/dhcp/reservations", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -198,7 +200,7 @@ func TestAddDHCPReservation_ValidRequest_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -220,7 +222,7 @@ func TestAddDHCPReservation_MissingName_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -243,7 +245,7 @@ func TestAddDHCPReservation_InvalidMAC_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -266,7 +268,7 @@ func TestAddDHCPReservation_InvalidIP_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -290,13 +292,13 @@ func TestDeleteDHCPReservation_Returns200(t *testing.T) {
 	addReq, _ := http.NewRequest(http.MethodPost, "/api/v1/network/dhcp/reservations", bytes.NewReader(body))
 	addReq.Header.Set("Content-Type", "application/json")
 	addReq.Header.Set("Authorization", "Bearer "+token)
-	addResp, _ := app.Test(addReq, -1)
+	addResp, _ := app.Test(addReq, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	addResp.Body.Close()
 
 	// Now delete it
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/network/dhcp/reservations/host_laptop", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -317,7 +319,7 @@ func TestKickClient_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/kick", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -336,7 +338,7 @@ func TestKickClient_MissingMAC_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/kick", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -357,7 +359,7 @@ func TestKickClient_InvalidMAC_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/kick", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -378,7 +380,7 @@ func TestBlockClient_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/block", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -399,7 +401,7 @@ func TestBlockClient_InvalidMAC_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/block", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -421,7 +423,7 @@ func TestUnblockClient_Returns200(t *testing.T) {
 	blockReq, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/block", bytes.NewReader(blockBody))
 	blockReq.Header.Set("Content-Type", "application/json")
 	blockReq.Header.Set("Authorization", "Bearer "+token)
-	blockResp, _ := app.Test(blockReq, -1)
+	blockResp, _ := app.Test(blockReq, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	blockResp.Body.Close()
 
 	// Unblock
@@ -431,7 +433,7 @@ func TestUnblockClient_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/unblock", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -448,7 +450,7 @@ func TestGetBlockedClients_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/clients/blocked", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -474,7 +476,7 @@ func TestSetInterfaceState_Up_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/wan/state", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -493,7 +495,7 @@ func TestSetInterfaceState_Down_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/lan/state", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -512,7 +514,7 @@ func TestSetInterfaceState_InvalidInterface_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/invalid/state", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -530,7 +532,7 @@ func TestSetInterfaceState_InvalidBody_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/wan/state", bytes.NewReader([]byte("not json")))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -547,7 +549,7 @@ func TestGetDDNSConfig_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/ddns", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -573,7 +575,7 @@ func TestSetDDNSConfig_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -596,7 +598,7 @@ func TestSetDDNSConfig_MissingService_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -619,7 +621,7 @@ func TestSetDDNSConfig_MissingDomain_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -646,7 +648,7 @@ func TestSetDDNSConfig_Custom_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -673,7 +675,7 @@ func TestSetDDNSConfig_Custom_MissingUpdateURL_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -700,7 +702,7 @@ func TestSetDDNSConfig_Custom_InvalidURL_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -717,7 +719,7 @@ func TestGetDDNSStatus_Returns200(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/ddns/status", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

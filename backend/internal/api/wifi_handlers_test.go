@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 func TestWifiScanEndpoint(t *testing.T) {
@@ -14,7 +16,7 @@ func TestWifiScanEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/scan", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -42,7 +44,7 @@ func TestWifiConnectEndpoint(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/connect", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -63,7 +65,7 @@ func TestWifiConnect_EmptySSID_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/connect", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -90,7 +92,7 @@ func TestWifiConnect_ShortPassword_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/connect", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -111,7 +113,7 @@ func TestWifiConnect_OpenNetworkNoPassword_Returns200(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/connect", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -128,7 +130,7 @@ func TestWifiConnectionEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/connection", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -152,7 +154,7 @@ func TestWifiDisconnectEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/disconnect", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -179,7 +181,7 @@ func TestWifiApplyConfirmEndpoint(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/apply/confirm", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -196,7 +198,7 @@ func TestWifiDeleteEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/wifi/saved/sta0", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -213,7 +215,7 @@ func TestWifiDeleteEndpoint_NonexistentSection(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/wifi/saved/nonexistent", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -229,7 +231,7 @@ func TestGuestWifiGetEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/guest", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -258,7 +260,7 @@ func TestGuestWifiSetEndpoint(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/guest", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -279,7 +281,7 @@ func TestGuestWifiSet_EmptySSID_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/guest", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -300,7 +302,7 @@ func TestGuestWifiSet_ShortPassword_Returns400(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/guest", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -317,7 +319,7 @@ func TestRadioStatusGetEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/radio", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -344,7 +346,7 @@ func TestRadioStatusSetEndpoint(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/radio", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -365,7 +367,7 @@ func TestWifiSetPriorityEndpoint(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/saved/priority", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -394,7 +396,7 @@ func TestWifiSetPriorityEndpoint_EmptySSIDs(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/saved/priority", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -411,7 +413,7 @@ func TestGetAutoReconnectEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/autoreconnect", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -438,7 +440,7 @@ func TestSetAutoReconnectEndpoint(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/autoreconnect", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -463,7 +465,7 @@ func TestRandomizeMACEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/mac/randomize", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -65,11 +65,11 @@ func TestMiddlewareBlocksWithoutToken(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	app := fiber.New()
 	app.Use(svc.Middleware())
-	app.Get("/api/v1/test", func(c *fiber.Ctx) error {
+	app.Get("/api/v1/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/test", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -84,12 +84,12 @@ func TestMiddlewareAllowsWithValidToken(t *testing.T) {
 	token, _, _ := svc.Login("admin")
 	app := fiber.New()
 	app.Use(svc.Middleware())
-	app.Get("/api/v1/test", func(c *fiber.Ctx) error {
+	app.Get("/api/v1/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -104,11 +104,11 @@ func TestMiddlewareAllowsHealthWithoutToken(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	app := fiber.New()
 	app.Use(svc.Middleware())
-	app.Get("/api/health", func(c *fiber.Ctx) error {
+	app.Get("/api/health", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -122,14 +122,14 @@ func TestMiddlewareAllowsStaticFilesWithoutToken(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	app := fiber.New()
 	app.Use(svc.Middleware())
-	app.Get("/*", func(c *fiber.Ctx) error {
+	app.Get("/*", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
 	paths := []string{"/", "/index.html", "/assets/style.css", "/assets/main.js"}
 	for _, p := range paths {
 		req, _ := http.NewRequest(http.MethodGet, p, nil)
-		resp, err := app.Test(req, -1)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 		if err != nil {
 			t.Fatalf("request to %s failed: %v", p, err)
 		}
@@ -144,11 +144,11 @@ func TestMiddlewareAllowsLoginWithoutToken(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	app := fiber.New()
 	app.Use(svc.Middleware())
-	app.Post("/api/v1/auth/login", func(c *fiber.Ctx) error {
+	app.Post("/api/v1/auth/login", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

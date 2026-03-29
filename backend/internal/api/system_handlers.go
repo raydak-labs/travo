@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
@@ -15,7 +15,7 @@ import (
 
 // SystemInfoHandler handles GET /api/v1/system/info.
 func SystemInfoHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		info, err := svc.GetSystemInfo()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -26,7 +26,7 @@ func SystemInfoHandler(svc *services.SystemService) fiber.Handler {
 
 // SystemStatsHandler handles GET /api/v1/system/stats.
 func SystemStatsHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		stats, err := svc.GetSystemStats()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -37,7 +37,7 @@ func SystemStatsHandler(svc *services.SystemService) fiber.Handler {
 
 // SystemRebootHandler handles POST /api/v1/system/reboot.
 func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if err := svc.Reboot(); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -47,7 +47,7 @@ func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
 
 // SystemShutdownHandler handles POST /api/v1/system/shutdown.
 func SystemShutdownHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if err := svc.Shutdown(); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -57,7 +57,7 @@ func SystemShutdownHandler(svc *services.SystemService) fiber.Handler {
 
 // SystemLogsHandler handles GET /api/v1/system/logs.
 func SystemLogsHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		service := c.Query("service")
 		level := c.Query("level")
 		logs, err := svc.GetLogs(service, level)
@@ -70,7 +70,7 @@ func SystemLogsHandler(svc *services.SystemService) fiber.Handler {
 
 // SystemKernelLogsHandler handles GET /api/v1/system/logs/kernel.
 func SystemKernelLogsHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		logs, err := svc.GetKernelLogs()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -81,9 +81,9 @@ func SystemKernelLogsHandler(svc *services.SystemService) fiber.Handler {
 
 // SetHostnameHandler handles PUT /api/v1/system/hostname.
 func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.SetHostnameRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if req.Hostname == "" {
@@ -98,7 +98,7 @@ func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 
 // GetTimezoneHandler handles GET /api/v1/system/timezone.
 func GetTimezoneHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetTimezone()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -109,9 +109,9 @@ func GetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 
 // SetTimezoneHandler handles PUT /api/v1/system/timezone.
 func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.TimezoneConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if config.Zonename == "" {
@@ -129,7 +129,7 @@ func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 
 // BackupHandler handles GET /api/v1/system/backup — downloads config backup.
 func BackupHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		path, err := svc.CreateBackup()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -142,7 +142,7 @@ func BackupHandler(svc *services.SystemService) fiber.Handler {
 
 // RestoreHandler handles POST /api/v1/system/restore — uploads and restores config backup.
 func RestoreHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		file, err := c.FormFile("backup")
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "backup file is required"})
@@ -167,14 +167,14 @@ func RestoreHandler(svc *services.SystemService) fiber.Handler {
 
 // GetLEDStatusHandler handles GET /api/v1/system/leds.
 func GetLEDStatusHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetLEDStatus())
 	}
 }
 
 // FactoryResetHandler handles POST /api/v1/system/factory-reset.
 func FactoryResetHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if err := svc.FactoryReset(); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -184,7 +184,7 @@ func FactoryResetHandler(svc *services.SystemService) fiber.Handler {
 
 // FirmwareUpgradeHandler handles POST /api/v1/system/firmware/upgrade.
 func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		file, err := c.FormFile("firmware")
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "firmware file is required"})
@@ -208,9 +208,9 @@ func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
 
 // SetLEDStealthHandler handles PUT /api/v1/system/leds.
 func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.SetLEDRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetLEDStealthMode(req.StealthMode); err != nil {
@@ -222,16 +222,16 @@ func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 
 // GetLEDScheduleHandler handles GET /api/v1/system/leds/schedule.
 func GetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetLEDSchedule())
 	}
 }
 
 // SetLEDScheduleHandler handles PUT /api/v1/system/leds/schedule.
 func SetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.LEDSchedule
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetLEDSchedule(req); err != nil {
@@ -243,7 +243,7 @@ func SetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
 
 // GetNTPConfigHandler handles GET /api/v1/system/ntp.
 func GetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		config, err := svc.GetNTPConfig()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -254,9 +254,9 @@ func GetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 
 // SetNTPConfigHandler handles PUT /api/v1/system/ntp.
 func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var config models.NTPConfig
-		if err := c.BodyParser(&config); err != nil {
+		if err := c.Bind().Body(&config); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetNTPConfig(config); err != nil {
@@ -268,7 +268,7 @@ func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 
 // NTPSyncHandler handles POST /api/v1/system/ntp/sync.
 func NTPSyncHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if err := svc.SyncNTP(); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -278,14 +278,14 @@ func NTPSyncHandler(svc *services.SystemService) fiber.Handler {
 
 // GetSetupCompleteHandler handles GET /api/v1/system/setup-complete.
 func GetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetSetupComplete())
 	}
 }
 
 // SetSetupCompleteHandler handles POST /api/v1/system/setup-complete.
 func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if err := svc.SetSetupComplete(); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -297,11 +297,11 @@ func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 // Sets the system clock to the client's browser time, fixing clock-skew issues
 // on devices that boot without NTP access. Only applied when skew > 60 seconds.
 func SyncTimeHandler() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req struct {
 			ClientTimeMs int64 `json:"client_time_ms"`
 		}
-		if err := c.BodyParser(&req); err != nil || req.ClientTimeMs <= 0 {
+		if err := c.Bind().Body(&req); err != nil || req.ClientTimeMs <= 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "client_time_ms is required",
 			})
@@ -328,7 +328,7 @@ func SyncTimeHandler() fiber.Handler {
 
 // SystemAlertsHandler handles GET /api/v1/system/alerts.
 func SystemAlertsHandler(svc *services.AlertService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		alerts := svc.GetAlerts()
 		return c.JSON(models.AlertsResponse{Alerts: alerts})
 	}
@@ -336,16 +336,16 @@ func SystemAlertsHandler(svc *services.AlertService) fiber.Handler {
 
 // GetButtonsHandler handles GET /api/v1/system/buttons.
 func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetHardwareButtons())
 	}
 }
 
 // SetButtonActionsHandler handles PUT /api/v1/system/button-actions.
 func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.ButtonActionsRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := svc.SetButtonActions(req.Buttons); err != nil {
@@ -357,7 +357,7 @@ func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
 
 // GetSSHKeysHandler handles GET /api/v1/system/ssh-keys.
 func GetSSHKeysHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		resp, err := svc.GetSSHKeys()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -368,9 +368,9 @@ func GetSSHKeysHandler(svc *services.SystemService) fiber.Handler {
 
 // AddSSHKeyHandler handles POST /api/v1/system/ssh-keys.
 func AddSSHKeyHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req models.AddSSHKeyRequest
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.AddSSHKey(req.Key); err != nil {
@@ -382,8 +382,8 @@ func AddSSHKeyHandler(svc *services.SystemService) fiber.Handler {
 
 // DeleteSSHKeyHandler handles DELETE /api/v1/system/ssh-keys/:index.
 func DeleteSSHKeyHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		index, err := c.ParamsInt("index")
+	return func(c fiber.Ctx) error {
+		index, err := fiber.Params[int](c, "index"), error(nil)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid index"})
 		}
@@ -396,7 +396,7 @@ func DeleteSSHKeyHandler(svc *services.SystemService) fiber.Handler {
 
 // RunSpeedTestHandler handles POST /api/v1/system/speed-test.
 func RunSpeedTestHandler(svc *services.SystemService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		result, err := svc.RunSpeedTest()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -407,16 +407,16 @@ func RunSpeedTestHandler(svc *services.SystemService) fiber.Handler {
 
 // GetAlertThresholdsHandler handles GET /api/v1/system/alert-thresholds.
 func GetAlertThresholdsHandler(svc *services.AlertService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetAlertThresholds())
 	}
 }
 
 // SetAlertThresholdsHandler handles PUT /api/v1/system/alert-thresholds.
 func SetAlertThresholdsHandler(svc *services.AlertService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var t models.AlertThresholds
-		if err := c.BodyParser(&t); err != nil {
+		if err := c.Bind().Body(&t); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		if err := svc.SetAlertThresholds(t); err != nil {

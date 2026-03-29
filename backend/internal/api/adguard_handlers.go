@@ -4,14 +4,14 @@ import (
 	"errors"
 	"os"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
 // AdGuardStatusHandler handles GET /api/v1/services/adguardhome/status.
 func AdGuardStatusHandler(adguard *services.AdGuardService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		installed := adguard.IsInstalled()
 		running := adguard.IsRunning()
 		version := adguard.Version()
@@ -35,7 +35,7 @@ func AdGuardStatusHandler(adguard *services.AdGuardService) fiber.Handler {
 
 // AdGuardDNSStatusHandler handles GET /api/v1/adguard/dns.
 func AdGuardDNSStatusHandler(adguard *services.AdGuardService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		status, err := adguard.GetDNSStatus()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -46,11 +46,11 @@ func AdGuardDNSStatusHandler(adguard *services.AdGuardService) fiber.Handler {
 
 // SetAdGuardDNSHandler handles PUT /api/v1/adguard/dns.
 func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled bool `json:"enabled"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if err := adguard.SetDNS(body.Enabled); err != nil {
@@ -62,7 +62,7 @@ func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
 
 // GetAdGuardConfigHandler handles GET /api/v1/adguard/config.
 func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		content, err := adguard.GetConfig()
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) || (err.Error() != "" && errors.Unwrap(err) != nil && errors.Is(errors.Unwrap(err), os.ErrNotExist)) {
@@ -76,12 +76,12 @@ func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 
 // SetAdGuardPasswordHandler handles PUT /api/v1/adguard/password.
 func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if body.Password == "" {
@@ -99,11 +99,11 @@ func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
 
 // SetAdGuardConfigHandler handles PUT /api/v1/adguard/config.
 func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var body struct {
 			Content string `json:"content"`
 		}
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 		if body.Content == "" {

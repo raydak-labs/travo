@@ -11,20 +11,20 @@ import (
 )
 
 const (
-	defaultBandSwitchCheckInterval       = 10
-	defaultDownSwitchThresholdDBm        = -70
-	defaultDownSwitchDelaySec            = 30
-	defaultUpSwitchThresholdDBm          = -60
-	defaultUpSwitchDelaySec              = 60
-	defaultMinViableSignalDBm            = -80
-	bandSwitchCooldownSec                = 120
-	bandSwitchGuardFile                  = "/etc/travo/band-switch-in-progress"
+	defaultBandSwitchCheckInterval = 10
+	defaultDownSwitchThresholdDBm  = -70
+	defaultDownSwitchDelaySec      = 30
+	defaultUpSwitchThresholdDBm    = -60
+	defaultUpSwitchDelaySec        = 60
+	defaultMinViableSignalDBm      = -80
+	bandSwitchCooldownSec          = 120
+	bandSwitchGuardFile            = "/etc/travo/band-switch-in-progress"
 )
 
 // BandSwitchConfig holds user-configurable parameters for automatic band switching.
 type BandSwitchConfig struct {
 	Enabled                bool   `json:"enabled"`
-	PreferredBand          string `json:"preferred_band"`            // "5g" or "2g"
+	PreferredBand          string `json:"preferred_band"` // "5g" or "2g"
 	CheckIntervalSec       int    `json:"check_interval_sec"`
 	DownSwitchThresholdDBm int    `json:"down_switch_threshold_dbm"`
 	DownSwitchDelaySec     int    `json:"down_switch_delay_sec"`
