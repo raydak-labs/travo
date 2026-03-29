@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,6 @@ export function SystemTimezoneCard() {
   const setTz = useSetTimezone();
   const [selectedTz, setSelectedTz] = useState<string>('');
   const [editingTimezone, setEditingTimezone] = useState(false);
-
-  useEffect(() => {
-    if (timezoneConfig?.zonename) {
-      setSelectedTz(timezoneConfig.zonename);
-    }
-  }, [timezoneConfig]);
 
   return (
     <Card>
@@ -49,7 +43,10 @@ export function SystemTimezoneCard() {
               <>
                 <div className="space-y-1">
                   <label className="text-xs text-gray-500">Change Timezone</label>
-                  <Select value={selectedTz} onValueChange={setSelectedTz}>
+                  <Select
+                    value={selectedTz || timezoneConfig?.zonename || ''}
+                    onValueChange={setSelectedTz}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>

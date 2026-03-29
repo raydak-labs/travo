@@ -52,7 +52,12 @@ export function WifiHiddenNetworkDialog() {
 
   const onValidSubmit = (data: WifiHiddenNetworkFormValues) => {
     connectMutation.mutate(
-      { ssid: data.ssid.trim(), password: data.password, encryption: data.encryption, hidden: true },
+      {
+        ssid: data.ssid.trim(),
+        password: data.password,
+        encryption: data.encryption,
+        hidden: true,
+      },
       {
         onSuccess: () => {
           resetForm();

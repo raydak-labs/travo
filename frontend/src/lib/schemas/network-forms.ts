@@ -87,10 +87,7 @@ export type DiagnosticsFormValues = z.infer<typeof diagnosticsFormSchema>;
 /** Static local DNS entry (hostname → IPv4). */
 export const dnsEntryFormSchema = z.object({
   name: z.string().trim().min(1, 'Hostname is required'),
-  ip: z
-    .string()
-    .trim()
-    .regex(ipv4LikeRegex, 'Enter a valid IPv4 address'),
+  ip: z.string().trim().regex(ipv4LikeRegex, 'Enter a valid IPv4 address'),
 });
 
 export type DnsEntryFormValues = z.infer<typeof dnsEntryFormSchema>;
@@ -102,24 +99,13 @@ export const dhcpReservationFormSchema = z.object({
     .string()
     .trim()
     .regex(macAddressRegex, 'Enter a valid MAC address (e.g. AA:BB:CC:DD:EE:FF)'),
-  ip: z
-    .string()
-    .trim()
-    .regex(ipv4LikeRegex, 'Enter a valid IPv4 address'),
+  ip: z.string().trim().regex(ipv4LikeRegex, 'Enter a valid IPv4 address'),
 });
 
 export type DhcpReservationFormValues = z.infer<typeof dhcpReservationFormSchema>;
 
 /** Values accepted by the API / UCI for DHCP lease duration. */
-export const DHCP_LEASE_TIME_OPTIONS = [
-  '1h',
-  '2h',
-  '6h',
-  '12h',
-  '24h',
-  '48h',
-  '7d',
-] as const;
+export const DHCP_LEASE_TIME_OPTIONS = ['1h', '2h', '6h', '12h', '24h', '48h', '7d'] as const;
 
 /** LAN DHCP pool (start offset, size, lease). */
 export const dhcpPoolFormSchema = z.object({

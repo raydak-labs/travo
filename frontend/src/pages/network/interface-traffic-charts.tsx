@@ -30,7 +30,11 @@ export function InterfaceTrafficCharts() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {sortedNames.map((name) => (
-              <InterfaceTrafficChartCard key={name} name={name} points={interfaceDataPoints[name]} />
+              <InterfaceTrafficChartCard
+                key={name}
+                name={name}
+                points={interfaceDataPoints[name]}
+              />
             ))}
           </div>
         )}

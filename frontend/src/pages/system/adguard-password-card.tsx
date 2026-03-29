@@ -40,10 +40,7 @@ export function AdGuardPasswordCard() {
   };
 
   const onSubmit = (data: ChangeAdGuardPasswordFormValues) => {
-    changePasswordMutation.mutate(
-      { password: data.new_password },
-      { onSuccess: resetAndClose },
-    );
+    changePasswordMutation.mutate({ password: data.new_password }, { onSuccess: resetAndClose });
   };
 
   return (

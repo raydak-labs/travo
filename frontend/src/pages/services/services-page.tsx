@@ -82,7 +82,10 @@ export function ServicesPage() {
         />
       )}
 
-      <WireguardPostInstallDialog open={showWireguardWizard} onOpenChange={setShowWireguardWizard} />
+      <WireguardPostInstallDialog
+        open={showWireguardWizard}
+        onOpenChange={setShowWireguardWizard}
+      />
     </div>
   );
 }

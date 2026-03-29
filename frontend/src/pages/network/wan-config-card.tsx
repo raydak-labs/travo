@@ -66,9 +66,7 @@ export function WanConfigCard() {
               )}
             </span>
           )}
-          {detectWanType.data && network?.wan && (
-            <Badge variant="success">WAN Active</Badge>
-          )}
+          {detectWanType.data && network?.wan && <Badge variant="success">WAN Active</Badge>}
         </div>
       </CardContent>
     </Card>

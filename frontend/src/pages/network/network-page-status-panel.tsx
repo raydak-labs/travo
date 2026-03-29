@@ -26,13 +26,7 @@ export function NetworkPageStatusPanel({
   blockedClients,
 }: NetworkPageStatusPanelProps) {
   return (
-    <div
-      id={panelId}
-      role="tabpanel"
-      aria-labelledby={tabId}
-      hidden={hidden}
-      className="space-y-6"
-    >
+    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
       <WanStatusCard />
 
       <Card>

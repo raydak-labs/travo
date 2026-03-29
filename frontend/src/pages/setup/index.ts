@@ -1,9 +1,5 @@
 export { SetupPage } from './setup-page';
-export {
-  setupPasswordFormSchema,
-  setupWifiFormSchema,
-  setupApFormSchema,
-} from './setup-schema';
+export { setupPasswordFormSchema, setupWifiFormSchema, setupApFormSchema } from './setup-schema';
 export type {
   SetupPasswordFormValues,
   SetupWifiFormValues,

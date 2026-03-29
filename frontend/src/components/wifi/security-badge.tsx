@@ -35,7 +35,8 @@ const labelMap: Record<string, string> = {
 function normalizeEncryption(enc: string): string {
   const lower = enc.toLowerCase();
   if (lower === 'sae') return 'wpa3';
-  if (lower === 'psk2' || lower === 'psk-mixed') return lower === 'psk-mixed' ? 'wpa2/wpa3' : 'wpa2';
+  if (lower === 'psk2' || lower === 'psk-mixed')
+    return lower === 'psk-mixed' ? 'wpa2/wpa3' : 'wpa2';
   return lower;
 }
 

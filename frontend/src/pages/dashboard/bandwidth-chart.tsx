@@ -67,7 +67,7 @@ export function BandwidthChart() {
                   color: 'var(--chart-tooltip-text)',
                   fontSize: '12px',
                 }}
-                formatter={(value: number) => `${value.toFixed(1)}%`}
+                formatter={(value) => `${Number(value ?? 0).toFixed(1)}%`}
               />
               <Area
                 type="monotone"

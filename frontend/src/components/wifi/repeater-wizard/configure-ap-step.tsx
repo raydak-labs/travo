@@ -41,7 +41,9 @@ export function RepeaterWizardConfigureApStep({
 
       <div className="flex items-center justify-between rounded-lg border p-3">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium text-gray-900 dark:text-white">Same as upstream</span>
+          <span className="text-sm font-medium text-gray-900 dark:text-white">
+            Same as upstream
+          </span>
           <p className="text-xs text-gray-500">
             Use the same SSID and password as the upstream network
           </p>

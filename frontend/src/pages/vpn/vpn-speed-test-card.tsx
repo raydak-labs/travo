@@ -15,8 +15,9 @@ export function VpnSpeedTestCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Measures download throughput and latency from the router through the WireGuard tunnel (traffic is bound to{' '}
-          <span className="font-mono text-xs">wg0</span>). Enable WireGuard and wait for a handshake before running.
+          Measures download throughput and latency from the router through the WireGuard tunnel
+          (traffic is bound to <span className="font-mono text-xs">wg0</span>). Enable WireGuard and
+          wait for a handshake before running.
         </p>
 
         <Button size="sm" onClick={() => speedTest.mutate()} disabled={speedTest.isPending}>

@@ -184,7 +184,7 @@ export interface RandomizeMACResponse extends WifiMutationResponse {
 /** WiFi on/off schedule (cron-based) */
 export interface WiFiSchedule {
   readonly enabled: boolean;
-  readonly on_time: string;  // HH:MM
+  readonly on_time: string; // HH:MM
   readonly off_time: string; // HH:MM
 }
 

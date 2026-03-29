@@ -36,16 +36,15 @@ export function DoHCard() {
               </div>
               <Switch
                 checked={cfg?.enabled ?? false}
-                onChange={() =>
-                  cfg && setDoH.mutate({ ...cfg, enabled: !cfg.enabled })
-                }
+                onChange={() => cfg && setDoH.mutate({ ...cfg, enabled: !cfg.enabled })}
                 disabled={setDoH.isPending}
                 aria-label="Toggle DNS over HTTPS"
               />
             </div>
             <p className="text-xs text-gray-500">
-              Encrypts DNS queries to prevent eavesdropping and tampering.
-              Requires <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">https-dns-proxy</code> to be installed.
+              Encrypts DNS queries to prevent eavesdropping and tampering. Requires{' '}
+              <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">https-dns-proxy</code> to
+              be installed.
             </p>
           </div>
         )}

@@ -87,8 +87,9 @@ export function SystemAtAGlanceSection() {
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">Memory</span>
                     <span className="text-gray-900 dark:text-white">
-                      {stats.memory.usage_percent.toFixed(1)}% ({formatBytes(stats.memory.used_bytes)}{' '}
-                      / {formatBytes(stats.memory.total_bytes)})
+                      {stats.memory.usage_percent.toFixed(1)}% (
+                      {formatBytes(stats.memory.used_bytes)} /{' '}
+                      {formatBytes(stats.memory.total_bytes)})
                     </span>
                   </div>
                   <Progress value={stats.memory.usage_percent} />
@@ -103,8 +104,9 @@ export function SystemAtAGlanceSection() {
                       </span>
                     </span>
                     <span className="text-gray-900 dark:text-white">
-                      {stats.storage.usage_percent.toFixed(1)}% ({formatBytes(stats.storage.used_bytes)}{' '}
-                      / {formatBytes(stats.storage.total_bytes)})
+                      {stats.storage.usage_percent.toFixed(1)}% (
+                      {formatBytes(stats.storage.used_bytes)} /{' '}
+                      {formatBytes(stats.storage.total_bytes)})
                     </span>
                   </div>
                   <Progress value={stats.storage.usage_percent} />

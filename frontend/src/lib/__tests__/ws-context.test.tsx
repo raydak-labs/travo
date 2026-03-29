@@ -21,13 +21,14 @@ class MockWebSocket {
 let mockWsInstance: MockWebSocket;
 
 beforeEach(() => {
-  vi.stubGlobal(
-    'WebSocket',
-    vi.fn().mockImplementation(() => {
+  class WebSocketCtor {
+    constructor(...args: unknown[]) {
+      void args;
       mockWsInstance = new MockWebSocket();
-      return mockWsInstance;
-    }),
-  );
+      return mockWsInstance as unknown as WebSocket;
+    }
+  }
+  vi.stubGlobal('WebSocket', WebSocketCtor as unknown as typeof WebSocket);
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {

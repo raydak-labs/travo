@@ -22,12 +22,16 @@ export function NtpConfigSummaryView({
       <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
         <div className="flex items-center justify-between">
           <span className="text-gray-500">NTP</span>
-          <span className="text-gray-900 dark:text-white">{ntpEnabled ? 'Enabled' : 'Disabled'}</span>
+          <span className="text-gray-900 dark:text-white">
+            {ntpEnabled ? 'Enabled' : 'Disabled'}
+          </span>
         </div>
 
         <div className="mt-2">
           <div className="text-xs text-gray-500">Servers</div>
-          <div className="mt-1 font-mono text-sm text-gray-900 dark:text-white">{serversSummary}</div>
+          <div className="mt-1 font-mono text-sm text-gray-900 dark:text-white">
+            {serversSummary}
+          </div>
         </div>
       </div>
 

@@ -68,8 +68,12 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.network.dataUsageReset).toBe('/api/v1/network/data-usage/reset');
     expect(API_ROUTES.network.dataUsageBudget).toBe('/api/v1/network/data-usage/budget');
     expect(API_ROUTES.network.usbTethering).toBe('/api/v1/network/usb-tethering');
-    expect(API_ROUTES.network.usbTetheringConfigure).toBe('/api/v1/network/usb-tethering/configure');
-    expect(API_ROUTES.network.usbTetheringUnconfigure).toBe('/api/v1/network/usb-tethering/unconfigure');
+    expect(API_ROUTES.network.usbTetheringConfigure).toBe(
+      '/api/v1/network/usb-tethering/configure',
+    );
+    expect(API_ROUTES.network.usbTetheringUnconfigure).toBe(
+      '/api/v1/network/usb-tethering/unconfigure',
+    );
   });
 
   it('has wifi routes matching backend', () => {

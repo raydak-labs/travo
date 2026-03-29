@@ -61,11 +61,7 @@ export function DhcpPoolSettingsCard() {
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSaveDhcp)} className="space-y-4" noValidate>
-            <DhcpPoolFormFields
-              register={register}
-              control={control}
-              errors={dhcpErrors}
-            />
+            <DhcpPoolFormFields register={register} control={control} errors={dhcpErrors} />
             <Button type="submit" disabled={setDHCP.isPending} size="sm">
               {setDHCP.isPending ? 'Saving…' : 'Save DHCP Settings'}
             </Button>

@@ -12,9 +12,7 @@ describe('wifi-apply', () => {
   });
 
   it('confirms immediately when the router is reachable', async () => {
-    const spy = vi
-      .spyOn(apiClient, 'post')
-      .mockResolvedValueOnce({ status: 'ok' });
+    const spy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ status: 'ok' });
 
     await expect(confirmWifiApply('token-1', 1, 0)).resolves.toBeUndefined();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -35,9 +33,7 @@ describe('wifi-apply', () => {
   });
 
   it('finalizes pending wifi mutations by confirming their apply token', async () => {
-    const confirmSpy = vi
-      .spyOn(apiClient, 'post')
-      .mockResolvedValueOnce({ status: 'ok' });
+    const confirmSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ status: 'ok' });
 
     const response = await finalizeWifiMutation(
       Promise.resolve({

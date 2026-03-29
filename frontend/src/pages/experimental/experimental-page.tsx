@@ -1,4 +1,14 @@
-import { Cable, Wifi, Smartphone, Signal, Shield, Monitor, Router, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Cable,
+  Wifi,
+  Smartphone,
+  Signal,
+  Shield,
+  Monitor,
+  Router,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,9 +82,13 @@ function TopologyDiagram({
                   }`}
                 />
                 <div className="min-w-0">
-                  <div className="text-xs font-medium text-slate-200 leading-tight">{src.label}</div>
+                  <div className="text-xs font-medium text-slate-200 leading-tight">
+                    {src.label}
+                  </div>
                   {src.detail && (
-                    <div className="text-[10px] text-slate-500 leading-tight truncate">{src.detail}</div>
+                    <div className="text-[10px] text-slate-500 leading-tight truncate">
+                      {src.detail}
+                    </div>
                   )}
                 </div>
               </div>
@@ -125,10 +139,10 @@ function TopologyDiagram({
             </div>
             {/* Device name */}
             <div className="text-center">
-              <div className="text-xs font-semibold text-slate-200 leading-tight">{hostname || 'OpenWRT'}</div>
-              {model && (
-                <div className="text-[10px] text-slate-500 leading-tight">{model}</div>
-              )}
+              <div className="text-xs font-semibold text-slate-200 leading-tight">
+                {hostname || 'OpenWRT'}
+              </div>
+              {model && <div className="text-[10px] text-slate-500 leading-tight">{model}</div>}
             </div>
             {/* Feature badges */}
             <div className="flex flex-wrap justify-center gap-1">
@@ -241,9 +255,7 @@ function SourceCard({
       <CardContent>
         <div
           className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
-            connected
-              ? 'bg-emerald-500/10 text-emerald-400'
-              : 'bg-slate-700/40 text-slate-500'
+            connected ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/40 text-slate-500'
           }`}
         >
           <span
@@ -316,13 +328,17 @@ export function ExperimentalPage() {
               {wan.ip_address && (
                 <div className="flex justify-between">
                   <span>IP</span>
-                  <span className="text-slate-300 dark:text-slate-300 font-mono">{wan.ip_address}</span>
+                  <span className="text-slate-300 dark:text-slate-300 font-mono">
+                    {wan.ip_address}
+                  </span>
                 </div>
               )}
               {wan.gateway && (
                 <div className="flex justify-between">
                   <span>Gateway</span>
-                  <span className="text-slate-300 dark:text-slate-300 font-mono">{wan.gateway}</span>
+                  <span className="text-slate-300 dark:text-slate-300 font-mono">
+                    {wan.gateway}
+                  </span>
                 </div>
               )}
             </>
@@ -343,11 +359,15 @@ export function ExperimentalPage() {
               </div>
               <div className="flex justify-between">
                 <span>Band</span>
-                <span className="text-slate-300 dark:text-slate-300 uppercase">{wifiConn.band}</span>
+                <span className="text-slate-300 dark:text-slate-300 uppercase">
+                  {wifiConn.band}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Signal</span>
-                <span className="text-slate-300 dark:text-slate-300">{wifiConn.signal_percent}%</span>
+                <span className="text-slate-300 dark:text-slate-300">
+                  {wifiConn.signal_percent}%
+                </span>
               </div>
             </>
           ) : (
@@ -375,7 +395,9 @@ export function ExperimentalPage() {
               )}
             </>
           ) : (
-            <p className="text-slate-500">No tethering device found. Plug in your smartphone or USB modem to start.</p>
+            <p className="text-slate-500">
+              No tethering device found. Plug in your smartphone or USB modem to start.
+            </p>
           )}
         </SourceCard>
 
@@ -420,7 +442,9 @@ export function ExperimentalPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">Internet</span>
-                <p className={`font-medium mt-0.5 ${internetUp ? 'text-emerald-500' : 'text-red-500'}`}>
+                <p
+                  className={`font-medium mt-0.5 ${internetUp ? 'text-emerald-500' : 'text-red-500'}`}
+                >
                   {internetUp ? 'Reachable' : 'Unreachable'}
                 </p>
               </div>
@@ -442,7 +466,9 @@ export function ExperimentalPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">IPv6</span>
-                <p className={`font-medium mt-0.5 ${ipv6Enabled ? 'text-emerald-500' : 'text-slate-500'}`}>
+                <p
+                  className={`font-medium mt-0.5 ${ipv6Enabled ? 'text-emerald-500' : 'text-slate-500'}`}
+                >
                   {ipv6Enabled ? 'Enabled' : 'Disabled'}
                 </p>
               </div>

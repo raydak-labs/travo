@@ -33,12 +33,13 @@ export function ApRadioDisableDialog({
         {isLastActive ? (
           <p className="text-sm text-gray-700 dark:text-gray-300">
             This is the <strong>only active access point</strong>. Disabling it will make the router
-            unreachable via WiFi. You will need a wired connection or physical access to re-enable it.
+            unreachable via WiFi. You will need a wired connection or physical access to re-enable
+            it.
           </p>
         ) : (
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            Disabling this access point will disconnect all clients currently connected to it. Are you
-            sure?
+            Disabling this access point will disconnect all clients currently connected to it. Are
+            you sure?
           </p>
         )}
         <DialogFooter>

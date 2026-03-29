@@ -1,4 +1,10 @@
-import { Controller, type Control, type FieldErrors, type UseFormRegister, type UseFormSetValue } from 'react-hook-form';
+import {
+  Controller,
+  type Control,
+  type FieldErrors,
+  type UseFormRegister,
+  type UseFormSetValue,
+} from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/cn';
 import {
@@ -81,8 +87,8 @@ export function DdnsEnabledFields({
             </p>
           ) : null}
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Use ddns-scripts placeholders such as [IP], [DOMAIN], [USERNAME], [PASSWORD] as required by
-            your provider.
+            Use ddns-scripts placeholders such as [IP], [DOMAIN], [USERNAME], [PASSWORD] as required
+            by your provider.
           </p>
         </div>
       )}

@@ -48,7 +48,8 @@ export function useWifiConnect() {
       hidden?: boolean;
       /** Preferred band for dual-band networks (2.4ghz, 5ghz, 6ghz) */
       band?: string;
-    }) => finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.connect, params)),
+    }) =>
+      finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.connect, params)),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
@@ -195,7 +196,8 @@ export function useSetMAC() {
 export function useRandomizeMAC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => finalizeWifiMutation(apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize)),
+    mutationFn: () =>
+      finalizeWifiMutation(apiClient.post<RandomizeMACResponse>(API_ROUTES.wifi.macRandomize)),
     onSuccess: (data) => {
       toast.success(`MAC randomized to ${data.mac}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'mac'] });
@@ -247,10 +249,9 @@ export function useSetRadioRole() {
   return useMutation({
     mutationFn: ({ name, role }: { name: string; role: string }) =>
       finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(
-          API_ROUTES.wifi.radioRole.replace(':name', name),
-          { role },
-        ),
+        apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.radioRole.replace(':name', name), {
+          role,
+        }),
       ),
     onSuccess: () => {
       toast.success('Radio role updated');

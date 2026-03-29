@@ -20,13 +20,7 @@ export function NetworkPageAdvancedPanel({
   hidden,
 }: NetworkPageAdvancedPanelProps) {
   return (
-    <div
-      id={panelId}
-      role="tabpanel"
-      aria-labelledby={tabId}
-      hidden={hidden}
-      className="space-y-6"
-    >
+    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
       <DdnsCard />
       <FirewallCard />
       <IPv6Card />

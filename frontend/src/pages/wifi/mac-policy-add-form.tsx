@@ -24,9 +24,7 @@ export function MACPolicyAddForm({ onValidSubmit, isPending }: MACPolicyAddFormP
 
   return (
     <form
-      onSubmit={handleSubmit((data) =>
-        onValidSubmit(data, () => reset({ ssid: '', mac: '' })),
-      )}
+      onSubmit={handleSubmit((data) => onValidSubmit(data, () => reset({ ssid: '', mac: '' })))}
       className="space-y-2 rounded-md border p-3"
       noValidate
     >

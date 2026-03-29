@@ -27,10 +27,7 @@ export async function confirmWifiApply(
     }
   }
 
-  const suffix =
-    lastError instanceof Error && lastError.message
-      ? `: ${lastError.message}`
-      : '';
+  const suffix = lastError instanceof Error && lastError.message ? `: ${lastError.message}` : '';
   throw new Error(`Wireless settings could not be confirmed before rollback timeout${suffix}`);
 }
 

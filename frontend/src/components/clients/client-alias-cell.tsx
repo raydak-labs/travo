@@ -81,15 +81,31 @@ export function ClientAliasCell({
             {...register('alias')}
           />
           {errors.alias ? (
-            <span id={`alias-err-${client.mac_address}`} className="text-xs text-red-500" role="alert">
+            <span
+              id={`alias-err-${client.mac_address}`}
+              className="text-xs text-red-500"
+              role="alert"
+            >
               {errors.alias.message}
             </span>
           ) : null}
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6 self-start" type="submit" disabled={setAlias.isPending}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 self-start"
+          type="submit"
+          disabled={setAlias.isPending}
+        >
           <Check className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6 self-start" type="button" onClick={onCancel}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 self-start"
+          type="button"
+          onClick={onCancel}
+        >
           <X className="h-3 w-3" />
         </Button>
       </form>

@@ -48,10 +48,7 @@ export function MacAddressCloneBlock({
         </p>
       )}
       <div className="space-y-2">
-        <label
-          htmlFor="mac-input"
-          className="text-xs font-medium text-gray-600 dark:text-gray-400"
-        >
+        <label htmlFor="mac-input" className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Custom MAC Address
         </label>
         <Input

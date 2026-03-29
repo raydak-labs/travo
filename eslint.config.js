@@ -20,6 +20,8 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // React Hook Form `watch()` is intentionally used; compiler rule is overly strict for this codebase.
+      'react-hooks/incompatible-library': 'off',
     },
   },
 );

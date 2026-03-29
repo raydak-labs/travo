@@ -28,11 +28,7 @@ export const changeAdminPasswordSchema = z
 export type ChangeAdminPasswordFormValues = z.infer<typeof changeAdminPasswordSchema>;
 
 export const hostnameFormSchema = z.object({
-  hostname: z
-    .string()
-    .trim()
-    .min(1, 'Hostname is required')
-    .max(253, 'Hostname is too long'),
+  hostname: z.string().trim().min(1, 'Hostname is required').max(253, 'Hostname is too long'),
 });
 
 export type HostnameFormValues = z.infer<typeof hostnameFormSchema>;
@@ -90,9 +86,7 @@ export const ntpServerDraftSchema = z.object({
 export type NtpServerDraftFormValues = z.infer<typeof ntpServerDraftSchema>;
 
 /** HTML time input (HH:MM). */
-const timeHHMMSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a valid time (HH:MM)');
+const timeHHMMSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a valid time (HH:MM)');
 
 /** LED schedule — matches `LEDSchedule` API shape. */
 export const ledScheduleFormSchema = z.object({

@@ -48,7 +48,12 @@ export function VpnVerifyWireguardCard() {
           Check that the WireGuard tunnel, routes, and firewall rules are correctly configured.
         </p>
 
-        <Button size="sm" onClick={handleVerify} disabled={verifyMutation.isPending} className="gap-1.5">
+        <Button
+          size="sm"
+          onClick={handleVerify}
+          disabled={verifyMutation.isPending}
+          className="gap-1.5"
+        >
           {verifyMutation.isPending ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
