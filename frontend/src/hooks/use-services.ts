@@ -132,3 +132,16 @@ export function useSetAdGuardConfig() {
     },
   });
 }
+
+export function useChangeAdGuardPassword() {
+  return useMutation({
+    mutationFn: ({ username, password }: { username?: string; password: string }) =>
+      apiClient.put<{ status: string }>(API_ROUTES.adguard.password, { username, password }),
+    onSuccess: () => {
+      toast.success('AdGuard password updated');
+    },
+    onError: (error) => {
+      toast.error('Failed to update AdGuard password', { description: error.message });
+    },
+  });
+}

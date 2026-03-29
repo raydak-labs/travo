@@ -207,6 +207,7 @@ describe('API_ROUTES', () => {
       '/api/v1/captive/auto-accept',
       '/api/v1/adguard/dns',
       '/api/v1/adguard/config',
+      '/api/v1/adguard/password',
       '/api/v1/network/uptime-log',
       '/api/v1/system/buttons',
       '/api/v1/system/button-actions',

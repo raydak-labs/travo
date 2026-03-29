@@ -182,6 +182,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/adguard/dns", SetAdGuardDNSHandler(deps.AdGuard))
 	v1.Get("/adguard/config", GetAdGuardConfigHandler(deps.AdGuard))
 	v1.Put("/adguard/config", SetAdGuardConfigHandler(deps.AdGuard))
+	v1.Put("/adguard/password", SetAdGuardPasswordHandler(deps.AdGuard))
 
 	// Data usage tracking (requires vnstat)
 	v1.Get("/network/data-usage", GetDataUsageHandler(deps.DataUsage))

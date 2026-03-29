@@ -74,6 +74,29 @@ func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 	}
 }
 
+// SetAdGuardPasswordHandler handles PUT /api/v1/adguard/password.
+func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if body.Password == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password is required"})
+		}
+		if body.Username == "" {
+			body.Username = "admin"
+		}
+		if err := adguard.SetPassword(body.Username, body.Password); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
 // SetAdGuardConfigHandler handles PUT /api/v1/adguard/config.
 func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
