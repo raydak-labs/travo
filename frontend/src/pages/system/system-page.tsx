@@ -10,6 +10,7 @@ import { SystemTimezoneCard } from './system-timezone-card';
 import { SystemBackupRestoreCard } from './system-backup-restore-card';
 import { SystemQuickLinksCard } from './system-quick-links-card';
 import { SystemPowerSection } from './system-power-section';
+import { AdGuardPasswordCard } from './adguard-password-card';
 
 export function SystemPage() {
   return (
@@ -24,6 +25,7 @@ export function SystemPage() {
           <SystemTimezoneCard />
           <NTPConfigCard />
           <ChangePasswordCard />
+          <AdGuardPasswordCard />
           <HardwareButtonsCard />
           <LEDControlCard />
           <AlertThresholdsCard />

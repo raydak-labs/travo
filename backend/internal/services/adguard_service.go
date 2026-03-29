@@ -12,16 +12,18 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"golang.org/x/crypto/bcrypt"
 	yaml "gopkg.in/yaml.v3"
 )
 
 const (
-	adguardBinary         = "/opt/AdGuardHome/AdGuardHome"
-	adguardInitd          = "/etc/init.d/adguardhome"
-	adguardAPIBaseDefault = "http://127.0.0.1:3000"
-	adguardDefaultDNSPort = 5353
-	adguardYAMLPathUCI    = "/etc/adguardhome/adguardhome.yaml"
-	adguardYAMLPathOpt    = "/opt/AdGuardHome/AdGuardHome.yaml"
+	adguardBinary          = "/opt/AdGuardHome/AdGuardHome"
+	adguardInitd           = "/etc/init.d/adguardhome"
+	adguardAPIBaseDefault  = "http://127.0.0.1:3000"
+	adguardDefaultDNSPort  = 5353
+	adguardYAMLPathUCI     = "/etc/adguardhome/adguardhome.yaml"
+	adguardYAMLPathOpt     = "/opt/AdGuardHome/AdGuardHome.yaml"
+	adguardBundledTemplate = "/etc/travo/adguardhome.yaml"
 )
 
 // AdGuardChecker abstracts filesystem/process checks for testability.
@@ -418,7 +420,15 @@ verbose: false
 func (s *AdGuardService) AutoConfigure() error {
 	if !s.checker.FileExists(adguardYAMLPathUCI) && !s.checker.FileExists(adguardYAMLPathOpt) {
 		_, _ = s.checker.RunCommand("mkdir", "-p", "/opt/AdGuardHome")
-		if err := s.checker.WriteFile(adguardYAMLPathOpt, []byte(defaultAdGuardConfig), 0600); err != nil {
+		// Prefer the bundled template shipped with the tarball; fall back to the
+		// embedded constant so AutoConfigure works in non-tarball environments too.
+		var configBytes []byte
+		if bundled, err := s.checker.ReadFile(adguardBundledTemplate); err == nil {
+			configBytes = bundled
+		} else {
+			configBytes = []byte(defaultAdGuardConfig)
+		}
+		if err := s.checker.WriteFile(adguardYAMLPathOpt, configBytes, 0600); err != nil {
 			return fmt.Errorf("writing default AdGuard config: %w", err)
 		}
 	}
@@ -465,4 +475,56 @@ func (s *AdGuardService) SetConfig(content string) error {
 	}
 	s.refreshEndpointsFromYAML()
 	return nil
+}
+
+// SetPassword hashes password with bcrypt (default cost) and writes it into the
+// AdGuard Home YAML config under the first matching user, then restarts the service.
+func (s *AdGuardService) SetPassword(username, password string) error {
+	if password == "" {
+		return fmt.Errorf("password must not be empty")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hashing password: %w", err)
+	}
+
+	configStr, err := s.GetConfig()
+	if err != nil {
+		return fmt.Errorf("reading AdGuard config: %w", err)
+	}
+
+	// Unmarshal into a generic map so all unrecognised keys are preserved.
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal([]byte(configStr), &doc); err != nil {
+		return fmt.Errorf("parsing AdGuard config: %w", err)
+	}
+
+	users, _ := doc["users"].([]interface{})
+	updated := false
+	for _, u := range users {
+		m, ok := u.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if m["name"] == username {
+			m["password"] = string(hash)
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		// User not found — append a new entry.
+		users = append(users, map[string]interface{}{
+			"name":     username,
+			"password": string(hash),
+		})
+		doc["users"] = users
+	}
+
+	out, err := yaml.Marshal(doc)
+	if err != nil {
+		return fmt.Errorf("serialising AdGuard config: %w", err)
+	}
+	return s.SetConfig(string(out))
 }

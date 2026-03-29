@@ -18,9 +18,12 @@ SSH into your OpenWRT router and run:
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
 ```
 
-This installs the Travel GUI on port 80, AdGuard Home on port 3000 (DNS on 53),
+This installs Travo on port 80, AdGuard Home on port 3000 (DNS on 5353 via dnsmasq forwarding),
 and moves LuCI to port 8080. See [docs/deployment.md](docs/deployment.md) for
 all options and manual install instructions.
+
+> **Default AdGuard credentials:** `admin` / `password` — change immediately via
+> **Settings → AdGuard Password** in the Travo UI.
 
 ## General
 

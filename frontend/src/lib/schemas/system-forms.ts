@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+/** AdGuard Home password change (no current password required — admin-level). */
+export const changeAdGuardPasswordSchema = z
+  .object({
+    new_password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirm_password: z.string().min(1, 'Confirm your new password'),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: 'Passwords do not match',
+    path: ['confirm_password'],
+  });
+
+export type ChangeAdGuardPasswordFormValues = z.infer<typeof changeAdGuardPasswordSchema>;
+
 /** System page — change admin password (API allows new password ≥ 6 chars). */
 export const changeAdminPasswordSchema = z
   .object({
