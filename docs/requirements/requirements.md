@@ -136,6 +136,12 @@ Outstanding numbered tasks (see matching sections below for detail):
 
 ---
 
+## 16. General 
+
+- [ ] Investigate if it does make sense to introduce a very lightweight database something like SQLite to store passwords for travo and the data we collected like cpu, traffic usage etc. This needs to be thoroughly investigate because of size usage etc if it would make sense and is feasible. 
+
+---
+
 ## Performance & Size Constraints
 
 > Router devices have limited CPU, RAM (128–512 MB), and storage (16–128 MB flash).  
