@@ -41,6 +41,7 @@ export function SQMSection({ sqmService, onInstall, streamActionActive }: Props)
 
   const [draft, setDraft] = useState<SQMConfig | null>(null);
   const current = draft ?? data ?? DEFAULT_CFG;
+  const hasUnsavedChanges = draft !== null;
 
   const disabled = useMemo(() => {
     return (
@@ -84,6 +85,11 @@ export function SQMSection({ sqmService, onInstall, streamActionActive }: Props)
       </CardHeader>
       <CardContent className="space-y-4">
         {data?.advanced_hint ? <p className="text-sm">{data.advanced_hint}</p> : null}
+        {isLoading ? <p className="text-sm">Loading SQM configuration…</p> : null}
+        {isError ? <p className="text-sm">Failed to load SQM configuration.</p> : null}
+        {hasUnsavedChanges ? (
+          <p className="text-sm">You have unsaved changes. Save before applying.</p>
+        ) : null}
 
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
@@ -201,7 +207,10 @@ export function SQMSection({ sqmService, onInstall, streamActionActive }: Props)
           >
             Save
           </Button>
-          <Button disabled={disabled || !canEdit} onClick={() => apply.mutate()}>
+          <Button
+            disabled={disabled || !canEdit || hasUnsavedChanges}
+            onClick={() => apply.mutate()}
+          >
             Apply
           </Button>
         </div>

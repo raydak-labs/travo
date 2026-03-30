@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -57,12 +58,25 @@ func (s *SQMService) findQueueSection() (string, map[string]string) {
 	if err != nil || len(sections) == 0 {
 		return "", nil
 	}
+
+	// Prefer the conventional "default" section if present.
+	if opts, ok := sections[sqmDefaultSectionName]; ok && opts[".type"] == sqmSectionTypeQueue {
+		return sqmDefaultSectionName, opts
+	}
+
+	// Deterministic fallback: pick the lexicographically first queue section.
+	var names []string
 	for name, opts := range sections {
 		if opts[".type"] == sqmSectionTypeQueue {
-			return name, opts
+			names = append(names, name)
 		}
 	}
-	return "", nil
+	if len(names) == 0 {
+		return "", nil
+	}
+	sort.Strings(names)
+	name := names[0]
+	return name, sections[name]
 }
 
 func (s *SQMService) ensureQueueSection() (string, error) {
@@ -117,6 +131,9 @@ func validateSQMConfig(cfg models.SQMConfig) error {
 		if cfg.Interface == "" {
 			return fmt.Errorf("interface is required when SQM is enabled")
 		}
+		if cfg.DownloadKbit == 0 && cfg.UploadKbit == 0 {
+			return fmt.Errorf("set at least one bandwidth (download or upload) when SQM is enabled")
+		}
 	}
 	if cfg.DownloadKbit < 0 || cfg.UploadKbit < 0 {
 		return fmt.Errorf("bandwidth must be >= 0")
@@ -165,17 +182,36 @@ func (s *SQMService) SetConfig(cfg models.SQMConfig) error {
 	if cfg.Enabled {
 		enabled = "1"
 	}
-	_ = s.uci.Set(sqmConfigName, section, "enabled", enabled)
-	_ = s.uci.Set(sqmConfigName, section, "interface", cfg.Interface)
-	_ = s.uci.Set(sqmConfigName, section, "download", strconv.Itoa(cfg.DownloadKbit))
-	_ = s.uci.Set(sqmConfigName, section, "upload", strconv.Itoa(cfg.UploadKbit))
-	_ = s.uci.Set(sqmConfigName, section, "qdisc", cfg.Qdisc)
-	_ = s.uci.Set(sqmConfigName, section, "script", cfg.Script)
-	return s.uci.Commit(sqmConfigName)
+	if err := s.uci.Set(sqmConfigName, section, "enabled", enabled); err != nil {
+		return err
+	}
+	if err := s.uci.Set(sqmConfigName, section, "interface", cfg.Interface); err != nil {
+		return err
+	}
+	if err := s.uci.Set(sqmConfigName, section, "download", strconv.Itoa(cfg.DownloadKbit)); err != nil {
+		return err
+	}
+	if err := s.uci.Set(sqmConfigName, section, "upload", strconv.Itoa(cfg.UploadKbit)); err != nil {
+		return err
+	}
+	if err := s.uci.Set(sqmConfigName, section, "qdisc", cfg.Qdisc); err != nil {
+		return err
+	}
+	if err := s.uci.Set(sqmConfigName, section, "script", cfg.Script); err != nil {
+		return err
+	}
+	if err := s.uci.Commit(sqmConfigName); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Apply commits UCI (already committed by SetConfig) and restarts sqm.
 func (s *SQMService) Apply() (string, error) {
+	// Quick sanity: fail clearly when init script is missing.
+	if _, err := s.cmd.Run(sqmInitScript, "enabled"); err != nil {
+		return "", fmt.Errorf("sqm init script not available (is sqm-scripts installed?)")
+	}
 	out, err := s.cmd.Run(sqmInitScript, "restart")
 	return strings.TrimSpace(string(out)), err
 }

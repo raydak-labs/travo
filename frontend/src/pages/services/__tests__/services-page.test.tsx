@@ -93,7 +93,9 @@ describe('ServicesPage', () => {
       expect(screen.getByText('Zero config VPN mesh network')).toBeInTheDocument();
       expect(screen.getByText('Network-wide ad and tracker blocker')).toBeInTheDocument();
       expect(screen.getByText('Fast, modern, secure VPN tunnel')).toBeInTheDocument();
-      expect(screen.getByText('Smart Queue Management to reduce latency (bufferbloat)')).toBeInTheDocument();
+      expect(
+        screen.getByText('Smart Queue Management to reduce latency (bufferbloat)'),
+      ).toBeInTheDocument();
     });
   });
 });

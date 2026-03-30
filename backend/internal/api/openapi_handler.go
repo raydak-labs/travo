@@ -239,7 +239,7 @@ var openAPISpec = map[string]interface{}{
 			"get": endpoint("GetSQMConfig", "Get SQM (traffic shaping) configuration", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetSQMConfig", "Update SQM configuration (does not restart sqm)", true,
 				body("application/json", nil),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		"/sqm/apply": map[string]interface{}{

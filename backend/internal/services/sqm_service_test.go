@@ -76,6 +76,9 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 		RunFunc: func(name string, args ...string) ([]byte, error) {
 			gotName = name
 			gotArgs = args
+			if name == "/etc/init.d/sqm" && len(args) == 1 && args[0] == "enabled" {
+				return []byte("enabled"), nil
+			}
 			return []byte("ok"), nil
 		},
 	}
@@ -96,6 +99,9 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 	}
 
 	cmd.RunFunc = func(name string, args ...string) ([]byte, error) {
+		if name == "/etc/init.d/sqm" && len(args) == 1 && args[0] == "enabled" {
+			return []byte("enabled"), nil
+		}
 		return []byte("fail"), errors.New("boom")
 	}
 	_, err = s.Apply()
