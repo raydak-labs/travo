@@ -59,7 +59,7 @@ export function renderWithProviders(
     initialPath,
     routes: [
       { path: initialPath, component: TestComponent },
-      { path: '/dashboard', component: () => <div>Dashboard</div> },
+      { path: '/dashboard-2', component: () => <div>Dashboard</div> },
       { path: '/login', component: () => <div>Login</div> },
     ],
   });

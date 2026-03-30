@@ -298,7 +298,7 @@ export function ExperimentalPage() {
       {/* Page header */}
       <div className="flex items-center gap-3">
         <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400">
-          Experimental
+          Dashboard (NEW)
         </Badge>
         <span className="text-sm text-muted-foreground">
           Network overview — inspired by GL-iNet admin panel

@@ -40,7 +40,7 @@ function renderDashboard() {
 
   const dashboardRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/dashboard',
+    path: '/dashboard-1',
     component: DashboardPage,
   });
 
@@ -54,7 +54,7 @@ function renderDashboard() {
 
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/dashboard'] }),
+    history: createMemoryHistory({ initialEntries: ['/dashboard-1'] }),
   });
 
   return render(
