@@ -2,12 +2,15 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
 )
 
 // AuthService handles authentication and JWT tokens.
@@ -15,6 +18,7 @@ type AuthService struct {
 	passwordHash []byte
 	jwtSecret    []byte
 	blocklist    *TokenBlocklist
+	ubus         ubus.Ubus
 }
 
 // SetBlocklist attaches a token blocklist to the auth service.
@@ -44,15 +48,24 @@ func NewAuthServiceWithHash(passwordBcrypt, jwtSecret string) *AuthService {
 	}
 }
 
-// PasswordHashBcrypt returns the current bcrypt hash (for persistence).
-func (a *AuthService) PasswordHashBcrypt() string {
-	return string(a.passwordHash)
+// NewAuthServiceWithUbus validates credentials via rpcd/LuCI session login.
+func NewAuthServiceWithUbus(ub ubus.Ubus, jwtSecret string) *AuthService {
+	return &AuthService{
+		jwtSecret: []byte(jwtSecret),
+		ubus:      ub,
+	}
 }
 
 // Login verifies the password and returns a JWT token with expiry.
 func (a *AuthService) Login(password string) (string, time.Time, error) {
-	if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)); err != nil {
-		return "", time.Time{}, errors.New("invalid password")
+	if a.ubus != nil {
+		if err := a.verifyWithUbus(password); err != nil {
+			return "", time.Time{}, errors.New("invalid password")
+		}
+	} else {
+		if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)); err != nil {
+			return "", time.Time{}, errors.New("invalid password")
+		}
 	}
 
 	expiry := time.Now().Add(24 * time.Hour)
@@ -69,6 +82,42 @@ func (a *AuthService) Login(password string) (string, time.Time, error) {
 	}
 
 	return signed, expiry, nil
+}
+
+func (a *AuthService) verifyWithUbus(password string) error {
+	resp, err := a.ubus.Call("session", "login", map[string]interface{}{
+		"username": "root",
+		"password": password,
+	})
+	if err != nil {
+		return err
+	}
+	if s, _ := resp["ubus_rpc_session"].(string); s != "" {
+		return nil
+	}
+	// some ubus wrappers return result-array format
+	if sid := extractSessionID(resp); sid != "" {
+		return nil
+	}
+	return fmt.Errorf("login failed")
+}
+
+// extractSessionID finds ubus_rpc_session in a login response.
+// Handles top-level or result-array format.
+func extractSessionID(m map[string]interface{}) string {
+	if s, _ := m["ubus_rpc_session"].(string); s != "" {
+		return s
+	}
+	arr, ok := m["result"].([]interface{})
+	if !ok || len(arr) < 2 {
+		return ""
+	}
+	obj, ok := arr[1].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	s, _ := obj["ubus_rpc_session"].(string)
+	return s
 }
 
 // ValidateToken parses and validates a JWT token string.
@@ -112,6 +161,23 @@ func (a *AuthService) TokenExpiry(tokenStr string) (time.Time, error) {
 
 // ChangePassword verifies the current password and updates to the new one.
 func (a *AuthService) ChangePassword(currentPassword, newPassword string) error {
+	if a.ubus != nil {
+		if err := a.verifyWithUbus(currentPassword); err != nil {
+			return errors.New("invalid current password")
+		}
+		if len(newPassword) < 6 {
+			return errors.New("new password must be at least 6 characters")
+		}
+		_, err := a.ubus.Call("luci", "setPassword", map[string]interface{}{
+			"username": "root",
+			"password": newPassword,
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
 	if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(currentPassword)); err != nil {
 		return errors.New("invalid current password")
 	}

@@ -39,15 +39,15 @@ var openAPISpec = map[string]interface{}{
 			),
 		},
 		"/auth/logout": map[string]interface{}{
-			"post": endpoint("Logout", "Invalidate the current JWT token", true, nil, resp200("application/json", obj("ok"))),
+			"post": endpoint("Logout", "Invalidate the current JWT token", true, nil, resp200("application/json", obj("status"))),
 		},
 		"/auth/session": map[string]interface{}{
-			"get": endpoint("GetSession", "Get current session info", true, nil, resp200("application/json", obj("username", "expires_at"))),
+			"get": endpoint("GetSession", "Get current session info", true, nil, resp200("application/json", obj("valid"))),
 		},
 		"/auth/password": map[string]interface{}{
 			"put": endpoint("ChangePassword", "Change the admin password", true,
 				body("application/json", obj("current_password", "new_password")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		// System

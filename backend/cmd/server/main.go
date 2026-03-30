@@ -94,7 +94,12 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	if err != nil {
 		log.Fatalf("failed to load auth config: %v", err)
 	}
-	authSvc := auth.NewAuthServiceWithHash(authCfg.PasswordBcrypt, authCfg.JWTSecret)
+	var authSvc *auth.AuthService
+	if cfg.MockMode {
+		authSvc = auth.NewAuthService("admin", authCfg.JWTSecret)
+	} else {
+		authSvc = auth.NewAuthServiceWithUbus(ub, authCfg.JWTSecret)
+	}
 	var storage services.StorageProvider
 	var captiveProber services.HTTPProber
 	if cfg.MockMode {
