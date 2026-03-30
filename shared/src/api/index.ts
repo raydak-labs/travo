@@ -1,5 +1,6 @@
 export * from './system';
 export * from './network';
+export * from './sqm';
 export * from './wifi';
 export * from './vpn';
 export * from './services';

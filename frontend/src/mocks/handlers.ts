@@ -33,6 +33,7 @@ import {
   mockKillSwitchStatus,
   mockDDNSConfig,
   mockDDNSStatus,
+  mockSQMConfig,
 } from './data';
 
 export const handlers = [
@@ -83,6 +84,19 @@ export const handlers = [
 
   http.get(API_ROUTES.network.status, () => {
     return HttpResponse.json(mockNetworkStatus);
+  }),
+
+  http.get(API_ROUTES.sqm.config, () => {
+    return HttpResponse.json(mockSQMConfig);
+  }),
+
+  http.put(API_ROUTES.sqm.config, async ({ request }) => {
+    const body = (await request.json()) as typeof mockSQMConfig;
+    return HttpResponse.json({ status: 'ok', saved: body });
+  }),
+
+  http.post(API_ROUTES.sqm.apply, () => {
+    return HttpResponse.json({ ok: true, output: 'restarted' });
   }),
 
   http.get(API_ROUTES.wifi.scan, () => {

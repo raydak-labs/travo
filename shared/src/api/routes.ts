@@ -64,6 +64,10 @@ export const API_ROUTES = {
     ipv6: '/api/v1/network/ipv6',
     wol: '/api/v1/network/wol',
   },
+  sqm: {
+    config: '/api/v1/sqm/config',
+    apply: '/api/v1/sqm/apply',
+  },
   wifi: {
     scan: '/api/v1/wifi/scan',
     connect: '/api/v1/wifi/connect',
