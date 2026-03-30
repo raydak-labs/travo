@@ -13,11 +13,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.MockMode {
 		t.Error("expected MockMode to be false by default")
 	}
-	if cfg.Password != "admin" {
-		t.Errorf("expected default password 'admin', got %q", cfg.Password)
-	}
-	if cfg.JWTSecret == "" {
-		t.Error("expected JWTSecret to be non-empty")
+	if cfg.AuthConfigPath == "" {
+		t.Error("expected AuthConfigPath to be non-empty")
 	}
 	if cfg.StaticDir != "" {
 		t.Errorf("expected empty StaticDir, got %q", cfg.StaticDir)
@@ -41,11 +38,8 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	if cfg.MockMode {
 		t.Error("expected MockMode to be false")
 	}
-	if cfg.Password != "admin" {
-		t.Errorf("expected default password 'admin', got %q", cfg.Password)
-	}
-	if cfg.JWTSecret == "" {
-		t.Error("expected JWTSecret to be non-empty")
+	if cfg.AuthConfigPath == "" {
+		t.Error("expected AuthConfigPath to be non-empty")
 	}
 	if cfg.StaticDir != "" {
 		t.Errorf("expected empty StaticDir, got %q", cfg.StaticDir)
@@ -59,8 +53,7 @@ func TestLoadConfig_EnvOverridesDefaults(t *testing.T) {
 	// Env vars should override defaults
 	t.Setenv("PORT", "8080")
 	t.Setenv("MOCK_MODE", "true")
-	t.Setenv("PASSWORD", "secret123")
-	t.Setenv("JWT_SECRET", "mysecret")
+	t.Setenv("AUTH_CONFIG_PATH", "/tmp/auth.json")
 	t.Setenv("STATIC_DIR", "/var/www")
 	t.Setenv("CORS_ORIGINS", "http://localhost")
 
@@ -77,11 +70,8 @@ func TestLoadConfig_EnvOverridesDefaults(t *testing.T) {
 	if !cfg.MockMode {
 		t.Error("expected MockMode to be true")
 	}
-	if cfg.Password != "secret123" {
-		t.Errorf("expected password 'secret123', got %q", cfg.Password)
-	}
-	if cfg.JWTSecret != "mysecret" {
-		t.Errorf("expected JWTSecret 'mysecret', got %q", cfg.JWTSecret)
+	if cfg.AuthConfigPath != "/tmp/auth.json" {
+		t.Errorf("expected AuthConfigPath '/tmp/auth.json', got %q", cfg.AuthConfigPath)
 	}
 	if cfg.StaticDir != "/var/www" {
 		t.Errorf("expected StaticDir '/var/www', got %q", cfg.StaticDir)
@@ -94,15 +84,13 @@ func TestLoadConfig_EnvOverridesDefaults(t *testing.T) {
 func TestLoadConfig_FlagsOverrideEnv(t *testing.T) {
 	// CLI flags should override env vars
 	t.Setenv("PORT", "8080")
-	t.Setenv("PASSWORD", "envpassword")
-	t.Setenv("JWT_SECRET", "envsecret")
+	t.Setenv("AUTH_CONFIG_PATH", "/env/auth.json")
 	t.Setenv("STATIC_DIR", "/env/www")
 	t.Setenv("CORS_ORIGINS", "http://env")
 
 	args := []string{
 		"--port", "9090",
-		"--password", "flagpassword",
-		"--jwt-secret", "flagsecret",
+		"--auth-config-path", "/flag/auth.json",
 		"--static-dir", "/flag/www",
 		"--cors-origins", "http://flag",
 		"--mock",
@@ -121,11 +109,8 @@ func TestLoadConfig_FlagsOverrideEnv(t *testing.T) {
 	if !cfg.MockMode {
 		t.Error("expected MockMode to be true")
 	}
-	if cfg.Password != "flagpassword" {
-		t.Errorf("expected password 'flagpassword', got %q", cfg.Password)
-	}
-	if cfg.JWTSecret != "flagsecret" {
-		t.Errorf("expected JWTSecret 'flagsecret', got %q", cfg.JWTSecret)
+	if cfg.AuthConfigPath != "/flag/auth.json" {
+		t.Errorf("expected AuthConfigPath '/flag/auth.json', got %q", cfg.AuthConfigPath)
 	}
 	if cfg.StaticDir != "/flag/www" {
 		t.Errorf("expected StaticDir '/flag/www', got %q", cfg.StaticDir)
@@ -150,7 +135,7 @@ func TestLoadConfig_VersionFlag(t *testing.T) {
 func TestLoadConfig_FlagsPartialOverride(t *testing.T) {
 	// Only some flags set — env should fill the rest
 	t.Setenv("PORT", "8080")
-	t.Setenv("PASSWORD", "envpassword")
+	t.Setenv("AUTH_CONFIG_PATH", "/env/auth.json")
 
 	args := []string{"--port", "9090"}
 
@@ -161,15 +146,15 @@ func TestLoadConfig_FlagsPartialOverride(t *testing.T) {
 	if cfg.Port != 9090 {
 		t.Errorf("expected port 9090 (flag), got %d", cfg.Port)
 	}
-	if cfg.Password != "envpassword" {
-		t.Errorf("expected password 'envpassword' (env), got %q", cfg.Password)
+	if cfg.AuthConfigPath != "/env/auth.json" {
+		t.Errorf("expected AuthConfigPath '/env/auth.json' (env), got %q", cfg.AuthConfigPath)
 	}
 }
 
 // clearConfigEnv unsets all config-related env vars for a clean test.
 func clearConfigEnv(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"PORT", "MOCK_MODE", "PASSWORD", "JWT_SECRET", "STATIC_DIR", "CORS_ORIGINS"} {
+	for _, key := range []string{"PORT", "MOCK_MODE", "AUTH_CONFIG_PATH", "STATIC_DIR", "CORS_ORIGINS"} {
 		t.Setenv(key, "")
 		os.Unsetenv(key)
 	}

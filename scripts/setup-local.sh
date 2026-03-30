@@ -7,7 +7,7 @@
 # What it does:
 #   1. Moves LuCI (uhttpd) to port 8080 so travel-gui can use port 80
 #   2. Uploads the init.d service script
-#   3. Uploads the UCI config (password, port, etc.)
+#   3. Uploads the UCI config (port, etc.) and sets root password on the device
 #   4. Creates /www/travo
 #   5. Ensures initial wireless AP state (radios + default_radio0/1, default SSID/key)
 #   6. Enables the service (does not start — no binary yet)
@@ -48,7 +48,7 @@ Usage: $(basename "$0") [options]
 Options:
   --ip IP              Router IP address (default: 192.168.1.1)
   --user USER          SSH user (default: root)
-  --password PASSWORD  Admin password for travel-gui (default: admin)
+  --password PASSWORD  Root password for LuCI and Travo login (default: admin)
   --wifi-ssid NAME     Base SSID for APs: 2.4 GHz = NAME, 5 GHz = NAME-5G (default: OpenWrt-Travel / OpenWrt-Travel-5G)
   --wifi-password KEY  WPA2 key for all APs (default: travelrouter from setup-wireless-ap.sh)
   --no-luci-move       Skip moving LuCI to port 8080
@@ -147,17 +147,19 @@ info "Uploading init.d service script..."
 scp_cmd "$INITD_SRC" "${REMOTE}:/etc/init.d/travo"
 ssh_cmd "chmod +x /etc/init.d/travo"
 
-# Step 3: Upload UCI config (with configured password)
-info "Uploading UCI config (password: ${PASSWORD})..."
-# Write config to a temp file with the configured password substituted in
-TMPCONFIG=$(mktemp)
-trap 'rm -f "$TMPCONFIG"' EXIT
-sed "s/option password 'admin'/option password '${PASSWORD}'/" "$CONFIG_SRC" > "$TMPCONFIG"
-scp_cmd "$TMPCONFIG" "${REMOTE}:/etc/config/travo"
+# Step 3: Upload UCI config
+info "Uploading UCI config..."
+scp_cmd "$CONFIG_SRC" "${REMOTE}:/etc/config/travo"
+
+# Step 3b: Root password (same credential as LuCI / Travo API)
+info "Setting root password on device..."
+if ! printf '%s\n%s\n' "$PASSWORD" "$PASSWORD" | ssh $SSH_OPTS "${REMOTE}" 'passwd root' 2>/dev/null; then
+  warn "Could not set root password via SSH — run: ssh ${REMOTE} 'passwd root'"
+fi
 
 # Step 4: Create web asset directory
-info "Creating /www/travo..."
-ssh_cmd "mkdir -p /www/travo"
+info "Creating /www/travo and /etc/travo..."
+ssh_cmd "mkdir -p /www/travo /etc/travo && chmod 700 /etc/travo"
 
 # Step 5: Initial wireless AP state (radios + default_radio0 / default_radio1, no STA changes)
 info "Ensuring initial wireless AP state..."

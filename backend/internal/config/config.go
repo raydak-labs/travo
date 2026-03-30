@@ -14,8 +14,7 @@ import (
 type Config struct {
 	Port              int
 	MockMode          bool
-	Password          string
-	JWTSecret         string
+	AuthConfigPath    string
 	StaticDir         string
 	CorsOrigins       string
 	AllowedAdminCIDRs string
@@ -31,8 +30,7 @@ func DefaultConfig() Config {
 	return Config{
 		Port:              3000,
 		MockMode:          false,
-		Password:          "admin",
-		JWTSecret:         generateRandomSecret(),
+		AuthConfigPath:    "/etc/travo/auth.json",
 		StaticDir:         "",
 		CorsOrigins:       "*",
 		AllowedAdminCIDRs: "",
@@ -58,11 +56,8 @@ func LoadConfig(args []string) (Config, bool, error) {
 	if v := os.Getenv("MOCK_MODE"); v != "" {
 		cfg.MockMode = strings.EqualFold(v, "true") || v == "1"
 	}
-	if v := os.Getenv("PASSWORD"); v != "" {
-		cfg.Password = v
-	}
-	if v := os.Getenv("JWT_SECRET"); v != "" {
-		cfg.JWTSecret = v
+	if v := os.Getenv("AUTH_CONFIG_PATH"); v != "" {
+		cfg.AuthConfigPath = v
 	}
 	if v := os.Getenv("STATIC_DIR"); v != "" {
 		cfg.StaticDir = v
@@ -93,8 +88,7 @@ func LoadConfig(args []string) (Config, bool, error) {
 
 	port := fs.Int("port", cfg.Port, "HTTP listen port")
 	mock := fs.Bool("mock", cfg.MockMode, "Enable mock mode")
-	password := fs.String("password", cfg.Password, "Admin password")
-	jwtSecret := fs.String("jwt-secret", cfg.JWTSecret, "JWT signing secret")
+	authConfigPath := fs.String("auth-config-path", cfg.AuthConfigPath, "Path to auth config file (stores password hash + JWT secret)")
 	staticDir := fs.String("static-dir", cfg.StaticDir, "Path to static frontend files")
 	corsOrigins := fs.String("cors-origins", cfg.CorsOrigins, "CORS allowed origins")
 	allowedCIDRs := fs.String("allowed-admin-cidrs", cfg.AllowedAdminCIDRs, "Comma-separated admin IP/CIDR allowlist (empty disables)")
@@ -110,8 +104,7 @@ func LoadConfig(args []string) (Config, bool, error) {
 
 	cfg.Port = *port
 	cfg.MockMode = *mock
-	cfg.Password = *password
-	cfg.JWTSecret = *jwtSecret
+	cfg.AuthConfigPath = *authConfigPath
 	cfg.StaticDir = *staticDir
 	cfg.CorsOrigins = *corsOrigins
 	cfg.AllowedAdminCIDRs = *allowedCIDRs
@@ -130,6 +123,8 @@ func LoadConfigFromEnv() Config {
 	return cfg
 }
 
+// generateRandomSecret retained for backwards compatibility with tests that
+// expect a non-empty secret-like value from DefaultConfig.
 func generateRandomSecret() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

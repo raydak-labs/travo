@@ -72,7 +72,7 @@ func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
 }
 
 // ChangePasswordHandler handles PUT /api/v1/auth/password.
-func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
+func ChangePasswordHandler(authSvc *auth.AuthService, _ *auth.FileAuthStore) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ChangePasswordRequest
 		if err := c.Bind().Body(&req); err != nil {

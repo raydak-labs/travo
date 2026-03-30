@@ -11,7 +11,7 @@ wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/instal
 Or with options:
 
 ```sh
-# Install a specific version with a custom password, non-interactive
+# Install a specific version with a custom OpenWrt root password, non-interactive
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
   sh -s -- --yes --version 1.0.0 --password mysecret
 
@@ -33,8 +33,8 @@ The install script:
 2. Installs it via `opkg`
 3. Moves LuCI (uhttpd) to port 8080/8443
 4. Downloads and installs AdGuard Home
-5. Sets an admin password (default: `admin`)
-6. Starts the Travel GUI service
+5. Sets the OpenWrt root password (default: `admin`), used by LuCI and Travo login
+6. Starts the Travel GUI service (JWT secret is created on first start)
 
 ## Manual Installation from .ipk
 
@@ -60,17 +60,18 @@ UCI config is at `/etc/config/travo`:
 config travel_gui 'main'
     option enabled '1'
     option port '80'
-    option password 'admin'
-    option jwt_secret ''
 ```
+
+The JWT signing secret is stored in `/etc/travo/auth.json` and is auto-created on first `travo` start.
 
 ### Change password
+Travo login uses the OpenWrt/LuCI **root** password, so change it via LuCI/System settings (or CLI):
 
 ```sh
-uci set travo.main.password='newpassword'
-uci commit travo
-/etc/init.d/travo restart
+passwd root
 ```
+
+Restarting the `travo` service is optional; the backend validates via rpcd/LuCI when logging in.
 
 ### Change port
 
