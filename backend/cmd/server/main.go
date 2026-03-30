@@ -46,6 +46,10 @@ func splitCORSOrigins(s string) []string {
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
+	cfg.MockMode = true
+	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
+		cfg.AuthConfigPath = tmpDir + "/auth.json"
+	}
 	app, _, _, _, _, _, netWatcher := setupAppWithConfig(cfg)
 	// Stop the watcher goroutine immediately — setupApp is only used in tests.
 	netWatcher.Stop()
@@ -85,7 +89,12 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	}
 
 	// Create services
-	authSvc := auth.NewAuthService(cfg.Password, cfg.JWTSecret)
+	authStore := auth.NewFileAuthStore(cfg.AuthConfigPath)
+	authCfg, err := authStore.LoadOrInit()
+	if err != nil {
+		log.Fatalf("failed to load auth config: %v", err)
+	}
+	authSvc := auth.NewAuthServiceWithHash(authCfg.PasswordBcrypt, authCfg.JWTSecret)
 	var storage services.StorageProvider
 	var captiveProber services.HTTPProber
 	if cfg.MockMode {
@@ -182,6 +191,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	// API routes
 	deps := &api.Dependencies{
 		Auth:           authSvc,
+		AuthStore:      authStore,
 		Blocklist:      blocklist,
 		RateLimiter:    rateLimiter,
 		System:         systemSvc,

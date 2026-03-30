@@ -31,12 +31,15 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	autoReconnectPath := tmpDir + "/autoreconnect.json"
 	reconnectScriptPath := tmpDir + "/wifi-reconnect.sh"
 	bandSwitchConfigPath := tmpDir + "/band-switching.json"
+	authConfigPath := tmpDir + "/auth.json"
+	authStore := auth.NewFileAuthStore(authConfigPath)
 
 	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
 	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
 
 	deps := &Dependencies{
 		Auth:        authSvc,
+		AuthStore:   authStore,
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
 		System:      systemSvc,

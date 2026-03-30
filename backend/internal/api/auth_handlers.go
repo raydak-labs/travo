@@ -72,7 +72,7 @@ func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
 }
 
 // ChangePasswordHandler handles PUT /api/v1/auth/password.
-func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
+func ChangePasswordHandler(authSvc *auth.AuthService, store *auth.FileAuthStore) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ChangePasswordRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -84,6 +84,11 @@ func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
 				status = fiber.StatusUnauthorized
 			}
 			return c.Status(status).JSON(fiber.Map{"error": err.Error()})
+		}
+		if store != nil {
+			if err := store.SavePasswordHash(authSvc.PasswordHashBcrypt()); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			}
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}

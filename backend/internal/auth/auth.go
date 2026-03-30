@@ -36,6 +36,19 @@ func NewAuthService(password, jwtSecret string) *AuthService {
 	}
 }
 
+// NewAuthServiceWithHash creates an AuthService with an existing bcrypt hash.
+func NewAuthServiceWithHash(passwordBcrypt, jwtSecret string) *AuthService {
+	return &AuthService{
+		passwordHash: []byte(passwordBcrypt),
+		jwtSecret:    []byte(jwtSecret),
+	}
+}
+
+// PasswordHashBcrypt returns the current bcrypt hash (for persistence).
+func (a *AuthService) PasswordHashBcrypt() string {
+	return string(a.passwordHash)
+}
+
 // Login verifies the password and returns a JWT token with expiry.
 func (a *AuthService) Login(password string) (string, time.Time, error) {
 	if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)); err != nil {
