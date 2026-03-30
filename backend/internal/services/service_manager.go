@@ -72,7 +72,8 @@ var knownServices = []serviceDefinition{
 		ID:          "sqm",
 		Name:        "SQM (Traffic Shaping)",
 		Description: "Smart Queue Management to reduce latency (bufferbloat)",
-		Packages:    []string{"sqm-scripts"},
+		Packages:    []string{"sqm-scripts", "luci-app-sqm"},
+		DetectPackage: "sqm-scripts",
 		InitName:    "sqm",
 	},
 }

@@ -27,6 +27,11 @@ export function ServiceCardActionButtons({
           <Link to="/services/tailscale">Manage</Link>
         </Button>
       )}
+      {service.id === 'sqm' && service.state !== 'not_installed' && (
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/services/sqm">Configure</Link>
+        </Button>
+      )}
       {service.state === 'not_installed' && (
         <Button size="sm" disabled={isPending} onClick={() => onInstall(service.id)}>
           {isPending ? 'Installing...' : 'Install'}

@@ -1,8 +1,13 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { cn } from '@/lib/cn';
-import { NAV_ENTRIES, flattenNavRoutes, isRouteActive } from '@/components/layout/nav-config';
+import {
+  NAV_ENTRIES,
+  flattenNavRoutesWithSqm,
+  isRouteActive,
+} from '@/components/layout/nav-config';
 import { SidebarNavGroup } from '@/components/layout/sidebar-nav-group';
 import { useSidebarGroups } from '@/components/layout/use-sidebar-groups';
+import { useServices } from '@/hooks/use-services';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface SidebarProps {
@@ -17,6 +22,9 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const inDrawer = !!onNavClick;
   const { groupOpen, setGroup } = useSidebarGroups(pathname);
+  const { data: services } = useServices();
+  const sqmInstalled =
+    services?.some((s) => s.id === 'sqm' && s.state !== 'not_installed') ?? false;
 
   const linkClass = (active: boolean, rail: boolean) =>
     cn(
@@ -29,7 +37,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
     );
 
   const collapsedRail = collapsed && !inDrawer;
-  const flat = flattenNavRoutes();
+  const flat = flattenNavRoutesWithSqm(sqmInstalled);
 
   return (
     <aside
@@ -105,10 +113,18 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
                 );
               }
 
+              const group =
+                entry.id === 'services' && sqmInstalled
+                  ? {
+                      ...entry,
+                      items: [...entry.items, { to: '/services/sqm', label: 'SQM' }],
+                    }
+                  : entry;
+
               return (
                 <SidebarNavGroup
                   key={entry.id}
-                  group={entry}
+                  group={group}
                   pathname={pathname}
                   open={groupOpen[entry.id] ?? true}
                   onOpenChange={(o) => setGroup(entry.id, o)}

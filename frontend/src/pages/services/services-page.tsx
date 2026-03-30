@@ -11,7 +11,6 @@ import {
 import { InstallLogDialog } from '@/pages/services/install-log-dialog';
 import { ServicesInstalledCard } from '@/pages/services/services-installed-card';
 import { WireguardPostInstallDialog } from '@/pages/services/wireguard-post-install-dialog';
-import { SQMSection } from '@/pages/services/sqm-section';
 
 interface StreamAction {
   serviceId: string;
@@ -69,12 +68,6 @@ export function ServicesPage() {
         onAutoStartChange={(id, enabled) => setAutoStartMutation.mutate({ id, enabled })}
         isPending={isPending}
         isAutoStartPending={setAutoStartMutation.isPending}
-        streamActionActive={streamAction !== null}
-      />
-
-      <SQMSection
-        sqmService={services.find((s) => s.id === 'sqm')}
-        onInstall={handleInstall}
         streamActionActive={streamAction !== null}
       />
 

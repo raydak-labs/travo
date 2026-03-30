@@ -15,6 +15,9 @@ export const ServicesPage = lazy(() =>
 export const TailscalePage = lazy(() =>
   import('@/pages/services/tailscale-page').then((m) => ({ default: m.TailscalePage })),
 );
+export const SQMPage = lazy(() =>
+  import('@/pages/services/sqm-page').then((m) => ({ default: m.SQMPage })),
+);
 export const NetworkPage = lazy(() =>
   import('@/pages/network/network-page').then((m) => ({ default: m.NetworkPage })),
 );

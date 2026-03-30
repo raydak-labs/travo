@@ -14,9 +14,7 @@ import type { ServiceInfo, SQMConfig, SQMQdisc, SQMScript } from '@shared/index'
 import { useApplySQM, useSQMConfig, useSetSQMConfig } from '@/hooks/use-sqm';
 
 type Props = {
-  sqmService: ServiceInfo | undefined;
-  onInstall: (id: string) => void;
-  streamActionActive: boolean;
+  sqmService: ServiceInfo;
 };
 
 const DEFAULT_CFG: SQMConfig = {
@@ -33,8 +31,8 @@ function toInt(s: string) {
   return Number.isFinite(v) ? v : 0;
 }
 
-export function SQMSection({ sqmService, onInstall, streamActionActive }: Props) {
-  const installed = sqmService?.state !== 'not_installed';
+export function SQMSection({ sqmService }: Props) {
+  const installed = sqmService.state !== 'not_installed';
   const { data, isLoading, isError } = useSQMConfig(installed);
   const setCfg = useSetSQMConfig();
   const apply = useApplySQM();
@@ -44,36 +42,10 @@ export function SQMSection({ sqmService, onInstall, streamActionActive }: Props)
   const hasUnsavedChanges = draft !== null;
 
   const disabled = useMemo(() => {
-    return (
-      streamActionActive ||
-      setCfg.isPending ||
-      apply.isPending ||
-      sqmService?.state === 'not_installed' ||
-      sqmService === undefined
-    );
-  }, [apply.isPending, setCfg.isPending, sqmService, streamActionActive]);
+    return setCfg.isPending || apply.isPending;
+  }, [apply.isPending, setCfg.isPending]);
 
   const canEdit = installed && !isLoading && !isError;
-
-  if (!sqmService || sqmService.state === 'not_installed') {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">SQM (Traffic Shaping)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            Reduce latency (bufferbloat) on slow or variable WAN links by shaping traffic.
-          </p>
-          <div className="flex gap-2">
-            <Button onClick={() => onInstall('sqm')} disabled={streamActionActive}>
-              Install SQM
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const qdisc = current.qdisc as SQMQdisc;
   const script = current.script as SQMScript;
