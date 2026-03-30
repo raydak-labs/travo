@@ -71,6 +71,18 @@ add_cleanup() {
     CLEANUP_FILES="$CLEANUP_FILES $1"
 }
 
+# Set root password (LuCI + Travo API login). Best-effort for BusyBox/OpenWrt.
+set_root_password() {
+    _p="$1"
+    if printf '%s\n%s\n' "$_p" "$_p" | passwd root 2>/dev/null; then
+        return 0
+    fi
+    if command -v chpasswd >/dev/null 2>&1; then
+        printf 'root:%s\n' "$_p" | chpasswd 2>/dev/null && return 0
+    fi
+    return 1
+}
+
 # ============================================================
 # Parse arguments
 # ============================================================
@@ -119,7 +131,7 @@ Usage: install.sh [OPTIONS]
 
 Options:
   --version VERSION   Install a specific version (default: latest)
-  --password PASSWORD Set the admin password (default: prompt or "admin")
+  --password PASSWORD Set the root password for LuCI and Travo login (default: prompt or "admin")
   --no-adguard        Skip AdGuard Home installation
   --no-luci-move      Skip moving LuCI to port 8080
   --uninstall         Remove Travo and restore defaults
@@ -338,18 +350,22 @@ do_install() {
     /etc/init.d/travo enable 2>/dev/null || true
     success "Files installed"
 
-    # --- Step 3: Set password ---
+    # --- Step 3: Set root password (LuCI + Travo) ---
     _pw="$PASSWORD"
     if [ -z "$_pw" ]; then
         if [ -t 0 ] && [ "$YES" = 0 ]; then
-            printf "Enter admin password (default: admin): "
+            printf "Enter root password for LuCI and Travo (default: admin): "
             read -r _pw </dev/tty || _pw=""
         fi
         [ -z "$_pw" ] && _pw="admin"
     fi
-    uci set "${PKG_NAME}.main.password=${_pw}"
-    uci commit "$PKG_NAME"
-    success "Admin password configured"
+    mkdir -p /etc/travo
+    chmod 700 /etc/travo 2>/dev/null || true
+    if set_root_password "$_pw"; then
+        success "Root password configured (LuCI + Travo login)"
+    else
+        warn "Could not set root password non-interactively — run: passwd root"
+    fi
 
     # --- Step 4: Move LuCI to port 8080 ---
     if [ "$MOVE_LUCI" = 1 ]; then
@@ -396,9 +412,9 @@ do_install() {
     echo ""
     printf "  ${BLUE}Travo:${NC}         http://${_lan_ip}\n"
     if [ "$_pw" != "admin" ]; then
-        printf "  ${BLUE}Password:${NC}      (as configured)\n"
+        printf "  ${BLUE}Login:${NC}         root + your password (LuCI / Travo)\n"
     else
-        printf "  ${YELLOW}Password:${NC}      admin ${YELLOW}(change it in settings!)${NC}\n"
+        printf "  ${YELLOW}Login:${NC}         root / admin ${YELLOW}(change via passwd or System settings!)${NC}\n"
     fi
     if [ "$INSTALL_ADGUARD" = 1 ]; then
         printf "  ${BLUE}AdGuard Home:${NC}  http://${_lan_ip}:3000\n"
@@ -477,7 +493,7 @@ do_uninstall() {
 
     # Clean leftover files
     rm -rf /www/travo 2>/dev/null || true
-    rm -f /etc/config/travo 2>/dev/null || true
+    rm -f /etc/config/travo /etc/travo/auth.json 2>/dev/null || true
 
     echo ""
     printf "${GREEN}${BOLD}"

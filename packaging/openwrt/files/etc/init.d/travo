@@ -8,29 +8,23 @@ USE_PROCD=1
 PROG=/usr/bin/travo
 
 start_service() {
-    local enabled port password jwt_secret
+    local enabled port auth_config_path
 
     config_load travo
     config_get enabled main enabled '1'
     config_get port main port '80'
-    config_get password main password 'admin'
-    config_get jwt_secret main jwt_secret ''
+    config_get auth_config_path main auth_config_path '/etc/travo/auth.json'
 
     [ "$enabled" = "0" ] && return 0
 
-    # Generate and persist a JWT secret on first start
-    if [ -z "$jwt_secret" ]; then
-        jwt_secret=$(head -c 32 /dev/urandom | hexdump -e '32/1 "%02x"' 2>/dev/null || echo "fallback-secret-$(cat /proc/sys/kernel/random/uuid)")
-        uci set travo.main.jwt_secret="$jwt_secret"
-        uci commit travo
-    fi
+    mkdir -p /etc/travo
+    chmod 700 /etc/travo
 
     procd_open_instance
     procd_set_param command "$PROG"
     procd_append_param command --port "$port"
     procd_append_param command --static-dir /www/travo
-    procd_append_param command --password "$password"
-    procd_append_param command --jwt-secret "$jwt_secret"
+    procd_append_param command --auth-config-path "$auth_config_path"
     procd_set_param respawn
     procd_set_param stdout 1
     procd_set_param stderr 1
