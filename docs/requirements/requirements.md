@@ -34,7 +34,6 @@ Outstanding numbered tasks (see matching sections below for detail):
 - [ ] **Task 19** (§2.2) Clients: parental controls / client group policies  
 - [ ] **Task 21** (§3.3) VPN: OpenVPN support  
 - [ ] **Task 24** (§4.6) Future services: cloudflared (Cloudflare Tunnel)  
-- [ ] **Task 25** (§4.6) Future services: SQM / QoS (traffic shaping)  
 - [ ] **Task 26** (§4.6) Future services: Watchcat (connection watchdog)  
 
 ---
@@ -84,7 +83,6 @@ Outstanding numbered tasks (see matching sections below for detail):
 ### 4.6 Future Services
 
 - [ ] 🔮 Cloudflared (Cloudflare Tunnel)  
-- [ ] 🔮 SQM / QoS (traffic shaping)  
 - [ ] 🔮 Watchcat (connection watchdog)  
 
 ---
@@ -127,12 +125,6 @@ Outstanding numbered tasks (see matching sections below for detail):
 
 - [ ] 🔮 Custom button action scripting  
 - [ ] 🔮 Long-press vs short-press differentiation. See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-4--long-press-vs-short-press-future).  
-
----
-
-## 15. VPN, Wi‑Fi stability, SQM, performance & AdGuard (field issues)
-
-- [ ] **SQM / traffic shaping**: Offer SQM install (cake/fq_codel) with defaults suitable for most travel-router WANs; optional presets per scenario. Reference: [OpenWrt SQM](https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm).  
 
 ---
 
