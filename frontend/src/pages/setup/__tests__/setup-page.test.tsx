@@ -31,7 +31,7 @@ function renderSetup() {
 
   const dashboardRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/dashboard',
+    path: '/dashboard-2',
     component: () => <div>Dashboard</div>,
   });
 

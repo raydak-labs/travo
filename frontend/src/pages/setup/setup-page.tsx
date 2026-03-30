@@ -19,7 +19,7 @@ export function SetupPage() {
   const handleFinish = () => {
     completeSetup.mutate(undefined, {
       onSuccess: () => {
-        void navigate({ to: '/dashboard' });
+        void navigate({ to: '/dashboard-2' });
       },
       onError: () => {
         toast.error('Failed to mark setup as complete');

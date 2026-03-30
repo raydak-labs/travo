@@ -47,7 +47,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/dashboard' });
+    throw redirect({ to: '/dashboard-2' });
   },
 });
 
@@ -67,10 +67,32 @@ function shellPage(title: string, PageComponent: ComponentType) {
   );
 }
 
-const dashboardRoute = createRoute({
+const dashboardV1Route = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/dashboard-1',
+  component: shellPage('Dashboard', DashboardPage),
+});
+
+const dashboardV2Route = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/dashboard-2',
+  component: shellPage('Dashboard (NEW)', ExperimentalPage),
+});
+
+const dashboardLegacyRedirectRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/dashboard',
-  component: shellPage('Dashboard', DashboardPage),
+  beforeLoad: () => {
+    throw redirect({ to: '/dashboard-1' });
+  },
+});
+
+const experimentalRedirectRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/experimental',
+  beforeLoad: () => {
+    throw redirect({ to: '/dashboard-2' });
+  },
 });
 
 const wifiAdvancedRoute = createRoute({
@@ -139,18 +161,15 @@ const logsRoute = createRoute({
   component: shellPage('Logs', LogsPage),
 });
 
-const experimentalRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: '/experimental',
-  component: shellPage('Experimental', ExperimentalPage),
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   setupRoute,
   protectedRoute.addChildren([
-    dashboardRoute,
+    dashboardLegacyRedirectRoute,
+    experimentalRedirectRoute,
+    dashboardV1Route,
+    dashboardV2Route,
     wifiAdvancedRoute,
     wifiRoute,
     networkConfigurationRoute,
@@ -162,7 +181,6 @@ const routeTree = rootRoute.addChildren([
     tailscaleRoute,
     systemRoute,
     logsRoute,
-    experimentalRoute,
   ]),
 ]);
 
