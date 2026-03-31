@@ -174,6 +174,8 @@ export interface USBTetherStatus {
   readonly configured: boolean;
 }
 
+export * from './failover';
+
 /** Type guard for NetworkStatus */
 export function isNetworkStatus(value: unknown): value is NetworkStatus {
   if (typeof value !== 'object' || value === null) return false;

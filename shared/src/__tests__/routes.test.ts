@@ -230,6 +230,8 @@ describe('API_ROUTES', () => {
       '/api/v1/system/alert-thresholds',
       '/api/v1/system/ssh-keys',
       '/api/v1/system/speed-test',
+      '/api/v1/network/failover',
+      '/api/v1/network/failover/events',
       '/api/v1/network/firewall/zones',
       '/api/v1/network/firewall/port-forwards',
       '/api/v1/network/diagnostics',

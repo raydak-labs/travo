@@ -26,6 +26,7 @@ type Dependencies struct {
 	DataUsage      *services.DataUsageService
 	USBTether      *services.USBTetheringService
 	BandSwitching  *services.BandSwitchingService
+	Failover       *services.FailoverService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -102,6 +103,9 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/network/ddns", SetDDNSConfigHandler(deps.Network))
 	v1.Get("/network/ddns/status", GetDDNSStatusHandler(deps.Network))
 	v1.Get("/network/uptime-log", GetUptimeLogHandler(deps.UptimeTracker))
+	v1.Get("/network/failover", GetFailoverConfigHandler(deps.Failover))
+	v1.Put("/network/failover", SetFailoverConfigHandler(deps.Failover))
+	v1.Get("/network/failover/events", GetFailoverEventsHandler(deps.Failover))
 	v1.Get("/network/firewall/zones", GetFirewallZonesHandler(deps.Network))
 	v1.Get("/network/firewall/port-forwards", GetPortForwardsHandler(deps.Network))
 	v1.Post("/network/firewall/port-forwards", AddPortForwardHandler(deps.Network))

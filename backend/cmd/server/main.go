@@ -50,15 +50,15 @@ func setupApp() *fiber.App {
 	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
 		cfg.AuthConfigPath = tmpDir + "/auth.json"
 	}
-	app, _, _, _, _, _, netWatcher := setupAppWithConfig(cfg)
+	app, _, _, _, _, _, _, netWatcher := setupAppWithConfig(cfg)
 	// Stop the watcher goroutine immediately — setupApp is only used in tests.
 	netWatcher.Stop()
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, blocklist, and event watcher so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *auth.TokenBlocklist, services.EventWatcher) {
+// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, failover service, blocklist, and event watcher so the caller can manage their lifecycle.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *services.FailoverService, *auth.TokenBlocklist, services.EventWatcher) {
 	app := fiber.New(fiber.Config{AppName: "travo"})
 
 	// CORS middleware
@@ -164,6 +164,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()
 	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/travo/band-switching.json")
+	failoverSvc := services.NewFailoverService(u, networkSvc)
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
@@ -174,6 +175,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	if !cfg.MockMode {
 		alertSvc.SetCarrierChecker(&services.RealCarrierChecker{})
 	}
+	failoverSvc.SetAlertService(alertSvc)
 	uptimeTracker := services.NewUptimeTracker(captiveProber)
 
 	// Token blocklist with cleanup goroutine
@@ -213,6 +215,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		DataUsage:      dataUsageSvc,
 		USBTether:      usbTetherSvc,
 		BandSwitching:  bandSwitchSvc,
+		Failover:       failoverSvc,
 	}
 	api.SetupRoutes(app, deps)
 
@@ -224,6 +227,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	alertSvc.Start()
 	uptimeTracker.Start()
 	bandSwitchSvc.Start()
+	go failoverSvc.Start()
 
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
@@ -234,7 +238,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist, netWatcher
+	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, failoverSvc, blocklist, netWatcher
 }
 
 func main() {
@@ -249,7 +253,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, blocklist, netWatcher := setupAppWithConfig(cfg)
+	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, failoverSvc, blocklist, netWatcher := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -264,6 +268,7 @@ func main() {
 		alertSvc.Stop()
 		uptimeTracker.Stop()
 		bandSwitchSvc.Stop()
+		failoverSvc.Stop()
 		if err := app.Shutdown(); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}

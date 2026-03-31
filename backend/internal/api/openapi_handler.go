@@ -234,6 +234,16 @@ var openAPISpec = map[string]interface{}{
 		"/network/uptime-log": map[string]interface{}{
 			"get": endpoint("GetUptimeLog", "Connection uptime event log (internet up/down timeline)", true, nil, resp200("application/json", nil)),
 		},
+		"/network/failover": map[string]interface{}{
+			"get": endpoint("GetFailoverConfig", "Get connection failover configuration and runtime status", true, nil, resp200("application/json", nil)),
+			"put": endpoint("SetFailoverConfig", "Update connection failover ordering, enabled uplinks, and health tracking", true,
+				body("application/json", nil),
+				resp200("application/json", obj("status")),
+			),
+		},
+		"/network/failover/events": map[string]interface{}{
+			"get": endpoint("GetFailoverEvents", "Get recent failover switch events", true, nil, resp200("application/json", nil)),
+		},
 		// SQM
 		"/sqm/config": map[string]interface{}{
 			"get": endpoint("GetSQMConfig", "Get SQM (traffic shaping) configuration", true, nil, resp200("application/json", nil)),
