@@ -29,6 +29,9 @@ ROUTER_USER="root"
 PASSWORD="admin"
 MOVE_LUCI=true
 LEGACY_SCP=true
+INTERACTIVE_MODE="auto"
+INSTALL_SSH_KEY="auto"
+SSH_KEY_PATH="${HOME}/.ssh/id_ed25519.pub"
 # Optional WiFi AP naming (if unset, setup-wireless-ap.sh keeps OpenWrt-Travel / OpenWrt-Travel-5G + default key)
 WIFI_SSID_BASE=""
 WIFI_AP_KEY=""
@@ -51,7 +54,11 @@ Options:
   --password PASSWORD  Root password for LuCI and Travo login (default: admin)
   --wifi-ssid NAME     Base SSID for APs: 2.4 GHz = NAME, 5 GHz = NAME-5G (default: OpenWrt-Travel / OpenWrt-Travel-5G)
   --wifi-password KEY  WPA2 key for all APs (default: travelrouter from setup-wireless-ap.sh)
+  --ssh-key PATH       Public SSH key to append to /etc/dropbear/authorized_keys (default: ~/.ssh/id_ed25519.pub)
+  --no-ssh-key         Skip installing a public SSH key on the router
   --no-luci-move       Skip moving LuCI to port 8080
+  --interactive        Prompt for setup values before applying changes
+  --no-interactive     Disable prompts and use flags/defaults only
   --legacy-scp         Use SCP legacy protocol (-O flag) for Dropbear (default: on)
   --no-legacy-scp      Disable legacy SCP flag
   -h, --help           Show this help
@@ -66,7 +73,11 @@ while [[ $# -gt 0 ]]; do
     --password)      PASSWORD="$2"; shift 2 ;;
     --wifi-ssid)     WIFI_SSID_BASE="$2"; shift 2 ;;
     --wifi-password) WIFI_AP_KEY="$2"; shift 2 ;;
+    --ssh-key)       SSH_KEY_PATH="$2"; INSTALL_SSH_KEY=true; shift 2 ;;
+    --no-ssh-key)    INSTALL_SSH_KEY=false; shift ;;
     --no-luci-move)  MOVE_LUCI=false; shift ;;
+    --interactive)   INTERACTIVE_MODE=true; shift ;;
+    --no-interactive) INTERACTIVE_MODE=false; shift ;;
     --legacy-scp)    LEGACY_SCP=true; shift ;;
     --no-legacy-scp) LEGACY_SCP=false; shift ;;
     -h|--help)       usage ;;
@@ -89,6 +100,172 @@ ssh_cmd() {
   ssh $SSH_OPTS "${REMOTE}" "$@"
 }
 
+is_interactive_session() {
+  [[ -t 0 && -t 1 ]]
+}
+
+prompt_with_default() {
+  local prompt="$1"
+  local default_value="$2"
+  local result
+  read -r -p "$prompt [$default_value]: " result
+  printf '%s' "${result:-$default_value}"
+}
+
+prompt_optional() {
+  local prompt="$1"
+  local default_value="$2"
+  local result
+  read -r -p "$prompt [$default_value]: " result
+  printf '%s' "${result:-$default_value}"
+}
+
+prompt_yes_no() {
+  local prompt="$1"
+  local default_answer="$2"
+  local reply
+  local suffix="[y/N]"
+  if [[ "$default_answer" == "y" ]]; then
+    suffix="[Y/n]"
+  fi
+
+  while true; do
+    read -r -p "$prompt $suffix: " reply
+    reply="${reply:-$default_answer}"
+    case "${reply,,}" in
+      y|yes) return 0 ;;
+      n|no) return 1 ;;
+    esac
+  done
+}
+
+prompt_secret() {
+  local prompt="$1"
+  local current_value="$2"
+  local first=""
+  local second=""
+
+  if [[ -n "$current_value" ]]; then
+    if prompt_yes_no "$prompt (keep current value?)" "y"; then
+      printf '%s' "$current_value"
+      return 0
+    fi
+  fi
+
+  while true; do
+    read -r -s -p "$prompt: " first
+    echo
+    read -r -s -p "Confirm password: " second
+    echo
+
+    if [[ "$first" != "$second" ]]; then
+      warn "Passwords did not match. Try again."
+      continue
+    fi
+
+    if [[ -z "$first" ]]; then
+      warn "Password cannot be empty."
+      continue
+    fi
+
+    printf '%s' "$first"
+    return 0
+  done
+}
+
+configure_interactive_defaults() {
+  local interactive=false
+  case "$INTERACTIVE_MODE" in
+    true) interactive=true ;;
+    false) interactive=false ;;
+    auto)
+      if is_interactive_session; then
+        interactive=true
+      fi
+      ;;
+  esac
+
+  if [[ "$INSTALL_SSH_KEY" == "auto" ]]; then
+    if [[ -f "$SSH_KEY_PATH" ]]; then
+      INSTALL_SSH_KEY=true
+    else
+      INSTALL_SSH_KEY=false
+    fi
+  fi
+
+  if [[ "$interactive" != "true" ]]; then
+    return 0
+  fi
+
+  echo "Interactive setup"
+  echo "Press Enter to keep the current value shown in brackets."
+  echo ""
+
+  ROUTER_IP=$(prompt_with_default "Router IP" "$ROUTER_IP")
+  ROUTER_USER=$(prompt_with_default "SSH user" "$ROUTER_USER")
+  PASSWORD=$(prompt_secret "Root password for LuCI / Travo" "$PASSWORD")
+  WIFI_SSID_BASE=$(prompt_optional "WiFi SSID base (blank uses setup-wireless defaults)" "$WIFI_SSID_BASE")
+  WIFI_AP_KEY=$(prompt_optional "WiFi password (blank uses setup-wireless default)" "$WIFI_AP_KEY")
+
+  if prompt_yes_no "Move LuCI to ports 8080/8443?" "$([[ "$MOVE_LUCI" == "true" ]] && echo y || echo n)"; then
+    MOVE_LUCI=true
+  else
+    MOVE_LUCI=false
+  fi
+
+  if prompt_yes_no "Use legacy SCP mode for Dropbear?" "$([[ "$LEGACY_SCP" == "true" ]] && echo y || echo n)"; then
+    LEGACY_SCP=true
+  else
+    LEGACY_SCP=false
+  fi
+
+  if [[ -f "$SSH_KEY_PATH" ]]; then
+    SSH_KEY_PATH=$(prompt_with_default "SSH public key to install" "$SSH_KEY_PATH")
+    if prompt_yes_no "Install this SSH key on the router?" "$([[ "$INSTALL_SSH_KEY" == "true" ]] && echo y || echo n)"; then
+      INSTALL_SSH_KEY=true
+    else
+      INSTALL_SSH_KEY=false
+    fi
+  else
+    warn "Default SSH public key not found at $SSH_KEY_PATH"
+    if prompt_yes_no "Provide a different SSH public key path?" "n"; then
+      SSH_KEY_PATH=$(prompt_with_default "SSH public key path" "$SSH_KEY_PATH")
+      if [[ -f "$SSH_KEY_PATH" ]] && prompt_yes_no "Install this SSH key on the router?" "y"; then
+        INSTALL_SSH_KEY=true
+      else
+        INSTALL_SSH_KEY=false
+      fi
+    else
+      INSTALL_SSH_KEY=false
+    fi
+  fi
+}
+
+install_ssh_key() {
+  local ssh_key_file="$1"
+  local ssh_key_content
+
+  if [[ "$INSTALL_SSH_KEY" != "true" ]]; then
+    return 0
+  fi
+
+  [[ -f "$ssh_key_file" ]] || error "SSH public key not found at $ssh_key_file"
+
+  ssh_key_content=$(<"$ssh_key_file")
+  [[ -n "$ssh_key_content" ]] || error "SSH public key file is empty: $ssh_key_file"
+
+  info "Installing SSH public key from $ssh_key_file..."
+  ssh_cmd "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && chmod 600 /etc/dropbear/authorized_keys"
+  if ssh_cmd "grep -qxF $(printf '%q' "$ssh_key_content") /etc/dropbear/authorized_keys" >/dev/null 2>&1; then
+    info "SSH public key already present — skipping."
+    return 0
+  fi
+
+  if ! ssh $SSH_OPTS "${REMOTE}" "tee -a /etc/dropbear/authorized_keys >/dev/null" < "$ssh_key_file"; then
+    error "Failed to install SSH public key on ${REMOTE}"
+  fi
+}
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -98,10 +275,13 @@ CONFIG_SRC="${REPO_ROOT}/packaging/openwrt/files/etc/config/travo"
 [[ -f "$INITD_SRC" ]] || error "init.d script not found at $INITD_SRC"
 [[ -f "$CONFIG_SRC" ]] || error "UCI config not found at $CONFIG_SRC"
 
+configure_interactive_defaults
+REMOTE="${ROUTER_USER}@${ROUTER_IP}"
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Setup travo → ${REMOTE}"
-echo "  LuCI move: ${MOVE_LUCI}  |  Travel GUI password: ${PASSWORD}"
+echo "  LuCI move: ${MOVE_LUCI}  |  Travel GUI password: (hidden)"
 if [[ -n "$WIFI_SSID_BASE" ]]; then
   echo "  WiFi AP SSID base: ${WIFI_SSID_BASE} (5G: ${WIFI_SSID_BASE}-5G)"
 else
@@ -111,6 +291,11 @@ if [[ -n "$WIFI_AP_KEY" ]]; then
   echo "  WiFi AP key: (custom)"
 else
   echo "  WiFi AP key: default (travelrouter)"
+fi
+if [[ "$INSTALL_SSH_KEY" == "true" ]]; then
+  echo "  SSH public key: ${SSH_KEY_PATH}"
+else
+  echo "  SSH public key: skipped"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -125,6 +310,9 @@ fi
 CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
 info "Syncing router clock to ${CURRENT_TIME} UTC..."
 ssh_cmd "date -s '${CURRENT_TIME}' >/dev/null 2>&1 || true; /etc/init.d/sysntpd restart 2>/dev/null || true"
+
+# Step 0b: Install SSH key for future access
+install_ssh_key "$SSH_KEY_PATH"
 
 # Step 1: Move LuCI to port 8080
 if $MOVE_LUCI; then
