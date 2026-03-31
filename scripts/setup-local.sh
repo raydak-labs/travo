@@ -32,6 +32,7 @@ LEGACY_SCP=true
 INTERACTIVE_MODE="auto"
 INSTALL_SSH_KEY="auto"
 SSH_KEY_PATH="${HOME}/.ssh/id_ed25519.pub"
+SSH_KEY_VALUE=""
 # Optional WiFi AP naming (if unset, setup-wireless-ap.sh keeps OpenWrt-Travel / OpenWrt-Travel-5G + default key)
 WIFI_SSID_BASE=""
 WIFI_AP_KEY=""
@@ -54,7 +55,8 @@ Options:
   --password PASSWORD  Root password for LuCI and Travo login (default: admin)
   --wifi-ssid NAME     Base SSID for APs: 2.4 GHz = NAME, 5 GHz = NAME-5G (default: OpenWrt-Travel / OpenWrt-Travel-5G)
   --wifi-password KEY  WPA2 key for all APs (default: travelrouter from setup-wireless-ap.sh)
-  --ssh-key PATH       Public SSH key to append to /etc/dropbear/authorized_keys (default: ~/.ssh/id_ed25519.pub)
+  --ssh-key PATH       Public SSH key path to append to /etc/dropbear/authorized_keys (default: ~/.ssh/id_ed25519.pub)
+  --ssh-key-value KEY  Public SSH key text to append directly to authorized_keys
   --no-ssh-key         Skip installing a public SSH key on the router
   --no-luci-move       Skip moving LuCI to port 8080
   --interactive        Prompt for setup values before applying changes
@@ -74,6 +76,7 @@ while [[ $# -gt 0 ]]; do
     --wifi-ssid)     WIFI_SSID_BASE="$2"; shift 2 ;;
     --wifi-password) WIFI_AP_KEY="$2"; shift 2 ;;
     --ssh-key)       SSH_KEY_PATH="$2"; INSTALL_SSH_KEY=true; shift 2 ;;
+    --ssh-key-value) SSH_KEY_VALUE="$2"; INSTALL_SSH_KEY=true; shift 2 ;;
     --no-ssh-key)    INSTALL_SSH_KEY=false; shift ;;
     --no-luci-move)  MOVE_LUCI=false; shift ;;
     --interactive)   INTERACTIVE_MODE=true; shift ;;
@@ -186,7 +189,7 @@ configure_interactive_defaults() {
   esac
 
   if [[ "$INSTALL_SSH_KEY" == "auto" ]]; then
-    if [[ -f "$SSH_KEY_PATH" ]]; then
+    if [[ -n "$SSH_KEY_VALUE" || -f "$SSH_KEY_PATH" ]]; then
       INSTALL_SSH_KEY=true
     else
       INSTALL_SSH_KEY=false
@@ -219,7 +222,13 @@ configure_interactive_defaults() {
     LEGACY_SCP=false
   fi
 
-  if [[ -f "$SSH_KEY_PATH" ]]; then
+  if [[ -n "$SSH_KEY_VALUE" ]]; then
+    if prompt_yes_no "Install the provided SSH key value on the router?" "$([[ "$INSTALL_SSH_KEY" == "true" ]] && echo y || echo n)"; then
+      INSTALL_SSH_KEY=true
+    else
+      INSTALL_SSH_KEY=false
+    fi
+  elif [[ -f "$SSH_KEY_PATH" ]]; then
     SSH_KEY_PATH=$(prompt_with_default "SSH public key to install" "$SSH_KEY_PATH")
     if prompt_yes_no "Install this SSH key on the router?" "$([[ "$INSTALL_SSH_KEY" == "true" ]] && echo y || echo n)"; then
       INSTALL_SSH_KEY=true
@@ -241,27 +250,42 @@ configure_interactive_defaults() {
   fi
 }
 
+get_ssh_key_content() {
+  if [[ -n "$SSH_KEY_VALUE" ]]; then
+    printf '%s' "$SSH_KEY_VALUE"
+    return 0
+  fi
+
+  [[ -f "$SSH_KEY_PATH" ]] || error "SSH public key not found at $SSH_KEY_PATH"
+  [[ -s "$SSH_KEY_PATH" ]] || error "SSH public key file is empty: $SSH_KEY_PATH"
+  <"$SSH_KEY_PATH" tr -d '\n'
+}
+
 install_ssh_key() {
-  local ssh_key_file="$1"
   local ssh_key_content
+  local ssh_key_source
 
   if [[ "$INSTALL_SSH_KEY" != "true" ]]; then
     return 0
   fi
 
-  [[ -f "$ssh_key_file" ]] || error "SSH public key not found at $ssh_key_file"
+  ssh_key_content="$(get_ssh_key_content)"
+  [[ -n "$ssh_key_content" ]] || error "SSH public key is empty"
 
-  ssh_key_content=$(<"$ssh_key_file")
-  [[ -n "$ssh_key_content" ]] || error "SSH public key file is empty: $ssh_key_file"
+  if [[ -n "$SSH_KEY_VALUE" ]]; then
+    ssh_key_source="provided value"
+  else
+    ssh_key_source="$SSH_KEY_PATH"
+  fi
 
-  info "Installing SSH public key from $ssh_key_file..."
+  info "Installing SSH public key from $ssh_key_source..."
   ssh_cmd "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && chmod 600 /etc/dropbear/authorized_keys"
   if ssh_cmd "grep -qxF $(printf '%q' "$ssh_key_content") /etc/dropbear/authorized_keys" >/dev/null 2>&1; then
     info "SSH public key already present — skipping."
     return 0
   fi
 
-  if ! ssh $SSH_OPTS "${REMOTE}" "tee -a /etc/dropbear/authorized_keys >/dev/null" < "$ssh_key_file"; then
+  if ! printf '%s\n' "$ssh_key_content" | ssh $SSH_OPTS "${REMOTE}" "tee -a /etc/dropbear/authorized_keys >/dev/null"; then
     error "Failed to install SSH public key on ${REMOTE}"
   fi
 }
@@ -293,7 +317,11 @@ else
   echo "  WiFi AP key: default (travelrouter)"
 fi
 if [[ "$INSTALL_SSH_KEY" == "true" ]]; then
-  echo "  SSH public key: ${SSH_KEY_PATH}"
+  if [[ -n "$SSH_KEY_VALUE" ]]; then
+    echo "  SSH public key: provided directly"
+  else
+    echo "  SSH public key: ${SSH_KEY_PATH}"
+  fi
 else
   echo "  SSH public key: skipped"
 fi
@@ -312,7 +340,7 @@ info "Syncing router clock to ${CURRENT_TIME} UTC..."
 ssh_cmd "date -s '${CURRENT_TIME}' >/dev/null 2>&1 || true; /etc/init.d/sysntpd restart 2>/dev/null || true"
 
 # Step 0b: Install SSH key for future access
-install_ssh_key "$SSH_KEY_PATH"
+install_ssh_key
 
 # Step 1: Move LuCI to port 8080
 if $MOVE_LUCI; then
