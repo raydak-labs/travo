@@ -106,9 +106,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   },
 ] as const;
 
-const GROUP_CHILD_PATHS: ReadonlySet<string> = new Set(
-  NAV_ENTRIES.flatMap((e) => (e.kind === 'group' ? e.items.map((i) => i.to) : [])),
-);
+const GROUP_CHILD_PATHS: ReadonlySet<string> = new Set([
+  ...NAV_ENTRIES.flatMap((e) => (e.kind === 'group' ? e.items.map((i) => i.to) : [])),
+  // Shown in the Services submenu only when SQM is installed; still a valid deep link.
+  '/services/sqm',
+]);
 
 /** Icon per route for collapsed rail and group rows. */
 export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
@@ -120,6 +122,7 @@ export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
   '/clients': Users,
   '/services': Monitor,
   '/services/tailscale': Share2,
+  '/services/sqm': SlidersHorizontal,
   '/system': Settings,
   '/logs': ScrollText,
 };
@@ -185,4 +188,24 @@ export function flattenNavRoutes(): { to: string; label: string; icon: LucideIco
     }
   }
   return out;
+}
+
+/** Collapsed sidebar rail: include SQM under Services only when the package is installed. */
+export function flattenNavRoutesWithSqm(sqmInstalled: boolean): {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+}[] {
+  const base = flattenNavRoutes();
+  if (!sqmInstalled) return base;
+  const tailscaleIdx = base.findIndex((r) => r.to === '/services/tailscale');
+  const sqmEntry = {
+    to: '/services/sqm',
+    label: 'SQM',
+    icon: NAV_SUB_ICONS['/services/sqm'] ?? Monitor,
+  };
+  if (tailscaleIdx === -1) {
+    return [...base, sqmEntry];
+  }
+  return [...base.slice(0, tailscaleIdx + 1), sqmEntry, ...base.slice(tailscaleIdx + 1)];
 }

@@ -52,6 +52,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Task 4 (7) Authentication: IP-based access control
 - [x] Task 20 (3.3) VPN: VPN speed test
 - [x] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
+- [x] Task 25 (4.6) Future services: SQM / QoS (traffic shaping)
 
 
 ---
@@ -522,6 +523,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 ## 15. VPN, Wi‑Fi stability, SQM, performance & AdGuard (field issues)
 
+- [x] **SQM / traffic shaping**: Offer SQM install (cake/fq_codel) with defaults suitable for most travel-router WANs; optional presets per scenario. Reference: [OpenWrt SQM](https://openwrt.org/docs/guide-user/network/traffic-shaping/sqm).
 - [x] **WireGuard enable/error/runtime**: Enabling VPN from the UI shows an error while `wg0` still appears in LuCI; traffic does not use the tunnel. Align backend apply order with netifd/LuCI (interface, peer, firewall, routing). Ensure UCI objects LuCI expects exist before enable. Harden verification (avoid failing the whole operation when the interface is up but a handshake is still in progress).
 - [x] **Single active VPN policy**: Only one VPN-style path may be active at a time across WireGuard, Tailscale (exit node / full-tunnel style use), and future providers. Enabling one must disable or demote others deterministically.
 - [x] **Wi‑Fi SSID/password visibility after change**: After changing AP name/password via the GUI, clients do not see the network until the SSID is toggled in LuCI. Wireless confirm/apply path should fully restart or reload hostapd so the BSS reappears without manual LuCI steps.

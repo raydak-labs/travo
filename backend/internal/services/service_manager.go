@@ -68,6 +68,14 @@ var knownServices = []serviceDefinition{
 		Packages:    []string{"vnstat2"},
 		InitName:    "vnstat",
 	},
+	{
+		ID:          "sqm",
+		Name:        "SQM (Traffic Shaping)",
+		Description: "Smart Queue Management to reduce latency (bufferbloat)",
+		Packages:    []string{"sqm-scripts", "luci-app-sqm"},
+		DetectPackage: "sqm-scripts",
+		InitName:    "sqm",
+	},
 }
 
 // ServiceManager manages installable services.

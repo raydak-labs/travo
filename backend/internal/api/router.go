@@ -15,6 +15,7 @@ type Dependencies struct {
 	RateLimiter    *auth.RateLimiter
 	System         *services.SystemService
 	Network        *services.NetworkService
+	SQM            *services.SQMService
 	Wifi           *services.WifiService
 	Vpn            *services.VpnService
 	ServiceManager *services.ServiceManager
@@ -111,6 +112,11 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Get("/network/ipv6", GetIPv6StatusHandler(deps.Network))
 	v1.Put("/network/ipv6", SetIPv6EnabledHandler(deps.Network))
 	v1.Post("/network/wol", SendWoLHandler(deps.Network))
+
+	// SQM routes
+	v1.Get("/sqm/config", GetSQMConfigHandler(deps.SQM))
+	v1.Put("/sqm/config", SetSQMConfigHandler(deps.SQM))
+	v1.Post("/sqm/apply", ApplySQMHandler(deps.SQM))
 
 	// WiFi routes
 	v1.Get("/wifi/scan", WifiScanHandler(deps.Wifi))

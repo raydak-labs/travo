@@ -13,6 +13,7 @@ import { Sidebar } from '../sidebar';
 import { ThemeProvider } from '../theme-provider';
 import { AppShell } from '../app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useServices } from '@/hooks/use-services';
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(() => false),
@@ -28,7 +29,16 @@ vi.mock('@/hooks/use-system', () => ({
   useShutdown: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+vi.mock('@/hooks/use-services', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/hooks/use-services')>();
+  return {
+    ...actual,
+    useServices: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })),
+  };
+});
+
 const mockUseIsMobile = vi.mocked(useIsMobile);
+const mockUseServices = vi.mocked(useServices);
 
 const ROUTE_PATHS = [
   '/dashboard-1',
@@ -42,6 +52,7 @@ const ROUTE_PATHS = [
   '/vpn',
   '/services',
   '/services/tailscale',
+  '/services/sqm',
   '/system',
   '/logs',
 ] as const;
@@ -120,6 +131,26 @@ describe('Sidebar', () => {
       expect(screen.getByText('System')).toBeInTheDocument();
       expect(screen.getByText('Settings')).toBeInTheDocument();
       expect(screen.getByText('Logs')).toBeInTheDocument();
+    });
+  });
+
+  it('shows SQM under Services when SQM is installed', async () => {
+    mockUseServices.mockReturnValueOnce({
+      data: [
+        {
+          id: 'sqm',
+          name: 'SQM (Traffic Shaping)',
+          description: 'Smart Queue Management',
+          state: 'stopped',
+          auto_start: false,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useServices>);
+    renderSidebar();
+    await waitFor(() => {
+      expect(screen.getByText('SQM')).toBeInTheDocument();
     });
   });
 

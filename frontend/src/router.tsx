@@ -17,6 +17,7 @@ import {
   LogsPage,
   NetworkPage,
   ServicesPage,
+  SQMPage,
   SystemPage,
   TailscalePage,
   VpnPage,
@@ -149,6 +150,12 @@ const tailscaleRoute = createRoute({
   component: shellPage('Services / Tailscale', TailscalePage),
 });
 
+const sqmRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/services/sqm',
+  component: shellPage('Services / SQM', SQMPage),
+});
+
 const systemRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/system',
@@ -179,6 +186,7 @@ const routeTree = rootRoute.addChildren([
     vpnRoute,
     servicesRoute,
     tailscaleRoute,
+    sqmRoute,
     systemRoute,
     logsRoute,
   ]),

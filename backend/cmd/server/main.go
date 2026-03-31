@@ -112,6 +112,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 
 	systemSvc := services.NewSystemService(ub, u, storage)
 	networkSvc := services.NewNetworkService(u, ub)
+	sqmSvc := services.NewSQMService(u)
 
 	// Create event watcher (noop in mock mode to avoid running ubus on dev machines).
 	var netWatcher services.EventWatcher
@@ -201,6 +202,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		RateLimiter:    rateLimiter,
 		System:         systemSvc,
 		Network:        networkSvc,
+		SQM:            sqmSvc,
 		Wifi:           wifiSvc,
 		Vpn:            vpnSvc,
 		ServiceManager: svcManager,
