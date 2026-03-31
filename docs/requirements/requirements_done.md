@@ -502,7 +502,7 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Build scripts (build.sh, deploy.sh)
 - [x] Install / uninstall scripts
 - [x] APK + opkg package manager auto-detection
-- [x] `setup-local.sh` — one-time fresh-device setup over SSH (moves LuCI to :8080, uploads init.d + UCI config, marks setup complete)
+- [x] `setup-local.sh` — one-time fresh-device setup over SSH with interactive prompts, SSH key install, LuCI move to :8080, init.d/UCI upload, and setup-complete marker
 - [x] AP WiFi health check at startup (ensures enabled APs have valid config; skips disabled APs)
 - [x] Init script for auto-start on boot (procd service, verified on device)
 - [x] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
