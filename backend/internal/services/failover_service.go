@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -36,6 +37,7 @@ type failoverConfigFile struct {
 // FailoverService manages app-owned mwan3 failover configuration.
 type FailoverService struct {
 	uci        uci.UCI
+	ubus       ubus.Ubus
 	networkSvc *NetworkService
 	cmd        CommandRunner
 
@@ -43,6 +45,7 @@ type FailoverService struct {
 	guardPath  string
 	backupPath string
 	initScript string
+	applier    UCIApplyConfirm
 	alertSvc   *AlertService
 	mu         sync.RWMutex
 	events     []models.FailoverEvent
@@ -51,29 +54,33 @@ type FailoverService struct {
 	stopOnce   sync.Once
 }
 
-func NewFailoverService(u uci.UCI, networkSvc *NetworkService) *FailoverService {
+func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService) *FailoverService {
 	return &FailoverService{
 		uci:        u,
+		ubus:       ub,
 		networkSvc: networkSvc,
 		cmd:        &RealCommandRunner{},
 		configPath: failoverConfigPath,
 		guardPath:  failoverGuardPath,
 		backupPath: failoverBackupPath,
 		initScript: mwan3InitScriptPath,
+		applier:    NewRealUCIApplyConfirm(ub),
 		events:     make([]models.FailoverEvent, 0, 10),
 		stopCh:     make(chan struct{}),
 	}
 }
 
-func NewFailoverServiceWithRunner(u uci.UCI, networkSvc *NetworkService, cmd CommandRunner, configPath string) *FailoverService {
+func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, cmd CommandRunner, applier UCIApplyConfirm, configPath string) *FailoverService {
 	return &FailoverService{
 		uci:        u,
+		ubus:       ub,
 		networkSvc: networkSvc,
 		cmd:        cmd,
 		configPath: configPath,
 		guardPath:  filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
 		backupPath: filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
 		initScript: mwan3InitScriptPath,
+		applier:    applier,
 		events:     make([]models.FailoverEvent, 0, 10),
 		stopCh:     make(chan struct{}),
 	}
@@ -171,22 +178,24 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 }
 
 func (s *FailoverService) observeActiveChange() {
+	s.mu.Lock()
 	cfg, err := s.GetConfig()
 	if err != nil {
+		s.mu.Unlock()
 		return
 	}
 	active := cfg.ActiveInterface
 	if active == "" {
+		s.mu.Unlock()
 		return
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.lastActive == "" {
 		s.lastActive = active
+		s.mu.Unlock()
 		return
 	}
 	if s.lastActive == active {
+		s.mu.Unlock()
 		return
 	}
 	event := models.FailoverEvent{
@@ -200,8 +209,10 @@ func (s *FailoverService) observeActiveChange() {
 	if len(s.events) > 20 {
 		s.events = s.events[len(s.events)-20:]
 	}
-	if s.alertSvc != nil {
-		s.alertSvc.Publish(
+	alertSvc := s.alertSvc
+	s.mu.Unlock()
+	if alertSvc != nil {
+		alertSvc.Publish(
 			"connection_failover",
 			fmt.Sprintf("Connection failover switched from %s to %s", event.FromInterface, event.ToInterface),
 			"warning",
@@ -532,18 +543,27 @@ func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
 		if _, ok := sections[failoverRuleSection]; !ok {
 			return errors.New("expected failover rule missing after apply")
 		}
-	}
-	networkStatus, err := s.networkSvc.GetNetworkStatus()
-	if err != nil {
-		return err
-	}
-	for _, candidate := range cfg.Candidates {
-		if candidate.Enabled && interfacePresent(networkStatus.Interfaces, candidate.InterfaceName) {
-			return nil
+		enabledCount := 0
+		for _, c := range cfg.Candidates {
+			if c.Enabled {
+				enabledCount++
+			}
 		}
-	}
-	if cfg.Enabled {
-		return errors.New("no enabled failover candidate is readable at runtime")
+		if enabledCount > 0 {
+			presentEnabledCount := 0
+			networkStatus, err := s.networkSvc.GetNetworkStatus()
+			if err != nil {
+				return err
+			}
+			for _, candidate := range cfg.Candidates {
+				if candidate.Enabled && interfacePresent(networkStatus.Interfaces, candidate.InterfaceName) {
+					presentEnabledCount++
+				}
+			}
+			if presentEnabledCount == 0 {
+				return errors.New("no enabled failover candidate is readable at runtime")
+			}
+		}
 	}
 	return nil
 }
@@ -551,6 +571,9 @@ func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
 func (s *FailoverService) reloadMwan3() error {
 	if !s.serviceInstalled() {
 		return nil
+	}
+	if s.applier != nil {
+		return s.applier.ApplyAndConfirm([]string{"network"})
 	}
 	if _, err := s.cmd.Run(s.initScript, "reload"); err != nil {
 		if _, restartErr := s.cmd.Run(s.initScript, "restart"); restartErr != nil {
