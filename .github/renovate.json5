@@ -1,4 +1,26 @@
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-  extends: ['config:best-practices', 'config:semverAllWeekly'],
+  extends: ['config:best-practices'],
+  // Split into separate PRs by semver level instead of bundling everything
+  separateMajorMinor: true,
+  separateMinorPatch: true,
+  separateMultipleMajor: true,
+  packageRules: [
+    {
+      description: 'Automerge patch and pin updates for all packages',
+      matchUpdateTypes: ['patch', 'pin'],
+      automerge: true,
+      automergeType: 'pr',
+    },
+    {
+      description: 'Group all minor updates together',
+      matchUpdateTypes: ['minor'],
+      groupName: 'minor dependencies',
+    },
+    {
+      description: 'Group all major updates together',
+      matchUpdateTypes: ['major'],
+      groupName: 'major dependencies',
+    },
+  ],
 }
