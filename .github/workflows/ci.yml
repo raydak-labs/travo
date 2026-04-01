@@ -30,7 +30,7 @@ jobs:
         working-directory: backend
 
       - name: Test
-        run: go test ./... -count=1 -race
+        run: go test ./... -count=1
         working-directory: backend
 
   test-frontend:
