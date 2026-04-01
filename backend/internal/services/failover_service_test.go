@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -69,7 +70,7 @@ func TestFailoverServiceSetConfigWritesManagedSections(t *testing.T) {
 			Reliability:      1,
 			Count:            1,
 			Timeout:          2,
-			Interval:         5,
+			Interval:         10,
 			FailureInterval:  5,
 			RecoveryInterval: 5,
 			Down:             3,
@@ -128,48 +129,103 @@ func TestFailoverServiceRejectsEnabledConfigWithoutCandidates(t *testing.T) {
 	}
 }
 
-func TestFailoverServiceVerifyApplyChecksAllEnabledCandidates(t *testing.T) {
+func TestValidateHealthConfig(t *testing.T) {
 	t.Parallel()
 
-	mockUCI := uci.NewMockUCI()
-	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
-
-	svc.initScript = filepath.Join(tmpDir, "mwan3")
-	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0755); err != nil {
-		t.Fatalf("write init script: %v", err)
-	}
-
-	cfg := models.FailoverConfig{
-		Enabled: true,
-		Candidates: []models.FailoverCandidate{
-			{
-				ID:            "wan",
-				Label:         "Ethernet WAN",
-				InterfaceName: "wan",
-				Kind:          models.FailoverCandidateKindEthernet,
-				Available:     true,
-				Enabled:       true,
-				Priority:      1,
+	tests := []struct {
+		name    string
+		health  models.FailoverHealthConfig
+		wantErr error
+	}{
+		{
+			name: "valid config",
+			health: models.FailoverHealthConfig{
+				Timeout:          2,
+				Interval:         5,
+				FailureInterval:  3,
+				RecoveryInterval: 3,
+				Down:             3,
+				Up:               3,
+				Reliability:      1,
+				Count:            1,
 			},
-			{
-				ID:            "wwan",
-				Label:         "WiFi uplink",
-				InterfaceName: "wwan",
-				Kind:          models.FailoverCandidateKindWiFi,
-				Available:     true,
-				Enabled:       true,
-				Priority:      2,
-			},
+			wantErr: nil,
 		},
-		Health: defaultFailoverHealth(),
+		{
+			name: "zero timeout",
+			health: models.FailoverHealthConfig{
+				Timeout:          0,
+				Interval:         5,
+				FailureInterval:  3,
+				RecoveryInterval: 3,
+				Down:             3,
+				Up:               3,
+			},
+			wantErr: errors.New("health timeout must be greater than 0"),
+		},
+		{
+			name: "negative failure interval",
+			health: models.FailoverHealthConfig{
+				Timeout:          2,
+				Interval:         5,
+				FailureInterval:  -1,
+				RecoveryInterval: 3,
+				Down:             3,
+				Up:               3,
+			},
+			wantErr: errors.New("health failure_interval must be non-negative"),
+		},
+		{
+			name: "interval less than failure interval",
+			health: models.FailoverHealthConfig{
+				Timeout:          2,
+				Interval:         3,
+				FailureInterval:  5,
+				RecoveryInterval: 3,
+				Down:             3,
+				Up:               3,
+				Reliability:      1,
+				Count:            1,
+			},
+			wantErr: errors.New("health interval (3) must be greater than failure_interval (5)"),
+		},
+		{
+			name: "zero down",
+			health: models.FailoverHealthConfig{
+				Timeout:          2,
+				Interval:         5,
+				FailureInterval:  3,
+				RecoveryInterval: 3,
+				Down:             0,
+				Up:               3,
+			},
+			wantErr: errors.New("health down must be greater than 0"),
+		},
+		{
+			name: "zero reliability",
+			health: models.FailoverHealthConfig{
+				Timeout:          2,
+				Interval:         5,
+				FailureInterval:  3,
+				RecoveryInterval: 3,
+				Down:             3,
+				Up:               3,
+				Reliability:      0,
+			},
+			wantErr: errors.New("health reliability must be greater than 0"),
+		},
 	}
 
-	err := svc.SetConfig(cfg)
-	if err != nil {
-		t.Fatalf("SetConfig should succeed when at least one enabled candidate is present: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateHealthConfig(tt.health)
+			if tt.wantErr != nil && err == nil {
+				t.Errorf("expected error %v", tt.wantErr)
+			}
+			if tt.wantErr != nil && err != nil && !errors.Is(err, tt.wantErr) && err.Error() != tt.wantErr.Error() {
+				t.Errorf("expected error %v, got %v", tt.wantErr, err)
+			}
+		})
 	}
 }

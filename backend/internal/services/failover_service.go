@@ -40,12 +40,12 @@ type FailoverService struct {
 	ubus       ubus.Ubus
 	networkSvc *NetworkService
 	cmd        CommandRunner
+	applier    UCIApplyConfirm
 
 	configPath string
 	guardPath  string
 	backupPath string
 	initScript string
-	applier    UCIApplyConfirm
 	alertSvc   *AlertService
 	mu         sync.RWMutex
 	events     []models.FailoverEvent
@@ -60,11 +60,11 @@ func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService) *Fa
 		ubus:       ub,
 		networkSvc: networkSvc,
 		cmd:        &RealCommandRunner{},
+		applier:    NewRealUCIApplyConfirm(ub),
 		configPath: failoverConfigPath,
 		guardPath:  failoverGuardPath,
 		backupPath: failoverBackupPath,
 		initScript: mwan3InitScriptPath,
-		applier:    NewRealUCIApplyConfirm(ub),
 		events:     make([]models.FailoverEvent, 0, 10),
 		stopCh:     make(chan struct{}),
 	}
@@ -76,11 +76,11 @@ func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkSe
 		ubus:       ub,
 		networkSvc: networkSvc,
 		cmd:        cmd,
+		applier:    applier,
 		configPath: configPath,
 		guardPath:  filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
 		backupPath: filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
 		initScript: mwan3InitScriptPath,
-		applier:    applier,
 		events:     make([]models.FailoverEvent, 0, 10),
 		stopCh:     make(chan struct{}),
 	}
@@ -178,24 +178,22 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 }
 
 func (s *FailoverService) observeActiveChange() {
-	s.mu.Lock()
 	cfg, err := s.GetConfig()
 	if err != nil {
-		s.mu.Unlock()
 		return
 	}
 	active := cfg.ActiveInterface
 	if active == "" {
-		s.mu.Unlock()
 		return
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.lastActive == "" {
 		s.lastActive = active
-		s.mu.Unlock()
 		return
 	}
 	if s.lastActive == active {
-		s.mu.Unlock()
 		return
 	}
 	event := models.FailoverEvent{
@@ -209,10 +207,8 @@ func (s *FailoverService) observeActiveChange() {
 	if len(s.events) > 20 {
 		s.events = s.events[len(s.events)-20:]
 	}
-	alertSvc := s.alertSvc
-	s.mu.Unlock()
-	if alertSvc != nil {
-		alertSvc.Publish(
+	if s.alertSvc != nil {
+		s.alertSvc.Publish(
 			"connection_failover",
 			fmt.Sprintf("Connection failover switched from %s to %s", event.FromInterface, event.ToInterface),
 			"warning",
@@ -367,6 +363,40 @@ func (s *FailoverService) validateConfig(cfg models.FailoverConfig) error {
 			return fmt.Errorf("invalid track IP: %s", ip)
 		}
 	}
+	if err := validateHealthConfig(cfg.Health); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateHealthConfig(health models.FailoverHealthConfig) error {
+	if health.Timeout <= 0 {
+		return errors.New("health timeout must be greater than 0")
+	}
+	if health.Interval <= 0 {
+		return errors.New("health interval must be greater than 0")
+	}
+	if health.FailureInterval < 0 {
+		return errors.New("health failure_interval must be non-negative")
+	}
+	if health.RecoveryInterval < 0 {
+		return errors.New("health recovery_interval must be non-negative")
+	}
+	if health.Down <= 0 {
+		return errors.New("health down must be greater than 0")
+	}
+	if health.Up <= 0 {
+		return errors.New("health up must be greater than 0")
+	}
+	if health.Reliability <= 0 {
+		return errors.New("health reliability must be greater than 0")
+	}
+	if health.Count <= 0 {
+		return errors.New("health count must be greater than 0")
+	}
+	if health.Interval <= health.FailureInterval {
+		return fmt.Errorf("health interval (%d) must be greater than failure_interval (%d)", health.Interval, health.FailureInterval)
+	}
 	return nil
 }
 
@@ -430,7 +460,9 @@ func (s *FailoverService) restoreManagedSections() error {
 		if stype == "" {
 			continue
 		}
-		_ = s.uci.AddSection(mwan3ConfigName, name, stype)
+		if err := s.uci.AddSection(mwan3ConfigName, name, stype); err != nil {
+			return fmt.Errorf("restore add section %s: %w", name, err)
+		}
 		for option, value := range opts {
 			if strings.HasPrefix(option, ".") {
 				continue
@@ -499,9 +531,15 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 	if err := s.uci.AddSection(mwan3ConfigName, failoverRuleSection, "rule"); err != nil {
 		return err
 	}
-	_ = s.uci.Set(mwan3ConfigName, failoverRuleSection, "dest_ip", "0.0.0.0/0")
-	_ = s.uci.Set(mwan3ConfigName, failoverRuleSection, "family", "ipv4")
-	_ = s.uci.Set(mwan3ConfigName, failoverRuleSection, "use_policy", failoverPolicySection)
+	if err := s.uci.Set(mwan3ConfigName, failoverRuleSection, "dest_ip", "0.0.0.0/0"); err != nil {
+		return fmt.Errorf("set rule dest_ip: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, failoverRuleSection, "family", "ipv4"); err != nil {
+		return fmt.Errorf("set rule family: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, failoverRuleSection, "use_policy", failoverPolicySection); err != nil {
+		return fmt.Errorf("set rule use_policy: %w", err)
+	}
 	if err := s.uci.Commit(mwan3ConfigName); err != nil {
 		return err
 	}
@@ -513,19 +551,41 @@ func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandida
 	if err := s.uci.AddSection(mwan3ConfigName, sectionName, "interface"); err != nil {
 		return err
 	}
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "enabled", boolToUCI(candidate.Enabled))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "family", "ipv4")
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "reliability", fmt.Sprintf("%d", health.Reliability))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "count", fmt.Sprintf("%d", health.Count))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "timeout", fmt.Sprintf("%d", health.Timeout))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "interval", fmt.Sprintf("%d", health.Interval))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "failure_interval", fmt.Sprintf("%d", health.FailureInterval))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "recovery_interval", fmt.Sprintf("%d", health.RecoveryInterval))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "down", fmt.Sprintf("%d", health.Down))
-	_ = s.uci.Set(mwan3ConfigName, sectionName, "up", fmt.Sprintf("%d", health.Up))
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "enabled", boolToUCI(candidate.Enabled)); err != nil {
+		return fmt.Errorf("set interface enabled: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "family", "ipv4"); err != nil {
+		return fmt.Errorf("set interface family: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "reliability", fmt.Sprintf("%d", health.Reliability)); err != nil {
+		return fmt.Errorf("set interface reliability: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "count", fmt.Sprintf("%d", health.Count)); err != nil {
+		return fmt.Errorf("set interface count: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "timeout", fmt.Sprintf("%d", health.Timeout)); err != nil {
+		return fmt.Errorf("set interface timeout: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "interval", fmt.Sprintf("%d", health.Interval)); err != nil {
+		return fmt.Errorf("set interface interval: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "failure_interval", fmt.Sprintf("%d", health.FailureInterval)); err != nil {
+		return fmt.Errorf("set interface failure_interval: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "recovery_interval", fmt.Sprintf("%d", health.RecoveryInterval)); err != nil {
+		return fmt.Errorf("set interface recovery_interval: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "down", fmt.Sprintf("%d", health.Down)); err != nil {
+		return fmt.Errorf("set interface down: %w", err)
+	}
+	if err := s.uci.Set(mwan3ConfigName, sectionName, "up", fmt.Sprintf("%d", health.Up)); err != nil {
+		return fmt.Errorf("set interface up: %w", err)
+	}
 	for _, ip := range health.TrackIPs {
 		if err := s.uci.AddList(mwan3ConfigName, sectionName, "track_ip", ip); err != nil {
-			_ = s.uci.Set(mwan3ConfigName, sectionName, "track_ip", ip)
+			if setErr := s.uci.Set(mwan3ConfigName, sectionName, "track_ip", ip); setErr != nil {
+				return fmt.Errorf("set track_ip %s: %w", ip, setErr)
+			}
 		}
 	}
 	return nil
@@ -543,37 +603,33 @@ func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
 		if _, ok := sections[failoverRuleSection]; !ok {
 			return errors.New("expected failover rule missing after apply")
 		}
-		enabledCount := 0
-		for _, c := range cfg.Candidates {
-			if c.Enabled {
-				enabledCount++
-			}
+	}
+	networkStatus, err := s.networkSvc.GetNetworkStatus()
+	if err != nil {
+		return err
+	}
+	for _, candidate := range cfg.Candidates {
+		if candidate.Enabled && interfacePresent(networkStatus.Interfaces, candidate.InterfaceName) {
+			return nil
 		}
-		if enabledCount > 0 {
-			presentEnabledCount := 0
-			networkStatus, err := s.networkSvc.GetNetworkStatus()
-			if err != nil {
-				return err
-			}
-			for _, candidate := range cfg.Candidates {
-				if candidate.Enabled && interfacePresent(networkStatus.Interfaces, candidate.InterfaceName) {
-					presentEnabledCount++
-				}
-			}
-			if presentEnabledCount == 0 {
-				return errors.New("no enabled failover candidate is readable at runtime")
-			}
-		}
+	}
+	if cfg.Enabled {
+		return errors.New("no enabled failover candidate is readable at runtime")
 	}
 	return nil
 }
+
+var mwan3UCIConfigs = []string{"network", "mwan3"}
 
 func (s *FailoverService) reloadMwan3() error {
 	if !s.serviceInstalled() {
 		return nil
 	}
 	if s.applier != nil {
-		return s.applier.ApplyAndConfirm([]string{"network"})
+		if err := s.applier.ApplyAndConfirm(mwan3UCIConfigs); err != nil {
+			return fmt.Errorf("uci apply mwan3: %w", err)
+		}
+		return nil
 	}
 	if _, err := s.cmd.Run(s.initScript, "reload"); err != nil {
 		if _, restartErr := s.cmd.Run(s.initScript, "restart"); restartErr != nil {
