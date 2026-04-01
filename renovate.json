@@ -1,0 +1,237 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "separateMajorMinor": true,
+  "separateMinorPatch": true,
+  "separateMultipleMajor": true,
+  "packageRules": [
+    {
+      "description": "Automerge patch and pin updates for all packages",
+      "matchUpdateTypes": ["patch", "pin"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Group React ecosystem for minor updates",
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "react-minor"
+    },
+    {
+      "description": "Group React ecosystem for major updates",
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "react-major"
+    },
+    {
+      "description": "Group TanStack packages for minor updates",
+      "matchPackageNames": [
+        "@tanstack/react-query",
+        "@tanstack/react-router"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "tanstack-minor"
+    },
+    {
+      "description": "Group TanStack packages for major updates",
+      "matchPackageNames": [
+        "@tanstack/react-query",
+        "@tanstack/react-router"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "tanstack-major"
+    },
+    {
+      "description": "Group Radix UI packages for minor updates",
+      "matchPackageNames": [
+        "@radix-ui/react-collapsible",
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-select",
+        "@radix-ui/react-slot"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "radix-minor"
+    },
+    {
+      "description": "Group Radix UI packages for major updates",
+      "matchPackageNames": [
+        "@radix-ui/react-collapsible",
+        "@radix-ui/react-dialog",
+        "@radix-ui/react-select",
+        "@radix-ui/react-slot"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "radix-major"
+    },
+    {
+      "description": "Group Vite ecosystem for minor updates",
+      "matchPackageNames": [
+        "vite",
+        "@vitejs/plugin-react",
+        "vitest",
+        "tailwindcss",
+        "@tailwindcss/vite",
+        "postcss",
+        "autoprefixer"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "vite-minor"
+    },
+    {
+      "description": "Group Vite ecosystem for major updates",
+      "matchPackageNames": [
+        "vite",
+        "@vitejs/plugin-react",
+        "vitest",
+        "tailwindcss",
+        "@tailwindcss/vite",
+        "postcss",
+        "autoprefixer"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "vite-major"
+    },
+    {
+      "description": "Group testing libraries for minor updates",
+      "matchPackageNames": [
+        "@testing-library/jest-dom",
+        "@testing-library/react",
+        "@testing-library/user-event",
+        "jsdom",
+        "msw"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "test-minor"
+    },
+    {
+      "description": "Group testing libraries for major updates",
+      "matchPackageNames": [
+        "@testing-library/jest-dom",
+        "@testing-library/react",
+        "@testing-library/user-event",
+        "jsdom",
+        "msw"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "test-major"
+    },
+    {
+      "description": "Group Go Fiber packages for minor updates",
+      "matchPackageNames": [
+        "github.com/gofiber/fiber/v3",
+        "github.com/gofiber/contrib/v3"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "gofiber-minor"
+    },
+    {
+      "description": "Group Go Fiber packages for major updates",
+      "matchPackageNames": [
+        "github.com/gofiber/fiber/v3",
+        "github.com/gofiber/contrib/v3"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "gofiber-major"
+    },
+    {
+      "description": "Group golang.org/x packages for minor updates",
+      "matchPackageNames": [
+        "golang.org/x/crypto",
+        "golang.org/x/net",
+        "golang.org/x/sys",
+        "golang.org/x/text"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "golang-minor"
+    },
+    {
+      "description": "Group golang.org/x packages for major updates",
+      "matchPackageNames": [
+        "golang.org/x/crypto",
+        "golang.org/x/net",
+        "golang.org/x/sys",
+        "golang.org/x/text"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "golang-major"
+    },
+    {
+      "description": "Group root dev tools for minor updates",
+      "matchPackageNames": [
+        "typescript",
+        "eslint",
+        "@eslint/js",
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+        "typescript-eslint",
+        "prettier",
+        "globals"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "devtools-minor"
+    },
+    {
+      "description": "Group root dev tools for major updates",
+      "matchPackageNames": [
+        "typescript",
+        "eslint",
+        "@eslint/js",
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+        "typescript-eslint",
+        "prettier",
+        "globals"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "devtools-major"
+    },
+    {
+      "description": "Group misc node packages for minor updates",
+      "matchPackageNames": [
+        "zustand",
+        "recharts",
+        "lucide-react",
+        "sonner",
+        "zod",
+        "react-hook-form",
+        "@hookform/resolvers",
+        "class-variance-authority",
+        "clsx",
+        "tailwind-merge",
+        "qrcode.react"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "node-misc-minor"
+    },
+    {
+      "description": "Group misc node packages for major updates",
+      "matchPackageNames": [
+        "zustand",
+        "recharts",
+        "lucide-react",
+        "sonner",
+        "zod",
+        "react-hook-form",
+        "@hookform/resolvers",
+        "class-variance-authority",
+        "clsx",
+        "tailwind-merge",
+        "qrcode.react"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "node-misc-major"
+    }
+  ]
+}
