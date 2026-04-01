@@ -18,7 +18,7 @@ func TestFailoverServiceGetConfigDefaults(t *testing.T) {
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, networkSvc, &MockCommandRunner{}, configPath)
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
 
 	cfg, err := svc.GetConfig()
 	if err != nil {
@@ -40,7 +40,7 @@ func TestFailoverServiceSetConfigWritesManagedSections(t *testing.T) {
 	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, networkSvc, &MockCommandRunner{}, configPath)
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
 
 	cfg := models.FailoverConfig{
 		Enabled: true,
@@ -116,7 +116,7 @@ func TestFailoverServiceRejectsEnabledConfigWithoutCandidates(t *testing.T) {
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
-	svc := NewFailoverServiceWithRunner(mockUCI, networkSvc, &MockCommandRunner{}, filepath.Join(t.TempDir(), "failover.json"))
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
 
 	err := svc.SetConfig(models.FailoverConfig{
 		Enabled:    true,
@@ -125,5 +125,51 @@ func TestFailoverServiceRejectsEnabledConfigWithoutCandidates(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("expected validation error")
+	}
+}
+
+func TestFailoverServiceVerifyApplyChecksAllEnabledCandidates(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	mockUbus := ubus.NewMockUbus()
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "failover.json")
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
+
+	svc.initScript = filepath.Join(tmpDir, "mwan3")
+	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("write init script: %v", err)
+	}
+
+	cfg := models.FailoverConfig{
+		Enabled: true,
+		Candidates: []models.FailoverCandidate{
+			{
+				ID:            "wan",
+				Label:         "Ethernet WAN",
+				InterfaceName: "wan",
+				Kind:          models.FailoverCandidateKindEthernet,
+				Available:     true,
+				Enabled:       true,
+				Priority:      1,
+			},
+			{
+				ID:            "wwan",
+				Label:         "WiFi uplink",
+				InterfaceName: "wwan",
+				Kind:          models.FailoverCandidateKindWiFi,
+				Available:     true,
+				Enabled:       true,
+				Priority:      2,
+			},
+		},
+		Health: defaultFailoverHealth(),
+	}
+
+	err := svc.SetConfig(cfg)
+	if err != nil {
+		t.Fatalf("SetConfig should succeed when at least one enabled candidate is present: %v", err)
 	}
 }
