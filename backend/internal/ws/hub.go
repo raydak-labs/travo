@@ -65,7 +65,7 @@ func (h *Hub) Broadcast(data []byte) {
 	defer h.mu.RUnlock()
 	for conn := range h.clients {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-			conn.Close()
+			_ = conn.Close()
 		}
 	}
 }

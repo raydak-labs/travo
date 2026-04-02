@@ -149,7 +149,7 @@ func (b *BandSwitchingService) Start() {
 		var (
 			weakSignalSecs  int
 			cooldownSec     int
-			onPreferredBand = true // assume we start on preferred band
+			onPreferredBand bool
 		)
 
 		for {
@@ -230,9 +230,9 @@ func (b *BandSwitchingService) Start() {
 						if err := b.doSwitch(alternateRadio, reason); err == nil {
 							weakSignalSecs = 0
 							cooldownSec = bandSwitchCooldownSec
-							onPreferredBand = alternateRadio == preferredRadio
 						}
 					}
+					// continue is intentional — don't update status after switch
 					continue
 				}
 
@@ -245,7 +245,6 @@ func (b *BandSwitchingService) Start() {
 						if err := b.doSwitch(preferredRadio, reason); err == nil {
 							weakSignalSecs = 0
 							cooldownSec = bandSwitchCooldownSec
-							onPreferredBand = true
 						}
 					}
 				}

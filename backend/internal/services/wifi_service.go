@@ -1019,9 +1019,10 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 			continue
 		}
 		rf := roles[device]
-		if opts["mode"] == "ap" {
+		switch opts["mode"] {
+		case "ap":
 			rf.ap = true
-		} else if opts["mode"] == "sta" {
+		case "sta":
 			rf.sta = true
 		}
 		roles[device] = rf
@@ -1566,7 +1567,7 @@ func (w *WifiService) disableAutoReconnect() error {
 	_, _ = w.cmd.Run("sh", "-c", cronCmd)
 
 	// Remove script file
-	os.Remove(w.reconnectScript)
+	_ = os.Remove(w.reconnectScript)
 	return nil
 }
 

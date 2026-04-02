@@ -103,7 +103,7 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 			CanReachInternet: false,
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, captiveAutoAcceptMaxBodyBytes))
 	if err != nil {
@@ -146,7 +146,7 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 			continue
 		}
 		func() {
-			defer resp2.Body.Close()
+			defer func() { _ = resp2.Body.Close() }()
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp2.Body, 64*1024))
 		}()
 	}

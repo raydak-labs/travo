@@ -123,8 +123,10 @@ func LoadConfigFromEnv() Config {
 	return cfg
 }
 
-// generateRandomSecret retained for backwards compatibility with tests that
+// generateRandomSecret is retained for backwards compatibility with tests that
 // expect a non-empty secret-like value from DefaultConfig.
+//
+//lint:ignore U1000 kept for test compatibility
 func generateRandomSecret() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

@@ -39,7 +39,7 @@ func (p *RealHTTPProber) Do(url string) (int, string, string, error) {
 	if err != nil {
 		return 0, "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

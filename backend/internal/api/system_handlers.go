@@ -308,7 +308,10 @@ func SyncTimeHandler() fiber.Handler {
 		}
 
 		clientTime := time.UnixMilli(req.ClientTimeMs)
-		skew := clientTime.Sub(time.Now()).Abs()
+		skew := time.Until(clientTime)
+		if skew < 0 {
+			skew = -skew
+		}
 		if skew < 60*time.Second {
 			return c.JSON(fiber.Map{"synced": false, "reason": "clock already accurate"})
 		}
