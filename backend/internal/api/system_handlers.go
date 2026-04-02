@@ -198,7 +198,7 @@ func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to read uploaded file"})
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if err := svc.UpgradeFirmware(f, keepSettings); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}

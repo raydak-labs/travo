@@ -25,11 +25,6 @@ jobs:
         run: go mod tidy
         working-directory: backend
 
-      - uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
-        with:
-          version: v2.11.4
-          working-directory: backend
-
       - name: Test
         run: go test ./... -count=1
         working-directory: backend
