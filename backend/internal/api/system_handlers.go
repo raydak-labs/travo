@@ -198,7 +198,7 @@ func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to read uploaded file"})
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if err := svc.UpgradeFirmware(f, keepSettings); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -308,7 +308,10 @@ func SyncTimeHandler() fiber.Handler {
 		}
 
 		clientTime := time.UnixMilli(req.ClientTimeMs)
-		skew := clientTime.Sub(time.Now()).Abs()
+		skew := time.Until(clientTime)
+		if skew < 0 {
+			skew = -skew
+		}
 		if skew < 60*time.Second {
 			return c.JSON(fiber.Map{"synced": false, "reason": "clock already accurate"})
 		}

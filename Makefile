@@ -18,12 +18,12 @@ test:
 # Lint all code
 lint:
 	pnpm lint
-	cd backend && go vet ./...
+	cd backend && golangci-lint run ./...
 
 # Format all code
 format:
 	pnpm format
-	cd backend && gofmt -w .
+	cd backend && goimports -w .
 
 # Cross-compile production binary for OpenWRT (aarch64)
 build-prod:

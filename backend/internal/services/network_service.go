@@ -665,7 +665,7 @@ func (n *NetworkService) DetectWanType() (models.WanDetectResult, error) {
 	}
 
 	// Detect running services to determine actual WAN type
-	detectedType := "dhcp" // default
+	var detectedType string
 
 	// Check if pppd is running → PPPoE
 	if _, err := n.cmd.Run("pgrep", "-x", "pppd"); err == nil {

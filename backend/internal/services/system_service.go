@@ -472,11 +472,11 @@ func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error
 		return fmt.Errorf("creating firmware file: %w", err)
 	}
 	if _, err := io.Copy(out, file); err != nil {
-		out.Close()
-		os.Remove(firmwarePath)
+		_ = out.Close()
+		_ = os.Remove(firmwarePath)
 		return fmt.Errorf("saving firmware file: %w", err)
 	}
-	out.Close()
+	_ = out.Close()
 
 	var args []string
 	if keepSettings {
@@ -631,7 +631,7 @@ func buildButtonActionsJSON(buttons []models.HardwareButton) string {
 	var sb strings.Builder
 	sb.WriteString("[\n")
 	for i, b := range buttons {
-		sb.WriteString(fmt.Sprintf("  {\"name\":%q,\"action\":%q}", b.Name, string(b.Action)))
+		fmt.Fprintf(&sb, "  {\"name\":%q,\"action\":%q}", b.Name, string(b.Action))
 		if i < len(buttons)-1 {
 			sb.WriteString(",")
 		}
@@ -644,10 +644,6 @@ func buildButtonActionsJSON(buttons []models.HardwareButton) string {
 // unmarshalButtonActions is a minimal JSON parser for the button actions file.
 // We use encoding/json via a local import to avoid a circular reference.
 func unmarshalButtonActions(data []byte, out *[]models.HardwareButton) error {
-	type raw struct {
-		Name   string `json:"name"`
-		Action string `json:"action"`
-	}
 	// Parse manually: find pairs of "name":"..." "action":"..."
 	text := string(data)
 	var result []models.HardwareButton
@@ -703,7 +699,7 @@ func buildButtonHotplugScript(buttons []models.HardwareButton) string {
 		if b.Action == models.ButtonActionNone {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("  %s)\n", b.Name))
+		fmt.Fprintf(&sb, "  %s)\n", b.Name)
 		switch b.Action {
 		case models.ButtonActionVPNToggle:
 			// Use netifd-managed interface control; wg-quick is often absent on OpenWrt.
@@ -847,7 +843,7 @@ func (s *SystemService) AddSSHKey(key string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = fmt.Fprintln(f, key)
 	return err
 }

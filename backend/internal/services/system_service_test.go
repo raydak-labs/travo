@@ -58,6 +58,7 @@ func TestGetSystemStats(t *testing.T) {
 	// Network stats may be empty in test env (no sysfs), but must not be nil
 	if stats.Network == nil {
 		// readNetworkStats returns nil slice when no interfaces found — that's ok
+		_ = struct{}{} // explicitly ignore nil
 	}
 }
 
@@ -431,7 +432,9 @@ func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
 	// Remove the ntp section to test default fallback
-	u.DeleteSection("system", "ntp")
+	if err := u.DeleteSection("system", "ntp"); err != nil {
+		t.Fatalf("failed to delete ntp section: %v", err)
+	}
 	svc := NewSystemService(ub, u, &MockStorageProvider{})
 
 	config, err := svc.GetNTPConfig()
@@ -466,7 +469,7 @@ func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	if string(data) != content {
 		t.Errorf("expected firmware content %q, got %q", content, string(data))
 	}
-	os.Remove("/tmp/firmware.bin")
+	_ = os.Remove("/tmp/firmware.bin")
 }
 
 func TestGetSetupComplete_NotComplete(t *testing.T) {
@@ -485,7 +488,7 @@ func TestSetSetupComplete_CreatesFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test the logic: create the flag directory and file, then verify it exists.
 	flagDir := tmpDir + "/etc/openwrt-travel-gui"
@@ -497,7 +500,7 @@ func TestSetSetupComplete_CreatesFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create flag: %v", err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	// Verify the file exists
 	if _, err := os.Stat(flagPath); err != nil {
