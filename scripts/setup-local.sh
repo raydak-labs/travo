@@ -135,9 +135,9 @@ prompt_yes_no() {
   while true; do
     read -r -p "$prompt $suffix: " reply
     reply="${reply:-$default_answer}"
-    case "${reply,,}" in
-      y|yes) return 0 ;;
-      n|no) return 1 ;;
+    case "$reply" in
+      y|Y|yes|YES) return 0 ;;
+      n|N|no|NO) return 1 ;;
     esac
   done
 }
