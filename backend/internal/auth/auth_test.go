@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
 )
 
 func TestLoginSuccess(t *testing.T) {
@@ -192,5 +193,62 @@ func TestChangePasswordTooShort(t *testing.T) {
 	}
 	if err.Error() != "new password must be at least 6 characters" {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthServiceWithUbus_StoresPasswordOnLogin(t *testing.T) {
+	mub := ubus.NewMockUbus()
+	mub.RegisterResponse("session.login", map[string]interface{}{
+		"ubus_rpc_session": "test-session",
+	})
+
+	pw := NewRootPassword()
+	svc := NewAuthServiceWithUbus(mub, "test-secret", pw)
+
+	token, _, err := svc.Login("my-router-password")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if token == "" {
+		t.Fatal("expected non-empty token")
+	}
+
+	if pw.Get() != "my-router-password" {
+		t.Errorf("expected password holder to contain 'my-router-password', got %q", pw.Get())
+	}
+}
+
+func TestAuthServiceWithUbus_DoesNotStorePasswordOnFailedLogin(t *testing.T) {
+	mub := ubus.NewMockUbus()
+	// Don't register session.login response — will fail
+	pw := NewRootPassword()
+	pw.Set("old-password")
+	svc := NewAuthServiceWithUbus(mub, "test-secret", pw)
+
+	_, _, err := svc.Login("wrong-password")
+	if err == nil {
+		t.Fatal("expected error for failed login")
+	}
+
+	// Password should remain unchanged
+	if pw.Get() != "old-password" {
+		t.Errorf("expected password holder to remain 'old-password', got %q", pw.Get())
+	}
+}
+
+func TestAuthServiceWithUbus_NilPasswordHolder(t *testing.T) {
+	mub := ubus.NewMockUbus()
+	mub.RegisterResponse("session.login", map[string]interface{}{
+		"ubus_rpc_session": "test-session",
+	})
+
+	svc := NewAuthServiceWithUbus(mub, "test-secret", nil)
+
+	token, _, err := svc.Login("any-password")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if token == "" {
+		t.Fatal("expected non-empty token")
 	}
 }

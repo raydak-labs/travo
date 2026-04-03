@@ -19,6 +19,7 @@ type AuthService struct {
 	jwtSecret    []byte
 	blocklist    *TokenBlocklist
 	ubus         ubus.Ubus
+	rootPassword *RootPassword
 }
 
 // SetBlocklist attaches a token blocklist to the auth service.
@@ -49,10 +50,11 @@ func NewAuthServiceWithHash(passwordBcrypt, jwtSecret string) *AuthService {
 }
 
 // NewAuthServiceWithUbus validates credentials via rpcd/LuCI session login.
-func NewAuthServiceWithUbus(ub ubus.Ubus, jwtSecret string) *AuthService {
+func NewAuthServiceWithUbus(ub ubus.Ubus, jwtSecret string, rootPassword *RootPassword) *AuthService {
 	return &AuthService{
-		jwtSecret: []byte(jwtSecret),
-		ubus:      ub,
+		jwtSecret:    []byte(jwtSecret),
+		ubus:         ub,
+		rootPassword: rootPassword,
 	}
 }
 
@@ -93,10 +95,16 @@ func (a *AuthService) verifyWithUbus(password string) error {
 		return err
 	}
 	if s, _ := resp["ubus_rpc_session"].(string); s != "" {
+		if a.rootPassword != nil {
+			a.rootPassword.Set(password)
+		}
 		return nil
 	}
 	// some ubus wrappers return result-array format
 	if sid := extractSessionID(resp); sid != "" {
+		if a.rootPassword != nil {
+			a.rootPassword.Set(password)
+		}
 		return nil
 	}
 	return fmt.Errorf("login failed")
