@@ -89,6 +89,9 @@ func WifiSetModeHandler(svc *services.WifiService) fiber.Handler {
 		if err := c.Bind().Body(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
+		if strings.TrimSpace(body.Mode) == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mode is required"})
+		}
 		if body.Mode == "repeater" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "repeater mode is currently disabled. Use access point or client mode instead.",

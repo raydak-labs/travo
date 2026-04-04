@@ -25,15 +25,6 @@ import (
 // Version is set at build time via -ldflags "-X main.Version=..."
 var Version = "dev"
 
-const modeChangeGuardFile = "/etc/travo/mode-change-in-progress"
-
-func checkAndClearModeChangeGuard() {
-	if _, err := os.Stat(modeChangeGuardFile); err == nil {
-		log.Printf("WARNING: Mode change guard file exists. A previous mode change may have caused a crash. Clearing guard file to prevent retry loop.")
-		_ = os.Remove(modeChangeGuardFile)
-	}
-}
-
 func splitCORSOrigins(s string) []string {
 	if strings.TrimSpace(s) == "" {
 		return []string{"*"}
@@ -254,10 +245,6 @@ func main() {
 	cfg, showVersion, err := config.LoadConfig(os.Args[1:])
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
-	}
-
-	if !cfg.MockMode {
-		checkAndClearModeChangeGuard()
 	}
 
 	if showVersion {
