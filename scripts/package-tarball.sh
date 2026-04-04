@@ -30,6 +30,7 @@ mkdir -p \
     "${STAGE_DIR}/etc/init.d" \
     "${STAGE_DIR}/etc/config" \
     "${STAGE_DIR}/etc/uci-defaults" \
+    "${STAGE_DIR}/etc/sysupgrade.d" \
     "${STAGE_DIR}/etc/travo"
 
 cp "${BUILD_DIR}/travo"                                           "${STAGE_DIR}/usr/bin/travo"
@@ -39,6 +40,9 @@ cp packaging/openwrt/files/etc/init.d/travo                      "${STAGE_DIR}/e
 chmod +x "${STAGE_DIR}/etc/init.d/travo"
 cp packaging/openwrt/files/etc/config/travo                      "${STAGE_DIR}/etc/config/travo"
 cp packaging/openwrt/files/etc/uci-defaults/99-travel-gui-ports  "${STAGE_DIR}/etc/uci-defaults/99-travel-gui-ports"
+cp packaging/openwrt/files/etc/sysupgrade.d/10-travo-backup.sh   "${STAGE_DIR}/etc/sysupgrade.d/"
+cp packaging/openwrt/files/etc/sysupgrade.d/20-travo-restore.sh  "${STAGE_DIR}/etc/sysupgrade.d/"
+chmod +x "${STAGE_DIR}/etc/sysupgrade.d/"*
 cp packaging/adguard/AdGuardHome.yaml                             "${STAGE_DIR}/etc/travo/adguardhome.yaml"
 
 OUTPUT="${BUILD_DIR}/${PKG_NAME}_${VERSION}_${ARCH}.tar.gz"
