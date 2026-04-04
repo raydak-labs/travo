@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Monitor, Repeat, Wifi } from 'lucide-react';
+import { Monitor, Wifi } from 'lucide-react';
 import type { WifiMode } from '@shared/index';
 
 export interface WifiModeOption {
@@ -23,13 +23,6 @@ export const WIFI_MODE_OPTIONS: WifiModeOption[] = [
     icon: Monitor,
     description:
       'Connect to an existing WiFi network to get internet access. Your travel router acts as a WiFi client.',
-  },
-  {
-    mode: 'repeater',
-    label: 'Repeater',
-    icon: Repeat,
-    description:
-      'Connect to an existing WiFi and rebroadcast it to your devices. Extends WiFi range.',
   },
 ];
 

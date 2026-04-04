@@ -66,6 +66,7 @@ const defaultPriorityFile = "/etc/travo/wifi-priorities.json"
 const defaultAutoReconnectFile = "/etc/travo/autoreconnect.json"
 const defaultReconnectScript = "/etc/travo/wifi-reconnect.sh"
 const defaultWifiModeFile = "/etc/travo/wifi-mode"
+const modeChangeGuardFile = "/etc/travo/mode-change-in-progress"
 
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
 // otherwise falls back to reloader (e.g. tests or when rpcd session is unavailable).
@@ -149,6 +150,17 @@ func (w *WifiService) ConfirmApply(token string) error {
 			return fmt.Errorf("uci confirm ok but wireless reload failed: %w", err)
 		}
 	}
+
+	if modeChangeGuardFile != "" {
+		guardData, err := os.ReadFile(modeChangeGuardFile)
+		if err == nil {
+			guardToken := strings.TrimSpace(string(guardData))
+			if guardToken == token {
+				_ = os.Remove(modeChangeGuardFile)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -801,7 +813,14 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 }
 
 // SetMode sets the app-level WiFi operating mode by enabling/disabling STA and AP sections.
+// Uses crash guard and apply+confirm for safety: if the device crashes or becomes unreachable,
+// the rollback timer will revert changes. The guard file prevents retry loops on reboot.
 func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
+	validModes := map[string]bool{"ap": true, "client": true, "repeater": true}
+	if !validModes[mode] {
+		return nil, fmt.Errorf("unsupported wifi mode %q", mode)
+	}
+
 	apSections, err := w.getWifiSectionsByMode("ap")
 	if err != nil {
 		return nil, err
@@ -821,8 +840,6 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 	case "repeater":
 		enableAP = true
 		enableSTA = true
-	default:
-		return nil, fmt.Errorf("unsupported wifi mode %q", mode)
 	}
 
 	if enableSTA && len(staSections) == 0 {
@@ -861,7 +878,19 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 			_ = os.WriteFile(w.modeFile, []byte(mode), 0600)
 		}
 	}
-	return w.stageWirelessApply()
+
+	result, err := w.stageWirelessApply()
+	if err != nil {
+		return nil, err
+	}
+
+	if result != nil && result.Token != "" && modeChangeGuardFile != "" {
+		if err := os.MkdirAll(filepath.Dir(modeChangeGuardFile), 0750); err == nil {
+			_ = os.WriteFile(modeChangeGuardFile, []byte(result.Token), 0600)
+		}
+	}
+
+	return result, nil
 }
 
 // loadPriorities reads the priority file and returns an ssid->priority map.
