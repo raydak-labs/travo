@@ -46,7 +46,6 @@ func splitCORSOrigins(s string) []string {
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
-	cfg.MockMode = true
 	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
 		cfg.AuthConfigPath = tmpDir + "/auth.json"
 	}
