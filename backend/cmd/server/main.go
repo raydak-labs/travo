@@ -88,6 +88,9 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		ub = ubus.NewRealUbus()
 	}
 
+	// Create shared root password holder (written by auth after login, read by UCI apply).
+	rootPassword := auth.NewRootPassword()
+
 	// Create services
 	authStore := auth.NewFileAuthStore(cfg.AuthConfigPath)
 	authCfg, err := authStore.LoadOrInit()
@@ -98,7 +101,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	if cfg.MockMode {
 		authSvc = auth.NewAuthService("admin", authCfg.JWTSecret)
 	} else {
-		authSvc = auth.NewAuthServiceWithUbus(ub, authCfg.JWTSecret)
+		authSvc = auth.NewAuthServiceWithUbus(ub, authCfg.JWTSecret, rootPassword)
 	}
 	var storage services.StorageProvider
 	var captiveProber services.HTTPProber
@@ -126,7 +129,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	if cfg.MockMode {
 		wifiSvc = services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{})
 	} else {
-		wifiSvc = services.NewWifiService(u, ub) // uses apply+confirm instead of wifi up
+		wifiSvc = services.NewWifiService(u, ub, rootPassword) // uses apply+confirm instead of wifi up
 	}
 
 	// Fix wireless UCI on startup (country/channel, missing SSID/key on existing APs,

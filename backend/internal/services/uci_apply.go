@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 )
 
@@ -34,12 +35,13 @@ const (
 
 // RealUCIApplyConfirm uses ubus session + rpcd uci apply/confirm.
 type RealUCIApplyConfirm struct {
-	ubus ubus.Ubus
+	ubus     ubus.Ubus
+	password *auth.RootPassword
 }
 
-// NewRealUCIApplyConfirm returns a real applier that uses the given ubus.
-func NewRealUCIApplyConfirm(ub ubus.Ubus) *RealUCIApplyConfirm {
-	return &RealUCIApplyConfirm{ubus: ub}
+// NewRealUCIApplyConfirm returns a real applier that uses the given ubus and password holder.
+func NewRealUCIApplyConfirm(ub ubus.Ubus, pw *auth.RootPassword) *RealUCIApplyConfirm {
+	return &RealUCIApplyConfirm{ubus: ub, password: pw}
 }
 
 // StartApply stages an rpcd rollback apply and returns the session ID.
@@ -99,7 +101,7 @@ func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
 func (r *RealUCIApplyConfirm) sessionLogin() (string, error) {
 	args := map[string]interface{}{
 		"username": "root",
-		"password": "",
+		"password": r.password.Get(),
 	}
 	resp, err := r.ubus.Call("session", "login", args)
 	if err != nil {
