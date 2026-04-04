@@ -33,6 +33,7 @@ mkdir -p "${IPK_DIR}/data/usr/bin"
 mkdir -p "${IPK_DIR}/data/etc/init.d"
 mkdir -p "${IPK_DIR}/data/etc/config"
 mkdir -p "${IPK_DIR}/data/etc/uci-defaults"
+mkdir -p "${IPK_DIR}/data/etc/sysupgrade.d"
 mkdir -p "${IPK_DIR}/data/www/travo"
 mkdir -p "${IPK_DIR}/control"
 
@@ -46,6 +47,8 @@ cp -r frontend/dist/* "${IPK_DIR}/data/www/travo/"
 cp packaging/openwrt/files/etc/init.d/travo "${IPK_DIR}/data/etc/init.d/"
 cp packaging/openwrt/files/etc/config/travo "${IPK_DIR}/data/etc/config/"
 cp packaging/openwrt/files/etc/uci-defaults/99-travel-gui-ports "${IPK_DIR}/data/etc/uci-defaults/"
+cp packaging/openwrt/files/etc/sysupgrade.d/10-travo-backup.sh "${IPK_DIR}/data/etc/sysupgrade.d/"
+cp packaging/openwrt/files/etc/sysupgrade.d/20-travo-restore.sh "${IPK_DIR}/data/etc/sysupgrade.d/"
 
 # Create control file
 cat > "${IPK_DIR}/control/control" << EOF
