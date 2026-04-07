@@ -144,11 +144,7 @@ func (w *WifiService) ConfirmApply(token string) error {
 	if err := w.applier.Confirm(token); err != nil {
 		return err
 	}
-	if w.reloader != nil {
-		if err := w.reloader.Reload(); err != nil {
-			return fmt.Errorf("uci confirm ok but wireless reload failed: %w", err)
-		}
-	}
+	// After successful confirm, no reload is needed as apply+confirm already applied changes
 	return nil
 }
 
