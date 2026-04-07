@@ -801,7 +801,17 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 }
 
 // SetMode sets the app-level WiFi operating mode by enabling/disabling STA and AP sections.
+// Uses OpenWRT's apply+confirm flow for safety: if the device crashes or becomes unreachable,
+// the rollback timer (30 seconds) will automatically revert to the previous configuration.
+// The user's browser polls to confirm the router is still reachable; if confirm succeeds,
+// the rollback is cancelled. This prevents soft-brick scenarios without needing a separate
+// guard file (which is only required for background tasks that run without user oversight).
 func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
+	validModes := map[string]bool{"ap": true, "client": true, "repeater": true}
+	if !validModes[mode] {
+		return nil, fmt.Errorf("unsupported wifi mode %q", mode)
+	}
+
 	apSections, err := w.getWifiSectionsByMode("ap")
 	if err != nil {
 		return nil, err
@@ -821,8 +831,6 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 	case "repeater":
 		enableAP = true
 		enableSTA = true
-	default:
-		return nil, fmt.Errorf("unsupported wifi mode %q", mode)
 	}
 
 	if enableSTA && len(staSections) == 0 {
