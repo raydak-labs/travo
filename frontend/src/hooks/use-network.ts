@@ -17,6 +17,8 @@ import type {
   DDNSConfig,
   DDNSStatus,
   UptimeEvent,
+  FailoverConfig,
+  FailoverEvent,
   FirewallZone,
   PortForwardRule,
   AddPortForwardRequest,
@@ -301,6 +303,38 @@ export function useUptimeLog() {
     queryKey: ['network', 'uptimeLog'],
     queryFn: () => apiClient.get<UptimeEvent[]>(API_ROUTES.network.uptimeLog),
     refetchInterval: 60000,
+  });
+}
+
+export function useFailoverConfig() {
+  return useQuery({
+    queryKey: ['network', 'failover'],
+    queryFn: () => apiClient.get<FailoverConfig>(API_ROUTES.network.failover),
+  });
+}
+
+export function useSetFailoverConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: FailoverConfig) =>
+      apiClient.put<{ status: string }>(API_ROUTES.network.failover, config),
+    onSuccess: () => {
+      toast.success('Connection failover updated');
+      void queryClient.invalidateQueries({ queryKey: ['network', 'failover'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'failoverEvents'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to update connection failover', { description: error.message });
+    },
+  });
+}
+
+export function useFailoverEvents() {
+  return useQuery({
+    queryKey: ['network', 'failoverEvents'],
+    queryFn: () => apiClient.get<FailoverEvent[]>(API_ROUTES.network.failoverEvents),
+    refetchInterval: 15000,
   });
 }
 

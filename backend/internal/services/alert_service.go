@@ -230,6 +230,26 @@ func (a *AlertService) appendAlert(alert models.Alert) {
 	}
 }
 
+// Publish appends and broadcasts a one-off alert event.
+func (a *AlertService) Publish(alertType, message, severity string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	alert := models.Alert{
+		ID:        generateAlertID(),
+		Type:      alertType,
+		Message:   message,
+		Severity:  severity,
+		Timestamp: time.Now().UnixMilli(),
+	}
+	a.appendAlert(alert)
+
+	select {
+	case a.alertCh <- alert:
+	default:
+	}
+}
+
 func generateAlertID() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)

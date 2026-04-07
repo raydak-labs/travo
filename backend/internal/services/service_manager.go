@@ -69,12 +69,19 @@ var knownServices = []serviceDefinition{
 		InitName:    "vnstat",
 	},
 	{
-		ID:          "sqm",
-		Name:        "SQM (Traffic Shaping)",
-		Description: "Smart Queue Management to reduce latency (bufferbloat)",
-		Packages:    []string{"sqm-scripts", "luci-app-sqm"},
+		ID:            "sqm",
+		Name:          "SQM (Traffic Shaping)",
+		Description:   "Smart Queue Management to reduce latency (bufferbloat)",
+		Packages:      []string{"sqm-scripts", "luci-app-sqm"},
 		DetectPackage: "sqm-scripts",
-		InitName:    "sqm",
+		InitName:      "sqm",
+	},
+	{
+		ID:          "mwan3",
+		Name:        "Connection Failover (mwan3)",
+		Description: "Ordered multi-WAN failover with health tracking",
+		Packages:    []string{"mwan3"},
+		InitName:    "mwan3",
 	},
 }
 

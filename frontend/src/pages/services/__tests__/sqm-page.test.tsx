@@ -48,9 +48,7 @@ function renderSQMPage() {
 describe('SQMPage', () => {
   beforeEach(() => {
     mockUseServices.mockReturnValue({
-      data: mockServices.map((s) =>
-        s.id === 'sqm' ? { ...s, state: 'not_installed' } : s,
-      ),
+      data: mockServices.map((s) => (s.id === 'sqm' ? { ...s, state: 'not_installed' } : s)),
       isLoading: false,
       isError: false,
     } as ReturnType<typeof useServices>);
