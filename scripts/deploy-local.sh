@@ -11,9 +11,13 @@
 # It does NOT remove or replace:
 #   - /etc/init.d/travo
 #   - /etc/config/travo
-#   - /etc/travo/* (profiles, guards, etc.)
+#   - /etc/uci-defaults, /etc/sysupgrade.d, default AdGuard template under /etc/travo/
 # If the service script is missing, port 80 will stay down until you run
 #   ./scripts/setup-local.sh [--no-luci-move]
+#
+# Release mode (--method release) stages the same tree as scripts/package-tarball.sh
+# and streams it to / on the router (no .tar.gz file on disk). Matches tarball extract +
+# postinst-style uci-defaults apply. Overwrites packaged paths under /etc and /www.
 #
 # Usage:
 #   ./scripts/deploy-local.sh [options]
@@ -34,15 +38,22 @@
 #   # Just restart the service (no build, no file transfer)
 #   ./scripts/deploy-local.sh --restart-only
 #
-#   # Build + backend-only upload (skip frontend tarball)
+#   # Build + backend-only upload (skip frontend assets)
 #   ./scripts/deploy-local.sh --binary-only
+#
+#   # Same filesystem layout as a release tarball (binary, LuCI ports uci-default,
+#   # sysupgrade hooks, adguard template, etc.) — no tarball or .ipk step
+#   ./scripts/deploy-local.sh --method release
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 ROUTER_IP="192.168.1.1"
 ROUTER_USER="root"
-METHOD="direct"        # direct | opkg | apk
+METHOD="direct"        # direct | release | opkg | apk
 LEGACY_SCP=true        # use -O flag for older dropbear
 DO_BUILD=true
 DO_RESTART=true
@@ -65,7 +76,7 @@ Usage: $(basename "$0") [options]
 Options:
   --ip IP              Router IP address (default: 192.168.1.1)
   --user USER          SSH user (default: root)
-  --method METHOD      Deploy method: direct, opkg, apk (default: direct)
+  --method METHOD      Deploy method: direct, release, opkg, apk (default: direct)
   --ipk PATH           Path to .ipk file (auto-detected from dist/ if omitted)
   --legacy-scp         Use SCP legacy protocol (-O flag) for Dropbear (default: on)
   --no-legacy-scp      Disable legacy SCP flag
@@ -76,7 +87,8 @@ Options:
   -h, --help           Show this help
 
 Deploy methods:
-  direct   Copy binary + frontend assets directly (fastest, no package manager)
+  direct   Copy binary + frontend assets only (fastest; skips tarball-only files)
+  release  Same tree as package-tarball.sh → extract to / (no local .tar.gz; tests release layout)
   opkg     Build .ipk and install via opkg (OpenWrt <25)
   apk      Build .ipk and install via apk (OpenWrt 25.x+)
 EOF
@@ -99,6 +111,10 @@ while [[ $# -gt 0 ]]; do
     *)              error "Unknown option: $1. Use --help for usage." ;;
   esac
 done
+
+if $BINARY_ONLY && [[ "$METHOD" == "release" ]]; then
+  error "Cannot use --binary-only with --method release (release deploys the full staged tree)."
+fi
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 REMOTE="${ROUTER_USER}@${ROUTER_IP}"
@@ -185,6 +201,28 @@ deploy_direct() {
   info "Files deployed via direct copy."
 }
 
+# ── Deploy: release layout (same as tarball extract, no .tar.gz artifact) ────
+deploy_release() {
+  local stage_dir
+  stage_dir="$(cd "${REPO_ROOT}" && bash scripts/stage-release-layout.sh)"
+  [[ -n "$stage_dir" && -d "$stage_dir" ]] || error "Release staging failed — run scripts/build.sh or remove --no-build."
+
+  info "Stopping service..."
+  ssh_cmd "/etc/init.d/travo stop 2>/dev/null || true"
+
+  info "Uploading release filesystem tree (tar stream to /)..."
+  COPYFILE_DISABLE=1 tar -cf - -C "$stage_dir" . | ssh_cmd "tar -xf - -C /"
+
+  info "Applying post-install steps (chmod, uci-defaults, enable)..."
+  ssh_cmd "chmod +x /usr/bin/travo /etc/init.d/travo"
+  ssh_cmd "chmod +x /etc/sysupgrade.d/10-travo-backup.sh /etc/sysupgrade.d/20-travo-restore.sh 2>/dev/null || true"
+  ssh_cmd 'if [ -f /etc/uci-defaults/99-travel-gui-ports ]; then sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports; fi'
+  ssh_cmd "/etc/init.d/travo enable"
+  ssh_cmd "uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true"
+
+  info "Release layout deployed (matches package-tarball contents → /)."
+}
+
 # ── Deploy: package manager (opkg/apk) ───────────────────────────────────────
 deploy_package() {
   local pkg_cmd="$1"
@@ -259,10 +297,11 @@ if $DO_BUILD; then
 fi
 
 case "$METHOD" in
-  direct) deploy_direct ;;
-  opkg)   deploy_package "opkg" "install" ;;
-  apk)    deploy_package "apk" "add --allow-untrusted" ;;
-  *)      error "Unknown method: ${METHOD}. Use direct, opkg, or apk." ;;
+  direct)  deploy_direct ;;
+  release) deploy_release ;;
+  opkg)    deploy_package "opkg" "install" ;;
+  apk)     deploy_package "apk" "add --allow-untrusted" ;;
+  *)       error "Unknown method: ${METHOD}. Use direct, release, opkg, or apk." ;;
 esac
 
 if $DO_RESTART; then
