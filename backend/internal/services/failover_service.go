@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -54,13 +55,13 @@ type FailoverService struct {
 	stopOnce   sync.Once
 }
 
-func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService) *FailoverService {
+func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw *auth.RootPassword) *FailoverService {
 	return &FailoverService{
 		uci:        u,
 		ubus:       ub,
 		networkSvc: networkSvc,
 		cmd:        &RealCommandRunner{},
-		applier:    NewRealUCIApplyConfirm(ub),
+		applier:    NewRealUCIApplyConfirm(ub, pw),
 		configPath: failoverConfigPath,
 		guardPath:  failoverGuardPath,
 		backupPath: failoverBackupPath,
