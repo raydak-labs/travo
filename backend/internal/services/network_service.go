@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1311,7 +1312,19 @@ type ConnectionMethod struct {
 // dump for accurate address detection. On error, logs details and returns
 // "unknown" to avoid breaking UI.
 func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
-	if clientIP == "" || clientIP == "::1" {
+	// Handle localhost cases
+	if clientIP == "" || clientIP == "::1" || clientIP == "127.0.0.1" {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Parse client IP to validate it's valid
+	clientAddr, err := netip.ParseAddr(clientIP)
+	if err != nil {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// IPv6 addresses are not supported for connection method detection
+	if clientAddr.Is6() {
 		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
 	}
 
@@ -1330,7 +1343,7 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 	type ifaceInfo struct {
 		name        string
 		device      string
-		ipv4Addrs   []string
+		ipv4Addrs   []netip.Prefix
 		up          bool
 		interfaceUp bool
 	}
@@ -1373,12 +1386,28 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 			}(),
 		}
 
-		// Extract IPv4 addresses
+		// Extract IPv4 addresses with netmasks
 		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]interface{}); ok {
 			for _, addrRaw := range ipv4Addrs {
 				if addrMap, ok := addrRaw.(map[string]interface{}); ok {
 					if addrStr, ok := addrMap["address"].(string); ok {
-						info.ipv4Addrs = append(info.ipv4Addrs, addrStr)
+						// Parse address with netmask
+						if addr, err := netip.ParseAddr(addrStr); err == nil {
+							info.ipv4Addrs = append(info.ipv4Addrs, netip.PrefixFrom(addr, 32))
+						}
+					}
+				}
+			}
+		}
+
+		// Also extract IPv4 prefix data if available (includes netmask)
+		if ipv4Prefixes, ok := ifaceMap["ipv4-prefix"].([]interface{}); ok {
+			for _, prefixRaw := range ipv4Prefixes {
+				if prefixMap, ok := prefixRaw.(map[string]interface{}); ok {
+					if prefixStr, ok := prefixMap["address"].(string); ok {
+						if prefix, err := netip.ParsePrefix(prefixStr); err == nil {
+							info.ipv4Addrs = append(info.ipv4Addrs, prefix)
+						}
 					}
 				}
 			}
@@ -1396,9 +1425,8 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		}
 
 		// Check if client IP is in this interface's subnet
-		// Simple check: exact match or in same subnet
-		for _, addr := range info.ipv4Addrs {
-			if ipInSubnet(clientIP, addr) {
+		for _, prefix := range info.ipv4Addrs {
+			if prefix.Contains(clientAddr) {
 				matchedIface = info
 				break
 			}
@@ -1431,29 +1459,4 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		Interface: matchedIface.name,
 		IPAddress: clientIP,
 	}, nil
-}
-
-// ipInSubnet checks if two IPs are in the same subnet (simple /24 assumption)
-// For more accurate subnet detection, we would need to parse the netmask from ubus
-func ipInSubnet(ip1, ip2 string) bool {
-	if ip1 == ip2 {
-		return true
-	}
-
-	// Simple /24 subnet check
-	parts1 := strings.Split(ip1, ".")
-	parts2 := strings.Split(ip2, ".")
-
-	if len(parts1) != 4 || len(parts2) != 4 {
-		return false
-	}
-
-	// Check first three octets match
-	for i := 0; i < 3; i++ {
-		if parts1[i] != parts2[i] {
-			return false
-		}
-	}
-
-	return true
 }
