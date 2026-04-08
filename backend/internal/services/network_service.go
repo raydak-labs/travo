@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -55,6 +56,28 @@ func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *
 // NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
 func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
 	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
+}
+
+// uciSet is a helper for setting UCI values with consistent error wrapping.
+func (n *NetworkService) uciSet(config, section, option, value string) error {
+	if err := n.uci.Set(config, section, option, value); err != nil {
+		return fmt.Errorf("set %s.%s.%s: %w", config, section, option, err)
+	}
+	return nil
+}
+
+// uciCommit commits a UCI config with consistent error wrapping.
+func (n *NetworkService) uciCommit(config string) error {
+	if err := n.uci.Commit(config); err != nil {
+		return fmt.Errorf("commit %s: %w", config, err)
+	}
+	return nil
+}
+
+// restartService restarts an OpenWRT init.d service.
+func (n *NetworkService) restartService(service string) error {
+	_, err := n.cmd.Run("/etc/init.d/"+service, "restart")
+	return err
 }
 
 // updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
@@ -630,26 +653,26 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 // SetWanConfig updates the WAN configuration.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	if config.Type != "" {
-		if err := n.uci.Set("network", "wan", "proto", config.Type); err != nil {
-			return fmt.Errorf("setting WAN proto: %w", err)
+		if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
+			return err
 		}
 	}
 	if config.IPAddress != "" {
-		if err := n.uci.Set("network", "wan", "ip4addr", config.IPAddress); err != nil {
-			return fmt.Errorf("setting WAN ip4addr: %w", err)
+		if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
+			return err
 		}
 	}
 	if config.Netmask != "" {
-		if err := n.uci.Set("network", "wan", "netmask", config.Netmask); err != nil {
-			return fmt.Errorf("setting WAN netmask: %w", err)
+		if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
+			return err
 		}
 	}
 	if config.Gateway != "" {
-		if err := n.uci.Set("network", "wan", "gateway", config.Gateway); err != nil {
-			return fmt.Errorf("setting WAN gateway: %w", err)
+		if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+			return err
 		}
 	}
-	return n.uci.Commit("network")
+	return n.uciCommit("network")
 }
 
 // DetectWanType auto-detects the WAN connection type and returns
@@ -763,16 +786,16 @@ func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
 
 // SetDHCPConfig updates the DHCP configuration for the LAN.
 func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
-	if err := n.uci.Set("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
-		return fmt.Errorf("setting DHCP start: %w", err)
+	if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
+		return err
 	}
-	if err := n.uci.Set("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
-		return fmt.Errorf("setting DHCP limit: %w", err)
+	if err := n.uciSet("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
+		return err
 	}
-	if err := n.uci.Set("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
-		return fmt.Errorf("setting DHCP leasetime: %w", err)
+	if err := n.uciSet("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
+		return err
 	}
-	return n.uci.Commit("dhcp")
+	return n.uciCommit("dhcp")
 }
 
 // GetDHCPLeases reads active DHCP leases from /tmp/dhcp.leases.
@@ -935,38 +958,45 @@ func (n *NetworkService) KickClient(mac string) error {
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
 func (n *NetworkService) BlockClient(mac string) error {
 	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	macUpper := strings.ToUpper(mac)
+
 	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
-		return fmt.Errorf("adding firewall block rule: %w", err)
+		return fmt.Errorf("add firewall block rule: %w", err)
 	}
-	if err := n.uci.Set("firewall", section, "name", "Block-"+strings.ToUpper(mac)); err != nil {
-		return fmt.Errorf("setting block rule name: %w", err)
+	if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "src", "lan"); err != nil {
-		return fmt.Errorf("setting block rule src: %w", err)
+	if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "src_mac", strings.ToUpper(mac)); err != nil {
-		return fmt.Errorf("setting block rule src_mac: %w", err)
+	if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "target", "DROP"); err != nil {
-		return fmt.Errorf("setting block rule target: %w", err)
+	if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
+		return err
 	}
-	if err := n.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
+	if err := n.uciCommit("firewall"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	if err := n.restartService("firewall"); err != nil {
+		return fmt.Errorf("restart firewall: %w", err)
+	}
 	return nil
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
 	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+
 	if err := n.uci.DeleteSection("firewall", section); err != nil {
-		return fmt.Errorf("deleting firewall block rule: %w", err)
+		return fmt.Errorf("delete firewall block rule: %w", err)
 	}
-	if err := n.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
+	if err := n.uciCommit("firewall"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	if err := n.restartService("firewall"); err != nil {
+		return fmt.Errorf("restart firewall: %w", err)
+	}
 	return nil
 }
 
@@ -1297,4 +1327,165 @@ func (n *NetworkService) SendWoL(mac, iface string) error {
 		_, err = n.cmd.Run("ether-wake", args...)
 	}
 	return err
+}
+
+// ConnectionMethod describes how the client is connected.
+type ConnectionMethod struct {
+	Method    string `json:"method"`     // "wifi-client", "wifi-ap", "ethernet", "unknown"
+	Interface string `json:"interface"`  // interface name (e.g., "br-lan", "wwan0")
+	IPAddress string `json:"ip_address"` // client's IP address
+}
+
+// GetConnectionMethod determines how the client is connected by matching the
+// client IP against network interface addresses. Uses ubus network interface
+// dump for accurate address detection. On error, logs details and returns
+// "unknown" to avoid breaking UI.
+func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
+	// Handle localhost cases
+	if clientIP == "" || clientIP == "::1" || clientIP == "127.0.0.1" {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Parse client IP to validate it's valid
+	clientAddr, err := netip.ParseAddr(clientIP)
+	if err != nil {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// IPv6 addresses are not supported for connection method detection
+	if clientAddr.Is6() {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Get all network interface addresses via ubus
+	ifaceDump, err := n.ubus.Call("network.interface", "dump", nil)
+	if err != nil {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Parse the ubus response to find matching interfaces
+	interfaces, ok := ifaceDump["interface"].([]interface{})
+	if !ok {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	type ifaceInfo struct {
+		name        string
+		device      string
+		ipv4Addrs   []netip.Prefix
+		up          bool
+		interfaceUp bool
+	}
+
+	var ifaces []ifaceInfo
+
+	// Extract interface information
+	for _, ifaceRaw := range interfaces {
+		ifaceMap, ok := ifaceRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := ifaceMap["l3_device"].(string)
+		if name == "" {
+			name, _ = ifaceMap["interface"].(string)
+		}
+
+		l3Device, _ := ifaceMap["l3_device"].(string)
+		device, _ := ifaceMap["device"].(string)
+
+		if l3Device != "" {
+			device = l3Device
+		}
+
+		info := ifaceInfo{
+			name:   name,
+			device: device,
+			up: func() bool {
+				if up, ok := ifaceMap["up"].(bool); ok {
+					return up
+				}
+				return false
+			}(),
+			interfaceUp: func() bool {
+				if up, ok := ifaceMap["interface"].(bool); ok {
+					return up
+				}
+				return false
+			}(),
+		}
+
+		// Extract IPv4 addresses with netmasks
+		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]interface{}); ok {
+			for _, addrRaw := range ipv4Addrs {
+				if addrMap, ok := addrRaw.(map[string]interface{}); ok {
+					if addrStr, ok := addrMap["address"].(string); ok {
+						// Parse address with netmask
+						if addr, err := netip.ParseAddr(addrStr); err == nil {
+							info.ipv4Addrs = append(info.ipv4Addrs, netip.PrefixFrom(addr, 32))
+						}
+					}
+				}
+			}
+		}
+
+		// Also extract IPv4 prefix data if available (includes netmask)
+		if ipv4Prefixes, ok := ifaceMap["ipv4-prefix"].([]interface{}); ok {
+			for _, prefixRaw := range ipv4Prefixes {
+				if prefixMap, ok := prefixRaw.(map[string]interface{}); ok {
+					if prefixStr, ok := prefixMap["address"].(string); ok {
+						if prefix, err := netip.ParsePrefix(prefixStr); err == nil {
+							info.ipv4Addrs = append(info.ipv4Addrs, prefix)
+						}
+					}
+				}
+			}
+		}
+
+		ifaces = append(ifaces, info)
+	}
+
+	// Find which interface matches the client IP
+	var matchedIface *ifaceInfo
+	for i := range ifaces {
+		info := &ifaces[i]
+		if !info.up && !info.interfaceUp {
+			continue
+		}
+
+		// Check if client IP is in this interface's subnet
+		for _, prefix := range info.ipv4Addrs {
+			if prefix.Contains(clientAddr) {
+				matchedIface = info
+				break
+			}
+		}
+		if matchedIface != nil {
+			break
+		}
+	}
+
+	if matchedIface == nil {
+		// No match found - might be localhost or routed
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Determine connection method based on interface
+	method := "unknown"
+	switch {
+	case strings.HasPrefix(matchedIface.name, "wwan") ||
+		strings.HasPrefix(matchedIface.device, "phy") && strings.Contains(matchedIface.device, "-sta"):
+		method = "wifi-client"
+	case matchedIface.name == "br-lan" || matchedIface.name == "lan":
+		// Check if this is AP via wireless device presence
+		method = "wifi-ap" // Default to AP for LAN
+	case strings.HasPrefix(matchedIface.name, "eth") || strings.HasPrefix(matchedIface.device, "eth"):
+		method = "ethernet"
+	}
+
+	return &ConnectionMethod{
+		Method:    method,
+		Interface: matchedIface.name,
+		IPAddress: clientIP,
+	}, nil
 }
