@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -323,8 +322,6 @@ func TestGetConnectionMethod(t *testing.T) {
 			ub := ubus.NewMockUbus()
 			if tt.ubusResponse != nil {
 				ub.RegisterResponse("network.interface.dump", tt.ubusResponse)
-			} else if strings.Contains(tt.name, "ubus error") {
-				// Let it fall through to the unknown method which returns error
 			}
 
 			u := uci.NewMockUCI()
