@@ -117,9 +117,9 @@ export function WifiModeSwitchDialog({
           <div
             className={cn(
               'flex items-start gap-3 rounded-lg border p-3',
-              warning.severity === 'high'
+              warning!.severity === 'high'
                 ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'
-                : warning.severity === 'medium'
+                : warning!.severity === 'medium'
                   ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
                   : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950',
             )}
@@ -127,9 +127,9 @@ export function WifiModeSwitchDialog({
             <AlertTriangle
               className={cn(
                 'mt-0.5 h-4 w-4 shrink-0',
-                warning.severity === 'high'
+                warning!.severity === 'high'
                   ? 'text-red-600 dark:text-red-400'
-                  : warning.severity === 'medium'
+                  : warning!.severity === 'medium'
                     ? 'text-amber-600 dark:text-amber-400'
                     : 'text-blue-600 dark:text-blue-400',
               )}
@@ -138,34 +138,34 @@ export function WifiModeSwitchDialog({
               <p
                 className={cn(
                   'text-sm font-medium',
-                  warning.severity === 'high'
+                  warning!.severity === 'high'
                     ? 'text-red-900 dark:text-red-100'
-                    : warning.severity === 'medium'
+                    : warning!.severity === 'medium'
                       ? 'text-amber-900 dark:text-amber-100'
                       : 'text-blue-900 dark:text-blue-100',
                 )}
               >
-                {warning.title}
+                {warning!.title}
               </p>
               <p
                 className={cn(
                   'text-xs mt-1',
-                  warning.severity === 'high'
+                  warning!.severity === 'high'
                     ? 'text-red-800 dark:text-red-200'
-                    : warning.severity === 'medium'
+                    : warning!.severity === 'medium'
                       ? 'text-amber-800 dark:text-amber-200'
                       : 'text-blue-800 dark:text-blue-200',
                 )}
               >
-                {warning.message}
+                {warning!.message}
               </p>
             </div>
           </div>
 
-          {warning.extraWarning && (
+          {warning!.extraWarning && (
             <div className="rounded-lg border border-red-300 bg-red-100 p-3 dark:border-red-700 dark:bg-red-900">
               <p className="text-sm font-medium text-red-900 dark:text-red-100">
-                {warning.extraWarning}
+                {warning!.extraWarning}
               </p>
             </div>
           )}
@@ -182,7 +182,7 @@ export function WifiModeSwitchDialog({
           {showDetails && (
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900">
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                {warning.details.map((detail, index) => (
+                {warning!.details.map((detail, index) => (
                   <li key={index} className="flex items-start gap-2">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400 dark:bg-gray-600" />
                     {detail}
@@ -210,7 +210,7 @@ export function WifiModeSwitchDialog({
             onClick={onConfirm}
             disabled={isPending}
             type="button"
-            className={warning.severity === 'high' ? 'bg-red-600 hover:bg-red-700' : undefined}
+            className={warning!.severity === 'high' ? 'bg-red-600 hover:bg-red-700' : undefined}
           >
             {isPending ? 'Switching...' : 'I understand, switch mode'}
           </Button>
