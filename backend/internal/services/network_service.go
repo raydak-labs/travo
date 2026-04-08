@@ -948,9 +948,23 @@ func parseDHCPLeases(data string) []models.DHCPLease {
 
 // KickClient disconnects a WiFi client by deauthentication.
 func (n *NetworkService) KickClient(mac string) error {
-	// Try common AP interfaces
-	for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
-		_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+	// Discover AP interfaces dynamically using iw dev
+	iwDevOutput, err := n.cmd.Run("iw", "dev")
+	if err != nil {
+		// Fallback to common AP interfaces if iw fails
+		for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
+			_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+		}
+		return nil
+	}
+
+	// Parse iw dev output to find AP interfaces
+	for _, iface := range parseIwDev(string(iwDevOutput)) {
+		_, err := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+		if err == nil {
+			// Successfully kicked from this interface
+			return nil
+		}
 	}
 	return nil
 }
