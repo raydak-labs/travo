@@ -12,7 +12,7 @@ import (
 
 func TestGetSystemInfo(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{}, nil, nil)
 
 	info, err := svc.GetSystemInfo()
 	if err != nil {
@@ -37,7 +37,7 @@ func TestGetSystemInfo(t *testing.T) {
 
 func TestGetSystemStats(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{}, nil, nil)
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -64,7 +64,7 @@ func TestGetSystemStats(t *testing.T) {
 
 func TestGetSystemInfo_StorageNotHardcoded(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{}, nil, nil)
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -94,7 +94,7 @@ func TestGetSystemInfo_StorageNotHardcoded(t *testing.T) {
 
 func TestGetSystemInfo_CpuUsageReasonable(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{}, nil, nil)
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -117,7 +117,7 @@ func TestGetSystemInfo_CpuUsageReasonable(t *testing.T) {
 func TestGetSystemStats_CustomStorageProvider(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	custom := &testStorageProvider{total: 1073741824, used: 536870912, free: 536870912}
-	svc := NewSystemService(ub, uci.NewMockUCI(), custom)
+	svc := NewSystemService(ub, uci.NewMockUCI(), custom, nil, nil)
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -319,7 +319,7 @@ Tue Mar 11 09:17:53 2026 daemon.info dnsmasq[1234]: info msg`
 func TestSetHostname(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	if err := svc.SetHostname("MyRouter"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -338,7 +338,7 @@ func TestSetHostname(t *testing.T) {
 func TestGetTimezone(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	config, err := svc.GetTimezone()
 	if err != nil {
@@ -355,7 +355,7 @@ func TestGetTimezone(t *testing.T) {
 func TestSetTimezone(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	err := svc.SetTimezone(models.TimezoneConfig{
 		Zonename: "Europe/Berlin",
@@ -380,7 +380,7 @@ func TestSetTimezone(t *testing.T) {
 func TestGetNTPConfig(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	config, err := svc.GetNTPConfig()
 	if err != nil {
@@ -400,7 +400,7 @@ func TestGetNTPConfig(t *testing.T) {
 func TestSetNTPConfig(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	err := svc.SetNTPConfig(models.NTPConfig{
 		Enabled: false,
@@ -435,7 +435,7 @@ func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
 	if err := u.DeleteSection("system", "ntp"); err != nil {
 		t.Fatalf("failed to delete ntp section: %v", err)
 	}
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	config, err := svc.GetNTPConfig()
 	if err != nil {
@@ -451,7 +451,7 @@ func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
 
 func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{}, nil, nil)
 
 	content := "fake firmware binary"
 	reader := strings.NewReader(content)
@@ -474,7 +474,7 @@ func TestUpgradeFirmware_SavesFile(t *testing.T) {
 
 func TestGetSetupComplete_NotComplete(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{}, nil, nil)
 
 	status := svc.GetSetupComplete()
 	if status.Complete {
@@ -566,7 +566,7 @@ func TestBuildButtonActionsJSON_RoundTrip(t *testing.T) {
 func TestGetTimezone_MissingSection(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := NewSystemService(ub, u, &MockStorageProvider{}, nil, nil)
 
 	// Delete the system section to simulate it missing
 	err := u.DeleteSection("system", "system")

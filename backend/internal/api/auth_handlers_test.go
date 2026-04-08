@@ -34,7 +34,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	authConfigPath := tmpDir + "/auth.json"
 	authStore := auth.NewFileAuthStore(authConfigPath)
 
-	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
+	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{}, nil, nil)
 	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
 
 	deps := &Dependencies{

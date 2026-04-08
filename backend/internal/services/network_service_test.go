@@ -140,7 +140,7 @@ func TestSetWanConfigReturnsErrorOnSetFailure(t *testing.T) {
 		setErr:  fmt.Errorf("mock set error"),
 	}
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(fu, ub)
+	svc := NewNetworkService(fu, ub, nil, nil)
 
 	cfg := models.WanConfig{
 		Type: "static",
@@ -265,7 +265,7 @@ func TestSetWanConfigPropagatesEachFieldError(t *testing.T) {
 				setErr:  fmt.Errorf("set failed"),
 			}
 			ub := ubus.NewMockUbus()
-			svc := NewNetworkService(fu, ub)
+			svc := NewNetworkService(fu, ub, nil, nil)
 
 			err := svc.SetWanConfig(tt.config)
 			if err == nil {
