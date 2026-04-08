@@ -1,10 +1,19 @@
-import { Wifi, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
+import { Wifi, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import {
   useSavedNetworks,
@@ -20,6 +29,18 @@ export function WifiSavedNetworksCard() {
   const priorityMutation = useSetNetworkPriority();
   const { data: autoReconnect } = useAutoReconnect();
   const setAutoReconnect = useSetAutoReconnect();
+  const [pendingDelete, setPendingDelete] = useState<{ section: string; ssid: string } | null>(
+    null,
+  );
+
+  const handleDelete = () => {
+    if (pendingDelete) {
+      deleteMutation.mutate(pendingDelete.section);
+      setPendingDelete(null);
+    }
+  };
+
+  const isRiskyDelete = pendingDelete && savedNetworks.length === 1 && !autoReconnect?.enabled;
 
   return (
     <Card>
@@ -105,7 +126,9 @@ export function WifiSavedNetworksCard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => deleteMutation.mutate(network.section)}
+                    onClick={() =>
+                      setPendingDelete({ section: network.section, ssid: network.ssid })
+                    }
                     disabled={deleteMutation.isPending}
                     title="Remove network"
                   >
@@ -116,6 +139,48 @@ export function WifiSavedNetworksCard() {
             ))}
           </ul>
         )}
+
+        <Dialog
+          open={pendingDelete !== null}
+          onOpenChange={(open) => !open && setPendingDelete(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove saved network</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to remove the saved network{' '}
+                <span className="font-medium text-gray-900 dark:text-white">
+                  "{pendingDelete?.ssid}"
+                </span>
+                ?
+              </DialogDescription>
+            </DialogHeader>
+
+            {isRiskyDelete && (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  This is your only saved network and auto-reconnect is disabled. You will lose
+                  automatic reconnection capability.
+                </p>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingDelete(null)} type="button">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                variant="destructive"
+                type="button"
+              >
+                {deleteMutation.isPending ? 'Removing...' : 'Remove network'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

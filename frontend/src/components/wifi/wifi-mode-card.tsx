@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useWifiConnection, useWifiMode } from '@/hooks/use-wifi';
 import { cn } from '@/lib/cn';
 import type { WifiMode } from '@shared/index';
-import { getWifiModeLabel, WIFI_MODE_OPTIONS } from '@/components/wifi/wifi-mode-options';
+import { WIFI_MODE_OPTIONS } from '@/components/wifi/wifi-mode-options';
 import { WifiModeSwitchDialog } from '@/components/wifi/wifi-mode-switch-dialog';
 
 export function WifiModeCard() {
@@ -87,7 +87,8 @@ export function WifiModeCard() {
 
       <WifiModeSwitchDialog
         open={pendingMode !== null}
-        modeLabel={pendingMode != null ? getWifiModeLabel(pendingMode) : undefined}
+        currentMode={currentMode}
+        targetMode={pendingMode}
         isPending={setMode.isPending}
         onOpenChange={(open) => {
           if (!open) setPendingMode(null);

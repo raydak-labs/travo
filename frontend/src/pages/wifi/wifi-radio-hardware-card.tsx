@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Cpu, Radio } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,10 +12,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRadios, useSetRadioRole } from '@/hooks/use-wifi';
+import { ConfirmRadioDisableDialog } from '@/components/wifi/confirm-radio-disable-dialog';
 
 export function WifiRadioHardwareCard() {
   const { data: radios, isLoading: radiosLoading } = useRadios();
   const setRadioRole = useSetRadioRole();
+  const [pendingDisable, setPendingDisable] = useState<{
+    name: string;
+    currentRole: string;
+  } | null>(null);
+
+  function handleRoleChange(name: string, role: string, currentRole: string) {
+    if (role === 'none') {
+      setPendingDisable({ name, currentRole });
+    } else {
+      setRadioRole.mutate({ name, role });
+    }
+  }
+
+  function handleConfirmDisable() {
+    if (pendingDisable) {
+      setRadioRole.mutate({ name: pendingDisable.name, role: 'none' });
+      setPendingDisable(null);
+    }
+  }
 
   return (
     <Card>
@@ -61,6 +82,16 @@ export function WifiRadioHardwareCard() {
                             Recommended
                           </Badge>
                         )}
+
+                        {pendingDisable && (
+                          <ConfirmRadioDisableDialog
+                            open={true}
+                            radioName={pendingDisable.name}
+                            isPending={setRadioRole.isPending}
+                            onOpenChange={(open) => !open && setPendingDisable(null)}
+                            onConfirm={handleConfirmDisable}
+                          />
+                        )}
                         <Badge variant={radio.disabled ? 'destructive' : 'success'}>
                           {radio.disabled ? 'Disabled' : 'Active'}
                         </Badge>
@@ -75,7 +106,7 @@ export function WifiRadioHardwareCard() {
                   </div>
                   <Select
                     value={radio.role}
-                    onValueChange={(role) => setRadioRole.mutate({ name: radio.name, role })}
+                    onValueChange={(role) => handleRoleChange(radio.name, role, radio.role)}
                     disabled={setRadioRole.isPending}
                   >
                     <SelectTrigger className="w-32 shrink-0">

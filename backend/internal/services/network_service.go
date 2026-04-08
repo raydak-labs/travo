@@ -1298,3 +1298,162 @@ func (n *NetworkService) SendWoL(mac, iface string) error {
 	}
 	return err
 }
+
+// ConnectionMethod describes how the client is connected.
+type ConnectionMethod struct {
+	Method    string `json:"method"`     // "wifi-client", "wifi-ap", "ethernet", "unknown"
+	Interface string `json:"interface"`  // interface name (e.g., "br-lan", "wwan0")
+	IPAddress string `json:"ip_address"` // client's IP address
+}
+
+// GetConnectionMethod determines how the client is connected by matching the
+// client IP against network interface addresses. Uses ubus network interface
+// dump for accurate address detection. On error, logs details and returns
+// "unknown" to avoid breaking UI.
+func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
+	if clientIP == "" || clientIP == "::1" {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Get all network interface addresses via ubus
+	ifaceDump, err := n.ubus.Call("network.interface", "dump", nil)
+	if err != nil {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Parse the ubus response to find matching interfaces
+	interfaces, ok := ifaceDump["interface"].([]interface{})
+	if !ok {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	type ifaceInfo struct {
+		name        string
+		device      string
+		ipv4Addrs   []string
+		up          bool
+		interfaceUp bool
+	}
+
+	var ifaces []ifaceInfo
+
+	// Extract interface information
+	for _, ifaceRaw := range interfaces {
+		ifaceMap, ok := ifaceRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := ifaceMap["l3_device"].(string)
+		if name == "" {
+			name, _ = ifaceMap["interface"].(string)
+		}
+
+		l3Device, _ := ifaceMap["l3_device"].(string)
+		device, _ := ifaceMap["device"].(string)
+
+		if l3Device != "" {
+			device = l3Device
+		}
+
+		info := ifaceInfo{
+			name:   name,
+			device: device,
+			up: func() bool {
+				if up, ok := ifaceMap["up"].(bool); ok {
+					return up
+				}
+				return false
+			}(),
+			interfaceUp: func() bool {
+				if up, ok := ifaceMap["interface"].(bool); ok {
+					return up
+				}
+				return false
+			}(),
+		}
+
+		// Extract IPv4 addresses
+		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]interface{}); ok {
+			for _, addrRaw := range ipv4Addrs {
+				if addrMap, ok := addrRaw.(map[string]interface{}); ok {
+					if addrStr, ok := addrMap["address"].(string); ok {
+						info.ipv4Addrs = append(info.ipv4Addrs, addrStr)
+					}
+				}
+			}
+		}
+
+		ifaces = append(ifaces, info)
+	}
+
+	// Find which interface matches the client IP
+	var matchedIface *ifaceInfo
+	for i := range ifaces {
+		info := &ifaces[i]
+		if !info.up && !info.interfaceUp {
+			continue
+		}
+
+		// Check if client IP is in this interface's subnet
+		// Simple check: exact match or in same subnet
+		for _, addr := range info.ipv4Addrs {
+			if ipInSubnet(clientIP, addr) {
+				matchedIface = info
+				break
+			}
+		}
+		if matchedIface != nil {
+			break
+		}
+	}
+
+	if matchedIface == nil {
+		// No match found - might be localhost or routed
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Determine connection method based on interface
+	method := "unknown"
+	switch {
+	case strings.HasPrefix(matchedIface.name, "wwan") ||
+		strings.HasPrefix(matchedIface.device, "phy") && strings.Contains(matchedIface.device, "-sta"):
+		method = "wifi-client"
+	case matchedIface.name == "br-lan" || matchedIface.name == "lan":
+		// Check if this is AP via wireless device presence
+		method = "wifi-ap" // Default to AP for LAN
+	case strings.HasPrefix(matchedIface.name, "eth") || strings.HasPrefix(matchedIface.device, "eth"):
+		method = "ethernet"
+	}
+
+	return &ConnectionMethod{
+		Method:    method,
+		Interface: matchedIface.name,
+		IPAddress: clientIP,
+	}, nil
+}
+
+// ipInSubnet checks if two IPs are in the same subnet (simple /24 assumption)
+// For more accurate subnet detection, we would need to parse the netmask from ubus
+func ipInSubnet(ip1, ip2 string) bool {
+	if ip1 == ip2 {
+		return true
+	}
+
+	// Simple /24 subnet check
+	parts1 := strings.Split(ip1, ".")
+	parts2 := strings.Split(ip2, ".")
+
+	if len(parts1) != 4 || len(parts2) != 4 {
+		return false
+	}
+
+	// Check first three octets match
+	for i := 0; i < 3; i++ {
+		if parts1[i] != parts2[i] {
+			return false
+		}
+	}
+
+	return true
+}

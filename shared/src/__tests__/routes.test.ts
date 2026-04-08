@@ -238,6 +238,7 @@ describe('API_ROUTES', () => {
       '/api/v1/network/doh',
       '/api/v1/network/ipv6',
       '/api/v1/network/wol',
+      '/api/v1/network/connection-method',
       '/api/v1/sqm/config',
       '/api/v1/sqm/apply',
       '/api/v1/vpn/tailscale/ssh',

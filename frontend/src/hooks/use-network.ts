@@ -27,6 +27,7 @@ import type {
   IPv6Status,
   DiagnosticsRequest,
   DiagnosticsResult,
+  ConnectionMethod,
 } from '@shared/index';
 
 export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus>>) {
@@ -477,3 +478,12 @@ export const useAddPortForwardRule = useAddPortForward;
 export const useDeletePortForwardRule = useDeletePortForward;
 export const useDoHStatus = useDoHConfig;
 export const useSetDoHEnabled = useSetDoHConfig;
+
+export function useConnectionMethod() {
+  return useQuery({
+    queryKey: ['network', 'connectionMethod'],
+    queryFn: () => apiClient.get<ConnectionMethod>(API_ROUTES.network.connectionMethod),
+    // Cache for 1 minute - connection method doesn't change rapidly
+    staleTime: 60000,
+  });
+}

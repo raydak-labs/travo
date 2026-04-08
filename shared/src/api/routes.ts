@@ -34,6 +34,7 @@ export const API_ROUTES = {
   },
   network: {
     status: '/api/v1/network/status',
+    connectionMethod: '/api/v1/network/connection-method',
     wan: '/api/v1/network/wan',
     clients: '/api/v1/network/clients',
     clientAlias: '/api/v1/network/clients/alias',
