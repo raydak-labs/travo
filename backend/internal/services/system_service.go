@@ -250,7 +250,7 @@ func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
 // SetTimezone updates the timezone configuration with staged apply and auto-snapshot.
 func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
 	if s.snapshots != nil {
-		if _, err := s.snapshots.AutoSaveBeforeChange("timezone configuration", []string{"system"}, "user"); err != nil {
+		if _, err := s.snapshots.AutoSaveBeforeChange("timezone configuration", []string{"system"}); err != nil {
 			// Log but don't fail - snapshots are not critical
 		}
 	}
@@ -293,7 +293,7 @@ func (s *SystemService) GetNTPConfig() (models.NTPConfig, error) {
 // SetNTPConfig updates the NTP time synchronization configuration with staged apply and auto-snapshot.
 func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 	if s.snapshots != nil {
-		if _, err := s.snapshots.AutoSaveBeforeChange("NTP configuration", []string{"system"}, "user"); err != nil {
+		if _, err := s.snapshots.AutoSaveBeforeChange("NTP configuration", []string{"system"}); err != nil {
 			// Log but don't fail - snapshots are not critical
 		}
 	}

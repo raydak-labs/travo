@@ -51,12 +51,12 @@ func NewNetworkService(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm, snapsho
 
 // NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
 func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *NetworkService {
-	return newNetworkService(u, ub, aliasFile, &RealCommandRunner{})
+	return newNetworkService(u, ub, aliasFile, &RealCommandRunner{}, nil, nil)
 }
 
 // NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
 func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
-	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
+	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd, nil, nil)
 }
 
 // updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
