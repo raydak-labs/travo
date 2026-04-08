@@ -12,7 +12,7 @@ import (
 
 func TestNewHub(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
+	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{}, nil, nil)
 	alertSvc := services.NewAlertService(svc)
 	hub := NewHub(svc, alertSvc, nil)
 
@@ -26,7 +26,7 @@ func TestNewHub(t *testing.T) {
 
 func TestHubStartStop(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
+	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{}, nil, nil)
 	alertSvc := services.NewAlertService(svc)
 	hub := NewHub(svc, alertSvc, nil)
 	hub.BroadcastInterval = 10 * time.Millisecond
@@ -39,7 +39,7 @@ func TestHubStartStop(t *testing.T) {
 
 func TestHub_BroadcastsNetworkStatus(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
+	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{}, nil, nil)
 	alertSvc := services.NewAlertService(svc)
 
 	nsCh := make(chan models.NetworkStatus, 1)

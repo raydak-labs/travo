@@ -25,7 +25,7 @@ func TestNoopEventWatcher(t *testing.T) {
 func TestNetworkEventWatcher_EmitsOnEvent(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	networkSvc := NewNetworkService(u, ub)
+	networkSvc := NewNetworkService(u, ub, nil, nil)
 
 	// fakeRunner feeds one watched event line then blocks forever
 	lines := make(chan string, 1)

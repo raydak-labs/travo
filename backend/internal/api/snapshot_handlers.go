@@ -5,7 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/services"
+	"time"
 )
 
 // CreateSnapshotRequest represents a request to create a configuration snapshot.
@@ -16,11 +17,11 @@ type CreateSnapshotRequest struct {
 
 // SnapshotListResponse represents the response for listing snapshots.
 type SnapshotListResponse struct {
-	Snapshots []*models.ConfigSnapshot `json:"snapshots"`
+	Snapshots []*services.ConfigSnapshot `json:"snapshots"`
 }
 
 // CreateSnapshotHandler creates a new configuration snapshot.
-func CreateSnapshotHandler(snapshotSvc *SnapshotService) fiber.Handler {
+func CreateSnapshotHandler(snapshotSvc *services.SnapshotService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req CreateSnapshotRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -48,7 +49,7 @@ func CreateSnapshotHandler(snapshotSvc *SnapshotService) fiber.Handler {
 }
 
 // ListSnapshotsHandler returns all available snapshots.
-func ListSnapshotsHandler(snapshotSvc *SnapshotService) fiber.Handler {
+func ListSnapshotsHandler(snapshotSvc *services.SnapshotService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		snapshots, err := snapshotSvc.ListSnapshots()
 		if err != nil {
@@ -62,7 +63,7 @@ func ListSnapshotsHandler(snapshotSvc *SnapshotService) fiber.Handler {
 }
 
 // GetSnapshotHandler returns a specific snapshot by ID.
-func GetSnapshotHandler(snapshotSvc *SnapshotService) fiber.Handler {
+func GetSnapshotHandler(snapshotSvc *services.SnapshotService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		snapshotID := c.Params("id")
 		if snapshotID == "" {
@@ -83,7 +84,7 @@ func GetSnapshotHandler(snapshotSvc *SnapshotService) fiber.Handler {
 }
 
 // RestoreSnapshotHandler restores a configuration snapshot.
-func RestoreSnapshotHandler(snapshotSvc *SnapshotService, applier UCIApplyConfirm) fiber.Handler {
+func RestoreSnapshotHandler(snapshotSvc *services.SnapshotService, applier services.UCIApplyConfirm) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		snapshotID := c.Params("id")
 		if snapshotID == "" {
@@ -120,7 +121,7 @@ func RestoreSnapshotHandler(snapshotSvc *SnapshotService, applier UCIApplyConfir
 }
 
 // DeleteSnapshotHandler deletes a snapshot.
-func DeleteSnapshotHandler(snapshotSvc *SnapshotService) fiber.Handler {
+func DeleteSnapshotHandler(snapshotSvc *services.SnapshotService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		snapshotID := c.Params("id")
 		if snapshotID == "" {
@@ -142,7 +143,7 @@ func DeleteSnapshotHandler(snapshotSvc *SnapshotService) fiber.Handler {
 }
 
 // CleanSnapshotsHandler cleans up old snapshots.
-func CleanSnapshotsHandler(snapshotSvc *SnapshotService) fiber.Handler {
+func CleanSnapshotsHandler(snapshotSvc *services.SnapshotService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		olderThanDays := c.Query("older_than_days", "30")
 		days, err := strconv.Atoi(olderThanDays)

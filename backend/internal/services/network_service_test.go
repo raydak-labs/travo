@@ -25,7 +25,7 @@ func (f *failingSetUCI) Set(_, _, _, _ string) error {
 func TestGetNetworkStatus(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	status, err := svc.GetNetworkStatus()
 	if err != nil {
@@ -51,7 +51,7 @@ func TestGetNetworkStatus(t *testing.T) {
 func TestGetWanConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	config, err := svc.GetWanConfig()
 	if err != nil {
@@ -68,7 +68,7 @@ func TestGetWanConfig(t *testing.T) {
 func TestGetClients(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	clients, err := svc.GetClients()
 	if err != nil {
@@ -82,7 +82,7 @@ func TestGetClients(t *testing.T) {
 func TestGetNetworkStatus_IncludesClients(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	status, err := svc.GetNetworkStatus()
 	if err != nil {
@@ -122,7 +122,7 @@ func TestGetNetworkStatus_NoDHCP_EmptyClients(t *testing.T) {
 	ub.RegisterResponse("dhcp.ipv4leases", map[string]interface{}{
 		"device": map[string]interface{}{},
 	})
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	status, err := svc.GetNetworkStatus()
 	if err != nil {
@@ -154,7 +154,7 @@ func TestSetWanConfigReturnsErrorOnSetFailure(t *testing.T) {
 func TestGetDHCPConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	config, err := svc.GetDHCPConfig()
 	if err != nil {
@@ -174,7 +174,7 @@ func TestGetDHCPConfig(t *testing.T) {
 func TestSetDHCPConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	err := svc.SetDHCPConfig(models.DHCPConfig{Start: 50, Limit: 100, LeaseTime: "24h"})
 	if err != nil {
@@ -199,7 +199,7 @@ func TestSetDHCPConfig(t *testing.T) {
 func TestGetDNSConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	config, err := svc.GetDNSConfig()
 	if err != nil {
@@ -214,7 +214,7 @@ func TestGetDNSConfig(t *testing.T) {
 func TestSetDNSConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	// Enable custom DNS
 	err := svc.SetDNSConfig(models.DNSConfig{
@@ -450,7 +450,7 @@ func TestParseDHCPLeases_InvalidLine(t *testing.T) {
 func TestGetDHCPLeases_FileNotExist(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	leases := svc.GetDHCPLeases()
 	if len(leases) != 0 {
@@ -461,7 +461,7 @@ func TestGetDHCPLeases_FileNotExist(t *testing.T) {
 func TestGetDNSEntries_Empty(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	entries, err := svc.GetDNSEntries()
 	if err != nil {
@@ -475,7 +475,7 @@ func TestGetDNSEntries_Empty(t *testing.T) {
 func TestAddAndGetDNSEntry(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	err := svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.50"})
 	if err != nil {
@@ -503,7 +503,7 @@ func TestAddAndGetDNSEntry(t *testing.T) {
 func TestAddMultipleDNSEntries(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	_ = svc.AddDNSEntry(models.DNSEntry{Name: "server1", IP: "192.168.1.50"})
 	_ = svc.AddDNSEntry(models.DNSEntry{Name: "server2", IP: "192.168.1.60"})
@@ -520,7 +520,7 @@ func TestAddMultipleDNSEntries(t *testing.T) {
 func TestDeleteDNSEntry(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	_ = svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.50"})
 
@@ -541,7 +541,7 @@ func TestDeleteDNSEntry(t *testing.T) {
 func TestDeleteDNSEntry_NotFound(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	err := svc.DeleteDNSEntry("dns_nonexistent")
 	if err == nil {
@@ -552,7 +552,7 @@ func TestDeleteDNSEntry_NotFound(t *testing.T) {
 func TestAddDNSEntry_DuplicateName(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	_ = svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.50"})
 	err := svc.AddDNSEntry(models.DNSEntry{Name: "myserver", IP: "192.168.1.60"})
@@ -582,7 +582,7 @@ func TestSanitizeSectionName(t *testing.T) {
 func TestGetDHCPReservations_Empty(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	reservations, err := svc.GetDHCPReservations()
 	if err != nil {
@@ -596,7 +596,7 @@ func TestGetDHCPReservations_Empty(t *testing.T) {
 func TestAddAndGetDHCPReservation(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	err := svc.AddDHCPReservation(models.DHCPReservation{
 		Name: "laptop",
@@ -631,7 +631,7 @@ func TestAddAndGetDHCPReservation(t *testing.T) {
 func TestAddMultipleDHCPReservations(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:01", IP: "192.168.8.50"})
 	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "phone", MAC: "AA:BB:CC:DD:EE:02", IP: "192.168.8.51"})
@@ -648,7 +648,7 @@ func TestAddMultipleDHCPReservations(t *testing.T) {
 func TestDeleteDHCPReservation(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:FF", IP: "192.168.8.50"})
 
@@ -669,7 +669,7 @@ func TestDeleteDHCPReservation(t *testing.T) {
 func TestDeleteDHCPReservation_NotFound(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	err := svc.DeleteDHCPReservation("host_nonexistent")
 	if err == nil {
@@ -680,7 +680,7 @@ func TestDeleteDHCPReservation_NotFound(t *testing.T) {
 func TestAddDHCPReservation_DuplicateName(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	_ = svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:01", IP: "192.168.8.50"})
 	err := svc.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:02", IP: "192.168.8.51"})
@@ -735,7 +735,7 @@ func TestUnblockClient(t *testing.T) {
 func TestGetBlockedClients_Empty(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	blocked, err := svc.GetBlockedClients()
 	if err != nil {
@@ -1134,7 +1134,7 @@ func TestGetClients_NoIwCommand(t *testing.T) {
 func TestGetDDNSConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	config, err := svc.GetDDNSConfig()
 	if err != nil {
@@ -1170,7 +1170,7 @@ func TestGetDDNSConfig_CustomUpdateURL(t *testing.T) {
 		t.Fatalf("set update_url: %v", err)
 	}
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	config, err := svc.GetDDNSConfig()
 	if err != nil {
@@ -1194,7 +1194,7 @@ func TestGetDDNSConfig_CustomUpdateURL_ServiceDash(t *testing.T) {
 		t.Fatalf("set update_url: %v", err)
 	}
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	config, err := svc.GetDDNSConfig()
 	if err != nil {
@@ -1453,7 +1453,7 @@ func TestGetClients_HostnamesFromUbus(t *testing.T) {
 	// Verify that ubus-sourced clients already have hostnames populated
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkService(u, ub)
+	svc := NewNetworkService(u, ub, nil, nil)
 
 	clients, err := svc.GetClients()
 	if err != nil {
