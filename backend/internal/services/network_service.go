@@ -58,6 +58,28 @@ func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *Ne
 	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
 }
 
+// uciSet is a helper for setting UCI values with consistent error wrapping.
+func (n *NetworkService) uciSet(config, section, option, value string) error {
+	if err := n.uci.Set(config, section, option, value); err != nil {
+		return fmt.Errorf("set %s.%s.%s: %w", config, section, option, err)
+	}
+	return nil
+}
+
+// uciCommit commits a UCI config with consistent error wrapping.
+func (n *NetworkService) uciCommit(config string) error {
+	if err := n.uci.Commit(config); err != nil {
+		return fmt.Errorf("commit %s: %w", config, err)
+	}
+	return nil
+}
+
+// restartService restarts an OpenWRT init.d service.
+func (n *NetworkService) restartService(service string) error {
+	_, err := n.cmd.Run("/etc/init.d/"+service, "restart")
+	return err
+}
+
 // updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
 // dump results and returns a snapshot of MACs that were RECENTLY WiFi but are
 // not in the current wifiStats (i.e. they just disconnected). These must not be
@@ -631,26 +653,26 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 // SetWanConfig updates the WAN configuration.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	if config.Type != "" {
-		if err := n.uci.Set("network", "wan", "proto", config.Type); err != nil {
-			return fmt.Errorf("setting WAN proto: %w", err)
+		if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
+			return err
 		}
 	}
 	if config.IPAddress != "" {
-		if err := n.uci.Set("network", "wan", "ip4addr", config.IPAddress); err != nil {
-			return fmt.Errorf("setting WAN ip4addr: %w", err)
+		if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
+			return err
 		}
 	}
 	if config.Netmask != "" {
-		if err := n.uci.Set("network", "wan", "netmask", config.Netmask); err != nil {
-			return fmt.Errorf("setting WAN netmask: %w", err)
+		if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
+			return err
 		}
 	}
 	if config.Gateway != "" {
-		if err := n.uci.Set("network", "wan", "gateway", config.Gateway); err != nil {
-			return fmt.Errorf("setting WAN gateway: %w", err)
+		if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+			return err
 		}
 	}
-	return n.uci.Commit("network")
+	return n.uciCommit("network")
 }
 
 // DetectWanType auto-detects the WAN connection type and returns
@@ -764,16 +786,16 @@ func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
 
 // SetDHCPConfig updates the DHCP configuration for the LAN.
 func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
-	if err := n.uci.Set("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
-		return fmt.Errorf("setting DHCP start: %w", err)
+	if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
+		return err
 	}
-	if err := n.uci.Set("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
-		return fmt.Errorf("setting DHCP limit: %w", err)
+	if err := n.uciSet("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
+		return err
 	}
-	if err := n.uci.Set("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
-		return fmt.Errorf("setting DHCP leasetime: %w", err)
+	if err := n.uciSet("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
+		return err
 	}
-	return n.uci.Commit("dhcp")
+	return n.uciCommit("dhcp")
 }
 
 // GetDHCPLeases reads active DHCP leases from /tmp/dhcp.leases.
@@ -936,38 +958,45 @@ func (n *NetworkService) KickClient(mac string) error {
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
 func (n *NetworkService) BlockClient(mac string) error {
 	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	macUpper := strings.ToUpper(mac)
+
 	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
-		return fmt.Errorf("adding firewall block rule: %w", err)
+		return fmt.Errorf("add firewall block rule: %w", err)
 	}
-	if err := n.uci.Set("firewall", section, "name", "Block-"+strings.ToUpper(mac)); err != nil {
-		return fmt.Errorf("setting block rule name: %w", err)
+	if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "src", "lan"); err != nil {
-		return fmt.Errorf("setting block rule src: %w", err)
+	if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "src_mac", strings.ToUpper(mac)); err != nil {
-		return fmt.Errorf("setting block rule src_mac: %w", err)
+	if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "target", "DROP"); err != nil {
-		return fmt.Errorf("setting block rule target: %w", err)
+	if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
+		return err
 	}
-	if err := n.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
+	if err := n.uciCommit("firewall"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	if err := n.restartService("firewall"); err != nil {
+		return fmt.Errorf("restart firewall: %w", err)
+	}
 	return nil
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
 	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+
 	if err := n.uci.DeleteSection("firewall", section); err != nil {
-		return fmt.Errorf("deleting firewall block rule: %w", err)
+		return fmt.Errorf("delete firewall block rule: %w", err)
 	}
-	if err := n.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
+	if err := n.uciCommit("firewall"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	if err := n.restartService("firewall"); err != nil {
+		return fmt.Errorf("restart firewall: %w", err)
+	}
 	return nil
 }
 
