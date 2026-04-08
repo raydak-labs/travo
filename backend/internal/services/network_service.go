@@ -21,6 +21,8 @@ type NetworkService struct {
 	ubus      ubus.Ubus
 	aliasFile string
 	cmd       CommandRunner
+	applier   UCIApplyConfirm // optional; for staged apply with rollback
+	snapshots *SnapshotService // optional; for configuration snapshots
 
 	// wifiMACsMu guards wifiMACsSeen.
 	wifiMACsMu sync.Mutex
@@ -35,16 +37,16 @@ type NetworkService struct {
 // a wired LAN client if it reconnects that way.
 const wifiMACTTL = 5 * time.Minute
 
-func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
+func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner, applier UCIApplyConfirm, snapshots *SnapshotService) *NetworkService {
 	return &NetworkService{
-		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
+		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd, applier: applier, snapshots: snapshots,
 		wifiMACsSeen: make(map[string]time.Time),
 	}
 }
 
 // NewNetworkService creates a new NetworkService.
-func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return newNetworkService(u, ub, "/etc/travo/aliases.json", &RealCommandRunner{})
+func NewNetworkService(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm, snapshots *SnapshotService) *NetworkService {
+	return newNetworkService(u, ub, "/etc/travo/aliases.json", &RealCommandRunner{}, applier, snapshots)
 }
 
 // NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
@@ -649,6 +651,9 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 			return fmt.Errorf("setting WAN gateway: %w", err)
 		}
 	}
+	if n.applier != nil {
+		return n.applier.ApplyAndConfirm([]string{"network"})
+	}
 	return n.uci.Commit("network")
 }
 
@@ -771,6 +776,9 @@ func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
 	}
 	if err := n.uci.Set("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
 		return fmt.Errorf("setting DHCP leasetime: %w", err)
+	}
+	if n.applier != nil {
+		return n.applier.ApplyAndConfirm([]string{"dhcp"})
 	}
 	return n.uci.Commit("dhcp")
 }
@@ -950,6 +958,12 @@ func (n *NetworkService) BlockClient(mac string) error {
 	if err := n.uci.Set("firewall", section, "target", "DROP"); err != nil {
 		return fmt.Errorf("setting block rule target: %w", err)
 	}
+	if n.applier != nil {
+		return n.applier.ApplyAndConfirm([]string{"firewall"})
+	}
+	if n.applier != nil {
+		return n.applier.ApplyAndConfirm([]string{"firewall"})
+	}
 	if err := n.uci.Commit("firewall"); err != nil {
 		return fmt.Errorf("committing firewall: %w", err)
 	}
@@ -1046,9 +1060,13 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 	if err := n.uci.Set("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
 		return fmt.Errorf("setting ddns lookup_host: %w", err)
 	}
+	if n.applier != nil {
+		return n.applier.ApplyAndConfirm([]string{"ddns"})
+	}
 	if err := n.uci.Commit("ddns"); err != nil {
 		return fmt.Errorf("committing ddns: %w", err)
 	}
+	return nil
 	_, _ = n.cmd.Run("/etc/init.d/ddns", "restart")
 	return nil
 }

@@ -27,6 +27,7 @@ type Dependencies struct {
 	USBTether      *services.USBTetheringService
 	BandSwitching  *services.BandSwitchingService
 	Failover       *services.FailoverService
+	Snapshots      *services.SnapshotService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -209,4 +210,12 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))
 	v1.Post("/captive/auto-accept", CaptiveAutoAcceptHandler(deps.Captive))
+
+	// Configuration snapshots
+	v1.Post("/snapshots", CreateSnapshotHandler(deps.Snapshots))
+	v1.Get("/snapshots", ListSnapshotsHandler(deps.Snapshots))
+	v1.Get("/snapshots/:id", GetSnapshotHandler(deps.Snapshots))
+	v1.Post("/snapshots/:id/restore", RestoreSnapshotHandler(deps.Snapshots, deps.System.Applier))
+	v1.Delete("/snapshots/:id", DeleteSnapshotHandler(deps.Snapshots))
+	v1.Post("/snapshots/clean", CleanSnapshotsHandler(deps.Snapshots))
 }

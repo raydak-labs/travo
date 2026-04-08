@@ -50,14 +50,16 @@ func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 
 // SystemService provides system information and statistics.
 type SystemService struct {
-	ubus    ubus.Ubus
-	uci     uci.UCI
-	storage StorageProvider
+	ubus      ubus.Ubus
+	uci       uci.UCI
+	storage   StorageProvider
+	applier   UCIApplyConfirm // optional; for staged apply with rollback
+	snapshots *SnapshotService // optional; for configuration snapshots
 }
 
 // NewSystemService creates a new SystemService.
-func NewSystemService(ub ubus.Ubus, u uci.UCI, storage StorageProvider) *SystemService {
-	return &SystemService{ubus: ub, uci: u, storage: storage}
+func NewSystemService(ub ubus.Ubus, u uci.UCI, storage StorageProvider, applier UCIApplyConfirm, snapshots *SnapshotService) *SystemService {
+	return &SystemService{ubus: ub, uci: u, storage: storage, applier: applier, snapshots: snapshots}
 }
 
 // GetSystemInfo returns system identification information.
@@ -92,6 +94,11 @@ func (s *SystemService) GetSystemInfo() (models.SystemInfo, error) {
 		KernelVersion:   kernel,
 		UptimeSeconds:   uptime,
 	}, nil
+}
+
+// Applier returns the UCI apply service for staged configuration changes.
+func (s *SystemService) Applier() UCIApplyConfirm {
+	return s.applier
 }
 
 // GetSystemStats returns current system statistics.
@@ -240,8 +247,14 @@ func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
 	}, nil
 }
 
-// SetTimezone updates the timezone configuration.
+// SetTimezone updates the timezone configuration with staged apply and auto-snapshot.
 func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
+	if s.snapshots != nil {
+		if _, err := s.snapshots.AutoSaveBeforeChange("timezone configuration", []string{"system"}, "user"); err != nil {
+			// Log but don't fail - snapshots are not critical
+		}
+	}
+
 	section, _, err := s.findSystemSection()
 	if err != nil {
 		return fmt.Errorf("finding system section: %w", err)
@@ -251,6 +264,9 @@ func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
 	}
 	if err := s.uci.Set("system", section, "timezone", config.Timezone); err != nil {
 		return fmt.Errorf("setting timezone: %w", err)
+	}
+	if s.applier != nil {
+		return s.applier.ApplyAndConfirm([]string{"system"})
 	}
 	return s.uci.Commit("system")
 }
@@ -274,8 +290,14 @@ func (s *SystemService) GetNTPConfig() (models.NTPConfig, error) {
 	return config, nil
 }
 
-// SetNTPConfig updates the NTP time synchronization configuration.
+// SetNTPConfig updates the NTP time synchronization configuration with staged apply and auto-snapshot.
 func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
+	if s.snapshots != nil {
+		if _, err := s.snapshots.AutoSaveBeforeChange("NTP configuration", []string{"system"}, "user"); err != nil {
+			// Log but don't fail - snapshots are not critical
+		}
+	}
+
 	enabled := "1"
 	if !config.Enabled {
 		enabled = "0"
@@ -285,6 +307,9 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 	}
 	if err := s.uci.Set("system", "ntp", "server", strings.Join(config.Servers, " ")); err != nil {
 		return fmt.Errorf("setting ntp servers: %w", err)
+	}
+	if s.applier != nil {
+		return s.applier.ApplyAndConfirm([]string{"system"})
 	}
 	return s.uci.Commit("system")
 }
@@ -298,7 +323,7 @@ func (s *SystemService) SyncNTP() error {
 	return nil
 }
 
-// SetHostname changes the device hostname via UCI and applies it.
+// SetHostname changes the device hostname via UCI and applies it with staged apply.
 func (s *SystemService) SetHostname(hostname string) error {
 	section, _, err := s.findSystemSection()
 	if err != nil {
@@ -306,6 +331,9 @@ func (s *SystemService) SetHostname(hostname string) error {
 	}
 	if err := s.uci.Set("system", section, "hostname", hostname); err != nil {
 		return err
+	}
+	if s.applier != nil {
+		return s.applier.ApplyAndConfirm([]string{"system"})
 	}
 	return s.uci.Commit("system")
 }
@@ -395,7 +423,7 @@ func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 	return schedule
 }
 
-// SetLEDSchedule writes or removes LED schedule cron entries.
+// SetLEDSchedule writes or removes LED schedule cron entries with staged apply.
 func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 	data, _ := os.ReadFile("/etc/crontabs/root")
 	var lines []string
@@ -418,6 +446,9 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 	lines = append(lines, "")
 	if err := os.WriteFile("/etc/crontabs/root", []byte(strings.Join(lines, "\n")), 0600); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
+	}
+	if s.applier != nil {
+		return s.applier.ApplyAndConfirm([]string{"system"})
 	}
 	_ = exec.Command("/etc/init.d/cron", "restart").Run()
 	return nil

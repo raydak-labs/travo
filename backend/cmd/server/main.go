@@ -112,8 +112,19 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		captiveProber = services.NewRealHTTPProber()
 	}
 
-	systemSvc := services.NewSystemService(ub, u, storage)
-	networkSvc := services.NewNetworkService(u, ub)
+	// Create UCI apply service for staged configuration changes
+	var applier services.UCIApplyConfirm
+	if cfg.MockMode {
+		applier = &services.NoopUCIApplyConfirm{}
+	} else {
+		applier = services.NewRealUCIApplyConfirm(ub, rootPassword)
+	}
+
+	// Create snapshot service for configuration safety
+	snapshotSvc := services.NewSnapshotService("/etc/travo/snapshots", u)
+
+	systemSvc := services.NewSystemService(ub, u, storage, applier, snapshotSvc)
+	networkSvc := services.NewNetworkService(u, ub, applier, snapshotSvc)
 	sqmSvc := services.NewSQMService(u)
 
 	// Create event watcher (noop in mock mode to avoid running ubus on dev machines).
@@ -218,6 +229,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		USBTether:      usbTetherSvc,
 		BandSwitching:  bandSwitchSvc,
 		Failover:       failoverSvc,
+		Snapshots:      snapshotSvc,
 	}
 	api.SetupRoutes(app, deps)
 

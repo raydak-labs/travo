@@ -1,10 +1,12 @@
 import { Wifi, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import {
   useSavedNetworks,
@@ -20,6 +22,22 @@ export function WifiSavedNetworksCard() {
   const priorityMutation = useSetNetworkPriority();
   const { data: autoReconnect } = useAutoReconnect();
   const setAutoReconnect = useSetAutoReconnect();
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [networkToDelete, setNetworkToDelete] = useState<string | null>(null);
+
+  const handleDeleteClick = (section: string) => {
+    setNetworkToDelete(section);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (networkToDelete) {
+      deleteMutation.mutate(networkToDelete);
+    }
+    setDeleteDialogOpen(false);
+    setNetworkToDelete(null);
+  };
 
   return (
     <Card>
@@ -105,7 +123,7 @@ export function WifiSavedNetworksCard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => deleteMutation.mutate(network.section)}
+                    onClick={() => handleDeleteClick(network.section)}
                     disabled={deleteMutation.isPending}
                     title="Remove network"
                   >
@@ -117,6 +135,17 @@ export function WifiSavedNetworksCard() {
           </ul>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Remove Saved Network"
+        description="Are you sure you want to remove this saved WiFi network? You will need to reconnect manually if you want to use it again."
+        warningText="This action cannot be undone. The network will be completely removed from your saved networks."
+        confirmLabel="Remove Network"
+        isPending={deleteMutation.isPending}
+        onConfirm={handleDeleteConfirm}
+      />
     </Card>
   );
 }
