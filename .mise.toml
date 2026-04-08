@@ -11,7 +11,7 @@ min_version = "2024.1.0"
   pnpm = "latest"
 
   # Python
-  python = "3.14.3"
+  python = "3.14.4"
 
 [settings]
   experimental = true
