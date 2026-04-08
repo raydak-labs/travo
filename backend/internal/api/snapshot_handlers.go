@@ -94,7 +94,7 @@ func RestoreSnapshotHandler(snapshotSvc *services.SnapshotService, applier servi
 		}
 
 		// Create auto-snapshot before restore
-		if _, err := snapshotSvc.AutoSaveBeforeChange("before restore", []string{"system", "network", "wireless", "firewall", "dhcp"}) ; err != nil {
+		if _, err := snapshotSvc.AutoSaveBeforeChange("before restore", []string{"system", "network", "wireless", "firewall", "dhcp"}); err != nil {
 			// Log but continue
 		}
 
@@ -114,7 +114,7 @@ func RestoreSnapshotHandler(snapshotSvc *services.SnapshotService, applier servi
 		}
 
 		return c.JSON(fiber.Map{
-			"message": "Configuration restored successfully",
+			"message":     "Configuration restored successfully",
 			"snapshot_id": snapshotID,
 		})
 	}

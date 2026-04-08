@@ -53,7 +53,7 @@ type SystemService struct {
 	ubus      ubus.Ubus
 	uci       uci.UCI
 	storage   StorageProvider
-	applier   UCIApplyConfirm // optional; for staged apply with rollback
+	applier   UCIApplyConfirm  // optional; for staged apply with rollback
 	snapshots *SnapshotService // optional; for configuration snapshots
 }
 

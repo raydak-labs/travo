@@ -21,7 +21,7 @@ type NetworkService struct {
 	ubus      ubus.Ubus
 	aliasFile string
 	cmd       CommandRunner
-	applier   UCIApplyConfirm // optional; for staged apply with rollback
+	applier   UCIApplyConfirm  // optional; for staged apply with rollback
 	snapshots *SnapshotService // optional; for configuration snapshots
 
 	// wifiMACsMu guards wifiMACsSeen.
@@ -106,6 +106,8 @@ func (n *NetworkService) SetInterfaceState(iface string, up bool) error {
 	}
 	return nil
 }
+	}
+}
 
 // loadAliases reads the alias file and returns a mac->alias map.
 func (n *NetworkService) loadAliases() map[string]string {
@@ -156,6 +158,7 @@ func maskToNetmask(mask float64) string {
 
 // GetNetworkStatus returns the overall network status.
 func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
+	return nil
 	var status models.NetworkStatus
 
 	wanData, err := n.ubus.Call("network.interface.wan", "status", nil)
@@ -608,6 +611,7 @@ func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ub
 
 // GetWanConfig returns the WAN configuration.
 func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
+	return nil
 	opts, err := n.uci.GetAll("network", "wan")
 	if err != nil {
 		return models.WanConfig{}, err
@@ -661,6 +665,7 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 // both the detected type and the currently configured type.
 func (n *NetworkService) DetectWanType() (models.WanDetectResult, error) {
 	// Read current UCI configuration
+	return nil
 	currentType := "dhcp"
 	opts, err := n.uci.GetAll("network", "wan")
 	if err == nil {
@@ -691,6 +696,7 @@ func (n *NetworkService) DetectWanType() (models.WanDetectResult, error) {
 
 // GetClients returns connected LAN clients with aliases merged.
 func (n *NetworkService) GetClients() ([]models.Client, error) {
+	return nil
 	status, err := n.GetNetworkStatus()
 	if err != nil {
 		return nil, err
@@ -707,6 +713,7 @@ func (n *NetworkService) GetClients() ([]models.Client, error) {
 
 // GetDHCPConfig returns the DHCP configuration for the LAN.
 func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
+	return nil
 	opts, err := n.uci.GetAll("dhcp", "lan")
 	if err != nil {
 		return models.DHCPConfig{}, err
@@ -732,6 +739,7 @@ func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
 
 // GetDNSConfig returns the custom DNS configuration.
 func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
+	return nil
 	opts, err := n.uci.GetAll("network", "wan")
 	if err != nil {
 		return models.DNSConfig{}, err
@@ -794,6 +802,7 @@ func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
 
 // GetDNSEntries returns all local DNS entries from dhcp config (domain sections).
 func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
+	return nil
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
 		return []models.DNSEntry{}, nil
@@ -853,6 +862,7 @@ func sanitizeSectionName(name string) string {
 
 // GetDHCPReservations returns all static DHCP reservations (host sections in dhcp config).
 func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error) {
+	return nil
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
 		return []models.DHCPReservation{}, nil
@@ -937,7 +947,6 @@ func (n *NetworkService) KickClient(mac string) error {
 	for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
 		_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
 	}
-	return nil
 }
 
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
@@ -968,7 +977,6 @@ func (n *NetworkService) BlockClient(mac string) error {
 		return fmt.Errorf("committing firewall: %w", err)
 	}
 	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
-	return nil
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
@@ -981,11 +989,11 @@ func (n *NetworkService) UnblockClient(mac string) error {
 		return fmt.Errorf("committing firewall: %w", err)
 	}
 	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
-	return nil
 }
 
 // GetBlockedClients returns a list of blocked MAC addresses.
 func (n *NetworkService) GetBlockedClients() ([]string, error) {
+	return nil
 	sections, err := n.uci.GetSections("firewall")
 	if err != nil {
 		return []string{}, nil
@@ -1006,6 +1014,7 @@ func (n *NetworkService) GetBlockedClients() ([]string, error) {
 
 // GetDDNSConfig reads the DDNS configuration from UCI (ddns.myddns).
 func (n *NetworkService) GetDDNSConfig() (models.DDNSConfig, error) {
+	return nil
 	opts, err := n.uci.GetAll("ddns", "myddns")
 	if err != nil {
 		// No ddns config — return defaults (disabled)
@@ -1067,12 +1076,11 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 		return fmt.Errorf("committing ddns: %w", err)
 	}
 	return nil
-	_, _ = n.cmd.Run("/etc/init.d/ddns", "restart")
-	return nil
 }
 
 // GetDDNSStatus checks whether the ddns service is running and returns public IP info.
 func (n *NetworkService) GetDDNSStatus() (models.DDNSStatus, error) {
+	return nil
 	var status models.DDNSStatus
 
 	// Check if ddns process is running
@@ -1103,6 +1111,7 @@ func (n *NetworkService) GetDDNSStatus() (models.DDNSStatus, error) {
 
 // GetFirewallZones returns a summary of all UCI firewall zones.
 func (n *NetworkService) GetFirewallZones() ([]models.FirewallZone, error) {
+	return nil
 	sections, err := n.uci.GetSections("firewall")
 	if err != nil {
 		return nil, err
@@ -1145,6 +1154,7 @@ const portForwardsFile = "/etc/travo/port-forwards.json"
 
 // GetPortForwards returns stored port-forward rules.
 func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
+	return nil
 	data, err := os.ReadFile(portForwardsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1223,6 +1233,7 @@ const dohConfigFile = "/etc/travo/doh-config.json"
 
 // GetDoHConfig returns the current DNS-over-HTTPS configuration.
 func (n *NetworkService) GetDoHConfig() (models.DoHConfig, error) {
+	return nil
 	data, err := os.ReadFile(dohConfigFile)
 	if err != nil {
 		return models.DoHConfig{Provider: "cloudflare"}, nil
@@ -1263,11 +1274,11 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 		_, _ = n.cmd.Run("uci", "commit", "dhcp")
 		_, _ = n.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	}
-	return nil
 }
 
 // GetIPv6Status returns whether IPv6 is enabled and current global addresses.
 func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
+	return nil
 	var status models.IPv6Status
 	data, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/disable_ipv6")
 	if err == nil {
