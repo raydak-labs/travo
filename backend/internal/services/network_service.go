@@ -766,22 +766,22 @@ func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
 // SetDNSConfig updates the custom DNS configuration.
 func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
 	if config.UseCustomDNS {
-		if err := n.uci.Set("network", "wan", "peerdns", "0"); err != nil {
-			return fmt.Errorf("setting peerdns: %w", err)
+		if err := n.uciSet("network", "wan", "peerdns", "0"); err != nil {
+			return err
 		}
 		dns := strings.Join(config.Servers, " ")
-		if err := n.uci.Set("network", "wan", "dns", dns); err != nil {
-			return fmt.Errorf("setting dns: %w", err)
+		if err := n.uciSet("network", "wan", "dns", dns); err != nil {
+			return err
 		}
 	} else {
-		if err := n.uci.Set("network", "wan", "peerdns", "1"); err != nil {
-			return fmt.Errorf("setting peerdns: %w", err)
+		if err := n.uciSet("network", "wan", "peerdns", "1"); err != nil {
+			return err
 		}
-		if err := n.uci.Set("network", "wan", "dns", ""); err != nil {
-			return fmt.Errorf("clearing dns: %w", err)
+		if err := n.uciSet("network", "wan", "dns", ""); err != nil {
+			return err
 		}
 	}
-	return n.uci.Commit("network")
+	return n.uciCommit("network")
 }
 
 // SetDHCPConfig updates the DHCP configuration for the LAN.
@@ -1050,36 +1050,38 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 	if config.Enabled {
 		enabled = "1"
 	}
-	if err := n.uci.Set("ddns", "myddns", "enabled", enabled); err != nil {
-		return fmt.Errorf("setting ddns enabled: %w", err)
+	if err := n.uciSet("ddns", "myddns", "enabled", enabled); err != nil {
+		return err
 	}
 	if strings.EqualFold(strings.TrimSpace(config.Service), "custom") {
 		_ = n.uci.DeleteOption("ddns", "myddns", "service_name")
-		if err := n.uci.Set("ddns", "myddns", "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
-			return fmt.Errorf("setting ddns update_url: %w", err)
+		if err := n.uciSet("ddns", "myddns", "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
+			return err
 		}
 	} else {
 		_ = n.uci.DeleteOption("ddns", "myddns", "update_url")
-		if err := n.uci.Set("ddns", "myddns", "service_name", config.Service); err != nil {
-			return fmt.Errorf("setting ddns service_name: %w", err)
+		if err := n.uciSet("ddns", "myddns", "service_name", config.Service); err != nil {
+			return err
 		}
 	}
-	if err := n.uci.Set("ddns", "myddns", "domain", config.Domain); err != nil {
-		return fmt.Errorf("setting ddns domain: %w", err)
+	if err := n.uciSet("ddns", "myddns", "domain", config.Domain); err != nil {
+		return err
 	}
-	if err := n.uci.Set("ddns", "myddns", "username", config.Username); err != nil {
-		return fmt.Errorf("setting ddns username: %w", err)
+	if err := n.uciSet("ddns", "myddns", "username", config.Username); err != nil {
+		return err
 	}
-	if err := n.uci.Set("ddns", "myddns", "password", config.Password); err != nil {
-		return fmt.Errorf("setting ddns password: %w", err)
+	if err := n.uciSet("ddns", "myddns", "password", config.Password); err != nil {
+		return err
 	}
-	if err := n.uci.Set("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
-		return fmt.Errorf("setting ddns lookup_host: %w", err)
+	if err := n.uciSet("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
+		return err
 	}
-	if err := n.uci.Commit("ddns"); err != nil {
-		return fmt.Errorf("committing ddns: %w", err)
+	if err := n.uciCommit("ddns"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/ddns", "restart")
+	if err := n.restartService("ddns"); err != nil {
+		return fmt.Errorf("restart ddns: %w", err)
+	}
 	return nil
 }
 
