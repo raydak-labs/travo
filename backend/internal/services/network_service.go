@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1297,4 +1298,165 @@ func (n *NetworkService) SendWoL(mac, iface string) error {
 		_, err = n.cmd.Run("ether-wake", args...)
 	}
 	return err
+}
+
+// ConnectionMethod describes how the client is connected.
+type ConnectionMethod struct {
+	Method    string `json:"method"`     // "wifi-client", "wifi-ap", "ethernet", "unknown"
+	Interface string `json:"interface"`  // interface name (e.g., "br-lan", "wwan0")
+	IPAddress string `json:"ip_address"` // client's IP address
+}
+
+// GetConnectionMethod determines how the client is connected by matching the
+// client IP against network interface addresses. Uses ubus network interface
+// dump for accurate address detection. On error, logs details and returns
+// "unknown" to avoid breaking UI.
+func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
+	// Handle localhost cases
+	if clientIP == "" || clientIP == "::1" || clientIP == "127.0.0.1" {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Parse client IP to validate it's valid
+	clientAddr, err := netip.ParseAddr(clientIP)
+	if err != nil {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// IPv6 addresses are not supported for connection method detection
+	if clientAddr.Is6() {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Get all network interface addresses via ubus
+	ifaceDump, err := n.ubus.Call("network.interface", "dump", nil)
+	if err != nil {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Parse the ubus response to find matching interfaces
+	interfaces, ok := ifaceDump["interface"].([]interface{})
+	if !ok {
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	type ifaceInfo struct {
+		name        string
+		device      string
+		ipv4Addrs   []netip.Prefix
+		up          bool
+		interfaceUp bool
+	}
+
+	var ifaces []ifaceInfo
+
+	// Extract interface information
+	for _, ifaceRaw := range interfaces {
+		ifaceMap, ok := ifaceRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := ifaceMap["l3_device"].(string)
+		if name == "" {
+			name, _ = ifaceMap["interface"].(string)
+		}
+
+		l3Device, _ := ifaceMap["l3_device"].(string)
+		device, _ := ifaceMap["device"].(string)
+
+		if l3Device != "" {
+			device = l3Device
+		}
+
+		info := ifaceInfo{
+			name:   name,
+			device: device,
+			up: func() bool {
+				if up, ok := ifaceMap["up"].(bool); ok {
+					return up
+				}
+				return false
+			}(),
+			interfaceUp: func() bool {
+				if up, ok := ifaceMap["interface"].(bool); ok {
+					return up
+				}
+				return false
+			}(),
+		}
+
+		// Extract IPv4 addresses with netmasks
+		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]interface{}); ok {
+			for _, addrRaw := range ipv4Addrs {
+				if addrMap, ok := addrRaw.(map[string]interface{}); ok {
+					if addrStr, ok := addrMap["address"].(string); ok {
+						// Parse address with netmask
+						if addr, err := netip.ParseAddr(addrStr); err == nil {
+							info.ipv4Addrs = append(info.ipv4Addrs, netip.PrefixFrom(addr, 32))
+						}
+					}
+				}
+			}
+		}
+
+		// Also extract IPv4 prefix data if available (includes netmask)
+		if ipv4Prefixes, ok := ifaceMap["ipv4-prefix"].([]interface{}); ok {
+			for _, prefixRaw := range ipv4Prefixes {
+				if prefixMap, ok := prefixRaw.(map[string]interface{}); ok {
+					if prefixStr, ok := prefixMap["address"].(string); ok {
+						if prefix, err := netip.ParsePrefix(prefixStr); err == nil {
+							info.ipv4Addrs = append(info.ipv4Addrs, prefix)
+						}
+					}
+				}
+			}
+		}
+
+		ifaces = append(ifaces, info)
+	}
+
+	// Find which interface matches the client IP
+	var matchedIface *ifaceInfo
+	for i := range ifaces {
+		info := &ifaces[i]
+		if !info.up && !info.interfaceUp {
+			continue
+		}
+
+		// Check if client IP is in this interface's subnet
+		for _, prefix := range info.ipv4Addrs {
+			if prefix.Contains(clientAddr) {
+				matchedIface = info
+				break
+			}
+		}
+		if matchedIface != nil {
+			break
+		}
+	}
+
+	if matchedIface == nil {
+		// No match found - might be localhost or routed
+		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+	}
+
+	// Determine connection method based on interface
+	method := "unknown"
+	switch {
+	case strings.HasPrefix(matchedIface.name, "wwan") ||
+		strings.HasPrefix(matchedIface.device, "phy") && strings.Contains(matchedIface.device, "-sta"):
+		method = "wifi-client"
+	case matchedIface.name == "br-lan" || matchedIface.name == "lan":
+		// Check if this is AP via wireless device presence
+		method = "wifi-ap" // Default to AP for LAN
+	case strings.HasPrefix(matchedIface.name, "eth") || strings.HasPrefix(matchedIface.device, "eth"):
+		method = "ethernet"
+	}
+
+	return &ConnectionMethod{
+		Method:    method,
+		Interface: matchedIface.name,
+		IPAddress: clientIP,
+	}, nil
 }

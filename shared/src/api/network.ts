@@ -18,6 +18,13 @@ export interface NetworkInterface {
   readonly tx_bytes: number;
 }
 
+/** Connection method for the current client */
+export interface ConnectionMethod {
+  readonly method: 'wifi-client' | 'wifi-ap' | 'ethernet' | 'unknown';
+  readonly interface: string;
+  readonly ip_address: string;
+}
+
 /** WAN connection type */
 export type WanType = 'dhcp' | 'static' | 'pppoe' | 'usb_tethering' | 'none';
 

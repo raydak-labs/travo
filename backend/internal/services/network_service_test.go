@@ -22,6 +22,332 @@ func (f *failingSetUCI) Set(_, _, _, _ string) error {
 	return f.setErr
 }
 
+func TestGetConnectionMethod(t *testing.T) {
+	tests := []struct {
+		name           string
+		clientIP       string
+		ubusResponse   map[string]interface{}
+		expectedMethod string
+		expectError    bool
+	}{
+		{
+			name:           "empty IP",
+			clientIP:       "",
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:           "localhost IPv6",
+			clientIP:       "::1",
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:           "localhost IPv4",
+			clientIP:       "127.0.0.1",
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:           "invalid IP",
+			clientIP:       "not-an-ip",
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:           "IPv6 address not supported",
+			clientIP:       "2001:db8::1",
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:           "ubus error returns unknown",
+			clientIP:       "192.168.1.100",
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:     "malformed ubus interface",
+			clientIP: "192.168.1.100",
+			ubusResponse: map[string]interface{}{
+				"interface": "not-a-map",
+			},
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:     "wwan interface matches WiFi client",
+			clientIP: "192.168.20.100",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "wwan0",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.20.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "wifi-client",
+			expectError:    false,
+		},
+		{
+			name:     "phySTA device matches WiFi client",
+			clientIP: "192.168.30.50",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"device":    "phy0-sta",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.30.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "wifi-client",
+			expectError:    false,
+		},
+		{
+			name:     "br-lan interface matches WiFi AP",
+			clientIP: "192.168.1.200",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "br-lan",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.1.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "wifi-ap",
+			expectError:    false,
+		},
+		{
+			name:     "lan interface matches WiFi AP",
+			clientIP: "192.168.2.50",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "lan",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.2.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "wifi-ap",
+			expectError:    false,
+		},
+		{
+			name:     "eth0 matches Ethernet",
+			clientIP: "10.0.0.5",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "eth0",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "10.0.0.0/8",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+		{
+			name:     "eth1 device matches Ethernet",
+			clientIP: "172.16.0.10",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "eth1",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "172.16.0.0/12",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+		{
+			name:     "unknown interface returns unknown connection",
+			clientIP: "192.168.100.50",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "some-unknown",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.100.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:     "interface down not matched",
+			clientIP: "192.168.1.50",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": false,
+						"up":        false,
+						"l3_device": "br-lan",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.1.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:     "no matching interface returns unknown",
+			clientIP: "8.8.8.8",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "br-lan",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.1.0/24",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "unknown",
+			expectError:    false,
+		},
+		{
+			name:     "/23 subnet matching",
+			clientIP: "192.168.0.100",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "eth0",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "192.168.0.0/23",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+		{
+			name:     "/16 subnet matching",
+			clientIP: "10.0.210.20",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "eth0",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "10.0.0.0/16",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+		{
+			name:     "/19 subnet matching",
+			clientIP: "172.16.10.5",
+			ubusResponse: map[string]interface{}{
+				"interface": []interface{}{
+					map[string]interface{}{
+						"interface": true,
+						"up":        true,
+						"l3_device": "eth0",
+						"ipv4-prefix": []interface{}{
+							map[string]interface{}{
+								"address": "172.16.0.0/19",
+							},
+						},
+					},
+				},
+			},
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ub := ubus.NewMockUbus()
+			if tt.ubusResponse != nil {
+				ub.RegisterResponse("network.interface.dump", tt.ubusResponse)
+			}
+
+			u := uci.NewMockUCI()
+			svc := NewNetworkService(u, ub)
+
+			result, err := svc.GetConnectionMethod(tt.clientIP)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if result.Method != tt.expectedMethod {
+				t.Errorf("expected method %q, got %q", tt.expectedMethod, result.Method)
+			}
+		})
+	}
+}
+
 func TestGetNetworkStatus(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()

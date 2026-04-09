@@ -588,3 +588,19 @@ func SendWoLHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(fiber.Map{"ok": true})
 	}
 }
+
+// ConnectionMethodHandler handles GET /api/v1/network/connection-method.
+func ConnectionMethodHandler(svc *services.NetworkService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		clientIP := c.IP()
+		if clientIP == "" {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not determine client IP"})
+		}
+
+		resp, err := svc.GetConnectionMethod(clientIP)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(resp)
+	}
+}
