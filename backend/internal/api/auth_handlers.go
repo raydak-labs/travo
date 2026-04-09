@@ -21,7 +21,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 
 		var req models.LoginRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": ErrInvalidRequestBody})
 		}
 
 		token, expiry, err := authSvc.Login(req.Password)
@@ -76,7 +76,7 @@ func ChangePasswordHandler(authSvc *auth.AuthService, _ *auth.FileAuthStore) fib
 	return func(c fiber.Ctx) error {
 		var req models.ChangePasswordRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": ErrInvalidRequestBody})
 		}
 		if err := authSvc.ChangePassword(req.CurrentPassword, req.NewPassword); err != nil {
 			status := fiber.StatusBadRequest
