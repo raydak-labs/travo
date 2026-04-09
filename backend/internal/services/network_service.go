@@ -80,6 +80,12 @@ func (n *NetworkService) restartService(service string) error {
 	return err
 }
 
+// normalizeMACForSection converts a MAC address to a UCI section-safe format
+// by uppercasing and removing colons.
+func normalizeMACForSection(mac string) string {
+	return strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+}
+
 // updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
 // dump results and returns a snapshot of MACs that were RECENTLY WiFi but are
 // not in the current wifiStats (i.e. they just disconnected). These must not be
@@ -971,7 +977,7 @@ func (n *NetworkService) KickClient(mac string) error {
 
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
 func (n *NetworkService) BlockClient(mac string) error {
-	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	section := "block_" + normalizeMACForSection(mac)
 	macUpper := strings.ToUpper(mac)
 
 	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
@@ -1000,7 +1006,7 @@ func (n *NetworkService) BlockClient(mac string) error {
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
-	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	section := "block_" + normalizeMACForSection(mac)
 
 	if err := n.uci.DeleteSection("firewall", section); err != nil {
 		return fmt.Errorf("delete firewall block rule: %w", err)
