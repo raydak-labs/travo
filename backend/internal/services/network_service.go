@@ -36,6 +36,9 @@ type NetworkService struct {
 // a wired LAN client if it reconnects that way.
 const wifiMACTTL = 5 * time.Minute
 
+// initdPath is the path to OpenWRT init.d scripts directory.
+const initdPath = "/etc/init.d/"
+
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
 	return &NetworkService{
 		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
@@ -76,7 +79,7 @@ func (n *NetworkService) uciCommit(config string) error {
 
 // restartService restarts an OpenWRT init.d service.
 func (n *NetworkService) restartService(service string) error {
-	_, err := n.cmd.Run("/etc/init.d/"+service, "restart")
+	_, err := n.cmd.Run(initdPath+service, "restart")
 	return err
 }
 
