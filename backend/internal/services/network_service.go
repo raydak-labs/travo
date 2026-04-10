@@ -47,6 +47,11 @@ func boolToEnabled(enabled bool) string {
 	return "0"
 }
 
+// stringFromBytes converts a byte slice to a trimmed string.
+func stringFromBytes(data []byte) string {
+	return stringFromBytes(data)
+}
+
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
 	return &NetworkService{
 		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
@@ -1316,7 +1321,7 @@ func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
 	var status models.IPv6Status
 	data, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/disable_ipv6")
 	if err == nil {
-		status.Enabled = strings.TrimSpace(string(data)) == "0"
+		status.Enabled = stringFromBytes(data) == "0"
 	} else {
 		status.Enabled = true // assume enabled if file unreadable
 	}

@@ -7,9 +7,9 @@ import (
 const (
 	// Error messages for request validation
 	ErrInvalidRequestBody = "invalid request body"
-	ErrInvalidJSON       = "invalid JSON"
-	ErrMissingField      = "missing required field"
-	ErrInvalidValue      = "invalid value"
+	ErrInvalidJSON        = "invalid JSON"
+	ErrMissingField       = "missing required field"
+	ErrInvalidValue       = "invalid value"
 )
 
 // RespondWithError sends a JSON error response with the given message and status.
