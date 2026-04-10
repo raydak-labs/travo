@@ -49,7 +49,7 @@ func boolToEnabled(enabled bool) string {
 
 // stringFromBytes converts a byte slice to a trimmed string.
 func stringFromBytes(data []byte) string {
-	return stringFromBytes(data)
+	return strings.TrimSpace(string(data))
 }
 
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
