@@ -1,14 +1,6 @@
-version: '2'
-
 linters:
-  default: none
   enable:
     - govet
     - ineffassign
     - staticcheck
     - unused
-  exclusions:
-    rules:
-      - path: '(.+)_test\.go'
-        linters:
-          - errcheck
