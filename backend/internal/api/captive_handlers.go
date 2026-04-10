@@ -13,7 +13,7 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.CheckCaptivePortal()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(status)
 	}
@@ -30,7 +30,7 @@ func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
 		if portalURL == "" {
 			st, err := svc.CheckCaptivePortal()
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+				return RespondWithServerError(c, err)
 			}
 			if st.PortalURL != nil {
 				portalURL = strings.TrimSpace(*st.PortalURL)
@@ -38,12 +38,12 @@ func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
 		}
 
 		if portalURL == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "no portal URL available"})
+			return RespondWithError(c, fiber.StatusBadRequest, "no portal URL available")
 		}
 
 		res, err := svc.AutoAcceptCaptivePortal(portalURL)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 
 		return c.JSON(res)

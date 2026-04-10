@@ -1218,10 +1218,7 @@ func (w *WifiService) SetAPConfig(section string, config models.APConfig) (*Wire
 			return nil, fmt.Errorf("setting key: %w", err)
 		}
 	}
-	disabled := "0"
-	if !config.Enabled {
-		disabled = "1"
-	}
+	disabled := boolToEnabled(!config.Enabled)
 	if err := w.uci.Set("wireless", section, "disabled", disabled); err != nil {
 		return nil, fmt.Errorf("setting disabled: %w", err)
 	}

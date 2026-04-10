@@ -36,6 +36,22 @@ type NetworkService struct {
 // a wired LAN client if it reconnects that way.
 const wifiMACTTL = 5 * time.Minute
 
+// initdPath is the path to OpenWRT init.d scripts directory.
+const initdPath = "/etc/init.d/"
+
+// boolToEnabled converts a boolean to UCI enabled string ("1" or "0").
+func boolToEnabled(enabled bool) string {
+	if enabled {
+		return "1"
+	}
+	return "0"
+}
+
+// stringFromBytes converts a byte slice to a trimmed string.
+func stringFromBytes(data []byte) string {
+	return strings.TrimSpace(string(data))
+}
+
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
 	return &NetworkService{
 		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
@@ -56,6 +72,34 @@ func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *
 // NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
 func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
 	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
+}
+
+// uciSet is a helper for setting UCI values with consistent error wrapping.
+func (n *NetworkService) uciSet(config, section, option, value string) error {
+	if err := n.uci.Set(config, section, option, value); err != nil {
+		return fmt.Errorf("set %s.%s.%s: %w", config, section, option, err)
+	}
+	return nil
+}
+
+// uciCommit commits a UCI config with consistent error wrapping.
+func (n *NetworkService) uciCommit(config string) error {
+	if err := n.uci.Commit(config); err != nil {
+		return fmt.Errorf("commit %s: %w", config, err)
+	}
+	return nil
+}
+
+// restartService restarts an OpenWRT init.d service.
+func (n *NetworkService) restartService(service string) error {
+	_, err := n.cmd.Run(initdPath+service, "restart")
+	return err
+}
+
+// normalizeMACForSection converts a MAC address to a UCI section-safe format
+// by uppercasing and removing colons.
+func normalizeMACForSection(mac string) string {
+	return strings.ReplaceAll(strings.ToUpper(mac), ":", "")
 }
 
 // updateKnownWifiMACs refreshes the persistent WiFi MAC set with current station
@@ -631,26 +675,26 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 // SetWanConfig updates the WAN configuration.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	if config.Type != "" {
-		if err := n.uci.Set("network", "wan", "proto", config.Type); err != nil {
-			return fmt.Errorf("setting WAN proto: %w", err)
+		if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
+			return err
 		}
 	}
 	if config.IPAddress != "" {
-		if err := n.uci.Set("network", "wan", "ip4addr", config.IPAddress); err != nil {
-			return fmt.Errorf("setting WAN ip4addr: %w", err)
+		if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
+			return err
 		}
 	}
 	if config.Netmask != "" {
-		if err := n.uci.Set("network", "wan", "netmask", config.Netmask); err != nil {
-			return fmt.Errorf("setting WAN netmask: %w", err)
+		if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
+			return err
 		}
 	}
 	if config.Gateway != "" {
-		if err := n.uci.Set("network", "wan", "gateway", config.Gateway); err != nil {
-			return fmt.Errorf("setting WAN gateway: %w", err)
+		if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+			return err
 		}
 	}
-	return n.uci.Commit("network")
+	return n.uciCommit("network")
 }
 
 // DetectWanType auto-detects the WAN connection type and returns
@@ -744,36 +788,36 @@ func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
 // SetDNSConfig updates the custom DNS configuration.
 func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
 	if config.UseCustomDNS {
-		if err := n.uci.Set("network", "wan", "peerdns", "0"); err != nil {
-			return fmt.Errorf("setting peerdns: %w", err)
+		if err := n.uciSet("network", "wan", "peerdns", "0"); err != nil {
+			return err
 		}
 		dns := strings.Join(config.Servers, " ")
-		if err := n.uci.Set("network", "wan", "dns", dns); err != nil {
-			return fmt.Errorf("setting dns: %w", err)
+		if err := n.uciSet("network", "wan", "dns", dns); err != nil {
+			return err
 		}
 	} else {
-		if err := n.uci.Set("network", "wan", "peerdns", "1"); err != nil {
-			return fmt.Errorf("setting peerdns: %w", err)
+		if err := n.uciSet("network", "wan", "peerdns", "1"); err != nil {
+			return err
 		}
-		if err := n.uci.Set("network", "wan", "dns", ""); err != nil {
-			return fmt.Errorf("clearing dns: %w", err)
+		if err := n.uciSet("network", "wan", "dns", ""); err != nil {
+			return err
 		}
 	}
-	return n.uci.Commit("network")
+	return n.uciCommit("network")
 }
 
 // SetDHCPConfig updates the DHCP configuration for the LAN.
 func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
-	if err := n.uci.Set("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
-		return fmt.Errorf("setting DHCP start: %w", err)
+	if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
+		return err
 	}
-	if err := n.uci.Set("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
-		return fmt.Errorf("setting DHCP limit: %w", err)
+	if err := n.uciSet("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
+		return err
 	}
-	if err := n.uci.Set("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
-		return fmt.Errorf("setting DHCP leasetime: %w", err)
+	if err := n.uciSet("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
+		return err
 	}
-	return n.uci.Commit("dhcp")
+	return n.uciCommit("dhcp")
 }
 
 // GetDHCPLeases reads active DHCP leases from /tmp/dhcp.leases.
@@ -926,48 +970,69 @@ func parseDHCPLeases(data string) []models.DHCPLease {
 
 // KickClient disconnects a WiFi client by deauthentication.
 func (n *NetworkService) KickClient(mac string) error {
-	// Try common AP interfaces
-	for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
-		_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+	// Discover AP interfaces dynamically using iw dev
+	iwDevOutput, err := n.cmd.Run("iw", "dev")
+	if err != nil {
+		// Fallback to common AP interfaces if iw fails
+		for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
+			_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+		}
+		return nil
+	}
+
+	// Parse iw dev output to find AP interfaces
+	for _, iface := range parseIwDev(string(iwDevOutput)) {
+		_, err := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+		if err == nil {
+			// Successfully kicked from this interface
+			return nil
+		}
 	}
 	return nil
 }
 
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
 func (n *NetworkService) BlockClient(mac string) error {
-	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	section := "block_" + normalizeMACForSection(mac)
+	macUpper := strings.ToUpper(mac)
+
 	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
-		return fmt.Errorf("adding firewall block rule: %w", err)
+		return fmt.Errorf("add firewall block rule: %w", err)
 	}
-	if err := n.uci.Set("firewall", section, "name", "Block-"+strings.ToUpper(mac)); err != nil {
-		return fmt.Errorf("setting block rule name: %w", err)
+	if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "src", "lan"); err != nil {
-		return fmt.Errorf("setting block rule src: %w", err)
+	if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "src_mac", strings.ToUpper(mac)); err != nil {
-		return fmt.Errorf("setting block rule src_mac: %w", err)
+	if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
+		return err
 	}
-	if err := n.uci.Set("firewall", section, "target", "DROP"); err != nil {
-		return fmt.Errorf("setting block rule target: %w", err)
+	if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
+		return err
 	}
-	if err := n.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
+	if err := n.uciCommit("firewall"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	if err := n.restartService("firewall"); err != nil {
+		return fmt.Errorf("restart firewall: %w", err)
+	}
 	return nil
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
-	section := "block_" + strings.ReplaceAll(strings.ToUpper(mac), ":", "")
+	section := "block_" + normalizeMACForSection(mac)
+
 	if err := n.uci.DeleteSection("firewall", section); err != nil {
-		return fmt.Errorf("deleting firewall block rule: %w", err)
+		return fmt.Errorf("delete firewall block rule: %w", err)
 	}
-	if err := n.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
+	if err := n.uciCommit("firewall"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/firewall", "restart")
+	if err := n.restartService("firewall"); err != nil {
+		return fmt.Errorf("restart firewall: %w", err)
+	}
 	return nil
 }
 
@@ -1021,36 +1086,38 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 	if config.Enabled {
 		enabled = "1"
 	}
-	if err := n.uci.Set("ddns", "myddns", "enabled", enabled); err != nil {
-		return fmt.Errorf("setting ddns enabled: %w", err)
+	if err := n.uciSet("ddns", "myddns", "enabled", enabled); err != nil {
+		return err
 	}
 	if strings.EqualFold(strings.TrimSpace(config.Service), "custom") {
 		_ = n.uci.DeleteOption("ddns", "myddns", "service_name")
-		if err := n.uci.Set("ddns", "myddns", "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
-			return fmt.Errorf("setting ddns update_url: %w", err)
+		if err := n.uciSet("ddns", "myddns", "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
+			return err
 		}
 	} else {
 		_ = n.uci.DeleteOption("ddns", "myddns", "update_url")
-		if err := n.uci.Set("ddns", "myddns", "service_name", config.Service); err != nil {
-			return fmt.Errorf("setting ddns service_name: %w", err)
+		if err := n.uciSet("ddns", "myddns", "service_name", config.Service); err != nil {
+			return err
 		}
 	}
-	if err := n.uci.Set("ddns", "myddns", "domain", config.Domain); err != nil {
-		return fmt.Errorf("setting ddns domain: %w", err)
+	if err := n.uciSet("ddns", "myddns", "domain", config.Domain); err != nil {
+		return err
 	}
-	if err := n.uci.Set("ddns", "myddns", "username", config.Username); err != nil {
-		return fmt.Errorf("setting ddns username: %w", err)
+	if err := n.uciSet("ddns", "myddns", "username", config.Username); err != nil {
+		return err
 	}
-	if err := n.uci.Set("ddns", "myddns", "password", config.Password); err != nil {
-		return fmt.Errorf("setting ddns password: %w", err)
+	if err := n.uciSet("ddns", "myddns", "password", config.Password); err != nil {
+		return err
 	}
-	if err := n.uci.Set("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
-		return fmt.Errorf("setting ddns lookup_host: %w", err)
+	if err := n.uciSet("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
+		return err
 	}
-	if err := n.uci.Commit("ddns"); err != nil {
-		return fmt.Errorf("committing ddns: %w", err)
+	if err := n.uciCommit("ddns"); err != nil {
+		return err
 	}
-	_, _ = n.cmd.Run("/etc/init.d/ddns", "restart")
+	if err := n.restartService("ddns"); err != nil {
+		return fmt.Errorf("restart ddns: %w", err)
+	}
 	return nil
 }
 
@@ -1254,7 +1321,7 @@ func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
 	var status models.IPv6Status
 	data, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/disable_ipv6")
 	if err == nil {
-		status.Enabled = strings.TrimSpace(string(data)) == "0"
+		status.Enabled = stringFromBytes(data) == "0"
 	} else {
 		status.Enabled = true // assume enabled if file unreadable
 	}
