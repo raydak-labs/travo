@@ -39,6 +39,14 @@ const wifiMACTTL = 5 * time.Minute
 // initdPath is the path to OpenWRT init.d scripts directory.
 const initdPath = "/etc/init.d/"
 
+// boolToEnabled converts a boolean to UCI enabled string ("1" or "0").
+func boolToEnabled(enabled bool) string {
+	if enabled {
+		return "1"
+	}
+	return "0"
+}
+
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
 	return &NetworkService{
 		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
