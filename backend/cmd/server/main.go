@@ -96,11 +96,16 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	if err != nil {
 		log.Fatalf("failed to load auth config: %v", err)
 	}
+	if !cfg.MockMode {
+		if p := auth.LoadSealedRPCDPassword(cfg.AuthConfigPath, authCfg.JWTSecret); p != "" {
+			rootPassword.Set(p)
+		}
+	}
 	var authSvc *auth.AuthService
 	if cfg.MockMode {
 		authSvc = auth.NewAuthService("admin", authCfg.JWTSecret)
 	} else {
-		authSvc = auth.NewAuthServiceWithUbus(ub, authCfg.JWTSecret, rootPassword)
+		authSvc = auth.NewAuthServiceWithUbus(ub, authCfg.JWTSecret, rootPassword, cfg.AuthConfigPath)
 	}
 	var storage services.StorageProvider
 	var captiveProber services.HTTPProber

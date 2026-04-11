@@ -80,6 +80,17 @@ func WifiConnectionHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// WifiHealthHandler handles GET /api/v1/wifi/health.
+func WifiHealthHandler(svc *services.WifiService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		health, err := svc.GetHealth()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(health)
+	}
+}
+
 // WifiSetModeHandler handles PUT /api/v1/wifi/mode.
 func WifiSetModeHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
@@ -91,11 +102,6 @@ func WifiSetModeHandler(svc *services.WifiService) fiber.Handler {
 		}
 		if strings.TrimSpace(body.Mode) == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mode is required"})
-		}
-		if body.Mode == "repeater" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "repeater mode is currently disabled. Use access point or client mode instead.",
-			})
 		}
 		apply, err := svc.SetMode(body.Mode)
 		if err != nil {

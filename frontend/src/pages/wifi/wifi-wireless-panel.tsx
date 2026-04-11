@@ -1,7 +1,7 @@
 import { useWifiConnection } from '@/hooks/use-wifi';
 import { CaptivePortalBanner } from '@/components/wifi/captive-portal-banner';
+import { WifiHealthBanner } from '@/components/wifi/wifi-health-banner';
 import { WifiModeCard } from '@/components/wifi/wifi-mode-card';
-import { WifiRadioHardwareCard } from './wifi-radio-hardware-card';
 import { WifiCurrentConnectionCard } from './wifi-current-connection-card';
 import { WifiSavedNetworksCard } from './wifi-saved-networks-card';
 import { APConfigCard } from './ap-config-card';
@@ -21,8 +21,8 @@ export function WifiWirelessPanel({ panelId, tabId, hidden }: WifiWirelessPanelP
   return (
     <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
       <CaptivePortalBanner />
+      <WifiHealthBanner />
       <WifiModeCard />
-      <WifiRadioHardwareCard />
       {!isPureAP && <WifiCurrentConnectionCard />}
       {!isPureAP && <WifiSavedNetworksCard />}
       {!isPureSTA && <APConfigCard />}

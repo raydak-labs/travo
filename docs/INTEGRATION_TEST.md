@@ -305,6 +305,10 @@ ssh root@192.168.1.1 'logread -e travo -l 500' > "$RUN_DIR/after/logread-travo.t
 - If `wifi/connect` fails with `uci apply ... (Permission denied)`, check whether a
   previous mutating call returned `apply.pending=true` and was not confirmed yet.
   Confirm that token first, then retry.
+- If you see `session login` with empty `password`, the backend lost the sealed rpcd
+  credential (e.g. first boot, `/etc/travo/` wiped, or `auth.json` JWT secret replaced
+  without a matching `rpcd-login.sealed`). Log in once via `/api/v1/auth/login` to recreate
+  the seal file; a valid JWT alone does not carry the root password.
 - If offline/online checks use `wget`, OpenWrt commonly reports failures as
   `exit_code=4` (`Operation not permitted` / transport-level failure).
 - During connect, `wwan` may show `"pending": true` briefly before DHCP completes.

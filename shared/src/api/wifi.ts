@@ -188,6 +188,29 @@ export interface WiFiSchedule {
   readonly off_time: string; // HH:MM
 }
 
+/** Runtime health check — compares iwinfo SSID with netifd wwan device binding */
+export interface WifiHealthSTA {
+  readonly ifname: string;
+  readonly ssid: string;
+  readonly associated: boolean;
+}
+
+export interface WifiHealthWwan {
+  readonly device: string;
+  readonly up: boolean;
+  readonly ip_address: string;
+}
+
+export interface WifiHealth {
+  /** "ok" — STA associated with IP, or pure AP mode.
+   *  "warning" — STA associated but wwan has no lease yet.
+   *  "error" — wwan bound to a different device than the associated STA. */
+  readonly status: 'ok' | 'warning' | 'error';
+  readonly issues: readonly string[];
+  readonly sta?: WifiHealthSTA;
+  readonly wwan?: WifiHealthWwan;
+}
+
 /** Per-network MAC address policy */
 export interface MACPolicy {
   readonly ssid: string;

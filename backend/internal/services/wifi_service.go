@@ -3,6 +3,7 @@ package services
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,11 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
+
+// ErrMultipleActiveSTA is returned when more than one STA wifi-iface is enabled
+// and bound to network=wwan. netifd can bind only one device to the wwan interface,
+// so this state leaves the actually-connected STA without a DHCP lease.
+var ErrMultipleActiveSTA = errors.New("wireless config invalid: multiple enabled STA interfaces on network=wwan")
 
 // WifiReloader applies wireless configuration changes (e.g. "wifi up").
 type WifiReloader interface {
@@ -115,7 +121,39 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 	}
 }
 
+// validateWirelessConsistency enforces invariants that, if violated, leave the router
+// in a broken state that rpcd's rollback timer cannot fix (rollback restores the *previous*
+// config, which may itself be broken if the bug is in our own writer). Currently checks:
+//   - At most one enabled STA wifi-iface may be bound to network=wwan.
+func (w *WifiService) validateWirelessConsistency() error {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	var activeWwanSTAs []string
+	for name, opts := range sections {
+		if opts["mode"] != "sta" {
+			continue
+		}
+		if opts["disabled"] == "1" {
+			continue
+		}
+		if opts["network"] != "wwan" {
+			continue
+		}
+		activeWwanSTAs = append(activeWwanSTAs, name)
+	}
+	if len(activeWwanSTAs) > 1 {
+		sort.Strings(activeWwanSTAs)
+		return fmt.Errorf("%w: sections=%s", ErrMultipleActiveSTA, strings.Join(activeWwanSTAs, ","))
+	}
+	return nil
+}
+
 func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
+	if err := w.validateWirelessConsistency(); err != nil {
+		return nil, err
+	}
 	if w.applier != nil {
 		token, err := w.applier.StartApply(uciApplyConfigs)
 		if err != nil {
@@ -228,6 +266,56 @@ func (w *WifiService) nextSTASectionName() string {
 			return candidate
 		}
 	}
+}
+
+// selectActiveSTA picks the single STA wifi-iface that should be active.
+// Priority order:
+//  1. If exactly one STA section is currently enabled, keep it (preserve user's last Connect).
+//  2. Otherwise, rank remaining STA sections by the persisted priority file
+//     (lower number = higher priority; 0/unset ranked last).
+//  3. Tiebreak by section name (deterministic).
+//
+// Returns "" if no STA section exists.
+func (w *WifiService) selectActiveSTA() (string, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "", fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	var staNames []string
+	var enabledSTAs []string
+	for name, opts := range sections {
+		if opts["mode"] != "sta" {
+			continue
+		}
+		staNames = append(staNames, name)
+		if opts["disabled"] != "1" {
+			enabledSTAs = append(enabledSTAs, name)
+		}
+	}
+	if len(staNames) == 0 {
+		return "", nil
+	}
+	if len(enabledSTAs) == 1 {
+		return enabledSTAs[0], nil
+	}
+	priorities := w.loadPriorities()
+	sort.Slice(staNames, func(i, j int) bool {
+		ssidI := sections[staNames[i]]["ssid"]
+		ssidJ := sections[staNames[j]]["ssid"]
+		pi, pj := priorities[ssidI], priorities[ssidJ]
+		// Unset (0) ranks last.
+		if pi == 0 && pj != 0 {
+			return false
+		}
+		if pj == 0 && pi != 0 {
+			return true
+		}
+		if pi != pj {
+			return pi < pj
+		}
+		return staNames[i] < staNames[j]
+	})
+	return staNames[0], nil
 }
 
 // disableOtherSTASections disables every STA wifi-iface except activeSection.
@@ -837,21 +925,72 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		staSections = append(staSections, section)
 	}
 
-	for _, section := range apSections {
-		if err := w.setIfaceDisabled(section, !enableAP); err != nil {
+	// At most one STA may be enabled at a time: two STA wifi-iface sections pointing at
+	// network=wwan race for the interface in netifd, and the losing binding leaves the
+	// actually-connected STA without DHCP. Pick the single preferred profile and disable the rest.
+	var activeSTA string
+	if enableSTA {
+		var err error
+		activeSTA, err = w.selectActiveSTA()
+		if err != nil {
 			return nil, err
 		}
-		if enableAP {
+	}
+
+	// In repeater mode, separate STA and AP onto different radios when possible.
+	// On ath11k/IPQ6018, an AP sharing a radio with a STA is forced to follow the STA's
+	// channel and cannot start until the STA associates — a failing STA takes the AP with it.
+	// With only one radio, coexistence is unavoidable, so we allow it.
+	staRadio := ""
+	if mode == "repeater" && activeSTA != "" {
+		if opts, err := w.uci.GetAll("wireless", activeSTA); err == nil {
+			staRadio = opts["device"]
+		}
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return nil, err
+	}
+	multiRadio := len(radios) >= 2
+	apOnOtherRadio := func() bool {
+		if !multiRadio || staRadio == "" {
+			return false
+		}
+		for _, section := range apSections {
+			opts, err := w.uci.GetAll("wireless", section)
+			if err != nil {
+				continue
+			}
+			if opts["device"] != "" && opts["device"] != staRadio {
+				return true
+			}
+		}
+		return false
+	}()
+
+	for _, section := range apSections {
+		apDisabled := !enableAP
+		if enableAP && apOnOtherRadio {
+			opts, _ := w.uci.GetAll("wireless", section)
+			if opts["device"] == staRadio {
+				apDisabled = true
+			}
+		}
+		if err := w.setIfaceDisabled(section, apDisabled); err != nil {
+			return nil, err
+		}
+		if !apDisabled {
 			if err := w.ensureSectionRadioEnabled(section); err != nil {
 				return nil, err
 			}
 		}
 	}
 	for _, section := range staSections {
-		if err := w.setIfaceDisabled(section, !enableSTA); err != nil {
+		enable := enableSTA && section == activeSTA
+		if err := w.setIfaceDisabled(section, !enable); err != nil {
 			return nil, err
 		}
-		if enableSTA {
+		if enable {
 			if err := w.ensureSectionRadioEnabled(section); err != nil {
 				return nil, err
 			}
@@ -866,6 +1005,91 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		}
 	}
 	return w.stageWirelessApply()
+}
+
+// GetHealth returns a cross-checked view of the WiFi state to surface mismatches
+// between iwinfo (association state) and netifd (wwan lease/binding). The classic
+// failure mode it detects: a STA interface is associated to an SSID, but the wwan
+// logical interface has been bound to a different device by netifd — so no DHCP
+// client runs on the actually-connected STA and the router has no WAN. The
+// existing WifiConnection endpoint reports SSID from iwinfo and IP from wwan
+// separately, which is exactly why the broken state looked "connected".
+func (w *WifiService) GetHealth() (models.WifiHealth, error) {
+	h := models.WifiHealth{Status: "ok", Issues: []string{}}
+
+	// Skip if no STA section is enabled (pure AP mode).
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return h, err
+	}
+	hasEnabledSTA := false
+	for _, opts := range sections {
+		if opts["mode"] == "sta" && opts["disabled"] != "1" {
+			hasEnabledSTA = true
+			break
+		}
+	}
+	if !hasEnabledSTA {
+		return h, nil
+	}
+
+	// Find the runtime STA ifname and associated SSID via iwinfo.
+	staIfname, _, _ := w.findSTADevice()
+	var staSSID string
+	staAssociated := false
+	if staIfname != "" {
+		if resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": staIfname}); err == nil {
+			staSSID, _ = resp["ssid"].(string)
+			staAssociated = staSSID != ""
+		}
+	}
+	h.STA = &struct {
+		Ifname     string `json:"ifname"`
+		SSID       string `json:"ssid"`
+		Associated bool   `json:"associated"`
+	}{Ifname: staIfname, SSID: staSSID, Associated: staAssociated}
+
+	// Read wwan interface state from netifd.
+	wwanDevice := ""
+	wwanUp := false
+	wwanIP := ""
+	if data, err := w.ubus.Call("network.interface.wwan", "status", nil); err == nil && data != nil {
+		if u, ok := data["up"].(bool); ok {
+			wwanUp = u
+		}
+		if d, _ := data["device"].(string); d != "" {
+			wwanDevice = d
+		} else if d, _ := data["l3_device"].(string); d != "" {
+			wwanDevice = d
+		}
+		if addrs, ok := data["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
+			if a, ok := addrs[0].(map[string]interface{}); ok {
+				wwanIP, _ = a["address"].(string)
+			}
+		}
+	}
+	h.Wwan = &struct {
+		Device    string `json:"device"`
+		Up        bool   `json:"up"`
+		IPAddress string `json:"ip_address"`
+	}{Device: wwanDevice, Up: wwanUp, IPAddress: wwanIP}
+
+	// Classify.
+	switch {
+	case staAssociated && wwanDevice != "" && staIfname != "" && wwanDevice != staIfname:
+		h.Status = "error"
+		h.Issues = append(h.Issues, fmt.Sprintf(
+			"STA is associated on %s but wwan is bound to %s — reconcile by reconnecting to the intended network",
+			staIfname, wwanDevice))
+	case staAssociated && (!wwanUp || wwanIP == ""):
+		h.Status = "warning"
+		h.Issues = append(h.Issues, fmt.Sprintf(
+			"STA is associated to %q but wwan has no DHCP lease yet", staSSID))
+	case !staAssociated:
+		h.Status = "warning"
+		h.Issues = append(h.Issues, "STA enabled but not associated to any network")
+	}
+	return h, nil
 }
 
 // loadPriorities reads the priority file and returns an ssid->priority map.
@@ -1525,15 +1749,33 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 }
 
 // reconnectScriptContent is the safe script body (wifi up, not wifi reload).
-// Includes a crash guard: if a previous wifi up caused a crash/reboot, the guard
-// file will exist on next run and the script exits without retrying.
+//
+// Two layered guards:
+//  1. Crash guard: written before `wifi up`; if the call causes a kernel crash
+//     the file survives reboot and every subsequent cron tick becomes a no-op.
+//  2. Failure-count guard: increments on every non-crash failure. Once it hits
+//     MAX_FAIL the script stops retrying — this catches the case where the
+//     saved wireless config is broken (e.g. after an rpcd rollback restored a
+//     pre-incident bad config) and cron would otherwise replay the failure
+//     forever. Counter is cleared on any successful reconnect or on redeploy.
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
 	"GUARD=\"/etc/travo/autoreconnect-crash-guard\"\n" +
+	"FAILCOUNT_FILE=\"/etc/travo/autoreconnect-failcount\"\n" +
+	"MAX_FAIL=5\n\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
+	"FAILCOUNT=0\n" +
+	"if [ -f \"$FAILCOUNT_FILE\" ]; then\n    FAILCOUNT=$(cat \"$FAILCOUNT_FILE\" 2>/dev/null || echo 0)\nfi\n" +
+	"if [ \"$FAILCOUNT\" -ge \"$MAX_FAIL\" ] 2>/dev/null; then\n    exit 0\nfi\n\n" +
 	"IP=$(ubus call network.interface.wwan status 2>/dev/null | jsonfilter -e '@[\"ipv4-address\"][0].address' 2>/dev/null)\n" +
-	"if [ -n \"$IP\" ]; then\n    exit 0\nfi\n\n" +
-	"# Connection dropped — write guard, bring up WiFi, clear guard on success\n" +
-	"echo wifi-reconnect > \"$GUARD\"\nwifi up && rm -f \"$GUARD\"\n"
+	"if [ -n \"$IP\" ]; then\n    rm -f \"$FAILCOUNT_FILE\"\n    exit 0\nfi\n\n" +
+	"# Connection dropped — write crash guard, bring up WiFi, update counters on exit\n" +
+	"echo wifi-reconnect > \"$GUARD\"\n" +
+	"if wifi up; then\n" +
+	"    rm -f \"$GUARD\" \"$FAILCOUNT_FILE\"\n" +
+	"else\n" +
+	"    rm -f \"$GUARD\"\n" +
+	"    echo $((FAILCOUNT + 1)) > \"$FAILCOUNT_FILE\"\n" +
+	"fi\n"
 
 func (w *WifiService) enableAutoReconnect() error {
 	scriptDir := filepath.Dir(w.reconnectScript)

@@ -35,9 +35,77 @@ export function WifiModeSwitchDialog({
   const [showDetails, setShowDetails] = useState(false);
 
   const isWifiClient = connectionMethod?.method === 'wifi-client';
+  const isWifiAp = connectionMethod?.method === 'wifi-ap';
 
   function getWarningInfo() {
     if (!targetMode) return null;
+
+    if (currentMode === 'repeater' && targetMode === 'client') {
+      return {
+        severity: isWifiAp ? 'high' : 'medium',
+        title: isWifiAp ? 'Risk of lockout' : 'Local Wi-Fi will turn off',
+        message: isWifiAp
+          ? "Client mode disables your router's Wi-Fi access point. You may lose access to this page."
+          : 'Client mode disables the Wi-Fi network you broadcast. Devices can still use Ethernet on LAN.',
+        details: [
+          'The wireless subsystem will restart.',
+          'If you need local Wi-Fi for phones and laptops, use Travel / repeater or Access Point mode instead.',
+          'Changes will be confirmed within 30 seconds or rolled back.',
+        ],
+        extraWarning: isWifiAp
+          ? 'Connect via Ethernet before proceeding, or you may be unable to reach the router.'
+          : null,
+      };
+    }
+
+    if (currentMode === 'repeater' && targetMode === 'ap') {
+      return {
+        severity: 'high' as const,
+        title: 'Will lose Wi-Fi internet',
+        message:
+          'Access Point mode does not join upstream Wi-Fi. Your router will only offer its own network.',
+        details: [
+          'Use Ethernet (or another WAN source) for internet.',
+          'If you were using hotel or public Wi-Fi through this router, that path will stop.',
+          'The AP SSID for your devices stays available if it was already configured.',
+        ],
+        extraWarning: isWifiClient
+          ? 'You appear to reach this device via Wi-Fi WAN; confirm you have Ethernet or AP access before switching.'
+          : null,
+      };
+    }
+
+    if (currentMode === 'ap' && targetMode === 'repeater') {
+      return {
+        severity: 'medium' as const,
+        title: 'Connection may drop temporarily',
+        message: 'Travel / repeater mode enables Wi-Fi client (STA) as well as your access point.',
+        details: [
+          'The wireless subsystem will restart.',
+          'You can connect to upstream Wi-Fi for internet while keeping your own Wi-Fi for devices.',
+          'This usually takes 30–60 seconds.',
+        ],
+        extraWarning: null,
+      };
+    }
+
+    if (currentMode === 'ap' && targetMode === 'client') {
+      return {
+        severity: isWifiAp ? 'high' : 'medium',
+        title: isWifiAp ? 'Risk of lockout' : 'Wi-Fi access point will turn off',
+        message: isWifiAp
+          ? 'Client mode has no local Wi-Fi access point. You may lose access to this page.'
+          : 'Client mode disables the Wi-Fi network clients join. Use Ethernet on LAN to manage the router.',
+        details: [
+          'The router will only join upstream Wi-Fi for internet (no broadcast SSID for your LAN).',
+          'The wireless subsystem will restart.',
+          'Changes will be confirmed within 30 seconds or rolled back.',
+        ],
+        extraWarning: isWifiAp
+          ? 'Connect via Ethernet before proceeding, or you may be unable to reach the router.'
+          : null,
+      };
+    }
 
     if (currentMode === 'client' && targetMode === 'ap') {
       return {
@@ -59,7 +127,7 @@ export function WifiModeSwitchDialog({
       return {
         severity: 'medium' as const,
         title: 'Connection may drop temporarily',
-        message: 'Switching to repeater mode may cause your connection to drop.',
+        message: 'Switching to Travel / repeater mode may cause your connection to drop.',
         details: [
           'The wireless subsystem will restart.',
           'You may need to reconnect to the router via the new AP network.',

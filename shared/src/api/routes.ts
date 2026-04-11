@@ -76,6 +76,7 @@ export const API_ROUTES = {
     connect: '/api/v1/wifi/connect',
     disconnect: '/api/v1/wifi/disconnect',
     connection: '/api/v1/wifi/connection',
+    health: '/api/v1/wifi/health',
     mode: '/api/v1/wifi/mode',
     saved: '/api/v1/wifi/saved',
     deleteSaved: '/api/v1/wifi/saved',

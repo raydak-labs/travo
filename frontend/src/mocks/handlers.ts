@@ -107,6 +107,10 @@ export const handlers = [
     return HttpResponse.json(mockWifiConnection);
   }),
 
+  http.get(API_ROUTES.wifi.health, () => {
+    return HttpResponse.json({ status: 'ok', issues: [] });
+  }),
+
   http.post(API_ROUTES.wifi.connect, async ({ request }) => {
     const body = (await request.json()) as { ssid: string; password: string };
     return HttpResponse.json({

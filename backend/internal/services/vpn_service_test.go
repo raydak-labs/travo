@@ -352,7 +352,13 @@ func TestWgRuntimeState_Connected(t *testing.T) {
 
 func TestGetTailscaleStatus(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "which" && len(args) == 1 && args[0] == "tailscale" {
+			return nil, fmt.Errorf("not found")
+		}
+		return nil, fmt.Errorf("unexpected command %s", name)
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
 
 	status, err := svc.GetTailscaleStatus()
 	if err != nil {

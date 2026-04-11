@@ -128,6 +128,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/wifi/connect", WifiConnectHandler(deps.Wifi))
 	v1.Post("/wifi/disconnect", WifiDisconnectHandler(deps.Wifi))
 	v1.Get("/wifi/connection", WifiConnectionHandler(deps.Wifi))
+	v1.Get("/wifi/health", WifiHealthHandler(deps.Wifi))
 	v1.Put("/wifi/mode", WifiSetModeHandler(deps.Wifi))
 	v1.Get("/wifi/saved", WifiSavedHandler(deps.Wifi))
 	v1.Delete("/wifi/saved/:section", WifiDeleteHandler(deps.Wifi))

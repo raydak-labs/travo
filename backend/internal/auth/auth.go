@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -15,11 +16,12 @@ import (
 
 // AuthService handles authentication and JWT tokens.
 type AuthService struct {
-	passwordHash []byte
-	jwtSecret    []byte
-	blocklist    *TokenBlocklist
-	ubus         ubus.Ubus
-	rootPassword *RootPassword
+	passwordHash   []byte
+	jwtSecret      []byte
+	blocklist      *TokenBlocklist
+	ubus           ubus.Ubus
+	rootPassword   *RootPassword
+	authConfigPath string // path to auth.json; used to persist sealed rpcd login password
 }
 
 // SetBlocklist attaches a token blocklist to the auth service.
@@ -50,11 +52,14 @@ func NewAuthServiceWithHash(passwordBcrypt, jwtSecret string) *AuthService {
 }
 
 // NewAuthServiceWithUbus validates credentials via rpcd/LuCI session login.
-func NewAuthServiceWithUbus(ub ubus.Ubus, jwtSecret string, rootPassword *RootPassword) *AuthService {
+// authConfigPath is the path to auth.json (same as FileAuthStore); used to read/write
+// rpcd-login.sealed next to it. Pass empty to disable persistence (e.g. tests).
+func NewAuthServiceWithUbus(ub ubus.Ubus, jwtSecret string, rootPassword *RootPassword, authConfigPath string) *AuthService {
 	return &AuthService{
-		jwtSecret:    []byte(jwtSecret),
-		ubus:         ub,
-		rootPassword: rootPassword,
+		jwtSecret:      []byte(jwtSecret),
+		ubus:           ub,
+		rootPassword:   rootPassword,
+		authConfigPath: authConfigPath,
 	}
 }
 
@@ -86,7 +91,7 @@ func (a *AuthService) Login(password string) (string, time.Time, error) {
 	return signed, expiry, nil
 }
 
-func (a *AuthService) verifyWithUbus(password string) error {
+func (a *AuthService) tryUbusLogin(password string) error {
 	resp, err := a.ubus.Call("session", "login", map[string]interface{}{
 		"username": "root",
 		"password": password,
@@ -95,19 +100,32 @@ func (a *AuthService) verifyWithUbus(password string) error {
 		return err
 	}
 	if s, _ := resp["ubus_rpc_session"].(string); s != "" {
-		if a.rootPassword != nil {
-			a.rootPassword.Set(password)
-		}
 		return nil
 	}
-	// some ubus wrappers return result-array format
 	if sid := extractSessionID(resp); sid != "" {
-		if a.rootPassword != nil {
-			a.rootPassword.Set(password)
-		}
 		return nil
 	}
 	return fmt.Errorf("login failed")
+}
+
+func (a *AuthService) persistSealedLogin(password string) {
+	if a.authConfigPath == "" {
+		return
+	}
+	if err := SaveSealedRPCDPassword(a.authConfigPath, string(a.jwtSecret), password); err != nil {
+		log.Printf("WARNING: could not persist rpcd-login seal: %v", err)
+	}
+}
+
+func (a *AuthService) verifyWithUbus(password string) error {
+	if err := a.tryUbusLogin(password); err != nil {
+		return err
+	}
+	if a.rootPassword != nil {
+		a.rootPassword.Set(password)
+	}
+	a.persistSealedLogin(password)
+	return nil
 }
 
 // extractSessionID finds ubus_rpc_session in a login response.
@@ -170,7 +188,7 @@ func (a *AuthService) TokenExpiry(tokenStr string) (time.Time, error) {
 // ChangePassword verifies the current password and updates to the new one.
 func (a *AuthService) ChangePassword(currentPassword, newPassword string) error {
 	if a.ubus != nil {
-		if err := a.verifyWithUbus(currentPassword); err != nil {
+		if err := a.tryUbusLogin(currentPassword); err != nil {
 			return errors.New("invalid current password")
 		}
 		if len(newPassword) < 6 {
@@ -183,6 +201,10 @@ func (a *AuthService) ChangePassword(currentPassword, newPassword string) error 
 		if err != nil {
 			return err
 		}
+		if a.rootPassword != nil {
+			a.rootPassword.Set(newPassword)
+		}
+		a.persistSealedLogin(newPassword)
 		return nil
 	}
 

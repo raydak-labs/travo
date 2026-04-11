@@ -1,3 +1,4 @@
+import { WifiRadioHardwareCard } from './wifi-radio-hardware-card';
 import { GuestNetworkCard } from './guest-network-card';
 import { MACAddressCard } from './mac-address-card';
 import { BandSwitchingCard } from './band-switching-card';
@@ -13,6 +14,7 @@ type WifiAdvancedPanelProps = {
 export function WifiAdvancedPanel({ panelId, tabId, hidden }: WifiAdvancedPanelProps) {
   return (
     <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
+      <WifiRadioHardwareCard />
       <GuestNetworkCard />
       <MACAddressCard />
       <MACPolicyCard />
