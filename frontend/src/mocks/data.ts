@@ -520,7 +520,7 @@ export const mockAPConfigs: APConfig[] = [
   {
     radio: 'radio1',
     band: '5g',
-    ssid: 'OpenWrt-Travel-5G',
+    ssid: 'OpenWrt-Travel',
     encryption: 'psk2',
     key: 'travel12345',
     enabled: true,

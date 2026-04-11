@@ -106,6 +106,33 @@ export const guestWifiFormSchema = z
 
 export type GuestWifiFormValues = z.infer<typeof guestWifiFormSchema>;
 
+/** Shared SSID / encryption / key for all AP radios (WiFi page unified mode). */
+export const unifiedApCredentialsSchema = z
+  .object({
+    ssid: z.string(),
+    encryption: wifiApEncryptionEnum,
+    key: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.ssid.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'SSID is required',
+        path: ['ssid'],
+      });
+    }
+    if (data.encryption === 'none') return;
+    if (!data.key || data.key.length < 8) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Password must be at least 8 characters',
+        path: ['key'],
+      });
+    }
+  });
+
+export type UnifiedApCredentialsValues = z.infer<typeof unifiedApCredentialsSchema>;
+
 /** STA MAC clone — empty clears override; otherwise colon-separated hex. */
 export const macCloneFormSchema = z.object({
   custom_mac: z

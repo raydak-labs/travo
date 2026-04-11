@@ -63,6 +63,12 @@ surfaces violations via `GET /api/v1/wifi/health`:
   reconnect. This prevents cron from replaying a broken config forever if the
   rpcd rollback restored a pre-incident bad config.
 
+The **Access Point Configuration** card on the WiFi page defaults to one shared
+SSID and password for all bands (per-radio enable switches remain visible); a
+toggle enables separate forms per radio. The client (STA) link is always a
+single connection; band choice appears only when the same SSID is offered on
+multiple bands.
+
 ### 1.3 WiFi Modes
 
 - [ ] 🔮 Mesh / WDS mode  

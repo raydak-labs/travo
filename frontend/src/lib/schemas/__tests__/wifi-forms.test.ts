@@ -5,6 +5,7 @@ import {
   macPolicyAddFormSchema,
   wifiScheduleFormSchema,
   guestWifiFormSchema,
+  unifiedApCredentialsSchema,
   macCloneFormSchema,
 } from '../wifi-forms';
 
@@ -102,6 +103,30 @@ describe('guestWifiFormSchema', () => {
       key: 'password1',
     });
     expect(r.success).toBe(false);
+  });
+});
+
+describe('unifiedApCredentialsSchema', () => {
+  it('requires SSID and WPA key length', () => {
+    expect(
+      unifiedApCredentialsSchema.safeParse({ ssid: '', encryption: 'psk2', key: 'x' }).success,
+    ).toBe(false);
+    expect(
+      unifiedApCredentialsSchema.safeParse({
+        ssid: 'Net',
+        encryption: 'psk2',
+        key: 'longenough',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('allows open network without password', () => {
+    const r = unifiedApCredentialsSchema.safeParse({
+      ssid: 'Open',
+      encryption: 'none',
+      key: '',
+    });
+    expect(r.success).toBe(true);
   });
 });
 
