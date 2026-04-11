@@ -194,7 +194,12 @@ export function useSetRepeaterOptions() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: RepeaterOptions) =>
-      apiClient.put<RepeaterOptions>(API_ROUTES.wifi.repeaterOptions, body),
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse & Pick<RepeaterOptions, 'allow_ap_on_sta_radio'>>(
+          API_ROUTES.wifi.repeaterOptions,
+          body,
+        ),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'repeater-options'] });
     },

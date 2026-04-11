@@ -1081,7 +1081,7 @@ func TestWifiSetMode_RepeaterAllowAPOnSTARadioOverridesSplit(t *testing.T) {
 func TestRepeaterOptionsRoundTrip(t *testing.T) {
 	svc, _ := newTestWifiService()
 	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
-	if err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: true}); err != nil {
+	if _, err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: true}); err != nil {
 		t.Fatal(err)
 	}
 	o, err := svc.GetRepeaterOptions()
@@ -1090,6 +1090,50 @@ func TestRepeaterOptionsRoundTrip(t *testing.T) {
 	}
 	if !o.AllowAPOnSTARadio {
 		t.Fatal("expected AllowAPOnSTARadio true")
+	}
+}
+
+func TestSetRepeaterOptions_DisallowAPOnSTARadioRunsReconcileInRepeaterMode(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	// Bad state: AP on STA radio enabled while we are about to disallow that policy.
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	apply, err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: false})
+	if err != nil {
+		t.Fatalf("SetRepeaterOptions: %v", err)
+	}
+	if apply != nil {
+		t.Fatalf("expected nil apply without applier, got %#v", apply)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Errorf("expected AP on STA radio disabled after options change, got disabled=%q", ap0)
+	}
+}
+
+func TestSetRepeaterOptions_DisallowAPOnSTARadioReturnsApplyWhenApplierConfigured(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc.applier = &fakeWirelessApplier{startToken: "opts-reconcile"}
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	apply, err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: false})
+	if err != nil {
+		t.Fatalf("SetRepeaterOptions: %v", err)
+	}
+	if apply == nil || apply.Token != "opts-reconcile" {
+		t.Fatalf("expected pending apply token opts-reconcile, got %#v", apply)
 	}
 }
 

@@ -1,7 +1,7 @@
 # Repeater radio policy, unified AP UX, and health warnings
 
 **Date:** 2026-04-11  
-**Status:** Implemented (core); two optional follow-ups tracked in [requirements §1.5](../requirements/requirements.md#15-wifi-follow-up-optional).
+**Status:** Implemented, including former optional follow-ups (setup wizard all-AP save; repeater-options PUT reconcile). See [requirements §1.2](../requirements/requirements.md#12-wifi-mode-invariants-enforced) narrative.
 
 ## Goals
 
@@ -41,12 +41,10 @@
 | Health banner titles / dedupe | `frontend/src/components/wifi/wifi-health-banner.tsx` |
 | Hooks | `frontend/src/hooks/use-wifi.ts` — `useRepeaterRadioReconcile` |
 
-## Optional follow-ups
+## Follow-ups (completed 2026-04-11)
 
-Detailed acceptance criteria and file pointers: [requirements §1.5](../requirements/requirements.md#15-wifi-follow-up-optional).
-
-1. Setup wizard AP step: apply unified credentials to **all** AP UCI sections on dual-radio (not only the first list entry).
-2. `PUT` repeater options: when turning **off** `allow_ap_on_sta_radio` in repeater mode, optionally run the same wireless reconcile as the reconcile endpoint (or document manual reconcile).
+1. **Setup wizard** — `frontend/src/pages/setup/ap-step.tsx` saves SSID/key to every AP section; see `ap-step.test.tsx`.
+2. **Repeater options PUT** — `SetRepeaterOptions` in `wifi_service.go` calls `ReconcileRepeaterAPLayout` when `allow_ap_on_sta_radio` goes true→false in repeater mode (≥2 radios); handler returns `status` + `allow_ap_on_sta_radio` + optional `apply`; frontend `useSetRepeaterOptions` uses `finalizeWifiMutation`.
 
 ## Verification
 

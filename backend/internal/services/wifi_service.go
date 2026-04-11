@@ -150,24 +150,46 @@ func (w *WifiService) GetRepeaterOptions() (models.RepeaterOptions, error) {
 	return w.loadRepeaterOptions()
 }
 
-// SetRepeaterOptions writes repeater-options.json (no wireless apply).
-func (w *WifiService) SetRepeaterOptions(o models.RepeaterOptions) error {
+// SetRepeaterOptions persists repeater-options.json. When allow_ap_on_sta_radio
+// transitions from true to false in repeater mode on multi-radio hardware, it
+// re-applies STA/AP separation (same as ReconcileRepeaterAPLayout).
+func (w *WifiService) SetRepeaterOptions(o models.RepeaterOptions) (*WirelessApplyResult, error) {
 	if w.repeaterOptionsFile == "" {
-		return nil
+		return nil, nil
+	}
+	prev, err := w.loadRepeaterOptions()
+	if err != nil {
+		return nil, err
 	}
 	dir := filepath.Dir(w.repeaterOptionsFile)
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		return err
+		return nil, err
 	}
 	b, err := json.MarshalIndent(o, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	tmp := w.repeaterOptionsFile + ".tmp"
 	if err := os.WriteFile(tmp, b, 0600); err != nil {
-		return err
+		return nil, err
 	}
-	return os.Rename(tmp, w.repeaterOptionsFile)
+	if err := os.Rename(tmp, w.repeaterOptionsFile); err != nil {
+		return nil, err
+	}
+	if w.deriveWifiMode() != "repeater" {
+		return nil, nil
+	}
+	if !prev.AllowAPOnSTARadio || o.AllowAPOnSTARadio {
+		return nil, nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return nil, err
+	}
+	if len(radios) < 2 {
+		return nil, nil
+	}
+	return w.ReconcileRepeaterAPLayout()
 }
 
 func (w *WifiService) repeaterAllowAPOnSTARadio(multiRadio bool) bool {

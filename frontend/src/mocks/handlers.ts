@@ -518,7 +518,10 @@ export const handlers = [
   }),
   http.put(API_ROUTES.wifi.repeaterOptions, async ({ request }) => {
     const body = (await request.json()) as { allow_ap_on_sta_radio: boolean };
-    return HttpResponse.json(body);
+    return HttpResponse.json({
+      status: 'ok',
+      allow_ap_on_sta_radio: body.allow_ap_on_sta_radio,
+    });
   }),
   http.post(API_ROUTES.wifi.repeaterReconcile, () => {
     return HttpResponse.json({
