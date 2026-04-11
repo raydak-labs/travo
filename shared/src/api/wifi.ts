@@ -220,6 +220,8 @@ export interface WifiHealth {
    *  "error" — wwan bound to a different device than the associated STA. */
   readonly status: 'ok' | 'warning' | 'error';
   readonly issues: readonly string[];
+  /** Repeater mode: enabled AP shares the STA wifi-device (fragile); reconcile or move downlink. */
+  readonly repeater_same_radio_ap_sta?: boolean;
   readonly sta?: WifiHealthSTA;
   readonly wwan?: WifiHealthWwan;
 }

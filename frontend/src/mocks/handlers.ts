@@ -520,6 +520,12 @@ export const handlers = [
     const body = (await request.json()) as { allow_ap_on_sta_radio: boolean };
     return HttpResponse.json(body);
   }),
+  http.post(API_ROUTES.wifi.repeaterReconcile, () => {
+    return HttpResponse.json({
+      status: 'ok',
+      apply: { pending: true, token: 'apply-repeater-reconcile', rollback_timeout_seconds: 30 },
+    });
+  }),
   http.put(/\/api\/v1\/wifi\/ap\/.*/, () => {
     return HttpResponse.json({ status: 'ok' });
   }),

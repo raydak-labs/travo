@@ -315,6 +315,9 @@ var openAPISpec = map[string]interface{}{
 				resp200("application/json", nil),
 			),
 		},
+		"/wifi/repeater/reconcile": map[string]interface{}{
+			"post": endpoint("ReconcileRepeaterAPLayout", "Re-apply repeater STA/AP per-radio separation", true, nil, resp200("application/json", obj("ok"))),
+		},
 		"/wifi/mac": map[string]interface{}{
 			"get": endpoint("GetMAC", "Get MAC addresses for all WiFi interfaces", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetMAC", "Set a custom MAC address on the STA interface", true,

@@ -1129,6 +1129,70 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 	return w.stageWirelessApply()
 }
 
+// ReconcileRepeaterAPLayout re-applies STA/AP radio separation (repeater mode only).
+func (w *WifiService) ReconcileRepeaterAPLayout() (*WirelessApplyResult, error) {
+	if w.deriveWifiMode() != "repeater" {
+		return nil, fmt.Errorf("repeater radio reconcile only applies in repeater mode")
+	}
+	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+		return nil, err
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return nil, fmt.Errorf("committing wireless: %w", err)
+	}
+	return w.stageWirelessApply()
+}
+
+// sameRadioRepeaterAPSTAConflict reports whether an enabled AP shares the STA radio while
+// repeater split policy would disable it (multi-radio, allow_ap_on_sta off).
+func (w *WifiService) sameRadioRepeaterAPSTAConflict() (bool, error) {
+	if w.deriveWifiMode() != "repeater" {
+		return false, nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return false, err
+	}
+	if len(radios) < 2 {
+		return false, nil
+	}
+	if w.repeaterAllowAPOnSTARadio(true) {
+		return false, nil
+	}
+	activeSTA, err := w.selectActiveSTA()
+	if err != nil {
+		return false, err
+	}
+	staDevice := ""
+	if activeSTA != "" {
+		opts, err := w.uci.GetAll("wireless", activeSTA)
+		if err != nil {
+			return false, err
+		}
+		staDevice = opts["device"]
+	}
+	if staDevice == "" {
+		return false, nil
+	}
+	apSections, err := w.getWifiSectionsByMode("ap")
+	if err != nil {
+		return false, err
+	}
+	for _, section := range apSections {
+		opts, err := w.uci.GetAll("wireless", section)
+		if err != nil {
+			continue
+		}
+		if opts["disabled"] == "1" {
+			continue
+		}
+		if opts["device"] == staDevice {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // GetHealth returns a cross-checked view of the WiFi state to surface mismatches
 // between iwinfo (association state) and netifd (wwan lease/binding). The classic
 // failure mode it detects: a STA interface is associated to an SSID, but the wwan
@@ -1210,6 +1274,19 @@ func (w *WifiService) GetHealth() (models.WifiHealth, error) {
 	case !staAssociated:
 		h.Status = "warning"
 		h.Issues = append(h.Issues, "STA enabled but not associated to any network")
+	}
+
+	conflict, err := w.sameRadioRepeaterAPSTAConflict()
+	if err != nil {
+		return h, err
+	}
+	if conflict {
+		h.RepeaterSameRadioAPSTA = true
+		h.Issues = append(h.Issues,
+			"Repeater: Wi‑Fi uplink (STA) and an access point are on the same radio — use the other radio for downlink AP, or enable “Wi‑Fi on uplink radio” in repeater options.")
+		if h.Status == "ok" {
+			h.Status = "warning"
+		}
 	}
 	return h, nil
 }

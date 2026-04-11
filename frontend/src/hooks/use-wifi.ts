@@ -204,6 +204,28 @@ export function useSetRepeaterOptions() {
   });
 }
 
+export function useRepeaterRadioReconcile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      finalizeWifiMutation(
+        apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.repeaterReconcile, {}),
+      ),
+    onSuccess: () => {
+      toast.success('Repeater radio layout updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'health'],
+        ['wifi', 'ap'],
+        ['wifi', 'connection'],
+      ]);
+    },
+    onError: (error) => {
+      toast.error('Could not update radio layout', { description: error.message });
+    },
+  });
+}
+
 export function useMACAddresses() {
   return useQuery({
     queryKey: ['wifi', 'mac'],

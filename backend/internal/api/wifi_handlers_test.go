@@ -172,6 +172,23 @@ func TestWifiHealthEndpoint(t *testing.T) {
 	}
 }
 
+func TestWifiRepeaterReconcileEndpoint(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/repeater/reconcile", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, string(b))
+	}
+}
+
 func TestWifiDisconnectEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")

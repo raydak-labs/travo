@@ -1726,7 +1726,9 @@ func TestGetHealth_NoSTASection_ReturnsOK(t *testing.T) {
 }
 
 func TestGetHealth_STAAssociatedWithIP_ReturnsOK(t *testing.T) {
-	svc, _ := newTestWifiService()
+	svc, u := newTestWifiService()
+	// Avoid repeater same-radio warning: STA is on radio0 in mock; keep downlink AP only on radio1.
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 	// Mock default state: sta0 enabled, iwinfo.info.ssid=Hotel-WiFi, wwan up with IP 10.0.0.50.
 	h, err := svc.GetHealth()
 	if err != nil {
@@ -1771,8 +1773,9 @@ func TestGetHealth_WwanBoundToDifferentDevice_ReturnsError(t *testing.T) {
 }
 
 func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
-	svc, _ := newTestWifiService()
+	svc, u := newTestWifiService()
 	ub := svc.ubus.(*ubus.MockUbus)
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 
 	// wwan points at the same iface as STA but has no lease yet (still negotiating).
 	ub.RegisterResponse("network.interface.wwan.status", map[string]interface{}{
@@ -1787,6 +1790,65 @@ func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
 	}
 	if h.Status != "warning" {
 		t.Errorf("expected warning, got %q issues=%v", h.Status, h.Issues)
+	}
+}
+
+func TestGetHealth_RepeaterSameRadioAPSTA(t *testing.T) {
+	svc, _ := newTestWifiService()
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !h.RepeaterSameRadioAPSTA {
+		t.Fatal("expected RepeaterSameRadioAPSTA (STA and AP both on radio0 in mock)")
+	}
+	if h.Status != "warning" {
+		t.Errorf("expected warning status, got %q", h.Status)
+	}
+	found := false
+	for _, i := range h.Issues {
+		if strings.Contains(i, "same radio") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected same-radio issue in %#v", h.Issues)
+	}
+}
+
+func TestReconcileRepeaterAPLayout_NotRepeaterReturnsError(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.modeFile = filepath.Join(t.TempDir(), "wifi-mode")
+	if err := os.WriteFile(svc.modeFile, []byte("ap"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+	_, err := svc.ReconcileRepeaterAPLayout()
+	if err == nil || !strings.Contains(err.Error(), "repeater") {
+		t.Fatalf("expected repeater-only error, got %v", err)
+	}
+}
+
+func TestReconcileRepeaterAPLayout_DisablesSTARadioAP(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	_ = u.Set("wireless", "default_radio1", "disabled", "0")
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Fatalf("precondition: ap0 disabled, got %q", ap0)
+	}
+	// Simulate bad state: AP on STA radio enabled again
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	if _, err := svc.ReconcileRepeaterAPLayout(); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	ap0, _ = u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Errorf("expected AP on STA radio disabled after reconcile, got %q", ap0)
 	}
 }
 

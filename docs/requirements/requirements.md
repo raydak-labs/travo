@@ -70,7 +70,11 @@ single connection; band choice appears only when the same SSID is offered on
 multiple bands. After each `PUT /api/v1/wifi/ap/:section`, repeater mode
 re-applies STA/AP radio separation (same rules as `SetMode("repeater")`) so
 unified AP saves cannot leave an enabled AP on the STA PHY when another radio
-hosts an AP and `allow_ap_on_sta_radio` is off.
+hosts an AP and `allow_ap_on_sta_radio` is off. `GET /api/v1/wifi/health` sets
+`repeater_same_radio_ap_sta` when that fragile layout is detected; the UI warns
+on the WiFi page and offers **Fix radio layout** (`POST
+/api/v1/wifi/repeater/reconcile`). The Advanced tab includes the same reconcile
+action for repeater mode.
 
 ### 1.3 WiFi Modes
 

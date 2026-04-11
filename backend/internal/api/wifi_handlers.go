@@ -233,6 +233,17 @@ func SetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
 	}
 }
 
+// ReconcileRepeaterAPLayoutHandler handles POST /api/v1/wifi/repeater/reconcile.
+func ReconcileRepeaterAPLayoutHandler(svc *services.WifiService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		apply, err := svc.ReconcileRepeaterAPLayout()
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(wifiMutationResponse(apply))
+	}
+}
+
 // GetMACHandler handles GET /api/v1/wifi/mac.
 func GetMACHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
