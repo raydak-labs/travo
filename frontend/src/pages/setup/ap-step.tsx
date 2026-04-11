@@ -1,23 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { APConfigUpdate } from '@shared/index';
+import { API_ROUTES } from '@shared/index';
+import type { WifiMutationResponse } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAPConfigs, useSetAPConfig } from '@/hooks/use-wifi';
+import { useAPConfigs } from '@/hooks/use-wifi';
+import { apiClient } from '@/lib/api-client';
+import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { APStepCredentialsFields } from '@/pages/setup/ap-step-credentials-fields';
 import { APStepIntro } from '@/pages/setup/ap-step-intro';
 import { setupApFormSchema, type SetupApFormValues } from '@/pages/setup/setup-schema';
 
 export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const queryClient = useQueryClient();
   const { data: apConfigs, isLoading } = useAPConfigs();
-  const setAPMutation = useSetAPConfig();
   const [showPassword, setShowPassword] = useState(false);
   const seeded = useRef(false);
 
   const firstAP = apConfigs?.[0];
-  const section = firstAP?.section ?? '';
+
+  const saveAllAPs = useMutation({
+    mutationFn: async (data: SetupApFormValues) => {
+      if (!apConfigs?.length) {
+        throw new Error('No access point configuration available');
+      }
+      for (const ap of apConfigs) {
+        const config: APConfigUpdate = {
+          ssid: data.ssid,
+          key: data.key,
+          encryption: ap.encryption,
+          enabled: ap.enabled,
+        };
+        await finalizeWifiMutation(
+          apiClient.put<WifiMutationResponse>(`${API_ROUTES.wifi.ap}/${ap.section}`, config),
+        );
+      }
+    },
+    onSuccess: () => {
+      toast.success('AP configuration updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'ap'] });
+      onNext();
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update AP config', { description: error.message });
+    },
+  });
 
   const {
     register,
@@ -41,14 +73,7 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
   }, [firstAP, reset]);
 
   const onSave = (data: SetupApFormValues) => {
-    if (!firstAP) return;
-    const config: APConfigUpdate = {
-      ssid: data.ssid,
-      key: data.key,
-      encryption: firstAP.encryption,
-      enabled: firstAP.enabled,
-    };
-    setAPMutation.mutate({ section, config }, { onSuccess: () => onNext() });
+    saveAllAPs.mutate(data);
   };
 
   return (
@@ -75,10 +100,10 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
             </Button>
             <Button
               type="submit"
-              disabled={setAPMutation.isPending || isLoading || !firstAP}
+              disabled={saveAllAPs.isPending || isLoading || !firstAP}
               className="flex-1"
             >
-              {setAPMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saveAllAPs.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save AP Config
             </Button>
           </div>
