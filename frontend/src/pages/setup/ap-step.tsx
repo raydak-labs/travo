@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import type { APConfig } from '@shared/index';
+import type { APConfigUpdate } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAPConfigs, useSetAPConfig } from '@/hooks/use-wifi';
@@ -42,10 +42,11 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
 
   const onSave = (data: SetupApFormValues) => {
     if (!firstAP) return;
-    const config: APConfig = {
-      ...firstAP,
+    const config: APConfigUpdate = {
       ssid: data.ssid,
       key: data.key,
+      encryption: firstAP.encryption,
+      enabled: firstAP.enabled,
     };
     setAPMutation.mutate({ section, config }, { onSuccess: () => onNext() });
   };

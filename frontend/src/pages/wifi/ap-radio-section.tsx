@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import { useSetAPConfig } from '@/hooks/use-wifi';
-import type { APConfig } from '@shared/index';
+import type { APConfig, APConfigUpdate } from '@shared/index';
 import { apRadioFormSchema, type APRadioFormValues } from '@/lib/schemas/wifi-forms';
 import { normalizeApEncryption } from './ap-config-normalize';
 import { ApRadioFormFields } from './ap-radio-form-fields';
@@ -57,8 +57,7 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
     onEnabledChange(ap.section, enabled);
   }, [ap.section, enabled, onEnabledChange]);
 
-  const buildConfig = (data: APRadioFormValues): APConfig => ({
-    ...ap,
+  const buildConfig = (data: APRadioFormValues): APConfigUpdate => ({
     ssid: data.ssid.trim(),
     encryption: data.encryption,
     key: data.encryption === 'none' ? '' : data.key,

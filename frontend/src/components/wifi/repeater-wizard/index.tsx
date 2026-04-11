@@ -57,6 +57,9 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
             upstream={w.upstream}
             apConfig={w.apConfig}
             setApConfig={w.setApConfig}
+            apConfigs={w.apConfigs}
+            allowApOnStaRadio={w.allowApOnStaRadio}
+            setAllowApOnStaRadio={w.setAllowApOnStaRadio}
             canProceedAP={w.canProceedAP}
             onBack={() => w.setStep('select-upstream')}
             onNext={() => w.setStep('review')}
@@ -67,9 +70,10 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
           <RepeaterWizardReviewStep
             upstream={w.upstream}
             selectedNetwork={w.selectedNetwork}
-            effectiveAPSSID={w.effectiveAPSSID}
+            apSummaryLine={w.apSummaryLine}
             effectiveAPEncryption={w.effectiveAPEncryption}
             apConfig={w.apConfig}
+            allowApOnStaRadio={w.allowApOnStaRadio}
             applyError={w.applyError}
             applying={w.applying}
             onBack={() => w.setStep('configure-ap')}
@@ -80,7 +84,7 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
         {w.done && (
           <RepeaterWizardDoneStep
             upstreamSsid={w.upstream.ssid}
-            effectiveAPSSID={w.effectiveAPSSID}
+            apSummaryLine={w.apSummaryLine}
             onDone={() => handleClose(false)}
           />
         )}

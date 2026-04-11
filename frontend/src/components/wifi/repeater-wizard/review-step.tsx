@@ -9,9 +9,10 @@ import type { RepeaterUpstreamConfig, RepeaterApFormConfig } from './types';
 type ReviewStepProps = {
   upstream: RepeaterUpstreamConfig;
   selectedNetwork: WifiScanResult | null;
-  effectiveAPSSID: string;
+  apSummaryLine: string;
   effectiveAPEncryption: string;
   apConfig: RepeaterApFormConfig;
+  allowApOnStaRadio: boolean;
   applyError: string | null;
   applying: boolean;
   onBack: () => void;
@@ -21,9 +22,10 @@ type ReviewStepProps = {
 export function RepeaterWizardReviewStep({
   upstream,
   selectedNetwork,
-  effectiveAPSSID,
+  apSummaryLine,
   effectiveAPEncryption,
   apConfig,
+  allowApOnStaRadio,
   applyError,
   applying,
   onBack,
@@ -45,13 +47,20 @@ export function RepeaterWizardReviewStep({
         <div className="rounded-lg border p-3">
           <div className="flex items-center gap-2">
             <Radio className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium">{effectiveAPSSID}</span>
+            <span className="text-sm font-medium">{apSummaryLine}</span>
             <Badge variant="outline">
               {effectiveAPEncryption === 'none' ? 'Open' : effectiveAPEncryption.toUpperCase()}
             </Badge>
           </div>
           {apConfig.sameAsUpstream && (
-            <p className="mt-1 text-xs text-gray-500">Same credentials as upstream</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Same credentials as upstream
+            </p>
+          )}
+          {allowApOnStaRadio && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              Uplink-radio AP allowed (less stable on dual-radio setups).
+            </p>
           )}
         </div>
       </div>

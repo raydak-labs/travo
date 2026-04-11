@@ -513,6 +513,13 @@ export const handlers = [
   http.get(API_ROUTES.wifi.ap, () => {
     return HttpResponse.json(mockAPConfigs);
   }),
+  http.get(API_ROUTES.wifi.repeaterOptions, () => {
+    return HttpResponse.json({ allow_ap_on_sta_radio: false });
+  }),
+  http.put(API_ROUTES.wifi.repeaterOptions, async ({ request }) => {
+    const body = (await request.json()) as { allow_ap_on_sta_radio: boolean };
+    return HttpResponse.json(body);
+  }),
   http.put(/\/api\/v1\/wifi\/ap\/.*/, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
