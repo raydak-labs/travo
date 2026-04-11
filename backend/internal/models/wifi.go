@@ -11,6 +11,26 @@ type WifiScanResult struct {
 	Band          string `json:"band"`
 }
 
+// WifiHealthStatus enumerates the health check result.
+//
+//	"ok"      — STA is associated, wwan has an IP, or user is in AP mode (no STA expected).
+//	"warning" — STA is associated but wwan has no lease yet.
+//	"error"   — wwan is bound to a different device than the associated STA (config mismatch).
+type WifiHealth struct {
+	Status string   `json:"status"`
+	Issues []string `json:"issues"`
+	STA    *struct {
+		Ifname     string `json:"ifname"`
+		SSID       string `json:"ssid"`
+		Associated bool   `json:"associated"`
+	} `json:"sta,omitempty"`
+	Wwan *struct {
+		Device    string `json:"device"`
+		Up        bool   `json:"up"`
+		IPAddress string `json:"ip_address"`
+	} `json:"wwan,omitempty"`
+}
+
 // WifiConnection represents the active WiFi connection.
 type WifiConnection struct {
 	SSID          string `json:"ssid"`

@@ -7,6 +7,7 @@ import { API_ROUTES } from '@shared/index';
 import type {
   WifiScanResult,
   WifiConnection,
+  WifiHealth,
   SavedNetwork,
   WifiMode,
   APConfig,
@@ -35,6 +36,14 @@ export function useWifiConnection() {
   return useQuery({
     queryKey: ['wifi', 'connection'],
     queryFn: () => apiClient.get<WifiConnection>(API_ROUTES.wifi.connection),
+  });
+}
+
+export function useWifiHealth() {
+  return useQuery({
+    queryKey: ['wifi', 'health'],
+    queryFn: () => apiClient.get<WifiHealth>(API_ROUTES.wifi.health),
+    refetchInterval: 15_000,
   });
 }
 

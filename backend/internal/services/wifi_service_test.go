@@ -1567,6 +1567,85 @@ func TestDeriveWifiMode_FallsBackToUCIWhenNoModeFile(t *testing.T) {
 	}
 }
 
+func TestGetHealth_NoSTASection_ReturnsOK(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Mock has sta0 — delete it so we're in pure AP mode.
+	_ = u.DeleteSection("wireless", "sta0")
+
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.Status != "ok" {
+		t.Errorf("expected ok, got %q issues=%v", h.Status, h.Issues)
+	}
+}
+
+func TestGetHealth_STAAssociatedWithIP_ReturnsOK(t *testing.T) {
+	svc, _ := newTestWifiService()
+	// Mock default state: sta0 enabled, iwinfo.info.ssid=Hotel-WiFi, wwan up with IP 10.0.0.50.
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.Status != "ok" {
+		t.Errorf("expected ok, got %q issues=%v", h.Status, h.Issues)
+	}
+	if h.STA == nil || h.STA.SSID != "Hotel-WiFi" {
+		t.Errorf("expected STA.SSID=Hotel-WiFi, got %#v", h.STA)
+	}
+	if h.Wwan == nil || h.Wwan.IPAddress != "10.0.0.50" {
+		t.Errorf("expected wwan IP 10.0.0.50, got %#v", h.Wwan)
+	}
+}
+
+// This is the exact failure mode from the device investigation: STA is associated
+// on phy0-sta0 but netifd bound wwan to phy1-sta0, leaving the real connection
+// without DHCP. Health must surface this as an error, not as "connected".
+func TestGetHealth_WwanBoundToDifferentDevice_ReturnsError(t *testing.T) {
+	svc, _ := newTestWifiService()
+	ub := svc.ubus.(*ubus.MockUbus)
+
+	// STA phy0-sta0 is associated to Hotel-WiFi (mock default iwinfo.info).
+	// Override wwan to claim it lives on phy1-sta0 and has no lease.
+	ub.RegisterResponse("network.interface.wwan.status", map[string]interface{}{
+		"up":           false,
+		"device":       "phy1-sta0",
+		"ipv4-address": []interface{}{},
+	})
+
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.Status != "error" {
+		t.Errorf("expected error, got %q issues=%v", h.Status, h.Issues)
+	}
+	if len(h.Issues) == 0 {
+		t.Error("expected at least one issue string")
+	}
+}
+
+func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
+	svc, _ := newTestWifiService()
+	ub := svc.ubus.(*ubus.MockUbus)
+
+	// wwan points at the same iface as STA but has no lease yet (still negotiating).
+	ub.RegisterResponse("network.interface.wwan.status", map[string]interface{}{
+		"up":           false,
+		"device":       "phy0-sta0",
+		"ipv4-address": []interface{}{},
+	})
+
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.Status != "warning" {
+		t.Errorf("expected warning, got %q issues=%v", h.Status, h.Issues)
+	}
+}
+
 func TestValidateWirelessConsistency_SingleActiveSTA_OK(t *testing.T) {
 	svc, u := newTestWifiService()
 	_ = u.Set("wireless", "sta0", "disabled", "0")

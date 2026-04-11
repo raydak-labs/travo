@@ -81,6 +81,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.connect).toBe('/api/v1/wifi/connect');
     expect(API_ROUTES.wifi.disconnect).toBe('/api/v1/wifi/disconnect');
     expect(API_ROUTES.wifi.connection).toBe('/api/v1/wifi/connection');
+    expect(API_ROUTES.wifi.health).toBe('/api/v1/wifi/health');
     expect(API_ROUTES.wifi.mode).toBe('/api/v1/wifi/mode');
     expect(API_ROUTES.wifi.saved).toBe('/api/v1/wifi/saved');
     expect(API_ROUTES.wifi.radio).toBe('/api/v1/wifi/radio');
@@ -175,6 +176,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/connect',
       '/api/v1/wifi/disconnect',
       '/api/v1/wifi/connection',
+      '/api/v1/wifi/health',
       '/api/v1/wifi/mode',
       '/api/v1/wifi/saved',
       '/api/v1/wifi/saved/priority',

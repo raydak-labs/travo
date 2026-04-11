@@ -1007,6 +1007,91 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 	return w.stageWirelessApply()
 }
 
+// GetHealth returns a cross-checked view of the WiFi state to surface mismatches
+// between iwinfo (association state) and netifd (wwan lease/binding). The classic
+// failure mode it detects: a STA interface is associated to an SSID, but the wwan
+// logical interface has been bound to a different device by netifd — so no DHCP
+// client runs on the actually-connected STA and the router has no WAN. The
+// existing WifiConnection endpoint reports SSID from iwinfo and IP from wwan
+// separately, which is exactly why the broken state looked "connected".
+func (w *WifiService) GetHealth() (models.WifiHealth, error) {
+	h := models.WifiHealth{Status: "ok", Issues: []string{}}
+
+	// Skip if no STA section is enabled (pure AP mode).
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return h, err
+	}
+	hasEnabledSTA := false
+	for _, opts := range sections {
+		if opts["mode"] == "sta" && opts["disabled"] != "1" {
+			hasEnabledSTA = true
+			break
+		}
+	}
+	if !hasEnabledSTA {
+		return h, nil
+	}
+
+	// Find the runtime STA ifname and associated SSID via iwinfo.
+	staIfname, _, _ := w.findSTADevice()
+	var staSSID string
+	staAssociated := false
+	if staIfname != "" {
+		if resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": staIfname}); err == nil {
+			staSSID, _ = resp["ssid"].(string)
+			staAssociated = staSSID != ""
+		}
+	}
+	h.STA = &struct {
+		Ifname     string `json:"ifname"`
+		SSID       string `json:"ssid"`
+		Associated bool   `json:"associated"`
+	}{Ifname: staIfname, SSID: staSSID, Associated: staAssociated}
+
+	// Read wwan interface state from netifd.
+	wwanDevice := ""
+	wwanUp := false
+	wwanIP := ""
+	if data, err := w.ubus.Call("network.interface.wwan", "status", nil); err == nil && data != nil {
+		if u, ok := data["up"].(bool); ok {
+			wwanUp = u
+		}
+		if d, _ := data["device"].(string); d != "" {
+			wwanDevice = d
+		} else if d, _ := data["l3_device"].(string); d != "" {
+			wwanDevice = d
+		}
+		if addrs, ok := data["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
+			if a, ok := addrs[0].(map[string]interface{}); ok {
+				wwanIP, _ = a["address"].(string)
+			}
+		}
+	}
+	h.Wwan = &struct {
+		Device    string `json:"device"`
+		Up        bool   `json:"up"`
+		IPAddress string `json:"ip_address"`
+	}{Device: wwanDevice, Up: wwanUp, IPAddress: wwanIP}
+
+	// Classify.
+	switch {
+	case staAssociated && wwanDevice != "" && staIfname != "" && wwanDevice != staIfname:
+		h.Status = "error"
+		h.Issues = append(h.Issues, fmt.Sprintf(
+			"STA is associated on %s but wwan is bound to %s — reconcile by reconnecting to the intended network",
+			staIfname, wwanDevice))
+	case staAssociated && (!wwanUp || wwanIP == ""):
+		h.Status = "warning"
+		h.Issues = append(h.Issues, fmt.Sprintf(
+			"STA is associated to %q but wwan has no DHCP lease yet", staSSID))
+	case !staAssociated:
+		h.Status = "warning"
+		h.Issues = append(h.Issues, "STA enabled but not associated to any network")
+	}
+	return h, nil
+}
+
 // loadPriorities reads the priority file and returns an ssid->priority map.
 func (w *WifiService) loadPriorities() map[string]int {
 	data, err := os.ReadFile(w.priorityFile)
