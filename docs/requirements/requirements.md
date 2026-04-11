@@ -54,8 +54,10 @@ surfaces violations via `GET /api/v1/wifi/health`:
   ath11k/IPQ6018 a single-PHY STA+AP forces the AP to follow the STA channel;
   a failing STA then drags the AP down. `SetMode("repeater")` includes a
   radio-role planner that moves APs off the STA's radio when an alternate radio
-  exists. Single-radio hardware is still allowed to coexist (with the known
-  throughput trade-off — see Open Question #5).
+  exists, unless `allow_ap_on_sta_radio` is set in `/etc/travo/repeater-options.json`
+  (default off on multi-radio; wizard and `PUT /api/v1/wifi/ap/:section` omit `enabled` when updating SSID/key so the split is not undone). Single-radio
+  hardware is still allowed to coexist (with the known throughput trade-off —
+  see Open Question #5).
 - **Auto-reconnect script has a failure-count guard.** `wifi-reconnect.sh` caps
   consecutive failures at `MAX_FAIL=5` and clears the counter on any successful
   reconnect. This prevents cron from replaying a broken config forever if the
