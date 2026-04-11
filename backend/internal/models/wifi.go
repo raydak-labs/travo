@@ -78,6 +78,23 @@ type APConfig struct {
 	Section    string `json:"section"`
 }
 
+// APConfigUpdate is the request body for PUT /wifi/ap/:section.
+// When Enabled is nil, UCI disabled is left unchanged (repeater credential sync after radio split).
+type APConfigUpdate struct {
+	SSID       string `json:"ssid"`
+	Encryption string `json:"encryption"`
+	Key        string `json:"key"`
+	Enabled    *bool  `json:"enabled,omitempty"`
+}
+
+// RepeaterOptions is stored in /etc/travo/repeater-options.json.
+type RepeaterOptions struct {
+	AllowAPOnSTARadio bool `json:"allow_ap_on_sta_radio"`
+}
+
+// BoolPtr returns a pointer to b (optional JSON fields).
+func BoolPtr(b bool) *bool { p := b; return &p }
+
 // GuestWifiConfig holds the guest WiFi network configuration.
 type GuestWifiConfig struct {
 	Enabled    bool   `json:"enabled"`

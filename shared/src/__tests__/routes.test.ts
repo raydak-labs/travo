@@ -88,6 +88,8 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.wifi.radios).toBe('/api/v1/wifi/radios');
     expect(API_ROUTES.wifi.radioRole).toBe('/api/v1/wifi/radios/:name/role');
     expect(API_ROUTES.wifi.bandSwitching).toBe('/api/v1/wifi/band-switching');
+    expect(API_ROUTES.wifi.ap).toBe('/api/v1/wifi/ap');
+    expect(API_ROUTES.wifi.repeaterOptions).toBe('/api/v1/wifi/repeater-options');
     expect(API_ROUTES.wifi.mac).toBe('/api/v1/wifi/mac');
     expect(API_ROUTES.wifi.macRandomize).toBe('/api/v1/wifi/mac/randomize');
     expect(API_ROUTES.wifi.guest).toBe('/api/v1/wifi/guest');
@@ -185,6 +187,7 @@ describe('API_ROUTES', () => {
       '/api/v1/wifi/radios/:name/role',
       '/api/v1/wifi/band-switching',
       '/api/v1/wifi/ap',
+      '/api/v1/wifi/repeater-options',
       '/api/v1/wifi/mac',
       '/api/v1/wifi/mac/randomize',
       '/api/v1/wifi/guest',

@@ -137,6 +137,8 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Put("/wifi/radio", SetRadioEnabledHandler(deps.Wifi))
 	v1.Get("/wifi/ap", GetAPConfigHandler(deps.Wifi))
 	v1.Put("/wifi/ap/:section", SetAPConfigHandler(deps.Wifi))
+	v1.Get("/wifi/repeater-options", GetRepeaterOptionsHandler(deps.Wifi))
+	v1.Put("/wifi/repeater-options", SetRepeaterOptionsHandler(deps.Wifi))
 	v1.Get("/wifi/radios", GetRadiosHandler(deps.Wifi))
 	v1.Put("/wifi/radios/:name/role", SetRadioRoleHandler(deps.Wifi))
 	v1.Get("/wifi/band-switching", GetBandSwitchingHandler(deps.BandSwitching))

@@ -304,8 +304,15 @@ var openAPISpec = map[string]interface{}{
 		},
 		"/wifi/ap/{section}": map[string]interface{}{
 			"put": endpoint("SetAPConfig", "Update AP configuration for a section", true,
-				body("application/json", obj("ssid", "key", "encryption", "enabled")),
+				body("application/json", obj("ssid", "key", "encryption")),
 				resp200("application/json", obj("token", "confirm_within_seconds")),
+			),
+		},
+		"/wifi/repeater-options": map[string]interface{}{
+			"get": endpoint("GetRepeaterOptions", "Repeater radio policy (allow AP on STA radio)", true, nil, resp200("application/json", nil)),
+			"put": endpoint("SetRepeaterOptions", "Set repeater radio policy", true,
+				body("application/json", obj("allow_ap_on_sta_radio")),
+				resp200("application/json", nil),
 			),
 		},
 		"/wifi/mac": map[string]interface{}{

@@ -186,25 +186,50 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 		if section == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section parameter is required"})
 		}
-		var config models.APConfig
-		if err := c.Bind().Body(&config); err != nil {
+		var update models.APConfigUpdate
+		if err := c.Bind().Body(&update); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if config.SSID == "" {
+		if update.SSID == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ssid is required"})
 		}
 		validEnc := map[string]bool{"none": true, "psk2": true, "sae": true, "psk-mixed": true}
-		if config.Encryption != "" && !validEnc[config.Encryption] {
+		if update.Encryption != "" && !validEnc[update.Encryption] {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "encryption must be one of: none, psk2, sae, psk-mixed"})
 		}
-		if config.Encryption != "" && config.Encryption != "none" && len(config.Key) < 8 {
+		if update.Encryption != "" && update.Encryption != "none" && len(update.Key) < 8 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be at least 8 characters"})
 		}
-		apply, err := svc.SetAPConfig(section, config)
+		apply, err := svc.SetAPConfig(section, update)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(wifiMutationResponse(apply))
+	}
+}
+
+// GetRepeaterOptionsHandler handles GET /api/v1/wifi/repeater-options.
+func GetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		opts, err := svc.GetRepeaterOptions()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(opts)
+	}
+}
+
+// SetRepeaterOptionsHandler handles PUT /api/v1/wifi/repeater-options.
+func SetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		var body models.RepeaterOptions
+		if err := c.Bind().Body(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+		if err := svc.SetRepeaterOptions(body); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(body)
 	}
 }
 

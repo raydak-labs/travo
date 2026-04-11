@@ -65,6 +65,19 @@ export interface APConfig {
   readonly section: string;
 }
 
+/** Request body for PUT /wifi/ap/:section. Omit `enabled` to leave UCI disabled unchanged. */
+export interface APConfigUpdate {
+  readonly ssid: string;
+  readonly encryption: string;
+  readonly key: string;
+  readonly enabled?: boolean;
+}
+
+/** Persisted repeater radio policy (/etc/travo/repeater-options.json). */
+export interface RepeaterOptions {
+  readonly allow_ap_on_sta_radio: boolean;
+}
+
 /** Group of scan results with same SSID and encryption (dual-band = one group) */
 export interface GroupedScanNetwork {
   readonly ssid: string;

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -509,11 +510,11 @@ func TestGetAPConfigs(t *testing.T) {
 func TestSetAPConfig(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	_, err := svc.SetAPConfig("default_radio0", models.APConfig{
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID:       "MyTravelRouter",
 		Encryption: "psk2",
 		Key:        "newpassword123",
-		Enabled:    true,
+		Enabled:    models.BoolPtr(true),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -541,13 +542,35 @@ func TestSetAPConfig(t *testing.T) {
 	}
 }
 
+func TestSetAPConfig_OmitEnabledPreservesDisabled(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
+
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID:       "OnlySSID",
+		Encryption: "psk2",
+		Key:        "password123",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis != "1" {
+		t.Fatalf("expected AP to stay disabled, got disabled=%q", dis)
+	}
+	ssid, _ := u.Get("wireless", "default_radio0", "ssid")
+	if ssid != "OnlySSID" {
+		t.Fatalf("expected SSID updated, got %q", ssid)
+	}
+}
+
 func TestSetAPConfig_InvalidSection(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	_, err := svc.SetAPConfig("nonexistent", models.APConfig{
+	_, err := svc.SetAPConfig("nonexistent", models.APConfigUpdate{
 		SSID:       "Test",
 		Encryption: "none",
-		Enabled:    true,
+		Enabled:    models.BoolPtr(true),
 	})
 	if err == nil {
 		t.Error("expected error for nonexistent section")
@@ -558,11 +581,11 @@ func TestSetAPConfig_ReturnsApplyError(t *testing.T) {
 	svc, _ := newTestWifiService()
 	svc.applier = &fakeWirelessApplier{startErr: errors.New("apply failed")}
 
-	_, err := svc.SetAPConfig("default_radio0", models.APConfig{
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID:       "MyTravelRouter",
 		Encryption: "psk2",
 		Key:        "newpassword123",
-		Enabled:    true,
+		Enabled:    models.BoolPtr(true),
 	})
 	if err == nil || !strings.Contains(err.Error(), "apply failed") {
 		t.Fatalf("expected apply error, got %v", err)
@@ -977,6 +1000,42 @@ func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
 	}
 	if sta != "0" {
 		t.Errorf("expected STA enabled, got sta=%q", sta)
+	}
+}
+
+func TestWifiSetMode_RepeaterAllowAPOnSTARadioOverridesSplit(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
+	_ = u.Set("wireless", "default_radio1", "disabled", "1")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+	_ = u.Set("wireless", "default_radio0", "device", "radio0")
+	_ = u.Set("wireless", "default_radio1", "device", "radio1")
+
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "0" {
+		t.Errorf("with allow_ap_on_sta_radio, expected AP on STA radio enabled, got ap0=%q", ap0)
+	}
+}
+
+func TestRepeaterOptionsRoundTrip(t *testing.T) {
+	svc, _ := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: true}); err != nil {
+		t.Fatal(err)
+	}
+	o, err := svc.GetRepeaterOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !o.AllowAPOnSTARadio {
+		t.Fatal("expected AllowAPOnSTARadio true")
 	}
 }
 

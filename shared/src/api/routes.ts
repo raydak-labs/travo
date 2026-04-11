@@ -86,6 +86,7 @@ export const API_ROUTES = {
     radioRole: '/api/v1/wifi/radios/:name/role',
     bandSwitching: '/api/v1/wifi/band-switching',
     ap: '/api/v1/wifi/ap',
+    repeaterOptions: '/api/v1/wifi/repeater-options',
     mac: '/api/v1/wifi/mac',
     macRandomize: '/api/v1/wifi/mac/randomize',
     guest: '/api/v1/wifi/guest',
