@@ -1161,6 +1161,37 @@ func TestSetAutoReconnect_Enable(t *testing.T) {
 	}
 }
 
+// TestReconnectScript_HasFailureCountGuard verifies the auto-reconnect script caps
+// consecutive failures so a persistently broken wireless config cannot be replayed
+// indefinitely by cron (e.g. after a rollback recovers the old bad config).
+func TestReconnectScript_HasFailureCountGuard(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+
+	if err := svc.SetAutoReconnect(true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(tmpDir + "/wifi-reconnect.sh")
+	if err != nil {
+		t.Fatalf("expected script to exist: %v", err)
+	}
+	script := string(data)
+
+	if !strings.Contains(script, "FAILCOUNT") {
+		t.Error("expected script to track a FAILCOUNT so persistent failures stop retrying")
+	}
+	if !strings.Contains(script, "MAX_FAIL") {
+		t.Error("expected script to define a MAX_FAIL ceiling on retries")
+	}
+	if !strings.Contains(script, "failcount") {
+		t.Error("expected script to persist the counter in /etc/travo/autoreconnect-failcount")
+	}
+}
+
 func TestSetAutoReconnect_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()

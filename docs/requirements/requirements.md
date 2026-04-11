@@ -2,7 +2,7 @@
 
 > **Hint:** For the full checklist including everything already implemented, see [`requirements_done.md`](./requirements_done.md). This file lists **only open work** (and ongoing notes).
 
-> **Last updated:** 2026-03-27
+> **Last updated:** 2026-04-11
 
 ---
 
@@ -39,6 +39,27 @@ Outstanding numbered tasks (see matching sections below for detail):
 ---
 
 ## 1. WiFi Management
+
+### 1.2 WiFi Mode Invariants (enforced)
+
+The backend enforces the following invariants at every UCI mutation; the frontend
+surfaces violations via `GET /api/v1/wifi/health`:
+
+- **At most one enabled STA (`mode=sta`) bound to `network=wwan`.** Netifd can only
+  attach one L3 device to the `wwan` interface, so two enabled STAs cause one to
+  associate without an IP and no WAN. `validateWirelessConsistency` rejects the
+  apply; `SetMode("repeater"|"client")` picks the winner via
+  `/etc/travo/wifi-priorities.json` and disables the rest.
+- **In repeater mode with ≥2 radios, STA and AP run on different radios.** On
+  ath11k/IPQ6018 a single-PHY STA+AP forces the AP to follow the STA channel;
+  a failing STA then drags the AP down. `SetMode("repeater")` includes a
+  radio-role planner that moves APs off the STA's radio when an alternate radio
+  exists. Single-radio hardware is still allowed to coexist (with the known
+  throughput trade-off — see Open Question #5).
+- **Auto-reconnect script has a failure-count guard.** `wifi-reconnect.sh` caps
+  consecutive failures at `MAX_FAIL=5` and clears the counter on any successful
+  reconnect. This prevents cron from replaying a broken config forever if the
+  rpcd rollback restored a pre-incident bad config.
 
 ### 1.3 WiFi Modes
 

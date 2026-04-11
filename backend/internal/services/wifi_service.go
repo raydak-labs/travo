@@ -1749,15 +1749,33 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 }
 
 // reconnectScriptContent is the safe script body (wifi up, not wifi reload).
-// Includes a crash guard: if a previous wifi up caused a crash/reboot, the guard
-// file will exist on next run and the script exits without retrying.
+//
+// Two layered guards:
+//  1. Crash guard: written before `wifi up`; if the call causes a kernel crash
+//     the file survives reboot and every subsequent cron tick becomes a no-op.
+//  2. Failure-count guard: increments on every non-crash failure. Once it hits
+//     MAX_FAIL the script stops retrying — this catches the case where the
+//     saved wireless config is broken (e.g. after an rpcd rollback restored a
+//     pre-incident bad config) and cron would otherwise replay the failure
+//     forever. Counter is cleared on any successful reconnect or on redeploy.
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
 	"GUARD=\"/etc/travo/autoreconnect-crash-guard\"\n" +
+	"FAILCOUNT_FILE=\"/etc/travo/autoreconnect-failcount\"\n" +
+	"MAX_FAIL=5\n\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
+	"FAILCOUNT=0\n" +
+	"if [ -f \"$FAILCOUNT_FILE\" ]; then\n    FAILCOUNT=$(cat \"$FAILCOUNT_FILE\" 2>/dev/null || echo 0)\nfi\n" +
+	"if [ \"$FAILCOUNT\" -ge \"$MAX_FAIL\" ] 2>/dev/null; then\n    exit 0\nfi\n\n" +
 	"IP=$(ubus call network.interface.wwan status 2>/dev/null | jsonfilter -e '@[\"ipv4-address\"][0].address' 2>/dev/null)\n" +
-	"if [ -n \"$IP\" ]; then\n    exit 0\nfi\n\n" +
-	"# Connection dropped — write guard, bring up WiFi, clear guard on success\n" +
-	"echo wifi-reconnect > \"$GUARD\"\nwifi up && rm -f \"$GUARD\"\n"
+	"if [ -n \"$IP\" ]; then\n    rm -f \"$FAILCOUNT_FILE\"\n    exit 0\nfi\n\n" +
+	"# Connection dropped — write crash guard, bring up WiFi, update counters on exit\n" +
+	"echo wifi-reconnect > \"$GUARD\"\n" +
+	"if wifi up; then\n" +
+	"    rm -f \"$GUARD\" \"$FAILCOUNT_FILE\"\n" +
+	"else\n" +
+	"    rm -f \"$GUARD\"\n" +
+	"    echo $((FAILCOUNT + 1)) > \"$FAILCOUNT_FILE\"\n" +
+	"fi\n"
 
 func (w *WifiService) enableAutoReconnect() error {
 	scriptDir := filepath.Dir(w.reconnectScript)
