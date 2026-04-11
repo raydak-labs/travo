@@ -3,6 +3,7 @@ package auth
 import (
 	"io"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -203,7 +204,7 @@ func TestAuthServiceWithUbus_StoresPasswordOnLogin(t *testing.T) {
 	})
 
 	pw := NewRootPassword()
-	svc := NewAuthServiceWithUbus(mub, "test-secret", pw)
+	svc := NewAuthServiceWithUbus(mub, "test-secret", pw, "")
 
 	token, _, err := svc.Login("my-router-password")
 	if err != nil {
@@ -223,7 +224,7 @@ func TestAuthServiceWithUbus_DoesNotStorePasswordOnFailedLogin(t *testing.T) {
 	// Don't register session.login response — will fail
 	pw := NewRootPassword()
 	pw.Set("old-password")
-	svc := NewAuthServiceWithUbus(mub, "test-secret", pw)
+	svc := NewAuthServiceWithUbus(mub, "test-secret", pw, "")
 
 	_, _, err := svc.Login("wrong-password")
 	if err == nil {
@@ -242,7 +243,7 @@ func TestAuthServiceWithUbus_NilPasswordHolder(t *testing.T) {
 		"ubus_rpc_session": "test-session",
 	})
 
-	svc := NewAuthServiceWithUbus(mub, "test-secret", nil)
+	svc := NewAuthServiceWithUbus(mub, "test-secret", nil, "")
 
 	token, _, err := svc.Login("any-password")
 	if err != nil {
@@ -250,5 +251,69 @@ func TestAuthServiceWithUbus_NilPasswordHolder(t *testing.T) {
 	}
 	if token == "" {
 		t.Fatal("expected non-empty token")
+	}
+}
+
+func TestAuthServiceWithUbus_PersistsSealOnLogin(t *testing.T) {
+	mub := ubus.NewMockUbus()
+	mub.RegisterResponse("session.login", map[string]interface{}{
+		"ubus_rpc_session": "test-session",
+	})
+	dir := t.TempDir()
+	authPath := filepath.Join(dir, "auth.json")
+	pw := NewRootPassword()
+	svc := NewAuthServiceWithUbus(mub, "jwt-seal-test", pw, authPath)
+
+	_, _, err := svc.Login("stored-login-pw")
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if got := LoadSealedRPCDPassword(authPath, "jwt-seal-test"); got != "stored-login-pw" {
+		t.Fatalf("LoadSealedRPCDPassword: got %q", got)
+	}
+}
+
+func TestAuthServiceWithUbus_ChangePasswordUpdatesRootPasswordAndSeal(t *testing.T) {
+	mub := ubus.NewMockUbus()
+	mub.RegisterResponse("session.login", map[string]interface{}{
+		"ubus_rpc_session": "test-session",
+	})
+	mub.RegisterResponse("luci.setPassword", map[string]interface{}{})
+
+	dir := t.TempDir()
+	authPath := filepath.Join(dir, "auth.json")
+	pw := NewRootPassword()
+	svc := NewAuthServiceWithUbus(mub, "jwt-change", pw, authPath)
+
+	if err := svc.ChangePassword("current-ok", "newpassword99"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if pw.Get() != "newpassword99" {
+		t.Fatalf("holder got %q want newpassword99", pw.Get())
+	}
+	if got := LoadSealedRPCDPassword(authPath, "jwt-change"); got != "newpassword99" {
+		t.Fatalf("sealed got %q want newpassword99", got)
+	}
+}
+
+func TestAuthServiceWithUbus_ChangePasswordWrongCurrentNoUbusSession(t *testing.T) {
+	mub := ubus.NewMockUbus()
+	// session.login not registered → tryUbusLogin fails
+
+	dir := t.TempDir()
+	authPath := filepath.Join(dir, "auth.json")
+	pw := NewRootPassword()
+	pw.Set("unchanged-holder")
+	svc := NewAuthServiceWithUbus(mub, "jwt-x", pw, authPath)
+
+	err := svc.ChangePassword("wrong-current", "newpassword99")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != "invalid current password" {
+		t.Fatalf("got %v", err)
+	}
+	if pw.Get() != "unchanged-holder" {
+		t.Fatalf("holder should not change, got %q", pw.Get())
 	}
 }
