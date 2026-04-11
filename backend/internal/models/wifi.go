@@ -17,8 +17,11 @@ type WifiScanResult struct {
 //	"warning" — STA is associated but wwan has no lease yet.
 //	"error"   — wwan is bound to a different device than the associated STA (config mismatch).
 type WifiHealth struct {
-	Status string   `json:"status"`
+	Status string `json:"status"`
 	Issues []string `json:"issues"`
+	// RepeaterSameRadioAPSTA is true when repeater mode, multi-radio, allow_ap_on_sta is off,
+	// and an enabled AP shares the STA wifi-device (fragile on many chipsets).
+	RepeaterSameRadioAPSTA bool `json:"repeater_same_radio_ap_sta"`
 	STA    *struct {
 		Ifname     string `json:"ifname"`
 		SSID       string `json:"ssid"`
@@ -77,6 +80,23 @@ type APConfig struct {
 	Channel    int    `json:"channel"`
 	Section    string `json:"section"`
 }
+
+// APConfigUpdate is the request body for PUT /wifi/ap/:section.
+// When Enabled is nil, UCI disabled is left unchanged (repeater credential sync after radio split).
+type APConfigUpdate struct {
+	SSID       string `json:"ssid"`
+	Encryption string `json:"encryption"`
+	Key        string `json:"key"`
+	Enabled    *bool  `json:"enabled,omitempty"`
+}
+
+// RepeaterOptions is stored in /etc/travo/repeater-options.json.
+type RepeaterOptions struct {
+	AllowAPOnSTARadio bool `json:"allow_ap_on_sta_radio"`
+}
+
+// BoolPtr returns a pointer to b (optional JSON fields).
+func BoolPtr(b bool) *bool { p := b; return &p }
 
 // GuestWifiConfig holds the guest WiFi network configuration.
 type GuestWifiConfig struct {

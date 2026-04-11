@@ -54,12 +54,29 @@ surfaces violations via `GET /api/v1/wifi/health`:
   ath11k/IPQ6018 a single-PHY STA+AP forces the AP to follow the STA channel;
   a failing STA then drags the AP down. `SetMode("repeater")` includes a
   radio-role planner that moves APs off the STA's radio when an alternate radio
-  exists. Single-radio hardware is still allowed to coexist (with the known
-  throughput trade-off — see Open Question #5).
+  exists, unless `allow_ap_on_sta_radio` is set in `/etc/travo/repeater-options.json`
+  (default off on multi-radio; wizard and `PUT /api/v1/wifi/ap/:section` omit `enabled` when updating SSID/key so the split is not undone). Single-radio
+  hardware is still allowed to coexist (with the known throughput trade-off —
+  see Open Question #5).
 - **Auto-reconnect script has a failure-count guard.** `wifi-reconnect.sh` caps
   consecutive failures at `MAX_FAIL=5` and clears the counter on any successful
   reconnect. This prevents cron from replaying a broken config forever if the
   rpcd rollback restored a pre-incident bad config.
+
+The **Access Point Configuration** card on the WiFi page defaults to one shared
+SSID and password for all bands (per-radio enable switches remain visible); a
+toggle enables separate forms per radio. The client (STA) link is always a
+single connection; band choice appears only when the same SSID is offered on
+multiple bands. After each `PUT /api/v1/wifi/ap/:section`, repeater mode
+re-applies STA/AP radio separation (same rules as `SetMode("repeater")`) so
+unified AP saves cannot leave an enabled AP on the STA PHY when another radio
+hosts an AP and `allow_ap_on_sta_radio` is off. `GET /api/v1/wifi/health` sets
+`repeater_same_radio_ap_sta` when that fragile layout is detected; the UI warns
+on the WiFi page and offers **Fix radio layout** (`POST
+/api/v1/wifi/repeater/reconcile`). The Advanced tab includes the same reconcile
+action for repeater mode.
+
+The **setup wizard** AP step writes the same SSID and password to **every** downlink AP section (sequential `PUT /api/v1/wifi/ap/:section` with apply/confirm). **`PUT /api/v1/wifi/repeater-options`** with `allow_ap_on_sta_radio` going from `true` to `false` in repeater mode on multi-radio hardware triggers the same wireless reconcile as **`POST /api/v1/wifi/repeater/reconcile`** (response may include `apply` for rollback confirm).
 
 ### 1.3 WiFi Modes
 

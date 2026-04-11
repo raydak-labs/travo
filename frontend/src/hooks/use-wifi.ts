@@ -11,6 +11,8 @@ import type {
   SavedNetwork,
   WifiMode,
   APConfig,
+  APConfigUpdate,
+  RepeaterOptions,
   MACConfig,
   GuestWifiConfig,
   RadioInfo,
@@ -166,16 +168,69 @@ export function useAPConfigs() {
 export function useSetAPConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ section, config }: { section: string; config: APConfig }) =>
+    mutationFn: ({ section, config }: { section: string; config: APConfigUpdate }) =>
       finalizeWifiMutation(
         apiClient.put<WifiMutationResponse>(`${API_ROUTES.wifi.ap}/${section}`, config),
       ),
     onSuccess: () => {
       toast.success('AP configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'ap'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'health'],
+        ['wifi', 'connection'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to update AP config', { description: error.message });
+    },
+  });
+}
+
+export function useRepeaterOptions(enabled = true) {
+  return useQuery({
+    queryKey: ['wifi', 'repeater-options'],
+    queryFn: () => apiClient.get<RepeaterOptions>(API_ROUTES.wifi.repeaterOptions),
+    enabled,
+  });
+}
+
+export function useSetRepeaterOptions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RepeaterOptions) =>
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse & Pick<RepeaterOptions, 'allow_ap_on_sta_radio'>>(
+          API_ROUTES.wifi.repeaterOptions,
+          body,
+        ),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['wifi', 'repeater-options'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save repeater options', { description: error.message });
+    },
+  });
+}
+
+export function useRepeaterRadioReconcile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      finalizeWifiMutation(
+        apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.repeaterReconcile, {}),
+      ),
+    onSuccess: () => {
+      toast.success('Repeater radio layout updated');
+      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'health'],
+        ['wifi', 'ap'],
+        ['wifi', 'connection'],
+      ]);
+    },
+    onError: (error) => {
+      toast.error('Could not update radio layout', { description: error.message });
     },
   });
 }

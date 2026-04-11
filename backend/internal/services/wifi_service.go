@@ -53,15 +53,16 @@ type WirelessApplyResult struct {
 
 // WifiService provides WiFi scanning, connection, and configuration.
 type WifiService struct {
-	uci               uci.UCI
-	ubus              ubus.Ubus
-	reloader          WifiReloader
-	applier           UCIApplyConfirm // optional; when set, use apply+confirm instead of wifi up
-	cmd               CommandRunner
-	priorityFile      string
-	autoReconnectFile string
-	reconnectScript   string
-	modeFile          string
+	uci                 uci.UCI
+	ubus                ubus.Ubus
+	reloader            WifiReloader
+	applier             UCIApplyConfirm // optional; when set, use apply+confirm instead of wifi up
+	cmd                 CommandRunner
+	priorityFile        string
+	autoReconnectFile   string
+	reconnectScript     string
+	modeFile            string
+	repeaterOptionsFile string
 }
 
 // uciApplyConfigs is the list of configs copied for staged apply+confirm.
@@ -72,6 +73,7 @@ const defaultPriorityFile = "/etc/travo/wifi-priorities.json"
 const defaultAutoReconnectFile = "/etc/travo/autoreconnect.json"
 const defaultReconnectScript = "/etc/travo/wifi-reconnect.sh"
 const defaultWifiModeFile = "/etc/travo/wifi-mode"
+const defaultRepeaterOptionsFile = "/etc/travo/repeater-options.json"
 
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
 // otherwise falls back to reloader (e.g. tests or when rpcd session is unavailable).
@@ -80,7 +82,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 		uci: u, ubus: ub, reloader: &ShellWifiReloader{}, applier: NewRealUCIApplyConfirm(ub, pw),
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
-		modeFile: defaultWifiModeFile,
+		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
 	}
 }
 
@@ -91,6 +93,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile,
 	}
 }
 
@@ -100,6 +103,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile,
 	}
 }
 
@@ -109,6 +113,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile,
 	}
 }
 
@@ -118,7 +123,84 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile,
 	}
+}
+
+func (w *WifiService) loadRepeaterOptions() (models.RepeaterOptions, error) {
+	if w.repeaterOptionsFile == "" {
+		return models.RepeaterOptions{}, nil
+	}
+	data, err := os.ReadFile(w.repeaterOptionsFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return models.RepeaterOptions{AllowAPOnSTARadio: false}, nil
+		}
+		return models.RepeaterOptions{}, err
+	}
+	var o models.RepeaterOptions
+	if err := json.Unmarshal(data, &o); err != nil {
+		return models.RepeaterOptions{}, fmt.Errorf("repeater options: %w", err)
+	}
+	return o, nil
+}
+
+// GetRepeaterOptions returns persisted repeater preferences (missing file => allow_ap_on_sta_radio false).
+func (w *WifiService) GetRepeaterOptions() (models.RepeaterOptions, error) {
+	return w.loadRepeaterOptions()
+}
+
+// SetRepeaterOptions persists repeater-options.json. When allow_ap_on_sta_radio
+// transitions from true to false in repeater mode on multi-radio hardware, it
+// re-applies STA/AP separation (same as ReconcileRepeaterAPLayout).
+func (w *WifiService) SetRepeaterOptions(o models.RepeaterOptions) (*WirelessApplyResult, error) {
+	if w.repeaterOptionsFile == "" {
+		return nil, nil
+	}
+	prev, err := w.loadRepeaterOptions()
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(w.repeaterOptionsFile)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return nil, err
+	}
+	b, err := json.MarshalIndent(o, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	tmp := w.repeaterOptionsFile + ".tmp"
+	if err := os.WriteFile(tmp, b, 0600); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(tmp, w.repeaterOptionsFile); err != nil {
+		return nil, err
+	}
+	if w.deriveWifiMode() != "repeater" {
+		return nil, nil
+	}
+	if !prev.AllowAPOnSTARadio || o.AllowAPOnSTARadio {
+		return nil, nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return nil, err
+	}
+	if len(radios) < 2 {
+		return nil, nil
+	}
+	return w.ReconcileRepeaterAPLayout()
+}
+
+func (w *WifiService) repeaterAllowAPOnSTARadio(multiRadio bool) bool {
+	if !multiRadio {
+		return true
+	}
+	o, err := w.loadRepeaterOptions()
+	if err != nil {
+		return false
+	}
+	return o.AllowAPOnSTARadio
 }
 
 // validateWirelessConsistency enforces invariants that, if violated, leave the router
@@ -884,6 +966,80 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 	return conn, nil
 }
 
+// applyRepeaterDownlinkAPPolicy enables/disables AP wifi-iface sections for repeater (and ap/client)
+// mode transitions. When apOnOtherRadio && !allowSTAAP, AP sections on staRadio are disabled so
+// downlink stays off the STA PHY.
+func (w *WifiService) applyRepeaterDownlinkAPPolicy(
+	apSections []string,
+	staRadio string,
+	apOnOtherRadio bool,
+	allowSTAAP bool,
+	enableAP bool,
+) error {
+	for _, section := range apSections {
+		apDisabled := !enableAP
+		if enableAP && apOnOtherRadio && !allowSTAAP {
+			opts, _ := w.uci.GetAll("wireless", section)
+			if opts["device"] == staRadio {
+				apDisabled = true
+			}
+		}
+		if err := w.setIfaceDisabled(section, apDisabled); err != nil {
+			return err
+		}
+		if !apDisabled {
+			if err := w.ensureSectionRadioEnabled(section); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// reconcileRepeaterAPRadioLayout re-applies STA/AP radio separation in repeater mode after AP
+// credential or enabled mutations (e.g. unified SSID save) so uplink PHY APs are not left on.
+func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
+	if w.deriveWifiMode() != "repeater" {
+		return nil
+	}
+	apSections, err := w.getWifiSectionsByMode("ap")
+	if err != nil {
+		return err
+	}
+	activeSTA, err := w.selectActiveSTA()
+	if err != nil {
+		return err
+	}
+	staRadio := ""
+	if activeSTA != "" {
+		if opts, err := w.uci.GetAll("wireless", activeSTA); err == nil {
+			staRadio = opts["device"]
+		}
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return err
+	}
+	multiRadio := len(radios) >= 2
+	apOnOtherRadio := func() bool {
+		if !multiRadio || staRadio == "" {
+			return false
+		}
+		for _, section := range apSections {
+			opts, err := w.uci.GetAll("wireless", section)
+			if err != nil {
+				continue
+			}
+			if opts["device"] != "" && opts["device"] != staRadio {
+				return true
+			}
+		}
+		return false
+	}()
+	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+	return w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, true)
+}
+
 // SetMode sets the app-level WiFi operating mode by enabling/disabling STA and AP sections.
 // Uses OpenWRT's apply+confirm flow for safety: if the device crashes or becomes unreachable,
 // the rollback timer (30 seconds) will automatically revert to the previous configuration.
@@ -968,22 +1124,10 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		return false
 	}()
 
-	for _, section := range apSections {
-		apDisabled := !enableAP
-		if enableAP && apOnOtherRadio {
-			opts, _ := w.uci.GetAll("wireless", section)
-			if opts["device"] == staRadio {
-				apDisabled = true
-			}
-		}
-		if err := w.setIfaceDisabled(section, apDisabled); err != nil {
-			return nil, err
-		}
-		if !apDisabled {
-			if err := w.ensureSectionRadioEnabled(section); err != nil {
-				return nil, err
-			}
-		}
+		allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+
+	if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
+		return nil, err
 	}
 	for _, section := range staSections {
 		enable := enableSTA && section == activeSTA
@@ -1005,6 +1149,70 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		}
 	}
 	return w.stageWirelessApply()
+}
+
+// ReconcileRepeaterAPLayout re-applies STA/AP radio separation (repeater mode only).
+func (w *WifiService) ReconcileRepeaterAPLayout() (*WirelessApplyResult, error) {
+	if w.deriveWifiMode() != "repeater" {
+		return nil, fmt.Errorf("repeater radio reconcile only applies in repeater mode")
+	}
+	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+		return nil, err
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return nil, fmt.Errorf("committing wireless: %w", err)
+	}
+	return w.stageWirelessApply()
+}
+
+// sameRadioRepeaterAPSTAConflict reports whether an enabled AP shares the STA radio while
+// repeater split policy would disable it (multi-radio, allow_ap_on_sta off).
+func (w *WifiService) sameRadioRepeaterAPSTAConflict() (bool, error) {
+	if w.deriveWifiMode() != "repeater" {
+		return false, nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return false, err
+	}
+	if len(radios) < 2 {
+		return false, nil
+	}
+	if w.repeaterAllowAPOnSTARadio(true) {
+		return false, nil
+	}
+	activeSTA, err := w.selectActiveSTA()
+	if err != nil {
+		return false, err
+	}
+	staDevice := ""
+	if activeSTA != "" {
+		opts, err := w.uci.GetAll("wireless", activeSTA)
+		if err != nil {
+			return false, err
+		}
+		staDevice = opts["device"]
+	}
+	if staDevice == "" {
+		return false, nil
+	}
+	apSections, err := w.getWifiSectionsByMode("ap")
+	if err != nil {
+		return false, err
+	}
+	for _, section := range apSections {
+		opts, err := w.uci.GetAll("wireless", section)
+		if err != nil {
+			continue
+		}
+		if opts["disabled"] == "1" {
+			continue
+		}
+		if opts["device"] == staDevice {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // GetHealth returns a cross-checked view of the WiFi state to surface mismatches
@@ -1088,6 +1296,19 @@ func (w *WifiService) GetHealth() (models.WifiHealth, error) {
 	case !staAssociated:
 		h.Status = "warning"
 		h.Issues = append(h.Issues, "STA enabled but not associated to any network")
+	}
+
+	conflict, err := w.sameRadioRepeaterAPSTAConflict()
+	if err != nil {
+		return h, err
+	}
+	if conflict {
+		h.RepeaterSameRadioAPSTA = true
+		h.Issues = append(h.Issues,
+			"Repeater: Wi‑Fi uplink (STA) and an access point are on the same radio — use the other radio for downlink AP, or enable “Wi‑Fi on uplink radio” in repeater options.")
+		if h.Status == "ok" {
+			h.Status = "warning"
+		}
 	}
 	return h, nil
 }
@@ -1419,7 +1640,8 @@ func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
 }
 
 // SetAPConfig updates AP configuration for a specific section.
-func (w *WifiService) SetAPConfig(section string, config models.APConfig) (*WirelessApplyResult, error) {
+// When update.Enabled is nil, UCI disabled is not modified (for repeater credential sync).
+func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate) (*WirelessApplyResult, error) {
 	opts, err := w.uci.GetAll("wireless", section)
 	if err != nil {
 		return nil, fmt.Errorf("AP section %s not found", section)
@@ -1427,29 +1649,34 @@ func (w *WifiService) SetAPConfig(section string, config models.APConfig) (*Wire
 	if opts["mode"] != "ap" {
 		return nil, fmt.Errorf("section %s is not an AP interface", section)
 	}
-	if config.SSID != "" {
-		if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
+	if update.SSID != "" {
+		if err := w.uci.Set("wireless", section, "ssid", update.SSID); err != nil {
 			return nil, fmt.Errorf("setting SSID: %w", err)
 		}
 	}
-	if config.Encryption != "" {
-		if err := w.uci.Set("wireless", section, "encryption", config.Encryption); err != nil {
+	if update.Encryption != "" {
+		if err := w.uci.Set("wireless", section, "encryption", update.Encryption); err != nil {
 			return nil, fmt.Errorf("setting encryption: %w", err)
 		}
 	}
-	if config.Encryption != "none" && config.Key != "" {
-		if err := w.uci.Set("wireless", section, "key", config.Key); err != nil {
+	if update.Encryption != "none" && update.Key != "" {
+		if err := w.uci.Set("wireless", section, "key", update.Key); err != nil {
 			return nil, fmt.Errorf("setting key: %w", err)
 		}
 	}
-	disabled := boolToEnabled(!config.Enabled)
-	if err := w.uci.Set("wireless", section, "disabled", disabled); err != nil {
-		return nil, fmt.Errorf("setting disabled: %w", err)
-	}
-	if config.Enabled {
-		if err := w.ensureSectionRadioEnabled(section); err != nil {
-			return nil, fmt.Errorf("enabling AP radio: %w", err)
+	if update.Enabled != nil {
+		disabled := boolToEnabled(!*update.Enabled)
+		if err := w.uci.Set("wireless", section, "disabled", disabled); err != nil {
+			return nil, fmt.Errorf("setting disabled: %w", err)
 		}
+		if *update.Enabled {
+			if err := w.ensureSectionRadioEnabled(section); err != nil {
+				return nil, fmt.Errorf("enabling AP radio: %w", err)
+			}
+		}
+	}
+	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+		return nil, err
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return nil, fmt.Errorf("committing wireless: %w", err)

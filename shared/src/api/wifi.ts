@@ -65,6 +65,19 @@ export interface APConfig {
   readonly section: string;
 }
 
+/** Request body for PUT /wifi/ap/:section. Omit `enabled` to leave UCI disabled unchanged. */
+export interface APConfigUpdate {
+  readonly ssid: string;
+  readonly encryption: string;
+  readonly key: string;
+  readonly enabled?: boolean;
+}
+
+/** Persisted repeater radio policy (/etc/travo/repeater-options.json). */
+export interface RepeaterOptions {
+  readonly allow_ap_on_sta_radio: boolean;
+}
+
 /** Group of scan results with same SSID and encryption (dual-band = one group) */
 export interface GroupedScanNetwork {
   readonly ssid: string;
@@ -207,6 +220,8 @@ export interface WifiHealth {
    *  "error" — wwan bound to a different device than the associated STA. */
   readonly status: 'ok' | 'warning' | 'error';
   readonly issues: readonly string[];
+  /** Repeater mode: enabled AP shares the STA wifi-device (fragile); reconcile or move downlink. */
+  readonly repeater_same_radio_ap_sta?: boolean;
   readonly sta?: WifiHealthSTA;
   readonly wwan?: WifiHealthWwan;
 }

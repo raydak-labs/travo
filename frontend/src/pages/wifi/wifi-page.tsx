@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { WifiRepeaterSameRadioBanner } from '@/components/wifi/wifi-repeater-same-radio-banner';
 import { WifiPageTabBar } from '@/pages/wifi/wifi-page-tab-bar';
 import type { WifiSectionTab } from '@/pages/wifi/wifi-page-types';
 import { WifiAdvancedPanel } from '@/pages/wifi/wifi-advanced-panel';
@@ -34,6 +35,7 @@ export function WifiPage() {
 
   return (
     <div className="space-y-4">
+      <WifiRepeaterSameRadioBanner />
       <WifiPageTabBar
         activeTab={activeTab}
         onTabChange={onTabChange}

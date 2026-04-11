@@ -65,6 +65,49 @@ describe('WifiHealthBanner', () => {
     expect(screen.getByText(/wwan network is bound to wlan1/i)).toBeInTheDocument();
   });
 
+  it('renders nothing when the only warning is repeater same-radio (shown in dedicated banner)', async () => {
+    server.use(
+      http.get(API_ROUTES.wifi.health, () =>
+        HttpResponse.json({
+          status: 'warning',
+          issues: [
+            'Repeater: Wi‑Fi uplink (STA) and an access point are on the same radio — use the other radio for downlink AP, or enable “Wi‑Fi on uplink radio” in repeater options.',
+          ],
+          repeater_same_radio_ap_sta: true,
+        }),
+      ),
+    );
+
+    const { container } = renderBanner();
+
+    await waitFor(() => {
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+    });
+  });
+
+  it('after filtering repeater issue, shows DHCP warning title and no duplicate repeater bullet', async () => {
+    server.use(
+      http.get(API_ROUTES.wifi.health, () =>
+        HttpResponse.json({
+          status: 'warning',
+          issues: [
+            'STA is associated to "Hotel-WiFi" but wwan has no DHCP lease yet',
+            'Repeater: Wi‑Fi uplink (STA) and an access point are on the same radio — use the other radio for downlink AP, or enable “Wi‑Fi on uplink radio” in repeater options.',
+          ],
+          repeater_same_radio_ap_sta: true,
+        }),
+      ),
+    );
+
+    renderBanner();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Waiting for IP address/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Repeater:/i)).not.toBeInTheDocument();
+  });
+
   it('renders an amber banner on warning status', async () => {
     server.use(
       http.get(API_ROUTES.wifi.health, () =>

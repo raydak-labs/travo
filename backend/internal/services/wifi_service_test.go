@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -509,11 +510,12 @@ func TestGetAPConfigs(t *testing.T) {
 func TestSetAPConfig(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	_, err := svc.SetAPConfig("default_radio0", models.APConfig{
+	// STA is on radio0 in mock; repeater reconcile keeps AP on radio0 off. Update the 5 GHz AP.
+	_, err := svc.SetAPConfig("default_radio1", models.APConfigUpdate{
 		SSID:       "MyTravelRouter",
 		Encryption: "psk2",
 		Key:        "newpassword123",
-		Enabled:    true,
+		Enabled:    models.BoolPtr(true),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -525,13 +527,13 @@ func TestSetAPConfig(t *testing.T) {
 	}
 	var found *models.APConfig
 	for _, c := range configs {
-		if c.Section == "default_radio0" {
+		if c.Section == "default_radio1" {
 			found = &c
 			break
 		}
 	}
 	if found == nil {
-		t.Fatal("expected to find default_radio0 config")
+		t.Fatal("expected to find default_radio1 config")
 	}
 	if found.SSID != "MyTravelRouter" {
 		t.Errorf("expected SSID 'MyTravelRouter', got '%s'", found.SSID)
@@ -541,13 +543,35 @@ func TestSetAPConfig(t *testing.T) {
 	}
 }
 
+func TestSetAPConfig_OmitEnabledPreservesDisabled(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
+
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID:       "OnlySSID",
+		Encryption: "psk2",
+		Key:        "password123",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis != "1" {
+		t.Fatalf("expected AP to stay disabled, got disabled=%q", dis)
+	}
+	ssid, _ := u.Get("wireless", "default_radio0", "ssid")
+	if ssid != "OnlySSID" {
+		t.Fatalf("expected SSID updated, got %q", ssid)
+	}
+}
+
 func TestSetAPConfig_InvalidSection(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	_, err := svc.SetAPConfig("nonexistent", models.APConfig{
+	_, err := svc.SetAPConfig("nonexistent", models.APConfigUpdate{
 		SSID:       "Test",
 		Encryption: "none",
-		Enabled:    true,
+		Enabled:    models.BoolPtr(true),
 	})
 	if err == nil {
 		t.Error("expected error for nonexistent section")
@@ -558,14 +582,67 @@ func TestSetAPConfig_ReturnsApplyError(t *testing.T) {
 	svc, _ := newTestWifiService()
 	svc.applier = &fakeWirelessApplier{startErr: errors.New("apply failed")}
 
-	_, err := svc.SetAPConfig("default_radio0", models.APConfig{
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID:       "MyTravelRouter",
 		Encryption: "psk2",
 		Key:        "newpassword123",
-		Enabled:    true,
+		Enabled:    models.BoolPtr(true),
 	})
 	if err == nil || !strings.Contains(err.Error(), "apply failed") {
 		t.Fatalf("expected apply error, got %v", err)
+	}
+}
+
+func TestSetAPConfig_RepeaterDisablesSTARadioAPAfterEnableAttempt(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "device", "radio0")
+	_ = u.Set("wireless", "default_radio1", "device", "radio1")
+	_ = u.Set("wireless", "sta0", "device", "radio0")
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Fatalf("precondition: expected AP on STA radio disabled, got %q", ap0)
+	}
+
+	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID:       "Unified",
+		Encryption: "psk2",
+		Key:        "password12",
+		Enabled:    models.BoolPtr(true),
+	}); err != nil {
+		t.Fatalf("SetAPConfig: %v", err)
+	}
+	ap0, _ = u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Errorf("expected AP on STA radio to stay disabled after reconcile, got disabled=%q", ap0)
+	}
+	ssid, _ := u.Get("wireless", "default_radio0", "ssid")
+	if ssid != "Unified" {
+		t.Errorf("expected SSID updated on STA-radio section for when user turns allow_ap on later, got %q", ssid)
+	}
+}
+
+func TestSetAPConfig_APModeSkipsRepeaterReconcile(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.modeFile = filepath.Join(t.TempDir(), "wifi-mode")
+	if err := os.WriteFile(svc.modeFile, []byte("ap"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+
+	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID:       "APOnly",
+		Encryption: "psk2",
+		Key:        "password12",
+		Enabled:    models.BoolPtr(true),
+	}); err != nil {
+		t.Fatalf("SetAPConfig: %v", err)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis == "1" {
+		t.Error("expected AP on radio0 enabled in ap mode")
 	}
 }
 
@@ -977,6 +1054,86 @@ func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
 	}
 	if sta != "0" {
 		t.Errorf("expected STA enabled, got sta=%q", sta)
+	}
+}
+
+func TestWifiSetMode_RepeaterAllowAPOnSTARadioOverridesSplit(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
+	_ = u.Set("wireless", "default_radio1", "disabled", "1")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+	_ = u.Set("wireless", "default_radio0", "device", "radio0")
+	_ = u.Set("wireless", "default_radio1", "device", "radio1")
+
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "0" {
+		t.Errorf("with allow_ap_on_sta_radio, expected AP on STA radio enabled, got ap0=%q", ap0)
+	}
+}
+
+func TestRepeaterOptionsRoundTrip(t *testing.T) {
+	svc, _ := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if _, err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: true}); err != nil {
+		t.Fatal(err)
+	}
+	o, err := svc.GetRepeaterOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !o.AllowAPOnSTARadio {
+		t.Fatal("expected AllowAPOnSTARadio true")
+	}
+}
+
+func TestSetRepeaterOptions_DisallowAPOnSTARadioRunsReconcileInRepeaterMode(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	// Bad state: AP on STA radio enabled while we are about to disallow that policy.
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	apply, err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: false})
+	if err != nil {
+		t.Fatalf("SetRepeaterOptions: %v", err)
+	}
+	if apply != nil {
+		t.Fatalf("expected nil apply without applier, got %#v", apply)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Errorf("expected AP on STA radio disabled after options change, got disabled=%q", ap0)
+	}
+}
+
+func TestSetRepeaterOptions_DisallowAPOnSTARadioReturnsApplyWhenApplierConfigured(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc.applier = &fakeWirelessApplier{startToken: "opts-reconcile"}
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	apply, err := svc.SetRepeaterOptions(models.RepeaterOptions{AllowAPOnSTARadio: false})
+	if err != nil {
+		t.Fatalf("SetRepeaterOptions: %v", err)
+	}
+	if apply == nil || apply.Token != "opts-reconcile" {
+		t.Fatalf("expected pending apply token opts-reconcile, got %#v", apply)
 	}
 }
 
@@ -1613,7 +1770,9 @@ func TestGetHealth_NoSTASection_ReturnsOK(t *testing.T) {
 }
 
 func TestGetHealth_STAAssociatedWithIP_ReturnsOK(t *testing.T) {
-	svc, _ := newTestWifiService()
+	svc, u := newTestWifiService()
+	// Avoid repeater same-radio warning: STA is on radio0 in mock; keep downlink AP only on radio1.
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 	// Mock default state: sta0 enabled, iwinfo.info.ssid=Hotel-WiFi, wwan up with IP 10.0.0.50.
 	h, err := svc.GetHealth()
 	if err != nil {
@@ -1658,8 +1817,9 @@ func TestGetHealth_WwanBoundToDifferentDevice_ReturnsError(t *testing.T) {
 }
 
 func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
-	svc, _ := newTestWifiService()
+	svc, u := newTestWifiService()
 	ub := svc.ubus.(*ubus.MockUbus)
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 
 	// wwan points at the same iface as STA but has no lease yet (still negotiating).
 	ub.RegisterResponse("network.interface.wwan.status", map[string]interface{}{
@@ -1674,6 +1834,65 @@ func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
 	}
 	if h.Status != "warning" {
 		t.Errorf("expected warning, got %q issues=%v", h.Status, h.Issues)
+	}
+}
+
+func TestGetHealth_RepeaterSameRadioAPSTA(t *testing.T) {
+	svc, _ := newTestWifiService()
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !h.RepeaterSameRadioAPSTA {
+		t.Fatal("expected RepeaterSameRadioAPSTA (STA and AP both on radio0 in mock)")
+	}
+	if h.Status != "warning" {
+		t.Errorf("expected warning status, got %q", h.Status)
+	}
+	found := false
+	for _, i := range h.Issues {
+		if strings.Contains(i, "same radio") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected same-radio issue in %#v", h.Issues)
+	}
+}
+
+func TestReconcileRepeaterAPLayout_NotRepeaterReturnsError(t *testing.T) {
+	svc, u := newTestWifiService()
+	svc.modeFile = filepath.Join(t.TempDir(), "wifi-mode")
+	if err := os.WriteFile(svc.modeFile, []byte("ap"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+	_, err := svc.ReconcileRepeaterAPLayout()
+	if err == nil || !strings.Contains(err.Error(), "repeater") {
+		t.Fatalf("expected repeater-only error, got %v", err)
+	}
+}
+
+func TestReconcileRepeaterAPLayout_DisablesSTARadioAP(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	_ = u.Set("wireless", "default_radio1", "disabled", "0")
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Fatalf("precondition: ap0 disabled, got %q", ap0)
+	}
+	// Simulate bad state: AP on STA radio enabled again
+	_ = u.Set("wireless", "default_radio0", "disabled", "0")
+	if _, err := svc.ReconcileRepeaterAPLayout(); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	ap0, _ = u.Get("wireless", "default_radio0", "disabled")
+	if ap0 != "1" {
+		t.Errorf("expected AP on STA radio disabled after reconcile, got %q", ap0)
 	}
 }
 

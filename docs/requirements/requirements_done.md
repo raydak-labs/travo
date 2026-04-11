@@ -4,7 +4,7 @@
 
 > The AdGuard “blocklist management from travel router UI” item was removed from tracking (manage lists in AdGuard’s own UI).
 
-> **Last updated:** 2026-03-27
+> **Last updated:** 2026-04-11
 
 ---
 
@@ -53,6 +53,8 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Task 20 (3.3) VPN: VPN speed test
 - [x] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
 - [x] Task 25 (4.6) Future services: SQM / QoS (traffic shaping)
+- [x] Task 27 (1.5) WiFi: setup wizard applies unified AP credentials to all AP sections  
+- [x] Task 28 (1.5) WiFi: repeater-options PUT reconciles layout when disallowing AP on STA radio (multi-radio repeater)
 
 
 ---
