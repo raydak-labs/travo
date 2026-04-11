@@ -67,7 +67,10 @@ The **Access Point Configuration** card on the WiFi page defaults to one shared
 SSID and password for all bands (per-radio enable switches remain visible); a
 toggle enables separate forms per radio. The client (STA) link is always a
 single connection; band choice appears only when the same SSID is offered on
-multiple bands.
+multiple bands. After each `PUT /api/v1/wifi/ap/:section`, repeater mode
+re-applies STA/AP radio separation (same rules as `SetMode("repeater")`) so
+unified AP saves cannot leave an enabled AP on the STA PHY when another radio
+hosts an AP and `allow_ap_on_sta_radio` is off.
 
 ### 1.3 WiFi Modes
 

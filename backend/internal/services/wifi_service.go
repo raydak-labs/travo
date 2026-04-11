@@ -944,6 +944,80 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 	return conn, nil
 }
 
+// applyRepeaterDownlinkAPPolicy enables/disables AP wifi-iface sections for repeater (and ap/client)
+// mode transitions. When apOnOtherRadio && !allowSTAAP, AP sections on staRadio are disabled so
+// downlink stays off the STA PHY.
+func (w *WifiService) applyRepeaterDownlinkAPPolicy(
+	apSections []string,
+	staRadio string,
+	apOnOtherRadio bool,
+	allowSTAAP bool,
+	enableAP bool,
+) error {
+	for _, section := range apSections {
+		apDisabled := !enableAP
+		if enableAP && apOnOtherRadio && !allowSTAAP {
+			opts, _ := w.uci.GetAll("wireless", section)
+			if opts["device"] == staRadio {
+				apDisabled = true
+			}
+		}
+		if err := w.setIfaceDisabled(section, apDisabled); err != nil {
+			return err
+		}
+		if !apDisabled {
+			if err := w.ensureSectionRadioEnabled(section); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// reconcileRepeaterAPRadioLayout re-applies STA/AP radio separation in repeater mode after AP
+// credential or enabled mutations (e.g. unified SSID save) so uplink PHY APs are not left on.
+func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
+	if w.deriveWifiMode() != "repeater" {
+		return nil
+	}
+	apSections, err := w.getWifiSectionsByMode("ap")
+	if err != nil {
+		return err
+	}
+	activeSTA, err := w.selectActiveSTA()
+	if err != nil {
+		return err
+	}
+	staRadio := ""
+	if activeSTA != "" {
+		if opts, err := w.uci.GetAll("wireless", activeSTA); err == nil {
+			staRadio = opts["device"]
+		}
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return err
+	}
+	multiRadio := len(radios) >= 2
+	apOnOtherRadio := func() bool {
+		if !multiRadio || staRadio == "" {
+			return false
+		}
+		for _, section := range apSections {
+			opts, err := w.uci.GetAll("wireless", section)
+			if err != nil {
+				continue
+			}
+			if opts["device"] != "" && opts["device"] != staRadio {
+				return true
+			}
+		}
+		return false
+	}()
+	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+	return w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, true)
+}
+
 // SetMode sets the app-level WiFi operating mode by enabling/disabling STA and AP sections.
 // Uses OpenWRT's apply+confirm flow for safety: if the device crashes or becomes unreachable,
 // the rollback timer (30 seconds) will automatically revert to the previous configuration.
@@ -1028,24 +1102,10 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		return false
 	}()
 
-	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+		allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
 
-	for _, section := range apSections {
-		apDisabled := !enableAP
-		if enableAP && apOnOtherRadio && !allowSTAAP {
-			opts, _ := w.uci.GetAll("wireless", section)
-			if opts["device"] == staRadio {
-				apDisabled = true
-			}
-		}
-		if err := w.setIfaceDisabled(section, apDisabled); err != nil {
-			return nil, err
-		}
-		if !apDisabled {
-			if err := w.ensureSectionRadioEnabled(section); err != nil {
-				return nil, err
-			}
-		}
+	if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
+		return nil, err
 	}
 	for _, section := range staSections {
 		enable := enableSTA && section == activeSTA
@@ -1515,6 +1575,9 @@ func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate) 
 				return nil, fmt.Errorf("enabling AP radio: %w", err)
 			}
 		}
+	}
+	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+		return nil, err
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return nil, fmt.Errorf("committing wireless: %w", err)
