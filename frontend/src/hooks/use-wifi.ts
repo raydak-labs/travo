@@ -175,6 +175,10 @@ export function useSetAPConfig() {
     onSuccess: () => {
       toast.success('AP configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'ap'] });
+      void refreshRouterState(queryClient, [
+        ['wifi', 'health'],
+        ['wifi', 'connection'],
+      ]);
     },
     onError: (error) => {
       toast.error('Failed to update AP config', { description: error.message });

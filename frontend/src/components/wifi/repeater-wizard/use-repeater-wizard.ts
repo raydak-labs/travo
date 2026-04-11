@@ -42,12 +42,18 @@ export function useRepeaterWizard(open: boolean) {
   const modeMutation = useWifiMode();
   const setAPMutation = useSetAPConfig();
   const setRepeaterOptsMutation = useSetRepeaterOptions();
+  const [repeaterOptsHydrated, setRepeaterOptsHydrated] = useState(false);
 
   useEffect(() => {
-    if (open && repeaterOpts) {
-      setAllowApOnStaRadio(repeaterOpts.allow_ap_on_sta_radio);
+    if (!open) {
+      setRepeaterOptsHydrated(false);
+      return;
     }
-  }, [open, repeaterOpts]);
+    if (repeaterOpts != null && !repeaterOptsHydrated) {
+      setAllowApOnStaRadio(repeaterOpts.allow_ap_on_sta_radio);
+      setRepeaterOptsHydrated(true);
+    }
+  }, [open, repeaterOpts, repeaterOptsHydrated]);
 
   const reset = useCallback(() => {
     setStep('select-upstream');
@@ -55,6 +61,9 @@ export function useRepeaterWizard(open: boolean) {
     setUpstream({ ssid: '', password: '', encryption: '' });
     setApConfig(emptyApForm());
     setAllowApOnStaRadio(false);
+    // Avoid immediately re-seeding from cached repeaterOpts while the dialog is still open;
+    // `open === false` clears this so the next open hydrates fresh.
+    setRepeaterOptsHydrated(true);
     setApplying(false);
     setApplyError(null);
     setDone(false);

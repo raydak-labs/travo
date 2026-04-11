@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +11,26 @@ export function APConfigCard() {
   const { data: apConfigs, isLoading: apLoading } = useAPConfigs();
   const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
   const [separatePerRadio, setSeparatePerRadio] = useState(false);
+  const serverEnabledRef = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!apConfigs?.length) return;
+    setSectionOverrides((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const ap of apConfigs) {
+        const prevSrv = serverEnabledRef.current[ap.section];
+        if (prevSrv !== undefined && prevSrv !== ap.enabled && ap.section in next) {
+          delete next[ap.section];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    for (const ap of apConfigs) {
+      serverEnabledRef.current[ap.section] = ap.enabled;
+    }
+  }, [apConfigs]);
 
   const handleEnabledChange = useCallback((section: string, enabled: boolean) => {
     setSectionOverrides((prev) => ({ ...prev, [section]: enabled }));
