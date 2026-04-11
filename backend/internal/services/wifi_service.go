@@ -3,6 +3,7 @@ package services
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,11 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
+
+// ErrMultipleActiveSTA is returned when more than one STA wifi-iface is enabled
+// and bound to network=wwan. netifd can bind only one device to the wwan interface,
+// so this state leaves the actually-connected STA without a DHCP lease.
+var ErrMultipleActiveSTA = errors.New("wireless config invalid: multiple enabled STA interfaces on network=wwan")
 
 // WifiReloader applies wireless configuration changes (e.g. "wifi up").
 type WifiReloader interface {
@@ -115,7 +121,39 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 	}
 }
 
+// validateWirelessConsistency enforces invariants that, if violated, leave the router
+// in a broken state that rpcd's rollback timer cannot fix (rollback restores the *previous*
+// config, which may itself be broken if the bug is in our own writer). Currently checks:
+//   - At most one enabled STA wifi-iface may be bound to network=wwan.
+func (w *WifiService) validateWirelessConsistency() error {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	var activeWwanSTAs []string
+	for name, opts := range sections {
+		if opts["mode"] != "sta" {
+			continue
+		}
+		if opts["disabled"] == "1" {
+			continue
+		}
+		if opts["network"] != "wwan" {
+			continue
+		}
+		activeWwanSTAs = append(activeWwanSTAs, name)
+	}
+	if len(activeWwanSTAs) > 1 {
+		sort.Strings(activeWwanSTAs)
+		return fmt.Errorf("%w: sections=%s", ErrMultipleActiveSTA, strings.Join(activeWwanSTAs, ","))
+	}
+	return nil
+}
+
 func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
+	if err := w.validateWirelessConsistency(); err != nil {
+		return nil, err
+	}
 	if w.applier != nil {
 		token, err := w.applier.StartApply(uciApplyConfigs)
 		if err != nil {

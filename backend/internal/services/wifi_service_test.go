@@ -1530,6 +1530,65 @@ func TestDeriveWifiMode_FallsBackToUCIWhenNoModeFile(t *testing.T) {
 	}
 }
 
+func TestValidateWirelessConsistency_SingleActiveSTA_OK(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "sta0", "disabled", "0")
+	_ = u.Set("wireless", "sta0", "network", "wwan")
+
+	if err := svc.validateWirelessConsistency(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateWirelessConsistency_NoActiveSTA_OK(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+
+	if err := svc.validateWirelessConsistency(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateWirelessConsistency_MultipleActiveSTAsOnWwan_Error(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "sta0", "disabled", "0")
+	_ = u.Set("wireless", "sta0", "network", "wwan")
+	_ = u.AddSection("wireless", "sta1", "wifi-iface")
+	_ = u.Set("wireless", "sta1", "device", "radio1")
+	_ = u.Set("wireless", "sta1", "mode", "sta")
+	_ = u.Set("wireless", "sta1", "network", "wwan")
+	_ = u.Set("wireless", "sta1", "disabled", "0")
+
+	err := svc.validateWirelessConsistency()
+	if err == nil {
+		t.Fatal("expected error for two enabled STAs on wwan")
+	}
+	if !errors.Is(err, ErrMultipleActiveSTA) {
+		t.Errorf("expected ErrMultipleActiveSTA, got %v", err)
+	}
+}
+
+// Belt-and-suspenders: even if something writes a broken UCI directly, the apply
+// pipeline must refuse to stage it rather than letting rpcd's rollback timer catch it.
+func TestStageWirelessApply_RejectsBrokenConfig(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "sta0", "disabled", "0")
+	_ = u.Set("wireless", "sta0", "network", "wwan")
+	_ = u.AddSection("wireless", "sta1", "wifi-iface")
+	_ = u.Set("wireless", "sta1", "device", "radio1")
+	_ = u.Set("wireless", "sta1", "mode", "sta")
+	_ = u.Set("wireless", "sta1", "network", "wwan")
+	_ = u.Set("wireless", "sta1", "disabled", "0")
+
+	_, err := svc.stageWirelessApply()
+	if err == nil {
+		t.Fatal("expected stageWirelessApply to refuse broken config")
+	}
+	if !errors.Is(err, ErrMultipleActiveSTA) {
+		t.Errorf("expected ErrMultipleActiveSTA, got %v", err)
+	}
+}
+
 // Regression: SetMode("repeater") must never enable more than one STA section on network=wwan.
 // When the user toggles mode with multiple saved STA profiles, the wrong STA may win the wwan
 // binding in netifd, leaving the actually-connected STA without DHCP — "connected, no IP".
