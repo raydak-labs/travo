@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useWifiConnection, useWifiMode } from '@/hooks/use-wifi';
 import { cn } from '@/lib/cn';
 import type { WifiMode } from '@shared/index';
-import { WIFI_MODE_OPTIONS } from '@/components/wifi/wifi-mode-options';
+import { isRecommendedWifiMode, WIFI_MODE_OPTIONS } from '@/components/wifi/wifi-mode-options';
 import { WifiModeSwitchDialog } from '@/components/wifi/wifi-mode-switch-dialog';
 
 export function WifiModeCard() {
@@ -39,6 +39,7 @@ export function WifiModeCard() {
             <div className="grid gap-3 sm:grid-cols-3">
               {WIFI_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => {
                 const isActive = currentMode === mode;
+                const showRecommended = isRecommendedWifiMode(mode);
                 return (
                   <button
                     key={mode}
@@ -57,14 +58,21 @@ export function WifiModeCard() {
                       setMode.isPending && 'opacity-50 cursor-not-allowed',
                     )}
                   >
-                    <div className="flex w-full items-center justify-between">
+                    <div className="flex w-full flex-wrap items-center justify-between gap-1">
                       <Icon
                         className={cn(
                           'h-5 w-5',
                           isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400',
                         )}
                       />
-                      {isActive && <Badge variant="default">Active</Badge>}
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        {showRecommended && (
+                          <Badge variant="secondary" className="text-xs">
+                            Recommended
+                          </Badge>
+                        )}
+                        {isActive && <Badge variant="default">Active</Badge>}
+                      </div>
                     </div>
                     <span
                       className={cn(
