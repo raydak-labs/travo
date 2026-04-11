@@ -946,11 +946,19 @@ func TestWifiSetMode_ClientDisablesAPsAndEnablesSTA(t *testing.T) {
 	}
 }
 
+// In repeater mode with ≥2 radios, the STA (uplink) and AP (downlink) must live on
+// different radios. On ath11k/IPQ6018 an AP sharing a radio with a STA is forced to
+// follow the STA's channel and cannot start until the STA associates — a failing STA
+// takes down the AP on that radio. Separating them keeps the downlink AP reachable
+// even if the uplink drops.
 func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
 	svc, u := newTestWifiService()
 	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 	_ = u.Set("wireless", "default_radio1", "disabled", "1")
 	_ = u.Set("wireless", "sta0", "disabled", "1")
+	// sta0 lives on radio0 per the mock UCI. Ensure default_radio0 AP is on radio0 too.
+	_ = u.Set("wireless", "default_radio0", "device", "radio0")
+	_ = u.Set("wireless", "default_radio1", "device", "radio1")
 
 	_, err := svc.SetMode("repeater")
 	if err != nil {
@@ -960,8 +968,37 @@ func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
 	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
 	ap1, _ := u.Get("wireless", "default_radio1", "disabled")
 	sta, _ := u.Get("wireless", "sta0", "disabled")
-	if ap0 != "0" || ap1 != "0" || sta != "0" {
-		t.Fatalf("expected APs and STA enabled, got ap0=%q ap1=%q sta=%q", ap0, ap1, sta)
+	// AP on radio0 shares with the STA → must be disabled. AP on radio1 stays enabled.
+	if ap0 != "1" {
+		t.Errorf("expected AP on STA's radio disabled, got ap0=%q", ap0)
+	}
+	if ap1 != "0" {
+		t.Errorf("expected AP on free radio enabled, got ap1=%q", ap1)
+	}
+	if sta != "0" {
+		t.Errorf("expected STA enabled, got sta=%q", sta)
+	}
+}
+
+// With only one radio available, STA+AP coexistence on the same radio is unavoidable.
+// We still bring both up — partial connectivity beats none — and let the user upgrade
+// their hardware if they need better isolation.
+func TestSetModeRepeater_WithSingleRadio_AllowsCoexistence(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Delete radio1 and everything attached to it.
+	_ = u.DeleteSection("wireless", "default_radio1")
+	_ = u.DeleteSection("wireless", "radio1")
+	_ = u.Set("wireless", "default_radio0", "disabled", "1")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+
+	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
+	sta, _ := u.Get("wireless", "sta0", "disabled")
+	if ap0 != "0" || sta != "0" {
+		t.Errorf("single-radio repeater: expected ap0=0 sta=0, got ap0=%q sta=%q", ap0, sta)
 	}
 }
 
