@@ -35,6 +35,8 @@ Outstanding numbered tasks (see matching sections below for detail):
 - [ ] **Task 21** (§3.3) VPN: OpenVPN support  
 - [ ] **Task 24** (§4.6) Future services: cloudflared (Cloudflare Tunnel)  
 - [ ] **Task 26** (§4.6) Future services: Watchcat (connection watchdog)  
+- [ ] **Task 27** (§1.5) WiFi: setup wizard applies unified AP credentials to all radios  
+- [ ] **Task 28** (§1.5) WiFi: repeater-options PUT reconciles layout when disallowing AP on STA radio  
 
 ---
 
@@ -83,6 +85,20 @@ action for repeater mode.
 ### 1.4 Multi-Radio Support
 
 - [ ] 🔮 Startup script to auto-discover radio setup and persist config  
+
+### 1.5 WiFi follow-up (optional)
+
+> Full context, decisions, and problem history: [Repeater radio policy plan (2026-04-11)](../plans/2026-04-11-repeater-radio-policy-and-wifi-ux.md).
+
+- [ ] **Task 27 (optional)**: **Setup wizard — dual-radio AP step.** When the user finishes the Wi‑Fi / AP step of setup, apply the unified SSID and password to **every** downlink AP UCI section (all radios), not only `apConfigs[0]` / the first AP in the list.  
+  - **Why:** On dual-radio devices, only updating the first section leaves other APs with factory or stale SSIDs while the main Wi‑Fi page shows one logical network.  
+  - **Where:** `frontend/src/pages/setup/ap-step.tsx` (and any helper that persists AP config during setup); align with how `WifiService` / unified AP `PUT` applies credentials across sections.  
+  - **Done when:** After setup on a two-radio profile, `uci show wireless` (or the GET AP config API) shows the same SSID/key on each enabled downlink AP section the product treats as "main Wi‑Fi", or the step calls the same backend batch/update used elsewhere.
+
+- [ ] **Task 28 (optional)**: **Repeater options — reconcile when disallowing AP on STA radio.** When `PUT /api/v1/wifi/repeater-options` sets `allow_ap_on_sta_radio` from `true` → `false` and the device is in repeater mode, run the same post-change wireless path as `POST /api/v1/wifi/repeater/reconcile` (or an equivalent internal helper: `applyRepeaterDownlinkAPPolicy` + uci apply/confirm), so the downlink AP on the STA radio is turned off without requiring a second user action.  
+  - **Alternative (document only):** If automatic apply is rejected (e.g. rollback UX), document in OpenAPI that the client must call reconcile after this PUT, and ensure the UI prompts once.  
+  - **Where:** Handler for repeater options `PUT` (`backend/internal/api/wifi_handlers.go` or the service method it delegates to), reusing `ReconcileRepeaterAPLayout` / shared apply logic in `wifi_service.go`.  
+  - **Done when:** Toggling the option off in repeater mode updates UCI/radio layout consistently with the **Fix radio layout** action; tests cover the flag transition + apply (or the documented two-step contract).
 
 ---
 
