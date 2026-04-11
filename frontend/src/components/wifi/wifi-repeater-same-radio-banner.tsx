@@ -18,11 +18,12 @@ export function WifiRepeaterSameRadioBanner() {
       <div className="flex gap-3">
         <Radio className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
         <div className="space-y-1 text-sm text-amber-900 dark:text-amber-100">
-          <p className="font-semibold">Uplink and guest Wi‑Fi share one radio</p>
+          <p className="font-semibold">Uplink and downlink AP share one radio</p>
           <p className="text-amber-800 dark:text-amber-200">
-            In repeater mode, the access point on the same chip as your Wi‑Fi uplink is unstable on
-            many devices. Apply the usual layout: downlink AP only on the other radio (unless you
-            enabled “Wi‑Fi on uplink radio” in repeater options).
+            The network your devices join (downlink AP) should usually use the other radio than the
+            Wi‑Fi uplink; same-radio AP+STA is unstable on many hardware. Prefer the other radio for
+            the AP, or enable “Wi‑Fi on uplink radio” in repeater options—not the separate Guest
+            Network card in Advanced.
           </p>
         </div>
       </div>
