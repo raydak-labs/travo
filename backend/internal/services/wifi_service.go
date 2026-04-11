@@ -230,6 +230,56 @@ func (w *WifiService) nextSTASectionName() string {
 	}
 }
 
+// selectActiveSTA picks the single STA wifi-iface that should be active.
+// Priority order:
+//  1. If exactly one STA section is currently enabled, keep it (preserve user's last Connect).
+//  2. Otherwise, rank remaining STA sections by the persisted priority file
+//     (lower number = higher priority; 0/unset ranked last).
+//  3. Tiebreak by section name (deterministic).
+//
+// Returns "" if no STA section exists.
+func (w *WifiService) selectActiveSTA() (string, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "", fmt.Errorf("failed to get wireless sections: %w", err)
+	}
+	var staNames []string
+	var enabledSTAs []string
+	for name, opts := range sections {
+		if opts["mode"] != "sta" {
+			continue
+		}
+		staNames = append(staNames, name)
+		if opts["disabled"] != "1" {
+			enabledSTAs = append(enabledSTAs, name)
+		}
+	}
+	if len(staNames) == 0 {
+		return "", nil
+	}
+	if len(enabledSTAs) == 1 {
+		return enabledSTAs[0], nil
+	}
+	priorities := w.loadPriorities()
+	sort.Slice(staNames, func(i, j int) bool {
+		ssidI := sections[staNames[i]]["ssid"]
+		ssidJ := sections[staNames[j]]["ssid"]
+		pi, pj := priorities[ssidI], priorities[ssidJ]
+		// Unset (0) ranks last.
+		if pi == 0 && pj != 0 {
+			return false
+		}
+		if pj == 0 && pi != 0 {
+			return true
+		}
+		if pi != pj {
+			return pi < pj
+		}
+		return staNames[i] < staNames[j]
+	})
+	return staNames[0], nil
+}
+
 // disableOtherSTASections disables every STA wifi-iface except activeSection.
 // This ensures only one profile is connected at runtime while others remain saved.
 func (w *WifiService) disableOtherSTASections(activeSection string) error {
@@ -837,6 +887,18 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		staSections = append(staSections, section)
 	}
 
+	// At most one STA may be enabled at a time: two STA wifi-iface sections pointing at
+	// network=wwan race for the interface in netifd, and the losing binding leaves the
+	// actually-connected STA without DHCP. Pick the single preferred profile and disable the rest.
+	var activeSTA string
+	if enableSTA {
+		var err error
+		activeSTA, err = w.selectActiveSTA()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for _, section := range apSections {
 		if err := w.setIfaceDisabled(section, !enableAP); err != nil {
 			return nil, err
@@ -848,10 +910,11 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		}
 	}
 	for _, section := range staSections {
-		if err := w.setIfaceDisabled(section, !enableSTA); err != nil {
+		enable := enableSTA && section == activeSTA
+		if err := w.setIfaceDisabled(section, !enable); err != nil {
 			return nil, err
 		}
-		if enableSTA {
+		if enable {
 			if err := w.ensureSectionRadioEnabled(section); err != nil {
 				return nil, err
 			}

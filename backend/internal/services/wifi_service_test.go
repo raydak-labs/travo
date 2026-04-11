@@ -1529,3 +1529,113 @@ func TestDeriveWifiMode_FallsBackToUCIWhenNoModeFile(t *testing.T) {
 		t.Errorf("unexpected mode %q from UCI fallback", mode)
 	}
 }
+
+// Regression: SetMode("repeater") must never enable more than one STA section on network=wwan.
+// When the user toggles mode with multiple saved STA profiles, the wrong STA may win the wwan
+// binding in netifd, leaving the actually-connected STA without DHCP — "connected, no IP".
+func TestSetModeRepeater_WithMultipleSavedSTAs_EnablesOnlyHighestPriority(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpFile := t.TempDir() + "/priorities.json"
+	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+
+	// Two saved STA profiles, on different radios, both network=wwan, both initially disabled.
+	_ = u.Set("wireless", "sta0", "ssid", "LowPriority")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+	_ = u.Set("wireless", "sta0", "network", "wwan")
+	_ = u.AddSection("wireless", "sta1", "wifi-iface")
+	_ = u.Set("wireless", "sta1", "device", "radio1")
+	_ = u.Set("wireless", "sta1", "mode", "sta")
+	_ = u.Set("wireless", "sta1", "ssid", "HighPriority")
+	_ = u.Set("wireless", "sta1", "network", "wwan")
+	_ = u.Set("wireless", "sta1", "disabled", "1")
+
+	// HighPriority=1 (higher priority), LowPriority=2.
+	if err := svc.ReorderNetworks([]string{"HighPriority", "LowPriority"}); err != nil {
+		t.Fatalf("ReorderNetworks: %v", err)
+	}
+
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+
+	sta0Disabled, _ := u.Get("wireless", "sta0", "disabled")
+	sta1Disabled, _ := u.Get("wireless", "sta1", "disabled")
+	if sta0Disabled != "1" {
+		t.Errorf("expected LowPriority (sta0) disabled=1, got %q", sta0Disabled)
+	}
+	if sta1Disabled != "0" {
+		t.Errorf("expected HighPriority (sta1) disabled=0, got %q", sta1Disabled)
+	}
+}
+
+func TestSetModeClient_WithMultipleSavedSTAs_EnablesOnlyHighestPriority(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpFile := t.TempDir() + "/priorities.json"
+	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+
+	_ = u.Set("wireless", "sta0", "ssid", "Backup")
+	_ = u.Set("wireless", "sta0", "disabled", "1")
+	_ = u.Set("wireless", "sta0", "network", "wwan")
+	_ = u.AddSection("wireless", "sta1", "wifi-iface")
+	_ = u.Set("wireless", "sta1", "device", "radio1")
+	_ = u.Set("wireless", "sta1", "mode", "sta")
+	_ = u.Set("wireless", "sta1", "ssid", "Primary")
+	_ = u.Set("wireless", "sta1", "network", "wwan")
+	_ = u.Set("wireless", "sta1", "disabled", "1")
+
+	if err := svc.ReorderNetworks([]string{"Primary", "Backup"}); err != nil {
+		t.Fatalf("ReorderNetworks: %v", err)
+	}
+
+	if _, err := svc.SetMode("client"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+
+	sta0Disabled, _ := u.Get("wireless", "sta0", "disabled")
+	sta1Disabled, _ := u.Get("wireless", "sta1", "disabled")
+	if sta0Disabled != "1" {
+		t.Errorf("expected Backup (sta0) disabled=1, got %q", sta0Disabled)
+	}
+	if sta1Disabled != "0" {
+		t.Errorf("expected Primary (sta1) disabled=0, got %q", sta1Disabled)
+	}
+}
+
+// Regression for the "connected but no IP" bug: Connect() chose sta_B, disabling sta_A.
+// Later SetMode("repeater") must not blindly re-enable sta_A; the currently-active profile
+// (sta_B) stays the sole STA on wwan.
+func TestConnectThenSetModeRepeater_PreservesSingleActiveSTA(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpFile := t.TempDir() + "/priorities.json"
+	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+
+	// Existing sta0 (Hotel-WiFi) is the mock default.
+	// Connect to a second network — Connect() creates sta1 and disables sta0.
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Cafe-WiFi", Password: "latte", Encryption: "psk2",
+	}); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+
+	sta0Before, _ := u.Get("wireless", "sta0", "disabled")
+	sta1Before, _ := u.Get("wireless", "sta1", "disabled")
+	if sta0Before != "1" || sta1Before != "0" {
+		t.Fatalf("setup: expected sta0=1 sta1=0 after Connect, got %q %q", sta0Before, sta1Before)
+	}
+
+	if _, err := svc.SetMode("repeater"); err != nil {
+		t.Fatalf("SetMode: %v", err)
+	}
+
+	sta0After, _ := u.Get("wireless", "sta0", "disabled")
+	sta1After, _ := u.Get("wireless", "sta1", "disabled")
+	if sta0After != "1" {
+		t.Errorf("SetMode re-enabled stale STA: expected sta0 disabled=1, got %q", sta0After)
+	}
+	if sta1After != "0" {
+		t.Errorf("SetMode disabled active STA: expected sta1 disabled=0, got %q", sta1After)
+	}
+}
