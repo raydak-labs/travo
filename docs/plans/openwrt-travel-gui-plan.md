@@ -1,3 +1,10 @@
+---
+title: "Plan"
+description: "Planning / design notes: Plan"
+updated: 2026-04-13
+tags: [openwrt, plan, traceability]
+---
+
 ## Plan: OpenWRT Travel GUI
 
 A modern, mobile-first web UI for OpenWRT-based travel routers (GL.iNet Beryl AX MT3000, Slate AXT1800), providing an intuitive dashboard, WiFi management with hotel captive portal support, VPN/service management, and system configuration. Built as a Go backend + React frontend monorepo that coexists with LuCI (taking port 80/443, relocating LuCI to an alternate port). Licensed under MIT.

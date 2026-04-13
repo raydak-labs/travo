@@ -1,16 +1,22 @@
 # Agent Instructions
 
-## Tools & setup
+## Read First
+
+- `AGENTS.md` keeps repo workflow and guardrails.
+- `docs/architecture.md` keeps stable architecture decisions, safety rules, and runtime invariants. Update it whenever new essential behavior, subsystem contract, or operational constraint is decided.
+- `docs/requirements/tasks_open.md` is the working backlog.
+- `docs/requirements/tasks_done.md` is the completed task log.
+- `docs/_archive/requirements_done.md` is a legacy exhaustive archive; do not use it as the active backlog.
+- `docs/README.md` is the broader documentation map.
+
+## Tools & Setup
 
 - everything should be installed via `mise`. See `.mise.toml`
 
 ## Project Plans
 
-The plan directory is `plans/`. Do NOT modify plan files.
-
-The important file for **outstanding** requirements is `docs/requirements/requirements.md`.  
-Completed / historical checklists live in `docs/requirements/requirements_done.md`.  
-When we implement things, update the feature sets (mark items in the archive when done, trim or extend `requirements.md` as needed).
+- All planning docs live under `docs/plans/` (see `docs/plans/README.md`).
+- Do **not** modify plan file bodies except when executing an agreed change; prefer new dated plans for new work.
 
 ## Project Structure
 
@@ -20,12 +26,19 @@ This is a pnpm monorepo with:
 - `backend/` — Go + Fiber
 - `shared/` — Shared TypeScript types
 
-## Frontend UI & theming
+## Documentation Workflow
+
+- Keep `docs/architecture.md` current for stable design decisions, invariants, safety constraints, and important cross-component behavior.
+- Keep `docs/requirements/tasks_open.md` and `docs/requirements/tasks_done.md` current when scope changes or work is completed.
+- Keep `docs/README.md` as the documentation map (requirements pointers live there).
+- Prefer short overview docs that link deeper instead of putting backlog, architecture, and historical notes into one file.
+
+## Frontend UI & Theming
 
 - Dark mode is the `dark` class on `document.documentElement`, driven by `ThemeProvider` and an inline boot script in `frontend/index.html`. See `docs/ui-theming.md` for tokens and patterns.
-- **Do not** set explicit text colors (`text-gray-900`, hex, inline `color`, etc.) for ordinary copy unless there is no reasonable alternative—prefer inheriting from global `body` styles in `frontend/src/index.css` or using shared primitives (`CardTitle`, `CardDescription`, buttons) that already pair light/dark.
-- When you must set color, always provide **both** light and dark variants (e.g. `text-gray-500 dark:text-gray-400`). Charts and embedded SVGs may use the `--chart-*` CSS variables in `index.css` instead of hard-coded text fills.
-- **Exceptions** (explicit color allowed): status/semantic hues (success, error, links), charts, third-party widgets, badges, and contrast inside intentionally colored surfaces—still keep dark-mode variants where users can enable dark theme.
+- **Do not** set explicit text colors (`text-gray-900`, hex, inline `color`, etc.) for ordinary copy unless there is no reasonable alternative. Prefer inheriting from global `body` styles in `frontend/src/index.css` or using shared primitives (`CardTitle`, `CardDescription`, buttons) that already pair light/dark.
+- When you must set color, always provide **both** light and dark variants (for example `text-gray-500 dark:text-gray-400`). Charts and embedded SVGs may use the `--chart-*` CSS variables in `index.css` instead of hard-coded text fills.
+- **Exceptions**: status or semantic hues, charts, third-party widgets, badges, and contrast inside intentionally colored surfaces. Still keep dark-mode variants where users can enable dark theme.
 
 ## Development
 
@@ -34,7 +47,7 @@ This is a pnpm monorepo with:
 - Run `make test` to run all tests
 - Run `make dev` for development servers
 - Run `make format` for formatting code
-- Run `make lint` to run lint check
+- Run `make lint` to run lint checks
 - Run `make build` to build the projects
 
 ## Testing
@@ -45,86 +58,42 @@ Follow TDD: write tests first, see them fail, write minimal code to pass.
 - Shared tests: `cd shared && pnpm test`
 - Frontend tests: `cd frontend && pnpm test`
 
-## Real tests
+## Real Device Validation
 
-- if we are testing on the real system you have access to the OpenWRT test environemnt via ssh to IP 192.168.1.1
-- You are allowed execute and copy everything to the system
-- for scp you have to use the legacy option and commands like rg are not available on the target system, use the simpler alternatives like grep
-- always test things directly on the target system either with a browser if you capable to or via curl
-- if needed cross check with the real configurations on the system
+- You have access to the OpenWRT test environment via SSH at `192.168.1.1`.
+- You may execute commands on the device and copy files to it.
+- For `scp`, use the legacy option.
+- Commands like `rg` are not available on the target system; use simpler tools like `grep`.
+- Always test important device behavior directly on the target system, either with a browser, `curl`, or SSH-level validation.
+- If useful, cross-check with real configs on the device.
+- If direct device access would reduce guesswork, ask the user so you can validate behavior before implementing blindly.
 
-## Automated System Changes — Mandatory Failsafe
+## Safety-Critical System Changes
 
-Any automated action that modifies live system state (UCI commit + wifi reload,
-firewall rules, network interface changes, etc.) **MUST** use a crash guard:
+Follow full rationale and examples in `docs/architecture.md`. Core rules:
 
-1. **Write a guard file** to persistent storage (`/etc/travo/`) in
-   flash **before** executing the dangerous operation.
-2. **On next startup**, if the guard file exists, skip the operation entirely and
-   log a warning — a previous run crashed the system and must not be retried.
-3. **Remove the guard file** only after the operation completes successfully.
-4. A manual redeploy (`deploy-local.sh`) clears all guard files, giving explicit
-   permission to retry on the next boot.
-
-**Why:** OpenWRT runs on constrained hardware with sensitive kernel drivers
-(ath11k/IPQ6018). Operations like `wifi up` can cause kernel panics that
-reboot the device. Without a crash guard, the service restarts after reboot and
-immediately retries the crashing operation — creating a soft-brick crash loop
-where the router is permanently inaccessible.
-
-**WiFi commands:** On ath11k/IPQ6018 we use `wifi up` (recommended by OpenWRT)
-to apply wireless config and avoid `wifi reload`, which tears down all wireless
-first and is known to trigger driver/firmware crashes on this hardware.
-
-**LuCI vs script:** When you click "Save & Apply" in LuCI (Network → Wireless),
-LuCI does **not** run `wifi` or `wifi up` directly. It calls rpcd's **uci apply**
-RPC, which commits config and triggers procd/ubus to reload affected services,
-then starts a **rollback timer** (default 30s). The browser polls and calls
-**uci confirm**; if that succeeds, the rollback is cancelled. If the device
-becomes unreachable (e.g. reboot or crash), the timer fires and rpcd
-**reverts** the config to the pre-apply state, so after reboot the device has
-the old config and stays reachable. Our setup script must **not** run `wifi` or
-`wifi up` from SSH: there is no rollback, so a crash leaves the new config in
-place and can create a soft-brick loop. The script only writes UCI; the user
-applies via LuCI "Save & Apply" or by rebooting.
-
-**Backend:** The backend uses the same apply/confirm flow for wireless: after any
-UCI wireless change it calls rpcd **session login** → copy wireless/network/system
-to session dir → **uci apply** (rollback timeout) → **uci confirm**. No `wifi up`
-is run; see `services/uci_apply.go` and `WifiService.applyWireless()`.
-
-**Rule:** If you implement any background goroutine or scheduled task that touches
-system state, it must follow this pattern. No exceptions.
-
-Guard file naming convention: `/etc/travo/<feature>-in-progress`
-
-**Rule:** If implementing new zones or something ensure that all required firewall changes and required rules are implemented. Follow the existing default "WAN" things which we should use.
-
-**Rule:** If things would make implementing easier ask user if you can access the test device to execute command verify things on it. For example try replicating the flow via ssh/cli commands before implementing them blindly.
+- Any automated action that modifies live system state must use a crash guard file in `/etc/travo/<feature>-in-progress`.
+- Remove guard files only after the dangerous operation completes successfully.
+- A manual redeploy via `deploy-local.sh` clears guard files and is the explicit retry path.
+- Wireless changes must preserve LuCI-style rollback semantics: backend uses rpcd `uci apply` plus rollback plus `uci confirm`.
+- Scripts and SSH flows must not run `wifi` or `wifi up` as part of applying user wireless changes. They write UCI only; the user applies via LuCI "Save & Apply" or reboot.
+- Do not use `wifi reload` on ath11k/IPQ6018. Where `wifi up` already exists for bounded recovery logic, keep that exception explicit and documented.
+- If you add new zones, interfaces, or routing paths, include all required firewall changes and follow existing default `wan` patterns.
+- Any new background goroutine or scheduled task that changes live state must follow the same guard and rollback rules. No exceptions.
 
 ## API Documentation Endpoint
 
-The backend exposes a machine-readable **OpenAPI 3.0** specification at:
+Contract:
 
-```
+```text
 GET /api/openapi.json
 ```
 
-This endpoint requires **no authentication** and is available on the test device:
+- This endpoint is meant to be machine-readable OpenAPI 3.0 for automation and tests.
+- It should remain available on the test device at `http://192.168.1.1/api/openapi.json`.
+- Protected endpoints use `POST /api/v1/auth/login` and `Authorization: Bearer <token>`.
 
-```sh
-curl http://192.168.1.1/api/openapi.json
-```
+## Finish Task
 
-Use it for:
-
-- Generating typed API clients or test fixtures
-- Discovering all available `/api/v1/` routes without reading source code
-- Integration tests against the live device
-
-Authentication for protected endpoints: POST `/api/v1/auth/login` with `{"username":"root","password":"..."}` → use the returned `token` as `Authorization: Bearer <token>`.
-
-## Commit / finish task
-
-- before you finish the task you must ensure the lint, tests and build are working (check Makefile for general things)
-- if you have failed tests focus only on running them and at the end again test with Makefile
+- Before finishing, ensure lint, tests, and build pass. Check `Makefile` for the canonical commands.
+- If tests fail, focus on fixing and rerunning them, then run the top-level `make` checks again before finishing.

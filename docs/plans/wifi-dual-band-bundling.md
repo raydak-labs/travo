@@ -1,7 +1,14 @@
+---
+title: "Plan: WiFi dual-band bundling & automatic band switching"
+description: "Planning / design notes: Plan: WiFi dual-band bundling & automatic band switching"
+updated: 2026-04-13
+tags: [plan, traceability, wifi]
+---
+
 # Plan: WiFi dual-band bundling & automatic band switching
 
 **Status:** Not implemented (documented for future work)
-**Related requirements:** [1.1 Upstream WiFi — Dual-band scan bundling](../requirements/requirements.md#11-upstream-wifi-sta--wwan--connect-to-existing-wifi)
+**Related requirements:** [1.1 Upstream WiFi — Dual-band scan bundling](../requirements/tasks_done.md#wifi-and-network-foundation)
 
 ---
 
@@ -181,7 +188,7 @@ When creating/moving the STA for a new connection:
 
 ## References
 
-- Requirements: [docs/requirements/requirements.md](../requirements/requirements.md) — § 1.1 (Dual-band scan bundling)
+- Traceability: [tasks_done.md](../requirements/tasks_done.md#wifi-and-network-foundation) (dual-band shipped)
 - Current scan: backend `WifiService.Scan()` returns flat list from all radios; frontend `WifiScanList` renders one row per result.
 - Connect flow: `WifiConnectDialog` passes `network.ssid` and password; backend `Connect()` sets STA SSID/key and applies; band is determined by which radio the STA is on.
 - Auto-reconnect pattern: `/etc/openwrt-travel-gui/autoreconnect.json` + cron script + crash guard.

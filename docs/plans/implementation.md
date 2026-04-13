@@ -1,3 +1,10 @@
+---
+title: "Implementation Guide: Simple Tasks"
+description: "Planning / design notes: Implementation Guide: Simple Tasks"
+updated: 2026-04-13
+tags: [guide, plan, traceability]
+---
+
 # Implementation Guide: Simple Tasks
 
 > Items that are straightforward to implement without a full plan document.
@@ -34,7 +41,7 @@
 
 The switch component at `frontend/src/components/ui/switch.tsx` already has `dark:peer-checked:bg-blue-500`. This was fixed in the last bug round.
 
-**Action:** Mark `[x]` in requirements.md.
+**Action:** Update [`tasks_done.md`](../requirements/tasks_done.md).
 
 ---
 
@@ -334,7 +341,7 @@ The switch component at `frontend/src/components/ui/switch.tsx` already has `dar
 
 The init script at `packaging/openwrt/files/etc/init.d/openwrt-travel-gui` already exists as a procd service with `START=99`, respawn enabled, and auto-start. Verified on device: `/etc/init.d/openwrt-travel-gui enabled` returns true.
 
-**Action:** Mark `[x]` in requirements.md.
+**Action:** Update [`tasks_done.md`](../requirements/tasks_done.md).
 
 ---
 

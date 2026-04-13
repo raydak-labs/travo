@@ -1,8 +1,15 @@
+---
+title: "Plan: Connection Failover (Ordered Multi-WAN)"
+description: "Planning / design notes: Plan: Connection Failover (Ordered Multi-WAN)"
+updated: 2026-04-13
+tags: [failover, network, plan, traceability]
+---
+
 # Plan: Connection Failover (Ordered Multi-WAN)
 
 **Status:** Not implemented
 **Priority:** Medium
-**Related requirements:** [2.7 Connection Failover](../requirements/requirements.md#27-connection-failover)
+**Related requirements:** [2.7 Connection Failover](../requirements/tasks_open.md#27-connection-failover)
 
 ---
 

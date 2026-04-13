@@ -1,6 +1,15 @@
-# OpenWRT Travel Router GUI — Requirements archive (completed & historical)
+---
+title: Legacy requirements archive (read-only)
+description: Historical exhaustive checkbox snapshot; do not extend. Use tasks_open, tasks_done, architecture for current truth.
+updated: 2026-04-11
+tags: [archive, traceability, requirements]
+---
 
-> **This file** is a full snapshot of the requirements checklist, including all implemented (`[x]`) items and completed bug-list entries. For **outstanding work only**, use [`requirements.md`](./requirements.md).
+# OpenWRT Travel Router GUI — Legacy requirements archive
+
+> **Frozen export.** Do not edit checkboxes here. Current backlog: [`../requirements/tasks_open.md`](../requirements/tasks_open.md). Shipped summaries: [`../requirements/tasks_done.md`](../requirements/tasks_done.md). Rules: [`../architecture.md`](../architecture.md). Map: [`../README.md`](../README.md).
+
+> **This file** is the old exhaustive checklist snapshot, including implemented (`[x]`) items and historical bug-list entries.
 
 > The AdGuard “blocklist management from travel router UI” item was removed from tracking (manage lists in AdGuard’s own UI).
 
@@ -53,9 +62,8 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Task 20 (3.3) VPN: VPN speed test
 - [x] Task 23 (4.5) Dynamic DNS: custom DDNS update URL
 - [x] Task 25 (4.6) Future services: SQM / QoS (traffic shaping)
-- [x] Task 27 (1.5) WiFi: setup wizard applies unified AP credentials to all AP sections  
+- [x] Task 27 (1.5) WiFi: setup wizard applies unified AP credentials to all AP sections
 - [x] Task 28 (1.5) WiFi: repeater-options PUT reconciles layout when disallowing AP on STA radio (multi-radio repeater)
-
 
 ---
 
@@ -76,8 +84,8 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Repeater wizard must preserve upstream band/radio choice and configure the intended AP sections explicitly on multi-radio hardware. Using only the first AP section is not sufficient for dual-band devices.
 - [x] AP, guest WiFi, and STA MAC update flows must return an error when runtime apply fails. Do not commit wireless changes, report success, and leave the device in a "saved in UCI but not actually active" state.
 - [x] WiFi/AP management must discover radios and AP sections dynamically instead of assuming `radio0`, `radio1`, `default_radio0..3`, or guest WiFi on `radio0`, so the UI still works after LuCI resets or on different hardware layouts.
-- [x] 🐛 WireGuard should work out-of-the-box after service install + profile import/activate: runtime `wg0` must be created and status endpoints must not return success when tunnel is not actually up. See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
-- [x] 🐛 AdGuard should work out-of-the-box after install + DNS enable: backend install/running detection and DNS forwarding path must be functionally valid (no `nslookup` timeout after successful toggle). See [WireGuard + AdGuard Out-Of-Box Fix Plan](../wireguard-adguard-oob-fix-plan.md).
+- [x] 🐛 WireGuard should work out-of-the-box after service install + profile import/activate: runtime `wg0` must be created and status endpoints must not return success when tunnel is not actually up. See [WireGuard + AdGuard Out-Of-Box Fix Plan](../plans/wireguard-adguard-oob-fix-plan.md).
+- [x] 🐛 AdGuard should work out-of-the-box after install + DNS enable: backend install/running detection and DNS forwarding path must be functionally valid (no `nslookup` timeout after successful toggle). See [WireGuard + AdGuard Out-Of-Box Fix Plan](../plans/wireguard-adguard-oob-fix-plan.md).
 - [x] 🐛 WiFi page can incorrectly show "Repeater" as active when device is not actually in repeater mode; active mode indicator must reflect real UCI/runtime state.
 - [x] 🐛 Saved STA networks must persist and not be removed unexpectedly; only the selected/active network should be connected at runtime while other saved profiles remain stored.
 - [x] 🐛 Active WiFi network badge can display lock icon with `unknown` encryption/type; UI should show correct security label based on scan/connection metadata.
@@ -134,7 +142,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Per-radio configuration (one for uplink, one for AP, etc.). See [Implementation guide](../plans/implementation.md#14--multi-radio-per-radio-config).
 - [x] Recommended configuration based on detected hardware
 
-
 ---
 
 ## 2. Network Management
@@ -160,8 +167,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Block / kick a client
 - [x] Dedicated **Clients** tab/page with structured per-client view (device identity, connection type/path, interface, signal/IP/MAC, activity), plus quick actions (set hostname alias, add static IP reservation, block/ban, unblock/kick). Should consolidate existing client actions into one focused workflow.
 
-
-
 ### 2.3 DHCP & DNS
 
 - [x] Configure DHCP range (start, end, lease time)
@@ -183,7 +188,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Auto-configure as WAN source. See [USB Tethering plan](../plans/usb-tethering.md).
 - [x] Show tethering status on dashboard. See [USB Tethering plan](../plans/usb-tethering.md).
 
-
 ### 2.6 WAN Auto-Detection
 
 - [x] WAN connection type auto-detection (DHCP, PPPoE, static)
@@ -191,11 +195,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Show active WAN source indicator on dashboard
 
 ### 2.7 Connection Failover
-
-
-
-
-
 
 ---
 
@@ -281,10 +280,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 ### 4.6 Future Services
 
-
-
-
-
 ---
 
 ## 5. System Management
@@ -348,7 +343,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Network throughput chart (RX/TX bytes/sec)
 - [x] Per-interface traffic chart
 - [x] Connection uptime log (internet available since / lost at — timeline of events). See [Implementation guide](../plans/implementation.md#62--connection-uptime-log).
-
 
 ### 6.3 Quick Actions
 
@@ -418,10 +412,8 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 
 ## 11. Advanced Networking
 
-
 - [x] 🔮 Firewall zone summary (WAN/LAN/VPN zone overview — not full rule editor)
 - [x] 🔮 Port forwarding
-
 
 - [x] 🔮 IPv6 support toggle and status
 - [x] 🔮 Wake-on-LAN
@@ -510,7 +502,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] CI/CD pipeline (build + test + package). See [CI/CD Pipeline plan](../plans/cicd-pipeline.md).
 - [x] Size optimization audit (bundle size, Go binary strip). See [Implementation guide](../plans/implementation.md#13--size-optimization-audit).
 
-
 ---
 
 ## 14. Hardware Buttons
@@ -518,8 +509,6 @@ These tasks define the next end-to-end work items in a deliberate order. When a 
 - [x] Detect hardware buttons (identify available buttons via /etc/rc.button/). See [Hardware Buttons plan](../plans/hardware-buttons.md).
 - [x] Configure button actions (VPN toggle, WiFi on/off, LED toggle, etc.). See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-2--configure-button-actions).
 - [x] Button event handler via hotplug.d integration. See [Hardware Buttons plan](../plans/hardware-buttons.md).
-
-
 
 ---
 

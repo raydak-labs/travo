@@ -1,8 +1,15 @@
+---
+title: "Plan: WireGuard Full Networking Setup"
+description: "Planning / design notes: Plan: WireGuard Full Networking Setup"
+updated: 2026-04-13
+tags: [plan, traceability, wireguard]
+---
+
 # Plan: WireGuard Full Networking Setup
 
 **Status:** Not implemented
 **Priority:** High
-**Related requirements:** [3.1 WireGuard](../requirements/requirements.md#31-wireguard)
+**Related requirements:** [3.1 WireGuard](../requirements/tasks_done.md#vpn-and-services)
 **Reference:** [WireGuard Client OpenWRT 25.12 (CLI steps)](wireguard_client_openwrt_25.12.md)
 
 ---

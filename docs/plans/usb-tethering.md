@@ -1,8 +1,15 @@
+---
+title: "Plan: USB Tethering Support"
+description: "Planning / design notes: Plan: USB Tethering Support"
+updated: 2026-04-13
+tags: [plan, traceability, usb]
+---
+
 # Plan: USB Tethering Support
 
 **Status:** Not implemented
 **Priority:** Medium
-**Related requirements:** [2.5 USB Tethering](../requirements/requirements.md#25-usb-tethering)
+**Related requirements:** [2.5 USB Tethering](../requirements/tasks_open.md#25-usb-tethering)
 
 ---
 

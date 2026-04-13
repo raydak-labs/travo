@@ -1,8 +1,15 @@
+---
+title: "Plan: Hardware Buttons (GL.iNet AXT1800)"
+description: "Planning / design notes: Plan: Hardware Buttons (GL.iNet AXT1800)"
+updated: 2026-04-13
+tags: [hardware, plan, traceability]
+---
+
 # Plan: Hardware Buttons (GL.iNet AXT1800)
 
 **Status:** Not implemented
 **Priority:** Medium
-**Related requirements:** [14. Hardware Buttons](../requirements/requirements.md#14-hardware-buttons)
+**Related requirements:** [14. Hardware Buttons](../requirements/tasks_open.md#14-hardware-buttons)
 
 ---
 

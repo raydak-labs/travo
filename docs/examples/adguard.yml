@@ -1,3 +1,5 @@
+# Sample AdGuard Home YAML fragment for docs only.
+# Ship template: ../../packaging/adguard/AdGuardHome.yaml (listens UI on 0.0.0.0:3000, DNS5353).
 http:
   pprof:
     port: 6060

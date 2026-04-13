@@ -1,3 +1,10 @@
+---
+title: Frontend UI and theming
+description: ThemeProvider, dark class, Tailwind tokens, chart variables, contrast rules.
+updated: 2026-04-13
+tags: [docs, frontend, theming, tailwind]
+---
+
 # Frontend UI & theming
 
 Short reference for Tailwind + dark mode in `frontend/`.

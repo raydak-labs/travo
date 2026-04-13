@@ -8,7 +8,13 @@ A modern, mobile-first web UI for OpenWRT-based travel routers (GL.iNet Beryl AX
 
 Provides an intuitive dashboard, WiFi management with hotel captive portal support, VPN/service management, and system configuration. Built as a Go backend + React frontend monorepo that coexists with LuCI.
 
-![Dashboard](<docs/images/markdown-readme.webp>)
+![Dashboard](docs/images/markdown-readme.webp)
+
+## Documentation
+
+- Contributor and agent doc map: [docs/README.md](docs/README.md)
+- Stable architecture decisions: [docs/architecture.md](docs/architecture.md)
+- Active backlog: [docs/requirements/tasks_open.md](docs/requirements/tasks_open.md)
 
 ## Quick Install
 
@@ -27,7 +33,7 @@ all options and manual install instructions.
 
 ## General
 
-- UI / UX inspried by GLinet (https://medium.com/aimonks/gl-inet-slate-7-travel-router-a-review-920bddcea4ca)
+- UI / UX inspired by GL.iNet ([review article](https://medium.com/aimonks/gl-inet-slate-7-travel-router-a-review-920bddcea4ca))
 
 ## Architecture
 
@@ -162,7 +168,7 @@ travo/
 ├── shared/            # Shared TypeScript types
 │   └── src/
 ├── scripts/           # Dev and build scripts
-├── plans/             # Project planning documents
+├── docs/plans/        # Project planning documents
 ├── Makefile
 └── package.json       # Workspace root
 ```

@@ -1,3 +1,10 @@
+---
+title: "Resilience & Code Quality Improvements"
+description: "Planning / design notes: Resilience & Code Quality Improvements"
+updated: 2026-04-13
+tags: [plan, reliability, traceability]
+---
+
 # Resilience & Code Quality Improvements
 
 > **Status:** Implemented (2026-03-24)

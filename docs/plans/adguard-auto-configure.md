@@ -1,8 +1,15 @@
+---
+title: "Plan: AdGuard Auto-Configure After Install"
+description: "Planning / design notes: Plan: AdGuard Auto-Configure After Install"
+updated: 2026-04-13
+tags: [adguard, plan, traceability]
+---
+
 # Plan: AdGuard Auto-Configure After Install
 
 **Status:** Not implemented
 **Priority:** High
-**Related requirements:** [4.2 AdGuard Home](../requirements/requirements.md#42-adguard-home)
+**Related requirements:** [4.2 AdGuard Home](../requirements/tasks_done.md#vpn-and-services)
 
 ---
 

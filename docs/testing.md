@@ -1,16 +1,77 @@
-# Integration Testing On Real Device
+---
+title: On-device validation
+description: Integration shell scripts plus full manual playbook for router API, WiFi, VPN, evidence capture.
+updated: 2026-04-13
+tags: [docs, testing, integration, openwrt]
+---
+
+# On-device validation
+
+Router default `192.168.1.1` unless noted. Evidence often goes under `./tmp/`. Replace example SSIDs, passwords, and paths in the playbook with your lab values.
+
+## Quick script checks
+
+These scripts exercise the **live router** (default `192.168.1.1`). They use the HTTP API and optional SSH. Use the same password as the travel-gui login (often `admin` on lab images).
+
+### Scripts (from repo root)
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/integration-vpn-wireguard-toggle.sh` | WireGuard enable → disable; router must keep internet (`wget` connectivity check). |
+| `scripts/integration-vpn-dns-killswitch.sh` | DNS leak endpoint + kill switch GET; optional `--ssh-verify`, `--enable-killswitch`. |
+| `scripts/integration-device.sh` | Broader smoke test (health, WiFi connect/disconnect); needs `test/integration/.wifi_pass`. |
+
+#### DNS leak + kill switch (quick)
+
+```sh
+./scripts/integration-vpn-dns-killswitch.sh
+```
+
+With UCI snapshot over SSH:
+
+```sh
+./scripts/integration-vpn-dns-killswitch.sh --ssh-verify
+```
+
+Briefly enable kill switch, confirm API and UCI, then disable:
+
+```sh
+./scripts/integration-vpn-dns-killswitch.sh --enable-killswitch --ssh-verify
+```
+
+#### WireGuard toggle (regression)
+
+```sh
+./scripts/integration-vpn-wireguard-toggle.sh --login-password 'your-password'
+```
+
+### Deploying a new backend before testing
+
+```sh
+./scripts/deploy-local.sh              # frontend + backend
+./scripts/deploy-local.sh --binary-only   # backend only
+```
+
+### Notes
+
+- **DNS leak** is evaluated **on the router**: it compares WireGuard `dns` in UCI to effective upstream DNS (`/etc/resolv.conf` plus dnsmasq `server=` when resolv is only the local stub). It does not run in the browser.
+- **WireGuard + VPN DNS:** When the tunnel is enabled and `network.wg0` has `dns`, the backend **replaces** dnsmasq `server=` with those VPN DNS IPs (even if dnsmasq previously forwarded to AdGuard `127.0.0.1#5353`). The prior dnsmasq list is saved on disk and **restored** when WireGuard is disabled so AdGuard forwarding can return.
+- **Kill switch** adds a firewall **rule** `lan` → `wan` `REJECT` (see `GetKillSwitch` / `SetKillSwitch` in the backend). Verify with `nft list ruleset` on the device (look for `VPN Kill Switch`).
+
+
+## Full real-device playbook
 
 This document describes how to validate real functionality on an OpenWrt device
 (`192.168.1.1`) and store evidence under local `./tmp/` for comparison.
 
-## Scope
+### Scope
 
 - Device-level integration checks (not unit tests)
 - Network state transitions (offline -> online)
 - Backend API + runtime service behavior
 - UCI/runtime persistence across restart/reboot
 
-## Assumptions
+### Assumptions
 
 - Test machine is connected to router via LAN (stable management path)
 - SSH access is available as `root@192.168.1.1`
@@ -18,7 +79,7 @@ This document describes how to validate real functionality on an OpenWrt device
 - SSID under test: `Cappuxinno`
 - WiFi password is stored in local file `test/integration/.wifi_pass`
 
-## Test Artifacts
+### Test Artifacts
 
 Use one timestamped folder per run:
 
@@ -31,9 +92,9 @@ echo "Run dir: $RUN_DIR"
 
 Store all command output in this folder so runs can be diffed later.
 
-## Pre-Test Baseline Capture
+### Pre-Test Baseline Capture
 
-### 1) Device/system snapshot
+#### 1) Device/system snapshot
 
 ```sh
 ssh root@192.168.1.1 '
@@ -46,7 +107,7 @@ ssh root@192.168.1.1 '
 ' > "$RUN_DIR/before/system.txt"
 ```
 
-### 2) UCI snapshot for comparison
+#### 2) UCI snapshot for comparison
 
 ```sh
 ssh root@192.168.1.1 '
@@ -65,7 +126,7 @@ ssh root@192.168.1.1 'tar -czf - -C /etc/config network wireless firewall dhcp s
   > "$RUN_DIR/before/etc-configs.tar.gz"
 ```
 
-### 3) Baseline API/service reachability
+#### 3) Baseline API/service reachability
 
 ```sh
 curl -sS -m 8 -D "$RUN_DIR/before/health.headers" -o "$RUN_DIR/before/health.body" \
@@ -76,14 +137,14 @@ curl -sS -m 8 -o /dev/null -w "%{http_code}\n" "http://192.168.1.1:8080/" \
   > "$RUN_DIR/before/luci.http_code" || true
 ```
 
-## Core Integration Scenario: Offline -> Connect STA -> Online
+### Core Integration Scenario: Offline -> Connect STA -> Online
 
 Goal:
 - Verify internet is unavailable when no STA is connected
 - Connect STA to `Cappuxinno`
 - Verify internet + WAN source status become healthy
 
-### 4) Ensure no STA connected
+#### 4) Ensure no STA connected
 
 Use backend API when available, otherwise UCI check:
 
@@ -98,7 +159,7 @@ ssh root@192.168.1.1 '
 
 If a STA section is actively connected, disconnect via UI/API first, then re-check.
 
-### 5) Verify internet does not work (negative test)
+#### 5) Verify internet does not work (negative test)
 
 Run from router:
 
@@ -112,7 +173,7 @@ ssh root@192.168.1.1 '
 Expected:
 - Non-zero exit code or failed fetch when no upstream is connected
 
-### 6) Connect wireless to SSID `Cappuxinno`
+#### 6) Connect wireless to SSID `Cappuxinno`
 
 Read password from local `test/integration/.wifi_pass`:
 
@@ -159,7 +220,7 @@ if [ -n "$CONN_APPLY_TOKEN" ]; then
 fi
 ```
 
-### 7) Verify connection now works
+#### 7) Verify connection now works
 
 Router-level internet check:
 
@@ -197,9 +258,9 @@ Expected:
 - `wwan` has IPv4 address
 - Backend shows WAN source connected/healthy
 
-## Additional Real-Functionality Suites
+### Additional Real-Functionality Suites
 
-## A) WireGuard basic integration
+### A) WireGuard basic integration
 
 1. Configure/import valid WireGuard profile via UI/API.
 2. Enable tunnel.
@@ -214,7 +275,7 @@ Evidence:
 ssh root@192.168.1.1 'wg show; ip route; ip rule' > "$RUN_DIR/logs/wireguard.txt"
 ```
 
-## B) AdGuard DNS integration
+### B) AdGuard DNS integration
 
 1. Ensure AdGuard service is running.
 2. Validate DNS resolution path from router and LAN client.
@@ -230,7 +291,7 @@ ssh root@192.168.1.1 '
 ' > "$RUN_DIR/logs/adguard.txt"
 ```
 
-## C) Guest network isolation
+### C) Guest network isolation
 
 1. Enable guest WiFi.
 2. Connect a test client.
@@ -250,7 +311,7 @@ ssh root@192.168.1.1 '
 ' > "$RUN_DIR/logs/guest.txt"
 ```
 
-## D) Recovery and persistence after restart/reboot
+### D) Recovery and persistence after restart/reboot
 
 1. Trigger network disable/enable flow under test.
 2. Reboot device:
@@ -274,7 +335,7 @@ ssh root@192.168.1.1 '
 ' > "$RUN_DIR/logs/post-reboot.txt"
 ```
 
-## Post-Test Snapshot + Comparison
+### Post-Test Snapshot + Comparison
 
 Capture the same artifacts again:
 
@@ -300,7 +361,7 @@ Also save backend logs:
 ssh root@192.168.1.1 'logread -e travo -l 500' > "$RUN_DIR/after/logread-travo.txt"
 ```
 
-## Troubleshooting Notes (from real run)
+### Troubleshooting Notes (from real run)
 
 - If `wifi/connect` fails with `uci apply ... (Permission denied)`, check whether a
   previous mutating call returned `apply.pending=true` and was not confirmed yet.
@@ -327,7 +388,7 @@ ssh root@192.168.1.1 'logread -e travo -l 500' > "$RUN_DIR/after/logread-travo.t
   before AdGuard DNS upstream is properly configured, causing `nslookup` timeouts.
   Validate both process state and real DNS resolution, not only API toggle success.
 
-## Manual Run Record (2026-03-23)
+### Manual Run Record (2026-03-23)
 
 Run artifacts:
 
@@ -354,17 +415,17 @@ Observed outcomes:
 
 Tracked follow-up implementation plan:
 
-- [WireGuard + AdGuard Out-Of-Box Fix Plan](./wireguard-adguard-oob-fix-plan.md)
+- [WireGuard + AdGuard Out-Of-Box Fix Plan](./plans/wireguard-adguard-oob-fix-plan.md)
 
-## Input Needed For Full Validation
+### Input Needed For Full Validation
 
 No additional product requirement input is needed for baseline behavior:
 both WireGuard and AdGuard are expected to work out-of-the-box.
 Remaining work is tracked as backend implementation gaps in:
 
-- [WireGuard + AdGuard Out-Of-Box Fix Plan](./wireguard-adguard-oob-fix-plan.md)
+- [WireGuard + AdGuard Out-Of-Box Fix Plan](./plans/wireguard-adguard-oob-fix-plan.md)
 
-## Pass/Fail Criteria
+### Pass/Fail Criteria
 
 A run is considered PASS when all are true:
 
@@ -376,7 +437,7 @@ A run is considered PASS when all are true:
 - No unexpected service crashes or reboot loops
 - UCI/runtime deltas are explainable and intentional
 
-## Suggested Future Automation
+### Suggested Future Automation
 
 - Use `scripts/integration-device.sh` to execute this core flow end-to-end and
   generate `tmp/integration-<timestamp>/result.json`.

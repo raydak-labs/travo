@@ -1,79 +1,70 @@
+---
+title: Deployment guide
+description: Official install path (tarball), LuCI coexistence, AdGuard, build and package.
+updated: 2026-04-13
+tags: [docs, deployment, openwrt]
+---
+
 # Deployment Guide
 
-## Quick Install (recommended)
+Production installs use a **release `.tar.gz`** from GitHub Releases (see `scripts/install.sh`). LuCI stays available on alternate ports.
 
-SSH into your OpenWRT router and run:
+## Quick install (recommended)
+
+On the router:
 
 ```sh
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
 ```
 
-Or with options:
+Non-interactive examples:
 
 ```sh
-# Install a specific version with a custom OpenWrt root password, non-interactive
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
-  sh -s -- --yes --version 1.0.0 --password mysecret
+  sh -s -- --yes --version 1.0.0 --password 'your-root-password'
 
-# Skip AdGuard Home installation
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
   sh -s -- --no-adguard
 ```
 
-## What Gets Installed
+The script downloads `travo_<version>_<arch>.tar.gz`, extracts to `/`, moves LuCI off port 80 when configured, optionally installs AdGuard, sets root password, and enables `travo`.
 
-| Component    | Port          | Description                       |
-| ------------ | ------------- | --------------------------------- |
-| Travel GUI   | 80 (HTTP)     | Modern web dashboard              |
-| AdGuard Home | 3000 (Web UI) | DNS ad-blocker, DNS on port 53    |
-| LuCI (moved) | 8080 (HTTP)   | Original OpenWRT UI, still usable |
+## What gets installed
 
-The install script:
-1. Downloads the `.ipk` package for your architecture from GitHub Releases
-2. Installs it via `opkg`
-3. Moves LuCI (uhttpd) to port 8080/8443
-4. Downloads and installs AdGuard Home
-5. Sets the OpenWrt root password (default: `admin`), used by LuCI and Travo login
-6. Starts the Travel GUI service (JWT secret is created on first start)
+| Piece | Ports / path | Notes |
+| ----- | ------------ | ----- |
+| Travo UI + API | `http://<router>:80` (default) | Static UI under `/www/travo`; binary `/usr/bin/travo` |
+| LuCI (after move) | `http://<router>:8080`, HTTPS `8443` | `uhttpd` listen updated by uci-defaults |
+| AdGuard Home (optional) | Web UI `3000`; DNS **`5353`** | dnsmasq on the router forwards LAN DNS to AdGuard (`127.0.0.1#5353` pattern); see bundled `packaging/adguard/AdGuardHome.yaml` |
 
-## Manual Installation from .ipk
+JWT secret and sealed auth data live under `/etc/travo/` (created on first start).
 
-Download the `.ipk` for your architecture from
-[GitHub Releases](https://github.com/raydak-labs/travo/releases):
+## Manual install from a release tarball
+
+Pick the asset matching `uname -m` / OpenWrt arch (installer and `scripts/install.sh` use the same naming). Example:
 
 ```sh
-# On the router
 cd /tmp
-wget https://github.com/raydak-labs/travo/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.ipk
-opkg install travo_1.0.0_aarch64_cortex-a53.ipk
+wget "https://github.com/raydak-labs/travo/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.tar.gz"
+tar -xzf travo_1.0.0_aarch64_cortex-a53.tar.gz -C /
+chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
+# Run any pending uci-defaults (e.g. LuCI port move), then:
+/etc/init.d/travo enable
+/etc/init.d/travo start
 ```
 
-After installing the `.ipk` manually, you still need to:
-- Move LuCI to port 8080 (or run the uci-defaults script)
-- Optionally install AdGuard Home with `scripts/install-adguard.sh`
+If you skip the install script, run `scripts/install-adguard.sh` yourself when you want AdGuard.
 
 ## Configuration
 
-UCI config is at `/etc/config/travo`:
+- UCI: `/etc/config/travo`
+- Auth: `/etc/travo/auth.json` (auto-generated)
 
-```
-config travel_gui 'main'
-    option enabled '1'
-    option port '80'
-```
+### Password
 
-The JWT signing secret is stored in `/etc/travo/auth.json` and is auto-created on first `travo` start.
+Travo uses the **root** password (rpcd/LuCI). Change with `passwd root` or LuCI.
 
-### Change password
-Travo login uses the OpenWrt/LuCI **root** password, so change it via LuCI/System settings (or CLI):
-
-```sh
-passwd root
-```
-
-Restarting the `travo` service is optional; the backend validates via rpcd/LuCI when logging in.
-
-### Change port
+### Travo listen port
 
 ```sh
 uci set travo.main.port='8888'
@@ -81,7 +72,7 @@ uci commit travo
 /etc/init.d/travo restart
 ```
 
-### Disable the service
+### Disable service
 
 ```sh
 /etc/init.d/travo stop
@@ -90,106 +81,66 @@ uci commit travo
 
 ## AdGuard Home
 
-AdGuard Home is installed to `/opt/AdGuardHome` and runs as an init.d service.
+- Binary/config: `/opt/AdGuardHome`
+- UI: `http://<router>:3000`
+- DNS listener: **5353** in the stock template (not raw `53` on WAN)
 
-- **Web UI:** `http://<router_ip>:3000`
-- **DNS:** listens on port 53 (replaces dnsmasq as the primary DNS)
-- **Config:** `/opt/AdGuardHome/AdGuardHome.yaml`
-
-To customize AdGuard Home, use its web UI at port 3000 or edit the YAML config
-directly and restart:
-
-```sh
-/etc/init.d/adguardhome restart
-```
+Restart: `/etc/init.d/adguardhome restart`
 
 ## Uninstall
-
-Run the uninstall script on the router:
 
 ```sh
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh -s -- --uninstall
 ```
 
-Or if you have the repo cloned:
+Or from a clone: `sh scripts/uninstall.sh`
+
+## Build and package (maintainers)
+
+Prerequisites: Node 20+, pnpm 10+, Go 1.23+.
 
 ```sh
-sh scripts/uninstall.sh
-```
-
-This will:
-1. Stop and remove the Travel GUI service
-2. Remove AdGuard Home (if installed)
-3. Restore LuCI to ports 80/443
-4. Clean up config files
-
-## Building from Source
-
-### Prerequisites
-
-- Node.js >= 20, pnpm >= 9
-- Go >= 1.23
-- Git
-
-### Build
-
-```sh
-# Install dependencies
 pnpm install
 cd backend && go mod tidy && cd ..
 
-# Cross-compile for aarch64 (default)
-make build-prod
+# Cross-compile binary into dist/
+make build-prod # default arch
+make build-all         # aarch64 + amd64 artifacts
 
-# Or specify architecture
-GOARCH=amd64 bash scripts/build.sh
-
-# Build for both architectures
-make build-all
-```
-
-Output: `dist/travo`
-
-### Create .ipk package
-
-```sh
-# Default (aarch64_cortex-a53)
-make package
-
-# Specify architecture
-ARCH=x86_64 bash scripts/package-ipk.sh
-
-# Build packages for both architectures
+# Release tarball(s) for install.sh / GitHub Releases
+make package           # default ARCH
+ARCH=x86_64 bash scripts/package-tarball.sh
 make package-all
 ```
 
-Output: `dist/travo_<version>_<arch>.ipk`
+Output: `dist/travo_<version>_<arch>.tar.gz`
 
-### Deploy to router
+## Deploy from dev machine
+
+Fast iteration (binary + frontend assets over SSH):
 
 ```sh
-make deploy ROUTER_IP=192.168.8.1
+./scripts/deploy-local.sh --ip 192.168.1.1
+./scripts/deploy-local.sh --binary-only --ip 192.168.1.1
+./scripts/deploy-local.sh --method release --ip 192.168.1.1
 ```
 
-## Supported Devices
+`make deploy` wraps opkg-oriented flow when you maintain `.ipk` locally — see `scripts/deploy-local.sh --help` and `Makefile`.
 
-| Device                       | Architecture | Status    |
-| ---------------------------- | ------------ | --------- |
-| GL.iNet Beryl AX (MT3000)    | aarch64      | Tested    |
-| GL.iNet Slate AXT1800        | aarch64      | Tested    |
-| Any OpenWRT 23.05+ (aarch64) | aarch64      | Supported |
-| Any OpenWRT 23.05+ (x86_64)  | x86_64       | Supported |
+## Supported targets
+
+| Target | Arch | Notes |
+| ------ | ---- | ----- |
+| GL.iNet Beryl AX (MT3000) | aarch64 | Lab tested |
+| GL.iNet Slate AXT1800 | aarch64 | Lab tested |
+| Generic OpenWrt 23.05+ | aarch64 / x86_64 | Use matching tarball arch |
 
 ## Troubleshooting
 
-| Issue                            | Solution                                                                                       |
-| -------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Binary won't start               | Check arch: `file /usr/bin/travo` — must match your device                        |
-| Port 80 conflict                 | Verify uhttpd moved: `uci get uhttpd.main.listen_http` should show `0.0.0.0:8080`              |
-| Can't reach LuCI                 | Access via `http://<router_ip>:8080` after install                                             |
-| Service not running              | Check logs: `logread -e travo`, restart: `/etc/init.d/travo restart` |
-| Permission denied                | `chmod +x /usr/bin/travo`                                                         |
-| AdGuard not blocking ads         | Verify DNS: `nslookup ads.example.com <router_ip>` — should return 0.0.0.0                     |
-| AdGuard UI not accessible        | Check service: `/etc/init.d/adguardhome status`, restart if needed                             |
-| Insufficient storage             | Need ~20 MB free; check with `df -h /`                                                         |
-| Install script fails to download | Verify internet: `ping github.com`; try specifying `--version` explicitly                      |
+| Symptom | Check |
+| ------- | ----- |
+| Binary won’t run | `file /usr/bin/travo` matches CPU; `logread -e travo` |
+| Port 80 busy | `uci get uhttpd.main.listen_http` should be `0.0.0.0:8080` after migrate |
+| LuCI missing | `http://<router>:8080` |
+| AdGuard DNS oddities | `netstat`/`ss` on `5353`; dnsmasq `server=` / forwards |
+| Low flash | `df -h /` (~20 MB headroom minimum recommended) |

@@ -1,8 +1,15 @@
+---
+title: "Plan: Data Usage Tracking (via vnstat)"
+description: "Planning / design notes: Plan: Data Usage Tracking (via vnstat)"
+updated: 2026-04-13
+tags: [metrics, plan, traceability]
+---
+
 # Plan: Data Usage Tracking (via vnstat)
 
 **Status:** Not implemented
 **Priority:** Medium
-**Related requirements:** [2.4 Data Usage Tracking](../requirements/requirements.md#24-data-usage-tracking)
+**Related requirements:** [2.4 Data Usage Tracking](../requirements/tasks_done.md#wifi-and-network-foundation)
 
 ---
 

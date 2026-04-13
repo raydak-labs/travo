@@ -1,7 +1,14 @@
+---
+title: "Repeater radio policy, unified AP UX, and health warnings"
+description: "Planning / design notes: Repeater radio policy, unified AP UX, and health warnings"
+updated: 2026-04-13
+tags: [plan, repeater, traceability, ux, wifi]
+---
+
 # Repeater radio policy, unified AP UX, and health warnings
 
 **Date:** 2026-04-11  
-**Status:** Implemented, including former optional follow-ups (setup wizard all-AP save; repeater-options PUT reconcile). See [requirements §1.2](../requirements/requirements.md#12-wifi-mode-invariants-enforced) narrative.
+**Status:** Implemented, including former optional follow-ups (setup wizard all-AP save; repeater-options PUT reconcile). See [wireless invariants](../architecture.md#2-wireless-model-and-invariants).
 
 ## Goals
 
