@@ -1,7 +1,16 @@
 #!/bin/sh
-# Pre-sysupgrade hook: save travo configuration and binary to /overlay
-# This runs before the sysupgrade process
-
+#
+# 10-travo-backup.sh — OpenWrt sysupgrade pre-hook (runs before flash).
+# Copies travo UCI, auth, binary, init.d, and /www/travo into /overlay/etc/travo-backup.
+#
+# Invocation: by sysupgrade (do not run manually unless testing).
+#
+# Arguments:
+#   (none)
+#
+# Environment:
+#   (none)
+#
 TRAVO_CONFIG="/etc/config/travo"
 TRAVO_AUTH="/etc/travo/auth.json"
 TRAVO_VERSION="/etc/travo/version"

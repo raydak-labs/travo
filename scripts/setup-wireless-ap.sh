@@ -1,15 +1,26 @@
 #!/bin/sh
-# Ensures initial AP state by: (1) remove all AP entries and commit, (2) add
-# canonical APs (default_radio0, default_radio1) and commit, (3) verify UCI,
-# (4) optionally apply via rpcd (session + ubus apply) so rollback is possible.
-# Does not remove or modify STA (client) configs. Does NOT run "wifi" or "wifi up".
-# If apply is used, host must call uci confirm within timeout. See AGENTS.md.
-# Runs on the OpenWRT device (ash).
 #
-# Optional environment (set by setup-local.sh):
-#   SETUP_WIFI_SSID — base SSID: non-5g radio uses this; 5g uses ${SETUP_WIFI_SSID}-5G
-#   SETUP_WIFI_KEY  — WPA2 key for every AP (default remains travelrouter if unset)
-
+# setup-wireless-ap.sh — normalize wireless UCI APs on OpenWrt (run ON THE ROUTER, ash).
+#
+# Phases:
+#   1) Delete existing wifi-iface sections with mode=ap (STA / wifi-device untouched).
+#   2) Ensure default_radio0 / default_radio1 APs on radio0/radio1 with psk2 + SSIDs.
+#   3) Verify UCI.
+#   4) If rpcd session works, call ubus uci apply with rollback (LuCI-style); else print hint.
+#
+# Does NOT run `wifi` or `wifi up` (ath11k / rollback safety). Does not change STA interfaces.
+#
+# Usage:
+#   sh /tmp/setup-wireless-ap.sh
+#
+# Arguments:
+#   (none)
+#
+# Environment (optional; often set by setup-local.sh over SSH):
+#   SETUP_WIFI_SSID   Base SSID: 2.4 GHz uses this, 5 GHz uses ${SETUP_WIFI_SSID}-5G
+#   SETUP_WIFI_KEY    WPA2 PSK for all APs (default: travelrouter if unset)
+#   UCI_APPLY_SID     If set, use this ubus session id for uci apply (else tries session login)
+#
 set -e
 
 log() { echo "[setup-wireless] $*" >&2; }

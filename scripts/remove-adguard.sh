@@ -1,8 +1,20 @@
 #!/bin/sh
-# remove-adguard.sh — Cleanly remove AdGuard Home and restore dnsmasq DNS on OpenWRT
 #
-# Safe to run multiple times (idempotent).
-
+# remove-adguard.sh — stop AdGuard Home, remove files, restore dnsmasq (port 53) and WAN peerdns.
+# Idempotent. Intended to run on OpenWrt (ash).
+#
+# Usage:
+#   sh remove-adguard.sh
+#
+# Arguments:
+#   (none)
+#
+# Environment:
+#   (none)
+#
+# Side effects:
+#   Stops/disables /etc/init.d/adguardhome, deletes /opt/AdGuardHome, uci commits dhcp + network, restarts dnsmasq.
+#
 set -euo pipefail
 
 ADGUARD_DIR="/opt/AdGuardHome"

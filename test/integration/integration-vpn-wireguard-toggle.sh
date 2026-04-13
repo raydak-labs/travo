@@ -1,6 +1,21 @@
 #!/bin/bash
-# Real-device integration test: WireGuard enable -> disable must keep internet working.
-
+#
+# integration-vpn-wireguard-toggle.sh — enable WireGuard via API, then disable; router must stay online (wget).
+#
+# Usage:
+#   ./test/integration/integration-vpn-wireguard-toggle.sh [options]
+#
+# Options:
+#   --ip IP                 Router (default: 192.168.1.1)
+#   --login-password PASS   Travo UI / API password (default: admin)
+#   -h, --help              Print usage
+#
+# Environment:
+#   (none)
+#
+# Artifacts:
+#   tmp/integration-vpn-wireguard-toggle-<timestamp>/  per-phase captures and logs
+#
 set -euo pipefail
 
 ROUTER_IP="192.168.1.1"

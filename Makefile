@@ -45,13 +45,18 @@ package-all: build-all
 	ARCH=aarch64_cortex-a53 bash -c 'cp dist/travo-aarch64 dist/travo && bash scripts/package-tarball.sh'
 	ARCH=x86_64 bash -c 'cp dist/travo-x86_64 dist/travo && bash scripts/package-tarball.sh'
 
-# Deploy to OpenWRT device via opkg (requires ROUTER_IP)
-deploy:
-	@bash scripts/deploy-local.sh --mode opkg --ip $(ROUTER_IP)
+# Router IP for deploy targets (override: make deploy ROUTER_IP=10.0.0.1)
+ROUTER_IP ?= 192.168.1.1
+# direct = fast binary+UI; release = full tree like GitHub tarball
+DEPLOY_METHOD ?= direct
 
-# Deploy locally via direct copy (fast iteration)
+# Deploy build to router over SSH (developer workflow; not install.sh)
+deploy:
+	@bash scripts/deploy-local.sh --method $(DEPLOY_METHOD) --ip $(ROUTER_IP)
+
+# Same as deploy; pass extra args: make deploy-local DEPLOY_ARGS='--no-build'
 deploy-local:
-	@bash scripts/deploy-local.sh $(DEPLOY_ARGS)
+	@bash scripts/deploy-local.sh --method $(DEPLOY_METHOD) --ip $(ROUTER_IP) $(DEPLOY_ARGS)
 
 # Start Docker dev environment
 docker-dev:

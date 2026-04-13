@@ -1,15 +1,28 @@
 #!/bin/bash
-# Real-device checks: DNS leak API (WireGuard + dnsmasq/AdGuard) and VPN kill switch.
 #
-# Prerequisites:
-#   - Router reachable at ROUTER_IP (default 192.168.1.1)
-#   - App login password (same as UI; default admin)
-#   - SSH as root to the router (optional; for UCI/nft verification when --ssh-verify)
+# integration-vpn-dns-killswitch.sh — live router API tests: DNS leak endpoint, VPN kill switch.
+# Optional SSH read-only UCI snapshot when --ssh-verify.
 #
-# Does not toggle WireGuard or kill switch by default (--enable-killswitch enables it briefly).
+# Usage:
+#   ./test/integration/integration-vpn-dns-killswitch.sh [options]
 #
-# Exit codes: 0 = all checks passed, 2 = failure
-
+# Options:
+#   --ip IP                 Router (default: 192.168.1.1)
+#   --login-password PASS   Travo UI / API password (default: admin)
+#   --ssh-verify            After HTTP checks, SSH as root and print dnsmasq / wg / killswitch UCI
+#   --enable-killswitch     Briefly enable kill switch via API, verify, then disable (use with care)
+#   -h, --help              Print usage
+#
+# Environment:
+#   (none)
+#
+# Exit codes:
+#   0  success
+#   2  assertion / check failure
+#
+# Artifacts:
+#   tmp/integration-vpn-dns-killswitch-<timestamp>/logs/
+#
 set -euo pipefail
 
 ROUTER_IP="192.168.1.1"

@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+#
+# dev.sh — run frontend (Vite) and backend (Go) together for local development.
+#
+# Usage:
+#   ./scripts/dev.sh
+#   make dev
+#
+# Arguments:
+#   (none)
+#
+# Environment:
+#   (none required)
+#
+# Behavior:
+#   - Backend: if `air` is on PATH, runs `air` in backend/; else `go run ./cmd/server`.
+#   - Frontend: `pnpm dev` in frontend/.
+#   - Listens on http://localhost:3000 (API) and http://localhost:5173 (UI).
+#   - SIGINT/SIGTERM/EXIT stops child processes via `kill 0`.
+#
 set -euo pipefail
 
 # Colors for output

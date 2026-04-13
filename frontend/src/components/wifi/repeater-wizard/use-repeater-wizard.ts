@@ -183,8 +183,7 @@ export function useRepeaterWizard(open: boolean) {
     }
     if (!apConfig.separateBandConfig) {
       return (
-        apConfig.ssid.length > 0 &&
-        (apConfig.encryption === 'none' || apConfig.key.length >= 8)
+        apConfig.ssid.length > 0 && (apConfig.encryption === 'none' || apConfig.key.length >= 8)
       );
     }
     for (const ap of apConfigs ?? []) {

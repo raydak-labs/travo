@@ -17,11 +17,11 @@ jobs:
           - goos: linux
             goarch: arm64
             arch: aarch64
-            ipk_arch: aarch64_cortex-a53
+            package_arch: aarch64_cortex-a53
           - goos: linux
             goarch: amd64
             arch: x86_64
-            ipk_arch: x86_64
+            package_arch: x86_64
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -65,7 +65,7 @@ jobs:
       - name: Build install tarball
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
-          ARCH: ${{ matrix.ipk_arch }}
+          ARCH: ${{ matrix.package_arch }}
         run: bash scripts/package-tarball.sh
 
       - name: Prepare artifacts

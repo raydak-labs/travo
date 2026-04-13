@@ -1,12 +1,30 @@
 #!/bin/sh
-# install.sh — Install Travo on a fresh OpenWRT system
+#
+# install.sh — install or uninstall Travo on OpenWrt (release tarball from GitHub).
 #
 # Usage:
-#   wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
-#   sh install.sh [OPTIONS]
+#   wget -O- https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | sh
+#   wget -O- ... | sh -s -- --yes --version 1.0.0 --password 'secret'
+#   sh install.sh [OPTION]...
 #
-# POSIX sh compatible — works with busybox ash on OpenWRT.
-
+# POSIX sh (busybox ash on OpenWrt).
+#
+# Options:
+#   --version VERSION   Release to install (default: latest GitHub release)
+#   --password PASS     Set root password for LuCI + Travo (default: prompt or admin)
+#   --no-adguard        Skip AdGuard Home
+#   --no-luci-move      Do not move LuCI/uhttpd to 8080
+#   --uninstall         Remove Travo and restore uhttpd defaults (also runs remove-adguard when present)
+#   --yes, -y           Skip confirmation prompts
+#   --help, -h          Print help
+#
+# Environment:
+#   GITHUB_REPO   owner/repo for raw + API + releases (default: raydak-labs/travo)
+#
+# Notes:
+#   Piped stdin (no TTY) implies non-interactive confirmations unless you pass --yes.
+#   Internal constant MIN_SPACE_KB (20 MB) guards free space on /.
+#
 set -eu
 
 # ============================================================
@@ -217,7 +235,7 @@ detect_lan_ip() {
     echo "${_ip%%/*}"
 }
 
-# Detect machine architecture and map to .ipk architecture string
+# Detect machine architecture (matches release tarball suffix, e.g. aarch64_cortex-a53)
 detect_arch() {
     _machine="$(uname -m)"
     case "$_machine" in

@@ -1,8 +1,23 @@
 #!/bin/bash
-# Build production binary for OpenWRT
-# Usage: ./scripts/build.sh [target_arch] [target_os]
-# Default target: linux/arm64 (aarch64 for MT3000/AXT1800)
-# Override with GOARCH/GOOS env vars or positional arguments.
+#
+# build.sh — production frontend build + cross-compiled Go binary for OpenWrt.
+#
+# Usage:
+#   ./scripts/build.sh [GOARCH] [GOOS]
+#   GOARCH=amd64 GOOS=linux ./scripts/build.sh
+#
+# Positional arguments (optional; overridden by GOARCH / GOOS when set):
+#   $1  Target Go architecture (default: arm64)
+#   $2  Target Go OS (default: linux)
+#
+# Environment:
+#   GOARCH   Target architecture (e.g. arm64, amd64)
+#   GOOS     Target OS (typically linux)
+#
+# Outputs:
+#   dist/travo           Stripped Go binary (main.Version from git describe)
+#   frontend/dist/       Vite production assets (embedded path expectations)
+#
 set -euo pipefail
 
 TARGET_ARCH="${GOARCH:-${1:-arm64}}"

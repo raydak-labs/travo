@@ -1,11 +1,22 @@
 #!/bin/sh
-# uninstall.sh — Remove OpenWRT Travel GUI and restore defaults
 #
-# Usage: sh uninstall.sh [--yes]
+# uninstall.sh — remove Travo (delegates to install.sh --uninstall).
 #
-# This is a convenience wrapper around install.sh --uninstall.
-# POSIX sh compatible — works with busybox ash on OpenWRT.
-
+# Usage:
+#   sh scripts/uninstall.sh
+#   sh scripts/uninstall.sh --yes
+#
+# Arguments:
+#   Passed through to install.sh after --uninstall (e.g. --yes / -y to skip prompts).
+#
+# Environment:
+#   GITHUB_REPO   owner/repo when fetching install.sh from GitHub (default: raydak-labs/travo)
+#
+# Behavior:
+#   If scripts/install.sh exists next to this file, runs it locally; otherwise downloads install.sh from GitHub.
+#
+# POSIX sh (busybox ash on OpenWrt).
+#
 set -eu
 
 SCRIPT_DIR="$(dirname "$0")"

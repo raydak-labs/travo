@@ -8,7 +8,9 @@ import { APConfigCard } from '../ap-config-card';
 
 function renderCard() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, refetchOnMount: false, refetchOnWindowFocus: false } },
+    defaultOptions: {
+      queries: { retry: false, refetchOnMount: false, refetchOnWindowFocus: false },
+    },
   });
   client.setQueryData(['wifi', 'ap'], mockAPConfigs);
   return render(
@@ -27,7 +29,9 @@ describe('APConfigCard', () => {
     });
 
     expect(screen.getByPlaceholderText('SSID for all radios')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /Different settings per radio/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: /Different settings per radio/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /^SSID$/i })).not.toBeInTheDocument();
   });
 
@@ -50,7 +54,9 @@ describe('APConfigCard', () => {
   it('drops per-section enabled override when server enabled flag changes (reconcile)', async () => {
     const user = userEvent.setup();
     const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, refetchOnMount: false, refetchOnWindowFocus: false } },
+      defaultOptions: {
+        queries: { retry: false, refetchOnMount: false, refetchOnWindowFocus: false },
+      },
     });
     const initial: APConfig[] = [
       { ...mockAPConfigs[0]!, enabled: true },
