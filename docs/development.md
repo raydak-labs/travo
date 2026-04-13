@@ -57,8 +57,8 @@ Same ports; Vite HMR + Air if configured in the image.
 | `make format` | Prettier + goimports |
 | `make build-prod` / `make build-all` | Cross-compile `dist/travo` via `scripts/build.sh` |
 | `make package` / `make package-all` | Release tarballs `dist/travo_<version>_<arch>.tar.gz` |
-| `make deploy` | `scripts/deploy-local.sh --mode opkg --ip $(ROUTER_IP)` |
-| `make deploy-local` | Fast SSH deploy (default `direct`; see script `--help`) |
+| `make deploy` | `deploy-local.sh` over SSH (`DEPLOY_METHOD=direct` default, `ROUTER_IP`) |
+| `make deploy-local` | Same as `deploy`; pass extra flags via `DEPLOY_ARGS` |
 | `make docker-dev` | `docker compose up` |
 | `make clean` | Remove build artifacts |
 
@@ -69,7 +69,8 @@ travo/
 ├── frontend/     # React + Vite + Tailwind
 ├── backend/      # Go + Fiber
 ├── shared/       # Shared TS types
-├── scripts/      # dev, deploy, integration tests
+├── scripts/      # dev, deploy, install helpers
+├── test/integration/  # real-device integration runners (SSH + API)
 ├── docs/plans/   # Design history (read [`docs/plans/README.md`](./plans/README.md))
 ├── packaging/    # OpenWrt staging files
 ├── docs/         # This documentation

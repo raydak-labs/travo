@@ -288,8 +288,8 @@ export function RepeaterWizardConfigureApStep({
             Allow Wi‑Fi on uplink radio
           </span>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Off (default): downlink AP only on the other radio when possible — more stable. On:
-            also broadcast on the same radio as the client link (weaker on many chipsets).
+            Off (default): downlink AP only on the other radio when possible — more stable. On: also
+            broadcast on the same radio as the client link (weaker on many chipsets).
           </p>
         </div>
         <Switch

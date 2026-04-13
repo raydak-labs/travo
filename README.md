@@ -106,20 +106,20 @@ make dev
 
 ### Commands
 
-| Command            | Description                            |
-| ------------------ | -------------------------------------- |
-| `make dev`         | Run frontend + backend dev servers     |
-| `make build`       | Build frontend and backend             |
-| `make test`        | Run all tests (Go + shared + frontend) |
-| `make lint`        | Run ESLint + go vet                    |
-| `make format`      | Run Prettier + gofmt                   |
-| `make clean`       | Remove build artifacts                 |
-| `make build-prod`  | Cross-compile for OpenWRT (aarch64)    |
-| `make build-all`   | Cross-compile for aarch64 and x86_64   |
-| `make package`     | Create .ipk package                    |
-| `make package-all` | Create .ipk for aarch64 and x86_64     |
-| `make deploy`      | Deploy to router (needs `ROUTER_IP`)   |
-| `make docker-dev`  | Start Docker dev environment           |
+| Command            | Description                               |
+| ------------------ | ----------------------------------------- |
+| `make dev`         | Run frontend + backend dev servers        |
+| `make build`       | Build frontend and backend                |
+| `make test`        | Run all tests (Go + shared + frontend)    |
+| `make lint`        | Run ESLint + go vet                       |
+| `make format`      | Run Prettier + gofmt                      |
+| `make clean`       | Remove build artifacts                    |
+| `make build-prod`  | Cross-compile for OpenWRT (aarch64)       |
+| `make build-all`   | Cross-compile for aarch64 and x86_64      |
+| `make package`     | Create release `.tar.gz` (install layout) |
+| `make package-all` | Tarballs for aarch64 and x86_64           |
+| `make deploy`      | Deploy to router (needs `ROUTER_IP`)      |
+| `make docker-dev`  | Start Docker dev environment              |
 
 ## Docker Development
 
@@ -135,7 +135,7 @@ Runs frontend (Vite + HMR) and backend (Air hot reload) in containers. Same port
 # Cross-compile binary for aarch64
 make build-prod
 
-# Create .ipk package
+# Create install tarball (matches GitHub Releases)
 make package
 ```
 
@@ -148,7 +148,7 @@ See [docs/deployment.md](docs/deployment.md) for full details.
 make deploy ROUTER_IP=192.168.8.1
 ```
 
-This installs the `.ipk`, moves LuCI to port 8080, and starts the travel GUI on port 80. See [docs/deployment.md](docs/deployment.md).
+This copies the dev build to the router over SSH (default: binary + UI; use `DEPLOY_METHOD=release` for a full tree like the release tarball). Production installs use `scripts/install.sh` instead. See [docs/deployment.md](docs/deployment.md).
 
 ## Project Structure
 
@@ -181,7 +181,7 @@ travo/
 
 ## Releases
 
-Pre-built binaries and `.ipk` packages for aarch64 and x86_64 are available on
+Pre-built install tarballs for aarch64 and x86_64 are available on
 [GitHub Releases](https://github.com/raydak-labs/travo/releases).
 
 To create a new release, tag and push:

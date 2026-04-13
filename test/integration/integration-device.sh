@@ -1,7 +1,25 @@
 #!/bin/bash
-# Run real-device integration smoke test against OpenWrt router.
-# Focus: baseline -> wifi disconnect/connect -> online verification.
-
+#
+# integration-device.sh — real-device smoke: baseline, WiFi disconnect/reconnect, online checks.
+# Run from repo root; requires router API + SSH.
+#
+# Usage:
+#   ./test/integration/integration-device.sh [options]
+#
+# Options:
+#   --ip IP                 Router (default: 192.168.1.1)
+#   --user USER             SSH user (default: root)
+#   --login-password PASS   Travo UI / API password (default: admin)
+#   --wifi-ssid SSID        Upstream/client test SSID (default: Cappuxinno)
+#   --wifi-pass-file PATH   File with WPA secret for that SSID (default: test/integration/.wifi_pass)
+#   -h, --help              Print usage
+#
+# Environment:
+#   (none; use flags)
+#
+# Artifacts:
+#   tmp/integration-<timestamp>/  logs and result.json
+#
 set -euo pipefail
 
 ROUTER_IP="192.168.1.1"

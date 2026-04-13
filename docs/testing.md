@@ -17,32 +17,32 @@ These scripts exercise the **live router** (default `192.168.1.1`). They use the
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/integration-vpn-wireguard-toggle.sh` | WireGuard enable → disable; router must keep internet (`wget` connectivity check). |
-| `scripts/integration-vpn-dns-killswitch.sh` | DNS leak endpoint + kill switch GET; optional `--ssh-verify`, `--enable-killswitch`. |
-| `scripts/integration-device.sh` | Broader smoke test (health, WiFi connect/disconnect); needs `test/integration/.wifi_pass`. |
+| `test/integration/integration-vpn-wireguard-toggle.sh` | WireGuard enable → disable; router must keep internet (`wget` connectivity check). |
+| `test/integration/integration-vpn-dns-killswitch.sh` | DNS leak endpoint + kill switch GET; optional `--ssh-verify`, `--enable-killswitch`. |
+| `test/integration/integration-device.sh` | Broader smoke test (health, WiFi connect/disconnect); needs `test/integration/.wifi_pass`. |
 
 #### DNS leak + kill switch (quick)
 
 ```sh
-./scripts/integration-vpn-dns-killswitch.sh
+./test/integration/integration-vpn-dns-killswitch.sh
 ```
 
 With UCI snapshot over SSH:
 
 ```sh
-./scripts/integration-vpn-dns-killswitch.sh --ssh-verify
+./test/integration/integration-vpn-dns-killswitch.sh --ssh-verify
 ```
 
 Briefly enable kill switch, confirm API and UCI, then disable:
 
 ```sh
-./scripts/integration-vpn-dns-killswitch.sh --enable-killswitch --ssh-verify
+./test/integration/integration-vpn-dns-killswitch.sh --enable-killswitch --ssh-verify
 ```
 
 #### WireGuard toggle (regression)
 
 ```sh
-./scripts/integration-vpn-wireguard-toggle.sh --login-password 'your-password'
+./test/integration/integration-vpn-wireguard-toggle.sh --login-password 'your-password'
 ```
 
 ### Deploying a new backend before testing
@@ -439,7 +439,7 @@ A run is considered PASS when all are true:
 
 ### Suggested Future Automation
 
-- Use `scripts/integration-device.sh` to execute this core flow end-to-end and
+- Use `test/integration/integration-device.sh` to execute this core flow end-to-end and
   generate `tmp/integration-<timestamp>/result.json`.
 - Parse outputs and emit machine-readable summary (`PASS/FAIL`) to `tmp/.../result.json`.
 - Integrate in CI as optional/manual job for hardware-in-the-loop validation.

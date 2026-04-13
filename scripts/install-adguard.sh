@@ -1,9 +1,23 @@
 #!/bin/sh
-# install-adguard.sh — Install and configure AdGuard Home on OpenWRT
-# Usage: install-adguard.sh [--version VERSION]
 #
-# Safe to run multiple times (idempotent).
-
+# install-adguard.sh — download, install, and configure AdGuard Home on OpenWrt.
+# Idempotent.
+#
+# Usage:
+#   sh install-adguard.sh
+#   sh install-adguard.sh --version 0.107.54
+#
+# Options:
+#   --version VERSION   AdGuard Home release to install (default: see ADGUARD_VERSION below)
+#   -h, --help          Print short usage
+#
+# Environment:
+#   (none)
+#
+# Paths (constants in script):
+#   /opt/AdGuardHome     Install dir, binary, yaml
+#   /etc/init.d/adguardhome  Init script
+#
 set -euo pipefail
 
 ADGUARD_VERSION="0.107.54"

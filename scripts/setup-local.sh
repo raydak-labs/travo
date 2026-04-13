@@ -1,26 +1,33 @@
 #!/bin/bash
-# Initial one-time setup of a fresh OpenWRT device for local development.
 #
-# Run this once on a clean device before using deploy-local.sh.
-# It is idempotent — safe to run again without breaking anything.
+# setup-local.sh — one-time OpenWrt prep for local development (run before deploy-local.sh).
+# Idempotent; safe to re-run.
 #
-# What it does:
-#   1. Moves LuCI (uhttpd) to port 8080 so travel-gui can use port 80
-#   2. Uploads the init.d service script
-#   3. Uploads the UCI config (port, etc.) and sets root password on the device
-#   4. Creates /www/travo
-#   5. Ensures initial wireless AP state (radios + default_radio0/1, default SSID/key)
-#   6. Enables the service (does not start — no binary yet)
+# Does: move LuCI to 8080 (optional), install init.d + UCI for travo, set root password,
+#       create /www/travo, run scripts/setup-wireless-ap.sh on device, enable travo (no start).
 #
 # Usage:
 #   ./scripts/setup-local.sh [options]
 #
-# Examples:
-#   ./scripts/setup-local.sh
-#   ./scripts/setup-local.sh --ip 10.0.0.1 --password mysecret
-#   ./scripts/setup-local.sh --wifi-ssid MyRoute --wifi-password 'same-for-all-aps'
-#   ./scripts/setup-local.sh --no-luci-move
-
+# Options:
+#   --ip IP              Router SSH host (default: 192.168.1.1)
+#   --user USER          SSH user (default: root)
+#   --password PASSWORD  Root password for LuCI + Travo (default: admin)
+#   --wifi-ssid NAME     Base SSID: 2.4 GHz = NAME, 5 GHz = NAME-5G
+#   --wifi-password KEY  WPA2 PSK for all APs (default: travelrouter in setup-wireless-ap.sh)
+#   --ssh-key PATH       Public key file to append to Dropbear authorized_keys (default: ~/.ssh/id_ed25519.pub)
+#   --ssh-key-value KEY  Public key literal (instead of --ssh-key file)
+#   --no-ssh-key         Do not install an SSH key
+#   --no-luci-move       Leave uhttpd on default ports
+#   --interactive        Prompt for values when on a TTY
+#   --no-interactive     Never prompt
+#   --legacy-scp         scp -O for Dropbear (default: on)
+#   --no-legacy-scp      Disable -O
+#   -h, --help           Show usage
+#
+# Environment:
+#   (none; wireless overrides are passed to the device as SETUP_WIFI_SSID / SETUP_WIFI_KEY for setup-wireless-ap.sh)
+#
 set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────────────────

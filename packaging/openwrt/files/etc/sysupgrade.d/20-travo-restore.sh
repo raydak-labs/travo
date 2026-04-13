@@ -1,7 +1,16 @@
 #!/bin/sh
-# Post-sysupgrade hook: restore travo configuration and reinstall if needed
-# This runs after sysupgrade completes
-
+#
+# 20-travo-restore.sh — OpenWrt sysupgrade post-hook (first boot after flash).
+# Restores files from /overlay/etc/travo-backup; may fetch install.sh from GitHub if binary missing.
+#
+# Invocation: by sysupgrade / first-boot (do not run manually unless testing).
+#
+# Arguments:
+#   (none)
+#
+# Environment:
+#   GITHUB_REPO   owner/repo for raw install.sh (default: raydak-labs/travo)
+#
 set -e
 
 TRAVO_CONFIG="/etc/config/travo"

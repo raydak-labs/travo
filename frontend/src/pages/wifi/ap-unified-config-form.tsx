@@ -15,7 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { unifiedApCredentialsSchema, type UnifiedApCredentialsValues } from '@/lib/schemas/wifi-forms';
+import {
+  unifiedApCredentialsSchema,
+  type UnifiedApCredentialsValues,
+} from '@/lib/schemas/wifi-forms';
 import { useSetAPConfig } from '@/hooks/use-wifi';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import { normalizeApEncryption } from './ap-config-normalize';
@@ -44,10 +47,7 @@ function credentialsMatchAcross(aps: APConfig[]): boolean {
   const p = pickPrimaryAp(aps);
   const enc0 = normalizeApEncryption(p.encryption);
   return aps.every(
-    (a) =>
-      a.ssid === p.ssid &&
-      normalizeApEncryption(a.encryption) === enc0 &&
-      a.key === p.key,
+    (a) => a.ssid === p.ssid && normalizeApEncryption(a.encryption) === enc0 && a.key === p.key,
   );
 }
 
@@ -103,7 +103,9 @@ export function APUnifiedConfigForm({
     });
   }, [apConfigs, reset]);
 
-  const buildSharedUpdate = (data: UnifiedApCredentialsValues): Omit<APConfigUpdate, 'enabled'> => ({
+  const buildSharedUpdate = (
+    data: UnifiedApCredentialsValues,
+  ): Omit<APConfigUpdate, 'enabled'> => ({
     ssid: data.ssid.trim(),
     encryption: data.encryption,
     key: data.encryption === 'none' ? '' : data.key,
@@ -160,17 +162,22 @@ export function APUnifiedConfigForm({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         {mismatch ? (
           <p className="text-xs text-amber-700 dark:text-amber-300">
-            Bands currently use different names or passwords. Showing {bandLabel(primary.band)}; saving
-            applies these values to all bands.
+            Bands currently use different names or passwords. Showing {bandLabel(primary.band)};
+            saving applies these values to all bands.
           </p>
         ) : null}
 
         <div className="space-y-3 rounded-lg border p-4">
           {apConfigs.map((ap) => (
-            <div key={ap.section} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+            <div
+              key={ap.section}
+              className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
+            >
               <div className="flex items-center gap-2">
                 <Radio className="h-4 w-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{ap.radio}</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {ap.radio}
+                </span>
                 <Badge variant="outline">{bandLabel(ap.band)}</Badge>
                 <span className="text-xs text-gray-500">Ch {ap.channel}</span>
               </div>
@@ -206,7 +213,10 @@ export function APUnifiedConfigForm({
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="ap-unified-enc" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          <label
+            htmlFor="ap-unified-enc"
+            className="text-xs font-medium text-gray-600 dark:text-gray-400"
+          >
             Encryption
           </label>
           <Controller

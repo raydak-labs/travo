@@ -125,7 +125,7 @@ Fast iteration (binary + frontend assets over SSH):
 ./scripts/deploy-local.sh --method release --ip 192.168.1.1
 ```
 
-`make deploy` wraps opkg-oriented flow when you maintain `.ipk` locally — see `scripts/deploy-local.sh --help` and `Makefile`.
+`make deploy` runs the same script with `DEPLOY_METHOD` (default `direct`) and `ROUTER_IP` — see `scripts/deploy-local.sh --help` and `Makefile`.
 
 ## Supported targets
 
