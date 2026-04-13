@@ -1,3 +1,10 @@
+---
+title: "UX Overhaul Plan"
+description: "Planning / design notes: UX Overhaul Plan"
+updated: 2026-04-13
+tags: [plan, traceability, ux]
+---
+
 # UX Overhaul Plan
 
 > **Created:** 2026-03-25

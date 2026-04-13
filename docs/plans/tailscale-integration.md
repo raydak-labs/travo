@@ -1,8 +1,15 @@
+---
+title: "Plan: Tailscale Integration"
+description: "Planning / design notes: Plan: Tailscale Integration"
+updated: 2026-04-13
+tags: [plan, tailscale, traceability]
+---
+
 # Plan: Tailscale Integration
 
 **Status:** Not implemented
 **Priority:** Low (plan for future)
-**Related requirements:** [3.2 Tailscale](../requirements/requirements.md#32-tailscale)
+**Related requirements:** [3.2 Tailscale](../requirements/tasks_done.md#vpn-and-services)
 
 ---
 

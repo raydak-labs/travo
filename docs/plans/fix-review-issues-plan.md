@@ -1,3 +1,10 @@
+---
+title: "Implementation Plan: Fix All Code Review Issues"
+description: "Planning / design notes: Implementation Plan: Fix All Code Review Issues"
+updated: 2026-04-13
+tags: [maintenance, plan, traceability]
+---
+
 # Implementation Plan: Fix All Code Review Issues
 
 **30 issues across P0/P1/P2 severity, organized into 8 phases.**

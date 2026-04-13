@@ -1,3 +1,10 @@
+---
+title: "Implementation Plan: Fix All Review Issues (Detailed)"
+description: "Planning / design notes: Implementation Plan: Fix All Review Issues (Detailed)"
+updated: 2026-04-13
+tags: [maintenance, plan, traceability]
+---
+
 # Implementation Plan: Fix All Review Issues (Detailed)
 
 ## Phase 1 — Backend Core: Real UCI/Ubus, Error Handling, Graceful Shutdown

@@ -236,11 +236,11 @@ Import path unchanged: `@/components/wifi/repeater-wizard` → **`index.tsx`**.
 
 ## Deferred / follow-up (optional)
 
-| Item | Notes |
-|------|--------|
-| **Accordion vs Collapsible for sidebar** | Collapsible kept for simplicity; Accordion optional for stricter a11y. |
-| **Further splits** | Most page modules are ~130 lines or less; extract further only when a feature grows. |
-| **Per-card loading UX** | Router `Suspense` uses Skeletons; individual cards may still use inline spinners. |
+| Item                                     | Notes                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Accordion vs Collapsible for sidebar** | Collapsible kept for simplicity; Accordion optional for stricter a11y.               |
+| **Further splits**                       | Most page modules are ~130 lines or less; extract further only when a feature grows. |
+| **Per-card loading UX**                  | Router `Suspense` uses Skeletons; individual cards may still use inline spinners.    |
 
 **Structural refactor (sidebar, pages, router, theme, UI exports, Vite `manualChunks`):** treated as **complete** when `pnpm lint` is clean and `make test` / `make build` pass. The optional rows above are product or UX follow-ups, not pending code splits.
 
@@ -286,4 +286,4 @@ RepeaterWizard (folder)
 
 ---
 
-*When adding features, keep `docs/requirements/requirements.md` in sync if behavior changes.*
+_When adding features, keep `docs/architecture.md`, `docs/requirements/tasks_open.md`, and `docs/requirements/tasks_done.md` in sync as needed._

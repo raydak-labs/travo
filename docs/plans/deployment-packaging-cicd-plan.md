@@ -1,3 +1,10 @@
+---
+title: "Deployment, Packaging, AdGuard & CI/CD Plan"
+description: "Planning / design notes: Deployment, Packaging, AdGuard & CI/CD Plan"
+updated: 2026-04-13
+tags: [cicd, deployment, plan, traceability]
+---
+
 # Deployment, Packaging, AdGuard & CI/CD Plan
 
 ## Summary

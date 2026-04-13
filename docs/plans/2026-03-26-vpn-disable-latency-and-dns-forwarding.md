@@ -1,3 +1,10 @@
+---
+title: "Plan: VPN disable latency + VPN DNS forwarding behavior (2026-03-26)"
+description: "Planning / design notes: Plan: VPN disable latency + VPN DNS forwarding behavior (2026-03-26)"
+updated: 2026-04-13
+tags: [plan, traceability, vpn]
+---
+
 # Plan: VPN disable latency + VPN DNS forwarding behavior (2026-03-26)
 
 ## Context / questions

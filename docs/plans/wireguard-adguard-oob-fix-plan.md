@@ -1,3 +1,10 @@
+---
+title: "WireGuard + AdGuard Out-Of-Box Fix Plan"
+description: "Planning / design notes: WireGuard + AdGuard Out-Of-Box Fix Plan"
+updated: 2026-04-13
+tags: [adguard, maintenance, plan, traceability, wireguard]
+---
+
 # WireGuard + AdGuard Out-Of-Box Fix Plan
 
 ## Context
@@ -107,7 +114,7 @@ This document defines a concrete backend-first implementation and test plan.
    - store artifacts under `tmp/integration-*`
 
 3. Update docs:
-   - `docs/INTEGRATION_TEST.md` with final passing steps and expected outputs
+   - `docs/testing.md` with final passing steps and expected outputs
    - requirements checkboxes/bug list status updates
 
 ## Detailed Test Plan (After Implementation)

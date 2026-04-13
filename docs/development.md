@@ -1,137 +1,118 @@
+---
+title: Development guide
+description: Local prerequisites, install, dev servers, tests, lint, CI, MSW.
+updated: 2026-04-13
+tags: [docs, development, workflow]
+---
+
 # Development Guide
+
+Tooling versions are also pinned in [`.mise.toml`](../.mise.toml) (use [mise](https://mise.jdx.dev/) if you want a single installer).
 
 ## Prerequisites
 
-- **Node.js** >= 20 (22 recommended)
-- **pnpm** >= 9
-- **Go** >= 1.23
-- **Docker** + Docker Compose (optional, for containerized dev)
+- **Node.js** >= 20 (CI uses 24)
+- **pnpm** 10.x (see `package.json` / lockfile)
+- **Go** >= 1.23 (`backend/go.mod`)
+- **Docker** + Docker Compose (optional)
+- **golangci-lint** (for `make lint` backend pass)
+- **air** (optional; enables `--mock` reload for backend — see below)
 
-## Quick Start
+## Quick start
 
 ```bash
-git clone https://github.com/openwrt-travel-gui/openwrt-travel-gui.git
-cd openwrt-travel-gui
+git clone https://github.com/raydak-labs/travo.git
+cd travo
 pnpm install
 cd backend && go mod tidy && cd ..
 make dev
 ```
 
-> **Note:** `pnpm install` automatically generates the MSW (Mock Service Worker) file
-> needed for frontend development via the `postinstall` script. If you see a white page
-> after starting the frontend, run `cd frontend && pnpm exec msw init public --save`
-> to regenerate it.
+- Frontend: http://localhost:5173  
+- Backend API: http://localhost:3000  
+- Local login password is whatever you configure for mock auth (often `admin` in examples).
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- Default password: `admin`
+`pnpm install` runs `postinstall` and generates `frontend/public/mockServiceWorker.js`. If the app is a blank page, run:
 
-## Docker Development
+```bash
+cd frontend && pnpm exec msw init public --save
+```
+
+## Docker
 
 ```bash
 docker compose up
 ```
 
-Same ports. Hot reload for both frontend (Vite HMR) and backend (Air).
+Same ports; Vite HMR + Air if configured in the image.
 
-## Commands
+## Common `make` targets
 
-| Command            | Description                            |
-| ------------------ | -------------------------------------- |
-| `make dev`         | Run frontend + backend dev servers     |
-| `make build`       | Build frontend and backend             |
-| `make test`        | Run all tests (Go + shared + frontend) |
-| `make lint`        | Run ESLint + go vet                    |
-| `make format`      | Run Prettier + gofmt                   |
-| `make clean`       | Remove all build artifacts             |
-| `make build-prod`  | Cross-compile for OpenWRT (aarch64)    |
-| `make build-all`   | Cross-compile for aarch64 and x86_64   |
-| `make package`     | Create .ipk package (default arch)     |
-| `make package-all` | Create .ipk for aarch64 and x86_64     |
-| `make deploy`      | Deploy to router (needs `ROUTER_IP`)   |
-| `make docker-dev`  | Start Docker dev environment           |
+| Command | Description |
+| ------- | ----------- |
+| `make dev` | Frontend (Vite) + backend (`scripts/dev.sh`) |
+| `make build` | Production frontend build + `backend/bin/server` |
+| `make test` | `go test` (backend) + `pnpm test` (shared + frontend) |
+| `make lint` | `pnpm lint` (ESLint on frontend + shared) + `golangci-lint` (backend) |
+| `make format` | Prettier + goimports |
+| `make build-prod` / `make build-all` | Cross-compile `dist/travo` via `scripts/build.sh` |
+| `make package` / `make package-all` | Release tarballs `dist/travo_<version>_<arch>.tar.gz` |
+| `make deploy` | `scripts/deploy-local.sh --mode opkg --ip $(ROUTER_IP)` |
+| `make deploy-local` | Fast SSH deploy (default `direct`; see script `--help`) |
+| `make docker-dev` | `docker compose up` |
+| `make clean` | Remove build artifacts |
 
-## Project Structure
+## Repo layout
 
 ```
-openwrt-travel-gui/
-├── frontend/          # React + TypeScript + Vite + TailwindCSS
-├── backend/           # Go + Fiber REST API
-├── shared/            # Shared TypeScript types
-├── scripts/           # Dev, build, and deploy scripts
-├── packaging/         # OpenWRT package files
-├── docs/              # Documentation
-└── Makefile           # Task runner
+travo/
+├── frontend/     # React + Vite + Tailwind
+├── backend/      # Go + Fiber
+├── shared/       # Shared TS types
+├── scripts/      # dev, deploy, integration tests
+├── docs/plans/   # Design history (read [`docs/plans/README.md`](./plans/README.md))
+├── packaging/    # OpenWrt staging files
+├── docs/         # This documentation
+└── Makefile
 ```
 
-## Testing
-
-`make test` runs all tests across the monorepo: Go backend, shared TypeScript types,
-and frontend React components.
+## Tests
 
 ```bash
-# All tests
 make test
-
-# Backend only
 cd backend && go test ./...
-
-# Frontend only
-cd frontend && pnpm test
-
-# Shared only
 cd shared && pnpm test
+cd frontend && pnpm test
 ```
 
-## Linting
+## Backend mock mode
 
-```bash
-make lint     # ESLint + go vet
-make format   # Prettier + gofmt
-```
+Without OpenWrt, run with **in-memory** UCI/ubus:
 
-## Backend Mock Mode
+- **Air** (`brew install air` / mise): `backend/.air.toml` runs `./tmp/server --mock`.
+- **Once:** `cd backend && go run ./cmd/server --mock`
+- **Env:** `MOCK_MODE=true go run ./cmd/server`
 
-The backend runs with `MOCK_MODE=true` during development, providing in-memory fakes for UCI/ubus so no actual OpenWRT device is needed.
+Plain `go run ./cmd/server` (no flag) expects real UCI/ubus and is mainly for on-device debugging.
 
-## CI/CD
+## CI (GitHub Actions)
 
-### Continuous Integration
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): backend tests, shared + frontend tests, ESLint, golangci-lint, build check.
+- [`.github/workflows/release.yml`](../.github/workflows/release.yml): release artifacts on version tags.
+- [`.github/workflows/race-detector.yml`](../.github/workflows/race-detector.yml): optional Go race runs.
 
-The CI workflow (`.github/workflows/ci.yml`) runs on every push to `main` and on pull requests:
+## Releases
 
-1. **Test Backend** — `go vet`, `go test ./... -count=1 -race`
-2. **Test Frontend** — shared and frontend Vitest suites
-3. **Lint** — ESLint + Go vet
-4. **Build Check** — verifies both frontend and backend build successfully
-
-### Release Workflow
-
-The release workflow (`.github/workflows/release.yml`) triggers on version tags:
-
-1. Builds the binary and `.ipk` package for both **aarch64** and **x86_64**
-2. Generates SHA256 checksums
-3. Creates a GitHub Release with all artifacts and install instructions
-
-### Creating a Release
-
-Tag the commit and push:
+Tag and push; the release workflow builds tarballs and publishes them (see `docs/deployment.md`).
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The release workflow will automatically build binaries and packages for all
-supported architectures and create a GitHub Release with download links.
+## MSW
 
-## MSW (Mock Service Worker)
-
-The frontend uses [MSW](https://mswjs.io/) to mock API responses during development
-and testing. The service worker file (`frontend/public/mockServiceWorker.js`) is
-generated automatically by the `postinstall` script when running `pnpm install`.
-
-If the frontend shows a blank page, the MSW worker file may be missing. Regenerate it:
+The dev frontend can use [MSW](https://mswjs.io/) against the real backend or mocks. Regenerate the worker if needed:
 
 ```bash
 cd frontend && pnpm exec msw init public --save

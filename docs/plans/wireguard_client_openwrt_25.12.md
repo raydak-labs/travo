@@ -1,3 +1,10 @@
+---
+title: "WireGuard Client Configuration Plan – OpenWrt 25.12"
+description: "Planning / design notes: WireGuard Client Configuration Plan – OpenWrt 25.12"
+updated: 2026-04-13
+tags: [openwrt, plan, traceability, wireguard]
+---
+
 # WireGuard Client Configuration Plan – OpenWrt 25.12
 
 ## Overview

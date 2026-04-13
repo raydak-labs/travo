@@ -1,8 +1,15 @@
+---
+title: "Plan: CI/CD Pipeline"
+description: "Planning / design notes: Plan: CI/CD Pipeline"
+updated: 2026-04-13
+tags: [cicd, plan, traceability]
+---
+
 # Plan: CI/CD Pipeline
 
 **Status:** Not implemented
 **Priority:** Medium
-**Related requirements:** [13. Deployment & Packaging](../requirements/requirements.md#13-deployment--packaging)
+**Related requirements:** [13. Deployment & Packaging](../requirements/tasks_open.md#13-deployment-and-packaging)
 
 ---
 

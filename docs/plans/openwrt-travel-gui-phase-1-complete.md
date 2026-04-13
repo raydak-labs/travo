@@ -1,3 +1,10 @@
+---
+title: "Plan"
+description: "Planning / design notes: Plan"
+updated: 2026-04-13
+tags: [openwrt, plan, traceability]
+---
+
 ## Phase 1 Complete: Monorepo Scaffolding & Tooling
 
 Set up the pnpm monorepo with frontend (React 19 + Vite 6 + TailwindCSS 4), backend (Go + Fiber), and shared TypeScript packages. Configured ESLint flat config, Prettier, TypeScript strict mode, Makefile, and project documentation. All 6 tests pass across backend and shared packages.

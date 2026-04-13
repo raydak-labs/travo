@@ -1,3 +1,10 @@
+---
+title: "Plan: Live state refresh + WiFi saved network persistence (2026-03-26)"
+description: "Planning / design notes: Plan: Live state refresh + WiFi saved network persistence (2026-03-26)"
+updated: 2026-04-13
+tags: [plan, traceability, wifi]
+---
+
 # Plan: Live state refresh + WiFi saved network persistence (2026-03-26)
 
 ## Context / symptoms
