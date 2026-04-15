@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-04-13
+updated: 2026-04-15
 tags: [architecture, safety, invariants, travo]
 ---
 
@@ -99,7 +99,32 @@ This rule applies to:
 - Follow existing default `wan` patterns instead of inventing a separate one-off policy model.
 - WWAN, WAN, VPN, guest, and future interfaces should be treated as explicit routing and firewall topology decisions, not UI-only toggles.
 
-## 6. Device Constraints
+## 6. Networking Invariants
+
+### 6.1 Multi-WAN failover (mwan3)
+
+- Connection failover uses OpenWRT's mwan3 package for health tracking and route management.
+- Failover policy is generated deterministically from `/etc/travo/failover.json` into `/etc/config/mwan3`.
+- App-owned UCI sections are namespaced with `travo_` prefix.
+- Failback to higher-priority interfaces includes a 30-second hold-down period to prevent interface flapping.
+- Phase 1 implementation is **IPv4-only**: failover rules use `family: 'ipv4'` only.
+- IPv6 failover is deferred until device testing confirms mwan3 IPv6 reliability on OpenWRT 23.05+.
+
+**Decision rationale (IPv6 deferral):**
+
+- Generated failover rules specify `family: 'ipv4'` explicitly.
+- No IPv6 failover policies or tracking rules are created in Phase 1.
+- Future IPv6 support requires device verification of mwan3's IPv6 stability.
+- See [`docs/plans/connection-failover.md`](./plans/connection-failover.md) Phase 0 decision track for detailed rationale.
+
+### 6.2 Failover safety guards
+
+- Applying failover configuration writes live routing policy and requires an explicit guard: `/etc/travo/failover-in-progress`.
+- Guard file is only removed after verification succeeds; manual redeploy via `deploy-local.sh` clears stuck guards.
+- Wireless changes during failover apply must preserve LuCI-style rollback semantics.
+- Any new routes, zones, or firewall changes added for failover must include complete firewall zone configuration.
+
+## 7. Device Constraints
 
 Router hardware is constrained. Every feature must justify its footprint.
 
