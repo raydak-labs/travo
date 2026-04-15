@@ -19,14 +19,15 @@ import (
 )
 
 const (
-	failoverConfigPath     = "/etc/travo/failover.json"
-	failoverGuardPath      = "/etc/travo/failover-in-progress"
-	failoverBackupPath     = "/etc/travo/failover-mwan3-backup.json"
-	mwan3InitScriptPath    = "/etc/init.d/mwan3"
-	mwan3ConfigName        = "mwan3"
-	failoverPolicySection  = "travo_failover"
-	failoverRuleSection    = "travo_default_v4"
-	failoverTickerInterval = 10 * time.Second
+	failoverConfigPath       = "/etc/travo/failover.json"
+	failoverGuardPath        = "/etc/travo/failover-in-progress"
+	failoverBackupPath       = "/etc/travo/failover-mwan3-backup.json"
+	mwan3InitScriptPath      = "/etc/init.d/mwan3"
+	mwan3ConfigName          = "mwan3"
+	failoverPolicySection    = "travo_failover"
+	failoverRuleSection      = "travo_default_v4"
+	failoverTickerInterval   = 10 * time.Second
+	failbackHoldDownDuration = 30 * time.Second
 )
 
 type failoverConfigFile struct {
@@ -35,7 +36,6 @@ type failoverConfigFile struct {
 	Health     models.FailoverHealthConfig `json:"health"`
 }
 
-// FailoverService manages app-owned mwan3 failover configuration.
 type FailoverService struct {
 	uci        uci.UCI
 	ubus       ubus.Ubus
@@ -43,47 +43,50 @@ type FailoverService struct {
 	cmd        CommandRunner
 	applier    UCIApplyConfirm
 
-	configPath string
-	guardPath  string
-	backupPath string
-	initScript string
-	alertSvc   *AlertService
-	mu         sync.RWMutex
-	events     []models.FailoverEvent
-	lastActive string
-	stopCh     chan struct{}
-	stopOnce   sync.Once
+	configPath  string
+	guardPath   string
+	backupPath  string
+	initScript  string
+	alertSvc    *AlertService
+	mu          sync.RWMutex
+	events      []models.FailoverEvent
+	lastActive  string
+	stopCh      chan struct{}
+	stopOnce    sync.Once
+	onlineSince map[string]time.Time
 }
 
 func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw *auth.RootPassword) *FailoverService {
 	return &FailoverService{
-		uci:        u,
-		ubus:       ub,
-		networkSvc: networkSvc,
-		cmd:        &RealCommandRunner{},
-		applier:    NewRealUCIApplyConfirm(ub, pw),
-		configPath: failoverConfigPath,
-		guardPath:  failoverGuardPath,
-		backupPath: failoverBackupPath,
-		initScript: mwan3InitScriptPath,
-		events:     make([]models.FailoverEvent, 0, 10),
-		stopCh:     make(chan struct{}),
+		uci:         u,
+		ubus:        ub,
+		networkSvc:  networkSvc,
+		cmd:         &RealCommandRunner{},
+		applier:     NewRealUCIApplyConfirm(ub, pw),
+		configPath:  failoverConfigPath,
+		guardPath:   failoverGuardPath,
+		backupPath:  failoverBackupPath,
+		initScript:  mwan3InitScriptPath,
+		events:      make([]models.FailoverEvent, 0, 10),
+		stopCh:      make(chan struct{}),
+		onlineSince: make(map[string]time.Time),
 	}
 }
 
 func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, cmd CommandRunner, applier UCIApplyConfirm, configPath string) *FailoverService {
 	return &FailoverService{
-		uci:        u,
-		ubus:       ub,
-		networkSvc: networkSvc,
-		cmd:        cmd,
-		applier:    applier,
-		configPath: configPath,
-		guardPath:  filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
-		backupPath: filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
-		initScript: mwan3InitScriptPath,
-		events:     make([]models.FailoverEvent, 0, 10),
-		stopCh:     make(chan struct{}),
+		uci:         u,
+		ubus:        ub,
+		networkSvc:  networkSvc,
+		cmd:         cmd,
+		applier:     applier,
+		configPath:  configPath,
+		guardPath:   filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
+		backupPath:  filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
+		initScript:  mwan3InitScriptPath,
+		events:      make([]models.FailoverEvent, 0, 10),
+		stopCh:      make(chan struct{}),
+		onlineSince: make(map[string]time.Time),
 	}
 }
 
@@ -104,6 +107,7 @@ func (s *FailoverService) Start() {
 				return
 			}
 		}
+		s.updateOnlineTimestamps()
 		s.observeActiveChange()
 		select {
 		case <-ticker.C:
@@ -310,15 +314,57 @@ func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus,
 	return candidates
 }
 
+func (s *FailoverService) updateOnlineTimestamps() {
+	cfg, err := s.GetConfig()
+	if err != nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, candidate := range cfg.Candidates {
+		if candidate.Enabled && candidate.Available && candidate.IsUp && candidate.TrackingState == models.FailoverTrackingStateOnline {
+			if _, exists := s.onlineSince[candidate.InterfaceName]; !exists {
+				s.onlineSince[candidate.InterfaceName] = time.Now()
+			}
+		} else {
+			delete(s.onlineSince, candidate.InterfaceName)
+		}
+	}
+}
+
 func (s *FailoverService) computeActiveInterface(candidates []models.FailoverCandidate) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	currentActive := s.lastActive
+
 	for _, candidate := range candidates {
 		if !candidate.Enabled || !candidate.Available {
 			continue
 		}
+
 		if candidate.IsUp && candidate.TrackingState == models.FailoverTrackingStateOnline {
-			return candidate.InterfaceName
+			if candidate.InterfaceName == currentActive {
+				return candidate.InterfaceName
+			}
 		}
 	}
+
+	for _, candidate := range candidates {
+		if !candidate.Enabled || !candidate.Available {
+			continue
+		}
+
+		if candidate.IsUp && candidate.TrackingState == models.FailoverTrackingStateOnline {
+			onlineTime, exists := s.onlineSince[candidate.InterfaceName]
+			if exists && time.Since(onlineTime) >= failbackHoldDownDuration {
+				return candidate.InterfaceName
+			}
+		}
+	}
+
 	return ""
 }
 
