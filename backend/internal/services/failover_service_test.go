@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -228,4 +229,158 @@ func TestValidateHealthConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFailbackHoldDown(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	mockUbus := ubus.NewMockUbus()
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	configPath := filepath.Join(t.TempDir(), "failover.json")
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
+
+	t.Run("immediate failover to backup when current goes offline", func(t *testing.T) {
+		t.Parallel()
+
+		candidates := []models.FailoverCandidate{
+			{
+				InterfaceName: "wan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          false,
+				Priority:      1,
+				TrackingState: models.FailoverTrackingStateOffline,
+			},
+			{
+				InterfaceName: "wwan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      2,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+		}
+
+		svc.mu.Lock()
+		svc.candidateOnlineSince = map[string]time.Time{
+			"wwan": time.Now().Add(-time.Minute),
+		}
+		svc.mu.Unlock()
+
+		active := svc.computeActiveInterface(candidates)
+		if active != "wwan" {
+			t.Errorf("expected wwan to be active, got %s", active)
+		}
+	})
+
+	t.Run("hold-down prevents immediate failback to higher priority", func(t *testing.T) {
+		t.Parallel()
+
+		candidates := []models.FailoverCandidate{
+			{
+				InterfaceName: "wan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      1,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+			{
+				InterfaceName: "wwan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      2,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+		}
+
+		svc.mu.Lock()
+		svc.candidateOnlineSince = map[string]time.Time{
+			"wwan": time.Now().Add(-time.Minute),
+			"wan":  time.Now().Add(-10 * time.Second),
+		}
+		svc.mu.Unlock()
+
+		active := svc.computeActiveInterface(candidates)
+		if active != "wwan" {
+			t.Errorf("expected wwan to remain active during hold-down, got %s", active)
+		}
+	})
+
+	t.Run("failback after hold-down threshold", func(t *testing.T) {
+		t.Parallel()
+
+		candidates := []models.FailoverCandidate{
+			{
+				InterfaceName: "wan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      1,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+			{
+				InterfaceName: "wwan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      2,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+		}
+
+		svc.mu.Lock()
+		svc.candidateOnlineSince = map[string]time.Time{
+			"wwan": time.Now().Add(-time.Minute),
+			"wan":  time.Now().Add(-failbackHoldDown - time.Second),
+		}
+		svc.mu.Unlock()
+
+		active := svc.computeActiveInterface(candidates)
+		if active != "wan" {
+			t.Errorf("expected wan to be active after hold-down, got %s", active)
+		}
+	})
+
+	t.Run("initial selection uses highest priority online candidate", func(t *testing.T) {
+		t.Parallel()
+
+		candidates := []models.FailoverCandidate{
+			{
+				InterfaceName: "wan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          false,
+				Priority:      1,
+				TrackingState: models.FailoverTrackingStateOffline,
+			},
+			{
+				InterfaceName: "wwan",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      2,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+			{
+				InterfaceName: "usb0",
+				Enabled:       true,
+				Available:     true,
+				IsUp:          true,
+				Priority:      3,
+				TrackingState: models.FailoverTrackingStateOnline,
+			},
+		}
+
+		svc.mu.Lock()
+		svc.candidateOnlineSince = make(map[string]time.Time)
+		svc.mu.Unlock()
+
+		active := svc.computeActiveInterface(candidates)
+		if active != "wwan" {
+			t.Errorf("expected wwan to be selected as initial active, got %s", active)
+		}
+	})
 }

@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-04-13
+updated: 2026-04-15
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) if you introduced a new invariant.
 
-> **Last updated:** 2026-04-13
+> **Last updated:** 2026-04-15
 
 ## Milestone checklist (compact)
 
@@ -22,6 +22,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - [x] Authentication: IP-based access control
 - [x] VPN speed test; DDNS custom update URL; SQM / QoS (traffic shaping)
 - [x] WiFi: setup wizard unified AP credentials; repeater-options `PUT` reconcile
+- [x] Multi-WAN failover: priority-based uplink switching, health checks, 30s hold-down, alerts
 
 ## WiFi And Network Foundation
 
@@ -32,6 +33,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - Clients: aliases, block/kick, DHCP reservations, static IPs.
 - Network: WAN status and config, DHCP, LAN DNS, DDNS, firewall summary, port forwarding, IPv6, WoL, traffic charts.
 - Data usage tracking; USB tethering.
+- Multi-WAN failover: priority-based Ethernet/WiFi/USB uplink switching, health tracking, 30-second hold-down for stable failback, alerts, dashboard integration.
 
 ## VPN And Services
 

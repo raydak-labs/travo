@@ -36,10 +36,11 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ### 2.7 Connection Failover
 
-- [ ] Priority-based WAN source (Ethernet > WiFi > USB Tether). See [Connection Failover plan](../plans/connection-failover.md).
-- [ ] Health check via periodic ping (configurable target). See [Connection Failover plan](../plans/connection-failover.md).
-- [ ] Auto-switch to next source on failure. See [Connection Failover plan](../plans/connection-failover.md).
-- [ ] Notification on failover event. See [Connection Failover plan](../plans/connection-failover.md).
+- [x] Priority-based WAN source (Ethernet > WiFi > USB Tether). See [Connection Failover plan](../plans/connection-failover.md).
+- [x] Health check via periodic ping (configurable target). See [Connection Failover plan](../plans/connection-failover.md).
+- [x] Auto-switch to next source on failure. See [Connection Failover plan](../plans/connection-failover.md).
+- [x] Notification on failover event. See [Connection Failover plan](../plans/connection-failover.md).
+- [x] Dashboard integration showing active failover interface. See [Connection Failover plan](../plans/connection-failover.md).
 
 ## 3. VPN Management
 

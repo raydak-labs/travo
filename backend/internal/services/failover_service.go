@@ -27,6 +27,7 @@ const (
 	failoverPolicySection  = "travo_failover"
 	failoverRuleSection    = "travo_default_v4"
 	failoverTickerInterval = 10 * time.Second
+	failbackHoldDown       = 30 * time.Second
 )
 
 type failoverConfigFile struct {
@@ -37,53 +38,56 @@ type failoverConfigFile struct {
 
 // FailoverService manages app-owned mwan3 failover configuration.
 type FailoverService struct {
-	uci        uci.UCI
-	ubus       ubus.Ubus
-	networkSvc *NetworkService
-	cmd        CommandRunner
-	applier    UCIApplyConfirm
+	uci                   uci.UCI
+	ubus                  ubus.Ubus
+	networkSvc            *NetworkService
+	cmd                   CommandRunner
+	applier               UCIApplyConfirm
 
-	configPath string
-	guardPath  string
-	backupPath string
-	initScript string
-	alertSvc   *AlertService
-	mu         sync.RWMutex
-	events     []models.FailoverEvent
-	lastActive string
-	stopCh     chan struct{}
-	stopOnce   sync.Once
+	configPath            string
+	guardPath             string
+	backupPath            string
+	initScript            string
+	alertSvc              *AlertService
+	mu                    sync.RWMutex
+	events                []models.FailoverEvent
+	lastActive            string
+	stopCh                chan struct{}
+	stopOnce              sync.Once
+	candidateOnlineSince  map[string]time.Time
 }
 
 func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw *auth.RootPassword) *FailoverService {
 	return &FailoverService{
-		uci:        u,
-		ubus:       ub,
-		networkSvc: networkSvc,
-		cmd:        &RealCommandRunner{},
-		applier:    NewRealUCIApplyConfirm(ub, pw),
-		configPath: failoverConfigPath,
-		guardPath:  failoverGuardPath,
-		backupPath: failoverBackupPath,
-		initScript: mwan3InitScriptPath,
-		events:     make([]models.FailoverEvent, 0, 10),
-		stopCh:     make(chan struct{}),
+		uci:                   u,
+		ubus:                  ub,
+		networkSvc:            networkSvc,
+		cmd:                   &RealCommandRunner{},
+		applier:               NewRealUCIApplyConfirm(ub, pw),
+		configPath:            failoverConfigPath,
+		guardPath:             failoverGuardPath,
+		backupPath:            failoverBackupPath,
+		initScript:            mwan3InitScriptPath,
+		events:                make([]models.FailoverEvent, 0, 10),
+		stopCh:                make(chan struct{}),
+		candidateOnlineSince:  make(map[string]time.Time),
 	}
 }
 
 func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, cmd CommandRunner, applier UCIApplyConfirm, configPath string) *FailoverService {
 	return &FailoverService{
-		uci:        u,
-		ubus:       ub,
-		networkSvc: networkSvc,
-		cmd:        cmd,
-		applier:    applier,
-		configPath: configPath,
-		guardPath:  filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
-		backupPath: filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
-		initScript: mwan3InitScriptPath,
-		events:     make([]models.FailoverEvent, 0, 10),
-		stopCh:     make(chan struct{}),
+		uci:                   u,
+		ubus:                  ub,
+		networkSvc:            networkSvc,
+		cmd:                   cmd,
+		applier:               applier,
+		configPath:            configPath,
+		guardPath:             filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
+		backupPath:            filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
+		initScript:            mwan3InitScriptPath,
+		events:                make([]models.FailoverEvent, 0, 10),
+		stopCh:                make(chan struct{}),
+		candidateOnlineSince:  make(map[string]time.Time),
 	}
 }
 
@@ -311,15 +315,53 @@ func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus,
 }
 
 func (s *FailoverService) computeActiveInterface(candidates []models.FailoverCandidate) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	var bestCandidate string
+	var bestPriority int = -1
+	var bestStable bool
+
 	for _, candidate := range candidates {
 		if !candidate.Enabled || !candidate.Available {
+			delete(s.candidateOnlineSince, candidate.InterfaceName)
 			continue
 		}
-		if candidate.IsUp && candidate.TrackingState == models.FailoverTrackingStateOnline {
-			return candidate.InterfaceName
+
+		isOnline := candidate.IsUp && candidate.TrackingState == models.FailoverTrackingStateOnline
+
+		if isOnline {
+			_, wasTracked := s.candidateOnlineSince[candidate.InterfaceName]
+			if !wasTracked {
+				s.candidateOnlineSince[candidate.InterfaceName] = now
+			}
+		} else {
+			delete(s.candidateOnlineSince, candidate.InterfaceName)
+			continue
+		}
+
+		onlineSince, tracked := s.candidateOnlineSince[candidate.InterfaceName]
+		candidateStable := tracked && now.Sub(onlineSince) >= failbackHoldDown
+
+		shouldUse := false
+		if bestCandidate == "" {
+			shouldUse = true
+		} else if !bestStable && candidateStable {
+			shouldUse = true
+		} else if bestStable && candidateStable && candidate.Priority < bestPriority {
+			shouldUse = true
+		} else if !bestStable && !candidateStable && candidate.Priority < bestPriority {
+			shouldUse = true
+		}
+
+		if shouldUse {
+			bestCandidate = candidate.InterfaceName
+			bestPriority = candidate.Priority
+			bestStable = candidateStable
 		}
 	}
-	return ""
+
+	return bestCandidate
 }
 
 func (s *FailoverService) hasWirelessStation() bool {
