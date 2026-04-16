@@ -76,13 +76,13 @@ func (s *SpeedtestService) checkInstallation() (bool, string) {
 	}
 	out, err := exec.Command(path, "--version").Output()
 	if err != nil {
-		return true, "unknown"
+		return true, ""
 	}
 	re := regexp.MustCompile(`\d+\.\d+\.\d+`)
 	if match := re.FindString(string(out)); match != "" {
 		return true, match
 	}
-	return true, "unknown"
+	return true, ""
 }
 
 func detectArchitecture() (string, error) {
@@ -103,10 +103,11 @@ func detectArchitecture() (string, error) {
 }
 
 func isArchitectureSupported(arch string) bool {
-	return map[string]bool{
+	archMap := map[string]bool{
 		"aarch64": true, "arm": true, "x86_64": true, "i386": true,
 		"mips": true, "mipsel": true, "mips64": true, "mips64el": true,
-	}[arch]
+	}
+	return archMap[arch]
 }
 
 func parseSpeedtestOutput(output string) (models.SpeedTestResult, error) {
@@ -115,6 +116,10 @@ func parseSpeedtestOutput(output string) (models.SpeedTestResult, error) {
 	uploadMBps := 0.0
 	pingMs := 0.0
 	server := "unknown"
+
+	if output == "" {
+		return result, fmt.Errorf("empty output")
+	}
 
 	reDownload := regexp.MustCompile(`"download":\s*\{[^}]*"bandwidth":\s*([\d.]+)`)
 	reUpload := regexp.MustCompile(`"upload":\s*\{[^}]*"bandwidth":\s*([\d.]+)`)
@@ -138,6 +143,11 @@ func parseSpeedtestOutput(output string) (models.SpeedTestResult, error) {
 	result.UploadMbps = uploadMBps
 	result.PingMs = pingMs
 	result.Server = server
+
+	if downloadMBps == 0 && uploadMBps == 0 && pingMs == 0 && server == "unknown" {
+		return result, fmt.Errorf("invalid speedtest output: no valid data extracted")
+	}
+
 	return result, nil
 }
 

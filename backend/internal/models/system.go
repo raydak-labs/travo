@@ -216,13 +216,3 @@ type SpeedtestService struct {
 	PackageName    string `json:"package_name"`
 	StorageSizeMB  int    `json:"storage_size_mb"`
 }
-
-// SpeedtestService represents the speedtest CLI service availability and status.
-type SpeedtestService struct {
-	Installed      bool   `json:"installed"`      // Whether speedtest CLI is installed
-	Supported      bool   `json:"supported"`      // Whether architecture is supported
-	Architecture   string `json:"architecture"`   // Detected architecture (aarch64, x86_64, etc.)
-	Version        string `json:"version"`        // speedtest CLI version if installed
-	PackageName    string `json:"package_name"`   // OpenWRT package name (speedtest)
-	StorageSizeMB  int    `json:"storage_size_mb"`// Approx package size in MB
-}

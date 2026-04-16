@@ -51,9 +51,9 @@ func TestIsArchitectureSupported(t *testing.T) {
 		arch      string
 		supported bool
 	}{
-		{"aarch64", true}, {"arm", true}, {"x86_64": true}, {"i386": true},
-		{"mips", true}, {"mipsel", true}, {"mips64", true}, {"mips64el": true},
-		{"riscv64", false}, {"ppc64le", false},
+		{arch: "aarch64", supported: true}, {arch: "arm", supported: true}, {arch: "x86_64", supported: true}, {arch: "i386", supported: true},
+		{arch: "mips", supported: true}, {arch: "mipsel", supported: true}, {arch: "mips64", supported: true}, {arch: "mips64el", supported: true},
+		{arch: "riscv64", supported: false}, {arch: "ppc64le", supported: false},
 	}
 	for _, tt := range tests {
 		if got := isArchitectureSupported(tt.arch); got != tt.supported {
@@ -74,17 +74,22 @@ func TestParseSpeedtestOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := parseSpeedtestOutput(tt.input)
-			if tt.name == "valid" && err != nil {
-				t.Errorf("unexpected error: %v", err)
+			if tt.name == "valid" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if result.DownloadMbps < 300 || result.DownloadMbps > 500 {
+					t.Errorf("DownloadMbps unexpected: %f", result.DownloadMbps)
+				}
 			}
-			if tt.name == "valid" && result.DownloadMbps < 300 || result.DownloadMbps > 500 {
-				t.Errorf("DownloadMbps unexpected: %f", result.DownloadMbps)
+			if tt.name != "valid" && err == nil {
+				t.Errorf("expected error for invalid input, got nil")
 			}
 		})
 	}
 }
 
-func TestparseFloat(t *testing.T) {
+func TestParseFloat(t *testing.T) {
 	tests := []struct{ input string; want float64 }{
 		{"123.456", 123.456}, {"0", 0}, {"-5.5", -5.5}, {"invalid", 0},
 	}
