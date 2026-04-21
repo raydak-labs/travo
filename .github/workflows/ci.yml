@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: pnpm/action-setup@903f9c1a6ebcba6cf41d87230be49611ac97822e # v6
         with:
           version: 10
 
@@ -66,7 +66,7 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: pnpm/action-setup@903f9c1a6ebcba6cf41d87230be49611ac97822e # v6
         with:
           version: 10
 
@@ -98,7 +98,7 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: pnpm/action-setup@903f9c1a6ebcba6cf41d87230be49611ac97822e # v6
         with:
           version: 10
 
