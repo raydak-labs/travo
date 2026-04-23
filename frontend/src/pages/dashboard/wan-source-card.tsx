@@ -1,8 +1,8 @@
-import { Cable, Wifi, Usb, WifiOff } from 'lucide-react';
+import { Cable, Wifi, Usb, WifiOff, Zap } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNetworkStatus } from '@/hooks/use-network';
+import { useNetworkStatus, useFailoverConfig } from '@/hooks/use-network';
 import type { NetworkInterface } from '@shared/index';
 
 type WanSource = 'ethernet' | 'wifi' | 'usb' | 'none';
@@ -41,6 +41,7 @@ function detectWanSource(
 
 export function WanSourceCard() {
   const { data: network, isLoading } = useNetworkStatus();
+  const { data: failover } = useFailoverConfig();
 
   if (isLoading) {
     return (
@@ -59,6 +60,10 @@ export function WanSourceCard() {
   const info = detectWanSource(network?.wan, network?.interfaces);
   const Icon = info.icon;
   const isActive = info.source !== 'none';
+  const failoverEnabled = failover?.enabled && failover?.service_installed;
+  const activeFailoverInterface =
+    failoverEnabled && failover?.active_interface ? failover.active_interface : null;
+  const displayLabel = activeFailoverInterface ? `Active: ${activeFailoverInterface}` : info.label;
 
   return (
     <Card>
@@ -69,7 +74,16 @@ export function WanSourceCard() {
       <CardContent>
         <div className="flex items-center gap-2">
           <div className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`} />
-          <Badge variant={isActive ? 'success' : 'destructive'}>{info.label}</Badge>
+          <Badge variant={isActive ? 'success' : 'destructive'}>{displayLabel}</Badge>
+          {failoverEnabled && (
+            <Badge
+              variant="outline"
+              className="text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400"
+            >
+              <Zap className="h-3 w-3 mr-1" />
+              Auto
+            </Badge>
+          )}
         </div>
         {info.iface && (
           <div className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-400">
@@ -77,6 +91,14 @@ export function WanSourceCard() {
             {info.iface.ip_address && <div>IP: {info.iface.ip_address}</div>}
             {info.iface.gateway && <div>Gateway: {info.iface.gateway}</div>}
           </div>
+        )}
+        {failoverEnabled && activeFailoverInterface && (
+          <a
+            href="/network/advanced"
+            className="mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            View failover settings →
+          </a>
         )}
       </CardContent>
     </Card>
