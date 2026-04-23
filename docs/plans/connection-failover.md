@@ -1,15 +1,17 @@
 ---
 title: "Plan: Connection Failover (Ordered Multi-WAN)"
 description: "Planning / design notes: Plan: Connection Failover (Ordered Multi-WAN)"
-updated: 2026-04-13
+updated: 2026-04-15
 tags: [failover, network, plan, traceability]
 ---
 
 # Plan: Connection Failover (Ordered Multi-WAN)
 
-**Status:** Not implemented
+**Status:** Implemented (Phase 0)
 **Priority:** Medium
 **Related requirements:** [2.7 Connection Failover](../requirements/tasks_open.md#27-connection-failover)
+**Decisions:** See [`failover-decisions.md`](./failover-decisions.md) for resolved design choices.
+**Verification:** See [`../tests/failover-verification.md`](../tests/failover-verification.md) for test scenarios.
 
 ---
 

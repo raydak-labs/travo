@@ -110,6 +110,17 @@ Router hardware is constrained. Every feature must justify its footprint.
 - Keep API payloads small; avoid polling where a realtime channel already exists
 - Warn before installing packages that meaningfully consume flash storage
 
+## 5.1 Multi-WAN Failover Configuration
+
+The failover system uses OpenWrt's `mwan3` service with app-specific behavior:
+
+- **IPv4-only for Phase 1**: Failover applies to IPv4 traffic only via `family: "ipv4"` in UCI. IPv6 support is deferred.
+- **30-second hold-down**: When prioritized interfaces recover, failback requires 30 seconds of stable tracking. This prevents flapping interfaces from causing rapid uplink switches.
+- **Guard file enforcement**: Failover configuration changes use `/etc/travo/failover-in-progress` as a crash guard. See section 4 for the general guard file protocol.
+- **Candidate tracking**: Backend tracks `candidateOnlineSince` timestamps per interface to implement hold-down. Unavailable or disabled candidates are cleaned up from tracking state.
+
+Interface priority is encoded as `member.metric` in `mwan3` policies: lower metric = higher priority.
+
 ## 7. Documentation Rules
 
 - Put stable rules here, not in backlog files.
