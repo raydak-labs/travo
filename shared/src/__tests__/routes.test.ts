@@ -130,6 +130,8 @@ describe('API_ROUTES', () => {
   it('has captive routes matching backend', () => {
     expect(API_ROUTES.captive.status).toBe('/api/v1/captive/status');
     expect(API_ROUTES.captive.autoAccept).toBe('/api/v1/captive/auto-accept');
+    expect(API_ROUTES.captive.dnsBypass).toBe('/api/v1/captive/dns-bypass');
+    expect(API_ROUTES.captive.dnsRestore).toBe('/api/v1/captive/dns-restore');
   });
 
   it('covers all backend endpoints', () => {
@@ -216,6 +218,8 @@ describe('API_ROUTES', () => {
       '/api/v1/services/:id/autostart',
       '/api/v1/captive/status',
       '/api/v1/captive/auto-accept',
+      '/api/v1/captive/dns-bypass',
+      '/api/v1/captive/dns-restore',
       '/api/v1/adguard/dns',
       '/api/v1/adguard/config',
       '/api/v1/adguard/password',

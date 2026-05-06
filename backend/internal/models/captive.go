@@ -5,6 +5,8 @@ type CaptivePortalStatus struct {
 	Detected         bool    `json:"detected"`
 	PortalURL        *string `json:"portal_url,omitempty"`
 	CanReachInternet bool    `json:"can_reach_internet"`
+	DNSBypassed      bool    `json:"dns_bypassed"`
+	DNSBypassNeeded  bool    `json:"dns_bypass_needed"`
 }
 
 type CaptiveAutoAcceptResult struct {

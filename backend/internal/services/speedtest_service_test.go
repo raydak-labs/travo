@@ -90,7 +90,10 @@ func TestParseSpeedtestOutput(t *testing.T) {
 }
 
 func TestParseFloat(t *testing.T) {
-	tests := []struct{ input string; want float64 }{
+	tests := []struct {
+		input string
+		want  float64
+	}{
 		{"123.456", 123.456}, {"0", 0}, {"-5.5", -5.5}, {"invalid", 0},
 	}
 	for _, tt := range tests {

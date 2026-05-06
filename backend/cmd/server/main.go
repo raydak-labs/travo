@@ -166,7 +166,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 
 	vpnSvc := services.NewVpnService(u)
 	svcManager := services.NewServiceManager()
-	captiveSvc := services.NewCaptiveService(captiveProber)
+	captiveSvc := services.NewCaptiveServiceWithUCI(captiveProber, u, &services.RealCommandRunner{})
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()

@@ -21,3 +21,25 @@ export function useCaptiveAutoAccept() {
     },
   });
 }
+
+export function useCaptiveDNSBypass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiClient.post<{ ok: boolean; message: string }>(API_ROUTES.captive.dnsBypass, {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
+    },
+  });
+}
+
+export function useCaptiveDNSRestore() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiClient.post<{ ok: boolean; message: string }>(API_ROUTES.captive.dnsRestore, {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
+    },
+  });
+}

@@ -135,6 +135,8 @@ export const API_ROUTES = {
   captive: {
     status: '/api/v1/captive/status',
     autoAccept: '/api/v1/captive/auto-accept',
+    dnsBypass: '/api/v1/captive/dns-bypass',
+    dnsRestore: '/api/v1/captive/dns-restore',
   },
   adguard: {
     dns: '/api/v1/adguard/dns',

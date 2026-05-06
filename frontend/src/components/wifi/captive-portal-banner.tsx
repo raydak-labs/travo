@@ -1,7 +1,12 @@
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useCaptiveAutoAccept, useCaptivePortal } from '@/hooks/use-captive-portal';
+import {
+  useCaptiveAutoAccept,
+  useCaptiveDNSBypass,
+  useCaptiveDNSRestore,
+  useCaptivePortal,
+} from '@/hooks/use-captive-portal';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
@@ -10,6 +15,8 @@ const AUTO_TRY_KEY = 'openwrt-travel-gui:captive-auto-try';
 export function CaptivePortalBanner() {
   const { data: status } = useCaptivePortal();
   const autoAccept = useCaptiveAutoAccept();
+  const dnsBypass = useCaptiveDNSBypass();
+  const dnsRestore = useCaptiveDNSRestore();
   const [dismissed, setDismissed] = useState(false);
   const [autoTry, setAutoTry] = useState(() => localStorage.getItem(AUTO_TRY_KEY) === '1');
   const triedForPortalRef = useRef<string | null>(null);
@@ -24,6 +31,15 @@ export function CaptivePortalBanner() {
     if (!status?.detected || status.can_reach_internet || dismissed || !autoTry) {
       return;
     }
+
+    // Auto-bypass DNS if needed before attempting auto-accept
+    if (status.dns_bypass_needed && !dnsBypass.isPending) {
+      dnsBypass.mutate(undefined, {
+        onSuccess: () => toast.info('DNS auto-bypassed for portal access'),
+      });
+      return;
+    }
+
     const portal = status.portal_url ?? '';
     if (!portal) {
       return;
@@ -48,7 +64,7 @@ export function CaptivePortalBanner() {
         },
       },
     );
-  }, [status, dismissed, autoTry, autoAccept]);
+  }, [status, dismissed, autoTry, autoAccept, dnsBypass]);
 
   const handleToggleAutoTry = (enabled: boolean) => {
     setAutoTry(enabled);
@@ -75,10 +91,24 @@ export function CaptivePortalBanner() {
     return null;
   }
 
+  const handleDNSBypass = () => {
+    dnsBypass.mutate(undefined, {
+      onSuccess: () => toast.success('DNS switched to upstream for portal access'),
+      onError: (e) => toast.error(e instanceof Error ? e.message : 'DNS bypass failed'),
+    });
+  };
+
+  const handleDNSRestore = () => {
+    dnsRestore.mutate(undefined, {
+      onSuccess: () => toast.success('DNS restored to original configuration'),
+      onError: (e) => toast.error(e instanceof Error ? e.message : 'DNS restore failed'),
+    });
+  };
+
   return (
     <div
       role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-700 dark:bg-yellow-950 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-700 dark:bg-yellow-950"
     >
       <div className="flex items-center gap-3">
         <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-400" />
@@ -86,7 +116,12 @@ export function CaptivePortalBanner() {
           Login required to access internet
         </p>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+      {status.dns_bypass_needed && (
+        <p className="text-xs text-yellow-700 dark:text-yellow-300">
+          Custom DNS is blocking portal access. Bypass DNS to open the login page.
+        </p>
+      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Switch
           id="captive-auto-try"
           label="Auto-try accept links"
@@ -94,6 +129,26 @@ export function CaptivePortalBanner() {
           onChange={(e) => handleToggleAutoTry(e.target.checked)}
         />
         <div className="flex flex-wrap items-center gap-2">
+          {status.dns_bypass_needed && (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={dnsBypass.isPending}
+              onClick={handleDNSBypass}
+            >
+              Bypass DNS
+            </Button>
+          )}
+          {status.dns_bypassed && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={dnsRestore.isPending}
+              onClick={handleDNSRestore}
+            >
+              Restore DNS
+            </Button>
+          )}
           <Button
             size="sm"
             variant="secondary"

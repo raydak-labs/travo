@@ -1124,7 +1124,7 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		return false
 	}()
 
-		allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
 
 	if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
 		return nil, err

@@ -61,22 +61,22 @@ type SpeedTestResultAPI struct {
 
 // SpeedtestServiceStatusAPI is the frontend API response format for service status.
 type SpeedtestServiceStatusAPI struct {
-	Installed      bool   `json:"installed"`
-	Supported      bool   `json:"supported"`
-	Architecture   string `json:"architecture"`
-	Version        string `json:"version"`
-	PackageName    string `json:"package_name"`
-	StorageSizeMB  int    `json:"storage_size_mb"`
+	Installed     bool   `json:"installed"`
+	Supported     bool   `json:"supported"`
+	Architecture  string `json:"architecture"`
+	Version       string `json:"version"`
+	PackageName   string `json:"package_name"`
+	StorageSizeMB int    `json:"storage_size_mb"`
 }
 
 // ConvertToAPI converts models.SpeedtestService to API response.
 func ConvertToAPI(s models.SpeedtestService) SpeedtestServiceStatusAPI {
 	return SpeedtestServiceStatusAPI{
-		Installed:      s.Installed,
-		Supported:      s.Supported,
-		Architecture:   s.Architecture,
-		Version:        s.Version,
-		PackageName:    s.PackageName,
-		StorageSizeMB:  s.StorageSizeMB,
+		Installed:     s.Installed,
+		Supported:     s.Supported,
+		Architecture:  s.Architecture,
+		Version:       s.Version,
+		PackageName:   s.PackageName,
+		StorageSizeMB: s.StorageSizeMB,
 	}
 }

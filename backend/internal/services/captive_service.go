@@ -1,14 +1,27 @@
 package services
 
 import (
+	"encoding/json"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 const captiveProbeURL = "http://connectivitycheck.gstatic.com/generate_204"
+
+// captiveDNSGuardFile stores original DNS config while bypass is active.
+const captiveDNSGuardFile = "/etc/travo/captive-dns-in-progress"
+
+// captiveDNSRestoreTimeout auto-restores DNS if bypass has been active too long.
+const captiveDNSRestoreTimeout = 5 * time.Minute
 
 // HTTPProber performs HTTP probes for captive portal detection.
 type HTTPProber interface {
@@ -69,12 +82,31 @@ func (m *MockHTTPProber) Do(_ string) (int, string, string, error) {
 
 // CaptiveService checks for captive portal detection.
 type CaptiveService struct {
-	prober HTTPProber
+	prober    HTTPProber
+	uci       uci.UCI
+	cmd       CommandRunner
+	mu        sync.Mutex
+	guardFile string
+}
+
+// dnsBackup holds the original DNS settings for restoration.
+type dnsBackup struct {
+	PeerDNS string `json:"peerdns"`
+	DNS     string `json:"dns"`
+	Time    int64  `json:"time"`
 }
 
 // NewCaptiveService creates a new CaptiveService with the given HTTP prober.
 func NewCaptiveService(prober HTTPProber) *CaptiveService {
-	return &CaptiveService{prober: prober}
+	return &CaptiveService{prober: prober, guardFile: captiveDNSGuardFile}
+}
+
+// NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
+func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *CaptiveService {
+	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: captiveDNSGuardFile}
+	// Auto-restore stale bypass on startup
+	go svc.autoRestoreStaleBypass()
+	return svc
 }
 
 // CheckCaptivePortal probes for captive portals by making an HTTP request
@@ -123,4 +155,155 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 		Detected:         false,
 		CanReachInternet: false,
 	}, nil
+}
+
+// IsDNSBypassed returns true if DNS bypass is currently active.
+func (c *CaptiveService) IsDNSBypassed() bool {
+	_, err := os.Stat(c.guardFile)
+	return err == nil
+}
+
+// BypassDNS temporarily switches WAN to upstream DNS (peerdns=1) for captive portal access.
+// Stores original config in guard file for later restoration.
+func (c *CaptiveService) BypassDNS() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.uci == nil {
+		return nil // no UCI = mock mode, noop
+	}
+
+	// Already bypassed?
+	if _, err := os.Stat(c.guardFile); err == nil {
+		return nil
+	}
+
+	// Read current DNS config
+	opts, err := c.uci.GetAll("network", "wan")
+	if err != nil {
+		return err
+	}
+
+	// If already using upstream DNS, nothing to bypass
+	if opts["peerdns"] != "0" {
+		return nil
+	}
+
+	// Save current state
+	backup := dnsBackup{
+		PeerDNS: opts["peerdns"],
+		DNS:     opts["dns"],
+		Time:    time.Now().Unix(),
+	}
+	data, err := json.Marshal(backup)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(c.guardFile), 0755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(c.guardFile, data, 0600); err != nil {
+		return err
+	}
+
+	// Set to use upstream DNS
+	if err := c.uci.Set("network", "wan", "peerdns", "1"); err != nil {
+		_ = os.Remove(c.guardFile)
+		return err
+	}
+	if err := c.uci.Set("network", "wan", "dns", ""); err != nil {
+		_ = os.Remove(c.guardFile)
+		return err
+	}
+	if err := c.uci.Commit("network"); err != nil {
+		_ = os.Remove(c.guardFile)
+		return err
+	}
+
+	// Restart dnsmasq to pick up new resolv.conf
+	if c.cmd != nil {
+		_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	}
+
+	return nil
+}
+
+// RestoreDNS restores the original DNS config from the guard file.
+func (c *CaptiveService) RestoreDNS() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.uci == nil {
+		return nil
+	}
+
+	data, err := os.ReadFile(c.guardFile)
+	if err != nil {
+		return nil // no guard file = nothing to restore
+	}
+
+	var backup dnsBackup
+	if err := json.Unmarshal(data, &backup); err != nil {
+		_ = os.Remove(c.guardFile)
+		return err
+	}
+
+	if err := c.uci.Set("network", "wan", "peerdns", backup.PeerDNS); err != nil {
+		return err
+	}
+	dnsVal := backup.DNS
+	if err := c.uci.Set("network", "wan", "dns", dnsVal); err != nil {
+		return err
+	}
+	if err := c.uci.Commit("network"); err != nil {
+		return err
+	}
+
+	_ = os.Remove(c.guardFile)
+
+	if c.cmd != nil {
+		_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	}
+
+	return nil
+}
+
+// autoRestoreStaleBypass restores DNS if guard file is older than timeout.
+func (c *CaptiveService) autoRestoreStaleBypass() {
+	time.Sleep(10 * time.Second) // wait for startup
+	data, err := os.ReadFile(c.guardFile)
+	if err != nil {
+		return
+	}
+	var backup dnsBackup
+	if err := json.Unmarshal(data, &backup); err != nil {
+		_ = os.Remove(c.guardFile)
+		return
+	}
+	age := time.Since(time.Unix(backup.Time, 0))
+	if age > captiveDNSRestoreTimeout {
+		log.Printf("captive: auto-restoring DNS bypass (stale %v)", age)
+		_ = c.RestoreDNS()
+	}
+}
+
+// MaybeAutoRestoreDNS restores DNS if internet is now reachable and bypass is active.
+func (c *CaptiveService) MaybeAutoRestoreDNS(canReachInternet bool) {
+	if !canReachInternet || !c.IsDNSBypassed() {
+		return
+	}
+	log.Printf("captive: internet reachable, auto-restoring DNS")
+	_ = c.RestoreDNS()
+}
+
+// CheckDNSBypassNeeded returns true if custom DNS is configured (blocking portal access).
+func (c *CaptiveService) CheckDNSBypassNeeded() bool {
+	if c.uci == nil {
+		return false
+	}
+	opts, err := c.uci.GetAll("network", "wan")
+	if err != nil {
+		return false
+	}
+	return opts["peerdns"] == "0" && strings.TrimSpace(opts["dns"]) != ""
 }

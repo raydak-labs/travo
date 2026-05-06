@@ -318,12 +318,16 @@ export const mockSavedNetworks: SavedNetwork[] = [
 export const mockCaptivePortalStatus: CaptivePortalStatus = {
   detected: false,
   can_reach_internet: true,
+  dns_bypassed: false,
+  dns_bypass_needed: false,
 };
 
 export const mockCaptivePortalDetected: CaptivePortalStatus = {
   detected: true,
   portal_url: 'http://captive.hotel.com/login',
   can_reach_internet: false,
+  dns_bypassed: false,
+  dns_bypass_needed: true,
 };
 
 export const mockWireguardConfig: WireguardConfig = {

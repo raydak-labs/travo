@@ -214,4 +214,6 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))
 	v1.Post("/captive/auto-accept", CaptiveAutoAcceptHandler(deps.Captive))
+	v1.Post("/captive/dns-bypass", CaptiveDNSBypassHandler(deps.Captive))
+	v1.Post("/captive/dns-restore", CaptiveDNSRestoreHandler(deps.Captive))
 }

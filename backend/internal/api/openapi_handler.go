@@ -462,6 +462,12 @@ var openAPISpec = map[string]interface{}{
 				resp200("application/json", nil),
 			),
 		},
+		"/captive/dns-bypass": map[string]interface{}{
+			"post": endpoint("CaptiveDNSBypass", "Temporarily switch WAN DNS to upstream for captive portal access", true, nil, resp200("application/json", nil)),
+		},
+		"/captive/dns-restore": map[string]interface{}{
+			"post": endpoint("CaptiveDNSRestore", "Restore original DNS configuration after captive portal login", true, nil, resp200("application/json", nil)),
+		},
 	},
 }
 
