@@ -538,6 +538,7 @@ export const mockMACAddresses: MACConfig[] = [
     interface: 'sta',
     current_mac: '94:83:c4:1f:28:3a',
     custom_mac: '',
+    is_applied: false,
   },
 ];
 

@@ -106,6 +106,8 @@ export interface MACConfig {
   readonly interface: string;
   readonly current_mac: string;
   readonly custom_mac?: string;
+  /** True when current_mac matches custom_mac — i.e. the change is live on the interface. */
+  readonly is_applied?: boolean;
 }
 
 /** Request to set MAC address */

@@ -13,8 +13,8 @@ const defaultRadioConfigFile = "/etc/travo/radios.json"
 
 // RadioConfig is the persisted radio hardware discovery result.
 type RadioConfig struct {
-	Discovered bool                `json:"discovered"`
-	Radios     []RadioConfigEntry  `json:"radios"`
+	Discovered bool               `json:"discovered"`
+	Radios     []RadioConfigEntry `json:"radios"`
 }
 
 // RadioConfigEntry is one discovered radio with assigned default role.

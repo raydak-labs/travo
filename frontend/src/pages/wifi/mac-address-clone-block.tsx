@@ -9,6 +9,7 @@ export type MacAddressRow = {
   interface: string;
   current_mac?: string;
   custom_mac?: string;
+  is_applied?: boolean;
 };
 
 type MacAddressCloneBlockProps = {
@@ -43,9 +44,20 @@ export function MacAddressCloneBlock({
         )}
       </div>
       {mac.custom_mac && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          Custom MAC active: {mac.custom_mac}
-        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+            Saved: {mac.custom_mac}
+          </span>
+          {mac.is_applied ? (
+            <Badge variant="default" className="text-xs">
+              Applied
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs">
+              Pending wifi restart
+            </Badge>
+          )}
+        </div>
       )}
       <div className="space-y-2">
         <label htmlFor="mac-input" className="text-xs font-medium text-gray-600 dark:text-gray-400">

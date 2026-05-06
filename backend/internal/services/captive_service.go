@@ -114,6 +114,19 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error) {
 	statusCode, _, redirectURL, err := c.prober.Do(captiveProbeURL)
 	if err != nil {
+		// Probe failed (DNS error, timeout, connection refused).
+		// If custom DNS is configured, the captive portal is likely intercepting
+		// or blocking DNS lookups, which is why the probe can't reach the internet.
+		// Treat this as a captive portal detection signal so the UI shows the
+		// bypass option rather than just "no internet".
+		if c.CheckDNSBypassNeeded() {
+			fallback := captiveProbeURL
+			return models.CaptivePortalStatus{
+				Detected:        true,
+				PortalURL:       &fallback,
+				CanReachInternet: false,
+			}, nil
+		}
 		return models.CaptivePortalStatus{
 			Detected:         false,
 			CanReachInternet: false,

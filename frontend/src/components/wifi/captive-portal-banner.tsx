@@ -1,4 +1,4 @@
-import { AlertTriangle, ExternalLink, X } from 'lucide-react';
+import { AlertTriangle, ExternalLink, RefreshCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 const AUTO_TRY_KEY = 'openwrt-travel-gui:captive-auto-try';
 
 export function CaptivePortalBanner() {
-  const { data: status } = useCaptivePortal();
+  const { data: status, refetch, isFetching } = useCaptivePortal();
   const autoAccept = useCaptiveAutoAccept();
   const dnsBypass = useCaptiveDNSBypass();
   const dnsRestore = useCaptiveDNSRestore();
@@ -88,7 +88,25 @@ export function CaptivePortalBanner() {
   };
 
   if (!status?.detected || status?.can_reach_internet || dismissed) {
-    return null;
+    // Even when the banner is hidden, render a small "Check for captive portal"
+    // button so the user can manually trigger detection when the app misses it.
+    if (status?.can_reach_internet) {
+      return null; // internet is fine, no need for a check button
+    }
+    return (
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-xs text-muted-foreground"
+          disabled={isFetching}
+          onClick={() => void refetch()}
+        >
+          <RefreshCw className={`mr-1.5 h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+          Check for captive portal
+        </Button>
+      </div>
+    );
   }
 
   const handleDNSBypass = () => {
@@ -167,6 +185,15 @@ export function CaptivePortalBanner() {
               Open Login Page
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+            aria-label="Re-check captive portal"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setDismissed(true)} aria-label="Dismiss">
             <X className="h-4 w-4" />
           </Button>

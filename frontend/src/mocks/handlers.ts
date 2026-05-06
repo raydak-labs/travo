@@ -207,7 +207,12 @@ export const handlers = [
   }),
 
   http.post(API_ROUTES.captive.autoAccept, () => {
-    return HttpResponse.json({ ok: true, message: 'mock auto-accept', detected: false, can_reach_internet: true });
+    return HttpResponse.json({
+      ok: true,
+      message: 'mock auto-accept',
+      detected: false,
+      can_reach_internet: true,
+    });
   }),
 
   http.post(API_ROUTES.captive.dnsBypass, () => {

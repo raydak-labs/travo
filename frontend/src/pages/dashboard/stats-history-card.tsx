@@ -56,10 +56,7 @@ export function StatsHistoryCard() {
           <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
             <XAxis dataKey="time" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
             <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
-            <Tooltip
-              contentStyle={{ fontSize: 12 }}
-              formatter={(value: number) => [`${value}%`]}
-            />
+            <Tooltip contentStyle={{ fontSize: 12 }} formatter={(value: number) => [`${value}%`]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line
               type="monotone"
