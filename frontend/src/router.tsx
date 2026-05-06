@@ -18,6 +18,7 @@ import {
   NetworkPage,
   ServicesPage,
   SQMPage,
+  SpeedtestPage,
   SystemPage,
   TailscalePage,
   VpnPage,
@@ -156,6 +157,12 @@ const sqmRoute = createRoute({
   component: shellPage('Services / SQM', SQMPage),
 });
 
+const speedtestRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/services/speedtest',
+  component: shellPage('Services / Speedtest', SpeedtestPage),
+});
+
 const systemRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/system',
@@ -187,6 +194,7 @@ const routeTree = rootRoute.addChildren([
     servicesRoute,
     tailscaleRoute,
     sqmRoute,
+    speedtestRoute,
     systemRoute,
     logsRoute,
   ]),

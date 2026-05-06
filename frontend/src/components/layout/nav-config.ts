@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
   Users,
   Wifi,
+  Gauge,
 } from 'lucide-react';
 
 /** Leaf nav entry (single route). */
@@ -92,6 +93,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     items: [
       { to: '/services', label: 'Installed services' },
       { to: '/services/tailscale', label: 'Tailscale' },
+      { to: '/services/speedtest', label: 'Speedtest' },
     ],
   },
   {
@@ -123,6 +125,7 @@ export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
   '/services': Monitor,
   '/services/tailscale': Share2,
   '/services/sqm': SlidersHorizontal,
+  '/services/speedtest': Gauge,
   '/system': Settings,
   '/logs': ScrollText,
 };

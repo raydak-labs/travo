@@ -18,6 +18,9 @@ export const TailscalePage = lazy(() =>
 export const SQMPage = lazy(() =>
   import('@/pages/services/sqm-page').then((m) => ({ default: m.SQMPage })),
 );
+export const SpeedtestPage = lazy(() =>
+  import('@/pages/services/speedtest-page').then((m) => ({ default: m.SpeedtestPage })),
+);
 export const NetworkPage = lazy(() =>
   import('@/pages/network/network-page').then((m) => ({ default: m.NetworkPage })),
 );

@@ -6,4 +6,5 @@ export * from './vpn';
 export * from './services';
 export * from './auth';
 export * from './captive';
+export * from './speedtest';
 export * from './routes';

@@ -206,3 +206,13 @@ type AlertThresholds struct {
 	CPUPercent     float64 `json:"cpu_percent"`
 	MemoryPercent  float64 `json:"memory_percent"`
 }
+
+// SpeedtestService represents the speedtest CLI service availability and status.
+type SpeedtestService struct {
+	Installed      bool   `json:"installed"`
+	Supported      bool   `json:"supported"`
+	Architecture   string `json:"architecture"`
+	Version        string `json:"version"`
+	PackageName    string `json:"package_name"`
+	StorageSizeMB  int    `json:"storage_size_mb"`
+}

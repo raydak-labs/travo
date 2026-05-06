@@ -205,6 +205,17 @@ export interface SpeedTestResult {
   readonly server: string;
 }
 
+export function isSpeedTestResult(value: unknown): value is SpeedTestResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.download_mbps === 'number' &&
+    typeof v.upload_mbps === 'number' &&
+    typeof v.ping_ms === 'number' &&
+    typeof v.server === 'string'
+  );
+}
+
 /** Configurable alert thresholds */
 export interface AlertThresholds {
   readonly storage_percent: number;
