@@ -27,6 +27,7 @@ export const API_ROUTES = {
     timeSync: '/api/v1/system/time-sync',
     alerts: '/api/v1/system/alerts',
     alertThresholds: '/api/v1/system/alert-thresholds',
+    statsHistory: '/api/v1/system/stats/history',
     sshKeys: '/api/v1/system/ssh-keys',
     speedTest: '/api/v1/system/speed-test',
     speedtestService: '/api/v1/system/speedtest-service',

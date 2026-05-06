@@ -56,3 +56,6 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - WireGuard disable restores connectivity; AdGuard install/DNS path fixes.
 - OpenAPI at `GET /api/openapi.json`.
 - Packaging, install tarball, uci-defaults, CI workflows.
+- Connection failover: priority-based WAN source, health check, auto-switch, event notifications (mwan3).
+- Captive portal: DNS bypass/restore for custom DNS blocking portal access; form-based auto-accept.
+- Services: Watchcat (connection watchdog), Cloudflared (Cloudflare Tunnel) registered.

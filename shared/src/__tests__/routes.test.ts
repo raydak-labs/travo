@@ -160,6 +160,7 @@ describe('API_ROUTES', () => {
       '/api/v1/system/setup-complete',
       '/api/v1/system/time-sync',
       '/api/v1/system/alerts',
+      '/api/v1/system/stats/history',
       '/api/v1/network/status',
       '/api/v1/network/wan',
       '/api/v1/network/wan/detect',

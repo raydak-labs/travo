@@ -27,6 +27,7 @@ type Dependencies struct {
 	USBTether      *services.USBTetheringService
 	BandSwitching  *services.BandSwitchingService
 	Failover       *services.FailoverService
+	StatsHistory   *services.StatsHistoryService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -45,6 +46,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// System routes
 	v1.Get("/system/info", SystemInfoHandler(deps.System))
 	v1.Get("/system/stats", SystemStatsHandler(deps.System))
+	v1.Get("/system/stats/history", StatsHistoryHandler(deps.StatsHistory))
 	v1.Get("/system/logs", SystemLogsHandler(deps.System))
 	v1.Get("/system/logs/kernel", SystemKernelLogsHandler(deps.System))
 	v1.Post("/system/reboot", SystemRebootHandler(deps.System))

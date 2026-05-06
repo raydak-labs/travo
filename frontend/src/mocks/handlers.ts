@@ -45,6 +45,19 @@ export const handlers = [
     return HttpResponse.json(mockSystemStats);
   }),
 
+  http.get(API_ROUTES.system.statsHistory, () => {
+    // Generate 20 mock data points over the last 10 minutes
+    const now = Math.floor(Date.now() / 1000);
+    const points = Array.from({ length: 20 }, (_, i) => ({
+      time: now - (19 - i) * 30,
+      cpu: 20 + Math.random() * 40,
+      memory: 45 + Math.random() * 15,
+      rx_bytes: 1000000 * (i + 1),
+      tx_bytes: 500000 * (i + 1),
+    }));
+    return HttpResponse.json(points);
+  }),
+
   http.get(API_ROUTES.system.logs, ({ request }) => {
     const url = new URL(request.url);
     const service = url.searchParams.get('service');

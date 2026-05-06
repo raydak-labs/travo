@@ -185,6 +185,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	failoverSvc.SetAlertService(alertSvc)
 	uptimeTracker := services.NewUptimeTracker(captiveProber)
 
+	// Stats history: collect every 30s, keep 720 points (~6 hours)
+	statsHistory := services.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
+	statsHistory.Start()
+
 	// Token blocklist with cleanup goroutine
 	blocklist := auth.NewTokenBlocklist()
 	authSvc.SetBlocklist(blocklist)
@@ -223,6 +227,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		USBTether:      usbTetherSvc,
 		BandSwitching:  bandSwitchSvc,
 		Failover:       failoverSvc,
+		StatsHistory:   statsHistory,
 	}
 	api.SetupRoutes(app, deps)
 
