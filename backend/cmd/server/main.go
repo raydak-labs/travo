@@ -162,6 +162,15 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 				wifiSvc.WriteReconnectScriptSafe()
 			}
 		}()
+		// Auto-discover radio hardware and persist config on first boot.
+		go func() {
+			time.Sleep(10 * time.Second)
+			if discovered, err := wifiSvc.DiscoverAndPersistRadios(); err != nil {
+				log.Printf("WARNING: radio discovery failed: %v", err)
+			} else if discovered {
+				log.Printf("Radio auto-discovery completed on first boot.")
+			}
+		}()
 	}
 
 	vpnSvc := services.NewVpnService(u)
