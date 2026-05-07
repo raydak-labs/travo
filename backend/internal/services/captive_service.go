@@ -91,9 +91,14 @@ type CaptiveService struct {
 
 // dnsBackup holds the original DNS settings for restoration.
 type dnsBackup struct {
-	PeerDNS string `json:"peerdns"`
-	DNS     string `json:"dns"`
-	Time    int64  `json:"time"`
+	// Legacy wan-level settings (kept for backward compat)
+	PeerDNS string `json:"peerdns,omitempty"`
+	DNS     string `json:"dns,omitempty"`
+	// Dnsmasq-level settings (the actual blocking mechanism)
+	DnsmasqNoResolv      string   `json:"dnsmasq_noresolv,omitempty"`
+	DnsmasqServers       []string `json:"dnsmasq_servers,omitempty"`
+	DnsmasqRebindProtect string   `json:"dnsmasq_rebind_protection,omitempty"`
+	Time                 int64    `json:"time"`
 }
 
 // NewCaptiveService creates a new CaptiveService with the given HTTP prober.
@@ -114,16 +119,20 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error) {
 	statusCode, _, redirectURL, err := c.prober.Do(captiveProbeURL)
 	if err != nil {
-		// Probe failed (DNS error, timeout, connection refused).
-		// If custom DNS is configured, the captive portal is likely intercepting
-		// or blocking DNS lookups, which is why the probe can't reach the internet.
-		// Treat this as a captive portal detection signal so the UI shows the
-		// bypass option rather than just "no internet".
-		if c.CheckDNSBypassNeeded() {
-			fallback := captiveProbeURL
+		// Probe failed (DNS error, timeout, connection refused, "operation not permitted").
+		// This commonly happens when:
+		// 1. Custom DNS (AdGuard) can't resolve because captive portal blocks upstream
+		// 2. Captive portal firewall blocks all HTTP except to gateway
+		// Try to detect which case and build a useful portal URL.
+		gatewayURL := c.detectGatewayPortalURL()
+		if c.CheckDNSBypassNeeded() || gatewayURL != "" {
+			portalURL := gatewayURL
+			if portalURL == "" {
+				portalURL = captiveProbeURL
+			}
 			return models.CaptivePortalStatus{
-				Detected:        true,
-				PortalURL:       &fallback,
+				Detected:         true,
+				PortalURL:        &portalURL,
 				CanReachInternet: false,
 			}, nil
 		}
@@ -144,8 +153,13 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 	// Redirect = captive portal
 	if statusCode == http.StatusMovedPermanently ||
 		statusCode == http.StatusFound ||
+		statusCode == http.StatusSeeOther ||
 		statusCode == http.StatusTemporaryRedirect {
+		// Prefer gateway URL for auto-accept compatibility
 		portalURL := redirectURL
+		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
+			portalURL = gatewayURL
+		}
 		return models.CaptivePortalStatus{
 			Detected:         true,
 			PortalURL:        &portalURL,
@@ -156,6 +170,10 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 	// 200 with content = likely captive portal login page
 	if statusCode == http.StatusOK {
 		fallback := captiveProbeURL
+		// Prefer gateway URL if available — better for auto-accept
+		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
+			fallback = gatewayURL
+		}
 		return models.CaptivePortalStatus{
 			Detected:         true,
 			PortalURL:        &fallback,
@@ -176,7 +194,8 @@ func (c *CaptiveService) IsDNSBypassed() bool {
 	return err == nil
 }
 
-// BypassDNS temporarily switches WAN to upstream DNS (peerdns=1) for captive portal access.
+// BypassDNS temporarily disables custom DNS (AdGuard/noresolv) so that the
+// captive portal's DNS can be resolved via the upstream DHCP-provided nameserver.
 // Stores original config in guard file for later restoration.
 func (c *CaptiveService) BypassDNS() error {
 	c.mu.Lock()
@@ -191,22 +210,30 @@ func (c *CaptiveService) BypassDNS() error {
 		return nil
 	}
 
-	// Read current DNS config
-	opts, err := c.uci.GetAll("network", "wan")
-	if err != nil {
-		return err
-	}
+	// Read dnsmasq config — this is the real culprit when AdGuard is configured
+	noresolv := c.getDnsmasqOption("noresolv")
+	servers := c.getDnsmasqServers()
+	rebindProtect := c.getDnsmasqOption("rebind_protection")
 
-	// If already using upstream DNS, nothing to bypass
-	if opts["peerdns"] != "0" {
+	// Also read wan config for completeness
+	wanOpts, _ := c.uci.GetAll("network", "wan")
+	wanPeerdns := wanOpts["peerdns"]
+	wanDNS := wanOpts["dns"]
+
+	// Check if there's anything to bypass
+	needsBypass := (noresolv == "1" && len(servers) > 0) || (wanPeerdns == "0" && strings.TrimSpace(wanDNS) != "")
+	if !needsBypass {
 		return nil
 	}
 
 	// Save current state
 	backup := dnsBackup{
-		PeerDNS: opts["peerdns"],
-		DNS:     opts["dns"],
-		Time:    time.Now().Unix(),
+		PeerDNS:              wanPeerdns,
+		DNS:                  wanDNS,
+		DnsmasqNoResolv:      noresolv,
+		DnsmasqServers:       servers,
+		DnsmasqRebindProtect: rebindProtect,
+		Time:                 time.Now().Unix(),
 	}
 	data, err := json.Marshal(backup)
 	if err != nil {
@@ -219,25 +246,39 @@ func (c *CaptiveService) BypassDNS() error {
 		return err
 	}
 
-	// Set to use upstream DNS
-	if err := c.uci.Set("network", "wan", "peerdns", "1"); err != nil {
-		_ = os.Remove(c.guardFile)
-		return err
+	// Disable noresolv so dnsmasq reads /tmp/resolv.conf.d/resolv.conf.auto
+	if noresolv == "1" {
+		if err := c.setDnsmasqOption("noresolv", "0"); err != nil {
+			_ = os.Remove(c.guardFile)
+			return err
+		}
+		// Remove custom servers so dnsmasq uses upstream from resolv.conf
+		_ = c.deleteDnsmasqOption("server")
 	}
-	if err := c.uci.Set("network", "wan", "dns", ""); err != nil {
-		_ = os.Remove(c.guardFile)
-		return err
+
+	// Disable rebind protection — captive portals use private IPs for hostnames
+	if rebindProtect == "1" {
+		_ = c.setDnsmasqOption("rebind_protection", "0")
 	}
-	if err := c.uci.Commit("network"); err != nil {
+
+	if err := c.commitDhcp(); err != nil {
 		_ = os.Remove(c.guardFile)
 		return err
 	}
 
-	// Restart dnsmasq to pick up new resolv.conf
+	// Also fix wan peerdns if needed
+	if wanPeerdns == "0" {
+		_ = c.uci.Set("network", "wan", "peerdns", "1")
+		_ = c.uci.Set("network", "wan", "dns", "")
+		_ = c.uci.Commit("network")
+	}
+
+	// Restart dnsmasq to pick up new settings
 	if c.cmd != nil {
 		_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	}
 
+	log.Printf("captive: DNS bypassed (noresolv=%s, servers=%v, peerdns=%s)", noresolv, servers, wanPeerdns)
 	return nil
 }
 
@@ -261,15 +302,29 @@ func (c *CaptiveService) RestoreDNS() error {
 		return err
 	}
 
-	if err := c.uci.Set("network", "wan", "peerdns", backup.PeerDNS); err != nil {
-		return err
+	// Restore dnsmasq settings
+	if backup.DnsmasqNoResolv == "1" {
+		_ = c.setDnsmasqOption("noresolv", "1")
+		for _, srv := range backup.DnsmasqServers {
+			_ = c.addDnsmasqListItem("server", srv)
+		}
 	}
-	dnsVal := backup.DNS
-	if err := c.uci.Set("network", "wan", "dns", dnsVal); err != nil {
-		return err
+	if backup.DnsmasqRebindProtect == "1" {
+		_ = c.setDnsmasqOption("rebind_protection", "1")
 	}
-	if err := c.uci.Commit("network"); err != nil {
-		return err
+	if backup.DnsmasqNoResolv == "1" || backup.DnsmasqRebindProtect == "1" {
+		_ = c.commitDhcp()
+	}
+
+	// Restore wan settings
+	if backup.PeerDNS != "" {
+		_ = c.uci.Set("network", "wan", "peerdns", backup.PeerDNS)
+	}
+	if backup.DNS != "" {
+		_ = c.uci.Set("network", "wan", "dns", backup.DNS)
+	}
+	if backup.PeerDNS != "" || backup.DNS != "" {
+		_ = c.uci.Commit("network")
 	}
 
 	_ = os.Remove(c.guardFile)
@@ -278,7 +333,79 @@ func (c *CaptiveService) RestoreDNS() error {
 		_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	}
 
+	log.Printf("captive: DNS restored")
 	return nil
+}
+
+// findDnsmasqSection returns the UCI section identifier for the first dnsmasq instance.
+// On real OpenWRT this is typically "@dnsmasq[0]" (unnamed section).
+func (c *CaptiveService) findDnsmasqSection() string {
+	return "@dnsmasq[0]"
+}
+
+// getDnsmasqServers returns the list of server entries for the dnsmasq section
+// by running `uci get dhcp.@dnsmasq[0].server` via CommandRunner.
+func (c *CaptiveService) getDnsmasqServers() []string {
+	if c.cmd == nil {
+		return nil
+	}
+	out, err := c.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")
+	if err != nil {
+		return nil
+	}
+	val := strings.TrimSpace(string(out))
+	if val == "" {
+		return nil
+	}
+	return strings.Fields(val)
+}
+
+// getDnsmasqOption reads a single dnsmasq option via uci get.
+func (c *CaptiveService) getDnsmasqOption(option string) string {
+	if c.cmd == nil {
+		return ""
+	}
+	out, err := c.cmd.Run("uci", "get", "dhcp.@dnsmasq[0]."+option)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// setDnsmasqOption sets a dnsmasq option via uci set.
+func (c *CaptiveService) setDnsmasqOption(option, value string) error {
+	if c.cmd == nil {
+		return nil
+	}
+	_, err := c.cmd.Run("uci", "set", "dhcp.@dnsmasq[0]."+option+"="+value)
+	return err
+}
+
+// deleteDnsmasqOption deletes a dnsmasq option via uci delete.
+func (c *CaptiveService) deleteDnsmasqOption(option string) error {
+	if c.cmd == nil {
+		return nil
+	}
+	_, _ = c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0]."+option)
+	return nil
+}
+
+// addDnsmasqListItem appends a value to a dnsmasq list option.
+func (c *CaptiveService) addDnsmasqListItem(option, value string) error {
+	if c.cmd == nil {
+		return nil
+	}
+	_, err := c.cmd.Run("uci", "add_list", "dhcp.@dnsmasq[0]."+option+"="+value)
+	return err
+}
+
+// commitDhcp runs uci commit dhcp.
+func (c *CaptiveService) commitDhcp() error {
+	if c.cmd == nil {
+		return nil
+	}
+	_, err := c.cmd.Run("uci", "commit", "dhcp")
+	return err
 }
 
 // autoRestoreStaleBypass restores DNS if guard file is older than timeout.
@@ -309,14 +436,87 @@ func (c *CaptiveService) MaybeAutoRestoreDNS(canReachInternet bool) {
 	_ = c.RestoreDNS()
 }
 
-// CheckDNSBypassNeeded returns true if custom DNS is configured (blocking portal access).
+// refreshBypassTimestamp updates the guard file timestamp to prevent stale auto-restore.
+func (c *CaptiveService) refreshBypassTimestamp() {
+	data, err := os.ReadFile(c.guardFile)
+	if err != nil {
+		return
+	}
+	var backup dnsBackup
+	if err := json.Unmarshal(data, &backup); err != nil {
+		return
+	}
+	backup.Time = time.Now().Unix()
+	newData, err := json.Marshal(backup)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(c.guardFile, newData, 0600)
+}
+
+// CheckDNSBypassNeeded returns true if custom DNS is configured that would
+// block captive portal access (e.g. AdGuard with noresolv, or wan peerdns=0).
 func (c *CaptiveService) CheckDNSBypassNeeded() bool {
 	if c.uci == nil {
 		return false
 	}
+
+	// Check dnsmasq noresolv + custom server (the main culprit with AdGuard)
+	noresolv := c.getDnsmasqOption("noresolv")
+	if noresolv == "1" {
+		servers := c.getDnsmasqServers()
+		if len(servers) > 0 {
+			return true
+		}
+	}
+
+	// Also check legacy wan peerdns=0
 	opts, err := c.uci.GetAll("network", "wan")
 	if err != nil {
 		return false
 	}
 	return opts["peerdns"] == "0" && strings.TrimSpace(opts["dns"]) != ""
+}
+
+// detectGatewayPortalURL tries to detect a captive portal by probing the default
+// gateway on HTTP. Many captive portals (hotel/airport) respond with a redirect
+// when you hit the gateway IP directly.
+func (c *CaptiveService) detectGatewayPortalURL() string {
+	if c.cmd == nil {
+		return ""
+	}
+	// Get the default gateway from `ip route`
+	out, err := c.cmd.Run("ip", "route", "show", "default")
+	if err != nil {
+		return ""
+	}
+	// Parse "default via <IP> dev <iface> ..."
+	fields := strings.Fields(strings.TrimSpace(string(out)))
+	if len(fields) < 3 || fields[0] != "default" || fields[1] != "via" {
+		return ""
+	}
+	gatewayIP := fields[2]
+	if gatewayIP == "" {
+		return ""
+	}
+
+	// Try to probe the gateway on HTTP (short timeout)
+	gatewayURL := "http://" + gatewayIP + "/"
+	statusCode, _, _, err := c.prober.Do(gatewayURL)
+	if err != nil {
+		return ""
+	}
+
+	// If it redirects or serves a page, the gateway itself is the portal entry point.
+	// Return the gateway HTTP URL (not the redirect target) because:
+	// 1. Users open this in their browser which follows redirects naturally
+	// 2. HTTPS redirect targets often don't work when fetched directly
+	// 3. Multi-step portals (MikroTik → external auth → back) need the browser flow
+	if statusCode == http.StatusFound || statusCode == http.StatusMovedPermanently ||
+		statusCode == http.StatusTemporaryRedirect || statusCode == http.StatusSeeOther ||
+		statusCode == http.StatusOK {
+		return gatewayURL
+	}
+
+	return ""
 }
