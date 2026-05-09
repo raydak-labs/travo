@@ -118,13 +118,16 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 // to a known endpoint and checking for redirects or unexpected responses.
 func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error) {
 	statusCode, _, redirectURL, err := c.prober.Do(captiveProbeURL)
+
+	// Resolve gateway URL once — used across multiple branches.
+	gatewayURL := c.detectGatewayPortalURL()
+
 	if err != nil {
 		// Probe failed (DNS error, timeout, connection refused, "operation not permitted").
 		// This commonly happens when:
 		// 1. Custom DNS (AdGuard) can't resolve because captive portal blocks upstream
 		// 2. Captive portal firewall blocks all HTTP except to gateway
 		// Try to detect which case and build a useful portal URL.
-		gatewayURL := c.detectGatewayPortalURL()
 		if c.CheckDNSBypassNeeded() || gatewayURL != "" {
 			portalURL := gatewayURL
 			if portalURL == "" {
@@ -157,7 +160,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 		statusCode == http.StatusTemporaryRedirect {
 		// Prefer gateway URL for auto-accept compatibility
 		portalURL := redirectURL
-		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
+		if gatewayURL != "" {
 			portalURL = gatewayURL
 		}
 		return models.CaptivePortalStatus{
@@ -171,7 +174,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 	if statusCode == http.StatusOK {
 		fallback := captiveProbeURL
 		// Prefer gateway URL if available — better for auto-accept
-		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
+		if gatewayURL != "" {
 			fallback = gatewayURL
 		}
 		return models.CaptivePortalStatus{
@@ -335,12 +338,6 @@ func (c *CaptiveService) RestoreDNS() error {
 
 	log.Printf("captive: DNS restored")
 	return nil
-}
-
-// findDnsmasqSection returns the UCI section identifier for the first dnsmasq instance.
-// On real OpenWRT this is typically "@dnsmasq[0]" (unnamed section).
-func (c *CaptiveService) findDnsmasqSection() string {
-	return "@dnsmasq[0]"
 }
 
 // getDnsmasqServers returns the list of server entries for the dnsmasq section

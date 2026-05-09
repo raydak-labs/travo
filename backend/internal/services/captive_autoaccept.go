@@ -16,7 +16,7 @@ import (
 
 const (
 	captiveAutoAcceptMaxBodyBytes = 256 * 1024
-	captiveMaxSteps              = 8 // max pages to follow in a multi-step portal
+	captiveMaxSteps               = 8 // max pages to follow in a multi-step portal
 )
 
 var (
@@ -39,11 +39,73 @@ var (
 	// Auto-submit pattern: document.formName.submit(), document.forms[0].submit()
 	captiveAutoSubmitRe = regexp.MustCompile(
 		`(?i)document\.(?:forms\[\d+\]|\w+)\.submit\(\)`)
+
+	captiveHTMLTagRe = regexp.MustCompile(`(?s)<[^>]+>`)
 )
 
 func stripTags(s string) string {
-	out := regexp.MustCompile(`(?s)<[^>]+>`).ReplaceAllString(s, " ")
+	out := captiveHTMLTagRe.ReplaceAllString(s, " ")
 	return strings.Join(strings.Fields(out), " ")
+}
+
+func parseFormInputs(formBody string) url.Values {
+	values := url.Values{}
+	for _, inp := range captiveInputRe.FindAllStringSubmatch(formBody, -1) {
+		if len(inp) < 2 {
+			continue
+		}
+		attrs := inp[1]
+		nameMatch := captiveInputNameRe.FindStringSubmatch(attrs)
+		if nameMatch == nil {
+			continue
+		}
+		name := nameMatch[1]
+		value := ""
+		if valMatch := captiveInputValueRe.FindStringSubmatch(attrs); valMatch != nil {
+			value = valMatch[1]
+		}
+		typeMatch := captiveInputTypeRe.FindStringSubmatch(attrs)
+		inputType := "text"
+		if typeMatch != nil {
+			inputType = strings.ToLower(typeMatch[1])
+		}
+		switch inputType {
+		case "checkbox":
+			if value == "" {
+				value = "on"
+			}
+			values.Set(name, value)
+		case "radio":
+			if values.Get(name) == "" {
+				if value == "" {
+					value = "on"
+				}
+				values.Set(name, value)
+			}
+		default:
+			values.Set(name, value)
+		}
+	}
+	return values
+}
+
+func parseFormMeta(fullForm string, base *url.URL) (string, string) {
+	action := ""
+	if m := captiveFormActionRe.FindStringSubmatch(fullForm); m != nil {
+		action = m[1]
+	}
+	method := "POST"
+	if m := captiveFormMethodRe.FindStringSubmatch(fullForm); m != nil {
+		method = strings.ToUpper(m[1])
+	}
+	actionURL := base.String()
+	if action != "" {
+		resolved, err := resolveCaptiveURL(base, action)
+		if err == nil {
+			actionURL = resolved
+		}
+	}
+	return actionURL, method
 }
 
 func looksLikeCaptiveCTA(anchorInnerHTML string) bool {
@@ -92,62 +154,8 @@ func extractAllForms(html string, base *url.URL) []captiveFormData {
 		fullForm := formMatch[0]
 		formBody := formMatch[1]
 
-		action := ""
-		if m := captiveFormActionRe.FindStringSubmatch(fullForm); m != nil {
-			action = m[1]
-		}
-		method := "POST"
-		if m := captiveFormMethodRe.FindStringSubmatch(fullForm); m != nil {
-			method = strings.ToUpper(m[1])
-		}
-
-		actionURL := base.String()
-		if action != "" {
-			resolved, err := resolveCaptiveURL(base, action)
-			if err == nil {
-				actionURL = resolved
-			}
-		}
-
-		values := url.Values{}
-		for _, inp := range captiveInputRe.FindAllStringSubmatch(formBody, -1) {
-			if len(inp) < 2 {
-				continue
-			}
-			attrs := inp[1]
-			nameMatch := captiveInputNameRe.FindStringSubmatch(attrs)
-			if nameMatch == nil {
-				continue
-			}
-			name := nameMatch[1]
-			value := ""
-			if valMatch := captiveInputValueRe.FindStringSubmatch(attrs); valMatch != nil {
-				value = valMatch[1]
-			}
-
-			typeMatch := captiveInputTypeRe.FindStringSubmatch(attrs)
-			inputType := "text"
-			if typeMatch != nil {
-				inputType = strings.ToLower(typeMatch[1])
-			}
-
-			switch inputType {
-			case "checkbox":
-				if value == "" {
-					value = "on"
-				}
-				values.Set(name, value)
-			case "radio":
-				if values.Get(name) == "" {
-					if value == "" {
-						value = "on"
-					}
-					values.Set(name, value)
-				}
-			default:
-				values.Set(name, value)
-			}
-		}
+		actionURL, method := parseFormMeta(fullForm, base)
+		values := parseFormInputs(formBody)
 
 		forms = append(forms, captiveFormData{
 			Action: actionURL,
@@ -252,66 +260,8 @@ func extractCaptiveForms(html string, base *url.URL) []captiveFormData {
 			continue
 		}
 
-		// Parse action
-		action := ""
-		if m := captiveFormActionRe.FindStringSubmatch(fullForm); m != nil {
-			action = m[1]
-		}
-		method := "POST"
-		if m := captiveFormMethodRe.FindStringSubmatch(fullForm); m != nil {
-			method = strings.ToUpper(m[1])
-		}
-
-		actionURL := base.String()
-		if action != "" {
-			resolved, err := resolveCaptiveURL(base, action)
-			if err == nil {
-				actionURL = resolved
-			}
-		}
-
-		// Extract form inputs
-		values := url.Values{}
-		for _, inp := range captiveInputRe.FindAllStringSubmatch(formBody, -1) {
-			if len(inp) < 2 {
-				continue
-			}
-			attrs := inp[1]
-			nameMatch := captiveInputNameRe.FindStringSubmatch(attrs)
-			if nameMatch == nil {
-				continue
-			}
-			name := nameMatch[1]
-			value := ""
-			if valMatch := captiveInputValueRe.FindStringSubmatch(attrs); valMatch != nil {
-				value = valMatch[1]
-			}
-
-			typeMatch := captiveInputTypeRe.FindStringSubmatch(attrs)
-			inputType := "text"
-			if typeMatch != nil {
-				inputType = strings.ToLower(typeMatch[1])
-			}
-
-			switch inputType {
-			case "checkbox":
-				// Check all checkboxes (accept terms, etc.)
-				if value == "" {
-					value = "on"
-				}
-				values.Set(name, value)
-			case "radio":
-				// Only set if not already set
-				if values.Get(name) == "" {
-					if value == "" {
-						value = "on"
-					}
-					values.Set(name, value)
-				}
-			default:
-				values.Set(name, value)
-			}
-		}
+		actionURL, method := parseFormMeta(fullForm, base)
+		values := parseFormInputs(formBody)
 
 		forms = append(forms, captiveFormData{
 			Action: actionURL,
