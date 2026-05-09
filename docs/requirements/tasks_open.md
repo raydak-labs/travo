@@ -11,7 +11,7 @@ Working backlog only — no duplicate “priority queue”; each item appears on
 
 Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
-> **Last updated:** 2026-04-13
+> **Last updated:** 2026-05-06
 
 ## 1. WiFi Management
 
@@ -21,7 +21,7 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ### 1.4 Multi-Radio Support
 
-- [ ] Startup script to auto-discover radio setup and persist config
+- [ ] Startup script to auto-discover radio setup and persist config *(implemented — runs on first boot, writes /etc/travo/radios.json)*
 
 ## 2. Network Management
 
@@ -36,10 +36,10 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ### 2.7 Connection Failover
 
-- [ ] Priority-based WAN source (Ethernet > WiFi > USB Tether). See [Connection Failover plan](../plans/connection-failover.md).
-- [ ] Health check via periodic ping (configurable target). See [Connection Failover plan](../plans/connection-failover.md).
-- [ ] Auto-switch to next source on failure. See [Connection Failover plan](../plans/connection-failover.md).
-- [ ] Notification on failover event. See [Connection Failover plan](../plans/connection-failover.md).
+- [ ] Priority-based WAN source (Ethernet > WiFi > USB Tether). See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
+- [ ] Health check via periodic ping (configurable target). See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
+- [ ] Auto-switch to next source on failure. See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
+- [ ] Notification on failover event. See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
 
 ## 3. VPN Management
 
@@ -51,8 +51,8 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ### 4.6 Future Services
 
-- [ ] Cloudflared (Cloudflare Tunnel)
-- [ ] Watchcat (connection watchdog)
+- [ ] Cloudflared (Cloudflare Tunnel) *(registered — needs on-device test)*
+- [ ] Watchcat (connection watchdog) *(registered — needs on-device test)*
 
 ## 6. Dashboard And Monitoring
 

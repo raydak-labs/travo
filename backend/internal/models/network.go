@@ -70,6 +70,7 @@ type MACConfig struct {
 	Interface  string `json:"interface"`
 	CurrentMAC string `json:"current_mac"`
 	CustomMAC  string `json:"custom_mac,omitempty"`
+	IsApplied  bool   `json:"is_applied"`
 }
 
 // SetMACRequest holds the request to set a MAC address.

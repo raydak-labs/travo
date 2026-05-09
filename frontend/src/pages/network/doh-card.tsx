@@ -3,11 +3,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { useDoHStatus, useSetDoHEnabled } from '@/hooks/use-network';
+import { useDoHConfig, useSetDoHConfig } from '@/hooks/use-network';
 
 export function DoHCard() {
-  const { data: cfg, isLoading } = useDoHStatus();
-  const setDoH = useSetDoHEnabled();
+  const { data: cfg, isLoading } = useDoHConfig();
+  const setDoH = useSetDoHConfig();
 
   return (
     <Card>

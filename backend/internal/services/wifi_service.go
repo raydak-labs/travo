@@ -1124,7 +1124,7 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 		return false
 	}()
 
-		allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
 
 	if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
 		return nil, err
@@ -1703,16 +1703,22 @@ func (w *WifiService) GetMACAddresses() ([]models.MACConfig, error) {
 			currentMAC = strings.TrimSpace(string(data))
 		}
 	}
+	customMAC := staOpts["macaddr"]
+	isApplied := customMAC != "" && strings.EqualFold(currentMAC, customMAC)
 	configs = append(configs, models.MACConfig{
 		Interface:  "sta",
 		CurrentMAC: currentMAC,
-		CustomMAC:  staOpts["macaddr"],
+		CustomMAC:  customMAC,
+		IsApplied:  isApplied,
 	})
 
 	return configs, nil
 }
 
 // SetMACAddress sets a custom MAC address on the STA WiFi interface.
+// It writes the macaddr UCI option (persists across reboots via wifi up) and
+// also applies it immediately via "ip link set" so the change takes effect
+// without requiring a full wifi restart.
 func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 	staSection, err := w.findSTASection()
 	if err != nil {
@@ -1731,7 +1737,57 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 	if err := w.uci.Commit("wireless"); err != nil {
 		return nil, fmt.Errorf("committing wireless: %w", err)
 	}
+
+	// Apply the MAC immediately at runtime via ip link so it takes effect
+	// without waiting for wifi up. mac80211.sh also applies it on wifi up.
+	w.applyMACImmediate(mac)
+
 	return w.stageWirelessApply()
+}
+
+// applyMACImmediate applies (or restores) the MAC address on the live STA
+// interface right now using ip link, without requiring a wifi restart.
+// Errors are ignored because the UCI/wifi-up path is the authoritative one.
+func (w *WifiService) applyMACImmediate(mac string) {
+	if w.cmd == nil {
+		return
+	}
+	ifname, _, err := w.findSTADevice()
+	if err != nil || ifname == "" {
+		return
+	}
+	if mac == "" {
+		// Restore hardware MAC from the phy's permanent address list.
+		hwMAC := w.readPhyHardwareMAC(ifname)
+		if hwMAC == "" {
+			return // can't restore without knowing the permanent MAC
+		}
+		mac = hwMAC
+	}
+	_, _ = w.cmd.Run("ip", "link", "set", ifname, "down")
+	_, _ = w.cmd.Run("ip", "link", "set", ifname, "address", mac)
+	_, _ = w.cmd.Run("ip", "link", "set", ifname, "up")
+}
+
+// readPhyHardwareMAC reads the permanent/hardware MAC address for a wireless
+// interface from its parent phy's sysfs address list.
+func (w *WifiService) readPhyHardwareMAC(ifname string) string {
+	// Resolve the phy name from the interface: /sys/class/net/<ifname>/phy80211/name
+	phyNameBytes, err := os.ReadFile("/sys/class/net/" + ifname + "/phy80211/name")
+	if err != nil {
+		return ""
+	}
+	phyName := strings.TrimSpace(string(phyNameBytes))
+	// Read the first address from the phy (permanent hardware MAC).
+	addrsBytes, err := os.ReadFile("/sys/class/ieee80211/" + phyName + "/addresses")
+	if err != nil {
+		return ""
+	}
+	lines := strings.Fields(string(addrsBytes))
+	if len(lines) > 0 {
+		return strings.TrimSpace(lines[0])
+	}
+	return ""
 }
 
 // RandomizeMAC generates a random locally-administered unicast MAC address

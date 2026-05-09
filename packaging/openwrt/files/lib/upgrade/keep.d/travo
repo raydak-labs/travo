@@ -1,0 +1,8 @@
+# travo — files preserved across sysupgrade
+# self-bootstrapping: keeps this file so future upgrades also preserve travo
+/lib/upgrade/keep.d/travo
+/usr/bin/travo
+/etc/init.d/travo
+/etc/config/travo
+/etc/travo
+/www/travo

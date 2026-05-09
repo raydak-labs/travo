@@ -11,6 +11,8 @@ describe('CaptivePortalStatus', () => {
     const status: CaptivePortalStatus = {
       detected: false,
       can_reach_internet: true,
+      dns_bypassed: false,
+      dns_bypass_needed: false,
     };
     expect(isCaptivePortalStatus(status)).toBe(true);
   });
@@ -20,6 +22,8 @@ describe('CaptivePortalStatus', () => {
       detected: true,
       portal_url: 'http://captive.example.com/login',
       can_reach_internet: false,
+      dns_bypassed: false,
+      dns_bypass_needed: true,
     };
     expect(isCaptivePortalStatus(status)).toBe(true);
   });

@@ -27,6 +27,7 @@ export const API_ROUTES = {
     timeSync: '/api/v1/system/time-sync',
     alerts: '/api/v1/system/alerts',
     alertThresholds: '/api/v1/system/alert-thresholds',
+    statsHistory: '/api/v1/system/stats/history',
     sshKeys: '/api/v1/system/ssh-keys',
     speedTest: '/api/v1/system/speed-test',
     speedtestService: '/api/v1/system/speedtest-service',
@@ -135,6 +136,8 @@ export const API_ROUTES = {
   captive: {
     status: '/api/v1/captive/status',
     autoAccept: '/api/v1/captive/auto-accept',
+    dnsBypass: '/api/v1/captive/dns-bypass',
+    dnsRestore: '/api/v1/captive/dns-restore',
   },
   adguard: {
     dns: '/api/v1/adguard/dns',

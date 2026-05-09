@@ -60,3 +60,22 @@ func (r *RealUbus) Call(path, method string, args map[string]interface{}) (map[s
 
 	return result, nil
 }
+
+// ExtractSessionID finds ubus_rpc_session in a ubus login response.
+// Handles both top-level and result-array formats returned by different
+// OpenWrt versions.
+func ExtractSessionID(m map[string]interface{}) string {
+	if s, _ := m["ubus_rpc_session"].(string); s != "" {
+		return s
+	}
+	arr, ok := m["result"].([]interface{})
+	if !ok || len(arr) < 2 {
+		return ""
+	}
+	obj, ok := arr[1].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	s, _ := obj["ubus_rpc_session"].(string)
+	return s
+}

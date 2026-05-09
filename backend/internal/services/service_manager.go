@@ -83,6 +83,20 @@ var knownServices = []serviceDefinition{
 		Packages:    []string{"mwan3"},
 		InitName:    "mwan3",
 	},
+	{
+		ID:          "watchcat",
+		Name:        "Watchcat",
+		Description: "Connection watchdog — auto-reboot or restart interfaces on connectivity loss",
+		Packages:    []string{"watchcat"},
+		InitName:    "watchcat",
+	},
+	{
+		ID:          "cloudflared",
+		Name:        "Cloudflare Tunnel",
+		Description: "Expose local services securely via Cloudflare network without port forwarding",
+		Packages:    []string{"cloudflared"},
+		InitName:    "cloudflared",
+	},
 }
 
 // ServiceManager manages installable services.

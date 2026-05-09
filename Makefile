@@ -1,4 +1,9 @@
-.PHONY: dev build test lint format clean build-prod build-all package package-all deploy docker-dev
+.PHONY: dev build test lint format clean build-prod build-all package package-all deploy docker-dev install
+
+# Install all dependencies (run once after cloning or after dep changes)
+install:
+	pnpm install
+	cd backend && go mod download
 
 # Run frontend and backend dev servers concurrently
 dev:

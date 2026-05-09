@@ -17,12 +17,12 @@ type WifiScanResult struct {
 //	"warning" — STA is associated but wwan has no lease yet.
 //	"error"   — wwan is bound to a different device than the associated STA (config mismatch).
 type WifiHealth struct {
-	Status string `json:"status"`
+	Status string   `json:"status"`
 	Issues []string `json:"issues"`
 	// RepeaterSameRadioAPSTA is true when repeater mode, multi-radio, allow_ap_on_sta is off,
 	// and an enabled AP shares the STA wifi-device (fragile on many chipsets).
 	RepeaterSameRadioAPSTA bool `json:"repeater_same_radio_ap_sta"`
-	STA    *struct {
+	STA                    *struct {
 		Ifname     string `json:"ifname"`
 		SSID       string `json:"ssid"`
 		Associated bool   `json:"associated"`

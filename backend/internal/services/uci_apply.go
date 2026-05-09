@@ -107,25 +107,7 @@ func (r *RealUCIApplyConfirm) sessionLogin() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return extractSessionID(resp), nil
-}
-
-// extractSessionID finds ubus_rpc_session in the login response.
-// Handles top-level or result-array format.
-func extractSessionID(m map[string]interface{}) string {
-	if s, _ := m["ubus_rpc_session"].(string); s != "" {
-		return s
-	}
-	arr, ok := m["result"].([]interface{})
-	if !ok || len(arr) < 2 {
-		return ""
-	}
-	obj, ok := arr[1].(map[string]interface{})
-	if !ok {
-		return ""
-	}
-	s, _ := obj["ubus_rpc_session"].(string)
-	return s
+	return ubus.ExtractSessionID(resp), nil
 }
 
 func copyFile(src, dst string) error {

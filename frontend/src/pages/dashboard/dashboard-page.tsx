@@ -7,6 +7,7 @@ import { DataUsageCard } from './data-usage-card';
 import { QuickActions } from './quick-actions';
 import { BandwidthChart } from './bandwidth-chart';
 import { NetworkChart } from './network-chart';
+import { StatsHistoryCard } from './stats-history-card';
 import { TimezoneAlert } from '@/components/timezone-alert';
 
 export function DashboardPage() {
@@ -26,6 +27,7 @@ export function DashboardPage() {
         <BandwidthChart />
         <NetworkChart />
       </div>
+      <StatsHistoryCard />
     </div>
   );
 }

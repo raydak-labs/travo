@@ -27,6 +27,7 @@ type Dependencies struct {
 	USBTether      *services.USBTetheringService
 	BandSwitching  *services.BandSwitchingService
 	Failover       *services.FailoverService
+	StatsHistory   *services.StatsHistoryService
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -40,11 +41,12 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
 	v1.Post("/auth/logout", LogoutHandler(deps.Auth, deps.Blocklist))
 	v1.Get("/auth/session", SessionHandler(deps.Auth))
-	v1.Put("/auth/password", ChangePasswordHandler(deps.Auth, deps.AuthStore))
+	v1.Put("/auth/password", ChangePasswordHandler(deps.Auth))
 
 	// System routes
 	v1.Get("/system/info", SystemInfoHandler(deps.System))
 	v1.Get("/system/stats", SystemStatsHandler(deps.System))
+	v1.Get("/system/stats/history", StatsHistoryHandler(deps.StatsHistory))
 	v1.Get("/system/logs", SystemLogsHandler(deps.System))
 	v1.Get("/system/logs/kernel", SystemKernelLogsHandler(deps.System))
 	v1.Post("/system/reboot", SystemRebootHandler(deps.System))
@@ -214,4 +216,6 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// Captive portal
 	v1.Get("/captive/status", CaptiveStatusHandler(deps.Captive))
 	v1.Post("/captive/auto-accept", CaptiveAutoAcceptHandler(deps.Captive))
+	v1.Post("/captive/dns-bypass", CaptiveDNSBypassHandler(deps.Captive))
+	v1.Post("/captive/dns-restore", CaptiveDNSRestoreHandler(deps.Captive))
 }

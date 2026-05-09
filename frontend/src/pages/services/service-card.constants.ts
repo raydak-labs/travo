@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Shield, ShieldCheck, ShieldBan, Globe, ArrowLeftRight } from 'lucide-react';
+import { Shield, ShieldCheck, ShieldBan, Globe, ArrowLeftRight, Eye, Cloud } from 'lucide-react';
 import type { ServiceState } from '@shared/index';
 
 export const serviceCardIcons: Record<string, LucideIcon> = {
@@ -8,6 +8,8 @@ export const serviceCardIcons: Record<string, LucideIcon> = {
   adguardhome: ShieldBan,
   openvpn: Globe,
   mwan3: ArrowLeftRight,
+  watchcat: Eye,
+  cloudflared: Cloud,
 };
 
 export const serviceStateBadgeVariant: Record<

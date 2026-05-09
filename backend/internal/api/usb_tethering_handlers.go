@@ -20,16 +20,12 @@ func ConfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler 
 			Interface string `json:"interface"`
 		}
 		if err := c.Bind().Body(&req); err != nil || req.Interface == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "interface is required",
-			})
+			return RespondWithError(c, fiber.StatusBadRequest, "interface is required")
 		}
 		if err := svc.Configure(req.Interface); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -37,10 +33,8 @@ func ConfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler 
 func UnconfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.Unconfigure(); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }

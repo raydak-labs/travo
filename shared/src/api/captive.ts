@@ -3,6 +3,8 @@ export interface CaptivePortalStatus {
   readonly detected: boolean;
   readonly portal_url?: string;
   readonly can_reach_internet: boolean;
+  readonly dns_bypassed: boolean;
+  readonly dns_bypass_needed: boolean;
 }
 
 /** Type guard for CaptivePortalStatus */

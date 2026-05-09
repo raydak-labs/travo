@@ -209,10 +209,10 @@ type AlertThresholds struct {
 
 // SpeedtestService represents the speedtest CLI service availability and status.
 type SpeedtestService struct {
-	Installed      bool   `json:"installed"`
-	Supported      bool   `json:"supported"`
-	Architecture   string `json:"architecture"`
-	Version        string `json:"version"`
-	PackageName    string `json:"package_name"`
-	StorageSizeMB  int    `json:"storage_size_mb"`
+	Installed     bool   `json:"installed"`
+	Supported     bool   `json:"supported"`
+	Architecture  string `json:"architecture"`
+	Version       string `json:"version"`
+	PackageName   string `json:"package_name"`
+	StorageSizeMB int    `json:"storage_size_mb"`
 }

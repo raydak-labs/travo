@@ -12,6 +12,7 @@
 ## Tools & Setup
 
 - everything should be installed via `mise`. See `.mise.toml`
+- Run `make install` once after cloning or whenever dependencies change (installs pnpm packages and downloads Go modules)
 
 ## Project Plans
 

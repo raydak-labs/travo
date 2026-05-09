@@ -15,7 +15,8 @@ export function SpeedtestPage() {
   const uninstallMutation = useUninstallSpeedtestCLI();
   const runMutation = useRunSpeedtest();
 
-  const isPending = installMutation.isPending || uninstallMutation.isPending || runMutation.isPending;
+  const isPending =
+    installMutation.isPending || uninstallMutation.isPending || runMutation.isPending;
 
   if (isLoading) {
     return (
@@ -127,17 +128,23 @@ export function SpeedtestPage() {
               <div className="flex items-center gap-2">
                 <Download className="h-4 w-4 text-gray-500" />
                 <span className="text-gray-500 dark:text-gray-400">Download</span>
-                <span className="ml-auto font-medium">{runMutation.data.download_mbps.toFixed(2)} Mbps</span>
+                <span className="ml-auto font-medium">
+                  {runMutation.data.download_mbps.toFixed(2)} Mbps
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Upload className="h-4 w-4 text-gray-500" />
                 <span className="text-gray-500 dark:text-gray-400">Upload</span>
-                <span className="ml-auto font-medium">{runMutation.data.upload_mbps.toFixed(2)} Mbps</span>
+                <span className="ml-auto font-medium">
+                  {runMutation.data.upload_mbps.toFixed(2)} Mbps
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-gray-500" />
                 <span className="text-gray-500 dark:text-gray-400">Ping</span>
-                <span className="ml-auto font-medium">{runMutation.data.ping_ms.toFixed(1)} ms</span>
+                <span className="ml-auto font-medium">
+                  {runMutation.data.ping_ms.toFixed(1)} ms
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Server className="h-4 w-4 text-gray-500" />

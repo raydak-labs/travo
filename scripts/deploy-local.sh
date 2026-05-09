@@ -162,6 +162,7 @@ deploy_release() {
   info "Post-install chmod / uci-defaults..."
   ssh_cmd "chmod +x /usr/bin/travo /etc/init.d/travo"
   ssh_cmd "chmod +x /etc/sysupgrade.d/10-travo-backup.sh /etc/sysupgrade.d/20-travo-restore.sh 2>/dev/null || true"
+  ssh_cmd "mkdir -p /lib/upgrade/keep.d"
   ssh_cmd 'if [ -f /etc/uci-defaults/99-travel-gui-ports ]; then sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports; fi'
   ssh_cmd "/etc/init.d/travo enable"
   ssh_cmd "uci set attendedsysupgrade.client.login_check_for_upgrades='1' 2>/dev/null && uci commit attendedsysupgrade 2>/dev/null || true"

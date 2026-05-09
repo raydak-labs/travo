@@ -16,7 +16,7 @@ func NetworkStatusHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetNetworkStatus()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(status)
 	}
@@ -27,7 +27,7 @@ func GetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetWanConfig()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(config)
 	}
@@ -38,7 +38,7 @@ func DetectWanTypeHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result, err := svc.DetectWanType()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(result)
 	}
@@ -49,43 +49,43 @@ func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WanConfig
 		if err := c.Bind().Body(&config); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 
 		// Validate WAN type
 		if !isValidWanType(config.Type) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "type must be one of: dhcp, static, pppoe"})
+			return RespondWithError(c, fiber.StatusBadRequest, "type must be one of: dhcp, static, pppoe")
 		}
 
 		// For static config, validate IP fields
 		if config.Type == "static" {
 			if config.IPAddress != "" && !isValidIPv4(config.IPAddress) {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid IP address"})
+				return RespondWithError(c, fiber.StatusBadRequest, "invalid IP address")
 			}
 			if config.Gateway != "" && !isValidIPv4(config.Gateway) {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid gateway address"})
+				return RespondWithError(c, fiber.StatusBadRequest, "invalid gateway address")
 			}
 			if config.Netmask != "" && !isValidNetmask(config.Netmask) {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid netmask"})
+				return RespondWithError(c, fiber.StatusBadRequest, "invalid netmask")
 			}
 		}
 
 		// Validate MTU if provided
 		if config.MTU != 0 && !isValidMTU(config.MTU) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("MTU must be between 68 and 9000, got %d", config.MTU)})
+			return RespondWithError(c, fiber.StatusBadRequest, fmt.Sprintf("MTU must be between 68 and 9000, got %d", config.MTU))
 		}
 
 		// Validate DNS servers if provided
 		for _, dns := range config.DNSServers {
 			if !isValidIPv4(dns) {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("invalid DNS server IP: %s", dns)})
+				return RespondWithError(c, fiber.StatusBadRequest, fmt.Sprintf("invalid DNS server IP: %s", dns))
 			}
 		}
 
 		if err := svc.SetWanConfig(config); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -94,19 +94,19 @@ func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		name := c.Params("name")
 		if name == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "interface name is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "interface name is required")
 		}
 		var req models.SetInterfaceStateRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if err := svc.SetInterfaceState(name, req.Up); err != nil {
 			if err.Error() == fmt.Sprintf("unknown interface: %s", name) {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -115,7 +115,7 @@ func GetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetDNSConfig()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(config)
 	}
@@ -126,22 +126,22 @@ func SetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DNSConfig
 		if err := c.Bind().Body(&config); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if config.UseCustomDNS {
 			if len(config.Servers) == 0 {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "at least one DNS server is required when using custom DNS"})
+				return RespondWithError(c, fiber.StatusBadRequest, "at least one DNS server is required when using custom DNS")
 			}
 			for _, s := range config.Servers {
 				if !isValidIPv4(s) {
-					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("invalid DNS server IP: %s", s)})
+					return RespondWithError(c, fiber.StatusBadRequest, fmt.Sprintf("invalid DNS server IP: %s", s))
 				}
 			}
 		}
 		if err := svc.SetDNSConfig(config); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -150,7 +150,7 @@ func GetClientsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		clients, err := svc.GetClients()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(clients)
 	}
@@ -161,7 +161,7 @@ func GetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetDHCPConfig()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(config)
 	}
@@ -172,27 +172,27 @@ func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DHCPConfig
 		if err := c.Bind().Body(&config); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 
 		// Validate DHCP config
 		if config.Start < 2 || config.Start > 254 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "start must be between 2 and 254"})
+			return RespondWithError(c, fiber.StatusBadRequest, "start must be between 2 and 254")
 		}
 		if config.Limit < 1 || config.Limit > 253 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "limit must be between 1 and 253"})
+			return RespondWithError(c, fiber.StatusBadRequest, "limit must be between 1 and 253")
 		}
 		if config.Start+config.Limit > 255 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "start + limit must not exceed 255"})
+			return RespondWithError(c, fiber.StatusBadRequest, "start + limit must not exceed 255")
 		}
 		if config.LeaseTime == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "lease_time is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "lease_time is required")
 		}
 
 		if err := svc.SetDHCPConfig(config); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -209,18 +209,18 @@ func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetAliasRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if req.MAC == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
 		}
 		if !isValidMAC(req.MAC) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid MAC address format")
 		}
 		if err := svc.SetAlias(req.MAC, req.Alias); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -229,7 +229,7 @@ func GetDNSEntriesHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		entries, err := svc.GetDNSEntries()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(entries)
 	}
@@ -240,24 +240,24 @@ func AddDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var entry models.DNSEntry
 		if err := c.Bind().Body(&entry); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if entry.Name == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "name is required")
 		}
 		if !isValidHostname(entry.Name) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid hostname"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid hostname")
 		}
 		if entry.IP == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ip is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "ip is required")
 		}
 		if !isValidIPv4(entry.IP) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid IP address"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid IP address")
 		}
 		if err := svc.AddDNSEntry(entry); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -266,12 +266,12 @@ func DeleteDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "section is required")
 		}
 		if err := svc.DeleteDNSEntry(section); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -280,7 +280,7 @@ func GetDHCPReservationsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		reservations, err := svc.GetDHCPReservations()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(reservations)
 	}
@@ -291,30 +291,30 @@ func AddDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var reservation models.DHCPReservation
 		if err := c.Bind().Body(&reservation); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if reservation.Name == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "name is required")
 		}
 		if !isValidHostname(reservation.Name) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid hostname"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid hostname")
 		}
 		if reservation.MAC == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mac is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "mac is required")
 		}
 		if !isValidMAC(reservation.MAC) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid MAC address")
 		}
 		if reservation.IP == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ip is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "ip is required")
 		}
 		if !isValidIPv4(reservation.IP) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid IP address"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid IP address")
 		}
 		if err := svc.AddDHCPReservation(reservation); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -323,12 +323,12 @@ func DeleteDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "section is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "section is required")
 		}
 		if err := svc.DeleteDHCPReservation(section); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -337,18 +337,18 @@ func KickClientHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if req.MAC == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
 		}
 		if !isValidMAC(req.MAC) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid MAC address format")
 		}
 		if err := svc.KickClient(req.MAC); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -357,18 +357,18 @@ func BlockClientHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if req.MAC == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
 		}
 		if !isValidMAC(req.MAC) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid MAC address format")
 		}
 		if err := svc.BlockClient(req.MAC); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -377,18 +377,18 @@ func UnblockClientHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if req.MAC == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "MAC address is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
 		}
 		if !isValidMAC(req.MAC) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid MAC address format"})
+			return RespondWithError(c, fiber.StatusBadRequest, "invalid MAC address format")
 		}
 		if err := svc.UnblockClient(req.MAC); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -397,7 +397,7 @@ func GetBlockedClientsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		blocked, err := svc.GetBlockedClients()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(blocked)
 	}
@@ -408,7 +408,7 @@ func GetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetDDNSConfig()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(config)
 	}
@@ -419,30 +419,30 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DDNSConfig
 		if err := c.Bind().Body(&config); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if config.Enabled {
 			if config.Domain == "" {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "domain is required when DDNS is enabled"})
+				return RespondWithError(c, fiber.StatusBadRequest, "domain is required when DDNS is enabled")
 			}
-			svc := strings.TrimSpace(config.Service)
-			if strings.EqualFold(svc, "custom") {
+			serviceName := strings.TrimSpace(config.Service)
+			if strings.EqualFold(serviceName, "custom") {
 				raw := strings.TrimSpace(config.UpdateURL)
 				if raw == "" {
-					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "update_url is required for custom DDNS"})
+					return RespondWithError(c, fiber.StatusBadRequest, "update_url is required for custom DDNS")
 				}
 				u, err := url.Parse(raw)
 				if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "update_url must be a valid http(s) URL"})
+					return RespondWithError(c, fiber.StatusBadRequest, "update_url must be a valid http(s) URL")
 				}
-			} else if svc == "" {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "service is required when DDNS is enabled"})
+			} else if serviceName == "" {
+				return RespondWithError(c, fiber.StatusBadRequest, "service is required when DDNS is enabled")
 			}
 		}
 		if err := svc.SetDDNSConfig(config); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -458,7 +458,7 @@ func GetDDNSStatusHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetDDNSStatus()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(status)
 	}
@@ -469,7 +469,7 @@ func GetFirewallZonesHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		zones, err := svc.GetFirewallZones()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"zones": zones})
 	}
@@ -480,7 +480,7 @@ func GetPortForwardsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		rules, err := svc.GetPortForwards()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"rules": rules})
 	}
@@ -491,10 +491,10 @@ func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var rule models.PortForwardRule
 		if err := c.Bind().Body(&rule); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		if err := svc.AddPortForward(rule); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.Status(fiber.StatusCreated).JSON(fiber.Map{"ok": true})
 	}
@@ -505,7 +505,7 @@ func DeletePortForwardHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := svc.DeletePortForward(id); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"ok": true})
 	}
@@ -516,7 +516,7 @@ func RunDiagnosticsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.DiagnosticsRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		result := svc.RunDiagnostics(req)
 		return c.JSON(result)
@@ -528,7 +528,7 @@ func GetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetDoHConfig()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(cfg)
 	}
@@ -539,10 +539,10 @@ func SetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.DoHConfig
 		if err := c.Bind().Body(&cfg); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		if err := svc.SetDoHConfig(cfg); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"ok": true})
 	}
@@ -553,7 +553,7 @@ func GetIPv6StatusHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetIPv6Status()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(status)
 	}
@@ -566,10 +566,10 @@ func SetIPv6EnabledHandler(svc *services.NetworkService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		if err := svc.SetIPv6Enabled(req.Enabled); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"ok": true})
 	}
@@ -580,10 +580,10 @@ func SendWoLHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.WoLRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		if err := svc.SendWoL(req.MAC, req.Interface); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"ok": true})
 	}
@@ -594,12 +594,12 @@ func ConnectionMethodHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		clientIP := c.IP()
 		if clientIP == "" {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not determine client IP"})
+			return RespondWithError(c, fiber.StatusInternalServerError, "could not determine client IP")
 		}
 
 		resp, err := svc.GetConnectionMethod(clientIP)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(resp)
 	}

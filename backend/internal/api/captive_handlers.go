@@ -15,10 +15,15 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 		if err != nil {
 			return RespondWithServerError(c, err)
 		}
+		status.DNSBypassed = svc.IsDNSBypassed()
+		status.DNSBypassNeeded = !status.DNSBypassed && status.Detected && svc.CheckDNSBypassNeeded()
+		// Auto-restore DNS when internet is reachable
+		svc.MaybeAutoRestoreDNS(status.CanReachInternet)
 		return c.JSON(status)
 	}
 }
 
+// CaptiveAutoAcceptHandler handles POST /api/v1/captive/auto-accept.
 func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
@@ -47,5 +52,25 @@ func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
 		}
 
 		return c.JSON(res)
+	}
+}
+
+// CaptiveDNSBypassHandler handles POST /api/v1/captive/dns-bypass.
+func CaptiveDNSBypassHandler(svc *services.CaptiveService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if err := svc.BypassDNS(); err != nil {
+			return RespondWithServerError(c, err)
+		}
+		return c.JSON(fiber.Map{"ok": true, "message": "DNS switched to upstream for captive portal access"})
+	}
+}
+
+// CaptiveDNSRestoreHandler handles POST /api/v1/captive/dns-restore.
+func CaptiveDNSRestoreHandler(svc *services.CaptiveService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if err := svc.RestoreDNS(); err != nil {
+			return RespondWithServerError(c, err)
+		}
+		return c.JSON(fiber.Map{"ok": true, "message": "DNS restored to original configuration"})
 	}
 }

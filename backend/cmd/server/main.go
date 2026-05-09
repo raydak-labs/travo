@@ -162,11 +162,20 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 				wifiSvc.WriteReconnectScriptSafe()
 			}
 		}()
+		// Auto-discover radio hardware and persist config on first boot.
+		go func() {
+			time.Sleep(10 * time.Second)
+			if discovered, err := wifiSvc.DiscoverAndPersistRadios(); err != nil {
+				log.Printf("WARNING: radio discovery failed: %v", err)
+			} else if discovered {
+				log.Printf("Radio auto-discovery completed on first boot.")
+			}
+		}()
 	}
 
 	vpnSvc := services.NewVpnService(u)
 	svcManager := services.NewServiceManager()
-	captiveSvc := services.NewCaptiveService(captiveProber)
+	captiveSvc := services.NewCaptiveServiceWithUCI(captiveProber, u, &services.RealCommandRunner{})
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()
@@ -184,6 +193,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	}
 	failoverSvc.SetAlertService(alertSvc)
 	uptimeTracker := services.NewUptimeTracker(captiveProber)
+
+	// Stats history: collect every 30s, keep 720 points (~6 hours)
+	statsHistory := services.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
+	statsHistory.Start()
 
 	// Token blocklist with cleanup goroutine
 	blocklist := auth.NewTokenBlocklist()
@@ -223,6 +236,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		USBTether:      usbTetherSvc,
 		BandSwitching:  bandSwitchSvc,
 		Failover:       failoverSvc,
+		StatsHistory:   statsHistory,
 	}
 	api.SetupRoutes(app, deps)
 

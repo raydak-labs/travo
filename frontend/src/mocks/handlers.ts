@@ -45,6 +45,19 @@ export const handlers = [
     return HttpResponse.json(mockSystemStats);
   }),
 
+  http.get(API_ROUTES.system.statsHistory, () => {
+    // Generate 20 mock data points over the last 10 minutes
+    const now = Math.floor(Date.now() / 1000);
+    const points = Array.from({ length: 20 }, (_, i) => ({
+      time: now - (19 - i) * 30,
+      cpu: 20 + Math.random() * 40,
+      memory: 45 + Math.random() * 15,
+      rx_bytes: 1000000 * (i + 1),
+      tx_bytes: 500000 * (i + 1),
+    }));
+    return HttpResponse.json(points);
+  }),
+
   http.get(API_ROUTES.system.logs, ({ request }) => {
     const url = new URL(request.url);
     const service = url.searchParams.get('service');
@@ -191,6 +204,23 @@ export const handlers = [
 
   http.get(API_ROUTES.captive.status, () => {
     return HttpResponse.json(mockCaptivePortalStatus);
+  }),
+
+  http.post(API_ROUTES.captive.autoAccept, () => {
+    return HttpResponse.json({
+      ok: true,
+      message: 'mock auto-accept',
+      detected: false,
+      can_reach_internet: true,
+    });
+  }),
+
+  http.post(API_ROUTES.captive.dnsBypass, () => {
+    return HttpResponse.json({ ok: true, message: 'DNS switched to upstream' });
+  }),
+
+  http.post(API_ROUTES.captive.dnsRestore, () => {
+    return HttpResponse.json({ ok: true, message: 'DNS restored' });
   }),
 
   http.get(API_ROUTES.vpn.wireguard.config, () => {

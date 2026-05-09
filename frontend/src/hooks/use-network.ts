@@ -472,13 +472,6 @@ export function useSendWoL() {
   });
 }
 
-// Aliases used by legacy component files
-export const usePortForwardRules = usePortForwards;
-export const useAddPortForwardRule = useAddPortForward;
-export const useDeletePortForwardRule = useDeletePortForward;
-export const useDoHStatus = useDoHConfig;
-export const useSetDoHEnabled = useSetDoHConfig;
-
 export function useConnectionMethod() {
   return useQuery({
     queryKey: ['network', 'connectionMethod'],

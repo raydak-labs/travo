@@ -1,5 +1,5 @@
 import { redirect } from '@tanstack/react-router';
-import { getToken } from '@/lib/api-client';
+import { getToken, apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
 
 export function requireAuth() {
@@ -12,14 +12,9 @@ export function requireAuth() {
 export async function requireSetupComplete() {
   requireAuth();
   try {
-    const res = await fetch(API_ROUTES.system.setupComplete, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    if (res.ok) {
-      const data = (await res.json()) as { complete: boolean };
-      if (!data.complete) {
-        throw redirect({ to: '/setup' });
-      }
+    const data = await apiClient.get<{ complete: boolean }>(API_ROUTES.system.setupComplete);
+    if (!data.complete) {
+      throw redirect({ to: '/setup' });
     }
   } catch (e: unknown) {
     if (e !== null && typeof e === 'object' && 'to' in e) throw e;
