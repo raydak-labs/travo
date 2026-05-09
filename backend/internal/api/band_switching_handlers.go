@@ -25,6 +25,6 @@ func SetBandSwitchingHandler(svc *services.BandSwitchingService) fiber.Handler {
 		if err := svc.SetConfig(cfg); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }

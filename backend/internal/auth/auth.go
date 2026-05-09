@@ -102,7 +102,7 @@ func (a *AuthService) tryUbusLogin(password string) error {
 	if s, _ := resp["ubus_rpc_session"].(string); s != "" {
 		return nil
 	}
-	if sid := extractSessionID(resp); sid != "" {
+	if sid := ubus.ExtractSessionID(resp); sid != "" {
 		return nil
 	}
 	return fmt.Errorf("login failed")
@@ -126,24 +126,6 @@ func (a *AuthService) verifyWithUbus(password string) error {
 	}
 	a.persistSealedLogin(password)
 	return nil
-}
-
-// extractSessionID finds ubus_rpc_session in a login response.
-// Handles top-level or result-array format.
-func extractSessionID(m map[string]interface{}) string {
-	if s, _ := m["ubus_rpc_session"].(string); s != "" {
-		return s
-	}
-	arr, ok := m["result"].([]interface{})
-	if !ok || len(arr) < 2 {
-		return ""
-	}
-	obj, ok := arr[1].(map[string]interface{})
-	if !ok {
-		return ""
-	}
-	s, _ := obj["ubus_rpc_session"].(string)
-	return s
 }
 
 // ValidateToken parses and validates a JWT token string.

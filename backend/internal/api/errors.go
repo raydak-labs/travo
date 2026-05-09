@@ -21,3 +21,8 @@ func RespondWithError(c fiber.Ctx, status int, message string) error {
 func RespondWithServerError(c fiber.Ctx, err error) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 }
+
+// RespondOK sends a JSON {"status":"ok"} response.
+func RespondOK(c fiber.Ctx) error {
+	return c.JSON(fiber.Map{"status": "ok"})
+}

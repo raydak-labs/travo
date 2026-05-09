@@ -59,7 +59,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 
 	// Health endpoint (excluded from auth)
 	app.Get("/api/health", func(c fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	})
 
 	SetupRoutes(app, deps)

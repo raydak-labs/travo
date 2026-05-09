@@ -59,7 +59,7 @@ func LogoutHandler(authSvc *auth.AuthService, bl *auth.TokenBlocklist) fiber.Han
 				}
 			}
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -85,6 +85,6 @@ func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
 			}
 			return RespondWithError(c, status, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }

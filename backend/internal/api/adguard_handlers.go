@@ -56,7 +56,7 @@ func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
 		if err := adguard.SetDNS(body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -93,7 +93,7 @@ func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
 		if err := adguard.SetPassword(body.Username, body.Password); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -112,6 +112,6 @@ func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 		if err := adguard.SetConfig(body.Content); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }

@@ -28,7 +28,7 @@ func SetFailoverConfigHandler(svc *services.FailoverService) fiber.Handler {
 		if err := svc.SetConfig(cfg); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 

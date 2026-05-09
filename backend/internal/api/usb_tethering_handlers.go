@@ -25,7 +25,7 @@ func ConfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler 
 		if err := svc.Configure(req.Interface); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -35,6 +35,6 @@ func UnconfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handle
 		if err := svc.Unconfigure(); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }

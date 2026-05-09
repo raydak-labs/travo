@@ -78,7 +78,7 @@ func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.SetWireguardConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -92,7 +92,7 @@ func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.ToggleWireguard(enabled); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -117,7 +117,7 @@ func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.ToggleTailscale(enabled); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -154,7 +154,7 @@ func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.SetTailscaleExitNode(ip); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -173,7 +173,7 @@ func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.ImportWireguardConfig(body.Config); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -233,7 +233,7 @@ func DeleteWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.DeleteProfile(id); err != nil {
 			return RespondWithError(c, fiber.StatusNotFound, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -247,7 +247,7 @@ func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.ActivateProfile(id); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -274,7 +274,7 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.SetKillSwitch(body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -331,7 +331,7 @@ func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 		if err := svc.SetSplitTunnel(cfg); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 

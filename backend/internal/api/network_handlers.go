@@ -85,7 +85,7 @@ func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.SetWanConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -106,7 +106,7 @@ func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
 			}
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -141,7 +141,7 @@ func SetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.SetDNSConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -192,7 +192,7 @@ func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.SetDHCPConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -220,7 +220,7 @@ func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.SetAlias(req.MAC, req.Alias); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -257,7 +257,7 @@ func AddDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.AddDNSEntry(entry); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -271,7 +271,7 @@ func DeleteDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.DeleteDNSEntry(section); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -314,7 +314,7 @@ func AddDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.AddDHCPReservation(reservation); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -328,7 +328,7 @@ func DeleteDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.DeleteDHCPReservation(section); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -348,7 +348,7 @@ func KickClientHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.KickClient(req.MAC); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -368,7 +368,7 @@ func BlockClientHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.BlockClient(req.MAC); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -388,7 +388,7 @@ func UnblockClientHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.UnblockClient(req.MAC); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -442,7 +442,7 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 		if err := svc.SetDDNSConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 

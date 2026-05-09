@@ -30,7 +30,7 @@ func ResetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
 		if err := svc.ResetInterface(req.Interface); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -58,6 +58,6 @@ func SetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
 		if err := svc.SetBudget(cfg); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }

@@ -28,7 +28,7 @@ func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
 		if err := sm.Install(id); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -39,7 +39,7 @@ func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
 		if err := sm.Remove(id); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -50,7 +50,7 @@ func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
 		if err := sm.Start(id); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -61,7 +61,7 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 		if err := sm.Stop(id); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -78,7 +78,7 @@ func SetAutoStartHandler(mgr *services.ServiceManager) fiber.Handler {
 		if err := mgr.SetAutoStart(id, body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 

@@ -1,4 +1,12 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { getToken } from './api-client';
 
 type MessageHandler = (data: unknown) => void;
@@ -15,7 +23,7 @@ const WsContext = createContext<WsContextValue>({
 
 const RECONNECT_DELAY = 3000;
 
-export function WsProvider({ children }: { children: React.ReactNode }) {
+export function WsProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const subscribersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
   const wsRef = useRef<WebSocket | null>(null);

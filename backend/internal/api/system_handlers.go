@@ -42,7 +42,7 @@ func SystemRebootHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.Reboot(); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -52,7 +52,7 @@ func SystemShutdownHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.Shutdown(); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -93,7 +93,7 @@ func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetHostname(req.Hostname); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -124,7 +124,7 @@ func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetTimezone(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -179,7 +179,7 @@ func FactoryResetHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.FactoryReset(); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -263,7 +263,7 @@ func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetNTPConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -273,7 +273,7 @@ func NTPSyncHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SyncNTP(); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -290,7 +290,7 @@ func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetSetupComplete(); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -351,7 +351,7 @@ func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetButtonActions(req.Buttons); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 

@@ -24,7 +24,7 @@ func TestExtractSessionID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractSessionID(tt.m)
+			got := ubus.ExtractSessionID(tt.m)
 			if got != tt.want {
 				t.Errorf("extractSessionID() = %q, want %q", got, tt.want)
 			}

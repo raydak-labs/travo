@@ -304,7 +304,7 @@ func WifiSetPriorityHandler(svc *services.WifiService) fiber.Handler {
 		if err := svc.ReorderNetworks(body.SSIDs); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -395,7 +395,7 @@ func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
 		if err := svc.SetAutoReconnect(body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -414,7 +414,7 @@ func ConfirmWifiApplyHandler(svc *services.WifiService) fiber.Handler {
 		if err := svc.ConfirmApply(body.Token); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -439,7 +439,7 @@ func SetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
 		if err := svc.SetWiFiSchedule(schedule); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
 
@@ -464,6 +464,6 @@ func SetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
 		if err := svc.SetMACPolicies(policies); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+		return RespondOK(c)
 	}
 }
