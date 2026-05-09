@@ -175,6 +175,14 @@ const logsRoute = createRoute({
   component: shellPage('Logs', LogsPage),
 });
 
+const notFoundRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '*',
+  beforeLoad: () => {
+    throw redirect({ to: '/dashboard-2' });
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -198,6 +206,7 @@ const routeTree = rootRoute.addChildren([
     systemRoute,
     logsRoute,
   ]),
+  notFoundRoute,
 ]);
 
 export const router = createRouter({ routeTree });

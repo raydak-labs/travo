@@ -1,12 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient, getToken } from '@/lib/api-client';
+import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
 import type { Alert, AlertsResponse } from '@shared/index';
 import { useAlertStore } from '@/stores/alert-store';
-
-const RECONNECT_DELAY = 5000;
+import { useWsSubscribe } from '@/lib/ws-context';
 
 const severityLabels: Record<string, string> = {
   info: 'Info',
@@ -27,10 +26,7 @@ function showAlertToast(alert: Alert) {
 
 export function useAlerts() {
   const { alerts, unreadCount, addAlert, setAlerts, markAllRead } = useAlertStore();
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef = useRef(true);
-  const connectRef = useRef<() => void>(() => {});
+  const { subscribe } = useWsSubscribe();
 
   // Fetch history on mount
   useQuery({
@@ -43,64 +39,14 @@ export function useAlerts() {
     refetchInterval: 30_000,
   });
 
-  const connect = useCallback(() => {
-    if (!mountedRef.current) return;
-    const token = getToken();
-    if (!token) return;
-
-    // Don't create duplicate connections
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/api/v1/ws?token=${encodeURIComponent(token)}`;
-
-    try {
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const msg = JSON.parse(event.data) as { type: string; data: Alert };
-          if (msg.type === 'alert' && msg.data) {
-            addAlert(msg.data);
-            showAlertToast(msg.data);
-          }
-        } catch {
-          // Ignore non-alert messages
-        }
-      };
-
-      ws.onclose = () => {
-        if (mountedRef.current) {
-          reconnectTimer.current = setTimeout(() => connectRef.current(), RECONNECT_DELAY);
-        }
-      };
-
-      ws.onerror = () => {
-        ws.close();
-      };
-    } catch {
-      if (mountedRef.current) {
-        reconnectTimer.current = setTimeout(() => connectRef.current(), RECONNECT_DELAY);
-      }
-    }
-  }, [addAlert]);
-
+  // Subscribe to real-time alerts via the shared WebSocket
   useEffect(() => {
-    connectRef.current = connect;
-  }, [connect]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    connect();
-
-    return () => {
-      mountedRef.current = false;
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      if (wsRef.current) wsRef.current.close();
-    };
-  }, [connect]);
+    return subscribe('alert', (data) => {
+      const alert = data as Alert;
+      addAlert(alert);
+      showAlertToast(alert);
+    });
+  }, [subscribe, addAlert]);
 
   return { alerts, unreadCount, markAllRead };
 }

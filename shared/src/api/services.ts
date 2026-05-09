@@ -26,6 +26,9 @@ export interface AdGuardStatus {
 export interface AdGuardDNSStatus {
   readonly enabled: boolean;
   readonly dns_port: number;
+  readonly adguard_listener_ready: boolean;
+  readonly dnsmasq_forward_target: string;
+  readonly resolver_probe_ok: boolean;
 }
 
 /** AdGuard Home configuration (raw YAML content) */

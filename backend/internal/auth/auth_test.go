@@ -160,6 +160,24 @@ func TestMiddlewareAllowsLoginWithoutToken(t *testing.T) {
 	}
 }
 
+func TestMiddlewareAllowsOpenAPIWithoutToken(t *testing.T) {
+	svc := NewAuthService("admin", "test-secret")
+	app := fiber.New()
+	app.Use(svc.Middleware())
+	app.Get("/api/openapi.json", func(c fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+	req, _ := http.NewRequest(http.MethodGet, "/api/openapi.json", nil)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 for openapi.json, got %d", resp.StatusCode)
+	}
+}
+
 func TestChangePasswordSuccess(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	if err := svc.ChangePassword("admin", "newpassword123"); err != nil {
