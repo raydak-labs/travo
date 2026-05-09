@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
     *) POS_ARGS+=("$1"); shift ;;
   esac
 done
-set -- "${POS_ARGS[@]}"
+set -- "${POS_ARGS[@]+"${POS_ARGS[@]}"}"
 
 VERSION="${VERSION:-$(git -C "${REPO_ROOT}" describe --tags --always --dirty 2>/dev/null || echo "0.0.0")}"
 VERSION="${VERSION#v}"
@@ -69,7 +69,8 @@ stage_release_layout() {
     "${STAGE_DIR}/etc/config" \
     "${STAGE_DIR}/etc/uci-defaults" \
     "${STAGE_DIR}/etc/sysupgrade.d" \
-    "${STAGE_DIR}/etc/travo"
+    "${STAGE_DIR}/etc/travo" \
+    "${STAGE_DIR}/lib/upgrade/keep.d"
 
   cp "${BUILD_DIR}/travo"                                           "${STAGE_DIR}/usr/bin/travo"
   chmod +x "${STAGE_DIR}/usr/bin/travo"
@@ -81,6 +82,7 @@ stage_release_layout() {
   cp packaging/openwrt/files/etc/sysupgrade.d/10-travo-backup.sh   "${STAGE_DIR}/etc/sysupgrade.d/"
   cp packaging/openwrt/files/etc/sysupgrade.d/20-travo-restore.sh  "${STAGE_DIR}/etc/sysupgrade.d/"
   chmod +x "${STAGE_DIR}/etc/sysupgrade.d/"*
+  cp packaging/openwrt/files/lib/upgrade/keep.d/travo               "${STAGE_DIR}/lib/upgrade/keep.d/travo"
   cp packaging/adguard/AdGuardHome.yaml                             "${STAGE_DIR}/etc/travo/adguardhome.yaml"
 }
 
