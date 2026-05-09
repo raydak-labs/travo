@@ -23,6 +23,7 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 	}
 }
 
+// CaptiveAutoAcceptHandler handles POST /api/v1/captive/auto-accept.
 func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {

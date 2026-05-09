@@ -38,7 +38,7 @@ func AdGuardDNSStatusHandler(adguard *services.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := adguard.GetDNSStatus()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(status)
 	}
@@ -51,10 +51,10 @@ func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if err := adguard.SetDNS(body.Enabled); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -65,10 +65,10 @@ func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		content, err := adguard.GetConfig()
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) || (err.Error() != "" && errors.Unwrap(err) != nil && errors.Is(errors.Unwrap(err), os.ErrNotExist)) {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "AdGuard config file not found"})
+			if errors.Is(err, os.ErrNotExist) {
+				return RespondWithError(c, fiber.StatusNotFound, "AdGuard config file not found")
 			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"content": content})
 	}
@@ -82,16 +82,16 @@ func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
 			Password string `json:"password"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if body.Password == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "password is required")
 		}
 		if body.Username == "" {
 			body.Username = "admin"
 		}
 		if err := adguard.SetPassword(body.Username, body.Password); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -104,13 +104,13 @@ func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 			Content string `json:"content"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if body.Content == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "content is required"})
+			return RespondWithError(c, fiber.StatusBadRequest, "content is required")
 		}
 		if err := adguard.SetConfig(body.Content); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}

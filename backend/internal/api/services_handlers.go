@@ -15,7 +15,7 @@ func ListServicesHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		list, err := sm.ListServices()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(list)
 	}
@@ -26,7 +26,7 @@ func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Install(id); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -37,7 +37,7 @@ func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Remove(id); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -48,7 +48,7 @@ func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Start(id); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -59,7 +59,7 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Stop(id); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -73,10 +73,10 @@ func SetAutoStartHandler(mgr *services.ServiceManager) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if err := mgr.SetAutoStart(id, body.Enabled); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -95,25 +95,32 @@ func writeStreamEvent(w *bufio.Writer, evt streamLogEvent) {
 	w.Flush()
 }
 
+// streamServiceAction sets streaming headers and runs action with real-time NDJSON output.
+func streamServiceAction(c fiber.Ctx, action func(logFn func(string)) error) error {
+	c.Set("Content-Type", "application/x-ndjson")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("X-Content-Type-Options", "nosniff")
+	c.RequestCtx().SetBodyStreamWriter(func(w *bufio.Writer) {
+		logFn := func(line string) {
+			writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
+		}
+		if err := action(logFn); err != nil {
+			writeStreamEvent(w, streamLogEvent{Type: "error", Data: err.Error()})
+		} else {
+			writeStreamEvent(w, streamLogEvent{Type: "done"})
+		}
+	})
+	return nil
+}
+
 // InstallServiceStreamHandler handles POST /api/v1/services/:id/install/stream.
 // Returns NDJSON with real-time install output.
 func InstallServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
-		c.Set("Content-Type", "application/x-ndjson")
-		c.Set("Cache-Control", "no-cache")
-		c.Set("X-Content-Type-Options", "nosniff")
-		c.RequestCtx().SetBodyStreamWriter(func(w *bufio.Writer) {
-			logFn := func(line string) {
-				writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
-			}
-			if err := sm.InstallWithLog(id, logFn); err != nil {
-				writeStreamEvent(w, streamLogEvent{Type: "error", Data: err.Error()})
-			} else {
-				writeStreamEvent(w, streamLogEvent{Type: "done"})
-			}
+		return streamServiceAction(c, func(logFn func(string)) error {
+			return sm.InstallWithLog(id, logFn)
 		})
-		return nil
 	}
 }
 
@@ -122,21 +129,8 @@ func InstallServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
 func RemoveServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
-		c.Set("Content-Type", "application/x-ndjson")
-		c.Set("Cache-Control", "no-cache")
-		c.Set("X-Content-Type-Options", "nosniff")
-		c.RequestCtx().SetBodyStreamWriter(func(w *bufio.Writer) {
-			logFn := func(line string) {
-				writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
-			}
-			if err := sm.RemoveWithLog(id, logFn); err != nil {
-				writeStreamEvent(w, streamLogEvent{Type: "error", Data: err.Error()})
-			} else {
-				writeStreamEvent(w, streamLogEvent{Type: "done"})
-			}
+		return streamServiceAction(c, func(logFn func(string)) error {
+			return sm.RemoveWithLog(id, logFn)
 		})
-		return nil
 	}
 }
-
-// fiber:context-methods migrated

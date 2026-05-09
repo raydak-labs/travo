@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -76,18 +75,6 @@ func (v *VpnService) validateWireGuardConfigForEnable() error {
 }
 
 // CommandRunner abstracts command execution for testability.
-type CommandRunner interface {
-	Run(name string, args ...string) ([]byte, error)
-}
-
-// RealCommandRunner executes real OS commands.
-type RealCommandRunner struct{}
-
-// Run executes a command and returns its output.
-func (r *RealCommandRunner) Run(name string, args ...string) ([]byte, error) {
-	return exec.Command(name, args...).Output()
-}
-
 // VpnService provides VPN status and configuration.
 type VpnService struct {
 	uci          uci.UCI

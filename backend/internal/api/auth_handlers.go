@@ -16,12 +16,12 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 
 		// Check rate limit before processing
 		if rl != nil && !rl.Allow(ip) {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many login attempts"})
+			return RespondWithError(c, fiber.StatusTooManyRequests, "too many login attempts")
 		}
 
 		var req models.LoginRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": ErrInvalidRequestBody})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 
 		token, expiry, err := authSvc.Login(req.Password)
@@ -30,7 +30,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 			if rl != nil {
 				rl.Record(ip)
 			}
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid password"})
+			return RespondWithError(c, fiber.StatusUnauthorized, "invalid password")
 		}
 
 		// Reset rate limiter on successful login
@@ -72,18 +72,18 @@ func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
 }
 
 // ChangePasswordHandler handles PUT /api/v1/auth/password.
-func ChangePasswordHandler(authSvc *auth.AuthService, _ *auth.FileAuthStore) fiber.Handler {
+func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ChangePasswordRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": ErrInvalidRequestBody})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if err := authSvc.ChangePassword(req.CurrentPassword, req.NewPassword); err != nil {
 			status := fiber.StatusBadRequest
 			if err.Error() == "invalid current password" {
 				status = fiber.StatusUnauthorized
 			}
-			return c.Status(status).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, status, err.Error())
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}

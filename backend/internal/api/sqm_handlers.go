@@ -12,7 +12,7 @@ func GetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetConfig()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(cfg)
 	}
@@ -23,10 +23,10 @@ func SetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.SQMConfig
 		if err := c.Bind().Body(&cfg); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if err := svc.SetConfig(cfg); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}

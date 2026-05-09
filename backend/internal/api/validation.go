@@ -106,3 +106,12 @@ func isValidHostname(name string) bool {
 	}
 	return validHostnameRe.MatchString(name)
 }
+
+// isValidWifiEncryption returns true if enc is a supported OpenWRT encryption mode.
+func isValidWifiEncryption(enc string) bool {
+	switch enc {
+	case "none", "psk2", "sae", "psk-mixed":
+		return true
+	}
+	return false
+}

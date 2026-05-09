@@ -12,9 +12,7 @@ func GetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetStatus()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(status)
 	}
@@ -27,14 +25,10 @@ func ResetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
 			Interface string `json:"interface"`
 		}
 		if err := c.Bind().Body(&req); err != nil || req.Interface == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "interface is required",
-			})
+			return RespondWithError(c, fiber.StatusBadRequest, "interface is required")
 		}
 		if err := svc.ResetInterface(req.Interface); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
@@ -45,9 +39,7 @@ func GetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetBudget()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(cfg)
 	}
@@ -58,17 +50,13 @@ func SetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.DataBudgetConfig
 		if err := c.Bind().Body(&cfg); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid request body",
-			})
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
 		if cfg.Budgets == nil {
 			cfg.Budgets = []models.DataBudget{}
 		}
 		if err := svc.SetBudget(cfg); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	}

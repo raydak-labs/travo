@@ -2,18 +2,18 @@ import { Shield } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   useFirewallZones,
-  usePortForwardRules,
-  useAddPortForwardRule,
-  useDeletePortForwardRule,
+  usePortForwards,
+  useAddPortForward,
+  useDeletePortForward,
 } from '@/hooks/use-network';
 import { FirewallZonesSection } from './firewall-zones-section';
 import { FirewallPortForwardSection } from './firewall-port-forward-section';
 
 export function FirewallCard() {
   const { data: zones, isLoading: zonesLoading } = useFirewallZones();
-  const { data: rules, isLoading: rulesLoading } = usePortForwardRules();
-  const addRule = useAddPortForwardRule();
-  const deleteRule = useDeletePortForwardRule();
+  const { data: rules, isLoading: rulesLoading } = usePortForwards();
+  const addRule = useAddPortForward();
+  const deleteRule = useDeletePortForward();
 
   return (
     <Card>
