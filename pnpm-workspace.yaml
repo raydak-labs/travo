@@ -1,3 +1,5 @@
 packages:
   - 'frontend'
   - 'shared'
+allowBuilds:
+  msw: true
