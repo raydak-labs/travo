@@ -4,10 +4,12 @@
 
 - `AGENTS.md` keeps repo workflow and guardrails.
 - `docs/architecture.md` keeps stable architecture decisions, safety rules, and runtime invariants. Update it whenever new essential behavior, subsystem contract, or operational constraint is decided.
+- `docs/adr/README.md` indexes **architecture decision records** (ADRs). Before changing a subsystem, read the ADR for that area from that index (e.g. wireless → 0002, crash guards → 0003, firewall → 0004, mwan3 failover → 0005, platform/OpenAPI → 0006, auth → 0007, DNS/VPN/captive → 0001). Add a new numbered ADR when you introduce another normative cross-cutting topic.
 - `docs/requirements/tasks_open.md` is the working backlog.
 - `docs/requirements/tasks_done.md` is the completed task log.
 - `docs/_archive/requirements_done.md` is a legacy exhaustive archive; do not use it as the active backlog.
 - `docs/README.md` is the broader documentation map.
+- `docs/+ Start here.md` is the **Obsidian hub** (wikilinks) for the vault rooted at `docs/`.
 
 ## Tools & Setup
 
@@ -29,10 +31,31 @@ This is a pnpm monorepo with:
 
 ## Documentation Workflow
 
-- Keep `docs/architecture.md` current for stable design decisions, invariants, safety constraints, and important cross-component behavior.
+- Keep `docs/architecture.md` current for stable design decisions, invariants, safety constraints, and important cross-component behavior; link new long-form decisions from there into `docs/adr/` when a dedicated ADR is clearer than inflating the overview.
+- Keep `docs/adr/README.md` and the relevant ADR file updated when ADR-governed behavior changes.
 - Keep `docs/requirements/tasks_open.md` and `docs/requirements/tasks_done.md` current when scope changes or work is completed.
 - Keep `docs/README.md` as the documentation map (requirements pointers live there).
 - Prefer short overview docs that link deeper instead of putting backlog, architecture, and historical notes into one file.
+
+## Documentation retrieval (Obsidian CLI)
+
+**Default for agents:** When working with project documentation, prefer the **Obsidian CLI** if it is installed and registered, and this checkout’s vault is visible as `docs` pointing at `<repo>/docs`.
+
+1. **One-time setup (humans):** Obsidian **1.12+** → **Settings → General → Command line interface** → enable and install shell shim. After PATH changes: `hash -r` (bash) or `rehash` (zsh).
+
+2. **Verify:**
+   - `command -v obsidian`
+   - `obsidian vault list` — expect `name` `docs` with `path` matching this repository’s `docs/` directory.
+
+3. **Typical commands** (pass `vault=docs` explicitly; cwd can be anywhere once the vault is registered):
+   - Search: `obsidian search query="mwan3 failover" vault=docs`
+   - Read note body to stdout: `obsidian read path=architecture.md vault=docs` — paths are **vault-relative** (`adr/0002-wireless-model-and-luci-apply.md`, `requirements/tasks_open.md`, …). Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`. Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`.
+   - Backlinks: `obsidian backlinks path=adr/0001-dns-vpn-captive-portal-architecture.md vault=docs`
+   - More: `obsidian help`
+
+4. **Graph / wikilinks in the app:** Open the vault folder `docs/` in Obsidian; start at **`+ Start here.md`**.
+
+**Fallback:** No CLI, wrong vault path, headless CI, or command errors → use `Read` / `Grep` / `SemanticSearch` on `docs/` (same Markdown files). Do not block work on the Obsidian app being open.
 
 ## Frontend UI & Theming
 

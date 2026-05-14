@@ -1,8 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-04-15
-tags: [architecture, safety, invariants, travo]
+updated: 2026-05-14
 ---
 
 # Architecture Decisions
@@ -30,9 +29,11 @@ For completed work use [`docs/requirements/tasks_done.md`](./requirements/tasks_
 - Backend is the source of truth for OpenWRT mutations; frontend drives API calls and renders device state.
 - The backend exposes a machine-readable OpenAPI contract at `GET /api/openapi.json` for automation and integration work.
 
+Normative detail for repo layout, LuCI coexistence, OpenAPI, and footprint expectations: **[`docs/adr/0006-application-platform-and-api-contract.md`](./adr/0006-application-platform-and-api-contract.md)**.
+
 ## 2. Wireless Model And Invariants
 
-These rules are stable product behavior, not backlog notes.
+These rules are stable product behavior, not backlog notes. **Expanded wireless + LuCI apply/confirm behavior:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](./adr/0002-wireless-model-and-luci-apply.md).
 
 ### 2.1 STA / WWAN ownership
 
@@ -61,7 +62,7 @@ These rules are stable product behavior, not backlog notes.
 
 ## 3. Wireless Apply And Rollback Flow
 
-Wireless mutation safety is intentionally modeled after LuCI.
+Wireless mutation safety is intentionally modeled after LuCI. **Implementation reference:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](./adr/0002-wireless-model-and-luci-apply.md).
 
 - Backend wireless changes use rpcd session login, copy config into session state, `uci apply` with rollback timeout, then explicit `uci confirm`.
 - Confirmation must happen only after the caller proves the router is still reachable.
@@ -71,6 +72,8 @@ Wireless mutation safety is intentionally modeled after LuCI.
 - `wifi reload` is avoided on ath11k/IPQ6018. Where `wifi up` exists for bounded recovery paths, that exception must stay narrow and documented.
 
 ## 4. Crash Guards For Automated Live-State Changes
+
+**Guard catalog and patterns:** [`docs/adr/0003-crash-guards-and-live-state.md`](./adr/0003-crash-guards-and-live-state.md).
 
 Any automated action that can change live system state must use a crash guard:
 
@@ -95,6 +98,8 @@ This rule applies to:
 
 ## 5. Firewall And Interface Policy
 
+**Full-zone and topology rules:** [`docs/adr/0004-firewall-zones-and-interface-policy.md`](./adr/0004-firewall-zones-and-interface-policy.md).
+
 - New zones, forwarding paths, or interfaces must include the full required firewall changes.
 - Follow existing default `wan` patterns instead of inventing a separate one-off policy model.
 - WWAN, WAN, VPN, guest, and future interfaces should be treated as explicit routing and firewall topology decisions, not UI-only toggles.
@@ -102,6 +107,8 @@ This rule applies to:
 ## 6. Networking Invariants
 
 ### 6.1 Multi-WAN failover (mwan3)
+
+**Normative failover generation, guards, and IPv4 scope:** [`docs/adr/0005-multi-wan-failover-mwan3.md`](./adr/0005-multi-wan-failover-mwan3.md).
 
 - Connection failover uses OpenWRT's mwan3 package for health tracking and route management.
 - Failover policy is generated deterministically from `/etc/travo/failover.json` into `/etc/config/mwan3`.
@@ -124,7 +131,16 @@ This rule applies to:
 - Wireless changes during failover apply must preserve LuCI-style rollback semantics.
 - Any new routes, zones, or firewall changes added for failover must include complete firewall zone configuration.
 
-## 7. Device Constraints
+### 6.3 DNS resolution, VPN, captive portal, and temporary restore
+
+Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive portal DNS bypass**, and **snapshot/restore** semantics are normative in **[`docs/adr/0001-dns-vpn-captive-portal-architecture.md`](./adr/0001-dns-vpn-captive-portal-architecture.md)**. Read that ADR before changing `CaptiveService`, `VpnService` DNS helpers, `AdGuardService` DNS integration, or `NetworkService` WAN DNS.
+
+## 7. Authentication And API Access
+
+- Administrative login uses the **root** password validated via **rpcd** on device; Travo issues **JWT** bearer tokens for API access.
+- Optional **IP allowlist** and auth hardening details are normative in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
+
+## 8. Device Constraints
 
 Router hardware is constrained. Every feature must justify its footprint.
 
@@ -135,9 +151,11 @@ Router hardware is constrained. Every feature must justify its footprint.
 - Keep API payloads small; avoid polling where a realtime channel already exists
 - Warn before installing packages that meaningfully consume flash storage
 
-## 7. Documentation Rules
+## 9. Documentation Rules
 
 - Put stable rules here, not in backlog files.
 - Put open work in `tasks_open.md`, completed work in `tasks_done.md`.
 - Use [`docs/README.md`](./README.md) as the documentation map; plans live under [`docs/plans/`](./plans/) with a searchable [`docs/plans/README.md`](./plans/README.md).
+- Long-lived topic decisions that need more room than this file may become **ADRs** under [`docs/adr/`](./adr/) (see [`docs/adr/README.md`](./adr/README.md)); `docs/architecture.md` links to them where relevant.
+- The **`docs/`** tree is an **Obsidian vault**; humans and agents with the Obsidian CLI should start from **`+ Start here.md`** (see `AGENTS.md` → *Documentation retrieval (Obsidian CLI)*).
 - When a plan graduates into a durable rule, copy the essential decision here and link back to the plan for rationale if useful.

@@ -59,3 +59,5 @@ tmp/
 test/integration/.wifi_pass
 test/integration/tmp/
 test/integration/wireguard-profiles/
+
+docs/.obsidian

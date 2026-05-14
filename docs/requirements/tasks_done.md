@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-04-13
+updated: 2026-05-14
 tags: [backlog, requirements, changelog]
 ---
 
@@ -9,9 +9,9 @@ tags: [backlog, requirements, changelog]
 
 High-level **what shipped**, grouped by subsystem. For the old exhaustive checkbox export, see [`../_archive/requirements_done.md`](../_archive/requirements_done.md) (read-only).
 
-When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) if you introduced a new invariant.
+When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-04-13
+> **Last updated:** 2026-05-14
 
 ## Milestone checklist (compact)
 
