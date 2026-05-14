@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { WifiScanResult, GroupedScanNetwork } from '@shared/index';
 import {
   useWifiScan,
@@ -43,17 +43,22 @@ export function useRepeaterWizard(open: boolean) {
   const setAPMutation = useSetAPConfig();
   const setRepeaterOptsMutation = useSetRepeaterOptions();
   const [repeaterOptsHydrated, setRepeaterOptsHydrated] = useState(false);
+  const [prevOpen, setPrevOpen] = useState(open);
 
-  useEffect(() => {
+  // Reset hydration when the dialog closes (see React docs: adjusting state when a prop changes).
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (!open) {
       setRepeaterOptsHydrated(false);
-      return;
     }
-    if (repeaterOpts != null && !repeaterOptsHydrated) {
-      setAllowApOnStaRadio(repeaterOpts.allow_ap_on_sta_radio);
-      setRepeaterOptsHydrated(true);
-    }
-  }, [open, repeaterOpts, repeaterOptsHydrated]);
+  }
+
+  // Seed from cached repeater options once per open session; `reset()` sets hydrated true to
+  // avoid re-seeding while the dialog stays open.
+  if (open && repeaterOpts != null && !repeaterOptsHydrated) {
+    setAllowApOnStaRadio(repeaterOpts.allow_ap_on_sta_radio);
+    setRepeaterOptsHydrated(true);
+  }
 
   const reset = useCallback(() => {
     setStep('select-upstream');
