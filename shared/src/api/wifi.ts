@@ -49,6 +49,7 @@ export interface SavedNetwork {
   readonly section: string;
   readonly encryption: WifiEncryption;
   readonly mode: WifiMode;
+  /** True when this STA iface is enabled in UCI (the profile the router will try to use). Others are disabled while saved. */
   readonly auto_connect: boolean;
   readonly priority: number;
 }

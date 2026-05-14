@@ -119,6 +119,80 @@ func TestWifiConnect_ReusesSectionForSameSSID(t *testing.T) {
 	}
 }
 
+func TestWifiConnect_ReuseSavedProfile_EmptyPasswordKeepsKey(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", Password: "", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	key, _ := u.Get("wireless", "sta0", "key")
+	if key != "hotelpass" {
+		t.Errorf("expected sta0 key unchanged, got %q", key)
+	}
+	disabled, _ := u.Get("wireless", "sta0", "disabled")
+	if disabled != "0" {
+		t.Errorf("expected sta0 enabled, got disabled=%q", disabled)
+	}
+}
+
+func TestWifiConnect_NewSecuredSSID_RequiresPassword(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Brand-New-Secured-Net", Password: "", Encryption: "psk2",
+	})
+	if !errors.Is(err, ErrPasswordRequiredForNewSTA) {
+		t.Fatalf("expected ErrPasswordRequiredForNewSTA, got %v", err)
+	}
+}
+
+func TestWifiConnect_NewSTA_RequiresEncryption(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "No-Enc-New-Net", Password: "abcdefgh", Encryption: "",
+	})
+	if !errors.Is(err, ErrEncryptionRequiredForNewSTA) {
+		t.Fatalf("expected ErrEncryptionRequiredForNewSTA, got %v", err)
+	}
+}
+
+func TestWifiConnect_ReusePreservesHidden(t *testing.T) {
+	svc, u := newTestWifiService()
+	if err := u.Set("wireless", "sta0", "hidden", "1"); err != nil {
+		t.Fatalf("set hidden: %v", err)
+	}
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", Password: "", Encryption: "psk2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	h, _ := u.Get("wireless", "sta0", "hidden")
+	if h != "1" {
+		t.Errorf("expected hidden preserved as 1, got %q", h)
+	}
+}
+
+func TestWifiConnect_ReusePreservesEncryptionWhenPasswordEmpty(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", Password: "", Encryption: "psk2+ccmp",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	enc, _ := u.Get("wireless", "sta0", "encryption")
+	if enc != "psk2" {
+		t.Errorf("expected encryption unchanged as psk2, got %q", enc)
+	}
+}
+
 func TestWifiGetConnection(t *testing.T) {
 	svc, _ := newTestWifiService()
 

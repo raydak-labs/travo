@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -52,6 +53,10 @@ func WifiConnectHandler(svc *services.WifiService) fiber.Handler {
 
 		apply, err := svc.Connect(config)
 		if err != nil {
+			if errors.Is(err, services.ErrPasswordRequiredForNewSTA) ||
+				errors.Is(err, services.ErrEncryptionRequiredForNewSTA) {
+				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			}
 			return RespondWithServerError(c, err)
 		}
 		return c.JSON(wifiMutationResponse(apply))

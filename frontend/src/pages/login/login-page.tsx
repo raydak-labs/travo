@@ -26,7 +26,7 @@ export function LoginPage() {
     clearErrors('root');
     try {
       await login(data.password, data.rememberMe);
-      await navigate({ to: '/dashboard-2' });
+      await navigate({ to: '/dashboard' });
     } catch (err) {
       setError('root', {
         message: err instanceof Error ? err.message : 'Login failed',

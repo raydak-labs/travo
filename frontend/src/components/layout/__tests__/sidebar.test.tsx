@@ -41,8 +41,7 @@ const mockUseIsMobile = vi.mocked(useIsMobile);
 const mockUseServices = vi.mocked(useServices);
 
 const ROUTE_PATHS = [
-  '/dashboard-1',
-  '/dashboard-2',
+  '/dashboard',
   '/wifi',
   '/wifi/advanced',
   '/network',
@@ -57,7 +56,7 @@ const ROUTE_PATHS = [
   '/logs',
 ] as const;
 
-function renderSidebar(currentPath = '/dashboard-2') {
+function renderSidebar(currentPath = '/dashboard') {
   const rootRoute = createRootRoute({ component: Outlet });
 
   const routes = ROUTE_PATHS.map((path) =>
@@ -78,7 +77,7 @@ function renderSidebar(currentPath = '/dashboard-2') {
   return render(<RouterProvider router={router} />);
 }
 
-function renderAppShellMobile(currentPath = '/dashboard-2') {
+function renderAppShellMobile(currentPath = '/dashboard') {
   mockUseIsMobile.mockReturnValue(true);
 
   const rootRoute = createRootRoute({ component: Outlet });
@@ -116,7 +115,6 @@ describe('Sidebar', () => {
     renderSidebar();
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Dashboard (NEW)')).toBeInTheDocument();
       expect(screen.getByText('WiFi')).toBeInTheDocument();
       expect(screen.getByText('Wireless')).toBeInTheDocument();
       expect(screen.getByText('Network')).toBeInTheDocument();
@@ -155,7 +153,7 @@ describe('Sidebar', () => {
   });
 
   it('highlights active link', async () => {
-    renderSidebar('/dashboard-1');
+    renderSidebar('/dashboard');
     await waitFor(() => {
       const dashboardLink = screen.getByRole('link', { name: 'Dashboard' });
       expect(dashboardLink).toHaveClass('bg-blue-50');
@@ -197,7 +195,7 @@ describe('Mobile Sidebar', () => {
 
   it('closes drawer when navigation link is clicked', async () => {
     const user = userEvent.setup();
-    renderAppShellMobile('/dashboard-1');
+    renderAppShellMobile('/dashboard');
 
     await waitFor(() => {
       expect(screen.getByLabelText('Open menu')).toBeInTheDocument();

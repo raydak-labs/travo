@@ -1,7 +1,7 @@
 ---
 title: Frontend UI and theming
 description: ThemeProvider, dark class, Tailwind tokens, chart variables, contrast rules.
-updated: 2026-04-13
+updated: 2026-05-14
 tags: [docs, frontend, theming, tailwind]
 ---
 
@@ -58,6 +58,11 @@ These solve different levels of hierarchy:
 | **In-page tabs** (WiFi Wireless / Advanced; Network Status / Configuration / Advanced) | Same page component; **tab changes call the router** so URL, sidebar highlight, and shareable links stay aligned. |
 
 Collapsible **sidebar groups** are only for grouping nav links, not for hiding page content (page-level disclosure uses tabs + routes).
+
+## Overview vs detail pages
+
+- **Dashboard** (`/dashboard`): how you are connected right now, client counts, quick actions, and live throughput. Avoid duplicating long-form diagnostics (full interface tables, kernel strings, hour-long history charts) here; those belong on **Network**, **Clients**, **System**, or **Logs** as appropriate.
+- Prefer **one obvious next step** (e.g. link to System for firmware and hardware) over packing every metric onto the first screen.
 
 ## Avoid
 

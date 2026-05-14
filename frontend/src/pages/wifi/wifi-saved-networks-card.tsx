@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Wifi, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import {
   useSavedNetworks,
@@ -21,10 +28,20 @@ import {
   useSetNetworkPriority,
   useAutoReconnect,
   useSetAutoReconnect,
+  useWifiConnect,
+  useWifiConnection,
 } from '@/hooks/use-wifi';
+
+const SAVED_LIST_TOOLTIP =
+  'Priority is used when the router must pick a saved profile—for example when you turn on Wi‑Fi client mode, or if more than one STA profile needs reconciling. It is not continuous roaming by signal strength. Use Connect to switch to a standby network using its saved password.';
+
+const AUTO_RECONNECT_HELP =
+  'If Wi‑Fi drops, periodically runs a safe reconnect for the active profile. It does not automatically switch to another saved SSID for stronger signal.';
 
 export function WifiSavedNetworksCard() {
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
+  const { data: connection } = useWifiConnection();
+  const connectMutation = useWifiConnect();
   const deleteMutation = useWifiDelete();
   const priorityMutation = useSetNetworkPriority();
   const { data: autoReconnect } = useAutoReconnect();
@@ -43,18 +60,28 @@ export function WifiSavedNetworksCard() {
   const isRiskyDelete = pendingDelete && savedNetworks.length === 1 && !autoReconnect?.enabled;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Saved Networks</CardTitle>
+    <Card className="min-w-0">
+      <CardHeader className="space-y-1">
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm font-medium">Saved networks</CardTitle>
+          <InfoTooltip text={SAVED_LIST_TOOLTIP} />
+        </div>
+        <CardDescription>
+          <span className="text-muted-foreground">
+            In use = enabled profile; standby = saved but not active. <strong>Connect</strong> uses
+            the stored password. Arrows set priority for automatic selection (see info).
+          </span>
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="mb-4 flex items-center justify-between rounded-lg border p-3">
-          <div className="space-y-0.5">
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              Auto-Reconnect
-            </span>
-            <p className="text-xs text-gray-500">
-              Automatically reconnect to saved networks when connection drops
+      <CardContent className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-muted/15">
+          <div className="min-w-0 space-y-0.5 pr-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Auto-reconnect</span>
+              <InfoTooltip text={AUTO_RECONNECT_HELP} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Retry Wi‑Fi when the link drops (active profile only).
             </p>
           </div>
           <Switch
@@ -63,8 +90,10 @@ export function WifiSavedNetworksCard() {
             checked={autoReconnect?.enabled ?? false}
             onChange={(e) => setAutoReconnect.mutate(e.target.checked)}
             disabled={setAutoReconnect.isPending}
+            className="shrink-0 sm:ml-auto"
           />
         </div>
+
         {savedLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
@@ -73,22 +102,56 @@ export function WifiSavedNetworksCard() {
         ) : savedNetworks.length === 0 ? (
           <EmptyState message="No saved networks" />
         ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
-            {savedNetworks.map((network, index) => (
-              <li key={network.section} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  <Wifi className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {network.ssid}
-                    </p>
+          <ul
+            className="divide-y divide-border rounded-lg border border-border dark:divide-white/10 dark:border-white/10"
+            role="list"
+          >
+            {savedNetworks.map((network, index) => {
+              const isThisNetwork =
+                connection?.connected === true && connection.ssid === network.ssid;
+              const rowBusy =
+                connectMutation.isPending ||
+                priorityMutation.isPending ||
+                deleteMutation.isPending;
+              return (
+              <li
+                key={network.section}
+                className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-1"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <Wifi className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{network.ssid}</p>
                     <SecurityBadge encryption={network.encryption} />
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Badge variant={network.auto_connect ? 'success' : 'outline'}>
-                    {network.auto_connect ? 'Auto' : 'Manual'}
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
+                  <Badge variant={network.auto_connect ? 'success' : 'secondary'}>
+                    {network.auto_connect ? 'In use' : 'Standby'}
                   </Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isThisNetwork || rowBusy}
+                    title={
+                      isThisNetwork
+                        ? 'Already connected to this network'
+                        : 'Connect using saved password'
+                    }
+                    onClick={() =>
+                      connectMutation.mutate({
+                        ssid: network.ssid,
+                        password: '',
+                        encryption: network.encryption,
+                      })
+                    }
+                  >
+                    {connectMutation.isPending &&
+                    connectMutation.variables?.ssid === network.ssid
+                      ? 'Connecting…'
+                      : 'Connect'}
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -101,8 +164,8 @@ export function WifiSavedNetworksCard() {
                       ];
                       priorityMutation.mutate({ ssids: newSsids });
                     }}
-                    disabled={index === 0 || priorityMutation.isPending}
-                    title="Move up (higher priority)"
+                    disabled={index === 0 || rowBusy}
+                    title="Higher priority when the router picks among saved profiles"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </Button>
@@ -118,8 +181,8 @@ export function WifiSavedNetworksCard() {
                       ];
                       priorityMutation.mutate({ ssids: newSsids });
                     }}
-                    disabled={index === savedNetworks.length - 1 || priorityMutation.isPending}
-                    title="Move down (lower priority)"
+                    disabled={index === savedNetworks.length - 1 || rowBusy}
+                    title="Lower priority"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -129,14 +192,15 @@ export function WifiSavedNetworksCard() {
                     onClick={() =>
                       setPendingDelete({ section: network.section, ssid: network.ssid })
                     }
-                    disabled={deleteMutation.isPending}
+                    disabled={rowBusy}
                     title="Remove network"
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 
@@ -149,10 +213,7 @@ export function WifiSavedNetworksCard() {
               <DialogTitle>Remove saved network</DialogTitle>
               <DialogDescription>
                 Are you sure you want to remove the saved network{' '}
-                <span className="font-medium text-gray-900 dark:text-white">
-                  "{pendingDelete?.ssid}"
-                </span>
-                ?
+                <span className="font-medium text-foreground">"{pendingDelete?.ssid}"</span>?
               </DialogDescription>
             </DialogHeader>
 

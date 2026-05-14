@@ -73,7 +73,7 @@ describe('WifiPage', () => {
     renderWifiPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Saved Networks')).toBeInTheDocument();
+      expect(screen.getByText('Saved networks')).toBeInTheDocument();
     });
 
     await waitFor(() => {
