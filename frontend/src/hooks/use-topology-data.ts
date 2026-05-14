@@ -28,7 +28,7 @@ export interface TopologyData {
   ethernetUp: boolean;
   repeaterUp: boolean;
   tetherUp: boolean;
-  // Raw data for ExperimentalPage detail cards
+  // Raw data for dashboard source / detail cards
   wan: NetworkStatus['wan'];
   wifiConn: ReturnType<typeof useWifiConnection>['data'];
   usbTether: ReturnType<typeof useUSBTetherStatus>['data'];

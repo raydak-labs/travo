@@ -34,7 +34,7 @@ function renderLoginPage() {
 
   const dashboardRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/dashboard-2',
+    path: '/dashboard',
     component: () => <div data-testid="dashboard">Dashboard</div>,
   });
 

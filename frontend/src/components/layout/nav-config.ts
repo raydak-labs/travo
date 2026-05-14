@@ -39,15 +39,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   {
     kind: 'leaf',
     id: 'dashboard',
-    to: '/dashboard-1',
+    to: '/dashboard',
     label: 'Dashboard',
-    icon: Activity,
-  },
-  {
-    kind: 'leaf',
-    id: 'dashboard-new',
-    to: '/dashboard-2',
-    label: 'Dashboard (NEW)',
     icon: Activity,
   },
   {

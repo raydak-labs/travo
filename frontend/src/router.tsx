@@ -13,7 +13,6 @@ import { SetupPage } from '@/pages/setup/setup-page';
 import {
   ClientsPage,
   DashboardPage,
-  ExperimentalPage,
   LogsPage,
   NetworkPage,
   ServicesPage,
@@ -49,7 +48,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/dashboard-2' });
+    throw redirect({ to: '/dashboard' });
   },
 });
 
@@ -69,23 +68,25 @@ function shellPage(title: string, PageComponent: ComponentType) {
   );
 }
 
-const dashboardV1Route = createRoute({
+const dashboardRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: '/dashboard-1',
+  path: '/dashboard',
   component: shellPage('Dashboard', DashboardPage),
 });
 
-const dashboardV2Route = createRoute({
+const dashboardV1RedirectRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: '/dashboard-2',
-  component: shellPage('Dashboard (NEW)', ExperimentalPage),
+  path: '/dashboard-1',
+  beforeLoad: () => {
+    throw redirect({ to: '/dashboard' });
+  },
 });
 
-const dashboardLegacyRedirectRoute = createRoute({
+const dashboardV2RedirectRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: '/dashboard',
+  path: '/dashboard-2',
   beforeLoad: () => {
-    throw redirect({ to: '/dashboard-1' });
+    throw redirect({ to: '/dashboard' });
   },
 });
 
@@ -93,7 +94,7 @@ const experimentalRedirectRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/experimental',
   beforeLoad: () => {
-    throw redirect({ to: '/dashboard-2' });
+    throw redirect({ to: '/dashboard' });
   },
 });
 
@@ -179,7 +180,7 @@ const notFoundRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '*',
   beforeLoad: () => {
-    throw redirect({ to: '/dashboard-2' });
+    throw redirect({ to: '/dashboard' });
   },
 });
 
@@ -188,10 +189,10 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   setupRoute,
   protectedRoute.addChildren([
-    dashboardLegacyRedirectRoute,
+    dashboardRoute,
     experimentalRedirectRoute,
-    dashboardV1Route,
-    dashboardV2Route,
+    dashboardV1RedirectRoute,
+    dashboardV2RedirectRoute,
     wifiAdvancedRoute,
     wifiRoute,
     networkConfigurationRoute,
