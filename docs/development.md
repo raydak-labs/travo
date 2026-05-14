@@ -71,10 +71,8 @@ travo/
 ├── shared/       # Shared TS types
 ├── scripts/      # dev, deploy, install helpers
 ├── test/integration/  # real-device integration runners (SSH + API)
-├── docs/adr/     # Architecture decision records ([`docs/adr/README.md`](./adr/README.md))
-├── docs/plans/   # Design history (read [`docs/plans/README.md`](./plans/README.md))
+├── docs/         # Obsidian vault; hub [`+ Start here.md`](./+ Start here.md); ADRs in docs/adr/
 ├── packaging/    # OpenWrt staging files
-├── docs/         # This documentation
 └── Makefile
 ```
 

@@ -22,3 +22,5 @@ ADRs capture **durable, topic-specific** decisions that are too long for `docs/a
 **How to use:** pick the ADR that matches the subsystem you are changing; if the behavior is not documented yet, add or amend an ADR in the same numbering series.
 
 When an ADR supersedes or narrows a summary in `docs/architecture.md`, both stay in sync: the overview file links here; the ADR is the source of truth for that topic.
+
+**Obsidian:** open the vault at `docs/` and use **`+ Start here.md`** for a wikilink map of the same files; CLI search/read examples are in `AGENTS.md` → *Documentation retrieval (Obsidian CLI)*.

@@ -7,6 +7,8 @@ tags: [docs, index, navigation]
 
 # Documentation Map
 
+This directory is an **Obsidian vault** (`.obsidian/`). For graph and wikilink navigation, open **`+ Start here.md`**.
+
 ## Read first
 
 - [`AGENTS.md`](../AGENTS.md) — repo workflow, guardrails, finish criteria

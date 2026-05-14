@@ -157,4 +157,5 @@ Router hardware is constrained. Every feature must justify its footprint.
 - Put open work in `tasks_open.md`, completed work in `tasks_done.md`.
 - Use [`docs/README.md`](./README.md) as the documentation map; plans live under [`docs/plans/`](./plans/) with a searchable [`docs/plans/README.md`](./plans/README.md).
 - Long-lived topic decisions that need more room than this file may become **ADRs** under [`docs/adr/`](./adr/) (see [`docs/adr/README.md`](./adr/README.md)); `docs/architecture.md` links to them where relevant.
+- The **`docs/`** tree is an **Obsidian vault**; humans and agents with the Obsidian CLI should start from **`+ Start here.md`** (see `AGENTS.md` → *Documentation retrieval (Obsidian CLI)*).
 - When a plan graduates into a durable rule, copy the essential decision here and link back to the plan for rationale if useful.
