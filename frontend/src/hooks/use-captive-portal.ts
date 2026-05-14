@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { CaptiveAutoAcceptResult, CaptivePortalStatus } from '@shared/index';
+import type { CaptiveAutoAcceptResult, CaptivePortalStatus, DNSMode } from '@shared/index';
 
 export function useCaptivePortal() {
   const query = useQuery({
@@ -50,5 +50,13 @@ export function useCaptiveDNSRestore() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
     },
+  });
+}
+
+export function useDNSMode() {
+  return useQuery({
+    queryKey: ['adguard', 'dns-mode'],
+    queryFn: () => apiClient.get<DNSMode>(API_ROUTES.adguard.dnsMode),
+    refetchInterval: 30000,
   });
 }

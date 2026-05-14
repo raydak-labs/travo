@@ -609,6 +609,15 @@ export const handlers = [
     return HttpResponse.json({ status: 'ok', enabled: body.enabled });
   }),
 
+  http.get(API_ROUTES.adguard.dnsMode, () => {
+    return HttpResponse.json({
+      mode: 'adguard-forwarding',
+      description: 'dnsmasq forwards DNS to AdGuard Home (port 5353)',
+      adguard_running: true,
+      dns_bypassed: false,
+    });
+  }),
+
   http.get(API_ROUTES.system.alerts, () => {
     return HttpResponse.json({ alerts: [] });
   }),

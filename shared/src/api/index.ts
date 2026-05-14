@@ -8,3 +8,4 @@ export * from './auth';
 export * from './captive';
 export * from './speedtest';
 export * from './routes';
+export * from './dns';

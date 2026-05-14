@@ -528,3 +528,42 @@ func (s *AdGuardService) SetPassword(username, password string) error {
 	}
 	return s.SetConfig(string(out))
 }
+
+// GetDNSMode returns the current DNS resolver configuration mode.
+func (s *AdGuardService) GetDNSMode(dnsBypassed bool) models.DNSMode {
+	result := models.DNSMode{DNSBypassed: dnsBypassed}
+
+	if !s.IsInstalled() {
+		result.Mode = "default"
+		result.Description = "Using OpenWRT default DNS (dnsmasq with upstream from DHCP)"
+		return result
+	}
+
+	running := s.IsRunning()
+	result.AdGuardRunning = running
+
+	if !running {
+		result.Mode = "default"
+		result.Description = "AdGuard Home installed but not running — using default DNS"
+		return result
+	}
+
+	port := s.getDNSPort()
+	if port == 53 {
+		result.Mode = "adguard-direct"
+		result.Description = "AdGuard Home listening directly on port 53"
+		return result
+	}
+
+	// Check if dnsmasq forwards to AdGuard
+	noresolv, err := s.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].noresolv")
+	if err == nil && strings.TrimSpace(noresolv) == "1" {
+		result.Mode = "adguard-forwarding"
+		result.Description = fmt.Sprintf("dnsmasq forwards DNS to AdGuard Home (port %d)", port)
+		return result
+	}
+
+	result.Mode = "default"
+	result.Description = "Using OpenWRT default DNS (dnsmasq with upstream from DHCP)"
+	return result
+}

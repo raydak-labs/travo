@@ -5,13 +5,18 @@ export interface CaptivePortalStatus {
   readonly can_reach_internet: boolean;
   readonly dns_bypassed: boolean;
   readonly dns_bypass_needed: boolean;
+  readonly sta_connected: boolean;
 }
 
 /** Type guard for CaptivePortalStatus */
 export function isCaptivePortalStatus(value: unknown): value is CaptivePortalStatus {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return typeof v.detected === 'boolean' && typeof v.can_reach_internet === 'boolean';
+  return (
+    typeof v.detected === 'boolean' &&
+    typeof v.can_reach_internet === 'boolean' &&
+    typeof v.sta_connected === 'boolean'
+  );
 }
 
 export interface CaptiveAutoAcceptResult {

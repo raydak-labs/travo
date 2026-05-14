@@ -115,3 +115,12 @@ func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 		return RespondOK(c)
 	}
 }
+
+// AdGuardDNSModeHandler handles GET /api/v1/adguard/dns-mode.
+func AdGuardDNSModeHandler(adguardSvc *services.AdGuardService, captiveSvc *services.CaptiveService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		dnsBypassed := captiveSvc.IsDNSBypassed()
+		mode := adguardSvc.GetDNSMode(dnsBypassed)
+		return c.JSON(mode)
+	}
+}

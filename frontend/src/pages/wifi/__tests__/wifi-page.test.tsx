@@ -64,7 +64,8 @@ describe('WifiPage', () => {
     renderWifiPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      const matches = screen.getAllByText('Connected');
+      expect(matches.length).toBeGreaterThanOrEqual(1);
     });
   });
 

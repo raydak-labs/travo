@@ -5,7 +5,7 @@ import type { NetworkStatus, WifiConnection } from '@shared/index';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CaptivePortalBanner } from '@/components/wifi/captive-portal-banner';
+import { CaptivePortalCard } from '@/components/wifi/captive-portal-card';
 
 export function ConnectionStatusCard() {
   const { data: network, isLoading: networkLoading } = useQuery({
@@ -42,7 +42,7 @@ export function ConnectionStatusCard() {
 
   return (
     <div className="space-y-3">
-      <CaptivePortalBanner />
+      <CaptivePortalCard />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Connection Status</CardTitle>
