@@ -1,3 +1,4 @@
+import { DNSToolsCard } from '@/components/wifi/dns-tools-card';
 import { WifiRadioHardwareCard } from './wifi-radio-hardware-card';
 import { GuestNetworkCard } from './guest-network-card';
 import { MACAddressCard } from './mac-address-card';
@@ -15,6 +16,7 @@ type WifiAdvancedPanelProps = {
 export function WifiAdvancedPanel({ panelId, tabId, hidden }: WifiAdvancedPanelProps) {
   return (
     <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
+      <DNSToolsCard />
       <RepeaterRadioLayoutCard />
       <WifiRadioHardwareCard />
       <GuestNetworkCard />

@@ -17,6 +17,7 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 		}
 		status.DNSBypassed = svc.IsDNSBypassed()
 		status.DNSBypassNeeded = !status.DNSBypassed && status.Detected && svc.CheckDNSBypassNeeded()
+		status.STAConnected = svc.IsUpstreamConnected()
 		// Auto-restore DNS when internet is reachable
 		svc.MaybeAutoRestoreDNS(status.CanReachInternet)
 		return c.JSON(status)

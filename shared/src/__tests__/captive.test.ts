@@ -13,6 +13,7 @@ describe('CaptivePortalStatus', () => {
       can_reach_internet: true,
       dns_bypassed: false,
       dns_bypass_needed: false,
+      sta_connected: true,
     };
     expect(isCaptivePortalStatus(status)).toBe(true);
   });
@@ -24,6 +25,7 @@ describe('CaptivePortalStatus', () => {
       can_reach_internet: false,
       dns_bypassed: false,
       dns_bypass_needed: true,
+      sta_connected: true,
     };
     expect(isCaptivePortalStatus(status)).toBe(true);
   });

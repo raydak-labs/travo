@@ -143,5 +143,6 @@ export const API_ROUTES = {
     dns: '/api/v1/adguard/dns',
     config: '/api/v1/adguard/config',
     password: '/api/v1/adguard/password',
+    dnsMode: '/api/v1/adguard/dns-mode',
   },
 } as const;

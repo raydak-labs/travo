@@ -7,6 +7,7 @@ type CaptivePortalStatus struct {
 	CanReachInternet bool    `json:"can_reach_internet"`
 	DNSBypassed      bool    `json:"dns_bypassed"`
 	DNSBypassNeeded  bool    `json:"dns_bypass_needed"`
+	STAConnected     bool    `json:"sta_connected"`
 }
 
 type CaptiveAutoAcceptResult struct {

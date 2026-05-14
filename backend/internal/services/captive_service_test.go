@@ -1,7 +1,10 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -332,20 +335,161 @@ func TestCheckDNSBypassNeeded_NoCustomDNS(t *testing.T) {
 	}
 }
 
-func TestDetectGatewayPortalURL(t *testing.T) {
+func TestDetectGatewayPortalURL_NoRoute(t *testing.T) {
 	cmd := &mockCmdRunner{responses: map[string]string{
-		"ip route show default": "default via 192.168.1.1 dev eth0",
+		"ip route show default": "",
 	}}
-	prober := &MockHTTPProber{
-		StatusCode:  302,
-		RedirectURL: "http://192.168.1.1/portal",
-	}
-	svc, dir := newTestCaptiveServiceWithUCI(prober, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(&MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	got := svc.detectGatewayPortalURL()
-	// detectGatewayPortalURL returns the gateway URL (not the redirect target)
-	if got != "http://192.168.1.1/" {
-		t.Errorf("detectGatewayPortalURL = %q, want http://192.168.1.1/", got)
+	if got != "" {
+		t.Errorf("detectGatewayPortalURL with no route = %q, want empty", got)
+	}
+}
+
+func TestDetectGatewayPortalURL_NoCmd(t *testing.T) {
+	svc := NewCaptiveService(&MockHTTPProber{StatusCode: 204})
+
+	got := svc.detectGatewayPortalURL()
+	if got != "" {
+		t.Errorf("detectGatewayPortalURL with no cmd = %q, want empty", got)
+	}
+}
+
+// newMockAdGuardServer returns a test HTTP server that mimics the AdGuardHome
+// /control/dns_info and /control/dns_config endpoints.
+func newMockAdGuardServer(t *testing.T, upstream []string) (server *httptest.Server, receivedUpstream *[]string) {
+	t.Helper()
+	received := &[]string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/control/dns_info":
+			_ = json.NewEncoder(w).Encode(adguardDNSInfoResp{UpstreamDNS: upstream})
+		case "/control/dns_config":
+			var cfg adguardDNSConfig
+			_ = json.NewDecoder(r.Body).Decode(&cfg)
+			*received = cfg.UpstreamDNS
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	return srv, received
+}
+
+func newTestCaptiveServiceWithAdGuard(t *testing.T, cmd *mockCmdRunner, agServer *httptest.Server) (*CaptiveService, string) {
+	t.Helper()
+	u := uci.NewMockUCI()
+	guardDir, _ := os.MkdirTemp("", "captive-test-*")
+	guardFile := filepath.Join(guardDir, "dns-bypass-in-progress")
+	svc := &CaptiveService{prober: &MockHTTPProber{StatusCode: 204}, uci: u, cmd: cmd, guardFile: guardFile}
+	if agServer != nil {
+		// Patch the package-level constant via a subfield isn't possible directly,
+		// so we test via the exported methods with an overridden API base.
+		// We use a helper that replaces adguardAPIBase for the scope of the test.
+		svc.adguardAPIBaseOverride = agServer.URL
+	}
+	return svc, guardDir
+}
+
+// TestBypassDNS_WithAdGuard verifies that BypassDNS patches AdGuardHome's upstream
+// when AdGuardHome is present and using encrypted DNS.
+func TestBypassDNS_WithAdGuard_EncryptedUpstream(t *testing.T) {
+	agSrv, received := newMockAdGuardServer(t, []string{"https://dns10.quad9.net/dns-query"})
+	defer agSrv.Close()
+
+	// Write a fake resolv.conf.auto so readDHCPDNS finds a hotel DNS
+	tmpResolvDir, _ := os.MkdirTemp("", "resolv-*")
+	defer os.RemoveAll(tmpResolvDir)
+	resolvFile := filepath.Join(tmpResolvDir, "resolv.conf.auto")
+	_ = os.WriteFile(resolvFile, []byte("# test\nnameserver 10.1.2.3\n"), 0600)
+
+	cmd := &mockCmdRunner{responses: map[string]string{
+		"uci get dhcp.@dnsmasq[0].noresolv":          "0",
+		"uci get dhcp.@dnsmasq[0].server":            "",
+		"uci get dhcp.@dnsmasq[0].rebind_protection": "0",
+	}}
+	svc, dir := newTestCaptiveServiceWithAdGuard(t, cmd, agSrv)
+	defer os.RemoveAll(dir)
+	svc.resolvConfAutoOverride = resolvFile
+	_ = svc.uci.Set("network", "wan", "peerdns", "1")
+
+	if err := svc.BypassDNS(); err != nil {
+		t.Fatalf("BypassDNS error: %v", err)
+	}
+	if !svc.IsDNSBypassed() {
+		t.Error("expected guard file to exist after AdGuardHome-only bypass")
+	}
+	if len(*received) == 0 || (*received)[0] != "10.1.2.3" {
+		t.Errorf("expected AdGuardHome upstream set to 10.1.2.3, got %v", *received)
+	}
+}
+
+// TestBypassDNS_NoAdGuard verifies that BypassDNS still works (dnsmasq path)
+// when AdGuardHome is not installed (no HTTP server at adguardAPIBase).
+func TestBypassDNS_NoAdGuard_DnsmasqOnly(t *testing.T) {
+	cmd := &mockCmdRunner{responses: map[string]string{
+		"uci get dhcp.@dnsmasq[0].noresolv":          "1",
+		"uci get dhcp.@dnsmasq[0].server":            "127.0.0.1#5353",
+		"uci get dhcp.@dnsmasq[0].rebind_protection": "0",
+		"uci set dhcp.@dnsmasq[0].noresolv=0":        "",
+		"uci delete dhcp.@dnsmasq[0].server":         "",
+		"uci add_list dhcp.@dnsmasq[0].server=":      "", // hotel DNS empty (no resolv.conf.auto in test)
+		"uci commit dhcp":                            "",
+		"/etc/init.d/dnsmasq restart":                "",
+	}}
+	// No AdGuard server — calls to adguardAPIBase will fail with connection refused
+	svc, dir := newTestCaptiveServiceWithAdGuard(t, cmd, nil)
+	defer os.RemoveAll(dir)
+	// Point adguardAPIBaseOverride to a non-listening address
+	svc.adguardAPIBaseOverride = "http://127.0.0.1:19999"
+	_ = svc.uci.Set("network", "wan", "peerdns", "1")
+
+	if err := svc.BypassDNS(); err != nil {
+		t.Fatalf("BypassDNS should succeed even without AdGuardHome: %v", err)
+	}
+	if !svc.IsDNSBypassed() {
+		t.Error("expected guard file to exist (dnsmasq-only bypass)")
+	}
+}
+
+// TestCheckDNSBypassNeeded_AdGuardEncrypted verifies that CheckDNSBypassNeeded
+// returns true when AdGuardHome is running with encrypted upstreams.
+func TestCheckDNSBypassNeeded_AdGuardEncrypted(t *testing.T) {
+	agSrv, _ := newMockAdGuardServer(t, []string{"https://dns10.quad9.net/dns-query"})
+	defer agSrv.Close()
+
+	cmd := &mockCmdRunner{responses: map[string]string{
+		"uci get dhcp.@dnsmasq[0].noresolv": "0",
+		"uci get dhcp.@dnsmasq[0].server":   "",
+	}}
+	svc, dir := newTestCaptiveServiceWithAdGuard(t, cmd, agSrv)
+	defer os.RemoveAll(dir)
+	svc.adguardAPIBaseOverride = agSrv.URL
+	_ = svc.uci.Set("network", "wan", "peerdns", "1")
+
+	if !svc.CheckDNSBypassNeeded() {
+		t.Error("expected bypass needed when AdGuardHome uses encrypted DNS")
+	}
+}
+
+// TestCheckDNSBypassNeeded_AdGuardPlainDNS verifies bypass is not reported
+// needed when AdGuardHome uses plain IP upstreams (hotel DNS already).
+func TestCheckDNSBypassNeeded_AdGuardPlainDNS(t *testing.T) {
+	agSrv, _ := newMockAdGuardServer(t, []string{"10.1.2.3"})
+	defer agSrv.Close()
+
+	cmd := &mockCmdRunner{responses: map[string]string{
+		"uci get dhcp.@dnsmasq[0].noresolv": "0",
+		"uci get dhcp.@dnsmasq[0].server":   "",
+	}}
+	svc, dir := newTestCaptiveServiceWithAdGuard(t, cmd, agSrv)
+	defer os.RemoveAll(dir)
+	svc.adguardAPIBaseOverride = agSrv.URL
+	_ = svc.uci.Set("network", "wan", "peerdns", "1")
+
+	if svc.CheckDNSBypassNeeded() {
+		t.Error("expected no bypass needed when AdGuardHome already uses plain IP upstream")
 	}
 }

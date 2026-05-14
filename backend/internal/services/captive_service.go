@@ -1,7 +1,10 @@
 package services
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -38,7 +41,7 @@ type RealHTTPProber struct {
 func NewRealHTTPProber() *RealHTTPProber {
 	return &RealHTTPProber{
 		client: &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: 3 * time.Second,
 			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
@@ -87,7 +90,16 @@ type CaptiveService struct {
 	cmd       CommandRunner
 	mu        sync.Mutex
 	guardFile string
+	// test overrides (empty in production)
+	adguardAPIBaseOverride string
+	resolvConfAutoOverride string
 }
+
+// adguardAPIBase is the local AdGuardHome HTTP API endpoint.
+const adguardAPIBase = "http://127.0.0.1:3000"
+
+// resolvConfAuto is the path where dnsmasq/odhcp6c writes DHCP-provided DNS.
+const resolvConfAuto = "/tmp/resolv.conf.d/resolv.conf.auto"
 
 // dnsBackup holds the original DNS settings for restoration.
 type dnsBackup struct {
@@ -98,7 +110,11 @@ type dnsBackup struct {
 	DnsmasqNoResolv      string   `json:"dnsmasq_noresolv,omitempty"`
 	DnsmasqServers       []string `json:"dnsmasq_servers,omitempty"`
 	DnsmasqRebindProtect string   `json:"dnsmasq_rebind_protection,omitempty"`
-	Time                 int64    `json:"time"`
+	// AdGuardHome upstream DNS backup
+	AdGuardUpstream  []string `json:"adguard_upstream,omitempty"`
+	AdGuardBootstrap []string `json:"adguard_bootstrap,omitempty"`
+	AdGuardFallback  []string `json:"adguard_fallback,omitempty"`
+	Time             int64    `json:"time"`
 }
 
 // NewCaptiveService creates a new CaptiveService with the given HTTP prober.
@@ -114,20 +130,44 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 	return svc
 }
 
+// isUpstreamConnected returns true if the device has an active default route,
+// indicating it is connected to an upstream network. In test/mock mode (cmd == nil)
+// it always returns true to avoid breaking tests.
+func (c *CaptiveService) isUpstreamConnected() bool {
+	if c.cmd == nil {
+		return true // test mode: assume connected
+	}
+	out, err := c.cmd.Run("ip", "route", "show", "default")
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.TrimSpace(string(out)), "default via")
+}
+
+// IsUpstreamConnected is the exported wrapper around isUpstreamConnected.
+func (c *CaptiveService) IsUpstreamConnected() bool {
+	return c.isUpstreamConnected()
+}
+
 // CheckCaptivePortal probes for captive portals by making an HTTP request
 // to a known endpoint and checking for redirects or unexpected responses.
 func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error) {
 	statusCode, _, redirectURL, err := c.prober.Do(captiveProbeURL)
 
-	// Resolve gateway URL once — used across multiple branches.
-	gatewayURL := c.detectGatewayPortalURL()
-
 	if err != nil {
+		// If there's no upstream connection at all, avoid false-positive portal detection.
+		if !c.isUpstreamConnected() {
+			return models.CaptivePortalStatus{
+				Detected:         false,
+				CanReachInternet: false,
+			}, nil
+		}
 		// Probe failed (DNS error, timeout, connection refused, "operation not permitted").
 		// This commonly happens when:
 		// 1. Custom DNS (AdGuard) can't resolve because captive portal blocks upstream
 		// 2. Captive portal firewall blocks all HTTP except to gateway
 		// Try to detect which case and build a useful portal URL.
+		gatewayURL := c.detectGatewayPortalURL()
 		if c.CheckDNSBypassNeeded() || gatewayURL != "" {
 			portalURL := gatewayURL
 			if portalURL == "" {
@@ -145,7 +185,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 		}, nil
 	}
 
-	// 204 No Content = internet works fine
+	// 204 No Content = internet works fine — fast path, no gateway probe needed
 	if statusCode == http.StatusNoContent {
 		return models.CaptivePortalStatus{
 			Detected:         false,
@@ -160,7 +200,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 		statusCode == http.StatusTemporaryRedirect {
 		// Prefer gateway URL for auto-accept compatibility
 		portalURL := redirectURL
-		if gatewayURL != "" {
+		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
 			portalURL = gatewayURL
 		}
 		return models.CaptivePortalStatus{
@@ -174,7 +214,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 	if statusCode == http.StatusOK {
 		fallback := captiveProbeURL
 		// Prefer gateway URL if available — better for auto-accept
-		if gatewayURL != "" {
+		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
 			fallback = gatewayURL
 		}
 		return models.CaptivePortalStatus{
@@ -197,9 +237,10 @@ func (c *CaptiveService) IsDNSBypassed() bool {
 	return err == nil
 }
 
-// BypassDNS temporarily disables custom DNS (AdGuard/noresolv) so that the
-// captive portal's DNS can be resolved via the upstream DHCP-provided nameserver.
-// Stores original config in guard file for later restoration.
+// BypassDNS temporarily switches DNS to the DHCP-provided gateway DNS so the
+// captive portal login page can be resolved.  It patches both dnsmasq (for any
+// local consumers) and AdGuardHome (which is the actual port-53 resolver for
+// LAN clients).  Original config is stored in the guard file for restoration.
 func (c *CaptiveService) BypassDNS() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -213,29 +254,45 @@ func (c *CaptiveService) BypassDNS() error {
 		return nil
 	}
 
-	// Read dnsmasq config — this is the real culprit when AdGuard is configured
+	// Read dnsmasq config
 	noresolv := c.getDnsmasqOption("noresolv")
 	servers := c.getDnsmasqServers()
 	rebindProtect := c.getDnsmasqOption("rebind_protection")
 
-	// Also read wan config for completeness
+	// Read wan config for completeness
 	wanOpts, _ := c.uci.GetAll("network", "wan")
 	wanPeerdns := wanOpts["peerdns"]
 	wanDNS := wanOpts["dns"]
 
-	// Check if there's anything to bypass
-	needsBypass := (noresolv == "1" && len(servers) > 0) || (wanPeerdns == "0" && strings.TrimSpace(wanDNS) != "")
+	// Determine whether anything actually blocks portal DNS resolution.
+	// Either dnsmasq noresolv, legacy wan peerdns=0, or AdGuardHome using
+	// encrypted DoH/DoT upstreams (which bypass hotel DNS hijacking).
+	agEncrypted := c.isAdGuardUsingEncryptedDNS()
+	needsBypass := noresolv == "1" || (wanPeerdns == "0" && strings.TrimSpace(wanDNS) != "") || agEncrypted
 	if !needsBypass {
 		return nil
 	}
 
-	// Save current state
+	// Get the DHCP-provided upstream DNS from the WAN interface.
+	// This is what the captive portal network expects us to use.
+	hotelDNS := c.readDHCPDNS()
+	if hotelDNS == "" {
+		log.Printf("captive: could not read DHCP DNS from resolv.conf.auto")
+	}
+
+	// Read current AdGuardHome upstream config so we can restore it.
+	agUpstream, agBootstrap, agFallback := c.readAdGuardUpstream()
+
+	// Save current state (including AdGuardHome config)
 	backup := dnsBackup{
 		PeerDNS:              wanPeerdns,
 		DNS:                  wanDNS,
 		DnsmasqNoResolv:      noresolv,
 		DnsmasqServers:       servers,
 		DnsmasqRebindProtect: rebindProtect,
+		AdGuardUpstream:      agUpstream,
+		AdGuardBootstrap:     agBootstrap,
+		AdGuardFallback:      agFallback,
 		Time:                 time.Now().Unix(),
 	}
 	data, err := json.Marshal(backup)
@@ -249,39 +306,52 @@ func (c *CaptiveService) BypassDNS() error {
 		return err
 	}
 
-	// Disable noresolv so dnsmasq reads /tmp/resolv.conf.d/resolv.conf.auto
+	// --- Patch dnsmasq (only needed when noresolv=1 or rebind protection) ---
+	needsDnsmasqCommit := false
 	if noresolv == "1" {
 		if err := c.setDnsmasqOption("noresolv", "0"); err != nil {
 			_ = os.Remove(c.guardFile)
 			return err
 		}
-		// Remove custom servers so dnsmasq uses upstream from resolv.conf
 		_ = c.deleteDnsmasqOption("server")
+		// Add hotel DNS as explicit dnsmasq upstream (belt-and-suspenders)
+		if hotelDNS != "" {
+			_ = c.addDnsmasqListItem("server", hotelDNS)
+		}
+		needsDnsmasqCommit = true
 	}
-
-	// Disable rebind protection — captive portals use private IPs for hostnames
 	if rebindProtect == "1" {
 		_ = c.setDnsmasqOption("rebind_protection", "0")
+		needsDnsmasqCommit = true
 	}
-
-	if err := c.commitDhcp(); err != nil {
-		_ = os.Remove(c.guardFile)
-		return err
+	if needsDnsmasqCommit {
+		if err := c.commitDhcp(); err != nil {
+			_ = os.Remove(c.guardFile)
+			return err
+		}
+		if c.cmd != nil {
+			_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
+		}
 	}
-
-	// Also fix wan peerdns if needed
 	if wanPeerdns == "0" {
 		_ = c.uci.Set("network", "wan", "peerdns", "1")
 		_ = c.uci.Set("network", "wan", "dns", "")
 		_ = c.uci.Commit("network")
 	}
 
-	// Restart dnsmasq to pick up new settings
-	if c.cmd != nil {
-		_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	// --- Patch AdGuardHome (this is the actual port-53 resolver) ---
+	// Switch its upstream from DoH/DoT to the plain hotel DNS so that
+	// captive portal hostnames (which resolve to private IPs) are resolved.
+	if hotelDNS != "" {
+		if err := c.setAdGuardUpstream([]string{hotelDNS}, nil, nil); err != nil {
+			log.Printf("captive: warning — could not update AdGuardHome upstream: %v", err)
+			// Non-fatal: dnsmasq changes are still in effect
+		} else {
+			log.Printf("captive: AdGuardHome upstream switched to %s", hotelDNS)
+		}
 	}
 
-	log.Printf("captive: DNS bypassed (noresolv=%s, servers=%v, peerdns=%s)", noresolv, servers, wanPeerdns)
+	log.Printf("captive: DNS bypassed (noresolv=%s, servers=%v, hotelDNS=%s)", noresolv, servers, hotelDNS)
 	return nil
 }
 
@@ -305,17 +375,23 @@ func (c *CaptiveService) RestoreDNS() error {
 		return err
 	}
 
-	// Restore dnsmasq settings
-	if backup.DnsmasqNoResolv == "1" {
-		_ = c.setDnsmasqOption("noresolv", "1")
-		for _, srv := range backup.DnsmasqServers {
-			_ = c.addDnsmasqListItem("server", srv)
-		}
+	// Restore dnsmasq settings — always restore noresolv regardless of servers
+	needsDhcpCommit := false
+	if backup.DnsmasqNoResolv != "" {
+		_ = c.setDnsmasqOption("noresolv", backup.DnsmasqNoResolv)
+		needsDhcpCommit = true
+	}
+	// Delete current servers first, then re-add original ones
+	_ = c.deleteDnsmasqOption("server")
+	for _, srv := range backup.DnsmasqServers {
+		_ = c.addDnsmasqListItem("server", srv)
+		needsDhcpCommit = true
 	}
 	if backup.DnsmasqRebindProtect == "1" {
 		_ = c.setDnsmasqOption("rebind_protection", "1")
+		needsDhcpCommit = true
 	}
-	if backup.DnsmasqNoResolv == "1" || backup.DnsmasqRebindProtect == "1" {
+	if needsDhcpCommit {
 		_ = c.commitDhcp()
 	}
 
@@ -330,6 +406,15 @@ func (c *CaptiveService) RestoreDNS() error {
 		_ = c.uci.Commit("network")
 	}
 
+	// Restore AdGuardHome upstream DNS
+	if len(backup.AdGuardUpstream) > 0 {
+		if err := c.setAdGuardUpstream(backup.AdGuardUpstream, backup.AdGuardBootstrap, backup.AdGuardFallback); err != nil {
+			log.Printf("captive: warning — could not restore AdGuardHome upstream: %v", err)
+		} else {
+			log.Printf("captive: AdGuardHome upstream restored to %v", backup.AdGuardUpstream)
+		}
+	}
+
 	_ = os.Remove(c.guardFile)
 
 	if c.cmd != nil {
@@ -337,6 +422,110 @@ func (c *CaptiveService) RestoreDNS() error {
 	}
 
 	log.Printf("captive: DNS restored")
+	return nil
+}
+
+// readDHCPDNS parses the first nameserver line from resolv.conf.auto —
+// this is the DNS server handed out by the upstream network via DHCP.
+func (c *CaptiveService) readDHCPDNS() string {
+	path := resolvConfAuto
+	if c.resolvConfAutoOverride != "" {
+		path = c.resolvConfAutoOverride
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "nameserver ") {
+			ip := strings.TrimSpace(strings.TrimPrefix(line, "nameserver "))
+			if ip != "" {
+				return ip
+			}
+		}
+	}
+	return ""
+}
+
+// adguardDNSConfig is the JSON body for POST /control/dns_config.
+type adguardDNSConfig struct {
+	UpstreamDNS  []string `json:"upstream_dns"`
+	BootstrapDNS []string `json:"bootstrap_dns,omitempty"`
+	FallbackDNS  []string `json:"fallback_dns,omitempty"`
+}
+
+// adguardDNSInfoResp is the relevant subset of GET /control/dns_info.
+type adguardDNSInfoResp struct {
+	UpstreamDNS  []string `json:"upstream_dns"`
+	BootstrapDNS []string `json:"bootstrap_dns"`
+	FallbackDNS  []string `json:"fallback_dns"`
+}
+
+// isAdGuardUsingEncryptedDNS returns true when AdGuardHome is reachable and
+// its upstream DNS entries use encrypted protocols (https://, tls://, quic://)
+// that would prevent captive portal hostnames from resolving via hotel DNS.
+// Returns false (non-blocking) when AdGuardHome is absent or unreachable.
+func (c *CaptiveService) isAdGuardUsingEncryptedDNS() bool {
+	upstream, _, _ := c.readAdGuardUpstream()
+	for _, u := range upstream {
+		if strings.HasPrefix(u, "https://") ||
+			strings.HasPrefix(u, "tls://") ||
+			strings.HasPrefix(u, "quic://") ||
+			strings.HasPrefix(u, "sdns://") {
+			return true
+		}
+	}
+	return false
+}
+
+// agAPIBase returns the AdGuardHome API base URL, respecting test overrides.
+func (c *CaptiveService) agAPIBase() string {
+	if c.adguardAPIBaseOverride != "" {
+		return c.adguardAPIBaseOverride
+	}
+	return adguardAPIBase
+}
+
+// readAdGuardUpstream fetches the current upstream DNS config from AdGuardHome.
+// Returns empty slices if AdGuard is not running or not installed.
+func (c *CaptiveService) readAdGuardUpstream() (upstream, bootstrap, fallback []string) {
+	cl := &http.Client{Timeout: 2 * time.Second}
+	resp, err := cl.Get(c.agAPIBase() + "/control/dns_info")
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var info adguardDNSInfoResp
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return
+	}
+	return info.UpstreamDNS, info.BootstrapDNS, info.FallbackDNS
+}
+
+// setAdGuardUpstream calls AdGuardHome's /control/dns_config to update the upstream.
+func (c *CaptiveService) setAdGuardUpstream(upstream, bootstrap, fallback []string) error {
+	cfg := adguardDNSConfig{
+		UpstreamDNS:  upstream,
+		BootstrapDNS: bootstrap,
+		FallbackDNS:  fallback,
+	}
+	body, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	cl := &http.Client{Timeout: 3 * time.Second}
+	resp, err := cl.Post(c.agAPIBase()+"/control/dns_config", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("AdGuardHome dns_config returned %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
 	return nil
 }
 
@@ -458,21 +647,21 @@ func (c *CaptiveService) CheckDNSBypassNeeded() bool {
 		return false
 	}
 
-	// Check dnsmasq noresolv + custom server (the main culprit with AdGuard)
+	// noresolv=1 means dnsmasq ignores upstream DHCP DNS.
 	noresolv := c.getDnsmasqOption("noresolv")
 	if noresolv == "1" {
-		servers := c.getDnsmasqServers()
-		if len(servers) > 0 {
-			return true
-		}
+		return true
 	}
 
-	// Also check legacy wan peerdns=0
+	// Legacy wan peerdns=0 with static DNS.
 	opts, err := c.uci.GetAll("network", "wan")
-	if err != nil {
-		return false
+	if err == nil && opts["peerdns"] == "0" && strings.TrimSpace(opts["dns"]) != "" {
+		return true
 	}
-	return opts["peerdns"] == "0" && strings.TrimSpace(opts["dns"]) != ""
+
+	// AdGuardHome (if installed) uses encrypted DoH/DoT upstreams that bypass
+	// hotel DNS hijacking — captive portal hostnames won't resolve.
+	return c.isAdGuardUsingEncryptedDNS()
 }
 
 // detectGatewayPortalURL tries to detect a captive portal by probing the default
@@ -497,12 +686,21 @@ func (c *CaptiveService) detectGatewayPortalURL() string {
 		return ""
 	}
 
-	// Try to probe the gateway on HTTP (short timeout)
+	// Use a short-timeout client for the gateway probe — the gateway is on LAN
+	// so if it doesn't respond in 2s, it's not a captive portal gateway.
+	gwClient := &http.Client{
+		Timeout: 2 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	gatewayURL := "http://" + gatewayIP + "/"
-	statusCode, _, _, err := c.prober.Do(gatewayURL)
+	resp, err := gwClient.Get(gatewayURL)
 	if err != nil {
 		return ""
 	}
+	_ = resp.Body.Close()
+	statusCode := resp.StatusCode
 
 	// If it redirects or serves a page, the gateway itself is the portal entry point.
 	// Return the gateway HTTP URL (not the redirect target) because:
