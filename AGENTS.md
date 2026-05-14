@@ -4,6 +4,7 @@
 
 - `AGENTS.md` keeps repo workflow and guardrails.
 - `docs/architecture.md` keeps stable architecture decisions, safety rules, and runtime invariants. Update it whenever new essential behavior, subsystem contract, or operational constraint is decided.
+- `docs/adr/README.md` indexes **architecture decision records** (ADRs). Before changing a subsystem, read the ADR for that area from that index (e.g. wireless → 0002, crash guards → 0003, firewall → 0004, mwan3 failover → 0005, platform/OpenAPI → 0006, auth → 0007, DNS/VPN/captive → 0001). Add a new numbered ADR when you introduce another normative cross-cutting topic.
 - `docs/requirements/tasks_open.md` is the working backlog.
 - `docs/requirements/tasks_done.md` is the completed task log.
 - `docs/_archive/requirements_done.md` is a legacy exhaustive archive; do not use it as the active backlog.
@@ -29,7 +30,8 @@ This is a pnpm monorepo with:
 
 ## Documentation Workflow
 
-- Keep `docs/architecture.md` current for stable design decisions, invariants, safety constraints, and important cross-component behavior.
+- Keep `docs/architecture.md` current for stable design decisions, invariants, safety constraints, and important cross-component behavior; link new long-form decisions from there into `docs/adr/` when a dedicated ADR is clearer than inflating the overview.
+- Keep `docs/adr/README.md` and the relevant ADR file updated when ADR-governed behavior changes.
 - Keep `docs/requirements/tasks_open.md` and `docs/requirements/tasks_done.md` current when scope changes or work is completed.
 - Keep `docs/README.md` as the documentation map (requirements pointers live there).
 - Prefer short overview docs that link deeper instead of putting backlog, architecture, and historical notes into one file.

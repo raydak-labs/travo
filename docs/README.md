@@ -1,7 +1,7 @@
 ---
 title: Documentation map
 description: Entrypoint for human and agent docs; links to architecture, backlog, workflows, plans.
-updated: 2026-04-13
+updated: 2026-05-14
 tags: [docs, index, navigation]
 ---
 
@@ -11,6 +11,7 @@ tags: [docs, index, navigation]
 
 - [`AGENTS.md`](../AGENTS.md) — repo workflow, guardrails, finish criteria
 - [`docs/architecture.md`](./architecture.md) — stable architecture and safety decisions
+- [`docs/adr/README.md`](./adr/README.md) — architecture decision records (normative detail by topic, e.g. DNS/VPN/captive portal)
 
 ## Requirements and work status
 
@@ -19,6 +20,7 @@ tags: [docs, index, navigation]
 | Open backlog | [`docs/requirements/tasks_open.md`](./requirements/tasks_open.md) |
 | Completed log | [`docs/requirements/tasks_done.md`](./requirements/tasks_done.md) |
 | Wireless invariants, safety | [`docs/architecture.md`](./architecture.md#2-wireless-model-and-invariants) |
+| ADRs (wireless, failover, auth, DNS/VPN/captive, …) | [`docs/adr/README.md`](./adr/README.md) |
 | Legacy checkbox snapshot (read-only) | [`docs/_archive/requirements_done.md`](./_archive/requirements_done.md) |
 
 **Backlog:** [`tasks_open.md`](./requirements/tasks_open.md) · **Open questions:** [`tasks_open.md`](./requirements/tasks_open.md#open-questions)
