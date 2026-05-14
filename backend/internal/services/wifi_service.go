@@ -820,9 +820,18 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 	return all, nil
 }
 
+// ErrPasswordRequiredForNewSTA is returned when Connect would create a new secured STA profile without a password.
+var ErrPasswordRequiredForNewSTA = errors.New("password is required when adding a new secured network")
+
+// ErrEncryptionRequiredForNewSTA is returned when Connect creates a new STA profile without an encryption mode.
+var ErrEncryptionRequiredForNewSTA = errors.New("encryption is required when adding a new wireless client profile")
+
 // Connect connects to a WiFi network.
 // Each distinct SSID gets its own UCI section so saved profiles persist across connections.
 // All other STA sections are disabled (not deleted) when connecting to a new network.
+//
+// For an existing saved profile, an empty Password leaves the stored UCI key unchanged
+// (one-tap reconnect from the saved list).
 func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
 	// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN
 	if err := w.ensureWwanNetwork(); err != nil {
@@ -831,7 +840,15 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 
 	// Find or create a dedicated UCI section for this SSID.
 	section, err := w.findSTASectionBySSID(config.SSID)
-	if err != nil {
+	isNewSection := err != nil
+	if isNewSection {
+		enc := strings.TrimSpace(config.Encryption)
+		if enc == "" {
+			return nil, ErrEncryptionRequiredForNewSTA
+		}
+		if enc != "none" && strings.TrimSpace(config.Password) == "" {
+			return nil, ErrPasswordRequiredForNewSTA
+		}
 		// No saved profile for this SSID yet — allocate a new section.
 		section = w.nextSTASectionName()
 		sections, _ := w.uci.GetSections("wireless")
@@ -872,21 +889,26 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 	if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
 		return nil, fmt.Errorf("setting STA ssid: %w", err)
 	}
-	if err := w.uci.Set("wireless", section, "key", config.Password); err != nil {
-		return nil, fmt.Errorf("setting STA key: %w", err)
+	reuseCredentials := !isNewSection && strings.TrimSpace(config.Password) == ""
+	if strings.TrimSpace(config.Password) != "" {
+		if err := w.uci.Set("wireless", section, "key", config.Password); err != nil {
+			return nil, fmt.Errorf("setting STA key: %w", err)
+		}
 	}
-	if config.Encryption != "" {
+	if config.Encryption != "" && !reuseCredentials {
 		if err := w.uci.Set("wireless", section, "encryption", config.Encryption); err != nil {
 			return nil, fmt.Errorf("setting STA encryption: %w", err)
 		}
 	}
-	if config.Hidden {
-		if err := w.uci.Set("wireless", section, "hidden", "1"); err != nil {
-			return nil, fmt.Errorf("setting STA hidden flag: %w", err)
-		}
-	} else {
-		if err := w.uci.Set("wireless", section, "hidden", "0"); err != nil {
-			return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+	if !reuseCredentials {
+		if config.Hidden {
+			if err := w.uci.Set("wireless", section, "hidden", "1"); err != nil {
+				return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+			}
+		} else {
+			if err := w.uci.Set("wireless", section, "hidden", "0"); err != nil {
+				return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+			}
 		}
 	}
 	if err := w.uci.Set("wireless", section, "disabled", "0"); err != nil {

@@ -124,6 +124,48 @@ func TestWifiConnect_OpenNetworkNoPassword_Returns200(t *testing.T) {
 	}
 }
 
+func TestWifiConnect_NewSecuredWithoutPassword_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]string{
+		"ssid": "Totally-New-SSID-For-400-Test", "password": "", "encryption": "psk2",
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/connect", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+func TestWifiConnect_NewWithoutEncryption_Returns400(t *testing.T) {
+	app, deps := setupTestApp()
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]string{
+		"ssid": "No-Enc-SSID-Api-Test", "password": "abcdefgh", "encryption": "",
+	})
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/connect", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
 func TestWifiConnectionEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")

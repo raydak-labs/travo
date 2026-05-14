@@ -30,13 +30,13 @@ export function WifiModeCard() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-3">
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-3">
               {WIFI_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => {
                 const isActive = currentMode === mode;
                 const showRecommended = isRecommendedWifiMode(mode);
