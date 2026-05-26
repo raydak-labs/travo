@@ -2,20 +2,25 @@ package services
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 // Default AP and radio values applied when UCI has missing or invalid entries.
 const (
-	DefaultAPSSID   = "OpenWrt-Travel"    // 2.4 GHz default AP SSID
-	DefaultAPSSID5G = "OpenWrt-Travel-5G" // 5 GHz default AP SSID (separate so clients can choose band)
-	DefaultAPKey    = "travelrouter"      // default WPA key for AP when encryption is set but key missing
-	DefaultCountry  = "US"                // default regulatory country for wifi-device
-	DefaultChannel  = "auto"              // default channel (auto selection)
+	DefaultAPSSID    = "OpenWrt-Travel"    // 2.4 GHz default AP SSID
+	DefaultAPSSID5G  = "OpenWrt-Travel-5G" // 5 GHz default AP SSID (separate so clients can choose band)
+	DefaultAPKey     = "travelrouter"      // default WPA key for AP when encryption is set but key missing
+	DefaultCountry   = "US"               // default regulatory country for wifi-device
+	DefaultChannel   = "auto"             // default channel (auto selection)
+	Default5GChannel = "36"               // safe non-DFS 5 GHz fallback used when channel is missing or out of the standard range (> 165)
 )
 
 // EnsureAPRunning checks wireless config and applies safe defaults:
-//   - wifi-device (radio): set country to DefaultCountry and channel to DefaultChannel when missing.
+//   - wifi-device (radio): set country to DefaultCountry; set channel when missing (Default5GChannel
+//     for 5 GHz, DefaultChannel for 2.4 GHz); reset explicitly out-of-range 5 GHz channels (> 165)
+//     to Default5GChannel — UNII-4/V2X channels (e.g. 177) are invisible to consumer devices.
+//     channel=auto is preserved; auto-selection picks valid channels under normal operation.
 //   - AP sections: fix missing SSID (band-specific), encryption, and key; re-enable disabled APs
 //     unless the same radio has an active STA (ath11k crash avoidance).
 //
@@ -91,7 +96,9 @@ func (w *WifiService) EnsureAPRunning() (fixed bool, needWifiUp bool, err error)
 	return fixed, reEnabled, nil
 }
 
-// fixRadioSection applies defaults to a wifi-device: country=US, channel=auto when missing.
+// fixRadioSection applies defaults to a wifi-device: country=US when missing; channel default
+// when missing; and resets explicitly out-of-range 5 GHz channels (> 165) to Default5GChannel.
+// channel=auto is preserved — auto-selection produces valid channels under normal operation.
 func (w *WifiService) fixRadioSection(section string, opts map[string]string) (bool, error) {
 	fixed := false
 	if opts["country"] == "" {
@@ -101,11 +108,25 @@ func (w *WifiService) fixRadioSection(section string, opts map[string]string) (b
 		fixed = true
 	}
 	ch := strings.TrimSpace(opts["channel"])
+	is5G := strings.ToLower(opts["band"]) == "5g"
 	if ch == "" || ch == "0" {
-		if setErr := w.uci.Set("wireless", section, "channel", DefaultChannel); setErr != nil {
+		defaultCh := DefaultChannel
+		if is5G {
+			defaultCh = Default5GChannel
+		}
+		if setErr := w.uci.Set("wireless", section, "channel", defaultCh); setErr != nil {
 			return false, fmt.Errorf("setting channel: %w", setErr)
 		}
 		fixed = true
+	} else if is5G && ch != "auto" {
+		// Reset explicitly out-of-range 5 GHz channels (UNII-4/V2X, > 165).
+		// These can appear in UCI after driver crash-recovery and are invisible to consumer devices.
+		if chNum, err := strconv.Atoi(ch); err == nil && chNum > 165 {
+			if setErr := w.uci.Set("wireless", section, "channel", Default5GChannel); setErr != nil {
+				return false, fmt.Errorf("resetting out-of-range 5GHz channel: %w", setErr)
+			}
+			fixed = true
+		}
 	}
 	return fixed, nil
 }

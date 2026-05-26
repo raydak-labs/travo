@@ -921,6 +921,13 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 	if err := w.disableOtherSTASections(section); err != nil {
 		return nil, err
 	}
+	// Reconcile AP radio layout atomically with the STA activation: in repeater mode
+	// with ≥2 radios, disable any AP that shares the STA's radio before applying.
+	// Skipping this step would commit AP+STA on the same PHY, which crashes the
+	// ath11k/IPQ6018 driver and requires a second user-triggered "Fix" apply to recover.
+	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+		return nil, fmt.Errorf("reconciling AP radio layout: %w", err)
+	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return nil, err
 	}
@@ -2183,6 +2190,11 @@ func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
 	}
 	if err := w.uci.Set("wireless", section, "device", targetRadio); err != nil {
 		return fmt.Errorf("uci set device: %w", err)
+	}
+	// Reconcile AP layout: the target radio may host an AP that must be disabled
+	// (and the previous radio's AP re-enabled) to avoid ath11k/IPQ6018 crash.
+	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+		return fmt.Errorf("reconciling AP radio layout: %w", err)
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
 		return fmt.Errorf("uci commit: %w", err)
