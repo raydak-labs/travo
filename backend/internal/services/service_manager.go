@@ -56,6 +56,13 @@ var knownServices = []serviceDefinition{
 		InitName:      "",                // managed via UCI/netifd, no init.d
 	},
 	{
+		ID: "amneziawg", Name: "AmneziaWG",
+		Description:   "WireGuard with DPI-resistant obfuscation for censored networks",
+		Packages:      []string{"amneziawg-tools", "kmod-amneziawg"},
+		DetectPackage: "amneziawg-tools",
+		InitName:      "", // managed via UCI/netifd, no init.d
+	},
+	{
 		ID: "tailscale", Name: "Tailscale",
 		Description: "Zero-config mesh VPN",
 		Packages:    []string{"tailscale"},

@@ -15,8 +15,8 @@ func TestListServices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(services) != 8 {
-		t.Errorf("expected 8 services, got %d", len(services))
+	if len(services) != 9 {
+		t.Errorf("expected 9 services, got %d", len(services))
 	}
 	for _, s := range services {
 		if s.State != "not_installed" {
@@ -99,6 +99,18 @@ func TestWireguardInstalledState(t *testing.T) {
 	pkg.installed["wireguard-tools"] = true
 	info, _ := sm.GetServiceStatus("wireguard")
 	// WireGuard has no init.d, so installed state is "installed"
+	if info.State != "installed" {
+		t.Errorf("expected 'installed', got %q", info.State)
+	}
+}
+
+func TestAmneziaWGInstalledState(t *testing.T) {
+	sm, pkg, _ := newTestServiceManager()
+	pkg.installed["amneziawg-tools"] = true
+	info, err := sm.GetServiceStatus("amneziawg")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if info.State != "installed" {
 		t.Errorf("expected 'installed', got %q", info.State)
 	}

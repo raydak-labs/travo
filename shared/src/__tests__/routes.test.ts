@@ -108,6 +108,7 @@ describe('API_ROUTES', () => {
     expect(API_ROUTES.vpn.wireguard.status).toBe('/api/v1/vpn/wireguard/status');
     expect(API_ROUTES.vpn.wireguard.profiles).toBe('/api/v1/vpn/wireguard/profiles');
     expect(API_ROUTES.vpn.wireguard.verify).toBe('/api/v1/vpn/wireguard/verify');
+    expect(API_ROUTES.vpn.amneziawg.available).toBe('/api/v1/vpn/amneziawg/available');
     expect(API_ROUTES.vpn.tailscale.status).toBe('/api/v1/vpn/tailscale');
     expect(API_ROUTES.vpn.tailscale.toggle).toBe('/api/v1/vpn/tailscale/toggle');
     expect(API_ROUTES.vpn.tailscale.auth).toBe('/api/v1/vpn/tailscale/auth');
@@ -230,6 +231,7 @@ describe('API_ROUTES', () => {
       '/api/v1/vpn/dns-leak-test',
       '/api/v1/vpn/speed-test',
       '/api/v1/vpn/wireguard/verify',
+      '/api/v1/vpn/amneziawg/available',
       '/api/v1/network/data-usage',
       '/api/v1/network/data-usage/reset',
       '/api/v1/network/data-usage/budget',

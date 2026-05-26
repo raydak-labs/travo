@@ -16,11 +16,13 @@ import {
   useActivateWireguardProfile,
   useKillSwitch,
   useSetKillSwitch,
+  useAmneziaWGAvailability,
 } from '@/hooks/use-vpn';
 import {
   wireguardProfileImportFormSchema,
   type WireguardProfileImportFormValues,
 } from '@/lib/schemas/vpn-forms';
+import { AmneziaWGAvailabilityBanner } from '@/pages/vpn/amneziawg-availability-banner';
 import { WireguardCardBody } from '@/pages/vpn/wireguard-card-body';
 import { applyWireguardImportFile } from '@/pages/vpn/wireguard-import-profile-file';
 import { WireguardInstallPrompt } from '@/pages/vpn/wireguard-install-prompt';
@@ -31,6 +33,7 @@ export function WireguardSection() {
   const { data: config, isLoading } = useWireguardConfig();
   const { data: wgLiveStatus } = useWireguardStatus();
   const { data: profiles = [] } = useWireguardProfiles();
+  const { data: awgAvailability } = useAmneziaWGAvailability();
   const toggleMutation = useToggleWireguard();
   const addProfileMutation = useAddWireguardProfile();
   const deleteProfileMutation = useDeleteWireguardProfile();
@@ -49,6 +52,7 @@ export function WireguardSection() {
   const isInstalled = wgService ? wgService.state !== 'not_installed' : !!wgStatus;
   const isToggling = toggleMutation.isPending;
   const desiredEnabled = isToggling ? toggleMutation.variables : undefined;
+  const hasAmneziaProfiles = profiles.some((p) => p.is_amnezia);
 
   const statusDetail = wgStatus?.status_detail;
 
@@ -95,25 +99,31 @@ export function WireguardSection() {
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : (
-            <WireguardCardBody
-              wgStatus={wgStatus}
-              wgLiveStatus={wgLiveStatus}
-              config={config}
-              profiles={profiles}
-              killSwitch={killSwitch}
-              isToggling={isToggling}
-              desiredEnabled={desiredEnabled}
-              statusDetail={statusDetail}
-              toggleMutationPending={toggleMutation.isPending}
-              onToggleWireguard={() => toggleMutation.mutate(!(wgStatus?.enabled ?? false))}
-              activateProfileMutation={activateProfileMutation}
-              deleteProfileMutation={deleteProfileMutation}
-              killSwitchMutation={killSwitchMutation}
-              importForm={importForm}
-              onImportSubmit={onImportSubmit}
-              onFileSelected={handleFileUpload}
-              addProfilePending={addProfileMutation.isPending}
-            />
+            <>
+              <AmneziaWGAvailabilityBanner
+                availability={awgAvailability}
+                hasAmneziaProfiles={hasAmneziaProfiles}
+              />
+              <WireguardCardBody
+                wgStatus={wgStatus}
+                wgLiveStatus={wgLiveStatus}
+                config={config}
+                profiles={profiles}
+                killSwitch={killSwitch}
+                isToggling={isToggling}
+                desiredEnabled={desiredEnabled}
+                statusDetail={statusDetail}
+                toggleMutationPending={toggleMutation.isPending}
+                onToggleWireguard={() => toggleMutation.mutate(!(wgStatus?.enabled ?? false))}
+                activateProfileMutation={activateProfileMutation}
+                deleteProfileMutation={deleteProfileMutation}
+                killSwitchMutation={killSwitchMutation}
+                importForm={importForm}
+                onImportSubmit={onImportSubmit}
+                onFileSelected={handleFileUpload}
+                addProfilePending={addProfileMutation.isPending}
+              />
+            </>
           )}
         </CardContent>
       </Card>

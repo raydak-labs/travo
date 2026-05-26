@@ -112,6 +112,9 @@ export const API_ROUTES = {
       profiles: '/api/v1/vpn/wireguard/profiles',
       verify: '/api/v1/vpn/wireguard/verify',
     },
+    amneziawg: {
+      available: '/api/v1/vpn/amneziawg/available',
+    },
     tailscale: {
       status: '/api/v1/vpn/tailscale',
       toggle: '/api/v1/vpn/tailscale/toggle',

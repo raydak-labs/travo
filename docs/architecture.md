@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-05-14
+updated: 2026-05-26
 ---
 
 # Architecture Decisions
@@ -134,6 +134,15 @@ This rule applies to:
 ### 6.3 DNS resolution, VPN, captive portal, and temporary restore
 
 Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive portal DNS bypass**, and **snapshot/restore** semantics are normative in **[`docs/adr/0001-dns-vpn-captive-portal-architecture.md`](./adr/0001-dns-vpn-captive-portal-architecture.md)**. Read that ADR before changing `CaptiveService`, `VpnService` DNS helpers, `AdGuardService` DNS integration, or `NetworkService` WAN DNS.
+
+### 6.4 WireGuard-family VPN protocols
+
+**Coexistence and packaging rules:** [`docs/adr/0008-wireguard-family-protocol-coexistence.md`](./adr/0008-wireguard-family-protocol-coexistence.md).
+
+- Standard **WireGuard** remains the default VPN path.
+- **AmneziaWG** is an optional additive protocol in the same WireGuard-family subsystem, not a replacement.
+- Travo keeps one app-owned full-tunnel VPN slot at a time; imported configs with AWG-only parameters are treated as **AmneziaWG profiles** rather than a separate product surface.
+- AWG readiness is firmware-specific because packages are external to official OpenWrt feeds; UI and API must surface availability and install state clearly instead of failing late at tunnel enable time.
 
 ## 7. Authentication And API Access
 

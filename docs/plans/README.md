@@ -1,7 +1,7 @@
 ---
 title: Plans index
 description: Searchable catalog of all planning and historical design docs in this directory.
-updated: 2026-04-13
+updated: 2026-05-26
 tags: [plans, traceability, index]
 ---
 
@@ -19,6 +19,7 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`2026-03-26-wireguard-disable-breaks-internet.md`](2026-03-26-wireguard-disable-breaks-internet.md) | WireGuard disable / default route regression | `wireguard`, `vpn` |
 | [`2026-04-11-repeater-radio-policy-and-wifi-ux.md`](2026-04-11-repeater-radio-policy-and-wifi-ux.md) | Repeater radio policy, unified AP UX | `wifi`, `repeater` |
 | [`adguard-auto-configure.md`](adguard-auto-configure.md) | AdGuard install + dnsmasq integration | `adguard`, `dns`, `services` |
+| [`amneziawg-integration.md`](amneziawg-integration.md) | AmneziaWG alongside WireGuard | `amneziawg`, `vpn`, `wireguard` |
 | [`cicd-pipeline.md`](cicd-pipeline.md) | CI/CD for build/test/package | `cicd`, `deployment` |
 | [`connection-failover.md`](connection-failover.md) | Multi-WAN failover | `wan`, `failover`, `network` |
 | [`data-usage-tracking.md`](data-usage-tracking.md) | Per-interface data counters | `network`, `metrics` |

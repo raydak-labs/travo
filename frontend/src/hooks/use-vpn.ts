@@ -15,6 +15,7 @@ import type {
   SplitTunnelConfig,
   TailscaleSSHStatus,
   SpeedTestResult,
+  AmneziaWGAvailability,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -287,5 +288,13 @@ export function useSetTailscaleSSH() {
     onError: (error) => {
       toast.error('Failed to update Tailscale SSH', { description: error.message });
     },
+  });
+}
+
+export function useAmneziaWGAvailability() {
+  return useQuery({
+    queryKey: ['vpn', 'amneziawg', 'available'],
+    queryFn: () => apiClient.get<AmneziaWGAvailability>(API_ROUTES.vpn.amneziawg.available),
+    staleTime: 60000,
   });
 }

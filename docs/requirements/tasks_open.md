@@ -1,7 +1,7 @@
 ---
 title: Open tasks
 description: Active product and engineering backlog; link target for plans and architecture.
-updated: 2026-04-13
+updated: 2026-05-26
 tags: [backlog, requirements, tasks]
 ---
 
@@ -11,7 +11,7 @@ Working backlog only — no duplicate “priority queue”; each item appears on
 
 Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
-> **Last updated:** 2026-05-06
+> **Last updated:** 2026-05-26
 
 ## 1. WiFi Management
 
@@ -45,6 +45,7 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ### 3.3 General VPN UX
 
+- [x] AmneziaWG support (optional WireGuard-family DPI bypass). See [AmneziaWG integration plan](../plans/amneziawg-integration.md). *(Phases 1-4 complete: parser, service, API, frontend. Pending: AWG package availability for device.)*
 - [ ] OpenVPN support
 
 ## 4. Services Management

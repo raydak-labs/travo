@@ -361,3 +361,11 @@ func SetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
 		return c.JSON(fiber.Map{"ok": true})
 	}
 }
+
+// GetAmneziaWGAvailabilityHandler handles GET /api/v1/vpn/amneziawg/available.
+func GetAmneziaWGAvailabilityHandler(svc *services.VpnService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		avail := svc.GetAmneziaWGAvailability()
+		return c.JSON(avail)
+	}
+}

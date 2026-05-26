@@ -14,12 +14,34 @@ export interface VpnStatus {
   readonly status_detail?: string;
 }
 
+export interface AmneziaParams {
+  readonly jc?: number;
+  readonly jmin?: number;
+  readonly jmax?: number;
+  readonly s1?: number;
+  readonly s2?: number;
+  readonly h1?: number;
+  readonly h2?: number;
+  readonly h3?: number;
+  readonly h4?: number;
+}
+
+export interface AmneziaWGAvailability {
+  readonly ready: boolean;
+  readonly binary_present: boolean;
+  readonly helper_present: boolean;
+  readonly kernel_module: boolean;
+  readonly reason?: string;
+}
+
 /** WireGuard configuration */
 export interface WireguardConfig {
   readonly private_key: string;
   readonly address: string;
   readonly dns: readonly string[];
   readonly peers: readonly WireguardPeer[];
+  readonly is_amnezia?: boolean;
+  readonly amnezia?: AmneziaParams;
 }
 
 /** WireGuard peer */
@@ -79,6 +101,7 @@ export interface WireGuardProfile {
   readonly config: string;
   readonly active: boolean;
   readonly created_at: string;
+  readonly is_amnezia?: boolean;
 }
 
 /** VPN kill switch status */

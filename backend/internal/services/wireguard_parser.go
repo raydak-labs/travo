@@ -13,6 +13,13 @@ type WireguardParsedConfig struct {
 	Peers     []WireguardParsedPeer
 }
 
+// IsAmnezia returns true if the config contains any AmneziaWG-specific parameters.
+func (c *WireguardParsedConfig) IsAmnezia() bool {
+	return c.Interface.Jc > 0 || c.Interface.Jmin > 0 || c.Interface.Jmax > 0 ||
+		c.Interface.S1 > 0 || c.Interface.S2 > 0 ||
+		c.Interface.H1 > 0 || c.Interface.H2 > 0 || c.Interface.H3 > 0 || c.Interface.H4 > 0
+}
+
 // WireguardInterface represents the [Interface] section of a WireGuard config.
 type WireguardInterface struct {
 	PrivateKey string
@@ -20,6 +27,16 @@ type WireguardInterface struct {
 	DNS        string
 	MTU        int
 	ListenPort int
+	// AmneziaWG obfuscation parameters (zero means not set / standard WireGuard)
+	Jc   int
+	Jmin int
+	Jmax int
+	S1   int
+	S2   int
+	H1   uint32
+	H2   uint32
+	H3   uint32
+	H4   uint32
 }
 
 // WireguardParsedPeer represents a [Peer] section of a WireGuard config.
@@ -100,6 +117,51 @@ func ParseWireguardConfig(confContent string) (*WireguardParsedConfig, error) {
 				port, err := strconv.Atoi(value)
 				if err == nil {
 					result.Interface.ListenPort = port
+				}
+			case "jc":
+				jc, err := strconv.Atoi(value)
+				if err == nil {
+					result.Interface.Jc = jc
+				}
+			case "jmin":
+				jmin, err := strconv.Atoi(value)
+				if err == nil {
+					result.Interface.Jmin = jmin
+				}
+			case "jmax":
+				jmax, err := strconv.Atoi(value)
+				if err == nil {
+					result.Interface.Jmax = jmax
+				}
+			case "s1":
+				s1, err := strconv.Atoi(value)
+				if err == nil {
+					result.Interface.S1 = s1
+				}
+			case "s2":
+				s2, err := strconv.Atoi(value)
+				if err == nil {
+					result.Interface.S2 = s2
+				}
+			case "h1":
+				h1, err := strconv.ParseUint(value, 10, 32)
+				if err == nil {
+					result.Interface.H1 = uint32(h1)
+				}
+			case "h2":
+				h2, err := strconv.ParseUint(value, 10, 32)
+				if err == nil {
+					result.Interface.H2 = uint32(h2)
+				}
+			case "h3":
+				h3, err := strconv.ParseUint(value, 10, 32)
+				if err == nil {
+					result.Interface.H3 = uint32(h3)
+				}
+			case "h4":
+				h4, err := strconv.ParseUint(value, 10, 32)
+				if err == nil {
+					result.Interface.H4 = uint32(h4)
 				}
 			}
 		case "peer":

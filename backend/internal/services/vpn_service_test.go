@@ -77,6 +77,29 @@ func TestGetWireguardConfig(t *testing.T) {
 	}
 }
 
+func TestGetWireguardConfig_Amnezia(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "proto", string(ProtoAmneziaWG))
+	_ = u.Set("network", "wg0", "awg_jc", "5")
+	_ = u.Set("network", "wg0", "awg_s1", "10")
+	_ = u.Set("network", "wg0", "awg_h1", "12345")
+	svc := NewVpnService(u)
+
+	config, err := svc.GetWireguardConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !config.IsAmnezia {
+		t.Fatal("expected IsAmnezia=true")
+	}
+	if config.Amnezia == nil {
+		t.Fatal("expected Amnezia params")
+	}
+	if config.Amnezia.Jc != 5 || config.Amnezia.S1 != 10 || config.Amnezia.H1 != 12345 {
+		t.Fatalf("unexpected Amnezia params: %+v", config.Amnezia)
+	}
+}
+
 func TestToggleWireguard(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &MockCommandRunner{RunFunc: mockRunWireGuardEnableOK}
@@ -318,6 +341,41 @@ AllowedIPs = 0.0.0.0/0
 	}
 }
 
+func TestImportWireguardConfig_AmneziaWG(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnService(u)
+
+	conf := `[Interface]
+PrivateKey = abc123
+Address = 10.66.0.2/32
+DNS = 10.66.0.1
+Jc = 5
+S1 = 10
+H1 = 12345
+
+[Peer]
+PublicKey = peerkey
+Endpoint = vpn.example.com:51820
+AllowedIPs = 0.0.0.0/0
+`
+	if err := svc.ImportWireguardConfig(conf); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	proto, _ := u.Get("network", "wg0", "proto")
+	if proto != string(ProtoAmneziaWG) {
+		t.Fatalf("expected proto=%q after import, got %q", ProtoAmneziaWG, proto)
+	}
+	if got, _ := u.Get("network", "wg0", "awg_jc"); got != "5" {
+		t.Fatalf("expected awg_jc=5, got %q", got)
+	}
+	if got, _ := u.Get("network", "wg0", "awg_s1"); got != "10" {
+		t.Fatalf("expected awg_s1=10, got %q", got)
+	}
+	if got, _ := u.Get("network", "wg0", "awg_h1"); got != "12345" {
+		t.Fatalf("expected awg_h1=12345, got %q", got)
+	}
+}
+
 func TestWgRuntimeState_Disabled(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &MockCommandRunner{Err: fmt.Errorf("exit status 1")}
@@ -343,6 +401,24 @@ func TestWgRuntimeState_Connected(t *testing.T) {
 	dump := "PRIV\tPUB\t51820\toff\n" +
 		"peerpub\t(none)\tvpn.example.com:51820\t0.0.0.0/0\t1740000000\t100\t200\t0\n"
 	cmd := &MockCommandRunner{Output: []byte(dump)}
+	svc := NewVpnServiceWithRunner(u, cmd)
+	state := svc.wgRuntimeState(true)
+	if state != "connected" {
+		t.Errorf("expected 'connected', got %q", state)
+	}
+}
+
+func TestWgRuntimeState_AmneziaUsesAwgCommand(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "proto", string(ProtoAmneziaWG))
+	dump := "PRIV\tPUB\t51820\toff\n" +
+		"peerpub\t(none)\tvpn.example.com:51820\t0.0.0.0/0\t1740000000\t100\t200\t0\n"
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name != awgBin {
+			return nil, fmt.Errorf("unexpected command: %s", name)
+		}
+		return []byte(dump), nil
+	}}
 	svc := NewVpnServiceWithRunner(u, cmd)
 	state := svc.wgRuntimeState(true)
 	if state != "connected" {
@@ -510,6 +586,28 @@ func TestGetWireGuardStatus_CommandError(t *testing.T) {
 	}
 }
 
+func TestGetWireGuardStatus_AmneziaUsesAwgCommand(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "proto", string(ProtoAmneziaWG))
+	dump := "PRIVATE_KEY\tPUBLIC_KEY_IFACE\t51820\toff\n" +
+		"PEER_PUB_KEY\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t123456789\t987654321\toff\n"
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name != awgBin {
+			return nil, fmt.Errorf("unexpected command: %s", name)
+		}
+		return []byte(dump), nil
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	status, err := svc.GetWireGuardStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.PublicKey != "PUBLIC_KEY_IFACE" {
+		t.Fatalf("expected awg dump to be parsed, got %+v", status)
+	}
+}
+
 func TestParseWgDump_NoHandshake(t *testing.T) {
 	dump := "PRIV\tPUB\t51820\toff\n" +
 		"PEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t0\t0\t0\toff\n"
@@ -560,10 +658,25 @@ func TestAddProfile(t *testing.T) {
 	if profile.Active {
 		t.Error("expected new profile to not be active")
 	}
+	if profile.IsAmnezia {
+		t.Error("expected standard profile to not be marked Amnezia")
+	}
 
 	profiles, _ := svc.GetProfiles()
 	if len(profiles) != 1 {
 		t.Fatalf("expected 1 profile, got %d", len(profiles))
+	}
+}
+
+func TestAddProfile_Amnezia(t *testing.T) {
+	svc, _ := newTestVpnService(t)
+	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\nJc = 5\nS1 = 10\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
+	profile, err := svc.AddProfile("AWG", conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !profile.IsAmnezia {
+		t.Fatal("expected profile to be marked Amnezia")
 	}
 }
 
@@ -973,6 +1086,38 @@ func TestVerifyWireGuard(t *testing.T) {
 	}
 	// InterfaceUp / HandshakeOk / RouteOk depend on stub output (false in stub).
 	// Just ensure the function runs without panic.
+}
+
+func TestVerifyWireGuard_AmneziaUsesAwgCommand(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "proto", string(ProtoAmneziaWG))
+	_ = u.AddSection("firewall", "wg0_zone", "zone")
+	_ = u.Set("firewall", "wg0_zone", "name", "wg0")
+	_ = u.AddSection("firewall", "wg0_fwd", "forwarding")
+	_ = u.Set("firewall", "wg0_fwd", "src", "lan")
+	_ = u.Set("firewall", "wg0_fwd", "dest", "wg0")
+	svc := NewVpnServiceWithRunner(u, &FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "/sbin/ip":
+			if len(args) >= 4 && args[0] == "link" && args[1] == "show" && args[2] == "dev" && args[3] == "wg0" {
+				return []byte("2: wg0: <POINTOPOINT,UP,LOWER_UP> mtu 1420 state UP mode DEFAULT"), nil
+			}
+			if len(args) >= 2 && args[0] == "route" {
+				return []byte("default via wg0 dev wg0 proto static"), nil
+			}
+			if len(args) >= 3 && args[0] == "-6" && args[1] == "route" {
+				return []byte(""), nil
+			}
+		case awgBin:
+			return []byte("PRIV\tPUB\t51820\toff\nPEERPUB\tnone\t1.2.3.4:51820\t0.0.0.0/0\t9999999999\t1000\t2000\t25\n"), nil
+		}
+		return nil, fmt.Errorf("unexpected command %s %v", name, args)
+	}})
+
+	result := svc.VerifyWireGuard()
+	if !result.InterfaceUp || !result.RouteOk || !result.HandshakeOk {
+		t.Fatalf("expected successful AWG verify result, got %+v", result)
+	}
 }
 
 func TestRunWireGuardSpeedTest_WireGuardDisabled(t *testing.T) {

@@ -26,6 +26,11 @@ updated: 2026-05-14
 - [[adr/0005-multi-wan-failover-mwan3]]
 - [[adr/0006-application-platform-and-api-contract]]
 - [[adr/0007-authentication-and-access-control]]
+- [[adr/0008-wireguard-family-protocol-coexistence]]
+
+## Feature guides
+
+- [[amneziawg]] — DPI-resistant VPN (AmneziaWG obfuscation)
 
 ## Backlog and shipped work
 

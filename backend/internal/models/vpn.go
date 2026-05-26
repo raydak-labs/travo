@@ -23,12 +23,37 @@ type WireguardPeer struct {
 	LastHandshake *string  `json:"last_handshake,omitempty"`
 }
 
+// AmneziaParams holds AmneziaWG obfuscation parameters.
+type AmneziaParams struct {
+	Jc   int    `json:"jc,omitempty"`
+	Jmin int    `json:"jmin,omitempty"`
+	Jmax int    `json:"jmax,omitempty"`
+	S1   int    `json:"s1,omitempty"`
+	S2   int    `json:"s2,omitempty"`
+	H1   uint32 `json:"h1,omitempty"`
+	H2   uint32 `json:"h2,omitempty"`
+	H3   uint32 `json:"h3,omitempty"`
+	H4   uint32 `json:"h4,omitempty"`
+}
+
+// HasParams returns true if any obfuscation parameter is set.
+func (a *AmneziaParams) HasParams() bool {
+	if a == nil {
+		return false
+	}
+	return a.Jc > 0 || a.Jmin > 0 || a.Jmax > 0 ||
+		a.S1 > 0 || a.S2 > 0 ||
+		a.H1 > 0 || a.H2 > 0 || a.H3 > 0 || a.H4 > 0
+}
+
 // WireguardConfig holds WireGuard tunnel configuration.
 type WireguardConfig struct {
 	PrivateKey string          `json:"private_key"`
 	Address    string          `json:"address"`
 	DNS        []string        `json:"dns"`
 	Peers      []WireguardPeer `json:"peers"`
+	IsAmnezia  bool            `json:"is_amnezia,omitempty"`
+	Amnezia    *AmneziaParams  `json:"amnezia,omitempty"`
 }
 
 // WireGuardPeerStatus holds live status for a single WireGuard peer.
@@ -56,6 +81,7 @@ type WireGuardProfile struct {
 	Config    string `json:"config"` // Raw WireGuard .conf content
 	Active    bool   `json:"active"` // Is this the currently loaded profile?
 	CreatedAt string `json:"created_at"`
+	IsAmnezia bool   `json:"is_amnezia,omitempty"`
 }
 
 // KillSwitchStatus represents the VPN kill switch state.

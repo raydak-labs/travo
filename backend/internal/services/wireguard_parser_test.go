@@ -206,6 +206,160 @@ Endpoint = demo.wireguard.com:12912
 	}
 }
 
+func TestParseWireguardConfig_AmneziaWG1x(t *testing.T) {
+	conf := `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+DNS = 1.1.1.1
+Jc = 5
+Jmin = 40
+Jmax = 70
+S1 = 55
+S2 = 33
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+AllowedIPs = 0.0.0.0/0
+Endpoint = vpn.example.com:51820
+`
+	parsed, err := ParseWireguardConfig(conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !parsed.IsAmnezia() {
+		t.Error("expected IsAmnezia() to be true for AWG 1.x config")
+	}
+	if parsed.Interface.Jc != 5 {
+		t.Errorf("Jc = %d, want 5", parsed.Interface.Jc)
+	}
+	if parsed.Interface.Jmin != 40 {
+		t.Errorf("Jmin = %d, want 40", parsed.Interface.Jmin)
+	}
+	if parsed.Interface.Jmax != 70 {
+		t.Errorf("Jmax = %d, want 70", parsed.Interface.Jmax)
+	}
+	if parsed.Interface.S1 != 55 {
+		t.Errorf("S1 = %d, want 55", parsed.Interface.S1)
+	}
+	if parsed.Interface.S2 != 33 {
+		t.Errorf("S2 = %d, want 33", parsed.Interface.S2)
+	}
+}
+
+func TestParseWireguardConfig_AmneziaWG2(t *testing.T) {
+	conf := `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+DNS = 1.1.1.1
+Jc = 4
+Jmin = 40
+Jmax = 70
+S1 = 15
+S2 = 25
+H1 = 1234567890
+H2 = 987654321
+H3 = 1122334455
+H4 = 3566778899
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+AllowedIPs = 0.0.0.0/0
+Endpoint = vpn.example.com:51820
+`
+	parsed, err := ParseWireguardConfig(conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !parsed.IsAmnezia() {
+		t.Error("expected IsAmnezia() to be true for AWG 2.0 config")
+	}
+	if parsed.Interface.H1 != 1234567890 {
+		t.Errorf("H1 = %d, want 1234567890", parsed.Interface.H1)
+	}
+	if parsed.Interface.H2 != 987654321 {
+		t.Errorf("H2 = %d, want 987654321", parsed.Interface.H2)
+	}
+	if parsed.Interface.H3 != 1122334455 {
+		t.Errorf("H3 = %d, want 1122334455", parsed.Interface.H3)
+	}
+	if parsed.Interface.H4 != 3566778899 {
+		t.Errorf("H4 = %d, want 3566778899", parsed.Interface.H4)
+	}
+}
+
+func TestParseWireguardConfig_StandardWGNotAmnezia(t *testing.T) {
+	conf := `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+AllowedIPs = 0.0.0.0/0
+Endpoint = vpn.example.com:51820
+`
+	parsed, err := ParseWireguardConfig(conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if parsed.IsAmnezia() {
+		t.Error("expected IsAmnezia() to be false for standard WG config")
+	}
+}
+
+func TestParseWireguardConfig_AmneziaWGCaseInsensitive(t *testing.T) {
+	conf := `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+jC = 3
+JMIN = 20
+jmax = 50
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+AllowedIPs = 0.0.0.0/0
+`
+	parsed, err := ParseWireguardConfig(conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !parsed.IsAmnezia() {
+		t.Error("expected IsAmnezia() to be true")
+	}
+	if parsed.Interface.Jc != 3 {
+		t.Errorf("Jc = %d, want 3", parsed.Interface.Jc)
+	}
+	if parsed.Interface.Jmin != 20 {
+		t.Errorf("Jmin = %d, want 20", parsed.Interface.Jmin)
+	}
+	if parsed.Interface.Jmax != 50 {
+		t.Errorf("Jmax = %d, want 50", parsed.Interface.Jmax)
+	}
+}
+
+func TestParseWireguardConfig_AmneziaInvalidIntegers(t *testing.T) {
+	conf := `[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.8.0.2/32
+Jc = notanumber
+S1 = 42
+
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+AllowedIPs = 0.0.0.0/0
+`
+	parsed, err := ParseWireguardConfig(conf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if parsed.Interface.Jc != 0 {
+		t.Errorf("Jc = %d, want 0 (invalid input)", parsed.Interface.Jc)
+	}
+	if parsed.Interface.S1 != 42 {
+		t.Errorf("S1 = %d, want 42", parsed.Interface.S1)
+	}
+}
+
 func TestSplitWireGuardEndpoint(t *testing.T) {
 	cases := []struct {
 		in, host, port string

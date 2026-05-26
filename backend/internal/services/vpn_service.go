@@ -36,6 +36,18 @@ func tailscaleBin() string {
 	return "tailscale"
 }
 
+// activeVpnProtocol reads the proto field from network.wg0 and returns the VpnProtocol.
+func (v *VpnService) activeVpnProtocol() VpnProtocol {
+	proto, err := v.uci.Get("network", "wg0", "proto")
+	if err != nil {
+		return ProtoWireGuard
+	}
+	if proto == string(ProtoAmneziaWG) {
+		return ProtoAmneziaWG
+	}
+	return ProtoWireGuard
+}
+
 func (v *VpnService) validateWireGuardConfigForEnable() error {
 	wgOpts, err := v.uci.GetAll("network", "wg0")
 	if err != nil {
@@ -151,7 +163,7 @@ func (v *VpnService) setWireGuardAddresses(address string) error {
 }
 
 func (v *VpnService) applyWireGuardPeerParsed(section string, peer WireguardParsedPeer) error {
-	if err := v.ensureWireGuardInterface(); err != nil {
+	if err := v.ensureWireGuardFamilyInterface(v.activeVpnProtocol()); err != nil {
 		return err
 	}
 	if err := v.ensureWireGuardPeer(section); err != nil {
@@ -192,23 +204,62 @@ func (v *VpnService) applyWireGuardPeerParsed(section string, peer WireguardPars
 	return nil
 }
 
+// ensureWireGuardFamilyInterface normalizes the network.wg0 UCI section for the given protocol.
+func (v *VpnService) ensureWireGuardFamilyInterface(proto VpnProtocol) error {
+	opts, err := v.uci.GetAll("network", "wg0")
+	if err != nil {
+		if addErr := v.uci.AddSection("network", "wg0", "interface"); addErr != nil {
+			return fmt.Errorf("creating network.wg0 section: %w", addErr)
+		}
+	}
+	_ = opts
+	return v.uci.Set("network", "wg0", "proto", string(proto))
+}
+
 // ensureWireGuardInterface normalizes the network.wg0 UCI section so it has the
 // correct type (interface) and proto (wireguard). This must be called before
 // writing WireGuard-specific options, because UCI Set on a missing or wrong-typed
 // section silently fails on some OpenWrt builds.
 func (v *VpnService) ensureWireGuardInterface() error {
-	opts, err := v.uci.GetAll("network", "wg0")
-	if err != nil {
-		// Section doesn't exist: create it.
-		if addErr := v.uci.AddSection("network", "wg0", "interface"); addErr != nil {
-			return fmt.Errorf("creating network.wg0 section: %w", addErr)
-		}
-	} else if opts[".type"] != "interface" {
-		// Wrong section type — delete and recreate is the safe approach, but
-		// in practice just ensuring proto is set should be enough to overwrite.
-		_ = opts
+	return v.ensureWireGuardFamilyInterface(ProtoWireGuard)
+}
+
+// applyAmneziaParams writes AmneziaWG-specific UCI options to the wg0 interface section.
+func (v *VpnService) applyAmneziaParams(iface WireguardInterface) {
+	if iface.Jc > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_jc", strconv.Itoa(iface.Jc))
 	}
-	return v.uci.Set("network", "wg0", "proto", "wireguard")
+	if iface.Jmin > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_jmin", strconv.Itoa(iface.Jmin))
+	}
+	if iface.Jmax > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_jmax", strconv.Itoa(iface.Jmax))
+	}
+	if iface.S1 > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_s1", strconv.Itoa(iface.S1))
+	}
+	if iface.S2 > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_s2", strconv.Itoa(iface.S2))
+	}
+	if iface.H1 > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_h1", strconv.FormatUint(uint64(iface.H1), 10))
+	}
+	if iface.H2 > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_h2", strconv.FormatUint(uint64(iface.H2), 10))
+	}
+	if iface.H3 > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_h3", strconv.FormatUint(uint64(iface.H3), 10))
+	}
+	if iface.H4 > 0 {
+		_ = v.uci.Set("network", "wg0", "awg_h4", strconv.FormatUint(uint64(iface.H4), 10))
+	}
+}
+
+// clearAmneziaParams removes AmneziaWG-specific UCI options from wg0.
+func (v *VpnService) clearAmneziaParams() {
+	for _, key := range []string{"awg_jc", "awg_jmin", "awg_jmax", "awg_s1", "awg_s2", "awg_h1", "awg_h2", "awg_h3", "awg_h4"} {
+		_ = v.uci.DeleteOption("network", "wg0", key)
+	}
 }
 
 // ensureWireGuardPeer normalizes a peer section. Peer sections must have type
@@ -359,9 +410,10 @@ func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
 
 func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	showCmd := wgShowCommand(v.activeVpnProtocol())
 	var lastIPOut string
 	for time.Now().Before(deadline) {
-		if out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump"); err == nil {
+		if out, err := v.cmd.Run(showCmd, "show", "wg0", "dump"); err == nil {
 			s := strings.TrimSpace(string(out))
 			if s != "" {
 				if st, perr := ParseWgDump(s); perr == nil && st != nil {
@@ -381,7 +433,7 @@ func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
 	if lastIPOut != "" {
 		return fmt.Errorf("wg0 did not become ready in time (last %s: %s)", openwrtIPBin, lastIPOut)
 	}
-	return fmt.Errorf("wg0 did not become ready in time (%s and %s did not succeed)", openwrtWgBin, openwrtIPBin)
+	return fmt.Errorf("wg0 did not become ready in time (%s and %s did not succeed)", showCmd, openwrtIPBin)
 }
 
 // wgRuntimeState returns a fine-grained status detail string for the wg0 interface.
@@ -389,7 +441,8 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 	if !enabled {
 		return "disabled"
 	}
-	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
+	showCmd := wgShowCommand(v.activeVpnProtocol())
+	out, err := v.cmd.Run(showCmd, "show", "wg0", "dump")
 	if err != nil || strings.TrimSpace(string(out)) == "" {
 		return "enabled_not_up"
 	}
@@ -441,12 +494,18 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 // Line 1 (interface): private_key  public_key  listen_port  fwmark
 // Line 2+ (peers): public_key  preshared_key  endpoint  allowed_ips  latest_handshake_epoch  transfer_rx  transfer_tx  persistent_keepalive
 func (v *VpnService) GetWireGuardStatus() (*models.WireGuardStatus, error) {
-	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
+	showCmd := wgShowCommand(v.activeVpnProtocol())
+	out, err := v.cmd.Run(showCmd, "show", "wg0", "dump")
 	if err != nil {
 		// wg show fails with exit status 1 when interface doesn't exist (tunnel not active)
 		return &models.WireGuardStatus{Interface: "wg0", Peers: []models.WireGuardPeerStatus{}}, nil
 	}
 	return ParseWgDump(string(out))
+}
+
+// GetAmneziaWGAvailability returns the AmneziaWG readiness state for the device.
+func (v *VpnService) GetAmneziaWGAvailability() AmneziaWGAvailability {
+	return CheckAmneziaWGAvailability()
 }
 
 // ParseWgDump parses the output of `wg show <iface> dump` into a WireGuardStatus.
@@ -498,6 +557,45 @@ func ParseWgDump(dump string) (*models.WireGuardStatus, error) {
 	return status, nil
 }
 
+func (v *VpnService) readAmneziaParamsFromUCI(opts map[string]string) *models.AmneziaParams {
+	params := &models.AmneziaParams{}
+	if raw, ok := opts["awg_jc"]; ok {
+		params.Jc, _ = strconv.Atoi(raw)
+	}
+	if raw, ok := opts["awg_jmin"]; ok {
+		params.Jmin, _ = strconv.Atoi(raw)
+	}
+	if raw, ok := opts["awg_jmax"]; ok {
+		params.Jmax, _ = strconv.Atoi(raw)
+	}
+	if raw, ok := opts["awg_s1"]; ok {
+		params.S1, _ = strconv.Atoi(raw)
+	}
+	if raw, ok := opts["awg_s2"]; ok {
+		params.S2, _ = strconv.Atoi(raw)
+	}
+	if raw, ok := opts["awg_h1"]; ok {
+		val, _ := strconv.ParseUint(raw, 10, 32)
+		params.H1 = uint32(val)
+	}
+	if raw, ok := opts["awg_h2"]; ok {
+		val, _ := strconv.ParseUint(raw, 10, 32)
+		params.H2 = uint32(val)
+	}
+	if raw, ok := opts["awg_h3"]; ok {
+		val, _ := strconv.ParseUint(raw, 10, 32)
+		params.H3 = uint32(val)
+	}
+	if raw, ok := opts["awg_h4"]; ok {
+		val, _ := strconv.ParseUint(raw, 10, 32)
+		params.H4 = uint32(val)
+	}
+	if params.HasParams() {
+		return params
+	}
+	return nil
+}
+
 // GetWireguardConfig returns the WireGuard configuration.
 func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	opts, err := v.uci.GetAll("network", "wg0")
@@ -512,6 +610,10 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	}
 	if dns, ok := opts["dns"]; ok && dns != "" {
 		config.DNS = strings.Split(dns, " ")
+	}
+	if opts["proto"] == string(ProtoAmneziaWG) {
+		config.IsAmnezia = true
+		config.Amnezia = v.readAmneziaParamsFromUCI(opts)
 	}
 
 	// Get peer
@@ -571,7 +673,7 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 	if enable {
 		val = "0"
 		_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
-		if err := v.ensureWireGuardInterface(); err != nil {
+		if err := v.ensureWireGuardFamilyInterface(v.activeVpnProtocol()); err != nil {
 			return fmt.Errorf("normalizing wg0 interface: %w", err)
 		}
 		if err := v.ensureWireGuardPeer("wg0_peer0"); err != nil {
@@ -579,6 +681,12 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 		}
 		if err := v.validateWireGuardConfigForEnable(); err != nil {
 			return err
+		}
+		if v.activeVpnProtocol() == ProtoAmneziaWG {
+			avail := CheckAmneziaWGAvailability()
+			if !avail.Ready {
+				return fmt.Errorf("AmneziaWG packages are not installed (%s); install them from Services before enabling", avail.Reason)
+			}
 		}
 		if err := v.setupWireGuardFirewall(); err != nil {
 			return fmt.Errorf("setting up WireGuard firewall: %w", err)
@@ -795,7 +903,8 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	}
 
 	// Check latest handshake from wg show dump.
-	dumpOut, dumpErr := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
+	showCmd := wgShowCommand(v.activeVpnProtocol())
+	dumpOut, dumpErr := v.cmd.Run(showCmd, "show", "wg0", "dump")
 	if dumpErr == nil {
 		if status, err := ParseWgDump(string(dumpOut)); err == nil && status != nil {
 			var latest int64
@@ -1033,8 +1142,15 @@ func (v *VpnService) ImportWireguardConfig(confContent string) error {
 		return err
 	}
 
+	proto := protoForConfig(parsed)
+	if proto == ProtoAmneziaWG {
+		// Still allow import even if AWG packages aren't installed yet;
+		// enable-time validation will catch it before activating the tunnel.
+		_ = CheckAmneziaWGAvailability()
+	}
+
 	// Normalize wg0 UCI structure before writing values.
-	if err := v.ensureWireGuardInterface(); err != nil {
+	if err := v.ensureWireGuardFamilyInterface(proto); err != nil {
 		return fmt.Errorf("normalizing wg0 interface: %w", err)
 	}
 
@@ -1052,6 +1168,11 @@ func (v *VpnService) ImportWireguardConfig(confContent string) error {
 	}
 	if parsed.Interface.MTU > 0 {
 		_ = v.uci.Set("network", "wg0", "mtu", strconv.Itoa(parsed.Interface.MTU))
+	}
+	if proto == ProtoAmneziaWG {
+		v.applyAmneziaParams(parsed.Interface)
+	} else {
+		v.clearAmneziaParams()
 	}
 
 	for i, peer := range parsed.Peers {
@@ -1122,8 +1243,8 @@ func (v *VpnService) GetProfiles() ([]models.WireGuardProfile, error) {
 
 // AddProfile saves a new WireGuard profile.
 func (v *VpnService) AddProfile(name, config string) (*models.WireGuardProfile, error) {
-	// Validate the config is parseable
-	if _, err := ParseWireguardConfig(config); err != nil {
+	parsed, err := ParseWireguardConfig(config)
+	if err != nil {
 		return nil, fmt.Errorf("invalid WireGuard config: %w", err)
 	}
 
@@ -1138,6 +1259,7 @@ func (v *VpnService) AddProfile(name, config string) (*models.WireGuardProfile, 
 		Config:    config,
 		Active:    false,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		IsAmnezia: parsed.IsAmnezia(),
 	}
 	profiles = append(profiles, profile)
 

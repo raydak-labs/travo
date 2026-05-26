@@ -243,6 +243,16 @@ export const handlers = [
     return HttpResponse.json(mockWireguardProfiles);
   }),
 
+  http.get(API_ROUTES.vpn.amneziawg.available, () => {
+    return HttpResponse.json({
+      ready: false,
+      binary_present: false,
+      helper_present: false,
+      kernel_module: false,
+      reason: 'missing: awg binary, netifd proto helper',
+    });
+  }),
+
   http.post(API_ROUTES.vpn.wireguard.profiles, async ({ request }) => {
     const body = (await request.json()) as { name: string; config: string };
     return HttpResponse.json(

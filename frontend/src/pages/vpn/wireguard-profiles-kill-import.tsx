@@ -50,6 +50,14 @@ export function WireguardProfilesKillImport({
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900 dark:text-white">{profile.name}</span>
                   {profile.active && <Badge variant="success">Active</Badge>}
+                  {profile.is_amnezia && (
+                    <Badge
+                      variant="outline"
+                      className="border-purple-500 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+                    >
+                      AWG
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   {!profile.active && (
