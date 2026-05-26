@@ -154,12 +154,17 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 				log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
 			}
 		}()
-		// Replace any old auto-reconnect script that still had "wifi reload" with
-		// the safe "wifi up" version, so cron does not crash the device every minute.
+		// Ensure auto-reconnect script is present and up-to-date when enabled.
+		// Uses SetAutoReconnect to recreate a missing script (e.g. after a crash or
+		// accidental deletion) and to upgrade any old "wifi reload" script to the safe
+		// "wifi up" version. Safe to call idempotently: it rewrites the cron entry and
+		// script atomically, which is the same state SetAutoReconnect(true) produces.
 		go func() {
 			time.Sleep(5 * time.Second)
 			if enabled, _ := wifiSvc.GetAutoReconnect(); enabled {
-				wifiSvc.WriteReconnectScriptSafe()
+				if err := wifiSvc.SetAutoReconnect(true); err != nil {
+					log.Printf("WARNING: could not refresh auto-reconnect script: %v", err)
+				}
 			}
 		}()
 		// Auto-discover radio hardware and persist config on first boot.

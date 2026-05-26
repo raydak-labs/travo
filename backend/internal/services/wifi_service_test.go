@@ -486,6 +486,47 @@ func TestWifiConnect_ReturnsApplyError(t *testing.T) {
 	}
 }
 
+// TestWifiConnect_ReconcilesSameRadioAPInRepeaterMode verifies that Connect() atomically
+// disables the AP sharing the STA's radio when in repeater mode with ≥2 radios.
+//
+// The bug: without this fix, Connect() committed AP+STA on the same PHY, which crashes
+// the ath11k/IPQ6018 driver. The health check then showed a notification requiring a
+// second user-triggered "Fix radio layout" apply. That second apply could itself disconnect
+// the user (if on 2.4GHz) before they could confirm, triggering a rollback and infinite loop.
+//
+// With the fix: the AP on the STA radio is disabled in the same UCI commit as the STA
+// activation, so no intermediate broken state is ever applied.
+func TestWifiConnect_ReconcilesSameRadioAPInRepeaterMode(t *testing.T) {
+	// Default mock: radio0 (2G) hosts default_radio0 (AP) + sta0 (STA "Hotel-WiFi").
+	// radio1 (5G) hosts default_radio1 (AP). Both APs are enabled; mode = "repeater".
+	svc, u := newTestWifiService()
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", // reuses existing sta0 section on radio0
+	})
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+
+	// AP on the STA's radio (radio0) must be disabled to prevent ath11k crash.
+	d0, _ := u.Get("wireless", "default_radio0", "disabled")
+	if d0 != "1" {
+		t.Errorf("default_radio0 (AP on STA radio0): want disabled='1', got %q — AP+STA same-radio not reconciled", d0)
+	}
+
+	// AP on the other radio (radio1) must remain enabled: downlink AP stays reachable.
+	d1, _ := u.Get("wireless", "default_radio1", "disabled")
+	if d1 == "1" {
+		t.Errorf("default_radio1 (AP on radio1): should remain enabled for downlink, got disabled='1'")
+	}
+
+	// The STA itself must be enabled after connect.
+	sta, _ := u.Get("wireless", "sta0", "disabled")
+	if sta != "0" {
+		t.Errorf("sta0: want disabled='0', got %q", sta)
+	}
+}
+
 func TestWifiDeleteNetwork_NonexistentSection(t *testing.T) {
 	svc, _ := newTestWifiService()
 
@@ -2136,5 +2177,31 @@ func TestConnectThenSetModeRepeater_PreservesSingleActiveSTA(t *testing.T) {
 	}
 	if sta1After != "0" {
 		t.Errorf("SetMode disabled active STA: expected sta1 disabled=0, got %q", sta1After)
+	}
+}
+
+// Regression: SwitchSTAToRadio must reconcile AP layout so the target radio's AP is
+// disabled before commit (ath11k/IPQ6018 crashes if AP and STA share the same PHY).
+func TestSwitchSTAToRadio_ReconcilesSameRadioAP(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Default mock: sta0 on radio0, default_radio0 (AP) on radio0, default_radio1 (AP) on radio1.
+	// Switch STA to radio1 — default_radio1 must be disabled, default_radio0 must be enabled.
+	if err := svc.SwitchSTAToRadio("radio1"); err != nil {
+		t.Fatalf("SwitchSTAToRadio: %v", err)
+	}
+
+	staDevice, _ := u.Get("wireless", "sta0", "device")
+	if staDevice != "radio1" {
+		t.Errorf("expected sta0 device=radio1, got %q", staDevice)
+	}
+
+	ap0Disabled, _ := u.Get("wireless", "default_radio0", "disabled")
+	ap1Disabled, _ := u.Get("wireless", "default_radio1", "disabled")
+	if ap0Disabled == "1" {
+		t.Errorf("default_radio0 (AP on radio0, STA moved away) should be enabled, got disabled=1")
+	}
+	if ap1Disabled != "1" {
+		t.Errorf("default_radio1 (AP on radio1, STA now on radio1) should be disabled=1, got %q", ap1Disabled)
 	}
 }

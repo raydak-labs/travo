@@ -29,6 +29,7 @@ Travel-router behavior depends on predictable **STA/WWAN**, **repeater** radio l
 - With **two or more radios**, repeater mode prefers **STA and downlink AP on different radios** to avoid same-channel coupling and upstream-driven local AP failure on ath11k.
 - **`allow_ap_on_sta_radio`** in `repeater-options.json` (`/etc/travo/repeater-options.json`) is the explicit escape hatch for same-radio STA+AP.
 - **Repeater reconciliation** is a first-class API concern: changing AP or repeater options must not silently leave a fragile layout when a safer split exists.
+- **Atomic reconcile rule (MUST):** Any function that activates a STA or moves a STA to a different radio **must** call `reconcileRepeaterAPRadioLayout()` *before* `uci.Commit("wireless")` in the same call. Committing an AP+STA-on-same-radio state even transiently is enough to crash ath11k/IPQ6018. Staging the STA change, reconciling (which stages AP enable/disable changes), and then committing once is the required pattern. The health-check banner and its "Fix" button are a fallback only — they must never be the primary path for avoiding a crash.
 
 ### 3. AP credential model
 
