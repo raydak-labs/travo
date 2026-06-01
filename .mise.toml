@@ -8,7 +8,7 @@ min_version = "2024.1.0"
   # Node.js + JS tooling
   node = "26.2.0" # or "lts" / "latest"
   #bun = "latest"
-  pnpm = "11.2.2"
+  pnpm = "11.4.0"
 
   # Python
   python = "3.14.5"
