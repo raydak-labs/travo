@@ -38,7 +38,7 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
-    "@types/react": "19.2.15",
+    "@types/react": "19.2.16",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "autoprefixer": "10.5.0",
@@ -47,8 +47,8 @@
     "postcss": "8.5.15",
     "tailwindcss": "4.3.0",
     "typescript": "6.0.3",
-    "vite": "8.0.14",
-    "vitest": "4.1.7"
+    "vite": "8.0.16",
+    "vitest": "4.1.8"
   },
   "msw": {
     "workerDirectory": [
