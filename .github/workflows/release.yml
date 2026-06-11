@@ -4,13 +4,14 @@ on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   build-and-release:
     name: Build (${{ matrix.arch }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         include:
@@ -24,11 +25,13 @@ jobs:
             package_arch: x86_64
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          cache: false
 
       - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
         with:
@@ -37,7 +40,7 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24
-          cache: pnpm
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -56,9 +59,10 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           go build \
-            -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -ldflags "-s -w -X main.Version=${VERSION}" \
             -o "../dist/travo" \
             ./cmd/server
 
@@ -84,10 +88,13 @@ jobs:
     name: Create Release
     needs: build-and-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Download all artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -104,29 +111,35 @@ jobs:
         run: sha256sum * > SHA256SUMS
 
       - name: Create release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
-        with:
-          generate_release_notes: true
-          files: artifacts/*
-          body: |
-            ## Quick Install (OpenWRT)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            artifacts/* \
+            --notes "$(cat <<EOF
+          ## Quick Install (OpenWRT)
 
-            ```sh
-            wget -O- https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
-            ```
+          \`\`\`sh
+          wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | sh
+          \`\`\`
 
-            Or install a specific version:
+          Or install a specific version:
 
-            ```sh
-            VERSION=${{ steps.version.outputs.VERSION }} \
-              wget -O- https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh
-            ```
+          \`\`\`sh
+          VERSION=${VERSION} \\
+            wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | sh
+          \`\`\`
 
-            ## Downloads
+          ## Downloads
 
-            | Architecture | Install tarball |
-            |---|---|
-            | aarch64 (GL.iNet MT3000/AXT1800) | `travo_${{ steps.version.outputs.VERSION }}_aarch64_cortex-a53.tar.gz` |
-            | x86_64 | `travo_${{ steps.version.outputs.VERSION }}_x86_64.tar.gz` |
+          | Architecture | Install tarball |
+          |---|---|
+          | aarch64 (GL.iNet MT3000/AXT1800) | \`travo_${VERSION}_aarch64_cortex-a53.tar.gz\` |
+          | x86_64 | \`travo_${VERSION}_x86_64.tar.gz\` |
 
-            See [SHA256SUMS](SHA256SUMS) for checksums.
+          See [SHA256SUMS](SHA256SUMS) for checksums.
+          EOF
+          )"
