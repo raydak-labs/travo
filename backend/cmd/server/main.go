@@ -73,6 +73,7 @@ type appLifecycle struct {
 	netWatcher      services.EventWatcher
 	rateLimiter     *auth.RateLimiter
 	timeSyncLimiter *auth.RateLimiter
+	statsHistory    *services.StatsHistoryService
 }
 
 // Stop shuts down all background goroutines.
@@ -86,6 +87,7 @@ func (l *appLifecycle) Stop() {
 	l.failoverSvc.Stop()
 	l.rateLimiter.Stop()
 	l.timeSyncLimiter.Stop()
+	l.statsHistory.Stop()
 }
 
 // setupApp creates and configures the Fiber application with all routes.
@@ -315,8 +317,13 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
 		app.Use("/", static.New(cfg.StaticDir))
-		// SPA catch-all: serve index.html for non-API routes that don't match static files
+		// SPA catch-all: serve index.html for non-API routes that don't match
+		// static files. Unknown API paths get a JSON 404 — returning HTML with
+		// status 200 breaks API consumers on typo'd endpoints.
 		app.Get("/*", func(c fiber.Ctx) error {
+			if strings.HasPrefix(c.Path(), "/api/") {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "not found"})
+			}
 			return c.SendFile(cfg.StaticDir + "/index.html")
 		})
 	}
@@ -331,6 +338,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		netWatcher:      netWatcher,
 		rateLimiter:     rateLimiter,
 		timeSyncLimiter: timeSyncLimiter,
+		statsHistory:    statsHistory,
 	}
 }
 

@@ -21,6 +21,8 @@ type StatsHistoryService struct {
 	maxLen   int
 	interval time.Duration
 	checker  AlertChecker
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewStatsHistoryService creates a history service that samples every interval.
@@ -30,12 +32,18 @@ func NewStatsHistoryService(checker AlertChecker, interval time.Duration, maxPoi
 		maxLen:   maxPoints,
 		interval: interval,
 		checker:  checker,
+		stopCh:   make(chan struct{}),
 	}
 }
 
-// Start begins periodic collection in the background.
+// Start begins periodic collection in the background. Call Stop to shut it down.
 func (s *StatsHistoryService) Start() {
 	go s.collectLoop()
+}
+
+// Stop stops the collection goroutine. Safe to call multiple times.
+func (s *StatsHistoryService) Stop() {
+	s.stopOnce.Do(func() { close(s.stopCh) })
 }
 
 func (s *StatsHistoryService) collectLoop() {
@@ -44,8 +52,13 @@ func (s *StatsHistoryService) collectLoop() {
 
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
-	for range ticker.C {
-		s.collect()
+	for {
+		select {
+		case <-ticker.C:
+			s.collect()
+		case <-s.stopCh:
+			return
+		}
 	}
 }
 
