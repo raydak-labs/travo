@@ -1,6 +1,8 @@
 package api
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
@@ -28,6 +30,13 @@ type Dependencies struct {
 	BandSwitching  *services.BandSwitchingService
 	Failover       *services.FailoverService
 	StatsHistory   *services.StatsHistoryService
+
+	// Time-sync policy (see SyncTimeHandler). MinPlausible is typically the
+	// binary build time: a clock before it is clearly broken. SetTime is
+	// injectable for tests; nil uses the real system clock setter.
+	TimeSyncMinPlausible time.Time
+	TimeSyncSetTime      func(epochSec int64) error
+	TimeSyncLimiter      *auth.RateLimiter
 }
 
 // SetupRoutes registers all API routes under /api/v1/.
@@ -67,7 +76,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/ntp/sync", NTPSyncHandler(deps.System))
 	v1.Get("/system/setup-complete", GetSetupCompleteHandler(deps.System))
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
-	v1.Post("/system/time-sync", SyncTimeHandler())
+	v1.Post("/system/time-sync", SyncTimeHandler(deps))
 	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
 	v1.Get("/system/alert-thresholds", GetAlertThresholdsHandler(deps.Alerts))
 	v1.Put("/system/alert-thresholds", SetAlertThresholdsHandler(deps.Alerts))

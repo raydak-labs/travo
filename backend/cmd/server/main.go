@@ -25,6 +25,23 @@ import (
 // Version is set at build time via -ldflags "-X main.Version=..."
 var Version = "dev"
 
+// BuildTime is set at build time via -ldflags "-X main.BuildTime=..." (RFC3339).
+// Used as the "minimum plausible clock" for the unauthenticated time-sync gate.
+var BuildTime = ""
+
+// minPlausibleFloor is the fallback when no BuildTime is stamped: any clock
+// before this date is clearly broken (device booted without RTC/NTP).
+const minPlausibleFloor = "2025-01-01T00:00:00Z"
+
+// minPlausibleTime returns the later of the stamped build time and the floor.
+func minPlausibleTime() time.Time {
+	floor, _ := time.Parse(time.RFC3339, minPlausibleFloor)
+	if bt, err := time.Parse(time.RFC3339, BuildTime); err == nil && bt.After(floor) {
+		return bt
+	}
+	return floor
+}
+
 func splitCORSOrigins(s string) []string {
 	if strings.TrimSpace(s) == "" {
 		return []string{"*"}
@@ -107,6 +124,9 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	} else {
 		authSvc = auth.NewAuthServiceWithUbus(ub, authCfg.JWTSecret, rootPassword, cfg.AuthConfigPath)
 	}
+	// Monotonic session registry: session lifetime is immune to wall-clock
+	// jumps (NTP, time-sync, timezone fixes). See ADR 0007.
+	authSvc.SetSessionRegistry(auth.NewSessionRegistry(24 * time.Hour))
 	var storage services.StorageProvider
 	var captiveProber services.HTTPProber
 	if cfg.MockMode {
@@ -242,6 +262,9 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		BandSwitching:  bandSwitchSvc,
 		Failover:       failoverSvc,
 		StatsHistory:   statsHistory,
+
+		TimeSyncMinPlausible: minPlausibleTime(),
+		TimeSyncLimiter:      auth.NewRateLimiter(3, time.Minute),
 	}
 	api.SetupRoutes(app, deps)
 

@@ -24,6 +24,7 @@ TARGET_ARCH="${GOARCH:-${1:-arm64}}"
 TARGET_OS="${GOOS:-${2:-linux}}"
 BUILD_DIR="dist"
 VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo "Building travo v${VERSION} for ${TARGET_OS}/${TARGET_ARCH}..."
 
@@ -43,7 +44,7 @@ echo "→ Cross-compiling backend for ${TARGET_OS}/${TARGET_ARCH}..."
 (
   cd backend
   CGO_ENABLED=0 GOOS=${TARGET_OS} GOARCH=${TARGET_ARCH} go build \
-    -ldflags="-s -w -X main.Version=${VERSION}" \
+    -ldflags="-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
     -o "../${BUILD_DIR}/travo" \
     ./cmd/server
 )
