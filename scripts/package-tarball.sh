@@ -97,6 +97,12 @@ echo "==> Packaging ${PKG_NAME} v${VERSION} for ${ARCH}"
 stage_release_layout
 
 OUTPUT="${BUILD_DIR}/${PKG_NAME}_${VERSION}_${ARCH}.tar.gz"
-tar -czf "${OUTPUT}" -C "${STAGE_DIR}" .
+# Force root ownership inside the tarball: without this the build user's uid
+# (e.g. 501 on macOS) leaks onto /etc/travo when extracted on the router.
+if tar --version 2>/dev/null | grep -q GNU; then
+  tar --owner=0 --group=0 -czf "${OUTPUT}" -C "${STAGE_DIR}" .
+else
+  tar --uid 0 --gid 0 -czf "${OUTPUT}" -C "${STAGE_DIR}" .   # bsdtar (macOS)
+fi
 
 echo "==> Created: ${OUTPUT} ($(du -sh "${OUTPUT}" | cut -f1))"
