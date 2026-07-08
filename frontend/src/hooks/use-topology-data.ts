@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Cable, Wifi, Smartphone, Signal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { NetworkStatus } from '@shared/index';
@@ -8,7 +6,6 @@ import { useWifiConnection } from './use-wifi';
 import { useVpnStatus } from './use-vpn';
 import { useSystemInfo } from './use-system';
 import { useUSBTetherStatus } from './use-usb-tether';
-import { useWsSubscribe } from '@/lib/ws-context';
 
 export interface SourceDef {
   label: string;
@@ -40,10 +37,8 @@ export interface TopologyData {
 }
 
 export function useTopologyData(): TopologyData {
-  const queryClient = useQueryClient();
-  const { subscribe } = useWsSubscribe();
-
-  // staleTime: Infinity prevents HTTP refetches from overwriting WS-fresh data.
+  // staleTime: Infinity prevents HTTP refetches from overwriting WS-fresh data
+  // (useNetworkStatus itself feeds WS network_status pushes into the cache).
   // Other components using useNetworkStatus() without this option are unaffected.
   const { data: network, isLoading: networkLoading } = useNetworkStatus({
     staleTime: Infinity,
@@ -53,14 +48,6 @@ export function useTopologyData(): TopologyData {
   const { data: sysInfo, isLoading: sysLoading } = useSystemInfo();
   const { data: ipv6Status } = useIPv6Status();
   const { data: usbTether } = useUSBTetherStatus();
-
-  // On network_status WS message, update the React Query cache.
-  // All components using useNetworkStatus() benefit automatically.
-  useEffect(() => {
-    return subscribe('network_status', (raw) => {
-      queryClient.setQueryData<NetworkStatus>(['network', 'status'], raw as NetworkStatus);
-    });
-  }, [subscribe, queryClient]);
 
   // Connection type derivation — wan.type tells us the actual upstream medium.
   const wan = network?.wan ?? null;

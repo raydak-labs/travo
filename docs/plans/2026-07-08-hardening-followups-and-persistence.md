@@ -63,6 +63,9 @@ Record anything new here before deciding whether to fix inline or queue it.
 - (2026-07-08) `docs/tests/failover-verification.md` playbook is ready but
   `tasks_open.md` failover items still say "verify on device" — needs a lab
   session with two uplinks.
+- (2026-07-08, fixed in Q3) The `network_status` WS→query-cache wiring existed
+  but only inside `useTopologyData` — live network data stopped flowing the
+  moment the dashboard unmounted. Moved into `useNetworkStatus` itself.
 - (2026-07-08) Frontend `use-wifi`/`use-vpn` poll 10–15s; no WS source exists
   for them today. A later idea: broadcast a generic `state_changed` WS event
   from the network event watcher to trigger query invalidation instead of
