@@ -26,18 +26,12 @@ The 2026-07-08 hardening branch already landed the structural fixes:
 
 Three known weaknesses remain. Each is listed with impact, proposal, effort.
 
-## 1. Token blocklist is memory-only
+## 1. Token blocklist is memory-only — ✅ DONE (2026-07-08)
 
-**Impact:** Logout revocation is lost on backend restart while tokens live
-24h. The session registry is also memory-only, but its *fail direction* is
-safe (unknown jti → exp fallback), whereas a blocklisted token becomes valid
-again after restart.
-
-**Proposal:** Persist blocked token hashes (SHA-256, not raw tokens) with
-their expiry to `/etc/travo/revoked.json` next to `auth.json`; load on start,
-prune on the existing cleanup tick. Few writes (only logout), tiny file.
-
-**Effort:** ~half a day incl. tests. **Priority: medium.**
+Implemented via the bbolt store (`internal/store`, see
+[[2026-07-08-hardening-followups-and-persistence]]): SHA-256 token hashes with
+expiry persist in `/etc/travo/travo.db`, loaded on start and pruned on the
+existing cleanup tick. Revocations now survive backend restarts.
 
 ## 2. WebSocket token travels as a query parameter
 

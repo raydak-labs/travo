@@ -45,16 +45,16 @@ along the way.
   `network_status` and `alert` messages; wire them into the React Query cache
   like `system_stats`, and make the corresponding hooks fallback-poll only.
   Hooks without a WS source (wifi, vpn, services…) keep their intervals.
-- [ ] **Q4: persistence layer (backlog research item 16).** Evaluate and pick:
-  - `modernc.org/sqlite` (pure Go): full SQL, but ~10 MB binary growth — heavy
-    for a 12 MB binary on NAND flash.
-  - `go.etcd.io/bbolt` (pure Go KV): ~1 MB growth, transactional, single file.
-  - Flat JSON (status quo pattern): fine for tiny data, no history queries.
-  Working recommendation: **bbolt** at `/etc/travo/travo.db` unless SQL queries
-  are truly needed. First consumers: token blocklist (survives restarts — closes
-  auth-hardening plan item 1), stats history (survives reboots), later data
-  usage budgets. Flash-write discipline: batch/interval writes, no per-request
-  fsync.
+- [x] **Q4: persistence layer (backlog research item 16) — DECIDED: bbolt.**
+  Measured on this repo: `go.etcd.io/bbolt` adds **247 KB** to the stripped
+  binary (12.57 → 12.83 MB); `modernc.org/sqlite` would add ~10 MB — rejected.
+  Implemented `internal/store` (bucket KV at `<auth dir>/travo.db`, 0600, open
+  falls back to memory-only with a warning). First consumers:
+  - token blocklist: sha256(token)→expiry persisted; revocations survive
+    restarts (closes auth-hardening plan item 1).
+  - stats history: ring buffer flushed every 20 collects (~10 min) and on
+    Stop; restored at startup capped to maxLen. Flash-write discipline held.
+  Future consumers: data usage budgets, alert history.
 
 ## Findings along the way
 

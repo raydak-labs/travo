@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/config"
 	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/store"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 	"github.com/openwrt-travel-gui/backend/internal/ws"
@@ -74,9 +76,11 @@ type appLifecycle struct {
 	rateLimiter     *auth.RateLimiter
 	timeSyncLimiter *auth.RateLimiter
 	statsHistory    *services.StatsHistoryService
+	db              *store.Store // may be nil (memory-only fallback)
 }
 
-// Stop shuts down all background goroutines.
+// Stop shuts down all background goroutines, then closes the store —
+// last, because statsHistory.Stop flushes into it.
 func (l *appLifecycle) Stop() {
 	l.blocklist.Stop()
 	l.hub.Stop()
@@ -88,6 +92,9 @@ func (l *appLifecycle) Stop() {
 	l.rateLimiter.Stop()
 	l.timeSyncLimiter.Stop()
 	l.statsHistory.Stop()
+	if l.db != nil {
+		_ = l.db.Close()
+	}
 }
 
 // setupApp creates and configures the Fiber application with all routes.
@@ -132,6 +139,15 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	} else {
 		u = uci.NewRealUCI()
 		ub = ubus.NewRealUbus()
+	}
+
+	// Persistent KV store next to auth.json (so tests with a temp auth path get
+	// a temp store). Failure degrades to memory-only instead of blocking the UI.
+	var db *store.Store
+	if s, err := store.Open(filepath.Join(filepath.Dir(cfg.AuthConfigPath), "travo.db")); err == nil {
+		db = s
+	} else {
+		log.Printf("WARNING: persistent store unavailable (%v); running memory-only", err)
 	}
 
 	// Create shared root password holder (written by auth after login, read by UCI apply).
@@ -250,11 +266,21 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	uptimeTracker := services.NewUptimeTracker(captiveProber)
 
 	// Stats history: collect every 30s, keep 720 points (~6 hours)
-	statsHistory := services.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
+	var statsHistory *services.StatsHistoryService
+	if db != nil {
+		statsHistory = services.NewStatsHistoryServiceWithStore(systemSvc, 30*time.Second, 720, db)
+	} else {
+		statsHistory = services.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
+	}
 	statsHistory.Start()
 
 	// Token blocklist with cleanup goroutine
-	blocklist := auth.NewTokenBlocklist()
+	var blocklist *auth.TokenBlocklist
+	if db != nil {
+		blocklist = auth.NewTokenBlocklistWithStore(db)
+	} else {
+		blocklist = auth.NewTokenBlocklist()
+	}
 	authSvc.SetBlocklist(blocklist)
 	blocklist.StartCleanup(5 * time.Minute)
 
@@ -339,6 +365,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		rateLimiter:     rateLimiter,
 		timeSyncLimiter: timeSyncLimiter,
 		statsHistory:    statsHistory,
+		db:              db,
 	}
 }
 
