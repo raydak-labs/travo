@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -70,4 +71,43 @@ func TestRateLimiter_WindowExpiry(t *testing.T) {
 	if !rl.Allow("192.168.1.1") {
 		t.Error("expected to allow after window expires")
 	}
+}
+
+func TestRateLimiter_CleanupSweepsStaleIPs(t *testing.T) {
+	rl := NewRateLimiter(5, 10*time.Millisecond)
+	for i := 0; i < 100; i++ {
+		rl.Record(fmt.Sprintf("10.0.0.%d", i))
+	}
+	time.Sleep(20 * time.Millisecond)
+	rl.Cleanup()
+
+	rl.mu.Lock()
+	size := len(rl.attempts)
+	rl.mu.Unlock()
+	if size != 0 {
+		t.Errorf("expected all stale IPs swept, %d remain", size)
+	}
+}
+
+func TestRateLimiter_StartCleanupSweepsPeriodically(t *testing.T) {
+	rl := NewRateLimiter(5, 10*time.Millisecond)
+	rl.StartCleanup(20 * time.Millisecond)
+	defer rl.Stop()
+
+	rl.Record("10.0.0.1")
+	time.Sleep(60 * time.Millisecond)
+
+	rl.mu.Lock()
+	size := len(rl.attempts)
+	rl.mu.Unlock()
+	if size != 0 {
+		t.Errorf("expected background sweep to clear stale IPs, %d remain", size)
+	}
+}
+
+func TestRateLimiter_StopIsIdempotent(t *testing.T) {
+	rl := NewRateLimiter(5, time.Minute)
+	rl.StartCleanup(time.Minute)
+	rl.Stop()
+	rl.Stop() // must not panic
 }

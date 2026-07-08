@@ -60,21 +60,49 @@ func splitCORSOrigins(s string) []string {
 	return out
 }
 
+// appLifecycle bundles every component with a background goroutine so callers
+// can shut all of them down together (repo rule: every background goroutine
+// follows lifecycle rules).
+type appLifecycle struct {
+	hub             *ws.Hub
+	alertSvc        *services.AlertService
+	uptimeTracker   *services.UptimeTracker
+	bandSwitchSvc   *services.BandSwitchingService
+	failoverSvc     *services.FailoverService
+	blocklist       *auth.TokenBlocklist
+	netWatcher      services.EventWatcher
+	rateLimiter     *auth.RateLimiter
+	timeSyncLimiter *auth.RateLimiter
+}
+
+// Stop shuts down all background goroutines.
+func (l *appLifecycle) Stop() {
+	l.blocklist.Stop()
+	l.hub.Stop()
+	l.netWatcher.Stop()
+	l.alertSvc.Stop()
+	l.uptimeTracker.Stop()
+	l.bandSwitchSvc.Stop()
+	l.failoverSvc.Stop()
+	l.rateLimiter.Stop()
+	l.timeSyncLimiter.Stop()
+}
+
 // setupApp creates and configures the Fiber application with all routes.
 func setupApp() *fiber.App {
 	cfg := config.DefaultConfig()
 	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
 		cfg.AuthConfigPath = tmpDir + "/auth.json"
 	}
-	app, _, _, _, _, _, _, netWatcher := setupAppWithConfig(cfg)
-	// Stop the watcher goroutine immediately — setupApp is only used in tests.
-	netWatcher.Stop()
+	app, lifecycle := setupAppWithConfig(cfg)
+	// Stop the background goroutines immediately — setupApp is only used in tests.
+	lifecycle.Stop()
 	return app
 }
 
 // setupAppWithConfig creates and configures the Fiber application with the given config.
-// Returns the app, WebSocket hub, alert service, uptime tracker, band switching service, failover service, blocklist, and event watcher so the caller can manage their lifecycle.
-func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.AlertService, *services.UptimeTracker, *services.BandSwitchingService, *services.FailoverService, *auth.TokenBlocklist, services.EventWatcher) {
+// The returned lifecycle owns every background goroutine started here.
+func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	app := fiber.New(fiber.Config{AppName: "travo"})
 
 	// CORS middleware
@@ -228,8 +256,13 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 	authSvc.SetBlocklist(blocklist)
 	blocklist.StartCleanup(5 * time.Minute)
 
-	// Rate limiter: 5 attempts per minute
+	// Rate limiters: login (5/min) and unauthenticated time-sync (3/min).
+	// Periodic sweeps keep the per-IP maps bounded when many distinct source
+	// IPs never return (see RateLimiter.Cleanup).
 	rateLimiter := auth.NewRateLimiter(5, time.Minute)
+	rateLimiter.StartCleanup(5 * time.Minute)
+	timeSyncLimiter := auth.NewRateLimiter(3, time.Minute)
+	timeSyncLimiter.StartCleanup(5 * time.Minute)
 
 	// Auth middleware
 	app.Use(authSvc.Middleware())
@@ -264,7 +297,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		StatsHistory:   statsHistory,
 
 		TimeSyncMinPlausible: minPlausibleTime(),
-		TimeSyncLimiter:      auth.NewRateLimiter(3, time.Minute),
+		TimeSyncLimiter:      timeSyncLimiter,
 	}
 	api.SetupRoutes(app, deps)
 
@@ -287,7 +320,17 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *ws.Hub, *services.Alert
 		})
 	}
 
-	return app, hub, alertSvc, uptimeTracker, bandSwitchSvc, failoverSvc, blocklist, netWatcher
+	return app, &appLifecycle{
+		hub:             hub,
+		alertSvc:        alertSvc,
+		uptimeTracker:   uptimeTracker,
+		bandSwitchSvc:   bandSwitchSvc,
+		failoverSvc:     failoverSvc,
+		blocklist:       blocklist,
+		netWatcher:      netWatcher,
+		rateLimiter:     rateLimiter,
+		timeSyncLimiter: timeSyncLimiter,
+	}
 }
 
 func main() {
@@ -302,7 +345,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	app, hub, alertSvc, uptimeTracker, bandSwitchSvc, failoverSvc, blocklist, netWatcher := setupAppWithConfig(cfg)
+	app, lifecycle := setupAppWithConfig(cfg)
 
 	// Graceful shutdown on SIGINT/SIGTERM
 	quit := make(chan os.Signal, 1)
@@ -311,13 +354,7 @@ func main() {
 	go func() {
 		<-quit
 		log.Println("Shutting down server...")
-		blocklist.Stop()
-		hub.Stop()
-		netWatcher.Stop()
-		alertSvc.Stop()
-		uptimeTracker.Stop()
-		bandSwitchSvc.Stop()
-		failoverSvc.Stop()
+		lifecycle.Stop()
 		if err := app.Shutdown(); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}

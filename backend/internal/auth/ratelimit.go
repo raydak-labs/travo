@@ -11,6 +11,8 @@ type RateLimiter struct {
 	attempts    map[string][]time.Time
 	maxAttempts int
 	window      time.Duration
+	stopCh      chan struct{}
+	stopOnce    sync.Once
 }
 
 // NewRateLimiter creates a new RateLimiter.
@@ -20,7 +22,41 @@ func NewRateLimiter(maxAttempts int, window time.Duration) *RateLimiter {
 		attempts:    make(map[string][]time.Time),
 		maxAttempts: maxAttempts,
 		window:      window,
+		stopCh:      make(chan struct{}),
 	}
+}
+
+// Cleanup removes expired attempts for all IPs. Without this sweep the map
+// grows unbounded when many distinct source IPs record attempts once and
+// never return (per-IP cleanup only runs on that IP's next Allow call).
+func (r *RateLimiter) Cleanup() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for ip := range r.attempts {
+		r.cleanupIP(ip)
+	}
+}
+
+// StartCleanup starts a goroutine that periodically sweeps stale attempts.
+// Call Stop() to shut it down.
+func (r *RateLimiter) StartCleanup(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				r.Cleanup()
+			case <-r.stopCh:
+				return
+			}
+		}
+	}()
+}
+
+// Stop stops the cleanup goroutine. Safe to call multiple times.
+func (r *RateLimiter) Stop() {
+	r.stopOnce.Do(func() { close(r.stopCh) })
 }
 
 // Allow returns true if the IP is under the rate limit.
