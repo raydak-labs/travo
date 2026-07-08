@@ -34,17 +34,16 @@ along the way.
 
 ## Queue
 
-- [ ] **Q1: vpn_service settle-sleeps → observable waits.** ~12 bare
-  `time.Sleep` calls. Introduce a `waitFor(cond, timeout, step)` helper and use
-  it where a poll condition exists (interface up, wg handshake, route present).
-  Keep genuinely condition-less settle delays, but name them as constants.
-- [ ] **Q2: split wifi_service.go (2,276 lines)** into focused files by concern
-  (scan/connect, AP config, repeater, auto-reconnect/cron, apply/rollback,
-  health). Pure file move — no behavior change; tests must stay green untouched.
-- [ ] **Q3: WS-feed remaining query caches.** The hub already pushes
-  `network_status` and `alert` messages; wire them into the React Query cache
-  like `system_stats`, and make the corresponding hooks fallback-poll only.
-  Hooks without a WS source (wifi, vpn, services…) keep their intervals.
+- [x] **Q1: vpn_service settle-sleeps → observable waits.** Most sleeps were
+  already inside deadline-poll loops. Real fix: `applyAndVerifyWireGuard` ran
+  `ifup wg0` three times unconditionally (~1s wasted); it now probes the
+  runtime after each attempt and exits early. Settle delays named.
+- [x] **Q2: split wifi_service.go** — 2,276 → 504 lines core plus
+  `wifi_repeater/scan/connect/ap/mac/reconnect.go`. Pure moves, tests untouched.
+- [x] **Q3: WS-feed remaining query caches.** `network_status` wiring moved
+  from `useTopologyData` into `useNetworkStatus` (it only worked while the
+  dashboard was mounted); alert history polls only while the socket is down,
+  with a reconnect catch-up refetch.
 - [x] **Q4: persistence layer (backlog research item 16) — DECIDED: bbolt.**
   Measured on this repo: `go.etcd.io/bbolt` adds **247 KB** to the stripped
   binary (12.57 → 12.83 MB); `modernc.org/sqlite` would add ~10 MB — rejected.
@@ -55,6 +54,9 @@ along the way.
   - stats history: ring buffer flushed every 20 collects (~10 min) and on
     Stop; restored at startup capped to maxLen. Flash-write discipline held.
   Future consumers: data usage budgets, alert history.
+  **Device-validated** (GL-AXT1800): logout → `/etc/init.d/travo restart` →
+  token still revoked; stats history point count and first timestamp preserved
+  across restarts.
 
 ## Findings along the way
 
