@@ -18,6 +18,7 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`2026-03-26-vpn-disable-latency-and-dns-forwarding.md`](2026-03-26-vpn-disable-latency-and-dns-forwarding.md) | VPN off path, DNS restore | `vpn`, `dns` |
 | [`2026-03-26-wireguard-disable-breaks-internet.md`](2026-03-26-wireguard-disable-breaks-internet.md) | WireGuard disable / default route regression | `wireguard`, `vpn` |
 | [`2026-04-11-repeater-radio-policy-and-wifi-ux.md`](2026-04-11-repeater-radio-policy-and-wifi-ux.md) | Repeater radio policy, unified AP UX | `wifi`, `repeater` |
+| [`2026-07-08-auth-hardening.md`](2026-07-08-auth-hardening.md) | Auth follow-ups: blocklist persistence, WS token transport, token storage | `auth`, `security` |
 | [`adguard-auto-configure.md`](adguard-auto-configure.md) | AdGuard install + dnsmasq integration | `adguard`, `dns`, `services` |
 | [`cicd-pipeline.md`](cicd-pipeline.md) | CI/CD for build/test/package | `cicd`, `deployment` |
 | [`connection-failover.md`](connection-failover.md) | Multi-WAN failover | `wan`, `failover`, `network` |
