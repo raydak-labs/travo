@@ -30,6 +30,7 @@ type Dependencies struct {
 	BandSwitching  *services.BandSwitchingService
 	Failover       *services.FailoverService
 	StatsHistory   *services.StatsHistoryService
+	Speedtest      *services.SpeedtestService
 
 	// Time-sync policy (see SyncTimeHandler). MinPlausible is typically the
 	// binary build time: a clock before it is clearly broken. SetTime is
@@ -84,6 +85,10 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/ssh-keys", AddSSHKeyHandler(deps.System))
 	v1.Delete("/system/ssh-keys/:index", DeleteSSHKeyHandler(deps.System))
 	v1.Post("/system/speed-test", RunSpeedTestHandler(deps.System))
+	v1.Get("/system/speedtest-service", GetSpeedtestServiceStatusHandler(deps.Speedtest))
+	v1.Post("/system/speedtest-service/install", InstallSpeedtestCLIHandler(deps.Speedtest))
+	v1.Post("/system/speedtest-service/uninstall", UninstallSpeedtestCLIHandler(deps.Speedtest))
+	v1.Post("/system/speedtest-service/run", RunSpeedtestCLIHandler(deps.Speedtest))
 	v1.Get("/system/buttons", GetButtonsHandler(deps.System))
 	v1.Put("/system/button-actions", SetButtonActionsHandler(deps.System))
 

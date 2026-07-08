@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -35,7 +35,7 @@ type ShellWifiReloader struct{}
 
 // Reload executes "wifi up" to apply UCI wireless changes.
 func (r *ShellWifiReloader) Reload() error {
-	return exec.Command("wifi", "up").Run()
+	return execx.Run(execx.Slow, "wifi", "up")
 }
 
 // NoopWifiReloader does nothing (for tests).

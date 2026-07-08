@@ -3,13 +3,13 @@ package api
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
@@ -297,10 +297,10 @@ func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 // defaultSetSystemTime sets the system clock and persists it to the hardware
 // clock (best-effort).
 func defaultSetSystemTime(epochSec int64) error {
-	if err := exec.Command("date", "-s", fmt.Sprintf("@%d", epochSec)).Run(); err != nil {
+	if err := execx.Run(execx.Quick, "date", "-s", fmt.Sprintf("@%d", epochSec)); err != nil {
 		return err
 	}
-	_ = exec.Command("hwclock", "-w").Run()
+	_ = execx.Run(execx.Quick, "hwclock", "-w")
 	return nil
 }
 

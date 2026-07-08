@@ -69,6 +69,18 @@ var openAPISpec = map[string]interface{}{
 		"/system/shutdown": map[string]interface{}{
 			"post": endpoint("Shutdown", "Shut down the device", true, nil, resp200("application/json", obj("ok"))),
 		},
+		"/system/speedtest-service": map[string]interface{}{
+			"get": endpoint("GetSpeedtestService", "Ookla speedtest CLI availability and install state", true, nil, resp200("application/json", obj("installed", "supported", "architecture", "version"))),
+		},
+		"/system/speedtest-service/install": map[string]interface{}{
+			"post": endpoint("InstallSpeedtestCLI", "Install the Ookla speedtest CLI package (opkg or apk)", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/system/speedtest-service/uninstall": map[string]interface{}{
+			"post": endpoint("UninstallSpeedtestCLI", "Remove the Ookla speedtest CLI package", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/system/speedtest-service/run": map[string]interface{}{
+			"post": endpoint("RunSpeedtestCLI", "Run an Ookla speedtest (takes ~30-60s)", true, nil, resp200("application/json", nil)),
+		},
 		"/system/factory-reset": map[string]interface{}{
 			"post": endpoint("FactoryReset", "Factory reset the device", true, nil, resp200("application/json", obj("ok"))),
 		},

@@ -1,18 +1,22 @@
 package services
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 // PackageManager abstracts package install/remove operations.
 type PackageManager interface {
+	// Update refreshes the package index. On OpenWrt the opkg lists live in
+	// /tmp (RAM), so after every reboot an install without a prior update
+	// fails — callers run this best-effort before installing.
+	Update() (string, error)
 	Install(pkg string) (string, error)
 	Remove(pkg string) (string, error)
 	IsInstalled(pkg string) bool
@@ -231,6 +235,9 @@ func (sm *ServiceManager) Install(serviceID string) error {
 	if err != nil {
 		return err
 	}
+	// Best-effort index refresh: a failure (e.g. offline) still leaves the
+	// install attempt as the authoritative error.
+	_, _ = sm.pkg.Update()
 	for _, pkg := range def.Packages {
 		if out, err := sm.pkg.Install(pkg); err != nil {
 			return fmt.Errorf("failed to install %s: %w\n%s", pkg, err, out)
@@ -271,6 +278,10 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 	def, err := sm.findDef(serviceID)
 	if err != nil {
 		return err
+	}
+	logFn("Updating package index…")
+	if _, err := sm.pkg.Update(); err != nil {
+		logFn(fmt.Sprintf("Index update warning (continuing): %s", err.Error()))
 	}
 	for _, pkg := range def.Packages {
 		logFn(fmt.Sprintf("Installing package: %s", pkg))
@@ -407,50 +418,61 @@ func detectPackageManager() PackageManager {
 // ApkPackageManager uses apk (OpenWrt 25.x+).
 type ApkPackageManager struct{}
 
+func (a *ApkPackageManager) Update() (string, error) {
+	out, err := execx.CombinedOutput(execx.Package, "apk", "update")
+	return string(out), err
+}
 func (a *ApkPackageManager) Install(pkg string) (string, error) {
-	out, err := exec.Command("apk", "add", pkg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Package, "apk", "add", pkg)
 	return string(out), err
 }
 func (a *ApkPackageManager) Remove(pkg string) (string, error) {
-	out, err := exec.Command("apk", "del", pkg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Package, "apk", "del", pkg)
 	return string(out), err
 }
 func (a *ApkPackageManager) IsInstalled(pkg string) bool {
-	err := exec.Command("apk", "info", "-e", pkg).Run()
+	err := execx.Run(execx.Quick, "apk", "info", "-e", pkg)
 	return err == nil
 }
 func (a *ApkPackageManager) InstallStream(pkg string, logFn func(string)) error {
-	return streamCommand(exec.Command("apk", "add", pkg), logFn)
+	return execx.Stream(execx.Package, logFn, "apk", "add", pkg)
 }
 func (a *ApkPackageManager) RemoveStream(pkg string, logFn func(string)) error {
-	return streamCommand(exec.Command("apk", "del", pkg), logFn)
+	return execx.Stream(execx.Package, logFn, "apk", "del", pkg)
 }
 
 // OpkgPackageManager uses opkg (OpenWrt <25).
 type OpkgPackageManager struct{}
 
+func (o *OpkgPackageManager) Update() (string, error) {
+	out, err := execx.CombinedOutput(execx.Package, "opkg", "update")
+	return string(out), err
+}
 func (o *OpkgPackageManager) Install(pkg string) (string, error) {
-	out, err := exec.Command("opkg", "install", pkg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Package, "opkg", "install", pkg)
 	return string(out), err
 }
 func (o *OpkgPackageManager) Remove(pkg string) (string, error) {
-	out, err := exec.Command("opkg", "remove", pkg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Package, "opkg", "remove", pkg)
 	return string(out), err
 }
 func (o *OpkgPackageManager) IsInstalled(pkg string) bool {
-	out, err := exec.Command("opkg", "list-installed", pkg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "opkg", "list-installed", pkg)
 	return err == nil && strings.Contains(string(out), pkg)
 }
 func (o *OpkgPackageManager) InstallStream(pkg string, logFn func(string)) error {
-	return streamCommand(exec.Command("opkg", "install", pkg), logFn)
+	return execx.Stream(execx.Package, logFn, "opkg", "install", pkg)
 }
 func (o *OpkgPackageManager) RemoveStream(pkg string, logFn func(string)) error {
-	return streamCommand(exec.Command("opkg", "remove", pkg), logFn)
+	return execx.Stream(execx.Package, logFn, "opkg", "remove", pkg)
 }
 
 // NoopPackageManager for systems without a package manager.
 type NoopPackageManager struct{}
 
+func (n *NoopPackageManager) Update() (string, error) {
+	return "", fmt.Errorf("no package manager available")
+}
 func (n *NoopPackageManager) Install(string) (string, error) {
 	return "", fmt.Errorf("no package manager available")
 }
@@ -465,26 +487,6 @@ func (n *NoopPackageManager) RemoveStream(string, func(string)) error {
 	return fmt.Errorf("no package manager available")
 }
 
-// streamCommand runs a command and sends each output line to logFn.
-func streamCommand(cmd *exec.Cmd, logFn func(string)) error {
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	cmd.Stderr = cmd.Stdout // merge stderr into stdout
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		logFn(scanner.Text())
-	}
-
-	return cmd.Wait()
-}
-
 // RealSystemProbe checks init.d scripts and running processes.
 type RealSystemProbe struct{}
 
@@ -494,37 +496,47 @@ func (r *RealSystemProbe) HasInitScript(name string) bool {
 }
 func (r *RealSystemProbe) IsRunning(initName string) bool {
 	// OpenWrt init.d scripts return 0 for "running" status
-	err := exec.Command("/etc/init.d/"+initName, "status").Run()
+	err := execx.Run(execx.Quick, "/etc/init.d/"+initName, "status")
 	return err == nil
 }
 func (r *RealSystemProbe) Start(initName string) (string, error) {
-	out, err := exec.Command("/etc/init.d/"+initName, "start").CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, "/etc/init.d/"+initName, "start")
 	return string(out), err
 }
 func (r *RealSystemProbe) Stop(initName string) (string, error) {
-	out, err := exec.Command("/etc/init.d/"+initName, "stop").CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, "/etc/init.d/"+initName, "stop")
 	return string(out), err
 }
 func (r *RealSystemProbe) IsAutoStart(initName string) bool {
-	err := exec.Command("/etc/init.d/"+initName, "enabled").Run()
+	err := execx.Run(execx.Quick, "/etc/init.d/"+initName, "enabled")
 	return err == nil
 }
 func (r *RealSystemProbe) Enable(initName string) error {
-	return exec.Command("/etc/init.d/"+initName, "enable").Run()
+	return execx.Run(execx.Quick, "/etc/init.d/"+initName, "enable")
 }
 func (r *RealSystemProbe) Disable(initName string) error {
-	return exec.Command("/etc/init.d/"+initName, "disable").Run()
+	return execx.Run(execx.Quick, "/etc/init.d/"+initName, "disable")
 }
 
 // --- Mock implementations for tests ---
 
 // MockPackageManager tracks install/remove state in memory.
 type MockPackageManager struct {
-	installed map[string]bool
+	installed   map[string]bool
+	UpdateCalls int
+	UpdateErr   error
 }
 
 func NewMockPackageManager() *MockPackageManager {
 	return &MockPackageManager{installed: make(map[string]bool)}
+}
+
+func (m *MockPackageManager) Update() (string, error) {
+	m.UpdateCalls++
+	if m.UpdateErr != nil {
+		return "", m.UpdateErr
+	}
+	return "ok", nil
 }
 func (m *MockPackageManager) Install(pkg string) (string, error) {
 	m.installed[pkg] = true

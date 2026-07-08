@@ -295,6 +295,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		BandSwitching:  bandSwitchSvc,
 		Failover:       failoverSvc,
 		StatsHistory:   statsHistory,
+		Speedtest:      services.NewSpeedtestService(),
 
 		TimeSyncMinPlausible: minPlausibleTime(),
 		TimeSyncLimiter:      timeSyncLimiter,
