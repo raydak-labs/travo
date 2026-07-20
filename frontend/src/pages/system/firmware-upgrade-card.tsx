@@ -63,7 +63,7 @@ export function FirmwareUpgradeCard() {
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Firmware Upgrade</CardTitle>
+          <CardTitle>Firmware Upgrade</CardTitle>
           <Zap className="h-4 w-4 text-gray-500" />
         </CardHeader>
         <CardContent>

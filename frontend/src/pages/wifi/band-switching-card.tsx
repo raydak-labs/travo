@@ -11,7 +11,7 @@ export function BandSwitchingCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Auto Band Switching</CardTitle>
+        <CardTitle>Auto Band Switching</CardTitle>
         <ChevronUp className="h-4 w-4 text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-3">

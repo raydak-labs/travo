@@ -10,7 +10,7 @@ export function SpeedTestCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Speed Test</CardTitle>
+        <CardTitle>Speed Test</CardTitle>
         <Gauge className="h-4 w-4 text-gray-500" />
       </CardHeader>
       <CardContent className="space-y-4">

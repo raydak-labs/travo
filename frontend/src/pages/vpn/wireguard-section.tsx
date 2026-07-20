@@ -83,7 +83,7 @@ export function WireguardSection() {
       />
       <Card className={!isInstalled ? 'opacity-60' : undefined}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">WireGuard</CardTitle>
+          <CardTitle>WireGuard</CardTitle>
           <Shield className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent className="space-y-4">

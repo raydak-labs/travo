@@ -234,7 +234,7 @@ function SourceCard({
     <Card className="border-slate-700 bg-slate-900 text-slate-200">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-100">
+          <CardTitle className="flex items-center gap-2 text-slate-100">
             <Icon className="h-4 w-4 text-slate-400" />
             {title}
           </CardTitle>
@@ -379,7 +379,7 @@ export function DashboardPage() {
 
       <Card className="dark:border-slate-700 dark:bg-slate-900">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <CardTitle className="flex items-center gap-2">
             <Monitor className="h-4 w-4 text-slate-400" />
             Quick status
           </CardTitle>

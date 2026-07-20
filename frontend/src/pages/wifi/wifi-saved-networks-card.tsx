@@ -63,7 +63,7 @@ export function WifiSavedNetworksCard() {
     <Card className="min-w-0">
       <CardHeader className="space-y-1">
         <div className="flex items-center gap-2">
-          <CardTitle className="text-sm font-medium">Saved networks</CardTitle>
+          <CardTitle>Saved networks</CardTitle>
           <InfoTooltip text={SAVED_LIST_TOOLTIP} />
         </div>
         <CardDescription>

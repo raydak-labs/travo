@@ -46,7 +46,7 @@ export function TailscaleSection() {
       />
       <Card className={!isInstalled ? 'opacity-60' : undefined}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tailscale</CardTitle>
+          <CardTitle>Tailscale</CardTitle>
           <Globe className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent className="space-y-4">

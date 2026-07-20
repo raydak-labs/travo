@@ -43,7 +43,7 @@ export function SplitTunnelCard() {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Split Tunneling</CardTitle>
+          <CardTitle>Split Tunneling</CardTitle>
           <GitFork className="h-4 w-4 text-gray-400" />
         </CardHeader>
         <CardContent>
@@ -56,7 +56,7 @@ export function SplitTunnelCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Split Tunneling</CardTitle>
+        <CardTitle>Split Tunneling</CardTitle>
         <GitFork className="h-4 w-4 text-gray-400" />
       </CardHeader>
       <CardContent>

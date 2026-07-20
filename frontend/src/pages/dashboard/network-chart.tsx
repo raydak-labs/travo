@@ -17,7 +17,7 @@ export function NetworkChart() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Network Throughput</CardTitle>
+        <CardTitle>Network Throughput</CardTitle>
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-400'}`} />
         </div>

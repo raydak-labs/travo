@@ -34,7 +34,7 @@ export function ClientsConnectedClientsCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
+        <CardTitle>
           Connected Clients
           {clients && (
             <span className="ml-2 text-xs font-normal text-gray-500">

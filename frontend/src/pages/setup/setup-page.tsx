@@ -33,7 +33,7 @@ export function SetupPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <Card className="w-full max-w-lg shadow-lg">
         <CardHeader className="pb-2">
-          <CardTitle className="text-center text-sm font-medium text-gray-500">
+          <CardTitle className="text-center text-gray-500">
             Initial Setup
           </CardTitle>
         </CardHeader>

@@ -20,7 +20,7 @@ export function DataUsageSection() {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Data Usage</CardTitle>
+          <CardTitle>Data Usage</CardTitle>
           <BarChart2 className="h-4 w-4 text-gray-500" />
         </CardHeader>
         <CardContent>
@@ -45,7 +45,7 @@ export function DataUsageSection() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Data Usage</CardTitle>
+        <CardTitle>Data Usage</CardTitle>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => void refetch()}>
             <RefreshCw className="h-3.5 w-3.5" />

@@ -38,7 +38,7 @@ export function MACAddressCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">MAC Address Cloning</CardTitle>
+        <CardTitle>MAC Address Cloning</CardTitle>
       </CardHeader>
       <CardContent>
         {macLoading ? (

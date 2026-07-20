@@ -53,7 +53,7 @@ export function APConfigCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Access Point Configuration</CardTitle>
+        <CardTitle>Access Point Configuration</CardTitle>
       </CardHeader>
       <CardContent>
         {apLoading ? (

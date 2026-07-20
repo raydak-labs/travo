@@ -13,7 +13,7 @@ export function InterfacesCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Network Interfaces</CardTitle>
+        <CardTitle>Network Interfaces</CardTitle>
         <Power className="h-4 w-4 text-gray-500" />
       </CardHeader>
       <CardContent>
