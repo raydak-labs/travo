@@ -1,5 +1,6 @@
 import { Fingerprint } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useMACPolicies, useSetMACPolicies } from '@/hooks/use-wifi';
 import type { MACPolicy } from '@shared/index';
 import type { MacPolicyAddFormValues } from '@/lib/schemas/wifi-forms';
@@ -30,7 +31,7 @@ export function MACPolicyCard() {
           <Fingerprint className="h-4 w-4 text-gray-400" />
         </CardHeader>
         <CardContent>
-          <div className="h-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );

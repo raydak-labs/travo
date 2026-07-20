@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Key } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSSHKeys, useAddSSHKey, useDeleteSSHKey } from '@/hooks/use-system';
 import { sshPublicKeyFormSchema, type SshPublicKeyFormValues } from '@/lib/schemas/system-forms';
 import { SSHKeyAddForm } from '@/pages/system/ssh-key-add-form';
@@ -42,7 +43,7 @@ export function SSHKeysCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <Skeleton className="h-16 w-full" />
         ) : (
           <SSHKeysList
             keys={[...keys]}
