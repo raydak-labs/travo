@@ -378,10 +378,10 @@ export function DashboardPage() {
         </SourceCard>
       </div>
 
-      <Card className="dark:border-slate-700 dark:bg-slate-900">
+      <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
-            <Monitor className="h-4 w-4 text-slate-400" />
+            <Monitor className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             Quick status
           </CardTitle>
         </CardHeader>
@@ -399,7 +399,11 @@ export function DashboardPage() {
                 <div>
                   <span className="text-muted-foreground">Internet</span>
                   <p
-                    className={`mt-0.5 font-medium ${internetUp ? 'text-emerald-500' : 'text-red-500'}`}
+                    className={`mt-0.5 font-medium ${
+                      internetUp
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
                   >
                     {internetUp ? 'Reachable' : 'Unreachable'}
                   </p>
@@ -409,13 +413,15 @@ export function DashboardPage() {
                   <div className="mt-0.5 flex items-center gap-1.5">
                     {vpnActive ? (
                       <>
-                        <Shield className="h-3.5 w-3.5 text-emerald-500" />
-                        <span className="font-medium text-emerald-500">On</span>
+                        <Shield className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                          On
+                        </span>
                       </>
                     ) : (
                       <>
-                        <Shield className="h-3.5 w-3.5 text-slate-500" />
-                        <span className="font-medium text-slate-500">Off</span>
+                        <Shield className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                        <span className="font-medium text-gray-500 dark:text-gray-400">Off</span>
                       </>
                     )}
                   </div>

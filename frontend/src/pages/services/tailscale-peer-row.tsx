@@ -13,7 +13,9 @@ export function TailscalePeerRow({ peer, onSetExitNode, isPending }: TailscalePe
     <div className="flex items-center justify-between py-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <span
-          className={`h-2 w-2 shrink-0 rounded-full ${peer.online ? 'bg-green-500' : 'bg-gray-300'}`}
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            peer.online ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-300 dark:bg-gray-600'
+          }`}
         />
         <div className="min-w-0">
           <span className="truncate text-sm font-medium">{peer.hostname}</span>

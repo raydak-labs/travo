@@ -20,14 +20,14 @@ export const LOG_LEVEL_FILTERS: { label: string; value: string }[] = [
 ];
 
 export const LOG_LEVEL_COLORS: Record<string, string> = {
-  emerg: 'bg-red-600 text-white',
-  alert: 'bg-red-500 text-white',
-  crit: 'bg-red-500 text-white',
-  err: 'bg-red-400 text-white',
-  warning: 'bg-amber-400 text-amber-950',
-  notice: 'bg-green-400 text-green-950',
-  info: 'bg-blue-400 text-white',
-  debug: 'bg-gray-400 text-gray-950',
+  emerg: 'bg-red-600 text-white dark:bg-red-700 dark:text-red-100',
+  alert: 'bg-red-500 text-white dark:bg-red-600 dark:text-red-100',
+  crit: 'bg-red-500 text-white dark:bg-red-600 dark:text-red-100',
+  err: 'bg-red-400 text-white dark:bg-red-500 dark:text-red-50',
+  warning: 'bg-amber-400 text-amber-950 dark:bg-amber-500 dark:text-amber-950',
+  notice: 'bg-emerald-400 text-emerald-950 dark:bg-emerald-500 dark:text-emerald-950',
+  info: 'bg-blue-400 text-white dark:bg-blue-500 dark:text-blue-50',
+  debug: 'bg-gray-400 text-gray-950 dark:bg-gray-500 dark:text-gray-950',
 };
 
 export const defaultLogsFilters: LogsFilterFormValues = {

@@ -101,6 +101,17 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Quick status')).toBeInTheDocument();
       expect(screen.getByText('Reachable')).toBeInTheDocument();
     });
+    const reachable = screen.getByText('Reachable');
+    expect(reachable.className).toMatch(/text-emerald-600/);
+    expect(reachable.className).toMatch(/dark:text-emerald-400/);
+    const vpnState = screen.getByText(/^(On|Off)$/);
+    if (vpnState.textContent === 'Off') {
+      expect(vpnState.className).toMatch(/text-gray-500/);
+      expect(vpnState.className).toMatch(/dark:text-gray-400/);
+    } else {
+      expect(vpnState.className).toMatch(/text-emerald-600/);
+      expect(vpnState.className).toMatch(/dark:text-emerald-400/);
+    }
     expect(screen.getByRole('link', { name: /Device details and settings/i })).toHaveAttribute(
       'href',
       '/system',

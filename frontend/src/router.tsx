@@ -58,6 +58,7 @@ const protectedRoute = createRoute({
   beforeLoad: requireSetupComplete,
 });
 
+/** Shell header title. Service children use `Services / X`; WiFi/Network sub-routes stay flat. */
 function shellPage(title: string, PageComponent: ComponentType) {
   return () => (
     <AppShell title={title}>
