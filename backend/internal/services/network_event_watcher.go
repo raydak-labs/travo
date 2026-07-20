@@ -61,6 +61,8 @@ func (r *realRunner) Lines(stopCh <-chan struct{}) <-chan string {
 	out := make(chan string)
 	go func() {
 		defer close(out)
+		// Deliberately not execx: `iw event` is a long-running listener whose
+		// lifetime is bounded by stopCh (killed below), not by a timeout.
 		cmd := exec.Command("iw", "event")
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {

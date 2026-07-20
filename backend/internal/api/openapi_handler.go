@@ -33,16 +33,16 @@ var openAPISpec = map[string]interface{}{
 	"paths": map[string]interface{}{
 		// Auth
 		"/auth/login": map[string]interface{}{
-			"post": endpoint("Login", "Authenticate and receive a JWT token", false,
+			"post": endpoint("Login", "Authenticate and receive a JWT token (expires_in is the relative session lifetime in seconds)", false,
 				body("application/json", obj("username", "password")),
-				resp200("application/json", obj("token")),
+				resp200("application/json", obj("token", "expires_at", "expires_in")),
 			),
 		},
 		"/auth/logout": map[string]interface{}{
 			"post": endpoint("Logout", "Invalidate the current JWT token", true, nil, resp200("application/json", obj("status"))),
 		},
 		"/auth/session": map[string]interface{}{
-			"get": endpoint("GetSession", "Get current session info", true, nil, resp200("application/json", obj("valid"))),
+			"get": endpoint("GetSession", "Get current session info (expires_in = remaining seconds relative to the server clock)", true, nil, resp200("application/json", obj("valid", "expires_in"))),
 		},
 		"/auth/password": map[string]interface{}{
 			"put": endpoint("ChangePassword", "Change the admin password", true,
@@ -68,6 +68,18 @@ var openAPISpec = map[string]interface{}{
 		},
 		"/system/shutdown": map[string]interface{}{
 			"post": endpoint("Shutdown", "Shut down the device", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/system/speedtest-service": map[string]interface{}{
+			"get": endpoint("GetSpeedtestService", "Ookla speedtest CLI availability and install state", true, nil, resp200("application/json", obj("installed", "supported", "architecture", "version"))),
+		},
+		"/system/speedtest-service/install": map[string]interface{}{
+			"post": endpoint("InstallSpeedtestCLI", "Install the Ookla speedtest CLI package (opkg or apk)", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/system/speedtest-service/uninstall": map[string]interface{}{
+			"post": endpoint("UninstallSpeedtestCLI", "Remove the Ookla speedtest CLI package", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/system/speedtest-service/run": map[string]interface{}{
+			"post": endpoint("RunSpeedtestCLI", "Run an Ookla speedtest (takes ~30-60s)", true, nil, resp200("application/json", nil)),
 		},
 		"/system/factory-reset": map[string]interface{}{
 			"post": endpoint("FactoryReset", "Factory reset the device", true, nil, resp200("application/json", obj("ok"))),
@@ -125,7 +137,7 @@ var openAPISpec = map[string]interface{}{
 			"post": endpoint("NTPSync", "Trigger manual NTP synchronization", true, nil, resp200("application/json", obj("ok"))),
 		},
 		"/system/time-sync": map[string]interface{}{
-			"post": endpoint("TimeSync", "Sync device clock from browser time (pre-login)", false,
+			"post": endpoint("TimeSync", "Sync device clock from browser time. Unauthenticated only while the router clock is implausible (pre-login recovery, rate limited); authenticated callers may always sync.", false,
 				body("application/json", obj("timestamp")),
 				resp200("application/json", obj("ok")),
 			),

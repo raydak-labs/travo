@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-05-14
+updated: 2026-07-08
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-05-14
+> **Last updated:** 2026-07-08
 
 ## Milestone checklist (compact)
 
@@ -61,3 +61,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - Services: Watchcat (connection watchdog), Cloudflared (Cloudflare Tunnel) registered.
 - Dashboard: system stats history (CPU/memory over time, 6h ring buffer, 30s interval).
 - WiFi: multi-radio auto-discovery startup script, persists to /etc/travo/radios.json.
+- Auth: clock-independent sessions (monotonic jti registry, relative `expires_in`, frontend countdown); hardened pre-login time-sync (build-time plausibility gate + rate limit). (2026-07-08)
+- Reliability: all shell-outs bounded via `internal/execx` timeout tiers; WS hub write deadlines + dead-client removal; rate limiter sweep; stats-history stop; unified `appLifecycle` shutdown. (2026-07-08)
+- Packages: opkg/apk handled via runtime-detected `PackageManager` everywhere (speedtest CLI included); best-effort index update before installs; speedtest-service routes actually registered. (2026-07-08)
+- Frontend: WS `system_stats` feeds the React Query cache; HTTP polling only as disconnect fallback. Unknown `/api/*` GETs return JSON 404 instead of SPA HTML. (2026-07-08)

@@ -439,6 +439,7 @@ export const handlers = [
       return HttpResponse.json({
         token: 'mock-jwt-token-abc123',
         expires_at: '2026-03-05T00:00:00Z',
+        expires_in: 86400,
       });
     }
     return HttpResponse.json({ error: 'Invalid password' }, { status: 401 });
@@ -449,7 +450,7 @@ export const handlers = [
   }),
 
   http.get(API_ROUTES.auth.session, () => {
-    return HttpResponse.json({ valid: true });
+    return HttpResponse.json({ valid: true, expires_in: 86400 });
   }),
 
   http.put(API_ROUTES.auth.password, async ({ request }) => {

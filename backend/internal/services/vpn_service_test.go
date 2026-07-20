@@ -1050,3 +1050,66 @@ func (s *stubVerifyRunner) Run(name string, args ...string) ([]byte, error) {
 	}
 	return nil, fmt.Errorf("stub: unhandled command %s %v", name, args)
 }
+
+// applyAndVerifyWireGuard must stop retrying ifup once wg0 is already up —
+// blind fixed-count retries add ~1s of settle sleeps to every enable.
+func TestApplyAndVerifyWireGuard_StopsWhenInterfaceIsUp(t *testing.T) {
+	var ifupCalls, reloadCalls int
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "/sbin/ubus":
+			reloadCalls++
+			return []byte("{}"), nil
+		case "/sbin/ifup":
+			ifupCalls++
+			return nil, nil
+		case "/usr/bin/wg":
+			return []byte("PRIV\tPUB\t51820\toff\n"), nil
+		case "/sbin/ip":
+			return []byte("3: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 state UNKNOWN"), nil
+		}
+		return nil, fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
+	}}
+	svc := NewVpnServiceWithRunner(uci.NewMockUCI(), cmd)
+
+	if err := svc.applyAndVerifyWireGuard(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ifupCalls > 1 {
+		t.Errorf("expected at most 1 ifup when wg0 is already up, got %d", ifupCalls)
+	}
+	if reloadCalls > 1 {
+		t.Errorf("expected no extra network reloads when wg0 is already up, got %d", reloadCalls)
+	}
+}
+
+// When wg0 never comes up, the apply path must still retry and then fail.
+func TestApplyAndVerifyWireGuard_RetriesThenFails(t *testing.T) {
+	orig := wireGuardVerifyTimeout
+	wireGuardVerifyTimeout = 300 * time.Millisecond
+	defer func() { wireGuardVerifyTimeout = orig }()
+
+	var ifupCalls int
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "/sbin/ubus":
+			return []byte("{}"), nil
+		case "/sbin/ifup":
+			ifupCalls++
+			return nil, nil
+		case "/usr/bin/wg":
+			return nil, fmt.Errorf("no such device")
+		case "/sbin/ip":
+			return []byte("3: wg0: <POINTOPOINT,NOARP> mtu 1420 state DOWN"), nil
+		}
+		return nil, fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
+	}}
+	svc := NewVpnServiceWithRunner(uci.NewMockUCI(), cmd)
+
+	if err := svc.applyAndVerifyWireGuard(); err == nil {
+		t.Fatal("expected error when wg0 never comes up")
+	}
+	if ifupCalls < 2 {
+		t.Errorf("expected retries when wg0 stays down, got %d ifup calls", ifupCalls)
+	}
+}

@@ -3,9 +3,10 @@ package ubus
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 )
 
 var validUbusPath = regexp.MustCompile(`^[a-zA-Z0-9_.]+$`)
@@ -43,7 +44,7 @@ func (r *RealUbus) Call(path, method string, args map[string]interface{}) (map[s
 		cmdArgs = append(cmdArgs, string(msgJSON))
 	}
 
-	out, err := exec.Command("ubus", cmdArgs...).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "ubus", cmdArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("ubus call %s %s: %s", path, method, strings.TrimSpace(string(out)))
 	}

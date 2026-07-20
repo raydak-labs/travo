@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
@@ -90,7 +90,7 @@ func (r *RealDataUsageRunner) IsInstalled() bool {
 }
 
 func (r *RealDataUsageRunner) RunJSON(args ...string) ([]byte, error) {
-	out, err := exec.Command("vnstat", args...).Output()
+	out, err := execx.Output(execx.Quick, "vnstat", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,9 +282,7 @@ func (s *DataUsageService) AutoConfigureVnstat() error {
 		_, _ = s.runner.RunJSON("--add", "-i", iface)
 	}
 	// Start vnstatd if available.
-	out, _ := exec.Command("/etc/init.d/vnstat", "enable").CombinedOutput()
-	_ = strings.TrimSpace(string(out))
-	out, _ = exec.Command("/etc/init.d/vnstat", "start").CombinedOutput()
-	_ = strings.TrimSpace(string(out))
+	_, _ = execx.CombinedOutput(execx.Slow, "/etc/init.d/vnstat", "enable")
+	_, _ = execx.CombinedOutput(execx.Slow, "/etc/init.d/vnstat", "start")
 	return nil
 }

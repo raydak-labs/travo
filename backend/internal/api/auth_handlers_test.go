@@ -49,6 +49,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
 		}, profilesPath),
 		ServiceManager: services.NewServiceManager(),
+		Speedtest:      services.NewSpeedtestServiceWith(services.NewMockPackageManager()),
 		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
 		Alerts:         services.NewAlertService(systemSvc),
 		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),

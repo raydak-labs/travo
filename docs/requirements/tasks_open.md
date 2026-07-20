@@ -19,10 +19,6 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 - [ ] Mesh / WDS mode
 
-### 1.4 Multi-Radio Support
-
-- [ ] Startup script to auto-discover radio setup and persist config *(implemented — runs on first boot, writes /etc/travo/radios.json)*
-
 ## 2. Network Management
 
 ### 2.2 Connected Clients
