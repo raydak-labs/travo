@@ -7,6 +7,15 @@ export interface LoginRequest {
 export interface LoginResponse {
   readonly token: string;
   readonly expires_at: string;
+  /** Relative session lifetime in seconds — safe across clock/timezone skew. */
+  readonly expires_in: number;
+}
+
+/** Session status response payload (GET /auth/session) */
+export interface SessionResponse {
+  readonly valid: boolean;
+  /** Remaining session lifetime in seconds, relative to the server's clock. */
+  readonly expires_in: number;
 }
 
 /** Change password request payload */

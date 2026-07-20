@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 )
 
 // usbCandidateInterfaces lists common names for USB tethering interfaces.
@@ -78,7 +79,7 @@ func (r *RealUSBTetherRunner) IsIfaceUp(iface string) bool {
 }
 
 func (r *RealUSBTetherRunner) RunCommand(name string, args ...string) (string, error) {
-	out, err := exec.Command(name, args...).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, name, args...)
 	return strings.TrimSpace(string(out)), err
 }
 

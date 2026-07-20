@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -291,7 +292,7 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 
 // SyncNTP forces a one-shot NTP sync using ntpd.
 func (s *SystemService) SyncNTP() error {
-	out, err := exec.Command("ntpd", "-q", "-n", "-p", "pool.ntp.org").CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, "ntpd", "-q", "-n", "-p", "pool.ntp.org")
 	if err != nil {
 		return fmt.Errorf("ntp sync failed: %w: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -419,7 +420,7 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 	if err := os.WriteFile("/etc/crontabs/root", []byte(strings.Join(lines, "\n")), 0600); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
-	_ = exec.Command("/etc/init.d/cron", "restart").Run()
+	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")
 	return nil
 }
 
@@ -427,7 +428,7 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 // If service is non-empty, only lines containing that service name (case-insensitive) are returned.
 // If level is non-empty, only lines at or above that severity are returned.
 func (s *SystemService) GetLogs(service, level string) (models.LogResponse, error) {
-	out, err := exec.Command("logread").CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "logread")
 	if err != nil {
 		return models.LogResponse{}, err
 	}
@@ -436,7 +437,7 @@ func (s *SystemService) GetLogs(service, level string) (models.LogResponse, erro
 
 // GetKernelLogs retrieves kernel logs from dmesg.
 func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
-	out, err := exec.Command("dmesg").CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "dmesg")
 	if err != nil {
 		return models.LogResponse{}, err
 	}
@@ -446,7 +447,7 @@ func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
 // CreateBackup generates a configuration backup archive and returns its path.
 func (s *SystemService) CreateBackup() (string, error) {
 	path := "/tmp/backup-" + strconv.FormatInt(time.Now().Unix(), 10) + ".tar.gz"
-	out, err := exec.Command("sysupgrade", "-b", path).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, "sysupgrade", "-b", path)
 	if err != nil {
 		return "", fmt.Errorf("creating backup: %w: %s", err, string(out))
 	}
@@ -455,7 +456,7 @@ func (s *SystemService) CreateBackup() (string, error) {
 
 // RestoreBackup applies a configuration backup from the given file path.
 func (s *SystemService) RestoreBackup(path string) error {
-	out, err := exec.Command("sysupgrade", "-r", path).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, "sysupgrade", "-r", path)
 	if err != nil {
 		return fmt.Errorf("restoring backup: %w: %s", err, string(out))
 	}
@@ -871,16 +872,16 @@ func (s *SystemService) RunSpeedTest() (models.SpeedTestResult, error) {
 
 	// Measure download: fetch a 1MB test file and time it
 	start := time.Now()
-	_, err := exec.Command("wget", "-O", "/dev/null", "--timeout=15",
+	_, err := execx.CombinedOutput(execx.Quick, "wget", "-O", "/dev/null", "--timeout=15",
 		"--no-check-certificate",
-		"http://speedtest.tele2.net/1MB.zip").CombinedOutput()
+		"http://speedtest.tele2.net/1MB.zip")
 	elapsed := time.Since(start).Seconds()
 	if err == nil && elapsed > 0 {
 		result.DownloadMbps = (1024 * 1024 * 8) / elapsed / 1e6
 	}
 
 	// Measure ping to 8.8.8.8
-	pingOut, err2 := exec.Command("ping", "-c", "4", "-W", "3", "8.8.8.8").CombinedOutput()
+	pingOut, err2 := execx.CombinedOutput(execx.Quick, "ping", "-c", "4", "-W", "3", "8.8.8.8")
 	if err2 == nil {
 		for _, line := range strings.Split(string(pingOut), "\n") {
 			if strings.Contains(line, "avg") {

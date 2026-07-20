@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient, getToken } from '@/lib/api-client';
+import { useWsSubscribe } from '@/lib/ws-context';
 import { API_ROUTES } from '@shared/index';
 import type {
   SystemInfo,
@@ -29,11 +31,31 @@ export function useSystemInfo() {
   });
 }
 
+/**
+ * Polling cadence for system stats: the WebSocket hub already pushes
+ * system_stats every 2s, so HTTP polling is only a fallback while the
+ * socket is down. Exported for tests.
+ */
+export function statsRefetchInterval(wsConnected: boolean): number | false {
+  return wsConnected ? false : 5_000;
+}
+
 export function useSystemStats() {
+  const { connected, subscribe } = useWsSubscribe();
+  const queryClient = useQueryClient();
+
+  // Feed WebSocket pushes straight into the query cache — every consumer of
+  // this hook sees live data without duplicate HTTP requests to the router.
+  useEffect(() => {
+    return subscribe('system_stats', (raw) => {
+      queryClient.setQueryData(['system', 'stats'], raw as SystemStats);
+    });
+  }, [subscribe, queryClient]);
+
   return useQuery({
     queryKey: ['system', 'stats'],
     queryFn: () => apiClient.get<SystemStats>(API_ROUTES.system.stats),
-    refetchInterval: 5_000,
+    refetchInterval: statsRefetchInterval(connected),
   });
 }
 

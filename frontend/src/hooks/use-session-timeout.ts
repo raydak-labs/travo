@@ -1,44 +1,61 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { getToken, handleUnauthorized } from '@/lib/api-client';
+import { apiClient, getToken } from '@/lib/api-client';
+import { API_ROUTES } from '@shared/index';
+import type { SessionResponse } from '@shared/index';
 
 const WARNING_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const CHECK_INTERVAL_MS = 30_000; // 30 seconds
 
-/** Decode the exp claim from a JWT without any library. */
-export function getTokenExpiry(token: string): number | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    // base64url → base64, then decode
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64)) as { exp?: number };
-    return typeof payload.exp === 'number' ? payload.exp : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Monitors the JWT session and warns when it's about to expire.
- * Shows a toast warning at 5 minutes before expiry and
- * redirects to login when the token expires.
+ * Monitors the session and warns when it's about to expire.
+ *
+ * The remaining lifetime comes from the server as a relative duration
+ * (`expires_in` seconds) and counts down against performance.now(), so no
+ * wall-clock timestamps are ever compared across machines — a router or
+ * client with a wrong clock can no longer cause spurious logouts.
+ *
+ * When the local countdown runs out the hook re-validates with the server
+ * instead of logging out on its own: a real expiry surfaces as a 401, which
+ * api-client already turns into a redirect to /login.
  */
 export function useSessionTimeout(): void {
   const warnedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+    let refreshing = false;
+    // Deadline in performance.now() terms; null until the first server response.
+    let deadline: number | null = null;
+
+    async function refreshDeadline() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const session = await apiClient.get<SessionResponse>(API_ROUTES.auth.session);
+        if (!cancelled && session.expires_in > 0) {
+          deadline = performance.now() + session.expires_in * 1000;
+        }
+      } catch {
+        // A 401 is handled globally by api-client (redirect to login).
+        // Network errors keep the previous deadline — never log out locally.
+      } finally {
+        refreshing = false;
+      }
+    }
+
     function check() {
-      const token = getToken();
-      if (!token) return;
+      if (!getToken()) return;
+      if (deadline === null) {
+        void refreshDeadline();
+        return;
+      }
 
-      const exp = getTokenExpiry(token);
-      if (exp === null) return;
-
-      const remainingMs = exp * 1000 - Date.now();
+      const remainingMs = deadline - performance.now();
 
       if (remainingMs <= 0) {
-        handleUnauthorized();
+        // Ask the server; expiry shows up as a 401 through api-client.
+        void refreshDeadline();
         return;
       }
 
@@ -52,8 +69,13 @@ export function useSessionTimeout(): void {
       }
     }
 
-    check();
+    if (getToken()) {
+      void refreshDeadline();
+    }
     const id = setInterval(check, CHECK_INTERVAL_MS);
-    return () => clearInterval(id);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 }

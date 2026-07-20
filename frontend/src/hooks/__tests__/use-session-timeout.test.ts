@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { getTokenExpiry, useSessionTimeout } from '../use-session-timeout';
+import { useSessionTimeout } from '../use-session-timeout';
 
 // Mock api-client
 vi.mock('@/lib/api-client', () => ({
+  apiClient: { get: vi.fn() },
   getToken: vi.fn(),
   handleUnauthorized: vi.fn(),
 }));
@@ -13,44 +14,29 @@ vi.mock('sonner', () => ({
   toast: { warning: vi.fn() },
 }));
 
-import { getToken, handleUnauthorized } from '@/lib/api-client';
+import { apiClient, getToken, handleUnauthorized } from '@/lib/api-client';
 import { toast } from 'sonner';
 
+const mockedGet = vi.mocked(apiClient.get);
 const mockedGetToken = vi.mocked(getToken);
 const mockedHandleUnauthorized = vi.mocked(handleUnauthorized);
 const mockedToastWarning = vi.mocked(toast.warning);
 
-/** Build a fake JWT with a given exp claim. */
-function fakeJwt(exp: number): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({ sub: 'admin', exp }));
-  return `${header}.${payload}.fakesignature`;
+function mockSession(expiresIn: number) {
+  mockedGet.mockResolvedValue({ valid: true, expires_in: expiresIn });
 }
 
-describe('getTokenExpiry', () => {
-  it('returns exp from a valid JWT', () => {
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    expect(getTokenExpiry(fakeJwt(exp))).toBe(exp);
+async function flush() {
+  await act(async () => {
+    await Promise.resolve();
   });
-
-  it('returns null for invalid token', () => {
-    expect(getTokenExpiry('not-a-jwt')).toBeNull();
-  });
-
-  it('returns null for token without exp', () => {
-    const header = btoa(JSON.stringify({ alg: 'HS256' }));
-    const payload = btoa(JSON.stringify({ sub: 'admin' }));
-    expect(getTokenExpiry(`${header}.${payload}.sig`)).toBeNull();
-  });
-
-  it('returns null for empty string', () => {
-    expect(getTokenExpiry('')).toBeNull();
-  });
-});
+}
 
 describe('useSessionTimeout', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({
+      toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date', 'performance'],
+    });
     vi.clearAllMocks();
   });
 
@@ -58,84 +44,103 @@ describe('useSessionTimeout', () => {
     vi.useRealTimers();
   });
 
-  it('does nothing when no token is present', () => {
+  it('does not query the session when no token is present', async () => {
     mockedGetToken.mockReturnValue(null);
     renderHook(() => useSessionTimeout());
+    await flush();
 
+    expect(mockedGet).not.toHaveBeenCalled();
     expect(mockedToastWarning).not.toHaveBeenCalled();
     expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
   });
 
-  it('does nothing when token has plenty of time left', () => {
-    const exp = Math.floor(Date.now() / 1000) + 3600; // 1 hour
-    mockedGetToken.mockReturnValue(fakeJwt(exp));
+  it('fetches remaining lifetime from the server and stays quiet with time left', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockSession(3600);
     renderHook(() => useSessionTimeout());
+    await flush();
 
+    expect(mockedGet).toHaveBeenCalledWith('/api/v1/auth/session');
     expect(mockedToastWarning).not.toHaveBeenCalled();
     expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
   });
 
-  it('shows warning when less than 5 minutes remain', () => {
-    const exp = Math.floor(Date.now() / 1000) + 180; // 3 minutes
-    mockedGetToken.mockReturnValue(fakeJwt(exp));
+  it('warns when less than 5 minutes remain', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockSession(180); // 3 minutes
     renderHook(() => useSessionTimeout());
+    await flush();
 
-    expect(mockedToastWarning).toHaveBeenCalledWith('Session expiring soon', {
-      description: expect.stringContaining('3 minute'),
-      duration: 10_000,
-    });
-  });
-
-  it('shows warning only once', () => {
-    const exp = Math.floor(Date.now() / 1000) + 180;
-    mockedGetToken.mockReturnValue(fakeJwt(exp));
-    renderHook(() => useSessionTimeout());
-
-    expect(mockedToastWarning).toHaveBeenCalledTimes(1);
-
-    // Advance past next check interval
     act(() => {
       vi.advanceTimersByTime(30_000);
     });
 
+    expect(mockedToastWarning).toHaveBeenCalledWith('Session expiring soon', {
+      description: expect.stringContaining('minute'),
+      duration: 10_000,
+    });
+  });
+
+  it('warns only once', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockSession(280);
+    renderHook(() => useSessionTimeout());
+    await flush();
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(mockedToastWarning).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
     expect(mockedToastWarning).toHaveBeenCalledTimes(1);
   });
 
-  it('calls handleUnauthorized when token is expired', () => {
-    const exp = Math.floor(Date.now() / 1000) - 10; // already expired
-    mockedGetToken.mockReturnValue(fakeJwt(exp));
+  it('re-validates with the server when the local countdown runs out', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockSession(40);
     renderHook(() => useSessionTimeout());
+    await flush();
+    expect(mockedGet).toHaveBeenCalledTimes(1);
 
-    expect(mockedHandleUnauthorized).toHaveBeenCalled();
-  });
-
-  it('detects expiry on interval tick', () => {
-    // Start with 40 seconds left — inside warning threshold but not expired
-    const nowSec = Math.floor(Date.now() / 1000);
-    const exp = nowSec + 40;
-    mockedGetToken.mockReturnValue(fakeJwt(exp));
-    renderHook(() => useSessionTimeout());
-
-    expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
-
-    // Advance past two interval ticks (30s each = 60s) — token is now expired
-    act(() => {
+    // Past the deadline: hook must ask the server again instead of logging
+    // out based on local clock math.
+    await act(async () => {
       vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
     });
 
-    expect(mockedHandleUnauthorized).toHaveBeenCalled();
+    expect(mockedGet.mock.calls.length).toBeGreaterThan(1);
+    // The server said the session is still valid — no local logout.
+    expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
   });
 
-  it('cleans up interval on unmount', () => {
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    mockedGetToken.mockReturnValue(fakeJwt(exp));
+  it('does not log out locally when the session check fails (e.g. offline)', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockedGet.mockRejectedValue(new Error('network down'));
+    renderHook(() => useSessionTimeout());
+    await flush();
+
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    await flush();
+
+    expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('cleans up interval on unmount', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockSession(280);
     const { unmount } = renderHook(() => useSessionTimeout());
+    await flush();
 
     unmount();
 
-    // Advancing timers should not cause further calls
     act(() => {
-      vi.advanceTimersByTime(60_000);
+      vi.advanceTimersByTime(120_000);
     });
 
     expect(mockedToastWarning).not.toHaveBeenCalled();

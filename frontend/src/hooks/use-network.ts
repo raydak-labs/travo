@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { useWsSubscribe } from '@/lib/ws-context';
 import { API_ROUTES } from '@shared/index';
 import type {
   NetworkStatus,
@@ -31,6 +33,17 @@ import type {
 } from '@shared/index';
 
 export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus>>) {
+  const queryClient = useQueryClient();
+  const { subscribe } = useWsSubscribe();
+
+  // The event watcher pushes network_status over WS on interface/client
+  // changes; feed it into the cache so every consumer sees live data.
+  useEffect(() => {
+    return subscribe('network_status', (raw) => {
+      queryClient.setQueryData<NetworkStatus>(['network', 'status'], raw as NetworkStatus);
+    });
+  }, [subscribe, queryClient]);
+
   return useQuery({
     queryKey: ['network', 'status'],
     queryFn: () => apiClient.get<NetworkStatus>(API_ROUTES.network.status),

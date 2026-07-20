@@ -138,7 +138,9 @@ Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive
 ## 7. Authentication And API Access
 
 - Administrative login uses the **root** password validated via **rpcd** on device; Travo issues **JWT** bearer tokens for API access.
+- **Session validity is clock-independent**: a monotonic-clock registry decides token lifetime; clients receive relative `expires_in` seconds and must never compare server timestamps against their own clock. Normative details in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
 - Optional **IP allowlist** and auth hardening details are normative in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
+- Unknown `GET /api/*` paths return a **JSON 404**, never the SPA `index.html`.
 
 ## 8. Device Constraints
 
@@ -150,6 +152,9 @@ Router hardware is constrained. Every feature must justify its footprint.
 - Prefer SVG assets over raster assets
 - Keep API payloads small; avoid polling where a realtime channel already exists
 - Warn before installing packages that meaningfully consume flash storage
+- **Every shell-out goes through `backend/internal/execx`** with an explicit timeout tier (Quick 30s / Slow 3m / Package 10m); a hung external command must never pin a handler goroutine. Fire-and-forget paths that end in reboot/poweroff/flash are the only exception.
+- **Package operations use the `PackageManager` abstraction** (`service_manager.go`), which detects **apk** (OpenWrt 25.x+) vs **opkg** at runtime and refreshes the package index best-effort before installs (opkg lists live in `/tmp` and vanish on reboot). Never hardcode `opkg` or `apk` in feature code.
+- Every background goroutine registers in the `appLifecycle` shutdown path (`cmd/server/main.go`).
 
 ## 9. Documentation Rules
 

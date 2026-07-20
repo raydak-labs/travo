@@ -9,6 +9,8 @@ tags: [docs, testing, integration, openwrt]
 
 Router default `192.168.1.1` unless noted. Evidence often goes under `./tmp/`. Replace example SSIDs, passwords, and paths in the playbook with your lab values.
 
+> **Package manager note:** OpenWrt 25.x lab images use **apk** (`apk list --installed | grep <pkg>`); older images use **opkg** (`opkg list-installed <pkg>`). Travo detects this at runtime — commands in these docs that mention `opkg` need the apk equivalent on 25.x devices.
+
 ## Quick script checks
 
 These scripts exercise the **live router** (default `192.168.1.1`). They use the HTTP API and optional SSH. Use the same password as the travel-gui login (often `admin` on lab images).
