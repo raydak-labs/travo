@@ -41,6 +41,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 		return c.JSON(models.LoginResponse{
 			Token:     token,
 			ExpiresAt: expiry.Format("2006-01-02T15:04:05Z"),
+			ExpiresIn: int64(authSvc.TokenTTL().Seconds()),
 		})
 	}
 }
@@ -49,13 +50,16 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 func LogoutHandler(authSvc *auth.AuthService, bl *auth.TokenBlocklist) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
-		if authHeader != "" && bl != nil {
+		if authHeader != "" {
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) == 2 && parts[0] == "Bearer" {
 				tokenStr := parts[1]
-				expiry, err := authSvc.TokenExpiry(tokenStr)
-				if err == nil {
-					bl.Block(tokenStr, expiry)
+				authSvc.RevokeSession(tokenStr)
+				if bl != nil {
+					expiry, err := authSvc.TokenExpiry(tokenStr)
+					if err == nil {
+						bl.Block(tokenStr, expiry)
+					}
 				}
 			}
 		}
@@ -64,10 +68,19 @@ func LogoutHandler(authSvc *auth.AuthService, bl *auth.TokenBlocklist) fiber.Han
 }
 
 // SessionHandler handles GET /api/v1/auth/session.
+// Returns the remaining session lifetime in seconds so clients can count down
+// locally without comparing absolute timestamps across clocks.
 func SessionHandler(authSvc *auth.AuthService) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		_ = authSvc
-		return c.JSON(fiber.Map{"valid": true})
+		resp := models.SessionResponse{Valid: true}
+		authHeader := c.Get("Authorization")
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) == 2 && parts[0] == "Bearer" {
+			if remaining, err := authSvc.TokenRemaining(parts[1]); err == nil && remaining > 0 {
+				resp.ExpiresIn = int64(remaining.Seconds())
+			}
+		}
+		return c.JSON(resp)
 	}
 }
 

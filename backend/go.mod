@@ -6,6 +6,7 @@ require (
 	github.com/gofiber/contrib/v3/websocket v1.2.1
 	github.com/gofiber/fiber/v3 v3.4.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.53.0
 	gopkg.in/yaml.v3 v3.0.1
 )

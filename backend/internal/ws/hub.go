@@ -11,9 +11,21 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
+// writeTimeout bounds how long a single client write may stall the broadcast
+// loop — a client on dead Wi-Fi otherwise blocks it indefinitely.
+const writeTimeout = 5 * time.Second
+
+// Conn is the subset of *websocket.Conn the hub needs; an interface so tests
+// can exercise broadcast behavior without real network connections.
+type Conn interface {
+	WriteMessage(messageType int, data []byte) error
+	SetWriteDeadline(t time.Time) error
+	Close() error
+}
+
 // Hub manages WebSocket connections and broadcasts system stats.
 type Hub struct {
-	clients           map[*websocket.Conn]bool
+	clients           map[Conn]bool
 	mu                sync.RWMutex
 	systemSvc         *services.SystemService
 	alertSvc          *services.AlertService
@@ -29,7 +41,7 @@ func NewHub(
 	networkStatusCh <-chan models.NetworkStatus,
 ) *Hub {
 	return &Hub{
-		clients:           make(map[*websocket.Conn]bool),
+		clients:           make(map[Conn]bool),
 		systemSvc:         systemSvc,
 		alertSvc:          alertSvc,
 		networkStatusCh:   networkStatusCh,
@@ -39,14 +51,14 @@ func NewHub(
 }
 
 // Register adds a client connection to the hub.
-func (h *Hub) Register(conn *websocket.Conn) {
+func (h *Hub) Register(conn Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[conn] = true
 }
 
 // Unregister removes a client connection from the hub.
-func (h *Hub) Unregister(conn *websocket.Conn) {
+func (h *Hub) Unregister(conn Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.clients, conn)
@@ -59,14 +71,28 @@ func (h *Hub) ClientCount() int {
 	return len(h.clients)
 }
 
-// Broadcast sends data to all connected clients.
+// Broadcast sends data to all connected clients. Writes happen outside the
+// client-map lock so a slow or dead client never blocks Register/Unregister;
+// failed connections are closed and removed.
 func (h *Hub) Broadcast(data []byte) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
+	conns := make([]Conn, 0, len(h.clients))
 	for conn := range h.clients {
+		conns = append(conns, conn)
+	}
+	h.mu.RUnlock()
+
+	var failed []Conn
+	for _, conn := range conns {
+		_ = conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-			_ = conn.Close()
+			failed = append(failed, conn)
 		}
+	}
+
+	for _, conn := range failed {
+		_ = conn.Close()
+		h.Unregister(conn)
 	}
 }
 

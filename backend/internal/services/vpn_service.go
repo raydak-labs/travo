@@ -222,16 +222,45 @@ func (v *VpnService) ensureWireGuardPeer(section string) error {
 	return nil
 }
 
+// Settle delays after netifd operations that expose no observable "done"
+// condition — the subsequent runtime probe is the actual readiness check.
+const (
+	wireGuardReloadSettle = 300 * time.Millisecond
+	wireGuardRetrySettle  = 400 * time.Millisecond
+)
+
+// wireGuardRuntimeUp probes whether wg0 is live: a parseable `wg show dump`
+// or an UP link state.
+func (v *VpnService) wireGuardRuntimeUp() bool {
+	if out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump"); err == nil {
+		s := strings.TrimSpace(string(out))
+		if s != "" {
+			if st, perr := ParseWgDump(s); perr == nil && st != nil {
+				return true
+			}
+		}
+	}
+	if out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); err == nil {
+		return wireGuardIfaceLooksUp(string(out))
+	}
+	return false
+}
+
 func (v *VpnService) applyAndVerifyWireGuard() error {
 	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(wireGuardReloadSettle)
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(400 * time.Millisecond)
+			time.Sleep(wireGuardRetrySettle)
 			_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(wireGuardReloadSettle)
 		}
 		_, _ = v.cmd.Run(openwrtIfupBin, "wg0")
+		// Exit as soon as the interface is live instead of burning the
+		// remaining fixed-count retries.
+		if v.wireGuardRuntimeUp() {
+			return nil
+		}
 	}
 	return v.waitForWireGuardRuntime(wireGuardVerifyTimeout)
 }

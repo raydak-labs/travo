@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func newTestServiceManager() (*ServiceManager, *MockPackageManager, *MockSystemProbe) {
 	pkg := NewMockPackageManager()
@@ -320,5 +323,49 @@ func TestSetAutoStart_NotInstalled(t *testing.T) {
 	err := sm.SetAutoStart("adguardhome", true)
 	if err == nil {
 		t.Error("expected error for not installed service")
+	}
+}
+
+func TestInstall_RunsIndexUpdateFirst(t *testing.T) {
+	pkg := NewMockPackageManager()
+	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+
+	if err := sm.Install("tailscale"); err != nil {
+		t.Fatalf("install failed: %v", err)
+	}
+	if pkg.UpdateCalls != 1 {
+		t.Errorf("expected 1 index update before install, got %d", pkg.UpdateCalls)
+	}
+	if !pkg.IsInstalled("tailscale") {
+		t.Error("expected tailscale installed")
+	}
+}
+
+func TestInstallWithLog_RunsIndexUpdateFirst(t *testing.T) {
+	pkg := NewMockPackageManager()
+	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+
+	var lines []string
+	if err := sm.InstallWithLog("tailscale", func(s string) { lines = append(lines, s) }); err != nil {
+		t.Fatalf("install failed: %v", err)
+	}
+	if pkg.UpdateCalls != 1 {
+		t.Errorf("expected 1 index update before streamed install, got %d", pkg.UpdateCalls)
+	}
+	if len(lines) == 0 {
+		t.Error("expected log lines")
+	}
+}
+
+func TestInstall_ProceedsWhenIndexUpdateFails(t *testing.T) {
+	pkg := NewMockPackageManager()
+	pkg.UpdateErr = fmt.Errorf("no network")
+	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+
+	if err := sm.Install("tailscale"); err != nil {
+		t.Fatalf("install must proceed on best-effort update failure, got: %v", err)
+	}
+	if !pkg.IsInstalled("tailscale") {
+		t.Error("expected tailscale installed despite failed index update")
 	}
 }

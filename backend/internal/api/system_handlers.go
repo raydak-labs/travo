@@ -3,13 +3,13 @@ package api
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
@@ -294,16 +294,45 @@ func SetSetupCompleteHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
-// SyncTimeHandler handles POST /api/v1/system/time-sync (unauthenticated).
+// defaultSetSystemTime sets the system clock and persists it to the hardware
+// clock (best-effort).
+func defaultSetSystemTime(epochSec int64) error {
+	if err := execx.Run(execx.Quick, "date", "-s", fmt.Sprintf("@%d", epochSec)); err != nil {
+		return err
+	}
+	_ = execx.Run(execx.Quick, "hwclock", "-w")
+	return nil
+}
+
+// SyncTimeHandler handles POST /api/v1/system/time-sync.
 // Sets the system clock to the client's browser time, fixing clock-skew issues
 // on devices that boot without NTP access. Only applied when skew > 60 seconds.
-func SyncTimeHandler() fiber.Handler {
+// Unauthenticated callers are rate limited and only allowed while the router
+// clock is implausible (before build time) — an attacker must not be able to
+// move a healthy clock. Authenticated callers may always sync.
+func SyncTimeHandler(deps *Dependencies) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
 			ClientTimeMs int64 `json:"client_time_ms"`
 		}
 		if err := c.Bind().Body(&req); err != nil || req.ClientTimeMs <= 0 {
 			return RespondWithError(c, fiber.StatusBadRequest, "client_time_ms is required")
+		}
+
+		authorized := false
+		if parts := strings.SplitN(c.Get("Authorization"), " ", 2); len(parts) == 2 && parts[0] == "Bearer" {
+			authorized = deps.Auth.ValidateToken(parts[1]) == nil
+		}
+		if !authorized {
+			if deps.TimeSyncLimiter != nil {
+				if !deps.TimeSyncLimiter.Allow(c.IP()) {
+					return RespondWithError(c, fiber.StatusTooManyRequests, "too many time-sync attempts")
+				}
+				deps.TimeSyncLimiter.Record(c.IP())
+			}
+			if !time.Now().Before(deps.TimeSyncMinPlausible) {
+				return RespondWithError(c, fiber.StatusForbidden, "system clock is plausible; authentication required to change time")
+			}
 		}
 
 		clientTime := time.UnixMilli(req.ClientTimeMs)
@@ -315,12 +344,13 @@ func SyncTimeHandler() fiber.Handler {
 			return c.JSON(fiber.Map{"synced": false, "reason": "clock already accurate"})
 		}
 
-		epoch := clientTime.Unix()
-		if err := exec.Command("date", "-s", fmt.Sprintf("@%d", epoch)).Run(); err != nil {
+		setTime := deps.TimeSyncSetTime
+		if setTime == nil {
+			setTime = defaultSetSystemTime
+		}
+		if err := setTime(clientTime.Unix()); err != nil {
 			return RespondWithError(c, fiber.StatusInternalServerError, "failed to set system time")
 		}
-		// Persist to hardware clock if available (best-effort)
-		_ = exec.Command("hwclock", "-w").Run()
 
 		return c.JSON(fiber.Map{"synced": true, "set_to": clientTime.UTC().Format(time.RFC3339)})
 	}

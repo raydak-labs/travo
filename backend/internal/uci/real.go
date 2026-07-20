@@ -2,9 +2,10 @@ package uci
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 )
 
 var validIdentifier = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
@@ -76,7 +77,7 @@ func (r *RealUCI) Get(config, section, option string) (string, error) {
 	}
 
 	key := fmt.Sprintf("%s.%s.%s", config, section, option)
-	out, err := exec.Command("uci", "get", key).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "get", key)
 	if err != nil {
 		return "", fmt.Errorf("uci get %s: %s", key, strings.TrimSpace(string(out)))
 	}
@@ -95,7 +96,7 @@ func (r *RealUCI) Set(config, section, option, value string) error {
 	}
 
 	arg := fmt.Sprintf("%s.%s.%s=%s", config, section, option, value)
-	out, err := exec.Command("uci", "set", arg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "set", arg)
 	if err != nil {
 		return fmt.Errorf("uci set %s.%s.%s: %s", config, section, option, strings.TrimSpace(string(out)))
 	}
@@ -111,7 +112,7 @@ func (r *RealUCI) GetAll(config, section string) (map[string]string, error) {
 	}
 
 	key := fmt.Sprintf("%s.%s", config, section)
-	out, err := exec.Command("uci", "show", key).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "show", key)
 	if err != nil {
 		return nil, fmt.Errorf("uci show %s: %s", key, strings.TrimSpace(string(out)))
 	}
@@ -124,7 +125,7 @@ func (r *RealUCI) Commit(config string) error {
 		return err
 	}
 
-	out, err := exec.Command("uci", "commit", config).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "commit", config)
 	if err != nil {
 		return fmt.Errorf("uci commit %s: %s", config, strings.TrimSpace(string(out)))
 	}
@@ -144,7 +145,7 @@ func (r *RealUCI) AddSection(config, section, stype string) error {
 
 	// "uci set config.section=stype" creates a named section of the given type
 	arg := fmt.Sprintf("%s.%s=%s", config, section, stype)
-	out, err := exec.Command("uci", "set", arg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "set", arg)
 	if err != nil {
 		return fmt.Errorf("uci add section %s.%s: %s", config, section, strings.TrimSpace(string(out)))
 	}
@@ -167,7 +168,7 @@ func (r *RealUCI) AddList(config, section, option, value string) error {
 		return fmt.Errorf("uci: invalid value for add_list %q", value)
 	}
 	arg := fmt.Sprintf("%s.%s.%s=%s", config, section, option, value)
-	out, err := exec.Command("uci", "add_list", arg).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "add_list", arg)
 	if err != nil {
 		return fmt.Errorf("uci add_list %s: %s", arg, strings.TrimSpace(string(out)))
 	}
@@ -185,7 +186,7 @@ func (r *RealUCI) DeleteOption(config, section, option string) error {
 		return err
 	}
 	key := fmt.Sprintf("%s.%s.%s", config, section, option)
-	_ = exec.Command("uci", "-q", "delete", key).Run()
+	_ = execx.Run(execx.Quick, "uci", "-q", "delete", key)
 	return nil
 }
 
@@ -198,7 +199,7 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 	}
 
 	key := fmt.Sprintf("%s.%s", config, section)
-	out, err := exec.Command("uci", "delete", key).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "delete", key)
 	if err != nil {
 		return fmt.Errorf("uci delete %s: %s", key, strings.TrimSpace(string(out)))
 	}
@@ -249,7 +250,7 @@ func (r *RealUCI) GetSections(config string) (map[string]map[string]string, erro
 		return nil, err
 	}
 
-	out, err := exec.Command("uci", "show", config).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "show", config)
 	if err != nil {
 		return map[string]map[string]string{}, nil
 	}

@@ -27,9 +27,16 @@ func EnsureTLSCert(certFile, keyFile string) error {
 		return err
 	}
 
+	// Random serial: browsers reject a regenerated cert that reuses the same
+	// issuer+serial pair (SEC_ERROR_REUSED_ISSUER_AND_SERIAL).
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return err
+	}
+
 	// Self-signed certificate valid for 10 years.
 	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName: "openwrt-travel-gui",
 		},

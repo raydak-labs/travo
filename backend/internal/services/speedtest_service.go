@@ -6,13 +6,26 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
-type SpeedtestService struct{}
+const speedtestPackage = "speedtest"
+
+// SpeedtestService installs and runs the Ookla speedtest CLI through the
+// shared PackageManager abstraction (opkg or apk, detected at runtime).
+type SpeedtestService struct {
+	pkg PackageManager
+}
 
 func NewSpeedtestService() *SpeedtestService {
-	return &SpeedtestService{}
+	return NewSpeedtestServiceWith(detectPackageManager())
+}
+
+// NewSpeedtestServiceWith creates a SpeedtestService with an injected package
+// manager (for tests).
+func NewSpeedtestServiceWith(pkg PackageManager) *SpeedtestService {
+	return &SpeedtestService{pkg: pkg}
 }
 
 func (s *SpeedtestService) GetSpeedtestServiceStatus() (models.SpeedtestService, error) {
@@ -24,7 +37,7 @@ func (s *SpeedtestService) GetSpeedtestServiceStatus() (models.SpeedtestService,
 	installed, version := s.checkInstallation()
 	return models.SpeedtestService{
 		Installed: installed, Supported: supported, Architecture: arch,
-		Version: version, PackageName: "speedtest", StorageSizeMB: 2,
+		Version: version, PackageName: speedtestPackage, StorageSizeMB: 2,
 	}, nil
 }
 
@@ -36,24 +49,23 @@ func (s *SpeedtestService) InstallSpeedtestCLI() error {
 	if !isArchitectureSupported(arch) {
 		return fmt.Errorf("architecture %s is not supported by speedtest CLI", arch)
 	}
-	if installed, _ := s.checkInstallation(); installed {
+	if s.pkg.IsInstalled(speedtestPackage) {
 		return fmt.Errorf("speedtest CLI is already installed")
 	}
-	if out, err := exec.Command("opkg", "update").CombinedOutput(); err != nil {
-		return fmt.Errorf("updating package lists: %w: %s", err, string(out))
-	}
-	if out, err := exec.Command("opkg", "install", "speedtest").CombinedOutput(); err != nil {
-		return fmt.Errorf("installing speedtest: %w: %s", err, string(out))
+	// Best-effort index refresh; the install error is authoritative.
+	_, _ = s.pkg.Update()
+	if out, err := s.pkg.Install(speedtestPackage); err != nil {
+		return fmt.Errorf("installing speedtest: %w: %s", err, out)
 	}
 	return nil
 }
 
 func (s *SpeedtestService) UninstallSpeedtestCLI() error {
-	if installed, _ := s.checkInstallation(); !installed {
+	if !s.pkg.IsInstalled(speedtestPackage) {
 		return fmt.Errorf("speedtest CLI is not installed")
 	}
-	if out, err := exec.Command("opkg", "remove", "speedtest").CombinedOutput(); err != nil {
-		return fmt.Errorf("removing speedtest: %w: %s", err, string(out))
+	if out, err := s.pkg.Remove(speedtestPackage); err != nil {
+		return fmt.Errorf("removing speedtest: %w: %s", err, out)
 	}
 	return nil
 }
@@ -62,7 +74,7 @@ func (s *SpeedtestService) RunSpeedtestCLI() (models.SpeedTestResult, error) {
 	if installed, _ := s.checkInstallation(); !installed {
 		return models.SpeedTestResult{}, fmt.Errorf("speedtest CLI is not installed")
 	}
-	out, err := exec.Command("speedtest", "--format=json").Output()
+	out, err := execx.Output(execx.Slow, "speedtest", "--format=json")
 	if err != nil {
 		return models.SpeedTestResult{}, fmt.Errorf("running speedtest: %w", err)
 	}
@@ -74,7 +86,7 @@ func (s *SpeedtestService) checkInstallation() (bool, string) {
 	if err != nil {
 		return false, ""
 	}
-	out, err := exec.Command(path, "--version").Output()
+	out, err := execx.Output(execx.Quick, path, "--version")
 	if err != nil {
 		return true, ""
 	}
@@ -86,13 +98,13 @@ func (s *SpeedtestService) checkInstallation() (bool, string) {
 }
 
 func detectArchitecture() (string, error) {
-	out, err := exec.Command("uname", "-m").Output()
+	out, err := execx.Output(execx.Quick, "uname", "-m")
 	if err != nil {
 		return "", fmt.Errorf("executing uname: %w", err)
 	}
 	arch := strings.TrimSpace(string(out))
 	archMap := map[string]string{
-		"aarch64": "aarch64", "armv7l": "arm", "armv6l": "arm",
+		"aarch64": "aarch64", "arm64": "aarch64", "armv7l": "arm", "armv6l": "arm",
 		"x86_64": "x86_64", "i686": "i386", "i386": "i386",
 		"mips": "mips", "mipsel": "mipsel", "mips64": "mips64", "mips64el": "mips64el",
 	}

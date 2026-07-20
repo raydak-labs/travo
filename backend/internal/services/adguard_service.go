@@ -7,10 +7,10 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	yaml "gopkg.in/yaml.v3"
@@ -60,7 +60,7 @@ func (r *RealAdGuardChecker) FileExists(path string) bool {
 }
 
 func (r *RealAdGuardChecker) RunCommand(name string, args ...string) (string, error) {
-	out, err := exec.Command(name, args...).CombinedOutput()
+	out, err := execx.CombinedOutput(execx.Slow, name, args...)
 	return strings.TrimSpace(string(out)), err
 }
 
