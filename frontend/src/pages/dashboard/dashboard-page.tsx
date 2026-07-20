@@ -231,10 +231,10 @@ function SourceCard({
   children?: React.ReactNode;
 }) {
   return (
-    <Card className="dark:border-slate-700 dark:bg-slate-900">
+    <Card className="border-slate-700 bg-slate-900 text-slate-200">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-100">
             <Icon className="h-4 w-4 text-slate-400" />
             {title}
           </CardTitle>
@@ -256,9 +256,7 @@ function SourceCard({
           />
           {connected ? 'Connected' : 'Not connected'}
         </div>
-        {children && (
-          <div className="space-y-1 text-xs text-slate-500 dark:text-slate-500">{children}</div>
-        )}
+        {children && <div className="space-y-1 text-xs text-slate-500">{children}</div>}
       </CardContent>
     </Card>
   );
@@ -307,22 +305,18 @@ export function DashboardPage() {
             <>
               <div className="flex justify-between">
                 <span>Protocol</span>
-                <span className="uppercase text-slate-300 dark:text-slate-300">{wan.type}</span>
+                <span className="uppercase text-slate-300">{wan.type}</span>
               </div>
               {wan.ip_address && (
                 <div className="flex justify-between">
                   <span>IP</span>
-                  <span className="font-mono text-slate-300 dark:text-slate-300">
-                    {wan.ip_address}
-                  </span>
+                  <span className="font-mono text-slate-300">{wan.ip_address}</span>
                 </div>
               )}
               {wan.gateway && (
                 <div className="flex justify-between">
                   <span>Gateway</span>
-                  <span className="font-mono text-slate-300 dark:text-slate-300">
-                    {wan.gateway}
-                  </span>
+                  <span className="font-mono text-slate-300">{wan.gateway}</span>
                 </div>
               )}
             </>
@@ -336,21 +330,17 @@ export function DashboardPage() {
             <>
               <div className="flex justify-between">
                 <span>SSID</span>
-                <span className="max-w-[80px] truncate font-mono text-slate-300 dark:text-slate-300">
+                <span className="max-w-[80px] truncate font-mono text-slate-300">
                   {wifiConn.ssid}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Band</span>
-                <span className="uppercase text-slate-300 dark:text-slate-300">
-                  {wifiConn.band}
-                </span>
+                <span className="uppercase text-slate-300">{wifiConn.band}</span>
               </div>
               <div className="flex justify-between">
                 <span>Signal</span>
-                <span className="text-slate-300 dark:text-slate-300">
-                  {wifiConn.signal_percent}%
-                </span>
+                <span className="text-slate-300">{wifiConn.signal_percent}%</span>
               </div>
             </>
           ) : (
@@ -364,7 +354,7 @@ export function DashboardPage() {
               {usbTether?.detected && (
                 <div className="flex justify-between">
                   <span>Device</span>
-                  <span className="capitalize text-slate-300 dark:text-slate-300">
+                  <span className="capitalize text-slate-300">
                     {usbTether.device_type || 'Unknown'}
                   </span>
                 </div>
@@ -372,7 +362,7 @@ export function DashboardPage() {
               {usbDisplayIp ? (
                 <div className="flex justify-between">
                   <span>IP</span>
-                  <span className="font-mono text-slate-300 dark:text-slate-300">{usbDisplayIp}</span>
+                  <span className="font-mono text-slate-300">{usbDisplayIp}</span>
                 </div>
               ) : null}
               {tetherUp && !usbTether?.detected && !usbDisplayIp ? (

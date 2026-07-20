@@ -99,10 +99,10 @@ tags: [frontend, ux, theming, consistency]
 **Files:**
 - `frontend/src/pages/dashboard/dashboard-page.tsx` (`SourceCard` + related slate-on-white)
 
-- [ ] Make SourceCard readable in light mode: either force dark surface (`bg-slate-900` both themes) OR map slate text to gray/slate with proper light/dark pairs
-- [ ] Prefer forcing dark card chrome for SourceCard (matches topology aesthetic) — set explicit `bg-slate-900 border-slate-700 text-slate-*` without relying on white Card default
-- [ ] Update dashboard tests if they assert classes
-- [ ] Commit: `fix(ui): fix dashboard source card light contrast`
+- [x] Make SourceCard readable in light mode: either force dark surface (`bg-slate-900` both themes) OR map slate text to gray/slate with proper light/dark pairs
+- [x] Prefer forcing dark card chrome for SourceCard (matches topology aesthetic) — set explicit `bg-slate-900 border-slate-700 text-slate-*` without relying on white Card default
+- [x] Update dashboard tests if they assert classes
+- [x] Commit: `fix(ui): fix dashboard source card light contrast`
 
 ---
 
