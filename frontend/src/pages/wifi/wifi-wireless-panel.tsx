@@ -19,7 +19,7 @@ export function WifiWirelessPanel({ panelId, tabId, hidden }: WifiWirelessPanelP
   const isPureSTA = currentMode === 'client';
 
   return (
-    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-4 sm:space-y-6">
+    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
       <WifiHealthBanner />
       {!isPureAP && <CaptivePortalCard />}
       <WifiModeCard />

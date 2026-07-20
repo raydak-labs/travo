@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { InlineError } from '@/components/ui/inline-error';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { ServiceInfo, SQMConfig, SQMQdisc, SQMScript } from '@shared/index';
 import { useApplySQM, useSQMConfig, useSetSQMConfig } from '@/hooks/use-sqm';
 
@@ -59,7 +60,13 @@ export function SQMSection({ sqmService }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {data?.advanced_hint ? <p className="text-sm">{data.advanced_hint}</p> : null}
-        {isLoading ? <p className="text-sm">Loading SQM configuration…</p> : null}
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ) : null}
         {isError ? <InlineError>Failed to load SQM configuration.</InlineError> : null}
         {hasUnsavedChanges ? (
           <p className="text-sm">You have unsaved changes. Save before applying.</p>

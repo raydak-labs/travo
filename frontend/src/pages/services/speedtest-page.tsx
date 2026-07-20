@@ -53,7 +53,7 @@ export function SpeedtestPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>speedtest CLI</CardTitle>
-          <Gauge className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
@@ -116,7 +116,7 @@ export function SpeedtestPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Run Speed Test</CardTitle>
-          <Gauge className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">

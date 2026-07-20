@@ -10,10 +10,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, id, type, ...props }, ref) => (
     <div className="w-full">
       {label && (
-        <Label
-          htmlFor={id}
-          className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >
+        <Label htmlFor={id} className="mb-1 block">
           {label}
         </Label>
       )}
