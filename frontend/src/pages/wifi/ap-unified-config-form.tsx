@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { QrCode, Radio } from 'lucide-react';
 import type { APConfig, APConfigUpdate } from '@shared/index';
 import { Button } from '@/components/ui/button';
+import { CardInset } from '@/components/ui/card-inset';
 import { Input } from '@/components/ui/input';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -168,7 +169,7 @@ export function APUnifiedConfigForm({
           </p>
         ) : null}
 
-        <div className="space-y-3 rounded-lg border p-4">
+        <CardInset className="space-y-3 p-4">
           {apConfigs.map((ap) => (
             <div
               key={ap.section}
@@ -190,7 +191,7 @@ export function APUnifiedConfigForm({
               />
             </div>
           ))}
-        </div>
+        </CardInset>
 
         <div className="space-y-2">
           <Label

@@ -15,7 +15,7 @@ export function WifiCurrentConnectionCard() {
   const disconnectMutation = useWifiDisconnect();
 
   return (
-    <Card>
+    <Card className="flex h-full min-w-0 flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Current Connection</CardTitle>
         {connection?.connected ? (
@@ -24,7 +24,7 @@ export function WifiCurrentConnectionCard() {
           <WifiOff className="h-4 w-4 text-gray-400" />
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col">
         {connectionLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-3/4" />
@@ -48,7 +48,7 @@ export function WifiCurrentConnectionCard() {
               <span>IP: {connection.ip_address}</span>
               <SecurityBadge encryption={connection.encryption} />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -64,7 +64,7 @@ export function WifiCurrentConnectionCard() {
         ) : (
           <div className="space-y-3">
             <EmptyState message="Not connected to any WiFi network" />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <WifiScanDialog />
               <WifiHiddenNetworkDialog />
             </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { CardInset } from '@/components/ui/card-inset';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -71,7 +72,7 @@ export function APConfigCard() {
           />
         ) : (
           <div className="space-y-6">
-            <div className="flex items-center justify-between rounded-lg border p-3">
+            <CardInset className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   Different settings per radio
@@ -87,7 +88,7 @@ export function APConfigCard() {
                 checked={separatePerRadio}
                 onChange={(e) => setSeparatePerRadio(e.target.checked)}
               />
-            </div>
+            </CardInset>
             {separatePerRadio ? (
               <div className="space-y-6">
                 {apConfigs.map((ap) => (

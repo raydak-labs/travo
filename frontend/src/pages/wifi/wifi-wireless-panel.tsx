@@ -25,11 +25,11 @@ export function WifiWirelessPanel({ panelId, tabId, hidden }: WifiWirelessPanelP
       <WifiModeCard />
 
       {!isPureAP && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-          <div className="min-w-0 md:col-span-1 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+          <div className="min-w-0 h-full md:col-span-1 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
             <WifiCurrentConnectionCard />
           </div>
-          <div className="min-w-0 md:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-5">
+          <div className="min-w-0 h-full md:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-5">
             <WifiSavedNetworksCard />
           </div>
         </div>

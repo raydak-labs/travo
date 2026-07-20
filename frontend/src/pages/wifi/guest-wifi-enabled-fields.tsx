@@ -5,6 +5,7 @@ import {
   type UseFormRegister,
   type UseFormSetValue,
 } from 'react-hook-form';
+import { CardInset } from '@/components/ui/card-inset';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,13 +33,9 @@ export function GuestWifiEnabledFields({
   setValue,
 }: GuestWifiEnabledFieldsProps) {
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <CardInset className="space-y-3 p-4">
       <div className="space-y-2">
-        <Label
-          htmlFor="guest-ssid"
-        >
-          SSID
-        </Label>
+        <Label htmlFor="guest-ssid">SSID</Label>
         <Input
           id="guest-ssid"
           placeholder="Guest network name"
@@ -53,11 +50,7 @@ export function GuestWifiEnabledFields({
         ) : null}
       </div>
       <div className="space-y-2">
-        <Label
-          htmlFor="guest-encryption"
-        >
-          Encryption
-        </Label>
+        <Label htmlFor="guest-encryption">Encryption</Label>
         <Controller
           name="encryption"
           control={control}
@@ -86,11 +79,7 @@ export function GuestWifiEnabledFields({
       </div>
       {encryption !== 'none' && (
         <div className="space-y-2">
-          <Label
-            htmlFor="guest-key"
-          >
-            Password
-          </Label>
+          <Label htmlFor="guest-key">Password</Label>
           <Input
             id="guest-key"
             type="password"
@@ -110,6 +99,6 @@ export function GuestWifiEnabledFields({
         Client isolation is enabled — guests cannot see each other. Internet access only, no LAN
         access.
       </p>
-    </div>
+    </CardInset>
   );
 }

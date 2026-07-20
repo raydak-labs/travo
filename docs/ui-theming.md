@@ -49,6 +49,10 @@ That way elements that only set size/weight (e.g. `className="text-sm"`) inherit
 
 Recharts ticks and tooltips cannot use Tailwind classes directly. Use CSS variables from `index.css` (`--chart-grid`, `--chart-axis`, `--chart-tooltip-*`) and pass them via `stroke` / `fill` / `contentStyle`.
 
+## Nested regions
+
+Inside a `Card`, use **`CardInset`** (`frontend/src/components/ui/card-inset.tsx`) for sub-groups — border only (`default`) or border + muted fill (`muted`). Do not nest a second shadowed `Card`.
+
 ## Borders in dark mode
 
 Surfaces such as **`dark:bg-gray-950`** are darker than Tailwind **`gray-800`** (`#1f2937`). Using **`dark:border-gray-800`** on those panels makes the border **lighter than the fill**, which reads as a harsh, almost white outline.

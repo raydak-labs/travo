@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InlineError } from '@/components/ui/inline-error';
+import { cn } from '@/lib/cn';
 import { useRunDiagnostics } from '@/hooks/use-network';
 import { diagnosticsFormSchema, type DiagnosticsFormValues } from '@/lib/schemas/network-forms';
 
@@ -46,20 +47,27 @@ export function DiagnosticsCard() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onRun)} className="space-y-4" noValidate>
-          <div className="flex w-fit gap-1 rounded-md border p-1">
+          <div
+            role="tablist"
+            aria-label="Diagnostics type"
+            className="flex w-fit flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-white/10 dark:bg-gray-900/40"
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.value}
                 type="button"
+                role="tab"
+                aria-selected={activeTab === tab.value}
                 onClick={() => {
                   setValue('type', tab.value, { shouldValidate: false });
                   runDiagnostics.reset();
                 }}
-                className={`rounded px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                   activeTab === tab.value
-                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                }`}
+                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white',
+                )}
               >
                 {tab.label}
               </button>
@@ -76,11 +84,7 @@ export function DiagnosticsCard() {
               aria-describedby={errors.target ? 'diag-target-err' : undefined}
               {...register('target')}
             />
-            <Button
-              type="submit"
-              disabled={!targetValue?.trim() || runDiagnostics.isPending}
-              size="sm"
-            >
+            <Button type="submit" disabled={!targetValue?.trim() || runDiagnostics.isPending}>
               {runDiagnostics.isPending ? 'Running…' : 'Run'}
             </Button>
           </div>

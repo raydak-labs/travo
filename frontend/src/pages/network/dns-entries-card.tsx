@@ -114,7 +114,7 @@ export function DnsEntriesCard() {
                   </p>
                 ) : null}
               </div>
-              <Button type="submit" size="sm" disabled={addDNSEntry.isPending}>
+              <Button type="submit" disabled={addDNSEntry.isPending}>
                 {addDNSEntry.isPending ? 'Adding…' : 'Add'}
               </Button>
             </form>

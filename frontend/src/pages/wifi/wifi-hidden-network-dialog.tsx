@@ -74,9 +74,15 @@ export function WifiHiddenNetworkDialog() {
 
   return (
     <>
-      <Button onClick={handleOpen} size="sm" variant="outline">
+      <Button
+        onClick={handleOpen}
+        size="sm"
+        variant="outline"
+        aria-label="Hidden network"
+        title="Hidden network"
+      >
         <WifiOff className="mr-1.5 h-3.5 w-3.5" />
-        Hidden Network
+        Hidden
       </Button>
 
       <Dialog

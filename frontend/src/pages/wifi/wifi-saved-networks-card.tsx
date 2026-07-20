@@ -7,6 +7,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card';
+import { CardInset } from '@/components/ui/card-inset';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -60,7 +61,7 @@ export function WifiSavedNetworksCard() {
   const isRiskyDelete = pendingDelete && savedNetworks.length === 1 && !autoReconnect?.enabled;
 
   return (
-    <Card className="min-w-0">
+    <Card className="flex h-full min-w-0 flex-col">
       <CardHeader className="space-y-1">
         <div className="flex items-center gap-2">
           <CardTitle>Saved networks</CardTitle>
@@ -71,8 +72,11 @@ export function WifiSavedNetworksCard() {
           the stored password. Arrows set priority for automatic selection (see info).
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-gray-800/30">
+      <CardContent className="flex flex-1 flex-col space-y-4">
+        <CardInset
+          variant="muted"
+          className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div className="min-w-0 space-y-0.5 pr-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Auto-reconnect</span>
@@ -90,7 +94,7 @@ export function WifiSavedNetworksCard() {
             disabled={setAutoReconnect.isPending}
             className="shrink-0 sm:ml-auto"
           />
-        </div>
+        </CardInset>
 
         {savedLoading ? (
           <div className="space-y-2">

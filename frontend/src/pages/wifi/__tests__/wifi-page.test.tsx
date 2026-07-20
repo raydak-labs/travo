@@ -86,7 +86,7 @@ describe('WifiPage', () => {
     renderWifiPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Scan Networks')).toBeInTheDocument();
+      expect(screen.getByText('Scan')).toBeInTheDocument();
     });
   });
 

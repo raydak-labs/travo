@@ -38,7 +38,7 @@ export function ServiceCard({
   const setDNS = useSetAdGuardDNS();
 
   return (
-    <Card>
+    <Card className="shadow-none hover:shadow-none">
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="rounded-md bg-blue-50 p-2 dark:bg-blue-950">

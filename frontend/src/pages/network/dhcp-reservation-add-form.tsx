@@ -69,7 +69,7 @@ export function DhcpReservationAddForm({
           </p>
         ) : null}
       </div>
-      <Button type="submit" size="sm" disabled={addPending}>
+      <Button type="submit" disabled={addPending}>
         {addPending ? 'Adding…' : 'Add'}
       </Button>
     </form>

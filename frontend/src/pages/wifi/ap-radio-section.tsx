@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { CardInset } from '@/components/ui/card-inset';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import { useSetAPConfig } from '@/hooks/use-wifi';
 import type { APConfig, APConfigUpdate } from '@shared/index';
@@ -98,22 +99,20 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
 
   return (
     <>
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="space-y-3 rounded-lg border p-4"
-        noValidate
-      >
-        <ApRadioFormFields
-          ap={ap}
-          bandLabel={bandLabel}
-          register={register}
-          control={control}
-          errors={errors}
-          encryption={encryption}
-          setValue={setValue}
-          savePending={setAP.isPending}
-          onOpenQr={openQrFromForm}
-        />
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <CardInset className="space-y-3 p-4">
+          <ApRadioFormFields
+            ap={ap}
+            bandLabel={bandLabel}
+            register={register}
+            control={control}
+            errors={errors}
+            encryption={encryption}
+            setValue={setValue}
+            savePending={setAP.isPending}
+            onOpenQr={openQrFromForm}
+          />
+        </CardInset>
       </form>
 
       <WifiQRDialog

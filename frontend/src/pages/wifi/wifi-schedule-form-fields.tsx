@@ -1,4 +1,5 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import { CardInset } from '@/components/ui/card-inset';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -35,7 +36,7 @@ export function WiFiScheduleFormFields({
       </div>
 
       {enabled && (
-        <div className="space-y-3 rounded-md border p-3">
+        <CardInset className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <Label
               className="w-16 shrink-0 text-sm text-gray-600 dark:text-gray-400"
@@ -82,7 +83,7 @@ export function WiFiScheduleFormFields({
               ) : null}
             </div>
           </div>
-        </div>
+        </CardInset>
       )}
     </>
   );
