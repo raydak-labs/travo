@@ -3,7 +3,7 @@ import { ClientsDhcpReservationsCard } from '@/components/clients/clients-dhcp-r
 
 export function ClientsPage() {
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-6">
       <ClientsConnectedClientsCard />
       <ClientsDhcpReservationsCard />
     </div>
