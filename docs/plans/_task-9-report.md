@@ -1,7 +1,7 @@
 # Task 9 Report — Status chrome + shell titles
 
 **Status:** done  
-**Commit:** `refactor(ui): align status chrome and shell titles`  
+**Commit:** `4817a86` (`refactor(ui): align status chrome and shell titles`)  
 
 **Branch:** `fix/ui-consistency`  
 **Worktree:** `.worktrees/ui-consistency`
