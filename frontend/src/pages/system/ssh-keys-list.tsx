@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { SSHKey } from '@shared/index';
 
 type SSHKeysListProps = {
@@ -11,7 +12,7 @@ type SSHKeysListProps = {
 
 export function SSHKeysList({ keys, deletePending, onDelete }: SSHKeysListProps) {
   if (keys.length === 0) {
-    return <p className="text-sm text-muted-foreground">No keys configured</p>;
+    return <EmptyState message="No keys configured" />;
   }
 
   return (

@@ -134,10 +134,10 @@ tags: [frontend, ux, theming, consistency]
 
 **Files:** clients empty table, logs empty, ssh keys empty, setup scan empty, any other one-off empties
 
-- [ ] Replace one-off empty copy with `<EmptyState message="…" />`
-- [ ] Keep icon optional
-- [ ] Update tests that look for old empty markup
-- [ ] Commit: `refactor(ui): use EmptyState for empty content`
+- [x] Replace one-off empty copy with `<EmptyState message="…" />`
+- [x] Keep icon optional
+- [x] Update tests that look for old empty markup
+- [x] Commit: `refactor(ui): use EmptyState for empty content`
 
 ---
 

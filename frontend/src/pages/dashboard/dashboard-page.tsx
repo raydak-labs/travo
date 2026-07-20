@@ -11,6 +11,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { SourceDef } from '@/hooks/use-topology-data';
@@ -321,7 +322,7 @@ export function DashboardPage() {
               )}
             </>
           ) : (
-            <p className="text-slate-500">No Ethernet WAN connection detected.</p>
+            <EmptyState message="No Ethernet WAN connection detected." />
           )}
         </SourceCard>
 

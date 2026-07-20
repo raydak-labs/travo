@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { LogEntry, LogResponse } from '@shared/index';
 import { LogsLevelBadge } from './logs-level-badge';
 
@@ -28,6 +29,10 @@ export function LogsTextView({
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-3/4" />
         </div>
+      ) : filteredLines.length === 0 ? (
+        <EmptyState
+          message={lineFilter ? 'No log entries matching filter' : 'No log entries'}
+        />
       ) : (
         <pre
           ref={logRef}
@@ -35,18 +40,12 @@ export function LogsTextView({
           className="max-h-[500px] overflow-y-auto rounded-md bg-gray-950 p-4 font-mono text-xs leading-relaxed text-green-400"
         >
           <code>
-            {filteredLines.length > 0 ? (
-              filteredLines.map((entry, i) => (
-                <div key={i}>
-                  <LogsLevelBadge level={entry.level} />
-                  {entry.line}
-                </div>
-              ))
-            ) : (
-              <span className="text-gray-500">
-                No log entries{lineFilter ? ' matching filter' : ''}
-              </span>
-            )}
+            {filteredLines.map((entry, i) => (
+              <div key={i}>
+                <LogsLevelBadge level={entry.level} />
+                {entry.line}
+              </div>
+            ))}
           </code>
         </pre>
       )}

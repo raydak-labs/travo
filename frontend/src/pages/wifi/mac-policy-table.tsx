@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { MACPolicy } from '@shared/index';
 
 type MACPolicyTableProps = {
@@ -10,7 +11,7 @@ type MACPolicyTableProps = {
 
 export function MACPolicyTable({ policies, onDelete, isPending }: MACPolicyTableProps) {
   if (policies.length === 0) {
-    return <p className="text-xs text-gray-400">No policies configured.</p>;
+    return <EmptyState message="No policies configured." />;
   }
 
   return (

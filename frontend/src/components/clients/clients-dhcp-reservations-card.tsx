@@ -1,6 +1,7 @@
 import { BookmarkPlus, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useDHCPReservations, useDeleteDHCPReservation } from '@/hooks/use-network';
 
 export function ClientsDhcpReservationsCard() {
@@ -15,10 +16,7 @@ export function ClientsDhcpReservationsCard() {
       </CardHeader>
       <CardContent>
         {!reservations || reservations.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No static reservations. Use the bookmark icon next to a connected client to reserve its
-            IP.
-          </p>
+          <EmptyState message="No static reservations. Use the bookmark icon next to a connected client to reserve its IP." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

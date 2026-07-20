@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useNetworkStatus, useDetectWanType } from '@/hooks/use-network';
 import { formatBytes } from '@/lib/utils';
 
@@ -44,7 +45,7 @@ export function WanConfigCard() {
             </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-500">WAN not configured</p>
+          <EmptyState message="WAN not configured" />
         )}
         <div className="mt-3 flex items-center gap-3">
           <Button

@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ClientRow } from '@/components/clients/client-row';
 import type { Client } from '@shared/index';
 
@@ -31,9 +32,9 @@ export function ClientsConnectedTable({
 
   if (filtered.length === 0) {
     return (
-      <p className="py-4 text-center text-sm text-gray-500">
-        {hasSearch ? 'No clients match your search.' : 'No clients connected.'}
-      </p>
+      <EmptyState
+        message={hasSearch ? 'No clients match your search.' : 'No clients connected.'}
+      />
     );
   }
 
