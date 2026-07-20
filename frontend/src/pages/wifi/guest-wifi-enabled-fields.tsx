@@ -6,6 +6,7 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -33,12 +34,11 @@ export function GuestWifiEnabledFields({
   return (
     <div className="space-y-3 rounded-lg border p-4">
       <div className="space-y-2">
-        <label
+        <Label
           htmlFor="guest-ssid"
-          className="text-xs font-medium text-gray-600 dark:text-gray-400"
         >
           SSID
-        </label>
+        </Label>
         <Input
           id="guest-ssid"
           placeholder="Guest network name"
@@ -53,12 +53,11 @@ export function GuestWifiEnabledFields({
         ) : null}
       </div>
       <div className="space-y-2">
-        <label
+        <Label
           htmlFor="guest-encryption"
-          className="text-xs font-medium text-gray-600 dark:text-gray-400"
         >
           Encryption
-        </label>
+        </Label>
         <Controller
           name="encryption"
           control={control}
@@ -87,12 +86,11 @@ export function GuestWifiEnabledFields({
       </div>
       {encryption !== 'none' && (
         <div className="space-y-2">
-          <label
+          <Label
             htmlFor="guest-key"
-            className="text-xs font-medium text-gray-600 dark:text-gray-400"
           >
             Password
-          </label>
+          </Label>
           <Input
             id="guest-key"
             type="password"

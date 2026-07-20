@@ -6,6 +6,7 @@ import type {
 } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { NtpConfigFormValues, NtpServerDraftFormValues } from '@/lib/schemas/system-forms';
 
 type NtpConfigServerFieldsProps = {
@@ -27,7 +28,7 @@ export function NtpConfigServerFields({
 }: NtpConfigServerFieldsProps) {
   return (
     <div className="space-y-2">
-      <label className="text-xs text-gray-500">NTP Servers</label>
+      <Label>NTP Servers</Label>
       {fields.map((field, index) => (
         <div key={field.id} className="flex items-center gap-2">
           <Input

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { InlineError } from '@/components/ui/inline-error';
+import { Label } from '@/components/ui/label';
 import type { ServiceInfo, SQMConfig, SQMQdisc, SQMScript } from '@shared/index';
 import { useApplySQM, useSQMConfig, useSetSQMConfig } from '@/hooks/use-sqm';
 
@@ -66,9 +67,9 @@ export function SQMSection({ sqmService }: Props) {
 
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <label htmlFor="sqm-enabled" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-enabled" className="text-sm font-medium leading-none">
               Enable SQM
-            </label>
+            </Label>
           </div>
           <Switch
             id="sqm-enabled"
@@ -82,9 +83,9 @@ export function SQMSection({ sqmService }: Props) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="sqm-interface" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-interface" className="text-sm font-medium leading-none">
               Interface
-            </label>
+            </Label>
             <Input
               id="sqm-interface"
               placeholder="pppoe-wan / eth0.2 / wan"
@@ -141,9 +142,9 @@ export function SQMSection({ sqmService }: Props) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="sqm-download" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-download" className="text-sm font-medium leading-none">
               Download (kbit/s)
-            </label>
+            </Label>
             <Input
               id="sqm-download"
               inputMode="numeric"
@@ -155,9 +156,9 @@ export function SQMSection({ sqmService }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="sqm-upload" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-upload" className="text-sm font-medium leading-none">
               Upload (kbit/s)
-            </label>
+            </Label>
             <Input
               id="sqm-upload"
               inputMode="numeric"

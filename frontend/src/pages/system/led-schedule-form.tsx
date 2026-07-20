@@ -2,6 +2,7 @@ import type { FieldErrors, UseFormHandleSubmit, UseFormRegister } from 'react-ho
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { LedScheduleFormValues } from '@/lib/schemas/system-forms';
 
 type LedScheduleFormProps = {
@@ -40,9 +41,9 @@ export function LedScheduleForm({
       {scheduleEnabled && (
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <label htmlFor="led-on-time" className="w-16 text-xs text-gray-600 dark:text-gray-400">
+            <Label htmlFor="led-on-time" className="w-16">
               LEDs On
-            </label>
+            </Label>
             <Input
               id="led-on-time"
               type="time"
@@ -58,9 +59,9 @@ export function LedScheduleForm({
             </p>
           ) : null}
           <div className="flex items-center gap-3">
-            <label htmlFor="led-off-time" className="w-16 text-xs text-gray-600 dark:text-gray-400">
+            <Label htmlFor="led-off-time" className="w-16">
               LEDs Off
-            </label>
+            </Label>
             <Input
               id="led-off-time"
               type="time"

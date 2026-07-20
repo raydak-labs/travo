@@ -3,6 +3,7 @@ import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -42,7 +43,7 @@ export function SystemTimezoneCard() {
             {editingTimezone ? (
               <>
                 <div className="space-y-1">
-                  <label className="text-xs text-gray-500">Change Timezone</label>
+                  <Label>Change Timezone</Label>
                   <Select
                     value={selectedTz || timezoneConfig?.zonename || ''}
                     onValueChange={setSelectedTz}

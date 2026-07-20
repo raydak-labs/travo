@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { WifiScheduleFormValues } from '@/lib/schemas/wifi-forms';
 
 type WiFiScheduleFormFieldsProps = {
@@ -36,12 +37,12 @@ export function WiFiScheduleFormFields({
       {enabled && (
         <div className="space-y-3 rounded-md border p-3">
           <div className="flex flex-wrap items-center gap-3">
-            <label
+            <Label
               className="w-16 shrink-0 text-sm text-gray-600 dark:text-gray-400"
               htmlFor="wifi-on-time"
             >
               On at
-            </label>
+            </Label>
             <div className="flex flex-col gap-0.5">
               <Input
                 id="wifi-on-time"
@@ -59,12 +60,12 @@ export function WiFiScheduleFormFields({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <label
+            <Label
               className="w-16 shrink-0 text-sm text-gray-600 dark:text-gray-400"
               htmlFor="wifi-off-time"
             >
               Off at
-            </label>
+            </Label>
             <div className="flex flex-col gap-0.5">
               <Input
                 id="wifi-off-time"

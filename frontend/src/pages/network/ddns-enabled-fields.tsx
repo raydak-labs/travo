@@ -6,6 +6,7 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/cn';
 import {
   Select,
@@ -34,7 +35,7 @@ export function DdnsEnabledFields({
   return (
     <>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Provider</label>
+        <Label>Provider</Label>
         <Controller
           control={control}
           name="service"
@@ -69,7 +70,7 @@ export function DdnsEnabledFields({
       </div>
       {service === 'custom' && (
         <div className="space-y-1">
-          <label className="text-xs text-gray-500 dark:text-gray-400">Update URL</label>
+          <Label>Update URL</Label>
           <textarea
             rows={3}
             placeholder="https://example.com/update?hostname=[DOMAIN]&myip=[IP]"
@@ -93,7 +94,7 @@ export function DdnsEnabledFields({
         </div>
       )}
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Domain</label>
+        <Label>Domain</Label>
         <Input
           placeholder="myrouter.duckdns.org"
           aria-invalid={errors.domain ? 'true' : undefined}
@@ -108,16 +109,16 @@ export function DdnsEnabledFields({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Username / Token</label>
+          <Label>Username / Token</Label>
           <Input placeholder="username or token" {...register('username')} />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-gray-500">Password</label>
+          <Label>Password</Label>
           <Input type="password" placeholder="password" {...register('password')} />
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Lookup Host</label>
+        <Label>Lookup Host</Label>
         <Input placeholder="myrouter.duckdns.org" {...register('lookup_host')} />
       </div>
     </>

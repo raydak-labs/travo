@@ -3,6 +3,7 @@ import { Shuffle, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { MacCloneFormValues } from '@/lib/schemas/wifi-forms';
 
 export type MacAddressRow = {
@@ -60,9 +61,9 @@ export function MacAddressCloneBlock({
         </div>
       )}
       <div className="space-y-2">
-        <label htmlFor="mac-input" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+        <Label htmlFor="mac-input">
           Custom MAC Address
-        </label>
+        </Label>
         <Input
           id="mac-input"
           placeholder="AA:BB:CC:DD:EE:FF"

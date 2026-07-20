@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { useDNSEntries, useAddDNSEntry, useDeleteDNSEntry } from '@/hooks/use-network';
 import { dnsEntryFormSchema, type DnsEntryFormValues } from '@/lib/schemas/network-forms';
 
@@ -85,7 +86,7 @@ export function DnsEntriesCard() {
               noValidate
             >
               <div className="space-y-1">
-                <label className="text-xs text-gray-500">Hostname</label>
+                <Label>Hostname</Label>
                 <Input
                   placeholder="myserver"
                   aria-invalid={errors.name ? 'true' : undefined}
@@ -99,7 +100,7 @@ export function DnsEntriesCard() {
                 ) : null}
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-gray-500">IP Address</label>
+                <Label>IP Address</Label>
                 <Input
                   placeholder="192.168.8.10"
                   className="font-mono"

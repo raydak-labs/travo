@@ -4,6 +4,7 @@ import type { WifiScanResult, GroupedScanNetwork } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { WifiScanList } from '@/pages/wifi/wifi-scan-list';
@@ -57,12 +58,11 @@ export function RepeaterWizardSelectUpstreamStep({
 
           {needsPassword && (
             <div className="space-y-2">
-              <label
+              <Label
                 htmlFor="upstream-password"
-                className="text-xs font-medium text-gray-600 dark:text-gray-400"
               >
                 Password
-              </label>
+              </Label>
               <Input
                 id="upstream-password"
                 type="password"

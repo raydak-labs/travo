@@ -3,6 +3,7 @@ import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Zap, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { formatBytes } from '@/lib/utils';
 import type { FirmwareUpgradeFormValues } from '@/lib/schemas/system-forms';
 
@@ -58,9 +59,9 @@ export function FirmwareUpgradeFormFields({
         ) : null}
       </div>
       <div className="flex items-center justify-between">
-        <label htmlFor="keep-settings" className="text-sm text-gray-700 dark:text-gray-300">
+        <Label htmlFor="keep-settings" className="text-sm text-gray-700 dark:text-gray-300">
           Keep current settings
-        </label>
+        </Label>
         <Switch id="keep-settings" label="Keep settings" {...register('keep_settings')} />
       </div>
       <Button

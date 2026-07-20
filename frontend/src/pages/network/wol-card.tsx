@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useSendWoL } from '@/hooks/use-network';
 import { wolFormSchema, type WolFormValues } from '@/lib/schemas/network-forms';
 
@@ -36,7 +37,7 @@ export function WoLCard() {
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
           <div className="space-y-1">
-            <label className="text-xs text-gray-500">MAC Address</label>
+            <Label>MAC Address</Label>
             <Input
               className="font-mono"
               placeholder="AA:BB:CC:DD:EE:FF"
@@ -51,7 +52,7 @@ export function WoLCard() {
             ) : null}
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-gray-500">Interface (optional)</label>
+            <Label>Interface (optional)</Label>
             <Input placeholder="br-lan" {...register('interface')} />
           </div>
           <Button type="submit" size="sm" disabled={sendWoL.isPending}>

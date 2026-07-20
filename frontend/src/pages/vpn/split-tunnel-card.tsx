@@ -5,6 +5,7 @@ import { GitFork } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { useSplitTunnel, useSetSplitTunnel } from '@/hooks/use-vpn';
 import { splitTunnelFormSchema, type SplitTunnelFormValues } from '@/lib/schemas/vpn-forms';
 
@@ -89,9 +90,9 @@ export function SplitTunnelCard() {
 
           {mode === 'custom' && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              <Label>
                 CIDR ranges (comma-separated)
-              </label>
+              </Label>
               <textarea
                 placeholder="e.g. 10.0.0.0/8, 192.168.1.0/24"
                 rows={3}

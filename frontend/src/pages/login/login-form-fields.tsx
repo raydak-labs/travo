@@ -3,6 +3,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InlineError } from '@/components/ui/inline-error';
+import { Label } from '@/components/ui/label';
 import type { LoginFormValues } from '@/pages/login/login-schema';
 
 type LoginFormFieldsProps = {
@@ -21,9 +22,9 @@ export function LoginFormFields({
   return (
     <>
       <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Password
-        </label>
+        </Label>
         <Input
           id="password"
           type="password"
@@ -54,9 +55,9 @@ export function LoginFormFields({
           className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           {...register('rememberMe')}
         />
-        <label htmlFor="remember-me" className="text-sm text-gray-600 dark:text-gray-400">
+        <Label htmlFor="remember-me" className="text-sm text-gray-600 dark:text-gray-400">
           Remember me
-        </label>
+        </Label>
       </div>
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>

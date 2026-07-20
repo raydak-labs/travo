@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { SetupApFormValues } from '@/pages/setup/setup-schema';
 
 type APStepCredentialsFieldsProps = {
@@ -19,12 +20,12 @@ export function APStepCredentialsFields({
   return (
     <>
       <div>
-        <label
+        <Label
           htmlFor="setup-ap-ssid"
           className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Network Name (SSID)
-        </label>
+        </Label>
         <Input
           id="setup-ap-ssid"
           aria-invalid={!!errors.ssid}
@@ -39,12 +40,12 @@ export function APStepCredentialsFields({
         ) : null}
       </div>
       <div>
-        <label
+        <Label
           htmlFor="setup-ap-key"
           className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Password
-        </label>
+        </Label>
         <div className="relative">
           <Input
             id="setup-ap-key"

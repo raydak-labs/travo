@@ -9,6 +9,7 @@ import { QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -43,13 +44,13 @@ export function ApRadioFormCredentialsAndActions({
   return (
     <>
       <div className="space-y-2">
-        <label
+        <Label
           htmlFor={`ap-ssid-${ap.section}`}
-          className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
+          className="flex items-center gap-1"
         >
           SSID
           <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
-        </label>
+        </Label>
         <Input
           id={`ap-ssid-${ap.section}`}
           placeholder="Network name"
@@ -64,12 +65,11 @@ export function ApRadioFormCredentialsAndActions({
         ) : null}
       </div>
       <div className="space-y-2">
-        <label
+        <Label
           htmlFor={`ap-enc-${ap.section}`}
-          className="text-xs font-medium text-gray-600 dark:text-gray-400"
         >
           Encryption
-        </label>
+        </Label>
         <Controller
           name="encryption"
           control={control}
@@ -98,13 +98,13 @@ export function ApRadioFormCredentialsAndActions({
       </div>
       {encryption !== 'none' && (
         <div className="space-y-2">
-          <label
+          <Label
             htmlFor={`ap-key-${ap.section}`}
-            className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
+            className="flex items-center gap-1"
           >
             Password
             <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
-          </label>
+          </Label>
           <Input
             id={`ap-key-${ap.section}`}
             type="password"

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -192,13 +193,13 @@ export function APUnifiedConfigForm({
         </div>
 
         <div className="space-y-2">
-          <label
+          <Label
             htmlFor="ap-unified-ssid"
-            className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
+            className="flex items-center gap-1"
           >
             Network name (all bands)
             <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
-          </label>
+          </Label>
           <Input
             id="ap-unified-ssid"
             placeholder="SSID for all radios"
@@ -213,12 +214,11 @@ export function APUnifiedConfigForm({
         </div>
 
         <div className="space-y-2">
-          <label
+          <Label
             htmlFor="ap-unified-enc"
-            className="text-xs font-medium text-gray-600 dark:text-gray-400"
           >
             Encryption
-          </label>
+          </Label>
           <Controller
             name="encryption"
             control={control}
@@ -248,13 +248,13 @@ export function APUnifiedConfigForm({
 
         {encryption !== 'none' && (
           <div className="space-y-2">
-            <label
+            <Label
               htmlFor="ap-unified-key"
-              className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
+              className="flex items-center gap-1"
             >
               Password
               <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
-            </label>
+            </Label>
             <Input
               id="ap-unified-key"
               type="password"
