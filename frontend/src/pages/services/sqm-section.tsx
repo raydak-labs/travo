@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { InlineError } from '@/components/ui/inline-error';
 import type { ServiceInfo, SQMConfig, SQMQdisc, SQMScript } from '@shared/index';
 import { useApplySQM, useSQMConfig, useSetSQMConfig } from '@/hooks/use-sqm';
 
@@ -58,7 +59,7 @@ export function SQMSection({ sqmService }: Props) {
       <CardContent className="space-y-4">
         {data?.advanced_hint ? <p className="text-sm">{data.advanced_hint}</p> : null}
         {isLoading ? <p className="text-sm">Loading SQM configuration…</p> : null}
-        {isError ? <p className="text-sm">Failed to load SQM configuration.</p> : null}
+        {isError ? <InlineError>Failed to load SQM configuration.</InlineError> : null}
         {hasUnsavedChanges ? (
           <p className="text-sm">You have unsaved changes. Save before applying.</p>
         ) : null}

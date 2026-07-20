@@ -2,6 +2,7 @@ import type { UseFormRegister } from 'react-hook-form';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InlineError } from '@/components/ui/inline-error';
 import type { LoginFormValues } from '@/pages/login/login-schema';
 
 type LoginFormFieldsProps = {
@@ -40,13 +41,10 @@ export function LoginFormFields({
       </div>
 
       {rootMessage ? (
-        <div
-          className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400"
-          role="alert"
-        >
+        <InlineError className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{rootMessage}</span>
-        </div>
+        </InlineError>
       ) : null}
 
       <div className="flex items-center gap-2">

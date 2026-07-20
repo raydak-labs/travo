@@ -2,6 +2,7 @@ import { Gauge } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { InlineError } from '@/components/ui/inline-error';
 import { useRunSpeedTest } from '@/hooks/use-system';
 
 export function SpeedTestCard() {
@@ -47,11 +48,7 @@ export function SpeedTestCard() {
           </div>
         )}
 
-        {speedTest.isError && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            {speedTest.error.message}
-          </div>
-        )}
+        {speedTest.isError && <InlineError>{speedTest.error.message}</InlineError>}
       </CardContent>
     </Card>
   );

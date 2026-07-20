@@ -176,7 +176,53 @@ describe('SpeedtestPage', () => {
     renderSpeedtestPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/Failed to load speedtest service/i)).toBeInTheDocument();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(/Failed to load speedtest service/i);
+      expect(alert.className).toContain('border-red');
+    });
+  });
+
+  it('shows empty state when status is missing after load', async () => {
+    mockUseSpeedtestServiceStatus.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useSpeedtestServiceStatus>);
+
+    renderSpeedtestPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/No speedtest status available/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows run error via InlineError', async () => {
+    mockUseSpeedtestServiceStatus.mockReturnValue({
+      data: { ...mockStatus, installed: true },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof useSpeedtestServiceStatus>);
+
+    mockUseRunSpeedtest.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+      isError: true,
+      isSuccess: false,
+      isIdle: false,
+      reset: vi.fn(),
+      status: 'error',
+      voidFn: vi.fn(),
+      data: undefined,
+      error: new Error('Speed test failed'),
+    } as unknown as ReturnType<typeof useRunSpeedtest>);
+
+    renderSpeedtestPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Speed test failed');
     });
   });
 

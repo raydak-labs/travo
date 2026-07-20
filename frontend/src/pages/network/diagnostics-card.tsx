@@ -4,6 +4,7 @@ import { Activity } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InlineError } from '@/components/ui/inline-error';
 import { useRunDiagnostics } from '@/hooks/use-network';
 import { diagnosticsFormSchema, type DiagnosticsFormValues } from '@/lib/schemas/network-forms';
 
@@ -100,9 +101,7 @@ export function DiagnosticsCard() {
             </pre>
           )}
           {runDiagnostics.isError && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-              {runDiagnostics.error.message}
-            </div>
+            <InlineError>{runDiagnostics.error.message}</InlineError>
           )}
         </form>
       </CardContent>

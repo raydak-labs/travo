@@ -8,6 +8,8 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { InlineError } from '@/components/ui/inline-error';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export function SpeedtestPage() {
   const { data: status, isLoading, error: statusError } = useSpeedtestServiceStatus();
@@ -29,15 +31,21 @@ export function SpeedtestPage() {
 
   if (statusError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-        <AlertTriangle className="mr-2 inline h-4 w-4" />
-        Failed to load speedtest service: {statusError.message}
+      <div className="space-y-6">
+        <InlineError>
+          <AlertTriangle className="mr-2 inline h-4 w-4" />
+          Failed to load speedtest service: {statusError.message}
+        </InlineError>
       </div>
     );
   }
 
   if (!status) {
-    return null;
+    return (
+      <div className="space-y-6">
+        <EmptyState message="No speedtest status available." />
+      </div>
+    );
   }
 
   return (
@@ -155,9 +163,7 @@ export function SpeedtestPage() {
           )}
 
           {runMutation.isError && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-              {runMutation.error?.message || 'Speed test failed'}
-            </div>
+            <InlineError>{runMutation.error?.message || 'Speed test failed'}</InlineError>
           )}
         </CardContent>
       </Card>
