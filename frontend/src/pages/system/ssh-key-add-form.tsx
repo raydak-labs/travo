@@ -14,7 +14,7 @@ export function SSHKeyAddForm({ register, errors, onSubmit, addPending }: SSHKey
     <form onSubmit={onSubmit} className="space-y-2 pt-2" noValidate>
       <p className="text-sm font-medium">Add a new public key</p>
       <textarea
-        className="h-24 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500"
         placeholder="ssh-ed25519 AAAA… user@host"
         spellCheck={false}
         aria-invalid={!!errors.key}
@@ -22,7 +22,7 @@ export function SSHKeyAddForm({ register, errors, onSubmit, addPending }: SSHKey
         {...register('key')}
       />
       {errors.key ? (
-        <p id="ssh-key-error" className="text-xs text-destructive" role="alert">
+        <p id="ssh-key-error" className="text-xs text-red-500" role="alert">
           {errors.key.message}
         </p>
       ) : null}

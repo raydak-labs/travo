@@ -106,7 +106,7 @@ export function GuestWifiEnabledFields({
           ) : null}
         </div>
       )}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         Client isolation is enabled — guests cannot see each other. Internet access only, no LAN
         access.
       </p>

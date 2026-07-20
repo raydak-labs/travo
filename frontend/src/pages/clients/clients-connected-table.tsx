@@ -43,12 +43,12 @@ export function ClientsConnectedTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left dark:border-gray-700">
-            <th className="pb-2 font-medium text-gray-500">Device</th>
-            <th className="pb-2 font-medium text-gray-500">IP Address</th>
-            <th className="hidden pb-2 font-medium text-gray-500 md:table-cell">Interface</th>
-            <th className="hidden pb-2 font-medium text-gray-500 lg:table-cell">Connected Since</th>
-            <th className="pb-2 font-medium text-gray-500">Traffic</th>
-            <th className="pb-2 text-right font-medium text-gray-500">Actions</th>
+            <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Device</th>
+            <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">IP Address</th>
+            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 md:table-cell">Interface</th>
+            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 lg:table-cell">Connected Since</th>
+            <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Traffic</th>
+            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
           </tr>
         </thead>
         <tbody>

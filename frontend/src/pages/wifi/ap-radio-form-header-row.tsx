@@ -15,10 +15,10 @@ export function ApRadioFormHeaderRow({ ap, bandLabel, register }: ApRadioFormHea
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <Radio className="h-4 w-4 text-gray-500" />
+        <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         <span className="text-sm font-medium text-gray-900 dark:text-white">{ap.radio}</span>
         <Badge variant="outline">{bandLabel}</Badge>
-        <span className="text-xs text-gray-500">Ch {ap.channel}</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
       </div>
       <Switch id={`ap-enabled-${ap.section}`} label="Enabled" {...register('enabled')} />
     </div>

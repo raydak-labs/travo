@@ -20,15 +20,15 @@ export function WelcomeStep({ onNext }: { onNext: () => void }) {
       <div className="grid grid-cols-3 gap-4 pt-4">
         <div className="rounded-lg border p-3 dark:border-gray-700">
           <KeyRound className="mx-auto h-6 w-6 text-blue-500" />
-          <p className="mt-2 text-xs text-gray-500">Secure Password</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Secure Password</p>
         </div>
         <div className="rounded-lg border p-3 dark:border-gray-700">
           <Wifi className="mx-auto h-6 w-6 text-blue-500" />
-          <p className="mt-2 text-xs text-gray-500">WiFi Connection</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">WiFi Connection</p>
         </div>
         <div className="rounded-lg border p-3 dark:border-gray-700">
           <Shield className="mx-auto h-6 w-6 text-blue-500" />
-          <p className="mt-2 text-xs text-gray-500">AP Configuration</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">AP Configuration</p>
         </div>
       </div>
       <Button onClick={onNext} size="lg" className="mt-4 w-full">

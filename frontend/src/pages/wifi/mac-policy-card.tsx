@@ -44,7 +44,7 @@ export function MACPolicyCard() {
         <Fingerprint className="h-4 w-4 text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Remember which MAC address to use when connecting to specific SSIDs.
         </p>
 

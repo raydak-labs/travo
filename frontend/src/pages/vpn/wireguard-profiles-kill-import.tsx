@@ -94,7 +94,7 @@ export function WireguardProfilesKillImport({
             disabled={killSwitchMutation.isPending}
           />
         </div>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {killSwitch?.enabled
             ? 'All traffic is blocked if VPN disconnects. Disable to allow direct internet access.'
             : 'When enabled, blocks all internet traffic if the VPN connection drops to prevent IP leaks.'}

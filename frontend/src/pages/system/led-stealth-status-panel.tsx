@@ -36,7 +36,7 @@ export function LedStealthStatusPanel({
 
       {ledStatus.leds && ledStatus.leds.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-medium text-gray-500">Individual LEDs</p>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Individual LEDs</p>
           <div className="grid gap-1">
             {ledStatus.leds.map((led) => (
               <div

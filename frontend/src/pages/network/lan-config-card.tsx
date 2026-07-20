@@ -10,7 +10,7 @@ export function LanConfigCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>LAN Configuration</CardTitle>
-        <Network className="h-4 w-4 text-gray-500" />
+        <Network className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -21,11 +21,11 @@ export function LanConfigCard() {
         ) : network ? (
           <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500">IP Address</span>
+              <span className="text-gray-500 dark:text-gray-400">IP Address</span>
               <span className="text-gray-900 dark:text-white">{network.lan.ip_address}</span>
-              <span className="text-gray-500">Subnet</span>
+              <span className="text-gray-500 dark:text-gray-400">Subnet</span>
               <span className="text-gray-900 dark:text-white">{network.lan.netmask}</span>
-              <span className="text-gray-500">MAC</span>
+              <span className="text-gray-500 dark:text-gray-400">MAC</span>
               <span className="text-gray-900 dark:text-white">{network.lan.mac_address}</span>
             </div>
           </div>

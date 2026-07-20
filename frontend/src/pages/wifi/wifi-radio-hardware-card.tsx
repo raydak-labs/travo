@@ -71,7 +71,7 @@ export function WifiRadioHardwareCard() {
                   className="flex items-center justify-between gap-3 rounded-lg border p-3"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <Radio className="h-4 w-4 shrink-0 text-gray-500" />
+                    <Radio className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
@@ -96,7 +96,7 @@ export function WifiRadioHardwareCard() {
                           {radio.disabled ? 'Disabled' : 'Active'}
                         </Badge>
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                         <span>{bandLabel}</span>
                         <span>Ch {radio.channel}</span>
                         <span>{radio.htmode}</span>

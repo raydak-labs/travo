@@ -20,7 +20,7 @@ export function USBTetheringSection() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>USB Tethering</CardTitle>
-        <Smartphone className="h-4 w-4 text-gray-500" />
+        <Smartphone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-3">
         {status?.detected ? (
@@ -49,7 +49,7 @@ export function USBTetheringSection() {
               )}
             </div>
             {status.ip_address && (
-              <p className="text-sm text-gray-500 font-mono">{status.ip_address}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{status.ip_address}</p>
             )}
             {status.configured ? (
               <div className="flex items-center gap-2">
@@ -76,7 +76,7 @@ export function USBTetheringSection() {
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <XCircle className="h-4 w-4" />
             <span>No USB tethering device detected (UCI config still active)</span>
             <Button

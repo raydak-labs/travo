@@ -18,7 +18,7 @@ export function BandSwitchingCard() {
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <p className="text-sm">Automatic band switching</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Switches between 2.4 GHz and 5 GHz based on signal quality
             </p>
           </div>
@@ -54,7 +54,7 @@ export function BandSwitchingCard() {
             </div>
             {bandSwitchData.status.state !== 'inactive' && (
               <div className="flex items-center gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-500">Status:</span>
+                <span className="text-gray-500 dark:text-gray-400">Status:</span>
                 <Badge
                   variant={bandSwitchData.status.state === 'monitoring' ? 'success' : 'outline'}
                   className="text-xs"

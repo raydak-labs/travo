@@ -51,7 +51,7 @@ export function LogsTextView({
       )}
 
       {!isLoading && logs && (
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {filteredLines.length}
           {lineFilter ? ` / ${logs.total}` : ''} lines
         </p>

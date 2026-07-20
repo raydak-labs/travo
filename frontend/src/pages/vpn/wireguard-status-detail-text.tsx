@@ -12,7 +12,7 @@ export function WireguardStatusDetailText({
   }
 
   return (
-    <div className="text-xs text-gray-500">
+    <div className="text-xs text-gray-500 dark:text-gray-400">
       {statusDetail === 'disabled' && 'WireGuard is disabled.'}
       {statusDetail === 'configured' && 'WireGuard is configured but not connected yet.'}
       {statusDetail === 'enabled_not_up' && 'WireGuard is enabled but the interface is not up yet.'}

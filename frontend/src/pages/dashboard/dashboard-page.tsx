@@ -11,7 +11,6 @@ import {
 import { Link } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/empty-state';
 import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { SourceDef } from '@/hooks/use-topology-data';
@@ -322,7 +321,7 @@ export function DashboardPage() {
               )}
             </>
           ) : (
-            <EmptyState message="No Ethernet WAN connection detected." />
+            <p className="text-slate-500">No Ethernet WAN connection detected.</p>
           )}
         </SourceCard>
 
@@ -397,7 +396,7 @@ export function DashboardPage() {
             <>
               <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground">Internet</span>
+                  <span className="text-gray-500 dark:text-gray-400">Internet</span>
                   <p
                     className={`mt-0.5 font-medium ${
                       internetUp
@@ -409,7 +408,7 @@ export function DashboardPage() {
                   </p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">VPN</span>
+                  <span className="text-gray-500 dark:text-gray-400">VPN</span>
                   <div className="mt-0.5 flex items-center gap-1.5">
                     {vpnActive ? (
                       <>
@@ -427,17 +426,17 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Devices on your network</span>
+                  <span className="text-gray-500 dark:text-gray-400">Devices on your network</span>
                   <p className="mt-0.5 font-medium">{allClients.length}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Uptime</span>
+                  <span className="text-gray-500 dark:text-gray-400">Uptime</span>
                   <p className="mt-0.5 font-medium">
                     {sysInfo ? formatUptime(sysInfo.uptime_seconds) : '—'}
                   </p>
                 </div>
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                 <Link to="/system" className="underline-offset-4 hover:underline">
                   Device details and settings
                 </Link>{' '}

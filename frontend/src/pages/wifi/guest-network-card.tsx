@@ -78,7 +78,7 @@ export function GuestNetworkCard() {
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   Enable Guest WiFi
                 </span>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Separate network (192.168.2.0/24) with client isolation
                 </p>
               </div>

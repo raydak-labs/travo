@@ -24,7 +24,7 @@ export function SystemTimezoneCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Time & Timezone</CardTitle>
-        <Clock className="h-4 w-4 text-gray-500" />
+        <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {tzLoading ? (
@@ -33,7 +33,7 @@ export function SystemTimezoneCard() {
           <div className="space-y-4">
             <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
               <div className="grid grid-cols-2 gap-2">
-                <span className="text-gray-500">Timezone</span>
+                <span className="text-gray-500 dark:text-gray-400">Timezone</span>
                 <span className="text-gray-900 dark:text-white">
                   {timezoneConfig?.zonename || '—'}
                 </span>

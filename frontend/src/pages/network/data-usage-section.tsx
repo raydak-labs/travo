@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BarChart2, RefreshCw, Settings } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useDataUsage, useDataBudget, useSetDataBudget } from '@/hooks/use-data-usage';
 import type { DataBudget } from '@shared/index';
@@ -14,20 +15,30 @@ export function DataUsageSection() {
   const setBudgetMutation = useSetDataBudget();
   const [editingBudget, setEditingBudget] = useState<string | null>(null);
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle>Data Usage</CardTitle>
+          <BarChart2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!status?.available) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Data Usage</CardTitle>
-          <BarChart2 className="h-4 w-4 text-gray-500" />
+          <BarChart2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500">
-            Install the <strong>Data Usage (vnstat)</strong> service to track cumulative traffic per
-            interface with budget warnings.
-          </p>
+          <EmptyState message="Install the Data Usage (vnstat) service to track cumulative traffic per interface with budget warnings." />
         </CardContent>
       </Card>
     );
@@ -50,7 +61,7 @@ export function DataUsageSection() {
           <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => void refetch()}>
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
-          <BarChart2 className="h-4 w-4 text-gray-500" />
+          <BarChart2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -70,7 +81,7 @@ export function DataUsageSection() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 gap-1 text-xs text-gray-500"
+                  className="h-6 gap-1 text-xs text-gray-500 dark:text-gray-400"
                   onClick={() => setEditingBudget(iface.name)}
                 >
                   <Settings className="h-3 w-3" />

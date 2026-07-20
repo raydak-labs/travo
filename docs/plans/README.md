@@ -20,6 +20,7 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`2026-04-11-repeater-radio-policy-and-wifi-ux.md`](2026-04-11-repeater-radio-policy-and-wifi-ux.md) | Repeater radio policy, unified AP UX | `wifi`, `repeater` |
 | [`2026-07-08-auth-hardening.md`](2026-07-08-auth-hardening.md) | Auth follow-ups: blocklist persistence, WS token transport, token storage | `auth`, `security` |
 | [`2026-07-08-hardening-followups-and-persistence.md`](2026-07-08-hardening-followups-and-persistence.md) | Work log + queue: vpn sleeps, wifi split, WS-fed queries, bbolt persistence | `reliability`, `persistence`, `refactor` |
+| [`2026-07-20-ui-consistency.md`](2026-07-20-ui-consistency.md) | Unify page shell, cards, loading/empty/error, labels, status chrome | `frontend`, `ux`, `theming`, `consistency` |
 | [`adguard-auto-configure.md`](adguard-auto-configure.md) | AdGuard install + dnsmasq integration | `adguard`, `dns`, `services` |
 | [`cicd-pipeline.md`](cicd-pipeline.md) | CI/CD for build/test/package | `cicd`, `deployment` |
 | [`connection-failover.md`](connection-failover.md) | Multi-WAN failover | `wan`, `failover`, `network` |

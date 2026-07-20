@@ -12,10 +12,10 @@ export function SpeedTestCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Speed Test</CardTitle>
-        <Gauge className="h-4 w-4 text-gray-500" />
+        <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Measures download speed from the router using a 10 MB test file from Cloudflare.
         </p>
 
@@ -34,15 +34,15 @@ export function SpeedTestCard() {
         {speedTest.data && (
           <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500">Download</span>
+              <span className="text-gray-500 dark:text-gray-400">Download</span>
               <span className="font-medium text-gray-900 dark:text-white">
                 {speedTest.data.download_mbps} Mbps
               </span>
-              <span className="text-gray-500">Latency</span>
+              <span className="text-gray-500 dark:text-gray-400">Latency</span>
               <span className="font-medium text-gray-900 dark:text-white">
                 {speedTest.data.ping_ms} ms
               </span>
-              <span className="text-gray-500">Server</span>
+              <span className="text-gray-500 dark:text-gray-400">Server</span>
               <span className="text-gray-900 dark:text-white">{speedTest.data.server}</span>
             </div>
           </div>

@@ -59,7 +59,7 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           </span>
         ) : null}
       </div>
-      <span className="pb-2 text-xs text-gray-500">GB/month, warn at</span>
+      <span className="pb-2 text-xs text-gray-500 dark:text-gray-400">GB/month, warn at</span>
       <div className="flex flex-col gap-0.5">
         <Input
           className="h-7 w-16 text-sm"
@@ -74,7 +74,7 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           </span>
         ) : null}
       </div>
-      <span className="pb-2 text-xs text-gray-500">%</span>
+      <span className="pb-2 text-xs text-gray-500 dark:text-gray-400">%</span>
       <Button type="submit" size="sm" className="h-7 text-xs">
         Save
       </Button>

@@ -20,7 +20,7 @@ export function SystemPowerSection() {
         </h2>
         <Card className="border-red-200 dark:border-red-900">
           <CardContent className="space-y-4 pt-4">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               These actions are irreversible or will cause a service interruption. Proceed with
               caution.
             </p>
@@ -39,7 +39,7 @@ export function SystemPowerSection() {
                 Factory Reset
               </Button>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Shut Down powers off the device — you will need physical access to turn it back on.
             </p>
           </CardContent>

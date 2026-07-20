@@ -51,7 +51,7 @@ export function ServiceCard({
                 {serviceStateLabels[service.state]}
               </Badge>
             </div>
-            <p className="mt-1 text-sm text-gray-500">{service.description}</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{service.description}</p>
             {service.version && <p className="mt-0.5 text-xs text-gray-400">v{service.version}</p>}
 
             {service.state !== 'not_installed' && (

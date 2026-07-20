@@ -32,7 +32,7 @@ export function WireguardStatusToggleRow({
               : 'Disconnected'}
         </Badge>
         {isToggling && (
-          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+          <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <Loader2 className="h-3 w-3 animate-spin" />
             Applying changes…
           </span>

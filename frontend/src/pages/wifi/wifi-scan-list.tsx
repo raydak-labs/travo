@@ -97,7 +97,7 @@ export function WifiScanList({
                   <>
                     <button
                       type="button"
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                       onClick={() => setExpandedKey(isExpanded ? null : listKey)}
                       aria-expanded={isExpanded}
                     >

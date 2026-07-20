@@ -106,7 +106,7 @@ describe('DashboardPage', () => {
     expect(reachable.className).toMatch(/dark:text-emerald-400/);
     const vpnState = screen.getByText(/^(On|Off)$/);
     if (vpnState.textContent === 'Off') {
-      expect(vpnState.className).toMatch(/text-gray-500/);
+      expect(vpnState.className).toMatch(/text-gray-500 dark:text-gray-400/);
       expect(vpnState.className).toMatch(/dark:text-gray-400/);
     } else {
       expect(vpnState.className).toMatch(/text-emerald-600/);

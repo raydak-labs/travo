@@ -12,7 +12,7 @@ export function ClientsDhcpReservationsCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Static IP Reservations</CardTitle>
-        <BookmarkPlus className="h-4 w-4 text-gray-500" />
+        <BookmarkPlus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {!reservations || reservations.length === 0 ? (
@@ -22,10 +22,10 @@ export function ClientsDhcpReservationsCard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left dark:border-gray-700">
-                  <th className="pb-2 font-medium text-gray-500">Hostname</th>
-                  <th className="pb-2 font-medium text-gray-500">MAC</th>
-                  <th className="pb-2 font-medium text-gray-500">IP</th>
-                  <th className="pb-2 text-right font-medium text-gray-500">Actions</th>
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Hostname</th>
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">MAC</th>
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">IP</th>
+                  <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -35,7 +35,7 @@ export function ClientsDhcpReservationsCard() {
                     className="border-b border-gray-100 last:border-0 dark:border-white/[0.08]"
                   >
                     <td className="py-2 pr-4 text-gray-900 dark:text-white">{r.name}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-gray-500">{r.mac}</td>
+                    <td className="py-2 pr-4 font-mono text-xs text-gray-500 dark:text-gray-400">{r.mac}</td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{r.ip}</td>
                     <td className="py-2 text-right">
                       <Button

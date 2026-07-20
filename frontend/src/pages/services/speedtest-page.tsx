@@ -53,7 +53,7 @@ export function SpeedtestPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>speedtest CLI</CardTitle>
-          <Gauge className="h-5 w-5 text-gray-500" />
+          <Gauge className="h-5 w-5 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
@@ -116,7 +116,7 @@ export function SpeedtestPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Run Speed Test</CardTitle>
-          <Gauge className="h-5 w-5 text-gray-500" />
+          <Gauge className="h-5 w-5 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -134,28 +134,28 @@ export function SpeedtestPage() {
           {runMutation.data && (
             <div className="grid gap-3 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
               <div className="flex items-center gap-2">
-                <Download className="h-4 w-4 text-gray-500" />
+                <Download className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Download</span>
                 <span className="ml-auto font-medium">
                   {runMutation.data.download_mbps.toFixed(2)} Mbps
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Upload className="h-4 w-4 text-gray-500" />
+                <Upload className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Upload</span>
                 <span className="ml-auto font-medium">
                   {runMutation.data.upload_mbps.toFixed(2)} Mbps
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-500" />
+                <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Ping</span>
                 <span className="ml-auto font-medium">
                   {runMutation.data.ping_ms.toFixed(1)} ms
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Server className="h-4 w-4 text-gray-500" />
+                <Server className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Server</span>
                 <span className="ml-auto font-medium">{runMutation.data.server}</span>
               </div>

@@ -32,7 +32,7 @@ export function FirmwareUpgradeFormFields({
 }: FirmwareUpgradeFormFieldsProps) {
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         Upload a sysupgrade firmware image (.bin) to flash the device.
       </p>
       <div>

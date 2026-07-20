@@ -15,7 +15,7 @@ export function WanConfigCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>WAN Configuration</CardTitle>
-        <Wifi className="h-4 w-4 text-gray-500" />
+        <Wifi className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -26,19 +26,19 @@ export function WanConfigCard() {
         ) : network?.wan ? (
           <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500">Type</span>
+              <span className="text-gray-500 dark:text-gray-400">Type</span>
               <span className="text-gray-900 dark:text-white">{network.wan.type}</span>
-              <span className="text-gray-500">IP Address</span>
+              <span className="text-gray-500 dark:text-gray-400">IP Address</span>
               <span className="text-gray-900 dark:text-white">{network.wan.ip_address}</span>
-              <span className="text-gray-500">Gateway</span>
+              <span className="text-gray-500 dark:text-gray-400">Gateway</span>
               <span className="text-gray-900 dark:text-white">{network.wan.gateway}</span>
-              <span className="text-gray-500">DNS</span>
+              <span className="text-gray-500 dark:text-gray-400">DNS</span>
               <span className="text-gray-900 dark:text-white">
                 {(network.wan.dns_servers ?? []).join(', ') || '—'}
               </span>
-              <span className="text-gray-500">MAC</span>
+              <span className="text-gray-500 dark:text-gray-400">MAC</span>
               <span className="text-gray-900 dark:text-white">{network.wan.mac_address}</span>
-              <span className="text-gray-500">Traffic</span>
+              <span className="text-gray-500 dark:text-gray-400">Traffic</span>
               <span className="text-gray-900 dark:text-white">
                 ↓ {formatBytes(network.wan.rx_bytes)} / ↑ {formatBytes(network.wan.tx_bytes)}
               </span>

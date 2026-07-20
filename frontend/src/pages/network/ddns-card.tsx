@@ -71,7 +71,7 @@ export function DdnsCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Dynamic DNS (DDNS)</CardTitle>
-        <RefreshCw className="h-4 w-4 text-gray-500" />
+        <RefreshCw className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {ddnsConfigLoading ? (

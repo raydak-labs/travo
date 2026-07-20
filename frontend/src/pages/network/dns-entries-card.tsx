@@ -38,7 +38,7 @@ export function DnsEntriesCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Local DNS Entries</CardTitle>
-        <MapPin className="h-4 w-4 text-gray-500" />
+        <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {dnsEntriesLoading ? (
@@ -52,7 +52,7 @@ export function DnsEntriesCard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-gray-500">
+                    <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                       <th className="pb-2 font-medium">Hostname</th>
                       <th className="pb-2 font-medium">IP Address</th>
                       <th className="w-16 pb-2 font-medium"></th>

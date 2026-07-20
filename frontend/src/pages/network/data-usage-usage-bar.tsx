@@ -11,7 +11,7 @@ export function DataUsageUsageBar({ used, limit, label }: UsageBarProps) {
   const color = pct >= 90 ? 'bg-red-500' : pct >= 80 ? 'bg-yellow-500' : 'bg-blue-500';
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>{label}</span>
         <span>
           {formatBytes(used)} / {formatBytes(limit)} ({pct.toFixed(0)}%)

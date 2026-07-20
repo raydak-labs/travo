@@ -63,11 +63,11 @@ export function HardwareButtonsCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Hardware Buttons</CardTitle>
-        <ToggleLeft className="h-4 w-4 text-gray-500" />
+        <ToggleLeft className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Configure what each physical button does when pressed.
         </p>
 

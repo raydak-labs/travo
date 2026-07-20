@@ -23,7 +23,7 @@ export function InterfaceTrafficCharts() {
               connected ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-600'
             }`}
           />
-          <Activity className="h-4 w-4 text-gray-500" />
+          <Activity className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </div>
       </CardHeader>
       <CardContent>

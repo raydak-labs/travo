@@ -59,7 +59,7 @@ export function SetupWifiNetworkList({
                   onClick={() => onPickNetwork(network)}
                 >
                   <div className="flex items-center gap-3">
-                    <Signal className="h-4 w-4 text-gray-500" />
+                    <Signal className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <div>
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
                         {network.ssid}

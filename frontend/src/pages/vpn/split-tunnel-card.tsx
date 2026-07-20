@@ -63,7 +63,7 @@ export function SplitTunnelCard() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Control which traffic is routed through the WireGuard VPN.
           </p>
 
@@ -96,7 +96,7 @@ export function SplitTunnelCard() {
               <textarea
                 placeholder="e.g. 10.0.0.0/8, 192.168.1.0/24"
                 rows={3}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500"
                 {...register('routes_text')}
               />
               <p className="text-xs text-gray-400">

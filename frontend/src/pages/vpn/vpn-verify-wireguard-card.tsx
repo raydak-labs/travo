@@ -41,10 +41,10 @@ export function VpnVerifyWireguardCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Verify VPN</CardTitle>
-        <ShieldCheck className="h-4 w-4 text-gray-500" />
+        <ShieldCheck className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Check that the WireGuard tunnel, routes, and firewall rules are correctly configured.
         </p>
 

@@ -22,7 +22,7 @@ export function WiFiScheduleFormFields({
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
           <p className="text-sm">Enable schedule</p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Automatically turn WiFi on and off at set times (cron-based)
           </p>
         </div>

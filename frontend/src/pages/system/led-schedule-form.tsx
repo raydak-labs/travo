@@ -34,7 +34,7 @@ export function LedScheduleForm({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">LED Schedule</p>
-          <p className="text-xs text-gray-500">Automatically turn LEDs on/off at set times</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Automatically turn LEDs on/off at set times</p>
         </div>
         <Switch id="led-schedule" label="Enable schedule" {...register('enabled')} />
       </div>

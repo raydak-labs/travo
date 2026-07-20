@@ -50,7 +50,7 @@ function WanInterplay({ interfaces }: { interfaces: readonly NetworkInterface[] 
             <div className="flex-1">
               <span className="text-sm font-medium text-gray-900 dark:text-white">{src.label}</span>
               {src.iface && (
-                <span className="ml-2 text-xs text-gray-500">
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                   {src.active ? src.iface.ip_address : 'down'}
                 </span>
               )}
@@ -88,7 +88,7 @@ export function WanStatusCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>WAN Status</CardTitle>
-        <Cable className="h-4 w-4 text-gray-500" />
+        <Cable className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Internet connectivity row */}

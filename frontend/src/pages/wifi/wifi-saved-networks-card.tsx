@@ -67,20 +67,18 @@ export function WifiSavedNetworksCard() {
           <InfoTooltip text={SAVED_LIST_TOOLTIP} />
         </div>
         <CardDescription>
-          <span className="text-muted-foreground">
-            In use = enabled profile; standby = saved but not active. <strong>Connect</strong> uses
-            the stored password. Arrows set priority for automatic selection (see info).
-          </span>
+          In use = enabled profile; standby = saved but not active. <strong>Connect</strong> uses
+          the stored password. Arrows set priority for automatic selection (see info).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-muted/15">
+        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-gray-800/30">
           <div className="min-w-0 space-y-0.5 pr-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Auto-reconnect</span>
               <InfoTooltip text={AUTO_RECONNECT_HELP} />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Retry Wi‑Fi when the link drops (active profile only).
             </p>
           </div>
@@ -103,7 +101,7 @@ export function WifiSavedNetworksCard() {
           <EmptyState message="No saved networks" />
         ) : (
           <ul
-            className="divide-y divide-border rounded-lg border border-border dark:divide-white/10 dark:border-white/10"
+            className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-white/10 dark:border-white/10"
             role="list"
           >
             {savedNetworks.map((network, index) => {
@@ -119,7 +117,7 @@ export function WifiSavedNetworksCard() {
                 className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-1"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <Wifi className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Wifi className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{network.ssid}</p>
                     <SecurityBadge encryption={network.encryption} />
@@ -213,7 +211,7 @@ export function WifiSavedNetworksCard() {
               <DialogTitle>Remove saved network</DialogTitle>
               <DialogDescription>
                 Are you sure you want to remove the saved network{' '}
-                <span className="font-medium text-foreground">"{pendingDelete?.ssid}"</span>?
+                <span className="font-medium">"{pendingDelete?.ssid}"</span>?
               </DialogDescription>
             </DialogHeader>
 

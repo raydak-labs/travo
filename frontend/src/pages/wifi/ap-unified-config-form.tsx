@@ -175,12 +175,12 @@ export function APUnifiedConfigForm({
               className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
             >
               <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4 text-gray-500" />
+                <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {ap.radio}
                 </span>
                 <Badge variant="outline">{bandLabel(ap.band)}</Badge>
-                <span className="text-xs text-gray-500">Ch {ap.channel}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
               </div>
               <Switch
                 id={`ap-unified-enabled-${ap.section}`}

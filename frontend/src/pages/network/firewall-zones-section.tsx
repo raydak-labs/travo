@@ -12,7 +12,7 @@ type FirewallZonesSectionProps = {
 export function FirewallZonesSection({ zones, zonesLoading }: FirewallZonesSectionProps) {
   return (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         Firewall Zones
       </h3>
       {zonesLoading ? (
@@ -24,7 +24,7 @@ export function FirewallZonesSection({ zones, zonesLoading }: FirewallZonesSecti
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-gray-500">
+              <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                 <th className="pb-2 font-medium">Zone</th>
                 <th className="pb-2 font-medium">Networks</th>
                 <th className="pb-2 font-medium">Input</th>
@@ -37,7 +37,7 @@ export function FirewallZonesSection({ zones, zonesLoading }: FirewallZonesSecti
               {zones.map((zone) => (
                 <tr key={zone.name} className="border-b last:border-0">
                   <td className="py-2 font-medium text-gray-900 dark:text-white">{zone.name}</td>
-                  <td className="py-2 text-gray-500">
+                  <td className="py-2 text-gray-500 dark:text-gray-400">
                     {zone.network && zone.network.length > 0 ? zone.network.join(', ') : '—'}
                   </td>
                   <td className="py-2">

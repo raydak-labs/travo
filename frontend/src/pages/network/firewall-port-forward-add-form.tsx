@@ -55,7 +55,7 @@ export function FirewallPortForwardAddForm({ addRule }: FirewallPortForwardAddFo
       noValidate
       aria-label="Add port forwarding rule"
     >
-      <p className="text-xs text-gray-500">Add port forwarding rule</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">Add port forwarding rule</p>
       <FirewallPortForwardAddFormGrid
         register={register}
         control={control}

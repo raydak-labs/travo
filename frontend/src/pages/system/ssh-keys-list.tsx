@@ -27,16 +27,16 @@ export function SSHKeysList({ keys, deletePending, onDelete }: SSHKeysListProps)
               <Badge variant="secondary" className="shrink-0 font-mono text-xs">
                 {k.key.split(' ')[0] ?? 'key'}
               </Badge>
-              {k.comment && <span className="truncate text-sm text-foreground">{k.comment}</span>}
+              {k.comment && <span className="truncate text-sm">{k.comment}</span>}
             </div>
-            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+            <p className="mt-1 truncate font-mono text-xs text-gray-500 dark:text-gray-400">
               {k.key.slice(0, 40)}…
             </p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0 text-destructive hover:text-destructive"
+            className="shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
             disabled={deletePending}
             onClick={() => onDelete(k.index)}
             aria-label="Delete SSH key"

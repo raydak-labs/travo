@@ -51,7 +51,7 @@ export function DhcpPoolSettingsCard() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>DHCP Configuration</CardTitle>
-        <Settings className="h-4 w-4 text-gray-500" />
+        <Settings className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {dhcpLoading ? (
