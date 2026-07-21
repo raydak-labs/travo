@@ -118,7 +118,7 @@ export function WifiSavedNetworksCard() {
               return (
               <li
                 key={network.section}
-                className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-1"
+                className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <Wifi className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
