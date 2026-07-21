@@ -79,13 +79,12 @@ export function MacAddressCloneBlock({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" onClick={onRandomLocal}>
+        <Button type="button" onClick={onRandomLocal}>
           <Shuffle className="mr-1 h-4 w-4" />
           Random
         </Button>
         <Button
           type="button"
-          size="sm"
           variant="outline"
           disabled={randomizePending}
           onClick={onRandomizeApply}
@@ -93,16 +92,10 @@ export function MacAddressCloneBlock({
           <Shuffle className="mr-1 h-4 w-4" />
           {randomizePending ? 'Randomizing...' : 'Randomize & Apply'}
         </Button>
-        <Button type="submit" size="sm" disabled={setMacPending}>
+        <Button type="submit" disabled={setMacPending}>
           {setMacPending ? 'Applying...' : 'Apply'}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={setMacPending}
-          onClick={onResetDefault}
-        >
+        <Button type="button" variant="outline" disabled={setMacPending} onClick={onResetDefault}>
           <RotateCcw className="mr-1 h-4 w-4" />
           Reset to Default
         </Button>

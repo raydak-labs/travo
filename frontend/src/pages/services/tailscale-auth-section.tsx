@@ -30,7 +30,7 @@ export function TailscaleAuthSection() {
           aria-label="Tailscale pre-auth key"
           {...register('auth_key')}
         />
-        <Button type="submit" size="sm" disabled={authMutation.isPending}>
+        <Button type="submit" disabled={authMutation.isPending}>
           Authenticate
         </Button>
       </form>

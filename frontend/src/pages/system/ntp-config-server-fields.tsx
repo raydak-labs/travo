@@ -4,6 +4,7 @@ import type {
   UseFieldArrayReturn,
   UseFormReturn,
 } from 'react-hook-form';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,18 +33,18 @@ export function NtpConfigServerFields({
       {fields.map((field, index) => (
         <div key={field.id} className="flex items-center gap-2">
           <Input
-            className="h-8 text-sm"
             aria-invalid={!!errors.servers?.[index]?.value}
             {...register(`servers.${index}.value` as const)}
           />
           <Button
             type="button"
-            size="sm"
+            size="icon"
             variant="ghost"
-            className="h-8 px-2 text-red-500 hover:text-red-700"
+            className="shrink-0 text-red-500 hover:text-red-700"
             onClick={() => remove(index)}
+            aria-label={`Remove NTP server ${index + 1}`}
           >
-            Remove
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ))}
@@ -51,7 +52,6 @@ export function NtpConfigServerFields({
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col gap-0.5">
           <Input
-            className="h-8 text-sm"
             placeholder="Add NTP server address"
             aria-invalid={addServerForm.formState.errors.server ? 'true' : undefined}
             aria-describedby={addServerForm.formState.errors.server ? 'ntp-draft-err' : undefined}
@@ -74,9 +74,7 @@ export function NtpConfigServerFields({
         </div>
         <Button
           type="button"
-          size="sm"
           variant="outline"
-          className="h-8"
           onClick={() =>
             addServerForm.handleSubmit((d) => {
               append({ value: d.server });

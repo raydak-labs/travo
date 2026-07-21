@@ -71,13 +71,9 @@ export function VpnVerifyWireguardCard() {
           <div className="space-y-2 pt-1">
             <div className="flex items-center gap-2">
               {allOk ? (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                  All checks passed
-                </Badge>
+                <Badge variant="success">All checks passed</Badge>
               ) : (
-                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                  Issues detected
-                </Badge>
+                <Badge variant="destructive">Issues detected</Badge>
               )}
             </div>
             <div className="space-y-1.5 rounded-md bg-gray-50 p-3 dark:bg-gray-800">

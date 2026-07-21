@@ -39,13 +39,9 @@ export function USBTetheringSection() {
                 {status.interface}
               </Badge>
               {status.is_up ? (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                  Up
-                </Badge>
+                <Badge variant="success">Up</Badge>
               ) : (
-                <Badge variant="secondary" className="text-xs">
-                  Down
-                </Badge>
+                <Badge variant="secondary">Down</Badge>
               )}
             </div>
             {status.ip_address && (
@@ -53,9 +49,7 @@ export function USBTetheringSection() {
             )}
             {status.configured ? (
               <div className="flex items-center gap-2">
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
-                  Configured as WAN
-                </Badge>
+                <Badge variant="default">Configured as WAN</Badge>
                 <Button
                   variant="outline"
                   size="sm"

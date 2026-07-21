@@ -61,7 +61,6 @@ export function MACPolicyAddForm({ onValidSubmit, isPending }: MACPolicyAddFormP
           </div>
           <Button
             type="submit"
-            size="sm"
             disabled={isPending}
             className="gap-1.5 shrink-0 sm:self-start"
           >

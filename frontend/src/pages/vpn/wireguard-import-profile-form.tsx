@@ -85,7 +85,7 @@ export function WireguardImportProfileForm({
           {importErrors.config.message}
         </p>
       ) : null}
-      <Button type="submit" size="sm" disabled={isSaving}>
+      <Button type="submit" disabled={isSaving}>
         <Plus className="mr-1 h-4 w-4" />
         {isSaving ? 'Saving...' : 'Save Profile'}
       </Button>

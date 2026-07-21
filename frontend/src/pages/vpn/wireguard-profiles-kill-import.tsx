@@ -2,6 +2,7 @@ import type { UseFormReturn } from 'react-hook-form';
 import { ShieldAlert, Trash2, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CardInset } from '@/components/ui/card-inset';
 import { Switch } from '@/components/ui/switch';
 import type { WireGuardProfile, KillSwitchStatus } from '@shared/index';
 import type { WireguardProfileImportFormValues } from '@/lib/schemas/vpn-forms';
@@ -79,7 +80,7 @@ export function WireguardProfilesKillImport({
         </div>
       )}
 
-      <div className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+      <CardInset>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-orange-500" />
@@ -99,7 +100,7 @@ export function WireguardProfilesKillImport({
             ? 'All traffic is blocked if VPN disconnects. Disable to allow direct internet access.'
             : 'When enabled, blocks all internet traffic if the VPN connection drops to prevent IP leaks.'}
         </p>
-      </div>
+      </CardInset>
 
       <WireguardImportProfileForm
         form={importForm}

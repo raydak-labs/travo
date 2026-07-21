@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CardInset } from '@/components/ui/card-inset';
 import { useResetDataUsage } from '@/hooks/use-data-usage';
 import type { DataBudget, DataUsageInterface } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
@@ -15,7 +16,7 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
   const resetMutation = useResetDataUsage();
 
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <CardInset className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{iface.label}</span>
         <div className="flex items-center gap-2">
@@ -66,6 +67,6 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
           label="Monthly budget"
         />
       )}
-    </div>
+    </CardInset>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { CardInset } from '@/components/ui/card-inset';
 import type { RepeaterUpstreamConfig, RepeaterApFormConfig } from './types';
 import { mapScanEncryptionToUci } from './map-encryption';
 
@@ -55,7 +56,7 @@ export function RepeaterWizardConfigureApStep({
         </p>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border p-3">
+      <CardInset className="flex items-center justify-between">
         <div className="space-y-0.5">
           <span className="text-sm font-medium text-gray-900 dark:text-white">
             Same as upstream
@@ -79,12 +80,12 @@ export function RepeaterWizardConfigureApStep({
             }));
           }}
         />
-      </div>
+      </CardInset>
 
       {!apConfig.sameAsUpstream && (
         <>
           {!apConfig.separateBandConfig && (
-            <div className="space-y-3 rounded-lg border p-4">
+            <CardInset className="space-y-3 p-4">
               <div className="space-y-2">
                 <Label
                   htmlFor="ap-ssid-shared"
@@ -146,10 +147,10 @@ export function RepeaterWizardConfigureApStep({
                   )}
                 </div>
               )}
-            </div>
+            </CardInset>
           )}
 
-          <div className="flex items-center justify-between rounded-lg border p-3">
+          <CardInset className="flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-sm font-medium text-gray-900 dark:text-white">
                 Different settings per radio
@@ -183,7 +184,7 @@ export function RepeaterWizardConfigureApStep({
                 });
               }}
             />
-          </div>
+          </CardInset>
 
           {apConfig.separateBandConfig &&
             (apConfigs ?? []).map((ap) => {
@@ -193,7 +194,7 @@ export function RepeaterWizardConfigureApStep({
                 key: '',
               };
               return (
-                <div key={ap.section} className="space-y-3 rounded-lg border p-4">
+                <CardInset key={ap.section} className="space-y-3 p-4">
                   <p className="text-sm font-medium">{bandLabel(ap.band)}</p>
                   <div className="space-y-2">
                     <Label
@@ -271,13 +272,13 @@ export function RepeaterWizardConfigureApStep({
                       />
                     </div>
                   )}
-                </div>
+                </CardInset>
               );
             })}
         </>
       )}
 
-      <div className="flex items-center justify-between rounded-lg border p-3">
+      <CardInset className="flex items-center justify-between">
         <div className="space-y-0.5">
           <span className="text-sm font-medium text-gray-900 dark:text-white">
             Allow Wi‑Fi on uplink radio
@@ -293,7 +294,7 @@ export function RepeaterWizardConfigureApStep({
           checked={allowApOnStaRadio}
           onChange={(e) => setAllowApOnStaRadio(e.target.checked)}
         />
-      </div>
+      </CardInset>
 
       <DialogFooter>
         <Button variant="outline" onClick={onBack}>

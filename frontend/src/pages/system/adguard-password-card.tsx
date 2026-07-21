@@ -91,12 +91,11 @@ export function AdGuardPasswordCard() {
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="submit"
-                size="sm"
                 disabled={changePasswordMutation.isPending || isSubmitting}
               >
                 {changePasswordMutation.isPending ? 'Saving…' : 'Save Password'}
               </Button>
-              <Button type="button" size="sm" variant="outline" onClick={resetAndClose}>
+              <Button type="button" variant="outline" onClick={resetAndClose}>
                 Cancel
               </Button>
             </div>

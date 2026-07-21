@@ -1,7 +1,7 @@
 ---
 title: Plans index
 description: Searchable catalog of all planning and historical design docs in this directory.
-updated: 2026-04-13
+updated: 2026-07-21
 tags: [plans, traceability, index]
 ---
 
@@ -22,6 +22,8 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`2026-07-08-hardening-followups-and-persistence.md`](2026-07-08-hardening-followups-and-persistence.md) | Work log + queue: vpn sleeps, wifi split, WS-fed queries, bbolt persistence | `reliability`, `persistence`, `refactor` |
 | [`2026-07-20-ui-consistency.md`](2026-07-20-ui-consistency.md) | Unify page shell, cards, loading/empty/error, labels, status chrome | `frontend`, `ux`, `theming`, `consistency` |
 | [`2026-07-20-nested-cards-approach-a.md`](2026-07-20-nested-cards-approach-a.md) | Flatten nested panels, equal-height WiFi cards, form chrome (shadcn-like) | `frontend`, `ux`, `cards` |
+| [`_primitive-usage-audit.md`](_primitive-usage-audit.md) | Call-site audit: Select h-9, form `sm` buttons, CardInset leftovers, Badge bypass | `frontend`, `ux`, `audit` |
+| [`_primitive-mop-report.md`](_primitive-mop-report.md) | Mop-up: Select h-10, form buttons, CardInset, Badge variants, docs | `frontend`, `ux` |
 | [`adguard-auto-configure.md`](adguard-auto-configure.md) | AdGuard install + dnsmasq integration | `adguard`, `dns`, `services` |
 | [`cicd-pipeline.md`](cicd-pipeline.md) | CI/CD for build/test/package | `cicd`, `deployment` |
 | [`connection-failover.md`](connection-failover.md) | Multi-WAN failover | `wan`, `failover`, `network` |

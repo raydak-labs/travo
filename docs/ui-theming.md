@@ -1,7 +1,7 @@
 ---
 title: Frontend UI and theming
 description: ThemeProvider, dark class, Tailwind tokens, chart variables, contrast rules.
-updated: 2026-07-20
+updated: 2026-07-21
 tags: [docs, frontend, theming, tailwind]
 ---
 
@@ -51,7 +51,25 @@ Recharts ticks and tooltips cannot use Tailwind classes directly. Use CSS variab
 
 ## Nested regions
 
-Inside a `Card`, use **`CardInset`** (`frontend/src/components/ui/card-inset.tsx`) for sub-groups — border only (`default`) or border + muted fill (`muted`). Do not nest a second shadowed `Card`.
+Inside a `Card`, use **`CardInset`** (`frontend/src/components/ui/card-inset.tsx`) for sub-groups — border only (`default`) or border + muted fill (`muted`). Do not nest a second shadowed `Card`. Prefer `CardInset` over hand-rolled `rounded-lg border p-3/4` nests on the card plane. Keep semantic alert/banner boxes (amber/red/blue health) as custom surfaces — not `CardInset`.
+
+## Form density
+
+| Tier | Height | When |
+|------|--------|------|
+| **Form rows** | Default control height (`Input` / `SelectTrigger` / submit `Button` = **`h-10`**) | Labeled fields, add/save rows next to `Input` |
+| **Dense chrome** | `Button size="sm"` (and icon rows) | Logs filters, page header actions, service action icon rows, quick actions — **not** form rows with labeled Inputs |
+
+`SelectTrigger` default is **`h-10`** with light `border-gray-300` and dark `border-white/10` (card-plane consistency). Do not leave form submits at `size="sm"` beside default Inputs.
+
+## Badge exceptions
+
+| Exception | Where | Why |
+|-----------|--------|-----|
+| **`LogsLevelBadge`** | `logs-level-badge.tsx` | Dense uppercase terminal chips; parallel to `Badge` by design |
+| **Dashboard `SourceCard` status pill** | `dashboard-page.tsx` | Forced-dark topology card; custom chip, not `Badge` |
+
+Elsewhere prefer `Badge` variants (`success` / `destructive` / `default` / `secondary` / `outline` / `warning`) over hand-rolled `bg-green-*` / `bg-red-*` / `bg-blue-*` className overrides.
 
 ## Borders in dark mode
 

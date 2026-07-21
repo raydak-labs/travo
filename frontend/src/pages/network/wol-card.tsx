@@ -55,7 +55,7 @@ export function WoLCard() {
             <Label>Interface (optional)</Label>
             <Input placeholder="br-lan" {...register('interface')} />
           </div>
-          <Button type="submit" size="sm" disabled={sendWoL.isPending}>
+          <Button type="submit" disabled={sendWoL.isPending}>
             <Zap className="mr-1.5 h-3.5 w-3.5" />
             {sendWoL.isPending ? 'Sending…' : 'Send Magic Packet'}
           </Button>

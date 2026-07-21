@@ -101,7 +101,7 @@ export function FirewallPortForwardAddFormGrid({
           </p>
         ) : null}
       </div>
-      <Button type="submit" size="sm" className="self-end" disabled={isPending}>
+      <Button type="submit" className="self-end" disabled={isPending}>
         {isPending ? 'Adding…' : 'Add'}
       </Button>
     </div>

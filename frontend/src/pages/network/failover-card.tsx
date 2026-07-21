@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -186,7 +187,7 @@ export function FailoverCard() {
 
             <div className="space-y-3">
               {draft?.candidates.map((candidate, index) => (
-                <div key={candidate.interface_name} className="rounded-md border p-3">
+                <CardInset key={candidate.interface_name}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="font-medium">{candidate.label}</div>
@@ -251,7 +252,7 @@ export function FailoverCard() {
                       Move down
                     </Button>
                   </div>
-                </div>
+                </CardInset>
               ))}
             </div>
 
@@ -324,18 +325,12 @@ export function FailoverCard() {
 
             <div className="flex flex-wrap gap-2">
               <Button
-                size="sm"
                 onClick={handleSave}
                 disabled={setConfig.isPending || ((draft?.enabled ?? false) && enabledCount === 0)}
               >
                 {setConfig.isPending ? 'Saving…' : 'Save Failover Settings'}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancel}
-                disabled={setConfig.isPending}
-              >
+              <Button variant="outline" onClick={handleCancel} disabled={setConfig.isPending}>
                 Cancel
               </Button>
             </div>

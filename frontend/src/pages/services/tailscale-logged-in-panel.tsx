@@ -43,9 +43,7 @@ export function TailscaleLoggedInPanel({
               {status.exit_node}
             </span>
             {status.exit_node_active && (
-              <Badge className="bg-green-100 text-xs text-green-800 dark:bg-green-900 dark:text-green-200">
-                Active
-              </Badge>
+              <Badge variant="success">Active</Badge>
             )}
             <Button
               variant="ghost"

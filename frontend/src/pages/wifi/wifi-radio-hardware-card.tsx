@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Cpu, Radio } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { CardInset } from '@/components/ui/card-inset';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,9 +67,9 @@ export function WifiRadioHardwareCard() {
                 radio.band === '5g' ? 'ap' : radio.band === '2g' ? 'sta' : null;
               const isRecommended = recommendedRole && radio.role === recommendedRole;
               return (
-                <div
+                <CardInset
                   key={radio.name}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                  className="flex items-center justify-between gap-3"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <Radio className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
@@ -78,9 +79,7 @@ export function WifiRadioHardwareCard() {
                           {radio.name}
                         </p>
                         {isRecommended && (
-                          <Badge className="bg-green-100 text-xs text-green-800 dark:bg-green-900 dark:text-green-200">
-                            Recommended
-                          </Badge>
+                          <Badge variant="success">Recommended</Badge>
                         )}
 
                         {pendingDisable && (
@@ -119,7 +118,7 @@ export function WifiRadioHardwareCard() {
                       <SelectItem value="none">Disabled</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </CardInset>
               );
             })}
           </div>
