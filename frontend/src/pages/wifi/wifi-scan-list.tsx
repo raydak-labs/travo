@@ -4,6 +4,7 @@ import type { WifiScanResult, GroupedScanNetwork } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { formatWifiBandLabel, normalizeWifiBandKey } from '@/lib/wifi-band';
@@ -48,7 +49,7 @@ export function WifiScanList({
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <p className="py-4 text-center text-sm text-gray-500">No networks found</p>
+        <EmptyState message="No networks found" />
       ) : (
         <ul className="divide-y divide-gray-200 dark:divide-gray-800" role="list">
           {groups.map((group) => {
@@ -96,7 +97,7 @@ export function WifiScanList({
                   <>
                     <button
                       type="button"
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                       onClick={() => setExpandedKey(isExpanded ? null : listKey)}
                       aria-expanded={isExpanded}
                     >

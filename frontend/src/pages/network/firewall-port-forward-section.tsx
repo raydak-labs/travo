@@ -21,7 +21,7 @@ export function FirewallPortForwardSection({
 }: FirewallPortForwardSectionProps) {
   return (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         Port Forwarding
       </h3>
       {rulesLoading ? (

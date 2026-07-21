@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -102,12 +103,12 @@ export function ConfirmRadioDisableDialog({
           )}
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
-            <label
+            <Label
               htmlFor="confirm-input"
               className="block text-sm font-medium text-gray-900 dark:text-white"
             >
               Type <span className="font-mono font-bold">CONFIRM</span> to proceed
-            </label>
+            </Label>
             <input
               id="confirm-input"
               type="text"

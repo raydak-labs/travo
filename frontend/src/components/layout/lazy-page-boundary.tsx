@@ -8,7 +8,7 @@ export function LazyPageBoundary({ children }: { children: React.ReactNode }) {
     <ErrorBoundary>
       <Suspense
         fallback={
-          <div className="space-y-4 p-4 sm:p-6" aria-busy="true" aria-label="Loading page">
+          <div className="space-y-4" aria-busy="true" aria-label="Loading page">
             <Skeleton className="h-8 w-48 max-w-full" />
             <Skeleton className="h-4 w-full max-w-md" />
             <div className="grid gap-3 sm:grid-cols-2">

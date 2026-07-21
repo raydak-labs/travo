@@ -47,7 +47,7 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-wrap items-end gap-2" noValidate>
       <div className="flex flex-col gap-0.5">
         <Input
-          className="h-7 w-24 text-sm"
+          className="w-24"
           placeholder="Limit (GB)"
           aria-invalid={errors.limit_gb ? 'true' : undefined}
           aria-describedby={errors.limit_gb ? `budget-limit-${ifaceName}` : undefined}
@@ -59,10 +59,10 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           </span>
         ) : null}
       </div>
-      <span className="pb-2 text-xs text-gray-500">GB/month, warn at</span>
+      <span className="pb-2 text-xs text-gray-500 dark:text-gray-400">GB/month, warn at</span>
       <div className="flex flex-col gap-0.5">
         <Input
-          className="h-7 w-16 text-sm"
+          className="w-16"
           placeholder="80"
           aria-invalid={errors.warning_threshold_pct ? 'true' : undefined}
           aria-describedby={errors.warning_threshold_pct ? `budget-warn-${ifaceName}` : undefined}
@@ -74,10 +74,8 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           </span>
         ) : null}
       </div>
-      <span className="pb-2 text-xs text-gray-500">%</span>
-      <Button type="submit" size="sm" className="h-7 text-xs">
-        Save
-      </Button>
+      <span className="pb-2 text-xs text-gray-500 dark:text-gray-400">%</span>
+      <Button type="submit">Save</Button>
     </form>
   );
 }

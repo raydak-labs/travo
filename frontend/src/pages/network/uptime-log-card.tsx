@@ -9,8 +9,8 @@ export function UptimeLogCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Connection Uptime Log</CardTitle>
-        <Cable className="h-4 w-4 text-gray-500" />
+        <CardTitle>Connection Uptime Log</CardTitle>
+        <Cable className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {!uptimeLog || uptimeLog.length === 0 ? (
@@ -34,14 +34,22 @@ export function UptimeLogCard() {
                 <li key={event.timestamp} className="flex items-start gap-3 text-sm">
                   <span
                     className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                      isConnected ? 'bg-green-500' : 'bg-red-500'
+                      isConnected
+                        ? 'bg-emerald-500 dark:bg-emerald-400'
+                        : 'bg-red-500 dark:bg-red-400'
                     }`}
                   />
                   <div className="flex flex-col">
-                    <span className={isConnected ? 'text-green-700' : 'text-red-600'}>
+                    <span
+                      className={
+                        isConnected
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }
+                    >
                       {isConnected ? 'Connected' : 'Disconnected'}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {new Date(event.timestamp).toLocaleString()}
                       {durationMs !== null && durationMs > 0 && (
                         <> &mdash; lasted {fmt(durationMs)}</>

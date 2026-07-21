@@ -71,10 +71,10 @@ export function ReserveIpForm({ initial, onCancel }: ReserveIpFormProps) {
           ) : null}
         </div>
         <input type="hidden" {...register('mac')} />
-        <Button type="submit" size="sm" disabled={addReservation.isPending}>
+        <Button type="submit" disabled={addReservation.isPending}>
           {addReservation.isPending ? 'Saving…' : 'Save'}
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
       </div>

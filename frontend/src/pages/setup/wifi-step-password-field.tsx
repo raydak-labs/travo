@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { SetupWifiFormValues } from '@/pages/setup/setup-schema';
 
 type WifiStepPasswordFieldProps = {
@@ -20,12 +21,12 @@ export function WifiStepPasswordField({
 }: WifiStepPasswordFieldProps) {
   return (
     <div>
-      <label
+      <Label
         htmlFor="setup-wifi-psk"
         className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
       >
         Password for &quot;{selectedSsid}&quot;
-      </label>
+      </Label>
       <div className="relative">
         <Input
           id="setup-wifi-psk"

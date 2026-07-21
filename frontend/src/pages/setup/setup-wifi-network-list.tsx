@@ -3,6 +3,7 @@ import type { WifiScanResult } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { setupWifiSignalTier } from './setup-wifi-step-utils';
 
 type SetupWifiNetworkListProps = {
@@ -58,7 +59,7 @@ export function SetupWifiNetworkList({
                   onClick={() => onPickNetwork(network)}
                 >
                   <div className="flex items-center gap-3">
-                    <Signal className="h-4 w-4 text-gray-500" />
+                    <Signal className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <div>
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
                         {network.ssid}
@@ -77,7 +78,7 @@ export function SetupWifiNetworkList({
               );
             })
         ) : (
-          <p className="p-4 text-center text-sm text-gray-400">No networks found. Try scanning.</p>
+          <EmptyState message="No networks found. Try scanning." />
         )}
       </div>
     </>

@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { GitFork } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { useSplitTunnel, useSetSplitTunnel } from '@/hooks/use-vpn';
 import { splitTunnelFormSchema, type SplitTunnelFormValues } from '@/lib/schemas/vpn-forms';
 
@@ -43,11 +45,11 @@ export function SplitTunnelCard() {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Split Tunneling</CardTitle>
-          <GitFork className="h-4 w-4 text-gray-400" />
+          <CardTitle>Split Tunneling</CardTitle>
+          <GitFork className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          <div className="h-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );
@@ -56,12 +58,12 @@ export function SplitTunnelCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Split Tunneling</CardTitle>
-        <GitFork className="h-4 w-4 text-gray-400" />
+        <CardTitle>Split Tunneling</CardTitle>
+        <GitFork className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Control which traffic is routed through the WireGuard VPN.
           </p>
 
@@ -88,13 +90,13 @@ export function SplitTunnelCard() {
 
           {mode === 'custom' && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              <Label>
                 CIDR ranges (comma-separated)
-              </label>
+              </Label>
               <textarea
                 placeholder="e.g. 10.0.0.0/8, 192.168.1.0/24"
                 rows={3}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500"
                 {...register('routes_text')}
               />
               <p className="text-xs text-gray-400">

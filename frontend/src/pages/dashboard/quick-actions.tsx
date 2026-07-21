@@ -60,7 +60,7 @@ export function QuickActions() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+          <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
           <QuickActionsButtonRow

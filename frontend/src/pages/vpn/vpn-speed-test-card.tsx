@@ -2,6 +2,7 @@ import { Gauge } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { InlineError } from '@/components/ui/inline-error';
 import { useRunWireGuardSpeedTest } from '@/hooks/use-vpn';
 
 export function VpnSpeedTestCard() {
@@ -10,8 +11,8 @@ export function VpnSpeedTestCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">VPN Speed Test</CardTitle>
-        <Gauge className="h-4 w-4 text-gray-500" />
+        <CardTitle>VPN Speed Test</CardTitle>
+        <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -46,11 +47,7 @@ export function VpnSpeedTestCard() {
           </div>
         )}
 
-        {speedTest.isError && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            {speedTest.error.message}
-          </div>
-        )}
+        {speedTest.isError && <InlineError>{speedTest.error.message}</InlineError>}
       </CardContent>
     </Card>
   );

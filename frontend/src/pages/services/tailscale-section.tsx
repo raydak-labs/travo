@@ -46,13 +46,13 @@ export function TailscaleSection() {
       />
       <Card className={!isInstalled ? 'opacity-60' : undefined}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tailscale</CardTitle>
+          <CardTitle>Tailscale</CardTitle>
           <Globe className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent className="space-y-4">
           {!isInstalled ? (
             <div className="py-4 text-center">
-              <p className="mb-2 text-sm text-gray-500">Tailscale is not installed</p>
+              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">Tailscale is not installed</p>
               <Link
                 to="/services"
                 className="text-sm text-blue-600 hover:underline dark:text-blue-400"

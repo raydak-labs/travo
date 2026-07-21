@@ -1,6 +1,7 @@
 import { Controller, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -25,10 +26,10 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
     <>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className="flex items-center gap-1 text-xs text-gray-500">
+          <Label className="flex items-center gap-1">
             Start Offset
             <InfoTooltip text="First IP offset assigned to clients. Offset 100 on 192.168.1.x means the first assigned address is 192.168.1.100." />
-          </label>
+          </Label>
           <Input
             type="number"
             min={2}
@@ -44,10 +45,10 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
           ) : null}
         </div>
         <div className="space-y-1">
-          <label className="flex items-center gap-1 text-xs text-gray-500">
+          <Label className="flex items-center gap-1">
             Pool Size
             <InfoTooltip text="Maximum number of clients that can receive an IP address. E.g., 50 means up to 50 devices can connect." />
-          </label>
+          </Label>
           <Input
             type="number"
             min={1}
@@ -64,10 +65,10 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
         </div>
       </div>
       <div className="space-y-1">
-        <label className="flex items-center gap-1 text-xs text-gray-500">
+        <Label className="flex items-center gap-1">
           Lease Time
           <InfoTooltip text="How long a DHCP lease is valid before renewal. Shorter times reclaim IPs faster; longer times reduce DHCP traffic." />
-        </label>
+        </Label>
         <Controller
           name="lease_time"
           control={control}

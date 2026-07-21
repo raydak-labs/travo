@@ -30,7 +30,7 @@ export function RepeaterWizardStepIndicator({ step }: { step: RepeaterWizardStep
               >
                 {i + 1}
               </div>
-              <span className="text-xs text-gray-500">{LABELS[i]}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{LABELS[i]}</span>
             </div>
           </div>
         );

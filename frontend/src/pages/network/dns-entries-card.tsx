@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { useDNSEntries, useAddDNSEntry, useDeleteDNSEntry } from '@/hooks/use-network';
 import { dnsEntryFormSchema, type DnsEntryFormValues } from '@/lib/schemas/network-forms';
 
@@ -36,8 +37,8 @@ export function DnsEntriesCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Local DNS Entries</CardTitle>
-        <MapPin className="h-4 w-4 text-gray-500" />
+        <CardTitle>Local DNS Entries</CardTitle>
+        <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {dnsEntriesLoading ? (
@@ -51,7 +52,7 @@ export function DnsEntriesCard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-gray-500">
+                    <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                       <th className="pb-2 font-medium">Hostname</th>
                       <th className="pb-2 font-medium">IP Address</th>
                       <th className="w-16 pb-2 font-medium"></th>
@@ -85,7 +86,7 @@ export function DnsEntriesCard() {
               noValidate
             >
               <div className="space-y-1">
-                <label className="text-xs text-gray-500">Hostname</label>
+                <Label>Hostname</Label>
                 <Input
                   placeholder="myserver"
                   aria-invalid={errors.name ? 'true' : undefined}
@@ -99,7 +100,7 @@ export function DnsEntriesCard() {
                 ) : null}
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-gray-500">IP Address</label>
+                <Label>IP Address</Label>
                 <Input
                   placeholder="192.168.8.10"
                   className="font-mono"
@@ -113,7 +114,7 @@ export function DnsEntriesCard() {
                   </p>
                 ) : null}
               </div>
-              <Button type="submit" size="sm" disabled={addDNSEntry.isPending}>
+              <Button type="submit" disabled={addDNSEntry.isPending}>
                 {addDNSEntry.isPending ? 'Adding…' : 'Add'}
               </Button>
             </form>

@@ -10,6 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { InlineError } from '@/components/ui/inline-error';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { ServiceInfo, SQMConfig, SQMQdisc, SQMScript } from '@shared/index';
 import { useApplySQM, useSQMConfig, useSetSQMConfig } from '@/hooks/use-sqm';
 
@@ -53,21 +56,27 @@ export function SQMSection({ sqmService }: Props) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">SQM (Traffic Shaping)</CardTitle>
+        <CardTitle>SQM (Traffic Shaping)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {data?.advanced_hint ? <p className="text-sm">{data.advanced_hint}</p> : null}
-        {isLoading ? <p className="text-sm">Loading SQM configuration…</p> : null}
-        {isError ? <p className="text-sm">Failed to load SQM configuration.</p> : null}
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ) : null}
+        {isError ? <InlineError>Failed to load SQM configuration.</InlineError> : null}
         {hasUnsavedChanges ? (
           <p className="text-sm">You have unsaved changes. Save before applying.</p>
         ) : null}
 
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <label htmlFor="sqm-enabled" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-enabled" className="text-sm font-medium leading-none">
               Enable SQM
-            </label>
+            </Label>
           </div>
           <Switch
             id="sqm-enabled"
@@ -81,9 +90,9 @@ export function SQMSection({ sqmService }: Props) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="sqm-interface" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-interface" className="text-sm font-medium leading-none">
               Interface
-            </label>
+            </Label>
             <Input
               id="sqm-interface"
               placeholder="pppoe-wan / eth0.2 / wan"
@@ -140,9 +149,9 @@ export function SQMSection({ sqmService }: Props) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label htmlFor="sqm-download" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-download" className="text-sm font-medium leading-none">
               Download (kbit/s)
-            </label>
+            </Label>
             <Input
               id="sqm-download"
               inputMode="numeric"
@@ -154,9 +163,9 @@ export function SQMSection({ sqmService }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="sqm-upload" className="text-sm font-medium leading-none">
+            <Label htmlFor="sqm-upload" className="text-sm font-medium leading-none">
               Upload (kbit/s)
-            </label>
+            </Label>
             <Input
               id="sqm-upload"
               inputMode="numeric"

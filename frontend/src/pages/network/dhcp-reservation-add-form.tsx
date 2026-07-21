@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormHandleSubmit, UseFormRegister } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { DhcpReservationFormValues } from '@/lib/schemas/network-forms';
 
 type DhcpReservationAddFormProps = {
@@ -25,7 +26,7 @@ export function DhcpReservationAddForm({
       noValidate
     >
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Name</label>
+        <Label>Name</Label>
         <Input
           placeholder="laptop"
           aria-invalid={errors.name ? 'true' : undefined}
@@ -39,7 +40,7 @@ export function DhcpReservationAddForm({
         ) : null}
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">MAC Address</label>
+        <Label>MAC Address</Label>
         <Input
           placeholder="AA:BB:CC:DD:EE:FF"
           className="font-mono"
@@ -54,7 +55,7 @@ export function DhcpReservationAddForm({
         ) : null}
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">IP Address</label>
+        <Label>IP Address</Label>
         <Input
           placeholder="192.168.8.50"
           className="font-mono"
@@ -68,7 +69,7 @@ export function DhcpReservationAddForm({
           </p>
         ) : null}
       </div>
-      <Button type="submit" size="sm" disabled={addPending}>
+      <Button type="submit" disabled={addPending}>
         {addPending ? 'Adding…' : 'Add'}
       </Button>
     </form>

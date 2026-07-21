@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useMACAddresses, useSetMAC, useRandomizeMAC } from '@/hooks/use-wifi';
 import { macCloneFormSchema, type MacCloneFormValues } from '@/lib/schemas/wifi-forms';
 import { MacAddressCloneBlock } from './mac-address-clone-block';
@@ -38,7 +39,7 @@ export function MACAddressCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">MAC Address Cloning</CardTitle>
+        <CardTitle>MAC Address Cloning</CardTitle>
       </CardHeader>
       <CardContent>
         {macLoading ? (
@@ -47,7 +48,7 @@ export function MACAddressCard() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : !macAddresses || macAddresses.length === 0 ? (
-          <p className="text-sm text-gray-500">No STA interface detected</p>
+          <EmptyState message="No STA interface detected" />
         ) : (
           <form onSubmit={handleSubmit(onApply)} className="space-y-4" noValidate>
             {macAddresses.map((mac) => (

@@ -47,13 +47,13 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
           )}
         </div>
       </td>
-      <td className="hidden py-3 pr-4 text-sm text-gray-500 md:table-cell">
+      <td className="hidden py-3 pr-4 text-sm text-gray-500 dark:text-gray-400 md:table-cell">
         {client.interface_name}
       </td>
-      <td className="hidden py-3 pr-4 text-sm text-gray-500 lg:table-cell">
+      <td className="hidden py-3 pr-4 text-sm text-gray-500 dark:text-gray-400 lg:table-cell">
         {connectedSince ?? '—'}
       </td>
-      <td className="py-3 pr-4 text-sm text-gray-500">
+      <td className="py-3 pr-4 text-sm text-gray-500 dark:text-gray-400">
         <div className="text-xs">
           <span className="text-blue-600 dark:text-blue-400">↓ {formatBytes(client.rx_bytes)}</span>
           {' / '}

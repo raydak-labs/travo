@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CardInset } from '@/components/ui/card-inset';
 import { useResetDataUsage } from '@/hooks/use-data-usage';
 import type { DataBudget, DataUsageInterface } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
@@ -15,7 +16,7 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
   const resetMutation = useResetDataUsage();
 
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <CardInset className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{iface.label}</span>
         <div className="flex items-center gap-2">
@@ -37,21 +38,21 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
 
       <div className="grid grid-cols-3 gap-3 text-sm">
         <div>
-          <p className="mb-0.5 text-xs text-gray-500">Today</p>
+          <p className="mb-0.5 text-xs text-gray-500 dark:text-gray-400">Today</p>
           <p className="font-mono">{formatBytes(iface.today.rx_bytes + iface.today.tx_bytes)}</p>
           <p className="text-xs text-gray-400">
             ↓{formatBytes(iface.today.rx_bytes)} ↑{formatBytes(iface.today.tx_bytes)}
           </p>
         </div>
         <div>
-          <p className="mb-0.5 text-xs text-gray-500">This Month</p>
+          <p className="mb-0.5 text-xs text-gray-500 dark:text-gray-400">This Month</p>
           <p className="font-mono">{formatBytes(iface.month.rx_bytes + iface.month.tx_bytes)}</p>
           <p className="text-xs text-gray-400">
             ↓{formatBytes(iface.month.rx_bytes)} ↑{formatBytes(iface.month.tx_bytes)}
           </p>
         </div>
         <div>
-          <p className="mb-0.5 text-xs text-gray-500">Total</p>
+          <p className="mb-0.5 text-xs text-gray-500 dark:text-gray-400">Total</p>
           <p className="font-mono">{formatBytes(iface.total.rx_bytes + iface.total.tx_bytes)}</p>
           <p className="text-xs text-gray-400">
             ↓{formatBytes(iface.total.rx_bytes)} ↑{formatBytes(iface.total.tx_bytes)}
@@ -66,6 +67,6 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
           label="Monthly budget"
         />
       )}
-    </div>
+    </CardInset>
   );
 }

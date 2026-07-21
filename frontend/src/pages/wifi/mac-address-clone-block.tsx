@@ -3,6 +3,7 @@ import { Shuffle, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { MacCloneFormValues } from '@/lib/schemas/wifi-forms';
 
 export type MacAddressRow = {
@@ -60,9 +61,9 @@ export function MacAddressCloneBlock({
         </div>
       )}
       <div className="space-y-2">
-        <label htmlFor="mac-input" className="text-xs font-medium text-gray-600 dark:text-gray-400">
+        <Label htmlFor="mac-input">
           Custom MAC Address
-        </label>
+        </Label>
         <Input
           id="mac-input"
           placeholder="AA:BB:CC:DD:EE:FF"
@@ -78,13 +79,12 @@ export function MacAddressCloneBlock({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" onClick={onRandomLocal}>
+        <Button type="button" onClick={onRandomLocal}>
           <Shuffle className="mr-1 h-4 w-4" />
           Random
         </Button>
         <Button
           type="button"
-          size="sm"
           variant="outline"
           disabled={randomizePending}
           onClick={onRandomizeApply}
@@ -92,16 +92,10 @@ export function MacAddressCloneBlock({
           <Shuffle className="mr-1 h-4 w-4" />
           {randomizePending ? 'Randomizing...' : 'Randomize & Apply'}
         </Button>
-        <Button type="submit" size="sm" disabled={setMacPending}>
+        <Button type="submit" disabled={setMacPending}>
           {setMacPending ? 'Applying...' : 'Apply'}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={setMacPending}
-          onClick={onResetDefault}
-        >
+        <Button type="button" variant="outline" disabled={setMacPending} onClick={onResetDefault}>
           <RotateCcw className="mr-1 h-4 w-4" />
           Reset to Default
         </Button>

@@ -1,6 +1,7 @@
 import { Eye, EyeOff } from 'lucide-react';
 import { Controller, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -50,12 +51,12 @@ export function WifiHiddenNetworkDialogFields({
       ) : null}
 
       <div className="space-y-1.5">
-        <label
+        <Label
           htmlFor="hidden-encryption"
           className="text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Encryption
-        </label>
+        </Label>
         <Controller
           control={control}
           name="encryption"

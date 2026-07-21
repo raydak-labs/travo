@@ -78,6 +78,16 @@ describe('DashboardPage', () => {
     });
   });
 
+  it('forces dark SourceCard chrome for light-mode contrast', async () => {
+    renderDashboard();
+    const ethernet = await screen.findByRole('heading', { name: 'Ethernet (WAN)' });
+    const card = ethernet.closest('[class*="bg-slate-900"]');
+    expect(card).toBeTruthy();
+    expect(card?.className).toMatch(/border-slate-700/);
+    expect(card?.className).toMatch(/bg-slate-900/);
+    expect(ethernet.className).toMatch(/text-slate-100/);
+  });
+
   it('shows repeater details when WiFi is connected', async () => {
     renderDashboard();
     await waitFor(() => {
@@ -91,6 +101,17 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Quick status')).toBeInTheDocument();
       expect(screen.getByText('Reachable')).toBeInTheDocument();
     });
+    const reachable = screen.getByText('Reachable');
+    expect(reachable.className).toMatch(/text-emerald-600/);
+    expect(reachable.className).toMatch(/dark:text-emerald-400/);
+    const vpnState = screen.getByText(/^(On|Off)$/);
+    if (vpnState.textContent === 'Off') {
+      expect(vpnState.className).toMatch(/text-gray-500 dark:text-gray-400/);
+      expect(vpnState.className).toMatch(/dark:text-gray-400/);
+    } else {
+      expect(vpnState.className).toMatch(/text-emerald-600/);
+      expect(vpnState.className).toMatch(/dark:text-emerald-400/);
+    }
     expect(screen.getByRole('link', { name: /Device details and settings/i })).toHaveAttribute(
       'href',
       '/system',

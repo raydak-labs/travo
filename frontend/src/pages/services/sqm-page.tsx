@@ -11,7 +11,7 @@ export function SQMPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -20,21 +20,27 @@ export function SQMPage() {
 
   if (!sqm || sqm.state === 'not_installed') {
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">SQM (Traffic Shaping)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            Install SQM from Installed services, then configure shaping and latency settings here.
-          </p>
-          <Button asChild variant="secondary">
-            <Link to="/services">Go to Installed services</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>SQM (Traffic Shaping)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm">
+              Install SQM from Installed services, then configure shaping and latency settings here.
+            </p>
+            <Button asChild variant="secondary">
+              <Link to="/services">Go to Installed services</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  return <SQMSection sqmService={sqm} />;
+  return (
+    <div className="space-y-6">
+      <SQMSection sqmService={sqm} />
+    </div>
+  );
 }

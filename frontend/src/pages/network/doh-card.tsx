@@ -12,8 +12,8 @@ export function DoHCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">DNS over HTTPS/TLS</CardTitle>
-        <Lock className="h-4 w-4 text-gray-500" />
+        <CardTitle>DNS over HTTPS/TLS</CardTitle>
+        <Lock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -41,7 +41,7 @@ export function DoHCard() {
                 aria-label="Toggle DNS over HTTPS"
               />
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Encrypts DNS queries to prevent eavesdropping and tampering. Requires{' '}
               <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">https-dns-proxy</code> to
               be installed.

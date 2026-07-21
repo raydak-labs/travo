@@ -19,8 +19,8 @@ export function USBTetheringSection() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">USB Tethering</CardTitle>
-        <Smartphone className="h-4 w-4 text-gray-500" />
+        <CardTitle>USB Tethering</CardTitle>
+        <Smartphone className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-3">
         {status?.detected ? (
@@ -39,23 +39,17 @@ export function USBTetheringSection() {
                 {status.interface}
               </Badge>
               {status.is_up ? (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
-                  Up
-                </Badge>
+                <Badge variant="success">Up</Badge>
               ) : (
-                <Badge variant="secondary" className="text-xs">
-                  Down
-                </Badge>
+                <Badge variant="secondary">Down</Badge>
               )}
             </div>
             {status.ip_address && (
-              <p className="text-sm text-gray-500 font-mono">{status.ip_address}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{status.ip_address}</p>
             )}
             {status.configured ? (
               <div className="flex items-center gap-2">
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
-                  Configured as WAN
-                </Badge>
+                <Badge variant="default">Configured as WAN</Badge>
                 <Button
                   variant="outline"
                   size="sm"
@@ -76,7 +70,7 @@ export function USBTetheringSection() {
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <XCircle className="h-4 w-4" />
             <span>No USB tethering device detected (UCI config still active)</span>
             <Button

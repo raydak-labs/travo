@@ -34,15 +34,15 @@ export function ClientsConnectedClientsCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
+        <CardTitle>
           Connected Clients
           {clients && (
-            <span className="ml-2 text-xs font-normal text-gray-500">
+            <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
               ({clients.length} device{clients.length !== 1 ? 's' : ''})
             </span>
           )}
         </CardTitle>
-        <Users className="h-4 w-4 text-gray-500" />
+        <Users className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         <ClientsSearchBar value={search} onChange={setSearch} />

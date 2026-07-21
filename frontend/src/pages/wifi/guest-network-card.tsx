@@ -62,8 +62,8 @@ export function GuestNetworkCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Guest Network</CardTitle>
-        <ShieldCheck className="h-4 w-4 text-gray-400" />
+        <CardTitle>Guest Network</CardTitle>
+        <ShieldCheck className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {guestLoading ? (
@@ -78,7 +78,7 @@ export function GuestNetworkCard() {
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   Enable Guest WiFi
                 </span>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Separate network (192.168.2.0/24) with client isolation
                 </p>
               </div>

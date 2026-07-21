@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { SetupPasswordFormValues } from '@/pages/setup/setup-schema';
 
 type PasswordStepFormFieldsProps = {
@@ -19,12 +20,12 @@ export function PasswordStepFormFields({
   return (
     <>
       <div>
-        <label
+        <Label
           htmlFor="setup-current-password"
           className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Current Password
-        </label>
+        </Label>
         <Input
           id="setup-current-password"
           type={showPassword ? 'text' : 'password'}
@@ -41,12 +42,12 @@ export function PasswordStepFormFields({
         ) : null}
       </div>
       <div>
-        <label
+        <Label
           htmlFor="setup-new-password"
           className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           New Password
-        </label>
+        </Label>
         <div className="relative">
           <Input
             id="setup-new-password"
@@ -73,12 +74,12 @@ export function PasswordStepFormFields({
         ) : null}
       </div>
       <div>
-        <label
+        <Label
           htmlFor="setup-confirm-password"
           className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Confirm New Password
-        </label>
+        </Label>
         <Input
           id="setup-confirm-password"
           type={showPassword ? 'text' : 'password'}

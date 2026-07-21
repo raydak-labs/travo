@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useWiFiSchedule, useSetWiFiSchedule } from '@/hooks/use-wifi';
 import { wifiScheduleFormSchema, type WifiScheduleFormValues } from '@/lib/schemas/wifi-forms';
 import { WiFiScheduleFormFields } from '@/pages/wifi/wifi-schedule-form-fields';
@@ -52,11 +53,11 @@ export function WiFiScheduleCard() {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">WiFi Schedule</CardTitle>
-          <Clock className="h-4 w-4 text-gray-400" />
+          <CardTitle>WiFi Schedule</CardTitle>
+          <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          <div className="h-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );
@@ -65,8 +66,8 @@ export function WiFiScheduleCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">WiFi Schedule</CardTitle>
-        <Clock className="h-4 w-4 text-gray-400" />
+        <CardTitle>WiFi Schedule</CardTitle>
+        <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>

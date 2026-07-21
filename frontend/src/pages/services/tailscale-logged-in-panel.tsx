@@ -30,27 +30,25 @@ export function TailscaleLoggedInPanel({
     <>
       <div className="space-y-1 rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <span className="text-gray-500">IP Address</span>
+          <span className="text-gray-500 dark:text-gray-400">IP Address</span>
           <span className="font-mono text-gray-900 dark:text-white">{status.ip_address}</span>
-          <span className="text-gray-500">Hostname</span>
+          <span className="text-gray-500 dark:text-gray-400">Hostname</span>
           <span className="text-gray-900 dark:text-white">{status.hostname}</span>
         </div>
         {status.exit_node && (
           <div className="mt-2 flex items-center gap-2 border-t border-gray-200 pt-2 dark:border-gray-700">
             <Wifi className="h-3 w-3 text-blue-500" />
-            <span className="text-xs text-gray-500">Exit node:</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">Exit node:</span>
             <span className="font-mono text-xs text-gray-900 dark:text-white">
               {status.exit_node}
             </span>
             {status.exit_node_active && (
-              <Badge className="bg-green-100 text-xs text-green-800 dark:bg-green-900 dark:text-green-200">
-                Active
-              </Badge>
+              <Badge variant="success">Active</Badge>
             )}
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 px-1 text-xs text-gray-500"
+              className="h-5 px-1 text-xs text-gray-500 dark:text-gray-400"
               onClick={onClearExitNode}
               disabled={exitNodePending}
             >
@@ -64,7 +62,7 @@ export function TailscaleLoggedInPanel({
         <div className="flex items-center justify-between border-t border-gray-100 py-1 dark:border-white/[0.08]">
           <div>
             <span className="text-sm text-gray-700 dark:text-gray-300">Allow Tailscale SSH</span>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Let Tailscale manage SSH access from trusted devices
             </p>
           </div>
@@ -86,7 +84,7 @@ export function TailscaleLoggedInPanel({
               one full-tunnel VPN path runs at a time.
             </p>
           )}
-          <div className="mb-1 flex items-center gap-1 text-xs text-gray-500">
+          <div className="mb-1 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <Users className="h-3 w-3" />
             <span>
               {status.peers.length} peer{status.peers.length !== 1 ? 's' : ''}

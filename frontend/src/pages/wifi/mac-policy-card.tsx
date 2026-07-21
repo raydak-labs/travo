@@ -1,5 +1,6 @@
 import { Fingerprint } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useMACPolicies, useSetMACPolicies } from '@/hooks/use-wifi';
 import type { MACPolicy } from '@shared/index';
 import type { MacPolicyAddFormValues } from '@/lib/schemas/wifi-forms';
@@ -26,11 +27,11 @@ export function MACPolicyCard() {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Per-network MAC Policy</CardTitle>
-          <Fingerprint className="h-4 w-4 text-gray-400" />
+          <CardTitle>Per-network MAC Policy</CardTitle>
+          <Fingerprint className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          <div className="h-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );
@@ -39,11 +40,11 @@ export function MACPolicyCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Per-network MAC Policy</CardTitle>
-        <Fingerprint className="h-4 w-4 text-gray-400" />
+        <CardTitle>Per-network MAC Policy</CardTitle>
+        <Fingerprint className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Remember which MAC address to use when connecting to specific SSIDs.
         </p>
 

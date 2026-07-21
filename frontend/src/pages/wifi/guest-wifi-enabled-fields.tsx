@@ -5,7 +5,9 @@ import {
   type UseFormRegister,
   type UseFormSetValue,
 } from 'react-hook-form';
+import { CardInset } from '@/components/ui/card-inset';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -31,14 +33,9 @@ export function GuestWifiEnabledFields({
   setValue,
 }: GuestWifiEnabledFieldsProps) {
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <CardInset className="space-y-3 p-4">
       <div className="space-y-2">
-        <label
-          htmlFor="guest-ssid"
-          className="text-xs font-medium text-gray-600 dark:text-gray-400"
-        >
-          SSID
-        </label>
+        <Label htmlFor="guest-ssid">SSID</Label>
         <Input
           id="guest-ssid"
           placeholder="Guest network name"
@@ -53,12 +50,7 @@ export function GuestWifiEnabledFields({
         ) : null}
       </div>
       <div className="space-y-2">
-        <label
-          htmlFor="guest-encryption"
-          className="text-xs font-medium text-gray-600 dark:text-gray-400"
-        >
-          Encryption
-        </label>
+        <Label htmlFor="guest-encryption">Encryption</Label>
         <Controller
           name="encryption"
           control={control}
@@ -87,12 +79,7 @@ export function GuestWifiEnabledFields({
       </div>
       {encryption !== 'none' && (
         <div className="space-y-2">
-          <label
-            htmlFor="guest-key"
-            className="text-xs font-medium text-gray-600 dark:text-gray-400"
-          >
-            Password
-          </label>
+          <Label htmlFor="guest-key">Password</Label>
           <Input
             id="guest-key"
             type="password"
@@ -108,10 +95,10 @@ export function GuestWifiEnabledFields({
           ) : null}
         </div>
       )}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         Client isolation is enabled — guests cannot see each other. Internet access only, no LAN
         access.
       </p>
-    </div>
+    </CardInset>
   );
 }

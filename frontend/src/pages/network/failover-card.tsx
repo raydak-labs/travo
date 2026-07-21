@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Label } from '@/components/ui/label';
 import { useFailoverConfig, useSetFailoverConfig, useFailoverEvents } from '@/hooks/use-network';
 import type { FailoverCandidate, FailoverConfig } from '@shared/index';
 
@@ -55,7 +57,7 @@ export function FailoverCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Connection Failover</CardTitle>
+          <CardTitle>Connection Failover</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <Skeleton className="h-4 w-1/2" />
@@ -70,7 +72,7 @@ export function FailoverCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Connection Failover</CardTitle>
+          <CardTitle>Connection Failover</CardTitle>
         </CardHeader>
         <CardContent>
           <EmptyState
@@ -110,7 +112,7 @@ export function FailoverCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Connection Failover</CardTitle>
+        <CardTitle>Connection Failover</CardTitle>
         <ArrowLeftRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
@@ -185,7 +187,7 @@ export function FailoverCard() {
 
             <div className="space-y-3">
               {draft?.candidates.map((candidate, index) => (
-                <div key={candidate.interface_name} className="rounded-md border p-3">
+                <CardInset key={candidate.interface_name}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="font-medium">{candidate.label}</div>
@@ -250,15 +252,15 @@ export function FailoverCard() {
                       Move down
                     </Button>
                   </div>
-                </div>
+                </CardInset>
               ))}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
-                <label htmlFor="failover-track-ips" className="text-sm font-medium">
+                <Label htmlFor="failover-track-ips" className="text-sm font-medium">
                   Health targets
-                </label>
+                </Label>
                 <Input
                   id="failover-track-ips"
                   value={draft?.health.track_ips.join(', ') ?? ''}
@@ -288,9 +290,9 @@ export function FailoverCard() {
                 ['up', 'Successes before recovery'],
               ].map(([field, label]) => (
                 <div key={field} className="space-y-2">
-                  <label htmlFor={field} className="text-sm font-medium">
+                  <Label htmlFor={field} className="text-sm font-medium">
                     {label}
-                  </label>
+                  </Label>
                   <Input
                     id={field}
                     inputMode="numeric"
@@ -323,18 +325,12 @@ export function FailoverCard() {
 
             <div className="flex flex-wrap gap-2">
               <Button
-                size="sm"
                 onClick={handleSave}
                 disabled={setConfig.isPending || ((draft?.enabled ?? false) && enabledCount === 0)}
               >
                 {setConfig.isPending ? 'Saving…' : 'Save Failover Settings'}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancel}
-                disabled={setConfig.isPending}
-              >
+              <Button variant="outline" onClick={handleCancel} disabled={setConfig.isPending}>
                 Cancel
               </Button>
             </div>

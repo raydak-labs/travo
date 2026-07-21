@@ -26,7 +26,7 @@ export function WifiModeCard() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">WiFi Mode</CardTitle>
+          <CardTitle>WiFi Mode</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (

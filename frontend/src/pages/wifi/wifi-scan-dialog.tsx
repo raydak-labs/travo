@@ -45,9 +45,11 @@ export function WifiScanDialog() {
           void refetch();
         }}
         size="sm"
+        aria-label="Scan networks"
+        title="Scan networks"
       >
         <Search className="mr-1.5 h-3.5 w-3.5" />
-        Scan Networks
+        Scan
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

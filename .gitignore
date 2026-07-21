@@ -61,3 +61,4 @@ test/integration/tmp/
 test/integration/wireguard-profiles/
 
 docs/.obsidian
+.worktrees/

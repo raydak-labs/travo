@@ -7,6 +7,7 @@ import type {
 } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { NtpConfigFormValues, NtpServerDraftFormValues } from '@/lib/schemas/system-forms';
 import { NtpConfigServerFields } from '@/pages/system/ntp-config-server-fields';
 
@@ -42,9 +43,9 @@ export function NtpConfigEditForm({
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
       <div className="flex items-center justify-between">
-        <label htmlFor="ntp-enabled" className="text-sm text-gray-700 dark:text-gray-300">
+        <Label htmlFor="ntp-enabled" className="text-sm text-gray-700 dark:text-gray-300">
           Enable NTP time synchronization
-        </label>
+        </Label>
         <Switch id="ntp-enabled" label="Enable NTP" {...register('enabled')} />
       </div>
 

@@ -37,7 +37,7 @@ export function RepeaterWizardReviewStep({
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Upstream Connection</h3>
         <div className="rounded-lg border p-3">
           <div className="flex items-center gap-2">
-            <Wifi className="h-4 w-4 text-gray-500" />
+            <Wifi className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             <span className="text-sm font-medium">{upstream.ssid}</span>
             {selectedNetwork && <SecurityBadge encryption={selectedNetwork.encryption} />}
           </div>
@@ -46,7 +46,7 @@ export function RepeaterWizardReviewStep({
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Access Point</h3>
         <div className="rounded-lg border p-3">
           <div className="flex items-center gap-2">
-            <Radio className="h-4 w-4 text-gray-500" />
+            <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             <span className="text-sm font-medium">{apSummaryLine}</span>
             <Badge variant="outline">
               {effectiveAPEncryption === 'none' ? 'Open' : effectiveAPEncryption.toUpperCase()}

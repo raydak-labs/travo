@@ -1,6 +1,7 @@
 import { Controller, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -26,7 +27,7 @@ export function FirewallPortForwardAddFormGrid({
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_auto_1fr_1fr_1fr_auto]">
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Name</label>
+        <Label>Name</Label>
         <Input
           placeholder="my-rule"
           aria-invalid={errors.name ? 'true' : undefined}
@@ -40,7 +41,7 @@ export function FirewallPortForwardAddFormGrid({
         ) : null}
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Protocol</label>
+        <Label>Protocol</Label>
         <Controller
           name="protocol"
           control={control}
@@ -59,7 +60,7 @@ export function FirewallPortForwardAddFormGrid({
         />
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">External Port</label>
+        <Label>External Port</Label>
         <Input
           placeholder="8080"
           aria-invalid={errors.src_dport ? 'true' : undefined}
@@ -73,7 +74,7 @@ export function FirewallPortForwardAddFormGrid({
         ) : null}
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Internal IP</label>
+        <Label>Internal IP</Label>
         <Input
           placeholder="192.168.8.10"
           aria-invalid={errors.dest_ip ? 'true' : undefined}
@@ -87,7 +88,7 @@ export function FirewallPortForwardAddFormGrid({
         ) : null}
       </div>
       <div className="space-y-1">
-        <label className="text-xs text-gray-500">Internal Port</label>
+        <Label>Internal Port</Label>
         <Input
           placeholder="80"
           aria-invalid={errors.dest_port ? 'true' : undefined}
@@ -100,7 +101,7 @@ export function FirewallPortForwardAddFormGrid({
           </p>
         ) : null}
       </div>
-      <Button type="submit" size="sm" className="self-end" disabled={isPending}>
+      <Button type="submit" className="self-end" disabled={isPending}>
         {isPending ? 'Adding…' : 'Add'}
       </Button>
     </div>

@@ -18,8 +18,8 @@ export function SystemAtAGlanceSection() {
       <div className="space-y-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Information</CardTitle>
-            <Server className="h-4 w-4 text-gray-500" />
+            <CardTitle>System Information</CardTitle>
+            <Server className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent>
             {infoLoading ? (
@@ -30,17 +30,17 @@ export function SystemAtAGlanceSection() {
             ) : info ? (
               <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
                 <div className="grid grid-cols-2 gap-2">
-                  <span className="text-gray-500">Hostname</span>
+                  <span className="text-gray-500 dark:text-gray-400">Hostname</span>
                   <span className="flex items-center gap-1 text-gray-900 dark:text-white">
                     <HostnameInlineForm hostname={info.hostname} onUpdated={() => refetchInfo()} />
                   </span>
-                  <span className="text-gray-500">Model</span>
+                  <span className="text-gray-500 dark:text-gray-400">Model</span>
                   <span className="text-gray-900 dark:text-white">{info.model}</span>
-                  <span className="text-gray-500">Firmware</span>
+                  <span className="text-gray-500 dark:text-gray-400">Firmware</span>
                   <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
-                  <span className="text-gray-500">Kernel</span>
+                  <span className="text-gray-500 dark:text-gray-400">Kernel</span>
                   <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
-                  <span className="text-gray-500">Uptime</span>
+                  <span className="text-gray-500 dark:text-gray-400">Uptime</span>
                   <span className="text-gray-900 dark:text-white">
                     {formatUptime(info.uptime_seconds)}
                   </span>
@@ -52,8 +52,8 @@ export function SystemAtAGlanceSection() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Stats</CardTitle>
-            <Cpu className="h-4 w-4 text-gray-500" />
+            <CardTitle>System Stats</CardTitle>
+            <Cpu className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent className="space-y-4">
             {statsLoading ? (
@@ -70,14 +70,14 @@ export function SystemAtAGlanceSection() {
                     <span className="text-gray-900 dark:text-white">
                       {stats.cpu.usage_percent.toFixed(1)}%
                       {stats.cpu.temperature_celsius != null && (
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2 text-gray-500 dark:text-gray-400">
                           {stats.cpu.temperature_celsius}°C
                         </span>
                       )}
                     </span>
                   </div>
                   <Progress value={stats.cpu.usage_percent} />
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                     Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
                     {stats.cpu.cores} cores
                   </p>

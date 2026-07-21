@@ -1,6 +1,7 @@
 import { BookmarkPlus, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useDHCPReservations, useDeleteDHCPReservation } from '@/hooks/use-network';
 
 export function ClientsDhcpReservationsCard() {
@@ -10,24 +11,21 @@ export function ClientsDhcpReservationsCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Static IP Reservations</CardTitle>
-        <BookmarkPlus className="h-4 w-4 text-gray-500" />
+        <CardTitle>Static IP Reservations</CardTitle>
+        <BookmarkPlus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
         {!reservations || reservations.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No static reservations. Use the bookmark icon next to a connected client to reserve its
-            IP.
-          </p>
+          <EmptyState message="No static reservations. Use the bookmark icon next to a connected client to reserve its IP." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left dark:border-gray-700">
-                  <th className="pb-2 font-medium text-gray-500">Hostname</th>
-                  <th className="pb-2 font-medium text-gray-500">MAC</th>
-                  <th className="pb-2 font-medium text-gray-500">IP</th>
-                  <th className="pb-2 text-right font-medium text-gray-500">Actions</th>
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Hostname</th>
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">MAC</th>
+                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">IP</th>
+                  <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -37,7 +35,7 @@ export function ClientsDhcpReservationsCard() {
                     className="border-b border-gray-100 last:border-0 dark:border-white/[0.08]"
                   >
                     <td className="py-2 pr-4 text-gray-900 dark:text-white">{r.name}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-gray-500">{r.mac}</td>
+                    <td className="py-2 pr-4 font-mono text-xs text-gray-500 dark:text-gray-400">{r.mac}</td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{r.ip}</td>
                     <td className="py-2 text-right">
                       <Button

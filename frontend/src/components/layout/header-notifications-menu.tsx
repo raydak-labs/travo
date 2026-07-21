@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAlerts } from '@/hooks/use-alerts';
 import { headerAlertSeverityVariant } from './header-alert-severity';
 import { formatAlertTime } from './header-format-alert-time';
@@ -50,9 +51,7 @@ export function HeaderNotificationsMenu() {
           </div>
           <div className="max-h-72 overflow-y-auto">
             {alerts.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                No notifications
-              </div>
+              <EmptyState message="No notifications" />
             ) : (
               alerts.slice(0, 20).map((alert) => (
                 <div

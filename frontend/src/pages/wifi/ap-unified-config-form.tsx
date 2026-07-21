@@ -4,10 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { QrCode, Radio } from 'lucide-react';
 import type { APConfig, APConfigUpdate } from '@shared/index';
 import { Button } from '@/components/ui/button';
+import { CardInset } from '@/components/ui/card-inset';
 import { Input } from '@/components/ui/input';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -167,19 +169,19 @@ export function APUnifiedConfigForm({
           </p>
         ) : null}
 
-        <div className="space-y-3 rounded-lg border p-4">
+        <CardInset className="space-y-3 p-4">
           {apConfigs.map((ap) => (
             <div
               key={ap.section}
               className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
             >
               <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4 text-gray-500" />
+                <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {ap.radio}
                 </span>
                 <Badge variant="outline">{bandLabel(ap.band)}</Badge>
-                <span className="text-xs text-gray-500">Ch {ap.channel}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
               </div>
               <Switch
                 id={`ap-unified-enabled-${ap.section}`}
@@ -189,16 +191,16 @@ export function APUnifiedConfigForm({
               />
             </div>
           ))}
-        </div>
+        </CardInset>
 
         <div className="space-y-2">
-          <label
+          <Label
             htmlFor="ap-unified-ssid"
-            className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
+            className="flex items-center gap-1"
           >
             Network name (all bands)
             <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
-          </label>
+          </Label>
           <Input
             id="ap-unified-ssid"
             placeholder="SSID for all radios"
@@ -213,12 +215,11 @@ export function APUnifiedConfigForm({
         </div>
 
         <div className="space-y-2">
-          <label
+          <Label
             htmlFor="ap-unified-enc"
-            className="text-xs font-medium text-gray-600 dark:text-gray-400"
           >
             Encryption
-          </label>
+          </Label>
           <Controller
             name="encryption"
             control={control}
@@ -248,13 +249,13 @@ export function APUnifiedConfigForm({
 
         {encryption !== 'none' && (
           <div className="space-y-2">
-            <label
+            <Label
               htmlFor="ap-unified-key"
-              className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-400"
+              className="flex items-center gap-1"
             >
               Password
               <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
-            </label>
+            </Label>
             <Input
               id="ap-unified-key"
               type="password"

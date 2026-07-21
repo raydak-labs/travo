@@ -8,6 +8,8 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { InlineError } from '@/components/ui/inline-error';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export function SpeedtestPage() {
   const { data: status, isLoading, error: statusError } = useSpeedtestServiceStatus();
@@ -29,23 +31,29 @@ export function SpeedtestPage() {
 
   if (statusError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-        <AlertTriangle className="mr-2 inline h-4 w-4" />
-        Failed to load speedtest service: {statusError.message}
+      <div className="space-y-6">
+        <InlineError>
+          <AlertTriangle className="mr-2 inline h-4 w-4" />
+          Failed to load speedtest service: {statusError.message}
+        </InlineError>
       </div>
     );
   }
 
   if (!status) {
-    return null;
+    return (
+      <div className="space-y-6">
+        <EmptyState message="No speedtest status available." />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-base font-medium">speedtest CLI</CardTitle>
-          <Gauge className="h-5 w-5 text-gray-500" />
+          <CardTitle>speedtest CLI</CardTitle>
+          <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
@@ -107,8 +115,8 @@ export function SpeedtestPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-base font-medium">Run Speed Test</CardTitle>
-          <Gauge className="h-5 w-5 text-gray-500" />
+          <CardTitle>Run Speed Test</CardTitle>
+          <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -126,28 +134,28 @@ export function SpeedtestPage() {
           {runMutation.data && (
             <div className="grid gap-3 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
               <div className="flex items-center gap-2">
-                <Download className="h-4 w-4 text-gray-500" />
+                <Download className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Download</span>
                 <span className="ml-auto font-medium">
                   {runMutation.data.download_mbps.toFixed(2)} Mbps
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Upload className="h-4 w-4 text-gray-500" />
+                <Upload className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Upload</span>
                 <span className="ml-auto font-medium">
                   {runMutation.data.upload_mbps.toFixed(2)} Mbps
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-500" />
+                <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Ping</span>
                 <span className="ml-auto font-medium">
                   {runMutation.data.ping_ms.toFixed(1)} ms
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Server className="h-4 w-4 text-gray-500" />
+                <Server className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Server</span>
                 <span className="ml-auto font-medium">{runMutation.data.server}</span>
               </div>
@@ -155,9 +163,7 @@ export function SpeedtestPage() {
           )}
 
           {runMutation.isError && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-              {runMutation.error?.message || 'Speed test failed'}
-            </div>
+            <InlineError>{runMutation.error?.message || 'Speed test failed'}</InlineError>
           )}
         </CardContent>
       </Card>

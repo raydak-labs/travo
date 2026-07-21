@@ -231,10 +231,10 @@ function SourceCard({
   children?: React.ReactNode;
 }) {
   return (
-    <Card className="dark:border-slate-700 dark:bg-slate-900">
+    <Card className="border-slate-700 bg-slate-900 text-slate-200">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <CardTitle className="flex items-center gap-2 text-slate-100">
             <Icon className="h-4 w-4 text-slate-400" />
             {title}
           </CardTitle>
@@ -256,9 +256,7 @@ function SourceCard({
           />
           {connected ? 'Connected' : 'Not connected'}
         </div>
-        {children && (
-          <div className="space-y-1 text-xs text-slate-500 dark:text-slate-500">{children}</div>
-        )}
+        {children && <div className="space-y-1 text-xs text-slate-500">{children}</div>}
       </CardContent>
     </Card>
   );
@@ -307,22 +305,18 @@ export function DashboardPage() {
             <>
               <div className="flex justify-between">
                 <span>Protocol</span>
-                <span className="uppercase text-slate-300 dark:text-slate-300">{wan.type}</span>
+                <span className="uppercase text-slate-300">{wan.type}</span>
               </div>
               {wan.ip_address && (
                 <div className="flex justify-between">
                   <span>IP</span>
-                  <span className="font-mono text-slate-300 dark:text-slate-300">
-                    {wan.ip_address}
-                  </span>
+                  <span className="font-mono text-slate-300">{wan.ip_address}</span>
                 </div>
               )}
               {wan.gateway && (
                 <div className="flex justify-between">
                   <span>Gateway</span>
-                  <span className="font-mono text-slate-300 dark:text-slate-300">
-                    {wan.gateway}
-                  </span>
+                  <span className="font-mono text-slate-300">{wan.gateway}</span>
                 </div>
               )}
             </>
@@ -336,21 +330,17 @@ export function DashboardPage() {
             <>
               <div className="flex justify-between">
                 <span>SSID</span>
-                <span className="max-w-[80px] truncate font-mono text-slate-300 dark:text-slate-300">
+                <span className="max-w-[80px] truncate font-mono text-slate-300">
                   {wifiConn.ssid}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Band</span>
-                <span className="uppercase text-slate-300 dark:text-slate-300">
-                  {wifiConn.band}
-                </span>
+                <span className="uppercase text-slate-300">{wifiConn.band}</span>
               </div>
               <div className="flex justify-between">
                 <span>Signal</span>
-                <span className="text-slate-300 dark:text-slate-300">
-                  {wifiConn.signal_percent}%
-                </span>
+                <span className="text-slate-300">{wifiConn.signal_percent}%</span>
               </div>
             </>
           ) : (
@@ -364,7 +354,7 @@ export function DashboardPage() {
               {usbTether?.detected && (
                 <div className="flex justify-between">
                   <span>Device</span>
-                  <span className="capitalize text-slate-300 dark:text-slate-300">
+                  <span className="capitalize text-slate-300">
                     {usbTether.device_type || 'Unknown'}
                   </span>
                 </div>
@@ -372,7 +362,7 @@ export function DashboardPage() {
               {usbDisplayIp ? (
                 <div className="flex justify-between">
                   <span>IP</span>
-                  <span className="font-mono text-slate-300 dark:text-slate-300">{usbDisplayIp}</span>
+                  <span className="font-mono text-slate-300">{usbDisplayIp}</span>
                 </div>
               ) : null}
               {tetherUp && !usbTether?.detected && !usbDisplayIp ? (
@@ -387,12 +377,10 @@ export function DashboardPage() {
         </SourceCard>
       </div>
 
-      <Card className="dark:border-slate-700 dark:bg-slate-900">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium">
-            <Monitor className="h-4 w-4 text-slate-400" />
-            Quick status
-          </CardTitle>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle>Quick status</CardTitle>
+          <Monitor className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -406,41 +394,47 @@ export function DashboardPage() {
             <>
               <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground">Internet</span>
+                  <span className="text-gray-500 dark:text-gray-400">Internet</span>
                   <p
-                    className={`mt-0.5 font-medium ${internetUp ? 'text-emerald-500' : 'text-red-500'}`}
+                    className={`mt-0.5 font-medium ${
+                      internetUp
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
                   >
                     {internetUp ? 'Reachable' : 'Unreachable'}
                   </p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">VPN</span>
+                  <span className="text-gray-500 dark:text-gray-400">VPN</span>
                   <div className="mt-0.5 flex items-center gap-1.5">
                     {vpnActive ? (
                       <>
-                        <Shield className="h-3.5 w-3.5 text-emerald-500" />
-                        <span className="font-medium text-emerald-500">On</span>
+                        <Shield className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                          On
+                        </span>
                       </>
                     ) : (
                       <>
-                        <Shield className="h-3.5 w-3.5 text-slate-500" />
-                        <span className="font-medium text-slate-500">Off</span>
+                        <Shield className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                        <span className="font-medium text-gray-500 dark:text-gray-400">Off</span>
                       </>
                     )}
                   </div>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Devices on your network</span>
+                  <span className="text-gray-500 dark:text-gray-400">Devices on your network</span>
                   <p className="mt-0.5 font-medium">{allClients.length}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Uptime</span>
+                  <span className="text-gray-500 dark:text-gray-400">Uptime</span>
                   <p className="mt-0.5 font-medium">
                     {sysInfo ? formatUptime(sysInfo.uptime_seconds) : '—'}
                   </p>
                 </div>
               </div>
-              <p className="mt-4 text-sm text-muted-foreground">
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                 <Link to="/system" className="underline-offset-4 hover:underline">
                   Device details and settings
                 </Link>{' '}

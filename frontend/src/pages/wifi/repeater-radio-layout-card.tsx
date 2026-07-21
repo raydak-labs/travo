@@ -14,7 +14,7 @@ export function RepeaterRadioLayoutCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Repeater radio layout</CardTitle>
+        <CardTitle>Repeater radio layout</CardTitle>
         <CardDescription>
           Re-apply the default separation: Wi‑Fi uplink (STA) on one radio, downlink access point on
           the other (when both radios are available and “Wi‑Fi on uplink radio” is off). Use this if

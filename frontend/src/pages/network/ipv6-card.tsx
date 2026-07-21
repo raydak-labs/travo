@@ -2,6 +2,7 @@ import { Globe } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useIPv6Status, useSetIPv6Enabled } from '@/hooks/use-network';
 
 export function IPv6Card() {
@@ -11,8 +12,8 @@ export function IPv6Card() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">IPv6</CardTitle>
-        <Globe className="h-4 w-4 text-gray-500" />
+        <CardTitle>IPv6</CardTitle>
+        <Globe className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
@@ -31,7 +32,7 @@ export function IPv6Card() {
               />
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium text-gray-500">Global IPv6 Addresses</p>
+              <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">Global IPv6 Addresses</p>
               {status?.addresses && status.addresses.length > 0 ? (
                 <ul className="space-y-1">
                   {status.addresses.map((addr) => (
@@ -41,7 +42,7 @@ export function IPv6Card() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-gray-500">No global IPv6 addresses</p>
+                <EmptyState message="No global IPv6 addresses" />
               )}
             </div>
           </>

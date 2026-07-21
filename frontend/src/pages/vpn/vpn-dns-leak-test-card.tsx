@@ -19,11 +19,11 @@ export function VpnDnsLeakTestCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">DNS Leak Test</CardTitle>
-        <ShieldCheck className="h-4 w-4 text-gray-500" />
+        <CardTitle>DNS Leak Test</CardTitle>
+        <ShieldCheck className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Verify that DNS queries are routed through the VPN and not leaking to your ISP.
         </p>
 
@@ -63,7 +63,7 @@ export function VpnDnsLeakTestCard() {
             )}
 
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Active DNS Servers
               </p>
               {result.nameservers.length > 0 ? (
@@ -81,7 +81,7 @@ export function VpnDnsLeakTestCard() {
 
             {result.vpn_dns_servers.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   VPN DNS Servers
                 </p>
                 <ul className="space-y-0.5">

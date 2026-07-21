@@ -7,6 +7,7 @@ import {
   useDNSMode,
 } from '@/hooks/use-captive-portal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardInset } from '@/components/ui/card-inset';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,7 +43,7 @@ export function DNSToolsCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">DNS Configuration</CardTitle>
+        <CardTitle>DNS Configuration</CardTitle>
         <Button
           size="sm"
           variant="ghost"
@@ -70,7 +71,7 @@ export function DNSToolsCard() {
         ) : null}
 
         {/* Bypass status + actions */}
-        <div className="rounded-lg border p-3 dark:border-white/10">
+        <CardInset>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {dnsBypassed ? (
@@ -112,7 +113,7 @@ export function DNSToolsCard() {
               </Button>
             )}
           </div>
-        </div>
+        </CardInset>
       </CardContent>
     </Card>
   );
