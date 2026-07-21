@@ -110,16 +110,16 @@ jobs:
         working-directory: artifacts
         run: sha256sum * > SHA256SUMS
 
-      - name: Create release
+      # Idempotent: GitHub UI "Publish release" creates the release before the
+      # tag-push workflow runs. softprops/action-gh-release handled that; plain
+      # `gh release create` does not — upload into an existing release instead.
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.VERSION }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --generate-notes \
-            artifacts/* \
-            --notes "$(cat <<EOF
+          NOTES="$(cat <<EOF
           ## Quick Install (OpenWRT)
 
           \`\`\`sh
@@ -143,3 +143,13 @@ jobs:
           See [SHA256SUMS](SHA256SUMS) for checksums.
           EOF
           )"
+
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; uploading assets"
+            gh release upload "${GITHUB_REF_NAME}" artifacts/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --generate-notes \
+              artifacts/* \
+              --notes "${NOTES}"
+          fi
