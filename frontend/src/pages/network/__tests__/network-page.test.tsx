@@ -56,8 +56,51 @@ function renderNetworkPage(initialPath = '/network') {
 }
 
 describe('NetworkPage', () => {
+  it('has no in-page tablist mirroring sidebar', async () => {
+    renderNetworkPage('/network');
+
+    await waitFor(() => {
+      expect(screen.getByText('WAN Status')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: /Status|Configuration|Advanced/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Status panel content on /network', async () => {
+    renderNetworkPage('/network');
+
+    await waitFor(() => {
+      expect(screen.getByText('WAN Status')).toBeInTheDocument();
+      expect(screen.getByText('Connected Clients')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('LAN Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dynamic DNS/)).not.toBeInTheDocument();
+  });
+
+  it('shows Setup panel content on /network/configuration', async () => {
+    renderNetworkPage('/network/configuration');
+
+    await waitFor(() => {
+      expect(screen.getByText('LAN Configuration')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('WAN Status')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dynamic DNS/)).not.toBeInTheDocument();
+  });
+
+  it('shows Advanced panel content on /network/advanced', async () => {
+    renderNetworkPage('/network/advanced');
+
+    await waitFor(() => {
+      expect(screen.getByText(/Dynamic DNS/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText('WAN Status')).not.toBeInTheDocument();
+    expect(screen.queryByText('LAN Configuration')).not.toBeInTheDocument();
+  });
+
   it('renders WAN information', async () => {
-    renderNetworkPage();
+    renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
       expect(screen.getByText('WAN Configuration')).toBeInTheDocument();
@@ -105,7 +148,7 @@ describe('NetworkPage', () => {
   });
 
   it('shows DNS servers', async () => {
-    renderNetworkPage();
+    renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
       expect(screen.getByText('8.8.8.8, 8.8.4.4')).toBeInTheDocument();

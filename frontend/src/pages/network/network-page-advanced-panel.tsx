@@ -9,19 +9,9 @@ import { SpeedTestCard } from '@/pages/network/speed-test-card';
 import { USBTetheringSection } from '@/pages/network/usb-tethering-section';
 import { WoLCard } from '@/pages/network/wol-card';
 
-type NetworkPageAdvancedPanelProps = {
-  panelId: string;
-  tabId: string;
-  hidden: boolean;
-};
-
-export function NetworkPageAdvancedPanel({
-  panelId,
-  tabId,
-  hidden,
-}: NetworkPageAdvancedPanelProps) {
+export function NetworkPageAdvancedPanel() {
   return (
-    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
+    <div className="space-y-6">
       <DdnsCard />
       <FailoverCard />
       <FirewallCard />

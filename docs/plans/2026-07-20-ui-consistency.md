@@ -33,7 +33,7 @@ tags: [frontend, ux, theming, consistency]
 | Page type | Root class |
 |-----------|------------|
 | Default protected page | `space-y-6` |
-| Tabbed page (WiFi, Network) | `space-y-4` (tab bar tight) then panels `space-y-6` |
+| Former tabbed pages (WiFi, Network) | now `space-y-6` after traveler IA |
 | Never | Extra page-level `p-*` (AppShell already pads) |
 | Lazy suspense fallback | No extra `p-*` (shell already pads) |
 
@@ -83,7 +83,7 @@ tags: [frontend, ux, theming, consistency]
 - `frontend/src/pages/clients/clients-page.tsx` — drop extra `p-4`
 - `frontend/src/components/layout/lazy-page-boundary.tsx` — drop fallback `p-4 sm:p-6`
 - `frontend/src/pages/services/sqm-page.tsx` — wrap content in `space-y-6` when needed
-- Tabbed pages: confirm WiFi/Network roots stay `space-y-4`; other pages `space-y-6`
+- Former tabbed pages now `space-y-6` after traveler IA; other pages `space-y-6`
 - Update any tests asserting clients padding
 
 - [ ] Fix clients double padding

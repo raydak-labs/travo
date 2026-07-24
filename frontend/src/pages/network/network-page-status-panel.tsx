@@ -9,24 +9,18 @@ import { UptimeLogCard } from '@/pages/network/uptime-log-card';
 import { WanStatusCard } from '@/pages/network/wan-status-card';
 
 type NetworkPageStatusPanelProps = {
-  panelId: string;
-  tabId: string;
-  hidden: boolean;
   network: NetworkStatus | undefined;
   isLoading: boolean;
   blockedClients: string[] | undefined;
 };
 
 export function NetworkPageStatusPanel({
-  panelId,
-  tabId,
-  hidden,
   network,
   isLoading,
   blockedClients,
 }: NetworkPageStatusPanelProps) {
   return (
-    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
+    <div className="space-y-6">
       <WanStatusCard />
 
       <Card>
