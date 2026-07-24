@@ -1,3 +1,4 @@
+import { PageSection } from '@/components/ui/page-section';
 import { DataUsageSection } from '@/pages/network/data-usage-section';
 import { DdnsCard } from '@/pages/network/ddns-card';
 import { DiagnosticsCard } from '@/pages/network/diagnostics-card';
@@ -12,16 +13,34 @@ import { WoLCard } from '@/pages/network/wol-card';
 export function NetworkPageAdvancedPanel() {
   return (
     <div className="space-y-6">
-      <DdnsCard />
+      <PageSection title="Dynamic DNS">
+        <DdnsCard />
+      </PageSection>
       <FailoverCard />
-      <FirewallCard />
-      <IPv6Card />
-      <DoHCard />
-      <WoLCard />
-      <DiagnosticsCard />
-      <SpeedTestCard />
-      <USBTetheringSection />
-      <DataUsageSection />
+      <PageSection title="Firewall">
+        <FirewallCard />
+      </PageSection>
+      <PageSection title="IPv6">
+        <IPv6Card />
+      </PageSection>
+      <PageSection title="DNS over HTTPS/TLS">
+        <DoHCard />
+      </PageSection>
+      <PageSection title="Wake-on-LAN">
+        <WoLCard />
+      </PageSection>
+      <PageSection title="Network Diagnostics">
+        <DiagnosticsCard />
+      </PageSection>
+      <PageSection title="Speed Test">
+        <SpeedTestCard />
+      </PageSection>
+      <PageSection title="USB Tethering">
+        <USBTetheringSection />
+      </PageSection>
+      <PageSection title="Data Usage">
+        <DataUsageSection />
+      </PageSection>
     </div>
   );
 }

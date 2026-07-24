@@ -1,3 +1,4 @@
+import { PageSection } from '@/components/ui/page-section';
 import { DhcpDnsCard } from '@/pages/network/dhcp-dns-card';
 import { DhcpLeasesCard } from '@/pages/network/dhcp-leases-card';
 import { DhcpReservationsCard } from '@/pages/network/dhcp-reservations-card';
@@ -12,10 +13,20 @@ export function NetworkPageConfigurationPanel() {
       <WanConfigCard />
       <InterfacesCard />
       <LanConfigCard />
-      <DhcpDnsCard />
-      <DnsEntriesCard />
-      <DhcpReservationsCard />
-      <DhcpLeasesCard />
+      <PageSection title="DHCP & DNS">
+        <div className="space-y-6">
+          <DhcpDnsCard />
+        </div>
+      </PageSection>
+      <PageSection title="Local DNS Entries">
+        <DnsEntriesCard />
+      </PageSection>
+      <PageSection title="DHCP Reservations">
+        <DhcpReservationsCard />
+      </PageSection>
+      <PageSection title="DHCP Leases">
+        <DhcpLeasesCard />
+      </PageSection>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -116,10 +117,45 @@ describe('NetworkPage', () => {
     renderNetworkPage('/network/advanced');
 
     await waitFor(() => {
-      expect(screen.getByText(/Dynamic DNS/)).toBeInTheDocument();
+      expect(screen.getByText('Connection Failover')).toBeInTheDocument();
     });
     expect(screen.queryByText('WAN Status')).not.toBeInTheDocument();
     expect(screen.queryByText('LAN Configuration')).not.toBeInTheDocument();
+  });
+
+  it('collapses secondary Setup sections by default', async () => {
+    const user = userEvent.setup();
+    renderNetworkPage('/network/configuration');
+
+    await waitFor(() => {
+      expect(screen.getByText('WAN Configuration')).toBeInTheDocument();
+      expect(screen.getByText('LAN Configuration')).toBeInTheDocument();
+      expect(screen.getByText('Network Interfaces')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /DHCP & DNS/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /DHCP Leases/i })).toBeInTheDocument();
+    expect(screen.queryByText('DHCP Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No active leases|Expires/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /DHCP & DNS/i }));
+    expect(screen.getByText('DHCP Configuration')).toBeVisible();
+  });
+
+  it('keeps Failover open and collapses other Advanced sections', async () => {
+    const user = userEvent.setup();
+    renderNetworkPage('/network/advanced');
+
+    await waitFor(() => {
+      expect(screen.getByText('Connection Failover')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /Firewall/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Speed Test/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Run Speed Test/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Speed Test/i }));
+    expect(screen.getByRole('button', { name: /Run Speed Test/i })).toBeVisible();
   });
 
   it('renders WAN information', async () => {
