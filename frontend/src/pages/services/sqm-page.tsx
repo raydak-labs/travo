@@ -27,10 +27,10 @@ export function SQMPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm">
-              Install SQM from Installed services, then configure shaping and latency settings here.
+              Install SQM from Apps, then configure shaping and latency settings here.
             </p>
             <Button asChild variant="secondary">
-              <Link to="/services">Go to Installed services</Link>
+              <Link to="/services">Go to Apps</Link>
             </Button>
           </CardContent>
         </Card>
