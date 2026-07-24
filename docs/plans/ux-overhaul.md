@@ -8,11 +8,12 @@ tags: [plan, traceability, ux]
 # UX Overhaul Plan
 
 > **Created:** 2026-03-25
+> **Nav chrome superseded (2026-07-24):** In-page WiFi/Network tab bars as app navigation are obsolete. Follow [`2026-07-24-frontend-traveler-ia.md`](2026-07-24-frontend-traveler-ia.md) and [`../ui-theming.md`](../ui-theming.md) (Navigation patterns). Card extraction / layout notes below remain historical reference for what already shipped.
 > **Goal:** Restructure the UI so daily tasks are fast and obvious, while advanced
 > features remain accessible but don't dominate the default view.
 > **Principle:** A non-technical user should be able to check "is the internet up?"
 > and "who is connected?" within 2 seconds of opening any page. Configuration and
-> power-user features live behind tabs, accordions, or secondary views.
+> power-user features live behind secondary views (historically tabs; now sidebar routes + collapsed page sections — see traveler IA).
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Frontend UI and theming
 description: ThemeProvider, dark class, Tailwind tokens, chart variables, contrast rules.
-updated: 2026-07-21
+updated: 2026-07-24
 tags: [docs, frontend, theming, tailwind]
 ---
 
@@ -84,14 +84,15 @@ Light mode keeps **`border-gray-200`** (and similar) on white/off-white surfaces
 
 ## Navigation patterns (sidebar vs in-page tabs)
 
-These solve different levels of hierarchy:
+Normative IA: [`plans/2026-07-24-frontend-traveler-ia.md`](plans/2026-07-24-frontend-traveler-ia.md). Summary:
 
 | Pattern | Typical role |
 | --------|--------------|
-| **Sidebar** (collapsible **WiFi** and **Network** groups + leaf **Clients**, etc.) | *Where in the app am I?* Sub-links map to real routes (e.g. `/wifi/advanced`, `/network/configuration`). |
-| **In-page tabs** (WiFi Wireless / Advanced; Network Status / Configuration / Advanced) | Same page component; **tab changes call the router** so URL, sidebar highlight, and shareable links stay aligned. |
+| **Sidebar** (collapsible groups + leaves) | *Where in the app am I?* Child links are real routes (e.g. `/wifi/advanced`, `/network/configuration`). Switching Connect/Setup/Advanced is **sidebar-only** — do **not** mirror those axes with an in-page tab bar. |
+| **In-page tabs** | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**). |
+| **Page sections** (collapsed boxes) | Progressive disclosure **inside** a route (dense / Advanced pages). Default closed on first paint; not a second global nav. |
 
-Collapsible **sidebar groups** are only for grouping nav links, not for hiding page content (page-level disclosure uses tabs + routes).
+Sidebar group open/closed is for nav density (defaults collapsed on first visit; auto-expand the active group on child routes). It does not replace page-section collapse for card content.
 
 ## Overview vs detail pages
 
