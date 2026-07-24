@@ -135,11 +135,11 @@ describe('NetworkPage', () => {
 
     expect(screen.getByRole('button', { name: /DHCP & DNS/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /DHCP Leases/i })).toBeInTheDocument();
-    expect(screen.queryByText('DHCP Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save DHCP Settings/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/No active leases|Expires/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /DHCP & DNS/i }));
-    expect(screen.getByText('DHCP Configuration')).toBeVisible();
+    expect(screen.getByRole('button', { name: /Save DHCP Settings/i })).toBeVisible();
   });
 
   it('keeps Failover open and collapses other Advanced sections', async () => {

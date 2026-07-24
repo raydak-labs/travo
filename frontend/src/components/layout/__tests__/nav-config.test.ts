@@ -10,18 +10,18 @@ describe('nav-config traveler IA', () => {
     localStorage.clear();
   });
 
-  it('uses Connect / Setup / Apps labels', () => {
+  it('uses Connect / Internet & LAN / Apps / Extras / Tools labels', () => {
     const wifi = NAV_ENTRIES.find((e) => e.id === 'wifi');
     const network = NAV_ENTRIES.find((e) => e.id === 'network');
     const services = NAV_ENTRIES.find((e) => e.id === 'services');
     expect(wifi?.kind === 'group' && wifi.items.map((i) => i.label)).toEqual([
       'Connect',
-      'Advanced',
+      'Extras',
     ]);
     expect(network?.kind === 'group' && network.items.map((i) => i.label)).toEqual([
       'Status',
-      'Setup',
-      'Advanced',
+      'Internet & LAN',
+      'Tools',
     ]);
     expect(services?.kind === 'group' && services.items[0]?.label).toBe('Apps');
   });

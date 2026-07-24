@@ -159,7 +159,7 @@ describe('Sidebar', () => {
         'true',
       );
     });
-    const advanced = screen.getByRole('link', { name: 'Advanced' });
+    const advanced = screen.getByRole('link', { name: 'Extras' });
     expect(advanced).toHaveClass('bg-blue-50');
     expect(advanced).toHaveAttribute('href', '/wifi/advanced');
   });
@@ -167,9 +167,9 @@ describe('Sidebar', () => {
   it('marks only the exact leaf as current on /wifi/advanced', async () => {
     renderSidebar('/wifi/advanced');
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Extras' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Extras' })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -178,12 +178,12 @@ describe('Sidebar', () => {
     );
   });
 
-  it('marks only Setup as current on /network/configuration', async () => {
+  it('marks only Internet & LAN as current on /network/configuration', async () => {
     renderSidebar('/network/configuration');
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Setup' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Internet & LAN' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Setup' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Internet & LAN' })).toHaveAttribute(
       'aria-current',
       'page',
     );

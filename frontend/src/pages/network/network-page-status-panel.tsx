@@ -30,7 +30,12 @@ export function NetworkPageStatusPanel({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Connected Clients</CardTitle>
+          <div className="space-y-1">
+            <CardTitle>Connected Clients</CardTitle>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Devices on your travel Wi‑Fi. Full list and reservations live under Clients.
+            </p>
+          </div>
           <Network className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>

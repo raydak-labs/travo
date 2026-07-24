@@ -88,7 +88,7 @@ Normative IA: [`plans/2026-07-24-frontend-traveler-ia.md`](plans/2026-07-24-fron
 
 | Pattern | Typical role |
 | --------|--------------|
-| **Sidebar** (collapsible groups + leaves) | *Where in the app am I?* Child links are real routes (e.g. `/wifi/advanced`, `/network/configuration`). Switching Connect/Setup/Advanced is **sidebar-only** — do **not** mirror those axes with an in-page tab bar. |
+| **Sidebar** (collapsible groups + leaves) | *Where in the app am I?* Child links are real routes (e.g. `/wifi/advanced`, `/network/configuration`). Switching Connect/Extras and Status/Internet & LAN/Tools is **sidebar-only** — do **not** mirror those axes with an in-page tab bar. |
 | **In-page tabs** | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**). |
 | **Page sections** (collapsed boxes) | Progressive disclosure **inside** a route (dense / Advanced pages). Default closed on first paint; not a second global nav. |
 

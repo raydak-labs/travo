@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/cn';
+
+const PageSectionContext = createContext(false);
+
+/** True when rendering inside an expanded/collapsed PageSection body. */
+export function useInPageSection(): boolean {
+  return useContext(PageSectionContext);
+}
 
 type PageSectionProps = {
   title: string;
@@ -26,7 +34,9 @@ export function PageSection({ title, defaultOpen = false, children }: PageSectio
           aria-hidden
         />
       </CollapsibleTrigger>
-      <CollapsibleContent>{children}</CollapsibleContent>
+      <CollapsibleContent>
+        <PageSectionContext.Provider value={true}>{children}</PageSectionContext.Provider>
+      </CollapsibleContent>
     </Collapsible>
   );
 }

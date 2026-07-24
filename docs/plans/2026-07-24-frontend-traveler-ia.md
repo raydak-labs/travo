@@ -24,7 +24,7 @@ tags: [plan, frontend, ux, ia]
 4. **First visit (no usable sidebar-group storage):** land on `/dashboard`; all sidebar groups **collapsed**.
 5. **Collapse means two things:** (a) sidebar submenus, (b) page section boxes default closed on dense pages — **follow the Page disclosure table** (some primary blocks stay open).
 6. **No feature deletion** — every current capability stays on its current route (or existing page section).
-7. **Header** = action chrome only (title, status, notifications, theme, reboot/shutdown/logout). No header page menus. **Page title** for WiFi/Network children = sidebar **leaf** label (Connect, Advanced, Status, Setup, …), not the group name alone. Services children may keep `Services / Tailscale`-style titles if already used.
+7. **Header** = action chrome only (title, status, notifications, theme, reboot/shutdown/logout). No header page menus. **Page title** for WiFi/Network children = sidebar **leaf** label (Connect, Extras, Status, Internet & LAN, Tools, …), not the group name alone. Services children may keep `Services / Tailscale`-style titles if already used.
 8. **Cross-links** stay light (Dashboard shortcuts, Status → Clients, VPN ↔ Tailscale hints).
 
 ---
@@ -34,14 +34,14 @@ tags: [plan, frontend, ux, ia]
 | Top-level | Kind | Route(s) | Sidebar label |
 |-----------|------|----------|---------------|
 | Dashboard | leaf | `/dashboard` | Dashboard |
-| WiFi | group | `/wifi` · `/wifi/advanced` | **Connect** · Advanced |
-| Network | group | `/network` · `/network/configuration` · `/network/advanced` | Status · **Setup** · Advanced |
+| WiFi | group | `/wifi` · `/wifi/advanced` | **Connect** · **Extras** |
+| Network | group | `/network` · `/network/configuration` · `/network/advanced` | Status · **Internet & LAN** · **Tools** |
 | Clients | leaf | `/clients` | Clients |
 | VPN | leaf | `/vpn` | VPN |
 | Services | group | `/services` · `/services/tailscale` · `/services/speedtest` · `/services/sqm` (if installed) | **Apps** · Tailscale · Speedtest · SQM |
 | System | group | `/system` · `/logs` | Settings · Logs |
 
-Routes unchanged. Sidebar (and matching page titles / mobile drawer) label renames only: Wireless → **Connect**, Configuration → **Setup**, Installed services → **Apps**.
+Routes unchanged. Sidebar (and matching page titles / mobile drawer) label renames: Wireless → **Connect**, `/wifi/advanced` → **Extras**, Configuration → **Internet & LAN**, `/network/advanced` → **Tools**, Installed services → **Apps**. Distinct Extras/Tools avoid twin “Advanced” under WiFi and Network.
 
 SQM leaf: show only when the package is installed (same as today). Absent → hide the leaf (no dead link).
 
@@ -51,7 +51,7 @@ SQM leaf: show only when the package is installed (same as today). Absent → hi
 
 ### Sidebar owns route hierarchy
 
-- Switching Status ↔ Setup ↔ Advanced (Network) or Connect ↔ Advanced (WiFi) is **sidebar only**. Do not reintroduce a page tab strip for those axes.
+- Switching Status ↔ Internet & LAN ↔ Tools (Network) or Connect ↔ Extras (WiFi) is **sidebar only**. Do not reintroduce a page tab strip for those axes.
 - **In-page tabs allowed only** when the axis is *not* already a sidebar hierarchy. Today: Logs **System Log / Kernel Log** (log *source*, not a nav destination). That exception must stay documented in `ui-theming.md` so WiFi/Network tabs do not return.
 
 ### Active group auto-expand (precedence)
@@ -85,16 +85,16 @@ Regression if an implementation exceeds that.
 
 ## Page disclosure
 
-Collapse sections **in place** on the route that already owns the card. Do not move cards between Status / Setup / Advanced in this pass.
+Collapse sections **in place** on the route that already owns the card. Do not move cards between Status / Internet & LAN / Tools in this pass.
 
 | Page | Default open | Default collapsed |
 |------|--------------|-------------------|
 | Dashboard | Topology / WAN sources, quick status, quick actions, throughput | Keep lean |
 | WiFi Connect (`/wifi`) | Mode, connection / scan / saved, captive / internet health | Long help only if it crowds the happy path |
-| WiFi Advanced | Short intro optional | DNS tools, radio HW, guest, MAC, band switch, schedule |
+| WiFi Extras | Short intro optional | DNS tools, radio HW, guest, MAC, band switch, schedule |
 | Network Status | WAN status, clients preview, traffic, uptime | — |
-| Network Setup | **WAN + LAN open**; DHCP, DNS, entries, reservations, leases **collapsed** | (locked — not implementer choice) |
-| Network Advanced | Failover summary open if present | Remaining advanced cards on that route (firewall, IPv6, DoH, WoL, diagnostics, speed, USB, DDNS, data usage, …) |
+| Network Internet & LAN | **WAN + LAN open**; DHCP, DNS, entries, reservations, leases **collapsed** | (locked — not implementer choice) |
+| Network Tools | Failover summary open if present | Remaining advanced cards on that route (firewall, IPv6, DoH, WoL, diagnostics, speed, USB, DDNS, data usage, …) |
 | VPN | WireGuard connect + core toggles | Split tunnel, leak / speed / verify |
 | Clients | List + kick/block | Heavy reservation editor if needed |
 | System | Glance + password / timezone essentials | Maintenance, firmware, SSH, danger zone |
@@ -103,7 +103,7 @@ Collapse sections **in place** on the route that already owns the card. Do not m
 
 Page-section open/closed **not** persisted in the first implementation (defaults every visit).
 
-**Pre-existing dual homes** (e.g. Network Advanced speed card vs Services Speedtest page) stay as-is this pass; do not invent a new canonical rule here.
+**Pre-existing dual homes** (e.g. Network Tools speed card vs Services Speedtest page) stay as-is this pass; do not invent a new canonical rule here.
 
 ---
 
@@ -119,7 +119,7 @@ Page-section open/closed **not** persisted in the first implementation (defaults
 
 - Moving Tailscale under the VPN leaf.
 - Fully merging Clients into Network Status.
-- Moving cards between Configuration/Setup and Advanced routes.
+- Moving cards between Configuration/Internet & LAN and Tools routes.
 - Persisted accordion state for page sections.
 - Breadcrumbs / command palette.
 - LuCI escape-hatch link in System.
@@ -136,17 +136,17 @@ Not an implementation plan — pointers for the next plan:
 - Stop using `wifi-page-tab-bar.tsx` / `network-page-tab-bar.tsx` (delete or leave unused only if tests require a short transition); keep URL routes.
 - Page section collapse on dense / Advanced pages (existing Collapsible/`<details>` patterns OK).
 - Clients preview (≤5 rows) + link on Network Status.
-- Page titles / drawer copy align with Connect / Setup / Apps (leaf titles for WiFi/Network).
+- Page titles / drawer copy align with Connect / Internet & LAN / Apps / Extras / Tools (leaf titles for WiFi/Network).
 - Tests: first-visit defaults, storage key v2, deep-link expands group, Dashboard CTA expands group, no WiFi/Network tablists mirroring sidebar.
 
 ---
 
 ## Success criteria
 
-1. WiFi and Network pages have **no** tablist that mirrors sidebar Connect/Setup/Advanced (or old Wireless/Configuration labels).
+1. WiFi and Network pages have **no** tablist that mirrors sidebar Connect/Internet & LAN/Extras/Tools (or old Wireless/Configuration/Advanced labels).
 2. First cold load with empty/migrated storage: Dashboard + all sidebar groups collapsed.
 3. Opening `/wifi/advanced` (or any group child) expands that group and highlights the leaf.
-4. Labels Connect / Setup / Apps appear in sidebar (and matching titles).
+4. Labels Connect / Internet & LAN / Apps / Extras / Tools appear in sidebar (and matching titles).
 5. All pre-change features still reachable on the same routes/sections.
 6. Tap-budget jobs still hold on a mobile-width check.
 

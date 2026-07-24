@@ -50,7 +50,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     icon: Wifi,
     items: [
       { to: '/wifi', label: 'Connect' },
-      { to: '/wifi/advanced', label: 'Advanced' },
+      { to: '/wifi/advanced', label: 'Extras' },
     ],
   },
   {
@@ -60,8 +60,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     icon: Globe,
     items: [
       { to: '/network', label: 'Status' },
-      { to: '/network/configuration', label: 'Setup' },
-      { to: '/network/advanced', label: 'Advanced' },
+      { to: '/network/configuration', label: 'Internet & LAN' },
+      { to: '/network/advanced', label: 'Tools' },
     ],
   },
   {
