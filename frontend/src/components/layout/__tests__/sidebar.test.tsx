@@ -74,7 +74,8 @@ function renderSidebar(currentPath = '/dashboard') {
     history: createMemoryHistory({ initialEntries: [currentPath] }),
   });
 
-  return render(<RouterProvider router={router} />);
+  const view = render(<RouterProvider router={router} />);
+  return { ...view, router };
 }
 
 function renderAppShellMobile(currentPath = '/dashboard') {
@@ -138,6 +139,49 @@ describe('Sidebar', () => {
     const wifiTrigger = screen.getByRole('button', { name: /WiFi/i });
     expect(wifiTrigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+  });
+
+  it('keeps all groups collapsed on dashboard with empty storage', async () => {
+    renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByText('WiFi')).toBeInTheDocument();
+    });
+    for (const name of [/WiFi/i, /Network/i, /Services/i, /System/i]) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
+  it('auto-expands WiFi group on /wifi/advanced with empty storage', async () => {
+    renderSidebar('/wifi/advanced');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /WiFi/i })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+    });
+    const advanced = screen.getByRole('link', { name: 'Advanced' });
+    expect(advanced).toHaveClass('bg-blue-50');
+    expect(advanced).toHaveAttribute('href', '/wifi/advanced');
+  });
+
+  it('expands WiFi group when navigating from dashboard to /wifi', async () => {
+    const { router } = renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /WiFi/i })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    });
+
+    await router.navigate({ to: '/wifi' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /WiFi/i })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(screen.getByRole('link', { name: 'Connect' })).toHaveClass('bg-blue-50');
+    });
   });
 
   it('shows Connect label after opening WiFi group', async () => {
