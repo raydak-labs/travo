@@ -1,3 +1,4 @@
+import { PageSection } from '@/components/ui/page-section';
 import { DNSToolsCard } from '@/components/wifi/dns-tools-card';
 import { WifiRadioHardwareCard } from './wifi-radio-hardware-card';
 import { GuestNetworkCard } from './guest-network-card';
@@ -10,14 +11,33 @@ import { RepeaterRadioLayoutCard } from './repeater-radio-layout-card';
 export function WifiAdvancedPanel() {
   return (
     <div className="space-y-6">
-      <DNSToolsCard />
-      <RepeaterRadioLayoutCard />
-      <WifiRadioHardwareCard />
-      <GuestNetworkCard />
-      <MACAddressCard />
-      <MACPolicyCard />
-      <BandSwitchingCard />
-      <WiFiScheduleCard />
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Optional advanced Wi-Fi settings. Expand a section to configure it.
+      </p>
+      <PageSection title="DNS tools">
+        <DNSToolsCard />
+      </PageSection>
+      <PageSection title="Repeater radio layout">
+        <RepeaterRadioLayoutCard />
+      </PageSection>
+      <PageSection title="Radio hardware">
+        <WifiRadioHardwareCard />
+      </PageSection>
+      <PageSection title="Guest network">
+        <GuestNetworkCard />
+      </PageSection>
+      <PageSection title="MAC address cloning">
+        <MACAddressCard />
+      </PageSection>
+      <PageSection title="MAC policy">
+        <MACPolicyCard />
+      </PageSection>
+      <PageSection title="Band switching">
+        <BandSwitchingCard />
+      </PageSection>
+      <PageSection title="WiFi schedule">
+        <WiFiScheduleCard />
+      </PageSection>
     </div>
   );
 }
