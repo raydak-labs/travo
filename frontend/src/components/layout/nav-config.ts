@@ -49,7 +49,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     label: 'WiFi',
     icon: Wifi,
     items: [
-      { to: '/wifi', label: 'Wireless' },
+      { to: '/wifi', label: 'Connect' },
       { to: '/wifi/advanced', label: 'Advanced' },
     ],
   },
@@ -60,7 +60,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     icon: Globe,
     items: [
       { to: '/network', label: 'Status' },
-      { to: '/network/configuration', label: 'Configuration' },
+      { to: '/network/configuration', label: 'Setup' },
       { to: '/network/advanced', label: 'Advanced' },
     ],
   },
@@ -84,7 +84,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     label: 'Services',
     icon: Monitor,
     items: [
-      { to: '/services', label: 'Installed services' },
+      { to: '/services', label: 'Apps' },
       { to: '/services/tailscale', label: 'Tailscale' },
       { to: '/services/speedtest', label: 'Speedtest' },
     ],
@@ -123,14 +123,14 @@ export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
   '/logs': ScrollText,
 };
 
-const STORAGE_KEY_GROUPS = 'otg-sidebar-groups';
+const STORAGE_KEY_GROUPS = 'otg-sidebar-groups-v2';
 
 /** Default open state for groups (first visit). */
 const defaultOpen: Record<string, boolean> = {
-  wifi: true,
-  network: true,
-  services: true,
-  system: true,
+  wifi: false,
+  network: false,
+  services: false,
+  system: false,
 };
 
 export function loadSidebarGroupState(): Record<string, boolean> {

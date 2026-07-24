@@ -109,6 +109,12 @@ function renderAppShellMobile(currentPath = '/dashboard') {
 describe('Sidebar', () => {
   beforeEach(() => {
     mockUseIsMobile.mockReturnValue(false);
+    mockUseServices.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useServices>);
+    localStorage.clear();
   });
 
   it('renders category groups and leaf routes', async () => {
@@ -116,24 +122,39 @@ describe('Sidebar', () => {
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('WiFi')).toBeInTheDocument();
-      expect(screen.getByText('Wireless')).toBeInTheDocument();
       expect(screen.getByText('Network')).toBeInTheDocument();
-      expect(screen.getByText('Status')).toBeInTheDocument();
-      expect(screen.getByText('Configuration')).toBeInTheDocument();
-      expect(screen.getAllByText('Advanced').length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText('Clients')).toBeInTheDocument();
       expect(screen.getByText('VPN')).toBeInTheDocument();
       expect(screen.getByText('Services')).toBeInTheDocument();
-      expect(screen.getByText('Installed services')).toBeInTheDocument();
-      expect(screen.getByText('Tailscale')).toBeInTheDocument();
       expect(screen.getByText('System')).toBeInTheDocument();
-      expect(screen.getByText('Settings')).toBeInTheDocument();
-      expect(screen.getByText('Logs')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps WiFi children collapsed on dashboard with empty storage', async () => {
+    renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByText('WiFi')).toBeInTheDocument();
+    });
+    const wifiTrigger = screen.getByRole('button', { name: /WiFi/i });
+    expect(wifiTrigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+  });
+
+  it('shows Connect label after opening WiFi group', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByText('WiFi')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /WiFi/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
     });
   });
 
   it('shows SQM under Services when SQM is installed', async () => {
-    mockUseServices.mockReturnValueOnce({
+    const user = userEvent.setup();
+    mockUseServices.mockReturnValue({
       data: [
         {
           id: 'sqm',
@@ -148,7 +169,12 @@ describe('Sidebar', () => {
     } as ReturnType<typeof useServices>);
     renderSidebar();
     await waitFor(() => {
+      expect(screen.getByText('Services')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /Services/i }));
+    await waitFor(() => {
       expect(screen.getByText('SQM')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Apps' })).toBeInTheDocument();
     });
   });
 
@@ -164,6 +190,7 @@ describe('Sidebar', () => {
 describe('Mobile Sidebar', () => {
   beforeEach(() => {
     mockUseIsMobile.mockReturnValue(true);
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -207,7 +234,11 @@ describe('Mobile Sidebar', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('link', { name: 'Wireless' }));
+    await user.click(screen.getByRole('button', { name: /WiFi/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('link', { name: 'Connect' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

@@ -126,7 +126,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
                   key={entry.id}
                   group={group}
                   pathname={pathname}
-                  open={groupOpen[entry.id] ?? true}
+                  open={groupOpen[entry.id] ?? false}
                   onOpenChange={(o) => setGroup(entry.id, o)}
                   onNavClick={onNavClick}
                 />
