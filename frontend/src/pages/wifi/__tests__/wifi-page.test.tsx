@@ -70,7 +70,7 @@ describe('WifiPage', () => {
     renderWifiPage('/wifi/advanced');
 
     await waitFor(() => {
-      expect(screen.getByText('MAC Address Cloning')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /MAC address cloning/i })).toBeInTheDocument();
     });
     expect(screen.queryByText('Current Connection')).not.toBeInTheDocument();
   });
