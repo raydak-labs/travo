@@ -1,3 +1,4 @@
+import { PageSection } from '@/components/ui/page-section';
 import { NTPConfigCard } from './ntp-config-card';
 import { LEDControlCard } from './led-control-card';
 import { FirmwareUpgradeCard } from './firmware-upgrade-card';
@@ -29,7 +30,9 @@ export function SystemPage() {
           <HardwareButtonsCard />
           <LEDControlCard />
           <AlertThresholdsCard />
-          <SSHKeysCard />
+          <PageSection title="SSH Public Keys">
+            <SSHKeysCard />
+          </PageSection>
         </div>
       </div>
 
@@ -38,12 +41,18 @@ export function SystemPage() {
           Maintenance
         </h2>
         <div className="space-y-4">
-          <SystemBackupRestoreCard />
-          <FirmwareUpgradeCard />
+          <PageSection title="Backup & Restore">
+            <SystemBackupRestoreCard />
+          </PageSection>
+          <PageSection title="Firmware Upgrade">
+            <FirmwareUpgradeCard />
+          </PageSection>
         </div>
       </div>
 
-      <SystemPowerSection />
+      <PageSection title="Danger Zone">
+        <SystemPowerSection />
+      </PageSection>
       <SystemQuickLinksCard />
     </div>
   );

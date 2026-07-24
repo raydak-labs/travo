@@ -1,3 +1,4 @@
+import { PageSection } from '@/components/ui/page-section';
 import { WireguardSection } from './wireguard-section';
 import { SplitTunnelCard } from './split-tunnel-card';
 import { VpnSpeedTestCard } from './vpn-speed-test-card';
@@ -9,11 +10,19 @@ export function VpnPage() {
   return (
     <div className="space-y-6">
       <WireguardSection />
-      <SplitTunnelCard />
+      <PageSection title="Split Tunneling">
+        <SplitTunnelCard />
+      </PageSection>
       <VpnAdguardHint />
-      <VpnVerifyWireguardCard />
-      <VpnDnsLeakTestCard />
-      <VpnSpeedTestCard />
+      <PageSection title="Verify VPN">
+        <VpnVerifyWireguardCard />
+      </PageSection>
+      <PageSection title="DNS Leak Test">
+        <VpnDnsLeakTestCard />
+      </PageSection>
+      <PageSection title="VPN Speed Test">
+        <VpnSpeedTestCard />
+      </PageSection>
     </div>
   );
 }

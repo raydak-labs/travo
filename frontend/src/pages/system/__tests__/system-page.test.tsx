@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -97,12 +98,37 @@ describe('SystemPage', () => {
     });
   });
 
-  it('shows reboot button', async () => {
+  it('shows reboot button after expanding Danger Zone', async () => {
+    const user = userEvent.setup();
     renderSystemPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Reboot' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Danger Zone/i })).toBeInTheDocument();
     });
+    expect(screen.queryByRole('button', { name: 'Reboot' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Danger Zone/i }));
+    expect(screen.getByRole('button', { name: 'Reboot' })).toBeVisible();
+  });
+
+  it('collapses maintenance, firmware, and SSH by default', async () => {
+    const user = userEvent.setup();
+    renderSystemPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('System Information')).toBeInTheDocument();
+      expect(screen.getByText('Time & Timezone')).toBeInTheDocument();
+      expect(screen.getByText('Change Password')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /Backup & Restore/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Firmware Upgrade/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /SSH Public Keys/i })).toBeInTheDocument();
+    expect(screen.queryByText('Download Backup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Select Firmware Image')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Backup & Restore/i }));
+    expect(screen.getByText('Download Backup')).toBeVisible();
   });
 
   it('renders Quick Links section', async () => {
