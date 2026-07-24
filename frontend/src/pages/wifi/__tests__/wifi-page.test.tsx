@@ -47,6 +47,34 @@ function renderWifiPage(initialPath = '/wifi') {
 }
 
 describe('WifiPage', () => {
+  it('has no in-page tablist mirroring sidebar', async () => {
+    renderWifiPage('/wifi');
+
+    await waitFor(() => {
+      expect(screen.getByText('Current Connection')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Wireless|Connect|Advanced/i })).not.toBeInTheDocument();
+  });
+
+  it('shows Connect panel content on /wifi', async () => {
+    renderWifiPage('/wifi');
+
+    await waitFor(() => {
+      expect(screen.getByText('Current Connection')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('MAC Address Cloning')).not.toBeInTheDocument();
+  });
+
+  it('shows Advanced panel content on /wifi/advanced', async () => {
+    renderWifiPage('/wifi/advanced');
+
+    await waitFor(() => {
+      expect(screen.getByText('MAC Address Cloning')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Current Connection')).not.toBeInTheDocument();
+  });
+
   it('renders current connection section with SSID', async () => {
     renderWifiPage();
 

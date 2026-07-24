@@ -7,15 +7,9 @@ import { WiFiScheduleCard } from './wifi-schedule-card';
 import { MACPolicyCard } from './mac-policy-card';
 import { RepeaterRadioLayoutCard } from './repeater-radio-layout-card';
 
-type WifiAdvancedPanelProps = {
-  panelId: string;
-  tabId: string;
-  hidden: boolean;
-};
-
-export function WifiAdvancedPanel({ panelId, tabId, hidden }: WifiAdvancedPanelProps) {
+export function WifiAdvancedPanel() {
   return (
-    <div id={panelId} role="tabpanel" aria-labelledby={tabId} hidden={hidden} className="space-y-6">
+    <div className="space-y-6">
       <DNSToolsCard />
       <RepeaterRadioLayoutCard />
       <WifiRadioHardwareCard />
