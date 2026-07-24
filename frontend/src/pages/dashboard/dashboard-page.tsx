@@ -103,9 +103,9 @@ function TopologyDiagram({
   const routerCY = DIAGRAM_H / 2;
 
   return (
-    <div className="overflow-visible rounded-xl bg-slate-900 p-4 dark:bg-slate-950 md:p-6">
-      {/* Stacked layout for narrow viewports — avoids fixed-column clip */}
-      <div data-testid="topology-mobile" className="flex flex-col gap-5 md:hidden">
+    <div className="@container overflow-visible rounded-xl bg-slate-900 p-4 dark:bg-slate-950 sm:p-6">
+      {/* Stack when topology card < ~576px (@xl container). Phones only; mid widths keep line graph. */}
+      <div data-testid="topology-mobile" className="flex flex-col gap-5 @xl:hidden">
         <div className="space-y-2">
           {sources.map((src) => {
             const Icon = src.icon;
@@ -169,10 +169,10 @@ function TopologyDiagram({
         </div>
       </div>
 
-      {/* Horizontal diagram for md+ */}
+      {/* Original horizontal line diagram once the card is wide enough */}
       <div
         data-testid="topology-desktop"
-        className="relative hidden items-stretch overflow-hidden md:flex"
+        className="relative hidden min-w-0 items-stretch overflow-x-auto @xl:flex"
         style={{ minHeight: DIAGRAM_H + 48 }}
       >
         <div style={{ width: LEFT_COL, minWidth: LEFT_COL }}>

@@ -16,6 +16,22 @@ describe('PageSection', () => {
     expect(screen.queryByText('section body')).not.toBeInTheDocument();
   });
 
+  it('uses card chrome and header padding on the collapsed trigger', () => {
+    const { container } = render(
+      <PageSection title="DNS tools">
+        <div>section body</div>
+      </PageSection>,
+    );
+
+    const shell = container.firstElementChild as HTMLElement;
+    expect(shell.className).toMatch(/rounded-lg/);
+    expect(shell.className).toMatch(/border/);
+
+    const trigger = screen.getByRole('button', { name: /DNS tools/i });
+    expect(trigger.className).toMatch(/px-6/);
+    expect(trigger.className).toMatch(/py-4/);
+  });
+
   it('opens content when the trigger is clicked', async () => {
     const user = userEvent.setup();
     render(

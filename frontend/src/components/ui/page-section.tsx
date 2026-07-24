@@ -19,13 +19,18 @@ type PageSectionProps = {
 
 export function PageSection({ title, defaultOpen = false, children }: PageSectionProps) {
   return (
-    <Collapsible defaultOpen={defaultOpen}>
+    <Collapsible
+      defaultOpen={defaultOpen}
+      className={cn(
+        'rounded-lg border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-950',
+      )}
+    >
       <CollapsibleTrigger
         type="button"
         className={cn(
-          'group flex w-full items-center gap-2 rounded-md py-2 text-left text-sm font-medium',
+          'group flex w-full items-center gap-2 px-6 py-4 text-left text-sm font-medium',
           'text-gray-900 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-          'dark:text-white dark:hover:bg-gray-800',
+          'dark:text-white dark:hover:bg-gray-800/80',
         )}
       >
         <span className="flex-1 truncate">{title}</span>
@@ -34,7 +39,7 @@ export function PageSection({ title, defaultOpen = false, children }: PageSectio
           aria-hidden
         />
       </CollapsibleTrigger>
-      <CollapsibleContent>
+      <CollapsibleContent className="border-t border-gray-200 dark:border-white/10">
         <PageSectionContext.Provider value={true}>{children}</PageSectionContext.Provider>
       </CollapsibleContent>
     </Collapsible>

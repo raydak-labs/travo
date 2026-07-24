@@ -135,13 +135,13 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('uses stacked topology on small screens and horizontal on md+', async () => {
+  it('stacks topology when narrow and shows line diagram from @xl card width', async () => {
     renderDashboard();
     const mobile = await screen.findByTestId('topology-mobile');
     const desktop = screen.getByTestId('topology-desktop');
-    expect(mobile.className).toMatch(/md:hidden/);
+    expect(mobile.className).toMatch(/@xl:hidden/);
     expect(desktop.className).toMatch(/hidden/);
-    expect(desktop.className).toMatch(/md:flex/);
+    expect(desktop.className).toMatch(/@xl:flex/);
     await waitFor(() => {
       expect(screen.getAllByText('Internet').length).toBeGreaterThan(0);
     });
