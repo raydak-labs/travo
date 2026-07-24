@@ -54,7 +54,12 @@ export function SidebarNavGroup({
             const active = isRouteActive(item.to, pathname);
             return (
               <li key={item.to}>
-                <Link to={item.to} onClick={onNavClick} className={subLinkClass(active)}>
+                <Link
+                  to={item.to}
+                  onClick={onNavClick}
+                  className={subLinkClass(active)}
+                  activeOptions={{ exact: true }}
+                >
                   {item.label}
                 </Link>
               </li>

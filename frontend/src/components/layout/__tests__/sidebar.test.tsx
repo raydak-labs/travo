@@ -164,6 +164,34 @@ describe('Sidebar', () => {
     expect(advanced).toHaveAttribute('href', '/wifi/advanced');
   });
 
+  it('marks only the exact leaf as current on /wifi/advanced', async () => {
+    renderSidebar('/wifi/advanced');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Connect' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('marks only Setup as current on /network/configuration', async () => {
+    renderSidebar('/network/configuration');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Setup' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Setup' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Status' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
   it('expands WiFi group when navigating from dashboard to /wifi', async () => {
     const { router } = renderSidebar('/dashboard');
     await waitFor(() => {
