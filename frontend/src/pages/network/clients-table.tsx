@@ -8,14 +8,16 @@ import { useKickClient, useBlockClient, useUnblockClient } from '@/hooks/use-net
 interface ClientsTableProps {
   clients: readonly Client[];
   blockedMacs?: readonly string[];
+  limit?: number;
 }
 
-export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
+export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableProps) {
   const sorted = [...clients].sort((a, b) => {
     const nameA = a.alias || a.hostname || '';
     const nameB = b.alias || b.hostname || '';
     return nameA.localeCompare(nameB);
   });
+  const visible = limit != null ? sorted.slice(0, limit) : sorted;
   const kick = useKickClient();
   const block = useBlockClient();
   const unblock = useUnblockClient();
@@ -41,7 +43,7 @@ export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {sorted.map((client) => {
+          {visible.map((client) => {
             const isBlocked = blockedSet.has(client.mac_address.toUpperCase());
             return (
               <tr key={client.mac_address} className="group">

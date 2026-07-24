@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -9,7 +9,11 @@ import {
   Outlet,
   createMemoryHistory,
 } from '@tanstack/react-router';
+import { http, HttpResponse } from 'msw';
+import { API_ROUTES, type Client } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
+import { mockNetworkStatus } from '@/mocks/data';
+import { server } from '@/mocks/server';
 import { NetworkPage } from '../network-page';
 
 function renderNetworkPage(initialPath = '/network') {
@@ -34,11 +38,17 @@ function renderNetworkPage(initialPath = '/network') {
     path: '/network',
     component: NetworkPage,
   });
+  const clientsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/clients',
+    component: () => <div>Clients page</div>,
+  });
 
   const routeTree = rootRoute.addChildren([
     networkConfigurationRoute,
     networkAdvancedRoute,
     networkRoute,
+    clientsRoute,
   ]);
 
   const router = createRouter({
@@ -53,6 +63,19 @@ function renderNetworkPage(initialPath = '/network') {
       </QueryClientProvider>
     </ThemeProvider>,
   );
+}
+
+function makeClient(index: number): Client {
+  const n = String(index).padStart(2, '0');
+  return {
+    ip_address: `192.168.8.${100 + index}`,
+    mac_address: `AA:BB:CC:DD:EE:${n}`,
+    hostname: `Client-${n}`,
+    interface_name: 'br-lan',
+    rx_bytes: 1000,
+    tx_bytes: 500,
+    connected_since: '2026-03-04T08:00:00Z',
+  };
 }
 
 describe('NetworkPage', () => {
@@ -161,5 +184,29 @@ describe('NetworkPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Auto-detect WAN Type')).toBeInTheDocument();
     });
+  });
+
+  it('previews at most 5 clients and links to /clients', async () => {
+    const manyClients = Array.from({ length: 7 }, (_, i) => makeClient(i + 1));
+    server.use(
+      http.get(API_ROUTES.network.status, () =>
+        HttpResponse.json({ ...mockNetworkStatus, clients: manyClients }),
+      ),
+    );
+
+    renderNetworkPage('/network');
+
+    await waitFor(() => {
+      expect(screen.getByText('Connected Clients')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const table = screen.getByRole('table');
+      const bodyRows = within(table).getAllByRole('row').slice(1);
+      expect(bodyRows).toHaveLength(5);
+    });
+
+    const viewAll = screen.getByRole('link', { name: /view all/i });
+    expect(viewAll).toHaveAttribute('href', '/clients');
   });
 });
