@@ -53,7 +53,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
       <td className="hidden py-3 pr-4 text-sm text-gray-500 dark:text-gray-400 lg:table-cell">
         {connectedSince ?? '—'}
       </td>
-      <td className="py-3 pr-4 text-sm text-gray-500 dark:text-gray-400">
+      <td className="hidden py-3 pr-4 text-sm text-gray-500 dark:text-gray-400 sm:table-cell">
         <div className="text-xs">
           <span className="text-blue-600 dark:text-blue-400">↓ {formatBytes(client.rx_bytes)}</span>
           {' / '}

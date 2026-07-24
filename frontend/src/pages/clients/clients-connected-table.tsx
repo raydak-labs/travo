@@ -47,7 +47,9 @@ export function ClientsConnectedTable({
             <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">IP Address</th>
             <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 md:table-cell">Interface</th>
             <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 lg:table-cell">Connected Since</th>
-            <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Traffic</th>
+            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 sm:table-cell">
+              Traffic
+            </th>
             <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
           </tr>
         </thead>

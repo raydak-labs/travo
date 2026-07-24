@@ -74,6 +74,7 @@ describe('TimezoneAlert', () => {
     expect(screen.getByText('UTC', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('Europe/Berlin', { exact: false })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument();
+    expect(screen.getByRole('alert').className).toMatch(/flex-wrap/);
 
     vi.unstubAllGlobals();
   });

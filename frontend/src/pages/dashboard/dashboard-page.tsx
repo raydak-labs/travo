@@ -26,6 +26,53 @@ interface ClientDef {
   count: number;
 }
 
+function TopologyRouterCenter({
+  hostname,
+  model,
+  features,
+  loading,
+}: {
+  hostname: string;
+  model: string;
+  features: { label: string; active: boolean }[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return <Skeleton className="h-20 w-20 rounded-2xl" />;
+  }
+
+  return (
+    <>
+      <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-600 bg-slate-800">
+        <Router className="h-10 w-10 text-slate-300" />
+        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
+      </div>
+      <div className="min-w-0 max-w-full px-1 text-center">
+        <div className="text-xs font-semibold leading-tight text-slate-200">
+          {hostname || 'OpenWRT'}
+        </div>
+        {model && (
+          <div className="break-words text-[10px] leading-tight text-slate-500">{model}</div>
+        )}
+      </div>
+      <div className="flex max-w-full flex-wrap justify-center gap-1">
+        {features.map((f) => (
+          <span
+            key={f.label}
+            className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${
+              f.active
+                ? 'border-emerald-600 bg-emerald-900/40 text-emerald-300'
+                : 'border-slate-700 bg-slate-800/40 text-slate-500'
+            }`}
+          >
+            {f.label}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function TopologyDiagram({
   sources,
   clients,
@@ -56,21 +103,14 @@ function TopologyDiagram({
   const routerCY = DIAGRAM_H / 2;
 
   return (
-    <div
-      className="relative flex items-stretch overflow-hidden rounded-xl bg-slate-900 p-6 dark:bg-slate-950"
-      style={{ minHeight: DIAGRAM_H + 48 }}
-    >
-      <div style={{ width: LEFT_COL, minWidth: LEFT_COL }}>
-        <div className="relative" style={{ height: DIAGRAM_H }}>
-          {sources.map((src, i) => {
+    <div className="overflow-visible rounded-xl bg-slate-900 p-4 dark:bg-slate-950 md:p-6">
+      {/* Stacked layout for narrow viewports — avoids fixed-column clip */}
+      <div data-testid="topology-mobile" className="flex flex-col gap-5 md:hidden">
+        <div className="space-y-2">
+          {sources.map((src) => {
             const Icon = src.icon;
-            const y = sourceYs[i];
             return (
-              <div
-                key={src.label}
-                className="absolute flex items-center gap-2"
-                style={{ top: y - ROW_H / 2, height: ROW_H, left: 0, right: 0 }}
-              >
+              <div key={src.label} className="flex min-w-0 items-center gap-2">
                 <div
                   className={`h-2 w-2 flex-shrink-0 rounded-full ${
                     src.connected ? 'bg-emerald-400' : 'bg-slate-600'
@@ -86,7 +126,7 @@ function TopologyDiagram({
                     {src.label}
                   </div>
                   {src.detail && (
-                    <div className="truncate text-[10px] leading-tight text-slate-500">
+                    <div className="break-words text-[10px] leading-tight text-slate-500">
                       {src.detail}
                     </div>
                   )}
@@ -95,106 +135,21 @@ function TopologyDiagram({
             );
           })}
         </div>
-      </div>
 
-      <div className="relative min-w-[40px] flex-1">
-        <svg
-          className="absolute inset-0 h-full w-full"
-          preserveAspectRatio="none"
-          viewBox={`0 0 100 ${DIAGRAM_H}`}
-        >
-          {sources.map((src, i) => {
-            const y = sourceYs[i];
-            const midX = 50;
-            const color = src.connected ? '#10b981' : '#334155';
-            return (
-              <path
-                key={src.label}
-                d={`M 0 ${y} C ${midX} ${y}, ${midX} ${routerCY}, 100 ${routerCY}`}
-                fill="none"
-                stroke={color}
-                strokeWidth="1.5"
-                strokeDasharray={src.connected ? '0' : '4 3'}
-                opacity={src.connected ? 0.7 : 0.35}
-              />
-            );
-          })}
-        </svg>
-      </div>
+        <div className="flex flex-col items-center justify-center gap-2">
+          <TopologyRouterCenter
+            hostname={hostname}
+            model={model}
+            features={features}
+            loading={loading}
+          />
+        </div>
 
-      <div
-        className="flex w-[160px] flex-shrink-0 flex-col items-center justify-center gap-2"
-        style={{ width: CENTER_W }}
-      >
-        {loading ? (
-          <Skeleton className="h-20 w-20 rounded-2xl" />
-        ) : (
-          <>
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-slate-600 bg-slate-800">
-              <Router className="h-10 w-10 text-slate-300" />
-              <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-slate-900" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-semibold leading-tight text-slate-200">
-                {hostname || 'OpenWRT'}
-              </div>
-              {model && <div className="text-[10px] leading-tight text-slate-500">{model}</div>}
-            </div>
-            <div className="flex flex-wrap justify-center gap-1">
-              {features.map((f) => (
-                <span
-                  key={f.label}
-                  className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${
-                    f.active
-                      ? 'border-emerald-600 bg-emerald-900/40 text-emerald-300'
-                      : 'border-slate-700 bg-slate-800/40 text-slate-500'
-                  }`}
-                >
-                  {f.label}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="relative min-w-[40px] flex-1">
-        <svg
-          className="absolute inset-0 h-full w-full"
-          preserveAspectRatio="none"
-          viewBox={`0 0 100 ${DIAGRAM_H}`}
-        >
-          {clients.map((client, i) => {
-            const y = clientYs[i];
-            const midX = 50;
-            const hasClients = client.count > 0;
-            const color = hasClients ? '#10b981' : '#334155';
-            return (
-              <path
-                key={client.label}
-                d={`M 0 ${routerCY} C ${midX} ${routerCY}, ${midX} ${y}, 100 ${y}`}
-                fill="none"
-                stroke={color}
-                strokeWidth="1.5"
-                strokeDasharray={hasClients ? '0' : '4 3'}
-                opacity={hasClients ? 0.7 : 0.35}
-              />
-            );
-          })}
-        </svg>
-      </div>
-
-      <div style={{ width: RIGHT_COL, minWidth: RIGHT_COL }}>
-        <div className="relative" style={{ height: DIAGRAM_H }}>
-          {clients.map((client, i) => {
+        <div className="flex flex-wrap justify-center gap-4">
+          {clients.map((client) => {
             const Icon = client.icon;
-            const y = clientYs[i];
             return (
-              <div
-                key={client.label}
-                className="absolute flex items-center gap-3"
-                style={{ top: y - ROW_H / 2, height: ROW_H, left: 0, right: 0 }}
-              >
+              <div key={client.label} className="flex items-center gap-2">
                 <div className="rounded-lg border border-slate-700 bg-slate-800 p-1.5">
                   <Icon className="h-4 w-4 text-slate-400" />
                 </div>
@@ -211,6 +166,143 @@ function TopologyDiagram({
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Horizontal diagram for md+ */}
+      <div
+        data-testid="topology-desktop"
+        className="relative hidden items-stretch overflow-hidden md:flex"
+        style={{ minHeight: DIAGRAM_H + 48 }}
+      >
+        <div style={{ width: LEFT_COL, minWidth: LEFT_COL }}>
+          <div className="relative" style={{ height: DIAGRAM_H }}>
+            {sources.map((src, i) => {
+              const Icon = src.icon;
+              const y = sourceYs[i];
+              return (
+                <div
+                  key={src.label}
+                  className="absolute flex items-center gap-2"
+                  style={{ top: y - ROW_H / 2, height: ROW_H, left: 0, right: 0 }}
+                >
+                  <div
+                    className={`h-2 w-2 flex-shrink-0 rounded-full ${
+                      src.connected ? 'bg-emerald-400' : 'bg-slate-600'
+                    }`}
+                  />
+                  <Icon
+                    className={`h-4 w-4 flex-shrink-0 ${
+                      src.connected ? 'text-emerald-400' : 'text-slate-500'
+                    }`}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium leading-tight text-slate-200">
+                      {src.label}
+                    </div>
+                    {src.detail && (
+                      <div className="truncate text-[10px] leading-tight text-slate-500">
+                        {src.detail}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="relative min-w-[40px] flex-1">
+          <svg
+            className="absolute inset-0 h-full w-full"
+            preserveAspectRatio="none"
+            viewBox={`0 0 100 ${DIAGRAM_H}`}
+          >
+            {sources.map((src, i) => {
+              const y = sourceYs[i];
+              const midX = 50;
+              const color = src.connected ? '#10b981' : '#334155';
+              return (
+                <path
+                  key={src.label}
+                  d={`M 0 ${y} C ${midX} ${y}, ${midX} ${routerCY}, 100 ${routerCY}`}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.5"
+                  strokeDasharray={src.connected ? '0' : '4 3'}
+                  opacity={src.connected ? 0.7 : 0.35}
+                />
+              );
+            })}
+          </svg>
+        </div>
+
+        <div
+          className="flex w-[160px] flex-shrink-0 flex-col items-center justify-center gap-2"
+          style={{ width: CENTER_W }}
+        >
+          <TopologyRouterCenter
+            hostname={hostname}
+            model={model}
+            features={features}
+            loading={loading}
+          />
+        </div>
+
+        <div className="relative min-w-[40px] flex-1">
+          <svg
+            className="absolute inset-0 h-full w-full"
+            preserveAspectRatio="none"
+            viewBox={`0 0 100 ${DIAGRAM_H}`}
+          >
+            {clients.map((client, i) => {
+              const y = clientYs[i];
+              const midX = 50;
+              const hasClients = client.count > 0;
+              const color = hasClients ? '#10b981' : '#334155';
+              return (
+                <path
+                  key={client.label}
+                  d={`M 0 ${routerCY} C ${midX} ${routerCY}, ${midX} ${y}, 100 ${y}`}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.5"
+                  strokeDasharray={hasClients ? '0' : '4 3'}
+                  opacity={hasClients ? 0.7 : 0.35}
+                />
+              );
+            })}
+          </svg>
+        </div>
+
+        <div style={{ width: RIGHT_COL, minWidth: RIGHT_COL }}>
+          <div className="relative" style={{ height: DIAGRAM_H }}>
+            {clients.map((client, i) => {
+              const Icon = client.icon;
+              const y = clientYs[i];
+              return (
+                <div
+                  key={client.label}
+                  className="absolute flex items-center gap-3"
+                  style={{ top: y - ROW_H / 2, height: ROW_H, left: 0, right: 0 }}
+                >
+                  <div className="rounded-lg border border-slate-700 bg-slate-800 p-1.5">
+                    <Icon className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <div>
+                    {loading ? (
+                      <Skeleton className="h-5 w-8" />
+                    ) : (
+                      <div className="text-2xl font-bold leading-none text-slate-100">
+                        {client.count}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-500">{client.label}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -256,9 +348,30 @@ function SourceCard({
           />
           {connected ? 'Connected' : 'Not connected'}
         </div>
-        {children && <div className="space-y-1 text-xs text-slate-500">{children}</div>}
+        {children && <div className="space-y-2 text-xs text-slate-500">{children}</div>}
       </CardContent>
     </Card>
+  );
+}
+
+function DetailRow({
+  label,
+  children,
+  mono,
+}: {
+  label: string;
+  children: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+      <span className="shrink-0">{label}</span>
+      <span
+        className={`min-w-0 break-words text-slate-300 sm:text-right ${mono ? 'font-mono' : ''}`}
+      >
+        {children}
+      </span>
+    </div>
   );
 }
 
@@ -303,22 +416,11 @@ export function DashboardPage() {
         <SourceCard title="Ethernet (WAN)" icon={Cable} connected={ethernetUp}>
           {ethernetUp && wan ? (
             <>
-              <div className="flex justify-between">
-                <span>Protocol</span>
-                <span className="uppercase text-slate-300">{wan.type}</span>
-              </div>
-              {wan.ip_address && (
-                <div className="flex justify-between">
-                  <span>IP</span>
-                  <span className="font-mono text-slate-300">{wan.ip_address}</span>
-                </div>
-              )}
-              {wan.gateway && (
-                <div className="flex justify-between">
-                  <span>Gateway</span>
-                  <span className="font-mono text-slate-300">{wan.gateway}</span>
-                </div>
-              )}
+              <DetailRow label="Protocol">
+                <span className="uppercase">{wan.type}</span>
+              </DetailRow>
+              {wan.ip_address && <DetailRow label="IP" mono>{wan.ip_address}</DetailRow>}
+              {wan.gateway && <DetailRow label="Gateway" mono>{wan.gateway}</DetailRow>}
             </>
           ) : (
             <p className="text-slate-500">No Ethernet WAN connection detected.</p>
@@ -328,20 +430,13 @@ export function DashboardPage() {
         <SourceCard title="Repeater (WiFi)" icon={Wifi} connected={repeaterUp}>
           {repeaterUp && wifiConn ? (
             <>
-              <div className="flex justify-between">
-                <span>SSID</span>
-                <span className="max-w-[80px] truncate font-mono text-slate-300">
-                  {wifiConn.ssid}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Band</span>
-                <span className="uppercase text-slate-300">{wifiConn.band}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Signal</span>
-                <span className="text-slate-300">{wifiConn.signal_percent}%</span>
-              </div>
+              <DetailRow label="SSID" mono>
+                {wifiConn.ssid}
+              </DetailRow>
+              <DetailRow label="Band">
+                <span className="uppercase">{wifiConn.band}</span>
+              </DetailRow>
+              <DetailRow label="Signal">{wifiConn.signal_percent}%</DetailRow>
             </>
           ) : (
             <p className="text-slate-500">Repeater (STA) is disabled.</p>
@@ -352,19 +447,11 @@ export function DashboardPage() {
           {tetherUp ? (
             <>
               {usbTether?.detected && (
-                <div className="flex justify-between">
-                  <span>Device</span>
-                  <span className="capitalize text-slate-300">
-                    {usbTether.device_type || 'Unknown'}
-                  </span>
-                </div>
+                <DetailRow label="Device">
+                  <span className="capitalize">{usbTether.device_type || 'Unknown'}</span>
+                </DetailRow>
               )}
-              {usbDisplayIp ? (
-                <div className="flex justify-between">
-                  <span>IP</span>
-                  <span className="font-mono text-slate-300">{usbDisplayIp}</span>
-                </div>
-              ) : null}
+              {usbDisplayIp ? <DetailRow label="IP" mono>{usbDisplayIp}</DetailRow> : null}
               {tetherUp && !usbTether?.detected && !usbDisplayIp ? (
                 <p className="text-slate-500">USB uplink is active.</p>
               ) : null}
