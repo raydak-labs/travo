@@ -29,32 +29,60 @@ export function SidebarNavGroup({
 }) {
   const GroupIcon = group.icon;
   const groupActive = group.items.some((item) => isRouteActive(item.to, pathname));
+  const defaultActive = isRouteActive(group.defaultTo, pathname);
+  const submenuItems = group.items.filter((item) => item.to !== group.defaultTo);
 
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <CollapsibleTrigger
-        type="button"
+      <div
         className={cn(
-          'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-          groupActive
-            ? 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white'
-            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800',
+          'flex items-center gap-0.5 rounded-md',
+          groupActive && !defaultActive && 'bg-gray-100 dark:bg-gray-800',
         )}
       >
-        <GroupIcon className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
-        <span className="flex-1 truncate">{group.label}</span>
-        <ChevronDown
-          className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')}
-          aria-hidden
-        />
-      </CollapsibleTrigger>
+        <Link
+          to={group.defaultTo}
+          onClick={onNavClick}
+          activeOptions={{ exact: true }}
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+            defaultActive
+              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+              : groupActive
+                ? 'text-gray-900 dark:text-white'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800',
+          )}
+        >
+          <GroupIcon className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
+          <span className="truncate">{group.label}</span>
+        </Link>
+        <CollapsibleTrigger
+          type="button"
+          aria-label={`Toggle ${group.label} menu`}
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors',
+            'hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+            'dark:text-gray-400 dark:hover:bg-gray-800',
+          )}
+        >
+          <ChevronDown
+            className={cn('h-4 w-4 transition-transform', open && 'rotate-180')}
+            aria-hidden
+          />
+        </CollapsibleTrigger>
+      </div>
       <CollapsibleContent>
         <ul className="mt-1 space-y-0.5 border-l border-gray-200 pl-2 dark:border-gray-700">
-          {group.items.map((item) => {
+          {submenuItems.map((item) => {
             const active = isRouteActive(item.to, pathname);
             return (
               <li key={item.to}>
-                <Link to={item.to} onClick={onNavClick} className={subLinkClass(active)}>
+                <Link
+                  to={item.to}
+                  onClick={onNavClick}
+                  className={subLinkClass(active)}
+                  activeOptions={{ exact: true }}
+                >
                   {item.label}
                 </Link>
               </li>

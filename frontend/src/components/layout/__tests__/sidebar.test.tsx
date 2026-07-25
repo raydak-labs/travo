@@ -74,7 +74,8 @@ function renderSidebar(currentPath = '/dashboard') {
     history: createMemoryHistory({ initialEntries: [currentPath] }),
   });
 
-  return render(<RouterProvider router={router} />);
+  const view = render(<RouterProvider router={router} />);
+  return { ...view, router };
 }
 
 function renderAppShellMobile(currentPath = '/dashboard') {
@@ -109,6 +110,12 @@ function renderAppShellMobile(currentPath = '/dashboard') {
 describe('Sidebar', () => {
   beforeEach(() => {
     mockUseIsMobile.mockReturnValue(false);
+    mockUseServices.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useServices>);
+    localStorage.clear();
   });
 
   it('renders category groups and leaf routes', async () => {
@@ -116,24 +123,143 @@ describe('Sidebar', () => {
     await waitFor(() => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('WiFi')).toBeInTheDocument();
-      expect(screen.getByText('Wireless')).toBeInTheDocument();
       expect(screen.getByText('Network')).toBeInTheDocument();
-      expect(screen.getByText('Status')).toBeInTheDocument();
-      expect(screen.getByText('Configuration')).toBeInTheDocument();
-      expect(screen.getAllByText('Advanced').length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText('Clients')).toBeInTheDocument();
       expect(screen.getByText('VPN')).toBeInTheDocument();
       expect(screen.getByText('Services')).toBeInTheDocument();
-      expect(screen.getByText('Installed services')).toBeInTheDocument();
-      expect(screen.getByText('Tailscale')).toBeInTheDocument();
       expect(screen.getByText('System')).toBeInTheDocument();
-      expect(screen.getByText('Settings')).toBeInTheDocument();
-      expect(screen.getByText('Logs')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps WiFi children collapsed on dashboard with empty storage', async () => {
+    renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
+    });
+    const wifiToggle = screen.getByRole('button', { name: 'Toggle WiFi menu' });
+    expect(wifiToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+  });
+
+  it('keeps all groups collapsed on dashboard with empty storage', async () => {
+    renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
+    });
+    for (const name of ['WiFi', 'Network', 'Services', 'System']) {
+      expect(screen.getByRole('button', { name: `Toggle ${name} menu` })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    }
+  });
+
+  it('auto-expands WiFi group on /wifi/advanced with empty storage', async () => {
+    renderSidebar('/wifi/advanced');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+    });
+    const advanced = screen.getByRole('link', { name: 'Advanced' });
+    expect(advanced).toHaveClass('bg-blue-50');
+    expect(advanced).toHaveAttribute('href', '/wifi/advanced');
+  });
+
+  it('marks only the Advanced leaf as current on /wifi/advanced', async () => {
+    renderSidebar('/wifi/advanced');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+  });
+
+  it('highlights Network parent on Status default without submenu duplicate', async () => {
+    renderSidebar('/network');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Network' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Network' })).toHaveClass('bg-blue-50');
+    expect(screen.queryByRole('link', { name: 'Status' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Internet & LAN' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+  });
+
+  it('navigates to Connect when WiFi label is clicked without opening via arrow', async () => {
+    const user = userEvent.setup();
+    const { router } = renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('link', { name: 'WiFi' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/wifi');
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+    });
+  });
+
+  it('navigates to Status when Network label is clicked', async () => {
+    const user = userEvent.setup();
+    const { router } = renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Network' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('link', { name: 'Network' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/network');
+    });
+  });
+
+  it('expands WiFi group when navigating from dashboard to /wifi', async () => {
+    const { router } = renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    });
+
+    await router.navigate({ to: '/wifi' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(screen.getByRole('link', { name: 'WiFi' })).toHaveClass('bg-blue-50');
+      expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+    });
+  });
+
+  it('shows Advanced (not Connect) after opening WiFi group via arrow', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Toggle WiFi menu' }));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
     });
   });
 
   it('shows SQM under Services when SQM is installed', async () => {
-    mockUseServices.mockReturnValueOnce({
+    const user = userEvent.setup();
+    mockUseServices.mockReturnValue({
       data: [
         {
           id: 'sqm',
@@ -148,7 +274,13 @@ describe('Sidebar', () => {
     } as ReturnType<typeof useServices>);
     renderSidebar();
     await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Services' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Toggle Services menu' }));
+    await waitFor(() => {
       expect(screen.getByText('SQM')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Apps' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Tailscale' })).toBeInTheDocument();
     });
   });
 
@@ -164,6 +296,7 @@ describe('Sidebar', () => {
 describe('Mobile Sidebar', () => {
   beforeEach(() => {
     mockUseIsMobile.mockReturnValue(true);
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -207,7 +340,7 @@ describe('Mobile Sidebar', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('link', { name: 'Wireless' }));
+    await user.click(screen.getByRole('link', { name: 'WiFi' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

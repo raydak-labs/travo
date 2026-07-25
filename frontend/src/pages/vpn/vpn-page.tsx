@@ -1,3 +1,4 @@
+import { PageSection } from '@/components/ui/page-section';
 import { WireguardSection } from './wireguard-section';
 import { SplitTunnelCard } from './split-tunnel-card';
 import { VpnSpeedTestCard } from './vpn-speed-test-card';
@@ -11,9 +12,23 @@ export function VpnPage() {
       <WireguardSection />
       <SplitTunnelCard />
       <VpnAdguardHint />
-      <VpnVerifyWireguardCard />
-      <VpnDnsLeakTestCard />
-      <VpnSpeedTestCard />
+
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Diagnostics
+        </h2>
+        <div className="space-y-3">
+          <PageSection title="Verify VPN">
+            <VpnVerifyWireguardCard />
+          </PageSection>
+          <PageSection title="DNS Leak Test">
+            <VpnDnsLeakTestCard />
+          </PageSection>
+          <PageSection title="VPN Speed Test">
+            <VpnSpeedTestCard />
+          </PageSection>
+        </div>
+      </div>
     </div>
   );
 }

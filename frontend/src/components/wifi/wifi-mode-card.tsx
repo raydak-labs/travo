@@ -30,13 +30,13 @@ export function WifiModeCard() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-3">
+            <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-3">
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
             </div>
           ) : (
-            <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-3">
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 md:grid-cols-3">
               {WIFI_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => {
                 const isActive = currentMode === mode;
                 const showRecommended = isRecommendedWifiMode(mode);
@@ -51,39 +51,41 @@ export function WifiModeCard() {
                       }
                     }}
                     className={cn(
-                      'flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors',
+                      'flex min-w-0 flex-col items-start gap-2 overflow-visible rounded-lg border p-4 text-left transition-colors',
                       isActive
                         ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950'
                         : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-gray-900',
                       setMode.isPending && 'opacity-50 cursor-not-allowed',
                     )}
                   >
-                    <div className="flex w-full flex-wrap items-center justify-between gap-1">
-                      <Icon
-                        className={cn(
-                          'h-5 w-5',
-                          isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400',
-                        )}
-                      />
-                      <div className="flex flex-wrap items-center justify-end gap-1">
-                        {showRecommended && (
-                          <Badge variant="secondary" className="text-xs">
-                            Recommended
-                          </Badge>
-                        )}
-                        {isActive && <Badge variant="default">Active</Badge>}
-                      </div>
-                    </div>
-                    <span
+                    <Icon
                       className={cn(
-                        'text-sm font-medium',
-                        isActive
-                          ? 'text-blue-900 dark:text-blue-100'
-                          : 'text-gray-900 dark:text-white',
+                        'h-5 w-5 shrink-0',
+                        isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400',
                       )}
-                    >
-                      {label}
-                    </span>
+                    />
+                    <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
+                      <span
+                        className={cn(
+                          'min-w-0 text-sm font-medium',
+                          isActive
+                            ? 'text-blue-900 dark:text-blue-100'
+                            : 'text-gray-900 dark:text-white',
+                        )}
+                      >
+                        {label}
+                      </span>
+                      {showRecommended && (
+                        <Badge variant="secondary" className="shrink-0 text-xs">
+                          Recommended
+                        </Badge>
+                      )}
+                      {isActive && (
+                        <Badge variant="default" className="shrink-0">
+                          Active
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
                   </button>
                 );

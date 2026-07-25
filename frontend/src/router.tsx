@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/layout/app-shell';
 import { LazyPageBoundary } from '@/components/layout/lazy-page-boundary';
+import { shellTitleForPath } from '@/components/layout/shell-titles';
 import { LoginPage } from '@/pages/login/login-page';
 import { SetupPage } from '@/pages/setup/setup-page';
 import {
@@ -58,8 +59,9 @@ const protectedRoute = createRoute({
   beforeLoad: requireSetupComplete,
 });
 
-/** Shell header title. Service children use `Services / X`; WiFi/Network sub-routes stay flat. */
-function shellPage(title: string, PageComponent: ComponentType) {
+/** Shell header title. WiFi/Network use leaf labels; Services children keep `Services / X`. */
+function shellPage(pathname: string, PageComponent: ComponentType) {
+  const title = shellTitleForPath(pathname);
   return () => (
     <AppShell title={title}>
       <LazyPageBoundary>
@@ -72,7 +74,7 @@ function shellPage(title: string, PageComponent: ComponentType) {
 const dashboardRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/dashboard',
-  component: shellPage('Dashboard', DashboardPage),
+  component: shellPage('/dashboard', DashboardPage),
 });
 
 const dashboardV1RedirectRoute = createRoute({
@@ -102,79 +104,79 @@ const experimentalRedirectRoute = createRoute({
 const wifiAdvancedRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/wifi/advanced',
-  component: shellPage('WiFi', WifiPage),
+  component: shellPage('/wifi/advanced', WifiPage),
 });
 
 const wifiRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/wifi',
-  component: shellPage('WiFi', WifiPage),
+  component: shellPage('/wifi', WifiPage),
 });
 
 const networkConfigurationRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/network/configuration',
-  component: shellPage('Network', NetworkPage),
+  component: shellPage('/network/configuration', NetworkPage),
 });
 
 const networkAdvancedRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/network/advanced',
-  component: shellPage('Network', NetworkPage),
+  component: shellPage('/network/advanced', NetworkPage),
 });
 
 const networkRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/network',
-  component: shellPage('Network', NetworkPage),
+  component: shellPage('/network', NetworkPage),
 });
 
 const clientsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/clients',
-  component: shellPage('Clients', ClientsPage),
+  component: shellPage('/clients', ClientsPage),
 });
 
 const vpnRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/vpn',
-  component: shellPage('VPN', VpnPage),
+  component: shellPage('/vpn', VpnPage),
 });
 
 const servicesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/services',
-  component: shellPage('Services', ServicesPage),
+  component: shellPage('/services', ServicesPage),
 });
 
 const tailscaleRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/services/tailscale',
-  component: shellPage('Services / Tailscale', TailscalePage),
+  component: shellPage('/services/tailscale', TailscalePage),
 });
 
 const sqmRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/services/sqm',
-  component: shellPage('Services / SQM', SQMPage),
+  component: shellPage('/services/sqm', SQMPage),
 });
 
 const speedtestRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/services/speedtest',
-  component: shellPage('Services / Speedtest', SpeedtestPage),
+  component: shellPage('/services/speedtest', SpeedtestPage),
 });
 
 const systemRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/system',
-  component: shellPage('System', SystemPage),
+  component: shellPage('/system', SystemPage),
 });
 
 const logsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/logs',
-  component: shellPage('Logs', LogsPage),
+  component: shellPage('/logs', LogsPage),
 });
 
 const notFoundRoute = createRoute({

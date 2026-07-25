@@ -15,9 +15,6 @@ export function SystemPowerSection() {
   return (
     <>
       <div>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-500 dark:text-red-400">
-          Danger Zone
-        </h2>
         <Card className="border-red-200 dark:border-red-900">
           <CardContent className="space-y-4 pt-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">

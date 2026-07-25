@@ -69,7 +69,7 @@ describe('DashboardPage', () => {
   it('renders topology and connection cards', async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText('GL-MT3000')).toBeInTheDocument();
+      expect(screen.getAllByText('GL-MT3000').length).toBeGreaterThan(0);
     });
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Ethernet (WAN)' })).toBeInTheDocument();
@@ -133,5 +133,28 @@ describe('DashboardPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Network Throughput')).toBeInTheDocument();
     });
+  });
+
+  it('stacks topology when narrow and shows line diagram from @xl card width', async () => {
+    renderDashboard();
+    const mobile = await screen.findByTestId('topology-mobile');
+    const desktop = screen.getByTestId('topology-desktop');
+    expect(mobile.className).toMatch(/@xl:hidden/);
+    expect(desktop.className).toMatch(/hidden/);
+    expect(desktop.className).toMatch(/@xl:flex/);
+    await waitFor(() => {
+      expect(screen.getAllByText('Internet').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('lets connection detail values wrap instead of hard-truncating SSIDs', async () => {
+    renderDashboard();
+    const ssid = await screen.findAllByText('Hotel_Guest_5G');
+    const value = ssid.find((el) => el.className.includes('font-mono'));
+    expect(value).toBeTruthy();
+    expect(value!.className).not.toMatch(/max-w-\[80px\]/);
+    expect(value!.className).toMatch(/break-words|break-all|min-w-0/);
+    const row = value!.parentElement;
+    expect(row?.className).toMatch(/flex-col/);
   });
 });

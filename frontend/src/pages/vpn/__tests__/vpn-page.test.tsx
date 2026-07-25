@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -88,6 +89,27 @@ describe('VpnPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Kill Switch')).toBeInTheDocument();
     });
+  });
+
+  it('collapses secondary VPN cards by default', async () => {
+    const user = userEvent.setup();
+    renderVpnPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('WireGuard')).toBeInTheDocument();
+      expect(screen.getByText('Kill Switch')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /Split Tunneling/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /DNS Leak Test/i })).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Verify that DNS queries are routed through the VPN/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /DNS Leak Test/i }));
+    expect(
+      screen.getByText(/Verify that DNS queries are routed through the VPN/i),
+    ).toBeVisible();
   });
 
   it('shows not-installed message when WireGuard is not installed', async () => {

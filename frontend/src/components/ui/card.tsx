@@ -1,24 +1,38 @@
 import { type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
+import { useInPageSection } from '@/components/ui/page-section';
 
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        'rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-white/10 dark:bg-gray-950',
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, ...props }, ref) => {
+    const inPageSection = useInPageSection();
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-white/10 dark:bg-gray-950',
+          inPageSection && 'border-0 shadow-none hover:shadow-none',
+          className,
+        )}
+        {...props}
+      />
+    );
+  },
 );
 Card.displayName = 'Card';
 
 const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />
-  ),
+  ({ className, ...props }, ref) => {
+    const inPageSection = useInPageSection();
+    if (inPageSection) return null;
+    return (
+      <div
+        ref={ref}
+        data-slot="card-header"
+        className={cn('flex flex-col space-y-1.5 p-6', className)}
+        {...props}
+      />
+    );
+  },
 );
 CardHeader.displayName = 'CardHeader';
 
@@ -44,9 +58,17 @@ const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLPara
 CardDescription.displayName = 'CardDescription';
 
 const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
-  ),
+  ({ className, ...props }, ref) => {
+    const inPageSection = useInPageSection();
+    return (
+      <div
+        ref={ref}
+        data-slot="card-content"
+        className={cn('p-6 pt-0', inPageSection && 'pt-6', className)}
+        {...props}
+      />
+    );
+  },
 );
 CardContent.displayName = 'CardContent';
 

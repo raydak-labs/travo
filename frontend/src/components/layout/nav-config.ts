@@ -29,6 +29,8 @@ export interface NavGroup {
   readonly id: string;
   readonly label: string;
   readonly icon: LucideIcon;
+  /** Route opened when the group label is clicked (not the chevron). */
+  readonly defaultTo: string;
   readonly items: readonly { readonly to: string; readonly label: string }[];
 }
 
@@ -48,8 +50,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'wifi',
     label: 'WiFi',
     icon: Wifi,
+    defaultTo: '/wifi',
     items: [
-      { to: '/wifi', label: 'Wireless' },
+      { to: '/wifi', label: 'Connect' },
       { to: '/wifi/advanced', label: 'Advanced' },
     ],
   },
@@ -58,9 +61,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'network',
     label: 'Network',
     icon: Globe,
+    defaultTo: '/network',
     items: [
       { to: '/network', label: 'Status' },
-      { to: '/network/configuration', label: 'Configuration' },
+      { to: '/network/configuration', label: 'Internet & LAN' },
       { to: '/network/advanced', label: 'Advanced' },
     ],
   },
@@ -83,8 +87,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'services',
     label: 'Services',
     icon: Monitor,
+    defaultTo: '/services',
     items: [
-      { to: '/services', label: 'Installed services' },
+      { to: '/services', label: 'Apps' },
       { to: '/services/tailscale', label: 'Tailscale' },
       { to: '/services/speedtest', label: 'Speedtest' },
     ],
@@ -94,6 +99,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'system',
     label: 'System',
     icon: Settings,
+    defaultTo: '/system',
     items: [
       { to: '/system', label: 'Settings' },
       { to: '/logs', label: 'Logs' },
@@ -123,14 +129,14 @@ export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
   '/logs': ScrollText,
 };
 
-const STORAGE_KEY_GROUPS = 'otg-sidebar-groups';
+const STORAGE_KEY_GROUPS = 'otg-sidebar-groups-v3';
 
 /** Default open state for groups (first visit). */
 const defaultOpen: Record<string, boolean> = {
-  wifi: true,
-  network: true,
-  services: true,
-  system: true,
+  wifi: false,
+  network: false,
+  services: false,
+  system: false,
 };
 
 export function loadSidebarGroupState(): Record<string, boolean> {

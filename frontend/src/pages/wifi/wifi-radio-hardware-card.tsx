@@ -69,17 +69,19 @@ export function WifiRadioHardwareCard() {
               return (
                 <CardInset
                   key={radio.name}
-                  className="flex items-center justify-between gap-3"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <Radio className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="min-w-0 text-sm font-medium text-gray-900 dark:text-white">
                           {radio.name}
                         </p>
                         {isRecommended && (
-                          <Badge variant="success">Recommended</Badge>
+                          <Badge variant="success" className="shrink-0">
+                            Recommended
+                          </Badge>
                         )}
 
                         {pendingDisable && (
@@ -91,7 +93,10 @@ export function WifiRadioHardwareCard() {
                             onConfirm={handleConfirmDisable}
                           />
                         )}
-                        <Badge variant={radio.disabled ? 'destructive' : 'success'}>
+                        <Badge
+                          variant={radio.disabled ? 'destructive' : 'success'}
+                          className="shrink-0"
+                        >
                           {radio.disabled ? 'Disabled' : 'Active'}
                         </Badge>
                       </div>
@@ -108,7 +113,7 @@ export function WifiRadioHardwareCard() {
                     onValueChange={(role) => handleRoleChange(radio.name, role, radio.role)}
                     disabled={setRadioRole.isPending}
                   >
-                    <SelectTrigger className="w-32 shrink-0">
+                    <SelectTrigger className="w-full shrink-0 sm:w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

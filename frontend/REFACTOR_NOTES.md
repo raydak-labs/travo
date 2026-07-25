@@ -93,10 +93,10 @@ The former monolithic **`system-page.tsx`** is split into focused sections (each
 - **`wifi-radio-hardware-card.tsx`** — Radio list, band labels, role `Select`.
 - **`wifi-current-connection-card.tsx`** — STA connection status, disconnect, scan / hidden-network dialogs (hooks colocated).
 - **`wifi-saved-networks-card.tsx`** — Auto-reconnect, priority reorder, delete saved networks.
-- **`wifi-page-tab-bar.tsx`**, **`wifi-page-types.ts`** — In-page tabs **Wireless** / **Advanced**, synced to `/wifi` and `/wifi/advanced`.
+- ~~**`wifi-page-tab-bar.tsx`**, **`wifi-page-types.ts`** — In-page tabs **Wireless** / **Advanced**.~~ Deleted; sidebar owns Connect / Advanced.
 - **`wifi-wireless-panel.tsx`** — Captive portal, mode, radios, STA connection/saved networks, AP config (mode gating).
 - **`wifi-advanced-panel.tsx`** — Guest WiFi, MAC, policy, band, schedule cards.
-- **`wifi-page.tsx`** — Tab state from router + composes tab bar and panels.
+- **`wifi-page.tsx`** — Route pathname selects wireless vs advanced panel (no in-page tab bar).
 - **`wifi-mode-options.ts`** — `WIFI_MODE_OPTIONS`, `getWifiModeLabel()` (`WifiModeCard`).
 - **`wifi-mode-switch-dialog.tsx`** — Confirm switch away from repeater path (`WifiModeCard`).
 - **`wifi-mode-card.tsx`** — Mode tiles, repeater wizard trigger, composes switch dialog.
@@ -180,11 +180,11 @@ Import path unchanged: `@/components/wifi/repeater-wizard` → **`index.tsx`**.
 
 ### Network: DHCP/DNS, data usage (`pages/network/`)
 
-- **`network-page-types.ts`** — `NetworkSectionTab` union.
-- **`network-page-tab-bar.tsx`** — Status / Configuration / Advanced tab strip (`aria-controls` wired to panels).
-- **`network-page-status-panel.tsx`**, **`network-page-configuration-panel.tsx`**, **`network-page-advanced-panel.tsx`** — Tab panel content.
+- **`network-page-types.ts`** — `NetworkSectionTab` union (path utils still use tab ids).
+- ~~**`network-page-tab-bar.tsx`** — Status / Configuration / Advanced tab strip.~~ Deleted; sidebar owns Status / Setup / Advanced.
+- **`network-page-status-panel.tsx`**, **`network-page-configuration-panel.tsx`**, **`network-page-advanced-panel.tsx`** — Route panel content.
 - **`network-path-utils.ts`** — Maps `/network`, `/network/configuration`, `/network/advanced` ↔ tab ids.
-- **`network-page.tsx`** — Tab changes call `navigate()`; `useNetworkStatus` / `useBlockedClients`; composes panels.
+- **`network-page.tsx`** — Pathname selects panel; `useNetworkStatus` / `useBlockedClients`; no in-page tab bar.
 - **`dhcp-pool-settings-card.tsx`** — DHCP pool RHF form (`useDHCPConfig`, `useSetDHCPConfig`).
 - **`dhcp-pool-form-fields.tsx`** — Start/limit inputs + lease `Select` (composed by `DhcpPoolSettingsCard`).
 - **`lan-dns-settings-card.tsx`** — LAN custom DNS RHF form (`useDNSConfig`, `useSetDNSConfig`). Unused duplicate `dns-config-card.tsx` removed.
@@ -230,8 +230,8 @@ Import path unchanged: `@/components/wifi/repeater-wizard` → **`index.tsx`**.
 
 ## Assumptions
 
-- **`/services`** highlights “Installed services” only when the path is exactly `/services`; Tailscale under `/services/tailscale` does not activate the parent link.
-- **WiFi** sidebar sub-routes: `/wifi` (Wireless), `/wifi/advanced` (Advanced). **Network** sub-routes: `/network` (Status), `/network/configuration`, `/network/advanced`. In-page tab bars stay in sync with these URLs.
+- **`/services`** highlights “Apps” only when the path is exactly `/services`; Tailscale under `/services/tailscale` does not activate the parent link.
+- **WiFi** sidebar sub-routes: `/wifi` (Connect), `/wifi/advanced` (Advanced). **Network** sub-routes: `/network` (Status), `/network/configuration` (Setup), `/network/advanced`. ~~In-page tab bars~~ removed — sidebar only.
 - Collapsed desktop sidebar shows a **flat icon list** (one icon per destination), not nested groups.
 
 ## Deferred / follow-up (optional)
@@ -275,9 +275,9 @@ ClientsPage
 └── ClientsDhcpReservationsCard
 
 WifiPage
-├── Tab bar → /wifi | /wifi/advanced
-├── Wireless panel → CaptivePortalBanner, WifiModeCard, radios, STA/AP cards
-└── Advanced panel → Guest, MAC, policy, band, schedule cards
+├── ~~Tab bar~~ (deleted) → sidebar Connect | Advanced
+├── Wireless panel (`/wifi`) → CaptivePortalBanner, WifiModeCard, radios, STA/AP cards
+└── Advanced panel (`/wifi/advanced`) → Guest, MAC, policy, band, schedule cards
 
 RepeaterWizard (folder)
 ├── useRepeaterWizard + Dialog shell (index.tsx)

@@ -58,8 +58,8 @@ describe('SQMPage', () => {
     renderSQMPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/Install SQM from Installed services/i)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /Go to Installed services/i })).toBeInTheDocument();
+      expect(screen.getByText(/Install SQM from Apps/i)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Go to Apps/i })).toBeInTheDocument();
     });
   });
 });

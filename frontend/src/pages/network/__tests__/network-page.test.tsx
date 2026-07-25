@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -9,7 +10,11 @@ import {
   Outlet,
   createMemoryHistory,
 } from '@tanstack/react-router';
+import { http, HttpResponse } from 'msw';
+import { API_ROUTES, type Client } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
+import { mockNetworkStatus } from '@/mocks/data';
+import { server } from '@/mocks/server';
 import { NetworkPage } from '../network-page';
 
 function renderNetworkPage(initialPath = '/network') {
@@ -34,11 +39,17 @@ function renderNetworkPage(initialPath = '/network') {
     path: '/network',
     component: NetworkPage,
   });
+  const clientsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/clients',
+    component: () => <div>Clients page</div>,
+  });
 
   const routeTree = rootRoute.addChildren([
     networkConfigurationRoute,
     networkAdvancedRoute,
     networkRoute,
+    clientsRoute,
   ]);
 
   const router = createRouter({
@@ -55,9 +66,102 @@ function renderNetworkPage(initialPath = '/network') {
   );
 }
 
+function makeClient(index: number): Client {
+  const n = String(index).padStart(2, '0');
+  return {
+    ip_address: `192.168.8.${100 + index}`,
+    mac_address: `AA:BB:CC:DD:EE:${n}`,
+    hostname: `Client-${n}`,
+    interface_name: 'br-lan',
+    rx_bytes: 1000,
+    tx_bytes: 500,
+    connected_since: '2026-03-04T08:00:00Z',
+  };
+}
+
 describe('NetworkPage', () => {
+  it('has no in-page tablist mirroring sidebar', async () => {
+    renderNetworkPage('/network');
+
+    await waitFor(() => {
+      expect(screen.getByText('WAN Status')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: /Status|Configuration|Advanced/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Status panel content on /network', async () => {
+    renderNetworkPage('/network');
+
+    await waitFor(() => {
+      expect(screen.getByText('WAN Status')).toBeInTheDocument();
+      expect(screen.getByText('Connected Clients')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('LAN Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dynamic DNS/)).not.toBeInTheDocument();
+  });
+
+  it('shows Setup panel content on /network/configuration', async () => {
+    renderNetworkPage('/network/configuration');
+
+    await waitFor(() => {
+      expect(screen.getByText('LAN Configuration')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('WAN Status')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dynamic DNS/)).not.toBeInTheDocument();
+  });
+
+  it('shows Advanced panel content on /network/advanced', async () => {
+    renderNetworkPage('/network/advanced');
+
+    await waitFor(() => {
+      expect(screen.getByText('Connection Failover')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('WAN Status')).not.toBeInTheDocument();
+    expect(screen.queryByText('LAN Configuration')).not.toBeInTheDocument();
+  });
+
+  it('shows DHCP and DNS cards without PageSection collapse on Internet & LAN', async () => {
+    renderNetworkPage('/network/configuration');
+
+    await waitFor(() => {
+      expect(screen.getByText('WAN Configuration')).toBeInTheDocument();
+      expect(screen.getByText('LAN Configuration')).toBeInTheDocument();
+      expect(screen.getByText('Network Interfaces')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /DHCP & DNS/i })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save DHCP Settings/i })).toBeVisible();
+    });
+  });
+
+  it('keeps Failover and traveler tools open; collapses power tools', async () => {
+    const user = userEvent.setup();
+    renderNetworkPage('/network/advanced');
+
+    await waitFor(() => {
+      expect(screen.getByText('Connection Failover')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /Firewall/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Speed Test$/i })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Run Speed Test/i })).toBeVisible();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Firewall/i }));
+    // Firewall card body becomes visible after expand — title already in trigger
+    expect(screen.getByRole('button', { name: /Firewall/i })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
   it('renders WAN information', async () => {
-    renderNetworkPage();
+    renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
       expect(screen.getByText('WAN Configuration')).toBeInTheDocument();
@@ -105,7 +209,7 @@ describe('NetworkPage', () => {
   });
 
   it('shows DNS servers', async () => {
-    renderNetworkPage();
+    renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
       expect(screen.getByText('8.8.8.8, 8.8.4.4')).toBeInTheDocument();
@@ -118,5 +222,29 @@ describe('NetworkPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Auto-detect WAN Type')).toBeInTheDocument();
     });
+  });
+
+  it('previews at most 5 clients and links to /clients', async () => {
+    const manyClients = Array.from({ length: 7 }, (_, i) => makeClient(i + 1));
+    server.use(
+      http.get(API_ROUTES.network.status, () =>
+        HttpResponse.json({ ...mockNetworkStatus, clients: manyClients }),
+      ),
+    );
+
+    renderNetworkPage('/network');
+
+    await waitFor(() => {
+      expect(screen.getByText('Connected Clients')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const table = screen.getByRole('table');
+      const bodyRows = within(table).getAllByRole('row').slice(1);
+      expect(bodyRows).toHaveLength(5);
+    });
+
+    const viewAll = screen.getByRole('link', { name: /view all/i });
+    expect(viewAll).toHaveAttribute('href', '/clients');
   });
 });

@@ -1,7 +1,7 @@
 ---
 title: Plans index
 description: Searchable catalog of all planning and historical design docs in this directory.
-updated: 2026-07-21
+updated: 2026-07-24
 tags: [plans, traceability, index]
 ---
 
@@ -21,6 +21,9 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`2026-07-08-auth-hardening.md`](2026-07-08-auth-hardening.md) | Auth follow-ups: blocklist persistence, WS token transport, token storage | `auth`, `security` |
 | [`2026-07-08-hardening-followups-and-persistence.md`](2026-07-08-hardening-followups-and-persistence.md) | Work log + queue: vpn sleeps, wifi split, WS-fed queries, bbolt persistence | `reliability`, `persistence`, `refactor` |
 | [`2026-07-20-ui-consistency.md`](2026-07-20-ui-consistency.md) | Unify page shell, cards, loading/empty/error, labels, status chrome | `frontend`, `ux`, `theming`, `consistency` |
+| [`2026-07-24-frontend-traveler-ia.md`](2026-07-24-frontend-traveler-ia.md) | Sidebar-only IA, collapse defaults, traveler labels (Connect/Setup/Apps) | `frontend`, `ux`, `ia` |
+| [`2026-07-24-frontend-traveler-ia-implementation.md`](2026-07-24-frontend-traveler-ia-implementation.md) | Task plan to ship traveler IA (tabs off, storage v2, PageSection) | `frontend`, `ux`, `ia`, `implementation` |
+| [`2026-07-25-sidebar-defaults-lighter-disclosure.md`](2026-07-25-sidebar-defaults-lighter-disclosure.md) | Group label→default route; arrow toggle; twin Advanced; fewer PageSections | `frontend`, `ux`, `ia` |
 | [`2026-07-20-nested-cards-approach-a.md`](2026-07-20-nested-cards-approach-a.md) | Flatten nested panels, equal-height WiFi cards, form chrome (shadcn-like) | `frontend`, `ux`, `cards` |
 | [`_primitive-usage-audit.md`](_primitive-usage-audit.md) | Call-site audit: Select h-9, form `sm` buttons, CardInset leftovers, Badge bypass | `frontend`, `ux`, `audit` |
 | [`_primitive-mop-report.md`](_primitive-mop-report.md) | Mop-up: Select h-10, form buttons, CardInset, Badge variants, docs | `frontend`, `ux` |
@@ -38,7 +41,7 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`resilience-improvements.md`](resilience-improvements.md) | Recovery / robustness ideas | `reliability` |
 | [`tailscale-integration.md`](tailscale-integration.md) | Tailscale on router | `tailscale`, `vpn` |
 | [`usb-tethering.md`](usb-tethering.md) | USB WAN tethering | `usb`, `wan` |
-| [`ux-overhaul.md`](ux-overhaul.md) | Dashboard / network / system UX | `ux`, `frontend` |
+| [`ux-overhaul.md`](ux-overhaul.md) | Dashboard / network / system UX (**nav chrome superseded** by traveler IA) | `ux`, `frontend` |
 | [`wifi-dual-band-bundling.md`](wifi-dual-band-bundling.md) | Dual-band scan + band switch | `wifi` |
 | [`wireguard-adguard-oob-fix-plan.md`](wireguard-adguard-oob-fix-plan.md) | WG + AdGuard out-of-box correctness | `wireguard`, `adguard` |
 | [`wireguard-full-networking.md`](wireguard-full-networking.md) | WG zones, routes, split tunnel | `wireguard`, `firewall` |

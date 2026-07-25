@@ -8,14 +8,16 @@ import { useKickClient, useBlockClient, useUnblockClient } from '@/hooks/use-net
 interface ClientsTableProps {
   clients: readonly Client[];
   blockedMacs?: readonly string[];
+  limit?: number;
 }
 
-export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
+export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableProps) {
   const sorted = [...clients].sort((a, b) => {
     const nameA = a.alias || a.hostname || '';
     const nameB = b.alias || b.hostname || '';
     return nameA.localeCompare(nameB);
   });
+  const visible = limit != null ? sorted.slice(0, limit) : sorted;
   const kick = useKickClient();
   const block = useBlockClient();
   const unblock = useUnblockClient();
@@ -36,19 +38,23 @@ export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
             <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell">
               Connected Since
             </th>
-            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Traffic</th>
+            <th className="hidden pb-2 text-right font-medium text-gray-500 dark:text-gray-400 sm:table-cell">
+              Traffic
+            </th>
             <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {sorted.map((client) => {
+          {visible.map((client) => {
             const isBlocked = blockedSet.has(client.mac_address.toUpperCase());
             return (
               <tr key={client.mac_address} className="group">
-                <td className="py-2">
+                <td className="min-w-0 py-2">
                   <ClientAliasCell client={client} />
                 </td>
-                <td className="py-2 text-gray-600 dark:text-gray-400">{client.ip_address}</td>
+                <td className="whitespace-nowrap py-2 text-gray-600 dark:text-gray-400">
+                  {client.ip_address}
+                </td>
                 <td className="hidden py-2 text-gray-600 dark:text-gray-400 md:table-cell">
                   {client.mac_address}
                 </td>
@@ -60,7 +66,7 @@ export function ClientsTable({ clients, blockedMacs = [] }: ClientsTableProps) {
                     ? new Date(client.connected_since).toLocaleString()
                     : 'Unknown'}
                 </td>
-                <td className="py-2 text-right text-gray-600 dark:text-gray-400">
+                <td className="hidden py-2 text-right text-gray-600 dark:text-gray-400 sm:table-cell">
                   ↓ {formatBytes(client.rx_bytes)} / ↑ {formatBytes(client.tx_bytes)}
                 </td>
                 <td className="py-2 text-right">
