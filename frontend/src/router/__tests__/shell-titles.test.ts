@@ -5,10 +5,10 @@ describe('shellTitleForPath', () => {
   const cases: Array<[string, string]> = [
     ['/dashboard', 'Dashboard'],
     ['/wifi', 'Connect'],
-    ['/wifi/advanced', 'Extras'],
+    ['/wifi/advanced', 'Advanced'],
     ['/network', 'Status'],
     ['/network/configuration', 'Internet & LAN'],
-    ['/network/advanced', 'Tools'],
+    ['/network/advanced', 'Advanced'],
     ['/clients', 'Clients'],
     ['/vpn', 'VPN'],
     ['/services', 'Services'],

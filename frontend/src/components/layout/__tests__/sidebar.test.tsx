@@ -134,68 +134,98 @@ describe('Sidebar', () => {
   it('keeps WiFi children collapsed on dashboard with empty storage', async () => {
     renderSidebar('/dashboard');
     await waitFor(() => {
-      expect(screen.getByText('WiFi')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
     });
-    const wifiTrigger = screen.getByRole('button', { name: /WiFi/i });
-    expect(wifiTrigger).toHaveAttribute('aria-expanded', 'false');
+    const wifiToggle = screen.getByRole('button', { name: 'Toggle WiFi menu' });
+    expect(wifiToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
   });
 
   it('keeps all groups collapsed on dashboard with empty storage', async () => {
     renderSidebar('/dashboard');
     await waitFor(() => {
-      expect(screen.getByText('WiFi')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
     });
-    for (const name of [/WiFi/i, /Network/i, /Services/i, /System/i]) {
-      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    for (const name of ['WiFi', 'Network', 'Services', 'System']) {
+      expect(screen.getByRole('button', { name: `Toggle ${name} menu` })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
     }
   });
 
   it('auto-expands WiFi group on /wifi/advanced with empty storage', async () => {
     renderSidebar('/wifi/advanced');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /WiFi/i })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
     });
-    const advanced = screen.getByRole('link', { name: 'Extras' });
+    const advanced = screen.getByRole('link', { name: 'Advanced' });
     expect(advanced).toHaveClass('bg-blue-50');
     expect(advanced).toHaveAttribute('href', '/wifi/advanced');
   });
 
-  it('marks only the exact leaf as current on /wifi/advanced', async () => {
+  it('marks only the Advanced leaf as current on /wifi/advanced', async () => {
     renderSidebar('/wifi/advanced');
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Extras' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Extras' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('link', { name: 'Connect' })).not.toHaveAttribute(
-      'aria-current',
-    );
+    expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
   });
 
-  it('marks only Internet & LAN as current on /network/configuration', async () => {
-    renderSidebar('/network/configuration');
+  it('highlights Network parent on Status default without submenu duplicate', async () => {
+    renderSidebar('/network');
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Internet & LAN' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Network' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Internet & LAN' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(screen.getByRole('link', { name: 'Status' })).not.toHaveAttribute(
-      'aria-current',
-    );
+    expect(screen.getByRole('link', { name: 'Network' })).toHaveClass('bg-blue-50');
+    expect(screen.queryByRole('link', { name: 'Status' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Internet & LAN' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+  });
+
+  it('navigates to Connect when WiFi label is clicked without opening via arrow', async () => {
+    const user = userEvent.setup();
+    const { router } = renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('link', { name: 'WiFi' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/wifi');
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+    });
+  });
+
+  it('navigates to Status when Network label is clicked', async () => {
+    const user = userEvent.setup();
+    const { router } = renderSidebar('/dashboard');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Network' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('link', { name: 'Network' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/network');
+    });
   });
 
   it('expands WiFi group when navigating from dashboard to /wifi', async () => {
     const { router } = renderSidebar('/dashboard');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /WiFi/i })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
@@ -204,23 +234,26 @@ describe('Sidebar', () => {
     await router.navigate({ to: '/wifi' });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /WiFi/i })).toHaveAttribute(
+      expect(screen.getByRole('button', { name: 'Toggle WiFi menu' })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
-      expect(screen.getByRole('link', { name: 'Connect' })).toHaveClass('bg-blue-50');
+      expect(screen.getByRole('link', { name: 'WiFi' })).toHaveClass('bg-blue-50');
+      expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
     });
   });
 
-  it('shows Connect label after opening WiFi group', async () => {
+  it('shows Advanced (not Connect) after opening WiFi group via arrow', async () => {
     const user = userEvent.setup();
     renderSidebar('/dashboard');
     await waitFor(() => {
-      expect(screen.getByText('WiFi')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: /WiFi/i }));
+    await user.click(screen.getByRole('button', { name: 'Toggle WiFi menu' }));
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
     });
   });
 
@@ -241,12 +274,13 @@ describe('Sidebar', () => {
     } as ReturnType<typeof useServices>);
     renderSidebar();
     await waitFor(() => {
-      expect(screen.getByText('Services')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Services' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: /Services/i }));
+    await user.click(screen.getByRole('button', { name: 'Toggle Services menu' }));
     await waitFor(() => {
       expect(screen.getByText('SQM')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Apps' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Apps' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Tailscale' })).toBeInTheDocument();
     });
   });
 
@@ -306,11 +340,7 @@ describe('Mobile Sidebar', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /WiFi/i }));
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Connect' })).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('link', { name: 'Connect' }));
+    await user.click(screen.getByRole('link', { name: 'WiFi' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

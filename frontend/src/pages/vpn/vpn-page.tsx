@@ -10,19 +10,25 @@ export function VpnPage() {
   return (
     <div className="space-y-6">
       <WireguardSection />
-      <PageSection title="Split Tunneling">
-        <SplitTunnelCard />
-      </PageSection>
+      <SplitTunnelCard />
       <VpnAdguardHint />
-      <PageSection title="Verify VPN">
-        <VpnVerifyWireguardCard />
-      </PageSection>
-      <PageSection title="DNS Leak Test">
-        <VpnDnsLeakTestCard />
-      </PageSection>
-      <PageSection title="VPN Speed Test">
-        <VpnSpeedTestCard />
-      </PageSection>
+
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Diagnostics
+        </h2>
+        <div className="space-y-3">
+          <PageSection title="Verify VPN">
+            <VpnVerifyWireguardCard />
+          </PageSection>
+          <PageSection title="DNS Leak Test">
+            <VpnDnsLeakTestCard />
+          </PageSection>
+          <PageSection title="VPN Speed Test">
+            <VpnSpeedTestCard />
+          </PageSection>
+        </div>
+      </div>
     </div>
   );
 }

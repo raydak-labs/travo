@@ -123,8 +123,7 @@ describe('NetworkPage', () => {
     expect(screen.queryByText('LAN Configuration')).not.toBeInTheDocument();
   });
 
-  it('collapses secondary Setup sections by default', async () => {
-    const user = userEvent.setup();
+  it('shows DHCP and DNS cards without PageSection collapse on Internet & LAN', async () => {
     renderNetworkPage('/network/configuration');
 
     await waitFor(() => {
@@ -133,16 +132,13 @@ describe('NetworkPage', () => {
       expect(screen.getByText('Network Interfaces')).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: /DHCP & DNS/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /DHCP Leases/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Save DHCP Settings/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/No active leases|Expires/i)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /DHCP & DNS/i }));
-    expect(screen.getByRole('button', { name: /Save DHCP Settings/i })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /DHCP & DNS/i })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Save DHCP Settings/i })).toBeVisible();
+    });
   });
 
-  it('keeps Failover open and collapses other Advanced sections', async () => {
+  it('keeps Failover and traveler tools open; collapses power tools', async () => {
     const user = userEvent.setup();
     renderNetworkPage('/network/advanced');
 
@@ -151,11 +147,17 @@ describe('NetworkPage', () => {
     });
 
     expect(screen.getByRole('button', { name: /Firewall/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Speed Test/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Run Speed Test/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Speed Test$/i })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Run Speed Test/i })).toBeVisible();
+    });
 
-    await user.click(screen.getByRole('button', { name: /Speed Test/i }));
-    expect(screen.getByRole('button', { name: /Run Speed Test/i })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Firewall/i }));
+    // Firewall card body becomes visible after expand — title already in trigger
+    expect(screen.getByRole('button', { name: /Firewall/i })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('renders WAN information', async () => {

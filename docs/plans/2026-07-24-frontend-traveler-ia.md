@@ -7,8 +7,8 @@ tags: [plan, frontend, ux, ia]
 
 # Frontend traveler IA
 
-> **Created:** 2026-07-24  
-> **Status:** Design approved; implementation plan: [`2026-07-24-frontend-traveler-ia-implementation.md`](2026-07-24-frontend-traveler-ia-implementation.md)  
+> **Status:** Design approved; follow-up: [`2026-07-25-sidebar-defaults-lighter-disclosure.md`](2026-07-25-sidebar-defaults-lighter-disclosure.md) (parent→default, Advanced labels, lighter PageSections)  
+> **Implementation plan:** [`2026-07-24-frontend-traveler-ia-implementation.md`](2026-07-24-frontend-traveler-ia-implementation.md)  
 > **Goal:** Make daily travel jobs obvious; keep every existing feature reachable without duplicate nav chrome.  
 > **Primary user:** Non-technical traveler (hotel WiFi, “am I online?”, VPN on/off).
 
@@ -22,28 +22,27 @@ tags: [plan, frontend, ux, ia]
 2. **Sidebar-only app nav** — remove WiFi and Network **in-page tab bars**. Sidebar + header actions are the only app-level navigation.
 3. **Always-visible top-level:** Dashboard · WiFi · Network · Clients · VPN · Services · System. Services is its own group (not under System).
 4. **First visit (no usable sidebar-group storage):** land on `/dashboard`; all sidebar groups **collapsed**.
-5. **Collapse means two things:** (a) sidebar submenus, (b) page section boxes default closed on dense pages — **follow the Page disclosure table** (some primary blocks stay open).
-6. **No feature deletion** — every current capability stays on its current route (or existing page section).
-7. **Header** = action chrome only (title, status, notifications, theme, reboot/shutdown/logout). No header page menus. **Page title** for WiFi/Network children = sidebar **leaf** label (Connect, Extras, Status, Internet & LAN, Tools, …), not the group name alone. Services children may keep `Services / Tailscale`-style titles if already used.
-8. **Cross-links** stay light (Dashboard shortcuts, Status → Clients, VPN ↔ Tailscale hints).
+5. **Collapse means two things:** (a) sidebar submenus via **chevron only**; (b) page section boxes for **rare/power** cards only — see follow-up plan.
+6. **Group label click** navigates to the daily default (WiFi→Connect, Network→Status, Services→Apps, System→Settings). Does not toggle the submenu.
+7. **No feature deletion** — every current capability stays on its current route (or existing page section).
+8. **Header** = action chrome only (title, status, notifications, theme, reboot/shutdown/logout). No header page menus. **Page title** for WiFi/Network children = sidebar **leaf** label (Connect, Advanced, Status, Internet & LAN, …), not the group name alone. Services children may keep `Services / Tailscale`-style titles if already used.
+9. **Cross-links** stay light (Dashboard shortcuts, Status → Clients, VPN ↔ Tailscale hints).
 
 ---
 
 ## Nav tree
 
-| Top-level | Kind | Route(s) | Sidebar label |
-|-----------|------|----------|---------------|
+| Top-level | Kind | Default | Sidebar leaves |
+|-----------|------|---------|----------------|
 | Dashboard | leaf | `/dashboard` | Dashboard |
-| WiFi | group | `/wifi` · `/wifi/advanced` | **Connect** · **Extras** |
-| Network | group | `/network` · `/network/configuration` · `/network/advanced` | Status · **Internet & LAN** · **Tools** |
+| WiFi | group | `/wifi` | **Connect** · **Advanced** |
+| Network | group | `/network` | Status · **Internet & LAN** · **Advanced** |
 | Clients | leaf | `/clients` | Clients |
 | VPN | leaf | `/vpn` | VPN |
-| Services | group | `/services` · `/services/tailscale` · `/services/speedtest` · `/services/sqm` (if installed) | **Apps** · Tailscale · Speedtest · SQM |
-| System | group | `/system` · `/logs` | Settings · Logs |
+| Services | group | `/services` | **Apps** · Tailscale · Speedtest · SQM |
+| System | group | `/system` | Settings · Logs |
 
-Routes unchanged. Sidebar (and matching page titles / mobile drawer) label renames: Wireless → **Connect**, `/wifi/advanced` → **Extras**, Configuration → **Internet & LAN**, `/network/advanced` → **Tools**, Installed services → **Apps**. Distinct Extras/Tools avoid twin “Advanced” under WiFi and Network.
-
-SQM leaf: show only when the package is installed (same as today). Absent → hide the leaf (no dead link).
+Twin **Advanced** leaves OK (parent disambiguates). Storage key: `otg-sidebar-groups-v3`.
 
 ---
 
@@ -51,7 +50,7 @@ SQM leaf: show only when the package is installed (same as today). Absent → hi
 
 ### Sidebar owns route hierarchy
 
-- Switching Status ↔ Internet & LAN ↔ Tools (Network) or Connect ↔ Extras (WiFi) is **sidebar only**. Do not reintroduce a page tab strip for those axes.
+- Switching Status ↔ Internet & LAN ↔ Advanced (Network) or Connect ↔ Advanced (WiFi) is **sidebar only**. Do not reintroduce a page tab strip for those axes.
 - **In-page tabs allowed only** when the axis is *not* already a sidebar hierarchy. Today: Logs **System Log / Kernel Log** (log *source*, not a nav destination). That exception must stay documented in `ui-theming.md` so WiFi/Network tabs do not return.
 
 ### Active group auto-expand (precedence)
@@ -63,7 +62,7 @@ SQM leaf: show only when the package is installed (same as today). Absent → hi
 ### Sidebar group storage migration
 
 - Today’s key `otg-sidebar-groups` defaults were all **open**; many browsers already store that.
-- Implementation **must bump** the sidebar-groups storage key (e.g. `otg-sidebar-groups` → `otg-sidebar-groups-v2`) so returning users get new defaults once. Do not rely on merging new `defaultOpen` into an old all-`true` blob.
+- Implementation **must bump** the sidebar-groups storage key when defaults/behavior change (now `otg-sidebar-groups-v3`). Do not rely on merging new `defaultOpen` into an old all-`true` blob.
 - Corrupt JSON → treat as missing → new defaults.
 
 ### Tap budget (traveler jobs)

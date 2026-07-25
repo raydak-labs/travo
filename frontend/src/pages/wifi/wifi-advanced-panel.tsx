@@ -12,32 +12,32 @@ export function WifiAdvancedPanel() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-500 dark:text-gray-400">
-        Optional advanced Wi-Fi settings. Expand a section to configure it.
+        Guest network, cloning, and schedule stay visible. Expand only for radio / policy power
+        tools.
       </p>
-      <PageSection title="DNS tools">
-        <DNSToolsCard />
-      </PageSection>
-      <PageSection title="Repeater radio layout">
-        <RepeaterRadioLayoutCard />
-      </PageSection>
-      <PageSection title="Radio hardware">
-        <WifiRadioHardwareCard />
-      </PageSection>
-      <PageSection title="Guest network">
-        <GuestNetworkCard />
-      </PageSection>
-      <PageSection title="MAC address cloning">
-        <MACAddressCard />
-      </PageSection>
-      <PageSection title="MAC policy">
-        <MACPolicyCard />
-      </PageSection>
-      <PageSection title="Band switching">
-        <BandSwitchingCard />
-      </PageSection>
-      <PageSection title="WiFi schedule">
-        <WiFiScheduleCard />
-      </PageSection>
+
+      <GuestNetworkCard />
+      <MACAddressCard />
+      <BandSwitchingCard />
+      <WiFiScheduleCard />
+      <DNSToolsCard />
+
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Power tools
+        </h2>
+        <div className="space-y-3">
+          <PageSection title="Radio hardware">
+            <WifiRadioHardwareCard />
+          </PageSection>
+          <PageSection title="Repeater radio layout">
+            <RepeaterRadioLayoutCard />
+          </PageSection>
+          <PageSection title="MAC policy">
+            <MACPolicyCard />
+          </PageSection>
+        </div>
+      </div>
     </div>
   );
 }

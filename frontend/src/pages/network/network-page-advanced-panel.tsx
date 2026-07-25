@@ -13,34 +13,34 @@ import { WoLCard } from '@/pages/network/wol-card';
 export function NetworkPageAdvancedPanel() {
   return (
     <div className="space-y-6">
-      <PageSection title="Dynamic DNS">
-        <DdnsCard />
-      </PageSection>
       <FailoverCard />
-      <PageSection title="Firewall">
-        <FirewallCard />
-      </PageSection>
-      <PageSection title="IPv6">
-        <IPv6Card />
-      </PageSection>
-      <PageSection title="DNS over HTTPS/TLS">
-        <DoHCard />
-      </PageSection>
-      <PageSection title="Wake-on-LAN">
-        <WoLCard />
-      </PageSection>
-      <PageSection title="Network Diagnostics">
-        <DiagnosticsCard />
-      </PageSection>
-      <PageSection title="Speed Test">
-        <SpeedTestCard />
-      </PageSection>
-      <PageSection title="USB Tethering">
-        <USBTetheringSection />
-      </PageSection>
-      <PageSection title="Data Usage">
-        <DataUsageSection />
-      </PageSection>
+      <USBTetheringSection />
+      <DataUsageSection />
+      <DiagnosticsCard />
+      <SpeedTestCard />
+
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Power tools
+        </h2>
+        <div className="space-y-3">
+          <PageSection title="Dynamic DNS">
+            <DdnsCard />
+          </PageSection>
+          <PageSection title="Firewall">
+            <FirewallCard />
+          </PageSection>
+          <PageSection title="IPv6">
+            <IPv6Card />
+          </PageSection>
+          <PageSection title="DNS over HTTPS/TLS">
+            <DoHCard />
+          </PageSection>
+          <PageSection title="Wake-on-LAN">
+            <WoLCard />
+          </PageSection>
+        </div>
+      </div>
     </div>
   );
 }

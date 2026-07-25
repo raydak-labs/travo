@@ -29,6 +29,8 @@ export interface NavGroup {
   readonly id: string;
   readonly label: string;
   readonly icon: LucideIcon;
+  /** Route opened when the group label is clicked (not the chevron). */
+  readonly defaultTo: string;
   readonly items: readonly { readonly to: string; readonly label: string }[];
 }
 
@@ -48,9 +50,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'wifi',
     label: 'WiFi',
     icon: Wifi,
+    defaultTo: '/wifi',
     items: [
       { to: '/wifi', label: 'Connect' },
-      { to: '/wifi/advanced', label: 'Extras' },
+      { to: '/wifi/advanced', label: 'Advanced' },
     ],
   },
   {
@@ -58,10 +61,11 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'network',
     label: 'Network',
     icon: Globe,
+    defaultTo: '/network',
     items: [
       { to: '/network', label: 'Status' },
       { to: '/network/configuration', label: 'Internet & LAN' },
-      { to: '/network/advanced', label: 'Tools' },
+      { to: '/network/advanced', label: 'Advanced' },
     ],
   },
   {
@@ -83,6 +87,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'services',
     label: 'Services',
     icon: Monitor,
+    defaultTo: '/services',
     items: [
       { to: '/services', label: 'Apps' },
       { to: '/services/tailscale', label: 'Tailscale' },
@@ -94,6 +99,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     id: 'system',
     label: 'System',
     icon: Settings,
+    defaultTo: '/system',
     items: [
       { to: '/system', label: 'Settings' },
       { to: '/logs', label: 'Logs' },
@@ -123,7 +129,7 @@ export const NAV_SUB_ICONS: Record<string, LucideIcon> = {
   '/logs': ScrollText,
 };
 
-const STORAGE_KEY_GROUPS = 'otg-sidebar-groups-v2';
+const STORAGE_KEY_GROUPS = 'otg-sidebar-groups-v3';
 
 /** Default open state for groups (first visit). */
 const defaultOpen: Record<string, boolean> = {

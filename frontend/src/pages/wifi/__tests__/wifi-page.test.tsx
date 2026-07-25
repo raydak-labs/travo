@@ -70,9 +70,10 @@ describe('WifiPage', () => {
     renderWifiPage('/wifi/advanced');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /MAC address cloning/i })).toBeInTheDocument();
+      expect(screen.getByText('MAC Address Cloning')).toBeInTheDocument();
     });
     expect(screen.queryByText('Current Connection')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Radio hardware/i })).toBeInTheDocument();
   });
 
   it('renders current connection section with SSID', async () => {

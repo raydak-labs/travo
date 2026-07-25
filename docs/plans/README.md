@@ -23,6 +23,7 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`2026-07-20-ui-consistency.md`](2026-07-20-ui-consistency.md) | Unify page shell, cards, loading/empty/error, labels, status chrome | `frontend`, `ux`, `theming`, `consistency` |
 | [`2026-07-24-frontend-traveler-ia.md`](2026-07-24-frontend-traveler-ia.md) | Sidebar-only IA, collapse defaults, traveler labels (Connect/Setup/Apps) | `frontend`, `ux`, `ia` |
 | [`2026-07-24-frontend-traveler-ia-implementation.md`](2026-07-24-frontend-traveler-ia-implementation.md) | Task plan to ship traveler IA (tabs off, storage v2, PageSection) | `frontend`, `ux`, `ia`, `implementation` |
+| [`2026-07-25-sidebar-defaults-lighter-disclosure.md`](2026-07-25-sidebar-defaults-lighter-disclosure.md) | Group label→default route; arrow toggle; twin Advanced; fewer PageSections | `frontend`, `ux`, `ia` |
 | [`2026-07-20-nested-cards-approach-a.md`](2026-07-20-nested-cards-approach-a.md) | Flatten nested panels, equal-height WiFi cards, form chrome (shadcn-like) | `frontend`, `ux`, `cards` |
 | [`_primitive-usage-audit.md`](_primitive-usage-audit.md) | Call-site audit: Select h-9, form `sm` buttons, CardInset leftovers, Badge bypass | `frontend`, `ux`, `audit` |
 | [`_primitive-mop-report.md`](_primitive-mop-report.md) | Mop-up: Select h-10, form buttons, CardInset, Badge variants, docs | `frontend`, `ux` |

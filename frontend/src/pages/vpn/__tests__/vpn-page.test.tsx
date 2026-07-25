@@ -100,7 +100,7 @@ describe('VpnPage', () => {
       expect(screen.getByText('Kill Switch')).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: /Split Tunneling/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Split Tunneling/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /DNS Leak Test/i })).toBeInTheDocument();
     expect(
       screen.queryByText(/Verify that DNS queries are routed through the VPN/i),

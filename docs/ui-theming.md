@@ -88,9 +88,9 @@ Normative IA: [`plans/2026-07-24-frontend-traveler-ia.md`](plans/2026-07-24-fron
 
 | Pattern | Typical role |
 | --------|--------------|
-| **Sidebar** (collapsible groups + leaves) | *Where in the app am I?* Child links are real routes (e.g. `/wifi/advanced`, `/network/configuration`). Switching Connect/Extras and Status/Internet & LAN/Tools is **sidebar-only** — do **not** mirror those axes with an in-page tab bar. |
+| **Sidebar** (group label → daily default; chevron toggles leaves) | *Where in the app am I?* Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](plans/2026-07-25-sidebar-defaults-lighter-disclosure.md). |
 | **In-page tabs** | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**). |
-| **Page sections** (collapsed boxes) | Progressive disclosure **inside** a route (dense / Advanced pages). Default closed on first paint; not a second global nav. |
+| **Page sections** (collapsed boxes) | Only for rare / power / geek cards. Everyday cards stay visible. |
 
 Sidebar group open/closed is for nav density (defaults collapsed on first visit; auto-expand the active group on child routes). It does not replace page-section collapse for card content.
 
