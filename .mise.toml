@@ -6,7 +6,7 @@ min_version = "2024.1.0"
   golangci-lint = "2.12.2"
 
   # Node.js + JS tooling
-  node = "26.5.0" # or "lts" / "latest"
+  node = "26.5.1" # or "lts" / "latest"
   #bun = "latest"
   pnpm = "11.11.0"
 
