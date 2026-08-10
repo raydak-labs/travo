@@ -8,7 +8,9 @@ package execx
 import (
 	"bufio"
 	"context"
+	"io"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -65,22 +67,41 @@ func Stream(timeout time.Duration, logFn func(string), name string, args ...stri
 	if err != nil {
 		return err
 	}
-	cmd.Stderr = cmd.Stdout // merge stderr into stdout
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
-	// Read in a goroutine: if an orphaned grandchild keeps the pipe open after
-	// the timeout kill, Wait's WaitDelay force-close is what unblocks the
-	// scanner — so Wait must not sit behind the read loop.
+	// Read stdout/stderr separately. StdoutPipe()+Stderr=Stdout races on Linux
+	// under WaitDelay (CI saw empty line captures). Serialize logFn for callers.
+	var mu sync.Mutex
+	safeLog := func(line string) {
+		mu.Lock()
+		defer mu.Unlock()
+		logFn(line)
+	}
+	scan := func(r io.Reader) {
+		scanner := bufio.NewScanner(r)
+		for scanner.Scan() {
+			safeLog(scanner.Text())
+		}
+	}
+
+	// Read in goroutines: if an orphaned grandchild keeps a pipe open after the
+	// timeout kill, Wait's WaitDelay force-close unblocks the scanners — so Wait
+	// must not sit behind the read loops.
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			logFn(scanner.Text())
-		}
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); scan(stdout) }()
+		go func() { defer wg.Done(); scan(stderr) }()
+		wg.Wait()
 	}()
 
 	err = cmd.Wait()
