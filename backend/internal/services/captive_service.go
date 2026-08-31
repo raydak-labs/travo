@@ -440,8 +440,8 @@ func (c *CaptiveService) readDHCPDNS() string {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "nameserver ") {
-			ip := strings.TrimSpace(strings.TrimPrefix(line, "nameserver "))
+		if after, ok := strings.CutPrefix(line, "nameserver "); ok {
+			ip := strings.TrimSpace(after)
 			if ip != "" {
 				return ip
 			}

@@ -154,7 +154,7 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 		return models.WifiConnection{Mode: w.deriveWifiMode()}, nil
 	}
 
-	resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": ifname})
+	resp, err := w.ubus.Call("iwinfo", "info", map[string]any{"device": ifname})
 	if err != nil {
 		return models.WifiConnection{}, err
 	}
@@ -178,8 +178,8 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 	// Get IP from wwan interface
 	if conn.Connected {
 		if wwanData, err := w.ubus.Call("network.interface.wwan", "status", nil); err == nil {
-			if addrs, ok := wwanData["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
-				if a, ok := addrs[0].(map[string]interface{}); ok {
+			if addrs, ok := wwanData["ipv4-address"].([]any); ok && len(addrs) > 0 {
+				if a, ok := addrs[0].(map[string]any); ok {
 					conn.IPAddress, _ = a["address"].(string)
 				}
 			}

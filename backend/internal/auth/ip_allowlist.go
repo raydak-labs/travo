@@ -15,7 +15,7 @@ func ParseCIDRList(raw string) ([]*net.IPNet, error) {
 	}
 
 	var out []*net.IPNet
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue

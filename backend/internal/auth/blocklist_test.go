@@ -38,7 +38,7 @@ func TestBlocklist_Cleanup(t *testing.T) {
 func TestBlocklist_Concurrent(t *testing.T) {
 	bl := NewTokenBlocklist()
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(2)
 		token := fmt.Sprintf("token%d", i)
 		go func() {

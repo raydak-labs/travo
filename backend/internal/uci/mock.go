@@ -2,6 +2,7 @@ package uci
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 )
 
@@ -147,9 +148,7 @@ func (m *MockUCI) GetAll(config, section string) (map[string]string, error) {
 	if c, ok := m.data[config]; ok {
 		if s, ok := c[section]; ok {
 			result := make(map[string]string, len(s))
-			for k, v := range s {
-				result[k] = v
-			}
+			maps.Copy(result, s)
 			return result, nil
 		}
 	}
@@ -218,9 +217,7 @@ func (m *MockUCI) GetSections(config string) (map[string]map[string]string, erro
 	result := make(map[string]map[string]string, len(c))
 	for section, opts := range c {
 		result[section] = make(map[string]string, len(opts))
-		for k, v := range opts {
-			result[section][k] = v
-		}
+		maps.Copy(result[section], opts)
 	}
 	return result, nil
 }

@@ -123,7 +123,7 @@ func TestLogin_RegistersSession(t *testing.T) {
 		t.Fatalf("login failed: %v", err)
 	}
 
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		return []byte("test-secret"), nil
 	})
 	if err != nil {
@@ -170,7 +170,7 @@ func TestRevokeSession_RemovesJti(t *testing.T) {
 	}
 	svc.RevokeSession(token)
 
-	parsed, _ := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+	parsed, _ := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		return []byte("test-secret"), nil
 	})
 	claims := parsed.Claims.(jwt.MapClaims)

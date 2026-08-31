@@ -321,7 +321,7 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 	gatewayHost := base.Host
 
 	// Multi-step loop: fetch page → detect action → execute → repeat
-	for step := 0; step < captiveMaxSteps; step++ {
+	for step := range captiveMaxSteps {
 		html, pageBase, fetchErr := c.fetchPortalPage(noRedirectClient, client, ua, currentURL)
 		if fetchErr != nil || html == "" {
 			// If HTTPS failed, try HTTP on the gateway with the same path
@@ -504,7 +504,7 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 // This handles multi-step portals where submitting one form returns a page that
 // auto-submits to another endpoint (e.g., external auth → MikroTik gateway).
 func (c *CaptiveService) chainAutoSubmit(client *http.Client, ua string, base *url.URL, html string, gatewayHost string, attempted *int) {
-	for depth := 0; depth < 3; depth++ {
+	for range 3 {
 		if !captiveAutoSubmitRe.MatchString(html) {
 			return
 		}

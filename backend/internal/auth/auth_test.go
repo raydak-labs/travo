@@ -217,7 +217,7 @@ func TestChangePasswordTooShort(t *testing.T) {
 
 func TestAuthServiceWithUbus_StoresPasswordOnLogin(t *testing.T) {
 	mub := ubus.NewMockUbus()
-	mub.RegisterResponse("session.login", map[string]interface{}{
+	mub.RegisterResponse("session.login", map[string]any{
 		"ubus_rpc_session": "test-session",
 	})
 
@@ -257,7 +257,7 @@ func TestAuthServiceWithUbus_DoesNotStorePasswordOnFailedLogin(t *testing.T) {
 
 func TestAuthServiceWithUbus_NilPasswordHolder(t *testing.T) {
 	mub := ubus.NewMockUbus()
-	mub.RegisterResponse("session.login", map[string]interface{}{
+	mub.RegisterResponse("session.login", map[string]any{
 		"ubus_rpc_session": "test-session",
 	})
 
@@ -274,7 +274,7 @@ func TestAuthServiceWithUbus_NilPasswordHolder(t *testing.T) {
 
 func TestAuthServiceWithUbus_PersistsSealOnLogin(t *testing.T) {
 	mub := ubus.NewMockUbus()
-	mub.RegisterResponse("session.login", map[string]interface{}{
+	mub.RegisterResponse("session.login", map[string]any{
 		"ubus_rpc_session": "test-session",
 	})
 	dir := t.TempDir()
@@ -293,10 +293,10 @@ func TestAuthServiceWithUbus_PersistsSealOnLogin(t *testing.T) {
 
 func TestAuthServiceWithUbus_ChangePasswordUpdatesRootPasswordAndSeal(t *testing.T) {
 	mub := ubus.NewMockUbus()
-	mub.RegisterResponse("session.login", map[string]interface{}{
+	mub.RegisterResponse("session.login", map[string]any{
 		"ubus_rpc_session": "test-session",
 	})
-	mub.RegisterResponse("luci.setPassword", map[string]interface{}{})
+	mub.RegisterResponse("luci.setPassword", map[string]any{})
 
 	dir := t.TempDir()
 	authPath := filepath.Join(dir, "auth.json")

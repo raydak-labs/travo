@@ -25,7 +25,7 @@ func TestWifiScanEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data []interface{}
+	var data []any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON array: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestWifiConnect_EmptySSID_Returns400(t *testing.T) {
 		t.Errorf("expected 400, got %d, body: %s", resp.StatusCode, b)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	_ = json.Unmarshal(b, &data)
 	if _, ok := data["error"]; !ok {
 		t.Error("expected error field in response")
@@ -181,7 +181,7 @@ func TestWifiConnectionEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestWifiHealthEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestWifiDisconnectEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestGuestWifiGetEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -337,7 +337,7 @@ func TestGuestWifiSetEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled": true, "ssid": "Guest-Net", "encryption": "psk2", "key": "guestpass123",
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/guest", bytes.NewReader(body))
@@ -358,7 +358,7 @@ func TestGuestWifiSet_EmptySSID_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled": true, "ssid": "", "encryption": "psk2", "key": "guestpass123",
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/guest", bytes.NewReader(body))
@@ -379,7 +379,7 @@ func TestGuestWifiSet_ShortPassword_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled": true, "ssid": "Guest", "encryption": "psk2", "key": "short",
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/guest", bytes.NewReader(body))
@@ -412,7 +412,7 @@ func TestRadioStatusGetEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestRadioStatusSetEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{"enabled": false})
+	body, _ := json.Marshal(map[string]any{"enabled": false})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/radio", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -444,7 +444,7 @@ func TestWifiSetPriorityEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"ssids": []string{"Hotel-WiFi", "Office-Net"},
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/saved/priority", bytes.NewReader(body))
@@ -460,7 +460,7 @@ func TestWifiSetPriorityEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(b, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -473,7 +473,7 @@ func TestWifiSetPriorityEndpoint_EmptySSIDs(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"ssids": []string{},
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/saved/priority", bytes.NewReader(body))
@@ -506,7 +506,7 @@ func TestGetAutoReconnectEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -519,7 +519,7 @@ func TestSetAutoReconnectEndpoint(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{"enabled": true})
+	body, _ := json.Marshal(map[string]any{"enabled": true})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/autoreconnect", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -533,7 +533,7 @@ func TestSetAutoReconnectEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(b, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -558,7 +558,7 @@ func TestRandomizeMACEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}

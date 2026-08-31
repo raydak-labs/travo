@@ -25,7 +25,7 @@ func TestLoginResponseIncludesExpiresIn(t *testing.T) {
 		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	respBody, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(respBody, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestSessionEndpointReturnsExpiresIn(t *testing.T) {
 		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	respBody, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(respBody, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -196,20 +197,20 @@ func (w *WifiService) findSTADevice() (ifname string, section string, err error)
 	}
 
 	for _, radioData := range resp {
-		radioMap, ok := radioData.(map[string]interface{})
+		radioMap, ok := radioData.(map[string]any)
 		if !ok {
 			continue
 		}
-		ifaces, ok := radioMap["interfaces"].([]interface{})
+		ifaces, ok := radioMap["interfaces"].([]any)
 		if !ok {
 			continue
 		}
 		for _, iface := range ifaces {
-			ifaceMap, ok := iface.(map[string]interface{})
+			ifaceMap, ok := iface.(map[string]any)
 			if !ok {
 				continue
 			}
-			config, ok := ifaceMap["config"].(map[string]interface{})
+			config, ok := ifaceMap["config"].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -476,10 +477,8 @@ func (w *WifiService) ensureWwanFirewall() error {
 	}
 	// Check if wwan is already in the network list to avoid duplicates.
 	if net := sections[wanZone]["network"]; net != "" {
-		for _, item := range strings.Fields(net) {
-			if item == "wwan" {
-				return nil
-			}
+		if slices.Contains(strings.Fields(net), "wwan") {
+			return nil
 		}
 	}
 	if err := w.uci.AddList("firewall", wanZone, "network", "wwan"); err != nil {

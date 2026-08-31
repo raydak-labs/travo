@@ -25,7 +25,7 @@ func TestNetworkStatusEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestSetWanConfig_InvalidType_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"type": "invalid",
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
@@ -59,7 +59,7 @@ func TestSetWanConfig_InvalidIP_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"type":       "static",
 		"ip_address": "not-an-ip",
 		"gateway":    "192.168.1.1",
@@ -83,7 +83,7 @@ func TestSetWanConfig_InvalidMTU_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"type": "dhcp",
 		"mtu":  50000,
 	})
@@ -117,7 +117,7 @@ func TestDetectWanTypeEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestSetWanConfig_InvalidDNS_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"type":        "dhcp",
 		"dns_servers": []string{"not-an-ip"},
 	})
@@ -155,7 +155,7 @@ func TestSetWanConfig_ValidDHCP_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"type": "dhcp",
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/wan", bytes.NewReader(body))
@@ -192,7 +192,7 @@ func TestAddDHCPReservation_ValidRequest_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"name": "laptop",
 		"mac":  "AA:BB:CC:DD:EE:FF",
 		"ip":   "192.168.8.50",
@@ -215,7 +215,7 @@ func TestAddDHCPReservation_MissingName_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"mac": "AA:BB:CC:DD:EE:FF",
 		"ip":  "192.168.8.50",
 	})
@@ -237,7 +237,7 @@ func TestAddDHCPReservation_InvalidMAC_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"name": "laptop",
 		"mac":  "invalid-mac",
 		"ip":   "192.168.8.50",
@@ -260,7 +260,7 @@ func TestAddDHCPReservation_InvalidIP_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"name": "laptop",
 		"mac":  "AA:BB:CC:DD:EE:FF",
 		"ip":   "not-an-ip",
@@ -284,7 +284,7 @@ func TestDeleteDHCPReservation_Returns200(t *testing.T) {
 	token, _, _ := deps.Auth.Login("admin")
 
 	// First add a reservation
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"name": "laptop",
 		"mac":  "AA:BB:CC:DD:EE:FF",
 		"ip":   "192.168.8.50",
@@ -313,7 +313,7 @@ func TestKickClient_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"mac": "AA:BB:CC:DD:EE:FF",
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/kick", bytes.NewReader(body))
@@ -334,7 +334,7 @@ func TestKickClient_MissingMAC_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{})
+	body, _ := json.Marshal(map[string]any{})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/kick", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -353,7 +353,7 @@ func TestKickClient_InvalidMAC_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"mac": "invalid-mac",
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/kick", bytes.NewReader(body))
@@ -374,7 +374,7 @@ func TestBlockClient_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"mac": "AA:BB:CC:DD:EE:FF",
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/block", bytes.NewReader(body))
@@ -395,7 +395,7 @@ func TestBlockClient_InvalidMAC_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"mac": "not-a-mac",
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/block", bytes.NewReader(body))
@@ -417,7 +417,7 @@ func TestUnblockClient_Returns200(t *testing.T) {
 	token, _, _ := deps.Auth.Login("admin")
 
 	// Block first
-	blockBody, _ := json.Marshal(map[string]interface{}{
+	blockBody, _ := json.Marshal(map[string]any{
 		"mac": "AA:BB:CC:DD:EE:FF",
 	})
 	blockReq, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/block", bytes.NewReader(blockBody))
@@ -427,7 +427,7 @@ func TestUnblockClient_Returns200(t *testing.T) {
 	blockResp.Body.Close()
 
 	// Unblock
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"mac": "AA:BB:CC:DD:EE:FF",
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/clients/unblock", bytes.NewReader(body))
@@ -472,7 +472,7 @@ func TestSetInterfaceState_Up_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{"up": true})
+	body, _ := json.Marshal(map[string]any{"up": true})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/wan/state", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -491,7 +491,7 @@ func TestSetInterfaceState_Down_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{"up": false})
+	body, _ := json.Marshal(map[string]any{"up": false})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/lan/state", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -510,7 +510,7 @@ func TestSetInterfaceState_InvalidInterface_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{"up": true})
+	body, _ := json.Marshal(map[string]any{"up": true})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/invalid/state", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -564,7 +564,7 @@ func TestSetDDNSConfig_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled":     true,
 		"service":     "duckdns.org",
 		"domain":      "test.duckdns.org",
@@ -590,7 +590,7 @@ func TestSetDDNSConfig_MissingService_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled": true,
 		"service": "",
 		"domain":  "test.duckdns.org",
@@ -613,7 +613,7 @@ func TestSetDDNSConfig_MissingDomain_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled": true,
 		"service": "duckdns.org",
 		"domain":  "",
@@ -636,7 +636,7 @@ func TestSetDDNSConfig_Custom_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled":     true,
 		"service":     "custom",
 		"domain":      "router.example.com",
@@ -663,7 +663,7 @@ func TestSetDDNSConfig_Custom_MissingUpdateURL_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled":     true,
 		"service":     "custom",
 		"domain":      "router.example.com",
@@ -690,7 +690,7 @@ func TestSetDDNSConfig_Custom_InvalidURL_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"enabled":     true,
 		"service":     "custom",
 		"domain":      "router.example.com",

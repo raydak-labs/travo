@@ -67,7 +67,7 @@ func TestUptimeTracker_RingBufferCapAtMax(t *testing.T) {
 	tracker := NewUptimeTracker(prober)
 
 	// Force maxUptimeEvents+2 transitions by alternating state
-	for i := 0; i < maxUptimeEvents+2; i++ {
+	for i := range maxUptimeEvents + 2 {
 		if i%2 == 0 {
 			prober.StatusCode = 204
 		} else {

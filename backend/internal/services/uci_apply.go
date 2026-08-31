@@ -64,7 +64,7 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 			return "", fmt.Errorf("uci apply: copy %s: %w", name, err)
 		}
 	}
-	applyArgs := map[string]interface{}{
+	applyArgs := map[string]any{
 		"ubus_rpc_session": sid,
 		"rollback":         true,
 		"timeout":          uciApplyRollbackTimeout,
@@ -80,7 +80,7 @@ func (r *RealUCIApplyConfirm) Confirm(sessionID string) error {
 	if sessionID == "" {
 		return fmt.Errorf("uci confirm: empty session id")
 	}
-	confirmArgs := map[string]interface{}{
+	confirmArgs := map[string]any{
 		"ubus_rpc_session": sessionID,
 	}
 	if _, err := r.ubus.Call("uci", "confirm", confirmArgs); err != nil {
@@ -99,7 +99,7 @@ func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
 }
 
 func (r *RealUCIApplyConfirm) sessionLogin() (string, error) {
-	args := map[string]interface{}{
+	args := map[string]any{
 		"username": "root",
 		"password": r.password.Get(),
 	}

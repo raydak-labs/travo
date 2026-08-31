@@ -746,7 +746,7 @@ func (s *FailoverService) readTrackerStates() map[string]models.FailoverTracking
 	if err != nil {
 		return states
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "interface ") {
 			continue

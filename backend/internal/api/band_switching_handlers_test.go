@@ -26,7 +26,7 @@ func TestGetBandSwitchingHandler(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestSetBandSwitchingHandler(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"enabled":                   true,
 		"preferred_band":            "5g",
 		"check_interval_sec":        10,
@@ -67,7 +67,7 @@ func TestSetBandSwitchingHandler(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestSetRadioRoleHandler(t *testing.T) {
 		t.Error("expected 500 (service error) or 200, not 404 — route not registered?")
 	}
 	b, _ := io.ReadAll(resp.Body)
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
 		t.Fatalf("expected JSON response, got: %s", b)
 	}
@@ -140,7 +140,7 @@ func TestSetRadioRoleHandler_InvalidRole(t *testing.T) {
 		t.Errorf("expected 500 for invalid role, got %d: %s", resp.StatusCode, b)
 	}
 	b, _ := io.ReadAll(resp.Body)
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(b, &result); err != nil {
 		t.Fatalf("expected JSON: %s", b)
 	}

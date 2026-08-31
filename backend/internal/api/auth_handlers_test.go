@@ -175,7 +175,7 @@ func TestLoginRateLimited(t *testing.T) {
 	app, _ := setupTestApp()
 
 	// Make 5 failed login attempts
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		body, _ := json.Marshal(map[string]string{"password": "wrong"})
 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")

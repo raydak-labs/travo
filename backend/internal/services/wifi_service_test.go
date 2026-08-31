@@ -340,9 +340,9 @@ func TestWifiDisconnectFallsBackToUCI(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	// Register wireless status with no STA interfaces (simulating disabled STA)
-	ub.RegisterResponse("network.wireless.status", map[string]interface{}{
-		"radio0": map[string]interface{}{
-			"interfaces": []interface{}{},
+	ub.RegisterResponse("network.wireless.status", map[string]any{
+		"radio0": map[string]any{
+			"interfaces": []any{},
 		},
 	})
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
@@ -362,9 +362,9 @@ func TestWifiConnectFallsBackToUCI(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	// Register wireless status with no STA interfaces (simulating disabled STA)
-	ub.RegisterResponse("network.wireless.status", map[string]interface{}{
-		"radio0": map[string]interface{}{
-			"interfaces": []interface{}{},
+	ub.RegisterResponse("network.wireless.status", map[string]any{
+		"radio0": map[string]any{
+			"interfaces": []any{},
 		},
 	})
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
@@ -1782,27 +1782,27 @@ func TestEnsureAPRunning_CommitError(t *testing.T) {
 func TestParseIwinfoEncryption(t *testing.T) {
 	cases := []struct {
 		name  string
-		input interface{}
+		input any
 		want  string
 	}{
 		{"nil", nil, "none"},
-		{"empty map disabled", map[string]interface{}{"enabled": false}, "none"},
-		{"wpa2 psk", map[string]interface{}{
+		{"empty map disabled", map[string]any{"enabled": false}, "none"},
+		{"wpa2 psk", map[string]any{
 			"enabled":        true,
-			"wpa":            []interface{}{float64(2)},
-			"authentication": []interface{}{"psk"},
+			"wpa":            []any{float64(2)},
+			"authentication": []any{"psk"},
 		}, "psk2"},
-		{"wpa psk", map[string]interface{}{
+		{"wpa psk", map[string]any{
 			"enabled":        true,
-			"wpa":            []interface{}{float64(1)},
-			"authentication": []interface{}{"psk"},
+			"wpa":            []any{float64(1)},
+			"authentication": []any{"psk"},
 		}, "psk"},
-		{"wpa3 sae", map[string]interface{}{
+		{"wpa3 sae", map[string]any{
 			"enabled":        true,
-			"wpa":            []interface{}{float64(3)},
-			"authentication": []interface{}{"sae"},
+			"wpa":            []any{float64(3)},
+			"authentication": []any{"sae"},
 		}, "sae"},
-		{"wep (no wpa key)", map[string]interface{}{
+		{"wep (no wpa key)", map[string]any{
 			"enabled": true,
 		}, "wep"},
 		{"plain string fallback", "psk2", "psk2"},
@@ -1913,10 +1913,10 @@ func TestGetHealth_WwanBoundToDifferentDevice_ReturnsError(t *testing.T) {
 
 	// STA phy0-sta0 is associated to Hotel-WiFi (mock default iwinfo.info).
 	// Override wwan to claim it lives on phy1-sta0 and has no lease.
-	ub.RegisterResponse("network.interface.wwan.status", map[string]interface{}{
+	ub.RegisterResponse("network.interface.wwan.status", map[string]any{
 		"up":           false,
 		"device":       "phy1-sta0",
-		"ipv4-address": []interface{}{},
+		"ipv4-address": []any{},
 	})
 
 	h, err := svc.GetHealth()
@@ -1937,10 +1937,10 @@ func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
 	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 
 	// wwan points at the same iface as STA but has no lease yet (still negotiating).
-	ub.RegisterResponse("network.interface.wwan.status", map[string]interface{}{
+	ub.RegisterResponse("network.interface.wwan.status", map[string]any{
 		"up":           false,
 		"device":       "phy0-sta0",
-		"ipv4-address": []interface{}{},
+		"ipv4-address": []any{},
 	})
 
 	h, err := svc.GetHealth()
