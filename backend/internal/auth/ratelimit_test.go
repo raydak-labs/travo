@@ -8,13 +8,13 @@ import (
 
 func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 	rl := NewRateLimiter(5, time.Minute)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		rl.Record("192.168.1.1")
 	}
 	// 5 records, but Allow checks BEFORE recording, so 5 records means blocked
 	// Let's test with 4 records instead
 	rl2 := NewRateLimiter(5, time.Minute)
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		rl2.Record("192.168.1.1")
 	}
 	if !rl2.Allow("192.168.1.1") {
@@ -24,7 +24,7 @@ func TestRateLimiter_AllowsUnderLimit(t *testing.T) {
 
 func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 	rl := NewRateLimiter(5, time.Minute)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		rl.Record("192.168.1.1")
 	}
 	if rl.Allow("192.168.1.1") {
@@ -34,7 +34,7 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 
 func TestRateLimiter_ResetClearsAttempts(t *testing.T) {
 	rl := NewRateLimiter(5, time.Minute)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		rl.Record("192.168.1.1")
 	}
 	if rl.Allow("192.168.1.1") {
@@ -48,7 +48,7 @@ func TestRateLimiter_ResetClearsAttempts(t *testing.T) {
 
 func TestRateLimiter_DifferentIPs(t *testing.T) {
 	rl := NewRateLimiter(5, time.Minute)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		rl.Record("192.168.1.1")
 	}
 	if rl.Allow("192.168.1.1") {
@@ -61,7 +61,7 @@ func TestRateLimiter_DifferentIPs(t *testing.T) {
 
 func TestRateLimiter_WindowExpiry(t *testing.T) {
 	rl := NewRateLimiter(5, 50*time.Millisecond)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		rl.Record("192.168.1.1")
 	}
 	if rl.Allow("192.168.1.1") {
@@ -75,7 +75,7 @@ func TestRateLimiter_WindowExpiry(t *testing.T) {
 
 func TestRateLimiter_CleanupSweepsStaleIPs(t *testing.T) {
 	rl := NewRateLimiter(5, 10*time.Millisecond)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		rl.Record(fmt.Sprintf("10.0.0.%d", i))
 	}
 	time.Sleep(20 * time.Millisecond)

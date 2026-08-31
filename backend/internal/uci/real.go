@@ -36,17 +36,17 @@ func validateIdentifier(name, value string) error {
 // Lines in format "config.section.option='value'" are parsed; section type lines are skipped.
 func parseShowOutput(output string) map[string]string {
 	result := make(map[string]string)
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		eqIdx := strings.Index(line, "=")
-		if eqIdx < 0 {
+		before, after, ok := strings.Cut(line, "=")
+		if !ok {
 			continue
 		}
-		key := line[:eqIdx]
-		val := line[eqIdx+1:]
+		key := before
+		val := after
 
 		// Extract option name: key is "config.section.option"
 		parts := strings.SplitN(key, ".", 3)
@@ -209,17 +209,17 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 // parseShowConfigOutput parses `uci show <config>` output into a map of section → options.
 func parseShowConfigOutput(output string) map[string]map[string]string {
 	result := make(map[string]map[string]string)
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		eqIdx := strings.Index(line, "=")
-		if eqIdx < 0 {
+		before, after, ok := strings.Cut(line, "=")
+		if !ok {
 			continue
 		}
-		key := line[:eqIdx]
-		val := line[eqIdx+1:]
+		key := before
+		val := after
 
 		val = strings.TrimPrefix(val, "'")
 		val = strings.TrimSuffix(val, "'")

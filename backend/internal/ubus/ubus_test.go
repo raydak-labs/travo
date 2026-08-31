@@ -26,7 +26,7 @@ func TestMockUbusCallSystemInfo(t *testing.T) {
 	if !ok || uptime != 86400 {
 		t.Errorf("expected uptime 86400, got %v", resp["uptime"])
 	}
-	mem, ok := resp["memory"].(map[string]interface{})
+	mem, ok := resp["memory"].(map[string]any)
 	if !ok {
 		t.Fatal("expected memory map")
 	}
@@ -54,7 +54,7 @@ func TestMockUbusCallIwinfoScan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	results, ok := resp["results"].([]interface{})
+	results, ok := resp["results"].([]any)
 	if !ok {
 		t.Fatal("expected results array")
 	}
@@ -84,7 +84,7 @@ func TestMockUbusCallUnknownPath(t *testing.T) {
 
 func TestMockUbusRegisterResponse(t *testing.T) {
 	m := NewMockUbus()
-	m.RegisterResponse("custom.call", map[string]interface{}{"result": "ok"})
+	m.RegisterResponse("custom.call", map[string]any{"result": "ok"})
 	resp, err := m.Call("custom", "call", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

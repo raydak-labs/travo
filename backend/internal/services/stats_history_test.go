@@ -99,7 +99,7 @@ func TestStatsHistory_RestoreRespectsMaxLen(t *testing.T) {
 	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 
 	s := NewStatsHistoryServiceWithStore(svc, time.Minute, 10, db)
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		s.collect()
 	}
 	s.Flush()

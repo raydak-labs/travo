@@ -51,8 +51,8 @@ func (w *WifiService) ensureSTASectionForScan() (string, error) {
 // parseIwinfoEncryption parses the structured encryption map returned by iwinfo
 // (both from "scan" and "info" responses) into a normalized encryption string
 // (e.g. "psk2", "sae", "wep", "none").
-func parseIwinfoEncryption(encField interface{}) string {
-	encMap, ok := encField.(map[string]interface{})
+func parseIwinfoEncryption(encField any) string {
+	encMap, ok := encField.(map[string]any)
 	if !ok {
 		// Fallback: plain string (e.g. UCI value stored directly).
 		if s, ok := encField.(string); ok && s != "" {
@@ -64,9 +64,9 @@ func parseIwinfoEncryption(encField interface{}) string {
 	if !enabled {
 		return "none"
 	}
-	if wpa, ok := encMap["wpa"].([]interface{}); ok {
+	if wpa, ok := encMap["wpa"].([]any); ok {
 		authStr := ""
-		if auth, ok := encMap["authentication"].([]interface{}); ok && len(auth) > 0 {
+		if auth, ok := encMap["authentication"].([]any); ok && len(auth) > 0 {
 			authStr, _ = auth[0].(string)
 		}
 		wpaVer := 0
@@ -89,7 +89,7 @@ func parseIwinfoEncryption(encField interface{}) string {
 
 // parseScanResultItem builds a WifiScanResult from one iwinfo scan result map.
 // bandOverride (e.g. "2.4GHz", "5GHz") is used when the result has no band; empty means derive from channel/frequency.
-func parseScanResultItem(rm map[string]interface{}, bandOverride string) models.WifiScanResult {
+func parseScanResultItem(rm map[string]any, bandOverride string) models.WifiScanResult {
 	ssid, _ := rm["ssid"].(string)
 	bssid, _ := rm["bssid"].(string)
 	ch, _ := rm["channel"].(float64)
@@ -195,16 +195,16 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 		opts, _ := w.uci.GetAll("wireless", radioName)
 		bandOverride := radioBandToDisplay(opts["band"])
 
-		resp, err := w.ubus.Call("iwinfo", "scan", map[string]interface{}{"device": radioName})
+		resp, err := w.ubus.Call("iwinfo", "scan", map[string]any{"device": radioName})
 		if err != nil {
 			continue
 		}
-		results, ok := resp["results"].([]interface{})
+		results, ok := resp["results"].([]any)
 		if !ok {
 			continue
 		}
 		for _, r := range results {
-			rm, ok := r.(map[string]interface{})
+			rm, ok := r.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -237,7 +237,7 @@ func (w *WifiService) GetSTASignalInfo() (ssid string, signalDBM int, radio stri
 	if err != nil || ifname == "" {
 		return "", 0, "", nil // not connected
 	}
-	resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": ifname})
+	resp, err := w.ubus.Call("iwinfo", "info", map[string]any{"device": ifname})
 	if err != nil {
 		return "", 0, "", err
 	}
@@ -257,15 +257,15 @@ func (w *WifiService) GetSTASignalInfo() (ssid string, signalDBM int, radio stri
 // ScanRadioForSSID scans the given radio and returns the best signal for the target SSID.
 // Returns (0, false, nil) when the SSID is not found on that radio.
 func (w *WifiService) ScanRadioForSSID(radioName, ssid string) (int, bool, error) {
-	resp, err := w.ubus.Call("iwinfo", "scan", map[string]interface{}{"device": radioName})
+	resp, err := w.ubus.Call("iwinfo", "scan", map[string]any{"device": radioName})
 	if err != nil {
 		return 0, false, err
 	}
-	results, _ := resp["results"].([]interface{})
+	results, _ := resp["results"].([]any)
 	bestSignal := -999
 	found := false
 	for _, r := range results {
-		rm, ok := r.(map[string]interface{})
+		rm, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}

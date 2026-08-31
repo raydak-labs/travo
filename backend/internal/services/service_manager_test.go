@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 )
 
@@ -187,13 +188,7 @@ func TestRemoveWithLogStopsRunning(t *testing.T) {
 		t.Error("expected service stopped before removal")
 	}
 	// Should contain a "Stopping" line
-	found := false
-	for _, l := range lines {
-		if l == "Stopping adguardhome..." {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(lines, "Stopping adguardhome...")
 	if !found {
 		t.Error("expected 'Stopping adguardhome...' in log output")
 	}

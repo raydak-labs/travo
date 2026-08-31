@@ -27,7 +27,7 @@ func validateUbusArg(name, value string) error {
 	return nil
 }
 
-func (r *RealUbus) Call(path, method string, args map[string]interface{}) (map[string]interface{}, error) {
+func (r *RealUbus) Call(path, method string, args map[string]any) (map[string]any, error) {
 	if err := validateUbusArg("path", path); err != nil {
 		return nil, err
 	}
@@ -51,10 +51,10 @@ func (r *RealUbus) Call(path, method string, args map[string]interface{}) (map[s
 
 	output := strings.TrimSpace(string(out))
 	if output == "" {
-		return map[string]interface{}{}, nil
+		return map[string]any{}, nil
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		return nil, fmt.Errorf("ubus call %s %s: failed to parse output: %w", path, method, err)
 	}
@@ -65,15 +65,15 @@ func (r *RealUbus) Call(path, method string, args map[string]interface{}) (map[s
 // ExtractSessionID finds ubus_rpc_session in a ubus login response.
 // Handles both top-level and result-array formats returned by different
 // OpenWrt versions.
-func ExtractSessionID(m map[string]interface{}) string {
+func ExtractSessionID(m map[string]any) string {
 	if s, _ := m["ubus_rpc_session"].(string); s != "" {
 		return s
 	}
-	arr, ok := m["result"].([]interface{})
+	arr, ok := m["result"].([]any)
 	if !ok || len(arr) < 2 {
 		return ""
 	}
-	obj, ok := arr[1].(map[string]interface{})
+	obj, ok := arr[1].(map[string]any)
 	if !ok {
 		return ""
 	}

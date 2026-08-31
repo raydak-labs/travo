@@ -93,7 +93,7 @@ func TestTimeSync_SmallSkewNoOp(t *testing.T) {
 		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	_ = json.Unmarshal(body, &data)
 	if synced, _ := data["synced"].(bool); synced {
 		t.Error("expected synced=false for small skew")

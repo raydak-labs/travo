@@ -77,7 +77,7 @@ func (s *SystemService) GetSystemInfo() (models.SystemInfo, error) {
 	kernel, _ := board["kernel"].(string)
 
 	var fwVersion string
-	if release, ok := board["release"].(map[string]interface{}); ok {
+	if release, ok := board["release"].(map[string]any); ok {
 		fwVersion, _ = release["version"].(string)
 	}
 
@@ -105,7 +105,7 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 	var stats models.SystemStats
 
 	// Memory
-	if mem, ok := info["memory"].(map[string]interface{}); ok {
+	if mem, ok := info["memory"].(map[string]any); ok {
 		total, _ := mem["total"].(float64)
 		free, _ := mem["free"].(float64)
 		cached, _ := mem["cached"].(float64)
@@ -124,7 +124,7 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 
 	// CPU / Load
 	cores := runtime.NumCPU()
-	if load, ok := info["load"].([]interface{}); ok && len(load) >= 3 {
+	if load, ok := info["load"].([]any); ok && len(load) >= 3 {
 		l1, _ := load[0].(float64)
 		l5, _ := load[1].(float64)
 		l15, _ := load[2].(float64)
@@ -375,7 +375,7 @@ func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 		return models.LEDSchedule{}
 	}
 	schedule := models.LEDSchedule{}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if !strings.Contains(line, ledCronTag) {
 			continue
 		}
@@ -400,7 +400,7 @@ func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 	data, _ := os.ReadFile("/etc/crontabs/root")
 	var lines []string
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if line == "" || strings.Contains(line, ledCronTag) {
 			continue
 		}
@@ -683,11 +683,11 @@ func extractJSONString(s string) string {
 		return ""
 	}
 	s = s[start+1:]
-	end := strings.Index(s, `"`)
-	if end < 0 {
+	before, _, ok := strings.Cut(s, `"`)
+	if !ok {
 		return ""
 	}
-	return s[:end]
+	return before
 }
 
 func buildButtonHotplugScript(buttons []models.HardwareButton) string {
@@ -883,7 +883,7 @@ func (s *SystemService) RunSpeedTest() (models.SpeedTestResult, error) {
 	// Measure ping to 8.8.8.8
 	pingOut, err2 := execx.CombinedOutput(execx.Quick, "ping", "-c", "4", "-W", "3", "8.8.8.8")
 	if err2 == nil {
-		for _, line := range strings.Split(string(pingOut), "\n") {
+		for line := range strings.SplitSeq(string(pingOut), "\n") {
 			if strings.Contains(line, "avg") {
 				// "round-trip min/avg/max = X/Y/Z ms"
 				parts := strings.Split(line, "/")

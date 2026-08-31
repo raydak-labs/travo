@@ -14,10 +14,10 @@ func TestSetWireguard_InvalidPrivateKey_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"private_key": "not-a-valid-key",
 		"address":     "10.0.0.2/32",
-		"peers":       []interface{}{},
+		"peers":       []any{},
 	})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/vpn/wireguard", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -37,10 +37,10 @@ func TestSetWireguard_InvalidEndpoint_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"private_key": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
 		"address":     "10.0.0.2/32",
-		"peers": []map[string]interface{}{
+		"peers": []map[string]any{
 			{
 				"public_key":  "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
 				"endpoint":    "no-port",
@@ -66,10 +66,10 @@ func TestSetWireguard_InvalidAllowedIPs_Returns400(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"private_key": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
 		"address":     "10.0.0.2/32",
-		"peers": []map[string]interface{}{
+		"peers": []map[string]any{
 			{
 				"public_key":  "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
 				"endpoint":    "vpn.example.com:51820",
@@ -95,11 +95,11 @@ func TestSetWireguard_ValidConfig_Returns200(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"private_key": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
 		"address":     "10.0.0.2/32",
 		"dns":         []string{"1.1.1.1"},
-		"peers": []map[string]interface{}{
+		"peers": []map[string]any{
 			{
 				"public_key":  "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=",
 				"endpoint":    "vpn.example.com:51820",
@@ -137,7 +137,7 @@ func TestGetWireguardStatus_Returns200(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestGetWireguardStatus_Returns200(t *testing.T) {
 	if result["public_key"] != "PUB_KEY" {
 		t.Errorf("expected public key PUB_KEY, got %v", result["public_key"])
 	}
-	peers, ok := result["peers"].([]interface{})
+	peers, ok := result["peers"].([]any)
 	if !ok || len(peers) != 1 {
 		t.Errorf("expected 1 peer, got %v", result["peers"])
 	}
@@ -199,7 +199,7 @@ func TestToggleWireguard_EnabledField_TogglesOn(t *testing.T) {
 		b, _ := io.ReadAll(resp2.Body)
 		t.Fatalf("expected 200, got %d, body: %s", resp2.StatusCode, b)
 	}
-	var statuses []map[string]interface{}
+	var statuses []map[string]any
 	if err := json.NewDecoder(resp2.Body).Decode(&statuses); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
 		b, _ := io.ReadAll(resp2.Body)
 		t.Fatalf("expected 200, got %d, body: %s", resp2.StatusCode, b)
 	}
-	var statuses []map[string]interface{}
+	var statuses []map[string]any
 	if err := json.NewDecoder(resp2.Body).Decode(&statuses); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestGetKillSwitch_Returns200(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -407,7 +407,7 @@ func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
 	req2.Header.Set("Authorization", "Bearer "+token)
 	resp2, _ := app.Test(req2, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	defer resp2.Body.Close()
-	var result map[string]interface{}
+	var result map[string]any
 	_ = json.NewDecoder(resp2.Body).Decode(&result)
 	if result["enabled"] != true {
 		t.Errorf("expected enabled=true after setting, got %v", result["enabled"])

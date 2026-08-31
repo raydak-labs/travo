@@ -138,7 +138,7 @@ func (v *VpnService) setWireGuardAddresses(address string) error {
 	if addr == "" {
 		return nil
 	}
-	for _, part := range strings.Split(addr, ",") {
+	for part := range strings.SplitSeq(addr, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
@@ -180,7 +180,7 @@ func (v *VpnService) applyWireGuardPeerParsed(section string, peer WireguardPars
 	if allowed == "" {
 		allowed = "0.0.0.0/0,::/0"
 	}
-	for _, cidr := range strings.Split(allowed, ",") {
+	for cidr := range strings.SplitSeq(allowed, ",") {
 		cidr = strings.TrimSpace(cidr)
 		if cidr == "" {
 			continue
@@ -249,7 +249,7 @@ func (v *VpnService) wireGuardRuntimeUp() bool {
 func (v *VpnService) applyAndVerifyWireGuard() error {
 	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 	time.Sleep(wireGuardReloadSettle)
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := range 3 {
 		if attempt > 0 {
 			time.Sleep(wireGuardRetrySettle)
 			_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
@@ -290,19 +290,19 @@ func (v *VpnService) uplinksFromUbusDump() []string {
 		return nil
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil
 	}
 
-	ifaces, ok := raw["interface"].([]interface{})
+	ifaces, ok := raw["interface"].([]any)
 	if !ok {
 		return nil
 	}
 
 	var res []string
 	for _, v := range ifaces {
-		m, ok := v.(map[string]interface{})
+		m, ok := v.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -314,13 +314,13 @@ func (v *VpnService) uplinksFromUbusDump() []string {
 		if !up {
 			continue
 		}
-		routes, ok := m["route"].([]interface{})
+		routes, ok := m["route"].([]any)
 		if !ok {
 			continue
 		}
 		hasDefault := false
 		for _, r := range routes {
-			rm, ok := r.(map[string]interface{})
+			rm, ok := r.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -446,8 +446,8 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	if err == nil {
 		// WireGuard is configured
 		disabled := opts["disabled"]
-		wgStatus := models.VpnStatus{Type: "wireguard"}
-		wgStatus.Enabled = disabled != "1"
+		wgStatus := models.VpnStatus{Type: "wireguard",
+			Enabled: disabled != "1"}
 		wgStatus.StatusDetail = v.wgRuntimeState(wgStatus.Enabled)
 		wgStatus.Connected = wgStatus.StatusDetail == "connected"
 		if wgStatus.Enabled {
@@ -701,7 +701,7 @@ func splitWireGuardDNSOption(dns string) []string {
 	}
 	dns = strings.ReplaceAll(dns, ",", " ")
 	var out []string
-	for _, s := range strings.Fields(dns) {
+	for s := range strings.FieldsSeq(dns) {
 		s = strings.TrimSpace(s)
 		if s != "" {
 			out = append(out, s)
@@ -992,7 +992,7 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 	out, _ := v.cmd.Run(tailscaleBin(), args...)
 	combined := strings.TrimSpace(string(out))
 	// Extract URL from output like "To authenticate, visit:\n\thttps://login.tailscale.com/..."
-	for _, line := range strings.Split(combined, "\n") {
+	for line := range strings.SplitSeq(combined, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "https://login.tailscale.com") || strings.HasPrefix(line, "https://tailscale.com") {
 			return line, nil
@@ -1243,13 +1243,13 @@ func (v *VpnService) wireGuardIPv4Address() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 		fields := strings.Fields(line)
-		for i := 0; i < len(fields); i++ {
+		for i := range fields {
 			if fields[i] == "inet" && i+1 < len(fields) {
 				addr := fields[i+1]
 				if j := strings.Index(addr, "/"); j > 0 {
@@ -1299,7 +1299,7 @@ func (v *VpnService) RunWireGuardSpeedTest() (models.SpeedTestResult, error) {
 
 	pingOut, perr := v.cmd.Run("ping", "-I", "wg0", "-c", "4", "-W", "3", "8.8.8.8")
 	if perr == nil {
-		for _, line := range strings.Split(string(pingOut), "\n") {
+		for line := range strings.SplitSeq(string(pingOut), "\n") {
 			if strings.Contains(line, "avg") {
 				parts := strings.Split(line, "/")
 				if len(parts) >= 5 {
@@ -1417,10 +1417,10 @@ func readResolvConfNameserversFromPath(path string) []string {
 		return nil
 	}
 	var servers []string
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "nameserver ") {
-			ns := strings.TrimSpace(strings.TrimPrefix(line, "nameserver "))
+		if after, ok := strings.CutPrefix(line, "nameserver "); ok {
+			ns := strings.TrimSpace(after)
 			if ns != "" {
 				servers = append(servers, ns)
 			}

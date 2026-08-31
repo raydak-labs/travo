@@ -210,8 +210,8 @@ func (s *AdGuardService) Version() string {
 		return ""
 	}
 	// Output looks like "AdGuard Home, version v0.107.54"
-	if idx := strings.Index(out, "version "); idx >= 0 {
-		return strings.TrimSpace(out[idx+len("version "):])
+	if _, after, ok := strings.Cut(out, "version "); ok {
+		return strings.TrimSpace(after)
 	}
 	return out
 }
@@ -495,15 +495,15 @@ func (s *AdGuardService) SetPassword(username, password string) error {
 	}
 
 	// Unmarshal into a generic map so all unrecognised keys are preserved.
-	var doc map[string]interface{}
+	var doc map[string]any
 	if err := yaml.Unmarshal([]byte(configStr), &doc); err != nil {
 		return fmt.Errorf("parsing AdGuard config: %w", err)
 	}
 
-	users, _ := doc["users"].([]interface{})
+	users, _ := doc["users"].([]any)
 	updated := false
 	for _, u := range users {
-		m, ok := u.(map[string]interface{})
+		m, ok := u.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -515,7 +515,7 @@ func (s *AdGuardService) SetPassword(username, password string) error {
 	}
 	if !updated {
 		// User not found — append a new entry.
-		users = append(users, map[string]interface{}{
+		users = append(users, map[string]any{
 			"name":     username,
 			"password": string(hash),
 		})

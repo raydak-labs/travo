@@ -1,9 +1,18 @@
 .PHONY: dev build test lint format clean build-prod build-all package package-all deploy docker-dev install
 
+# Run a command through mise's resolved toolchain (go, node, pnpm, golangci-lint),
+# so recipes are correct regardless of the caller shell's PATH/GOROOT/etc.
+MISE := $(shell command -v mise 2>/dev/null)
+ifneq (,$(MISE))
+RUN := $(MISE) exec --
+else
+RUN :=
+endif
+
 # Install all dependencies (run once after cloning or after dep changes)
 install:
-	pnpm install
-	cd backend && go mod download
+	$(RUN) pnpm install
+	cd backend && $(RUN) go mod download
 
 # Run frontend and backend dev servers concurrently
 dev:
@@ -11,24 +20,24 @@ dev:
 
 # Build frontend and backend
 build:
-	cd frontend && pnpm build
-	cd backend && CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/server ./cmd/server
+	cd frontend && $(RUN) pnpm build
+	cd backend && CGO_ENABLED=0 $(RUN) go build -ldflags="-s -w" -o bin/server ./cmd/server
 
 # Run all tests (Go + Vitest)
 test:
-	cd backend && go test ./...
-	cd shared && pnpm test
-	cd frontend && pnpm test
+	cd backend && $(RUN) go test ./...
+	cd shared && $(RUN) pnpm test
+	cd frontend && $(RUN) pnpm test
 
 # Lint all code
 lint:
-	pnpm lint
-	cd backend && golangci-lint run ./...
+	$(RUN) pnpm lint
+	cd backend && $(RUN) golangci-lint run ./...
 
 # Format all code
 format:
-	pnpm format
-	cd backend && goimports -w .
+	$(RUN) pnpm format
+	cd backend && $(RUN) goimports -w .
 
 # Cross-compile production binary for OpenWRT (aarch64)
 build-prod:

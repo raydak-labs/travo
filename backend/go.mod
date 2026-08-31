@@ -1,6 +1,6 @@
 module github.com/openwrt-travel-gui/backend
 
-go 1.25.0
+go 1.27.0
 
 require (
 	github.com/gofiber/contrib/v3/websocket v1.2.3

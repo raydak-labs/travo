@@ -214,7 +214,7 @@ func TestAlertService_MaxAlerts(t *testing.T) {
 	svc := NewAlertService(checker)
 
 	// Manually fill with more than max alerts
-	for i := 0; i < 60; i++ {
+	for range 60 {
 		svc.alerts = append(svc.alerts, models.Alert{
 			ID:      "test",
 			Type:    "test",

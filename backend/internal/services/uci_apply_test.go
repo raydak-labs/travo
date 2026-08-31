@@ -10,16 +10,16 @@ import (
 func TestExtractSessionID(t *testing.T) {
 	tests := []struct {
 		name string
-		m    map[string]interface{}
+		m    map[string]any
 		want string
 	}{
-		{"top-level", map[string]interface{}{"ubus_rpc_session": "abc123"}, "abc123"},
-		{"empty", map[string]interface{}{}, ""},
-		{"result-array", map[string]interface{}{
-			"result": []interface{}{0, map[string]interface{}{"ubus_rpc_session": "sid456"}},
+		{"top-level", map[string]any{"ubus_rpc_session": "abc123"}, "abc123"},
+		{"empty", map[string]any{}, ""},
+		{"result-array", map[string]any{
+			"result": []any{0, map[string]any{"ubus_rpc_session": "sid456"}},
 		}, "sid456"},
-		{"result-array-no-second", map[string]interface{}{
-			"result": []interface{}{0},
+		{"result-array-no-second", map[string]any{
+			"result": []any{0},
 		}, ""},
 	}
 	for _, tt := range tests {

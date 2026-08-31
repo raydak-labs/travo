@@ -4,6 +4,7 @@ min_version = "2024.1.0"
   # Go toolchain
   go = "1.27.0"
   golangci-lint = "2.13.2"
+  "go:golang.org/x/tools/cmd/goimports" = "v0.49.0"
 
   # Node.js + JS tooling
   node = "26.8.1" # or "lts" / "latest"

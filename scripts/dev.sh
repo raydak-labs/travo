@@ -20,6 +20,9 @@
 #
 set -euo pipefail
 
+# Force mise-managed toolchain versions, regardless of caller's PATH order.
+command -v mise >/dev/null 2>&1 && eval "$(mise env -s bash)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

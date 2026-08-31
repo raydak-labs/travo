@@ -11,9 +11,9 @@ const (
 	DefaultAPSSID    = "OpenWrt-Travel"    // 2.4 GHz default AP SSID
 	DefaultAPSSID5G  = "OpenWrt-Travel-5G" // 5 GHz default AP SSID (separate so clients can choose band)
 	DefaultAPKey     = "travelrouter"      // default WPA key for AP when encryption is set but key missing
-	DefaultCountry   = "US"               // default regulatory country for wifi-device
-	DefaultChannel   = "auto"             // default channel (auto selection)
-	Default5GChannel = "36"               // safe non-DFS 5 GHz fallback used when channel is missing or out of the standard range (> 165)
+	DefaultCountry   = "US"                // default regulatory country for wifi-device
+	DefaultChannel   = "auto"              // default channel (auto selection)
+	Default5GChannel = "36"                // safe non-DFS 5 GHz fallback used when channel is missing or out of the standard range (> 165)
 )
 
 // EnsureAPRunning checks wireless config and applies safe defaults:

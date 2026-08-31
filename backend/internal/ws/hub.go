@@ -144,7 +144,7 @@ func (h *Hub) broadcastStats() {
 	if err != nil {
 		return
 	}
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type": "system_stats",
 		"data": stats,
 	}
@@ -159,7 +159,7 @@ func (h *Hub) broadcastNetworkStatus(ns models.NetworkStatus) {
 	if h.ClientCount() == 0 {
 		return
 	}
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type": "network_status",
 		"data": ns,
 	}
@@ -171,7 +171,7 @@ func (h *Hub) broadcastNetworkStatus(ns models.NetworkStatus) {
 }
 
 func (h *Hub) broadcastAlert(alert models.Alert) {
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type": "alert",
 		"data": alert,
 	}

@@ -296,7 +296,7 @@ func parseDHCPLeasesFile() map[string]dhcpLease {
 	if err != nil {
 		return result
 	}
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue
@@ -323,7 +323,7 @@ func parseEtcHosts() map[string]string {
 	if err != nil {
 		return result
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -396,12 +396,12 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 
 	// 3a. Try ubus dhcp ipv4leases (works on some builds).
 	if data, err := n.ubus.Call("dhcp", "ipv4leases", nil); err == nil {
-		if device, ok := data["device"].(map[string]interface{}); ok {
+		if device, ok := data["device"].(map[string]any); ok {
 			for ifaceName, ifaceData := range device {
-				ifaceMap, _ := ifaceData.(map[string]interface{})
-				leases, _ := ifaceMap["leases"].([]interface{})
+				ifaceMap, _ := ifaceData.(map[string]any)
+				leases, _ := ifaceMap["leases"].([]any)
 				for _, raw := range leases {
-					lm, _ := raw.(map[string]interface{})
+					lm, _ := raw.(map[string]any)
 					ip, _ := lm["ip"].(string)
 					mac := strings.ToUpper(fmt.Sprintf("%v", lm["mac"]))
 					hostname, _ := lm["hostname"].(string)
@@ -507,7 +507,7 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 func parseStationDump(output string) map[string][2]int64 {
 	result := make(map[string][2]int64)
 	var currentMAC string
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "Station ") {
 			parts := strings.Fields(trimmed)
@@ -519,15 +519,15 @@ func parseStationDump(output string) map[string][2]int64 {
 		if currentMAC == "" {
 			continue
 		}
-		if strings.HasPrefix(trimmed, "rx bytes:") {
-			valStr := strings.TrimSpace(strings.TrimPrefix(trimmed, "rx bytes:"))
+		if after, ok := strings.CutPrefix(trimmed, "rx bytes:"); ok {
+			valStr := strings.TrimSpace(after)
 			if v, err := strconv.ParseInt(valStr, 10, 64); err == nil {
 				entry := result[currentMAC]
 				entry[1] = v // AP rx from client = client TX
 				result[currentMAC] = entry
 			}
-		} else if strings.HasPrefix(trimmed, "tx bytes:") {
-			valStr := strings.TrimSpace(strings.TrimPrefix(trimmed, "tx bytes:"))
+		} else if after, ok := strings.CutPrefix(trimmed, "tx bytes:"); ok {
+			valStr := strings.TrimSpace(after)
 			if v, err := strconv.ParseInt(valStr, 10, 64); err == nil {
 				entry := result[currentMAC]
 				entry[0] = v // AP tx to client = client RX
@@ -542,10 +542,10 @@ func parseStationDump(output string) map[string][2]int64 {
 func parseIwDev(output string) []string {
 	var interfaces []string
 	var currentIface string
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "Interface ") {
-			currentIface = strings.TrimPrefix(trimmed, "Interface ")
+		if after, ok := strings.CutPrefix(trimmed, "Interface "); ok {
+			currentIface = after
 		} else if strings.HasPrefix(trimmed, "type ") && currentIface != "" {
 			if strings.TrimPrefix(trimmed, "type ") == "AP" {
 				interfaces = append(interfaces, currentIface)
@@ -587,7 +587,7 @@ func (n *NetworkService) getWifiClientStats() map[string]wifiClientStat {
 	return result
 }
 
-func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ubus) models.NetworkInterface {
+func parseInterface(name, device string, data map[string]any, ub ubus.Ubus) models.NetworkInterface {
 	iface := models.NetworkInterface{
 		Name: name, Type: name,
 	}
@@ -605,11 +605,11 @@ func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ub
 
 	// Fetch device stats for MAC and traffic
 	if ub != nil && devName != "" {
-		if devData, err := ub.Call("network.device", "status", map[string]interface{}{"name": devName}); err == nil {
+		if devData, err := ub.Call("network.device", "status", map[string]any{"name": devName}); err == nil {
 			if mac, ok := devData["macaddr"].(string); ok && mac != "" {
 				iface.MACAddress = mac
 			}
-			if stats, ok := devData["statistics"].(map[string]interface{}); ok {
+			if stats, ok := devData["statistics"].(map[string]any); ok {
 				if rxBytes, ok := stats["rx_bytes"].(float64); ok {
 					iface.RxBytes = int64(rxBytes)
 				}
@@ -620,17 +620,17 @@ func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ub
 		}
 	}
 
-	if addrs, ok := data["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
-		if a, ok := addrs[0].(map[string]interface{}); ok {
+	if addrs, ok := data["ipv4-address"].([]any); ok && len(addrs) > 0 {
+		if a, ok := addrs[0].(map[string]any); ok {
 			iface.IPAddress, _ = a["address"].(string)
 			if mask, ok := a["mask"].(float64); ok {
 				iface.Netmask = maskToNetmask(mask)
 			}
 		}
 	}
-	if routes, ok := data["route"].([]interface{}); ok {
+	if routes, ok := data["route"].([]any); ok {
 		for _, r := range routes {
-			if rm, ok := r.(map[string]interface{}); ok {
+			if rm, ok := r.(map[string]any); ok {
 				if gw, ok := rm["nexthop"].(string); ok && gw != "" {
 					iface.Gateway = gw
 					break
@@ -638,7 +638,7 @@ func parseInterface(name, device string, data map[string]interface{}, ub ubus.Ub
 			}
 		}
 	}
-	if dns, ok := data["dns-server"].([]interface{}); ok {
+	if dns, ok := data["dns-server"].([]any); ok {
 		iface.DNSServers = make([]string, 0, len(dns))
 		for _, d := range dns {
 			if s, ok := d.(string); ok {
@@ -942,7 +942,7 @@ func (n *NetworkService) DeleteDHCPReservation(section string) error {
 // Each line has the format: <expiry_epoch> <mac_address> <ip_address> <hostname> <client_id>
 func parseDHCPLeases(data string) []models.DHCPLease {
 	var leases []models.DHCPLease
-	for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(data), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue
@@ -1327,7 +1327,7 @@ func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
 	}
 	out, err := n.cmd.Run("ip", "-6", "addr", "show", "scope", "global")
 	if err == nil {
-		for _, line := range strings.Split(string(out), "\n") {
+		for line := range strings.SplitSeq(string(out), "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "inet6 ") {
 				parts := strings.Fields(line)
@@ -1402,7 +1402,7 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 	}
 
 	// Parse the ubus response to find matching interfaces
-	interfaces, ok := ifaceDump["interface"].([]interface{})
+	interfaces, ok := ifaceDump["interface"].([]any)
 	if !ok {
 		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
 	}
@@ -1419,7 +1419,7 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 
 	// Extract interface information
 	for _, ifaceRaw := range interfaces {
-		ifaceMap, ok := ifaceRaw.(map[string]interface{})
+		ifaceMap, ok := ifaceRaw.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -1454,9 +1454,9 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		}
 
 		// Extract IPv4 addresses with netmasks
-		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]interface{}); ok {
+		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]any); ok {
 			for _, addrRaw := range ipv4Addrs {
-				if addrMap, ok := addrRaw.(map[string]interface{}); ok {
+				if addrMap, ok := addrRaw.(map[string]any); ok {
 					if addrStr, ok := addrMap["address"].(string); ok {
 						// Parse address with netmask
 						if addr, err := netip.ParseAddr(addrStr); err == nil {
@@ -1468,9 +1468,9 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		}
 
 		// Also extract IPv4 prefix data if available (includes netmask)
-		if ipv4Prefixes, ok := ifaceMap["ipv4-prefix"].([]interface{}); ok {
+		if ipv4Prefixes, ok := ifaceMap["ipv4-prefix"].([]any); ok {
 			for _, prefixRaw := range ipv4Prefixes {
-				if prefixMap, ok := prefixRaw.(map[string]interface{}); ok {
+				if prefixMap, ok := prefixRaw.(map[string]any); ok {
 					if prefixStr, ok := prefixMap["address"].(string); ok {
 						if prefix, err := netip.ParsePrefix(prefixStr); err == nil {
 							info.ipv4Addrs = append(info.ipv4Addrs, prefix)

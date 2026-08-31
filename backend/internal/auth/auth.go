@@ -129,7 +129,7 @@ func newJTI() string {
 }
 
 func (a *AuthService) tryUbusLogin(password string) error {
-	resp, err := a.ubus.Call("session", "login", map[string]interface{}{
+	resp, err := a.ubus.Call("session", "login", map[string]any{
 		"username": "root",
 		"password": password,
 	})
@@ -170,7 +170,7 @@ func (a *AuthService) verifyWithUbus(password string) error {
 // registry (monotonic clock) or the exp fallback in validateLifetime.
 func (a *AuthService) parseSignedClaims(tokenStr string) (jwt.MapClaims, error) {
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-	token, err := parser.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+	token, err := parser.Parse(tokenStr, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
@@ -259,7 +259,7 @@ func (a *AuthService) RevokeSession(tokenStr string) {
 
 // TokenExpiry parses a JWT token and returns its expiration time.
 func (a *AuthService) TokenExpiry(tokenStr string) (time.Time, error) {
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
@@ -288,7 +288,7 @@ func (a *AuthService) ChangePassword(currentPassword, newPassword string) error 
 		if len(newPassword) < 6 {
 			return errors.New("new password must be at least 6 characters")
 		}
-		_, err := a.ubus.Call("luci", "setPassword", map[string]interface{}{
+		_, err := a.ubus.Call("luci", "setPassword", map[string]any{
 			"username": "root",
 			"password": newPassword,
 		})

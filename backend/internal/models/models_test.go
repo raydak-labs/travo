@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-func floatPtr(f float64) *float64 {
-	return &f
-}
-
 func TestSystemInfoJSON(t *testing.T) {
 	original := SystemInfo{
 		Hostname:        "OpenWrt",
@@ -23,7 +19,7 @@ func TestSystemInfoJSON(t *testing.T) {
 		t.Fatalf("failed to marshal SystemInfo: %v", err)
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal to map: %v", err)
 	}
@@ -47,7 +43,7 @@ func TestSystemStatsJSON(t *testing.T) {
 		CPU: CpuStats{
 			UsagePercent:       45.2,
 			Cores:              4,
-			TemperatureCelsius: floatPtr(55.0),
+			TemperatureCelsius: new(55.0),
 			LoadAverage:        [3]float64{0.5, 0.8, 1.2},
 		},
 		Memory: MemoryStats{
@@ -116,7 +112,7 @@ func TestNetworkStatusJSON(t *testing.T) {
 		t.Fatalf("failed to marshal NetworkStatus: %v", err)
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal to map: %v", err)
 	}
@@ -176,7 +172,7 @@ func TestServiceInfoJSON(t *testing.T) {
 		t.Fatalf("failed to marshal ServiceInfo: %v", err)
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal to map: %v", err)
 	}
@@ -231,7 +227,7 @@ func TestLoginResponseJSON(t *testing.T) {
 		t.Fatalf("failed to marshal LoginResponse: %v", err)
 	}
 
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal to map: %v", err)
 	}

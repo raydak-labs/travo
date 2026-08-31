@@ -27,7 +27,7 @@ func TestSystemInfoEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestSystemStatsEndpoint(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestGetNTPConfig(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestGetSetupComplete(t *testing.T) {
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(body, &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}

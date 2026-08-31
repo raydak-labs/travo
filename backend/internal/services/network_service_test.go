@@ -26,7 +26,7 @@ func TestGetConnectionMethod(t *testing.T) {
 	tests := []struct {
 		name           string
 		clientIP       string
-		ubusResponse   map[string]interface{}
+		ubusResponse   map[string]any
 		expectedMethod string
 		expectError    bool
 	}{
@@ -69,7 +69,7 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "malformed ubus interface",
 			clientIP: "192.168.1.100",
-			ubusResponse: map[string]interface{}{
+			ubusResponse: map[string]any{
 				"interface": "not-a-map",
 			},
 			expectedMethod: "unknown",
@@ -78,14 +78,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "wwan interface matches WiFi client",
 			clientIP: "192.168.20.100",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "wwan0",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.20.0/24",
 							},
 						},
@@ -98,14 +98,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "phySTA device matches WiFi client",
 			clientIP: "192.168.30.50",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"device":    "phy0-sta",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.30.0/24",
 							},
 						},
@@ -118,14 +118,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "br-lan interface matches WiFi AP",
 			clientIP: "192.168.1.200",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.1.0/24",
 							},
 						},
@@ -138,14 +138,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "lan interface matches WiFi AP",
 			clientIP: "192.168.2.50",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "lan",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.2.0/24",
 							},
 						},
@@ -158,14 +158,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "eth0 matches Ethernet",
 			clientIP: "10.0.0.5",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "10.0.0.0/8",
 							},
 						},
@@ -178,14 +178,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "eth1 device matches Ethernet",
 			clientIP: "172.16.0.10",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth1",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "172.16.0.0/12",
 							},
 						},
@@ -198,14 +198,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "unknown interface returns unknown connection",
 			clientIP: "192.168.100.50",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "some-unknown",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.100.0/24",
 							},
 						},
@@ -218,14 +218,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "interface down not matched",
 			clientIP: "192.168.1.50",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": false,
 						"up":        false,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.1.0/24",
 							},
 						},
@@ -238,14 +238,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "no matching interface returns unknown",
 			clientIP: "8.8.8.8",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.1.0/24",
 							},
 						},
@@ -258,14 +258,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "/23 subnet matching",
 			clientIP: "192.168.0.100",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "192.168.0.0/23",
 							},
 						},
@@ -278,14 +278,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "/16 subnet matching",
 			clientIP: "10.0.210.20",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "10.0.0.0/16",
 							},
 						},
@@ -298,14 +298,14 @@ func TestGetConnectionMethod(t *testing.T) {
 		{
 			name:     "/19 subnet matching",
 			clientIP: "172.16.10.5",
-			ubusResponse: map[string]interface{}{
-				"interface": []interface{}{
-					map[string]interface{}{
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []interface{}{
-							map[string]interface{}{
+						"ipv4-prefix": []any{
+							map[string]any{
 								"address": "172.16.0.0/19",
 							},
 						},
@@ -445,8 +445,8 @@ func TestGetNetworkStatus_NoDHCP_EmptyClients(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	// Override DHCP response with empty data
-	ub.RegisterResponse("dhcp.ipv4leases", map[string]interface{}{
-		"device": map[string]interface{}{},
+	ub.RegisterResponse("dhcp.ipv4leases", map[string]any{
+		"device": map[string]any{},
 	})
 	svc := NewNetworkService(u, ub)
 

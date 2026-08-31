@@ -367,7 +367,7 @@ func (w *WifiService) GetHealth() (models.WifiHealth, error) {
 	var staSSID string
 	staAssociated := false
 	if staIfname != "" {
-		if resp, err := w.ubus.Call("iwinfo", "info", map[string]interface{}{"device": staIfname}); err == nil {
+		if resp, err := w.ubus.Call("iwinfo", "info", map[string]any{"device": staIfname}); err == nil {
 			staSSID, _ = resp["ssid"].(string)
 			staAssociated = staSSID != ""
 		}
@@ -391,8 +391,8 @@ func (w *WifiService) GetHealth() (models.WifiHealth, error) {
 		} else if d, _ := data["l3_device"].(string); d != "" {
 			wwanDevice = d
 		}
-		if addrs, ok := data["ipv4-address"].([]interface{}); ok && len(addrs) > 0 {
-			if a, ok := addrs[0].(map[string]interface{}); ok {
+		if addrs, ok := data["ipv4-address"].([]any); ok && len(addrs) > 0 {
+			if a, ok := addrs[0].(map[string]any); ok {
 				wwanIP, _ = a["address"].(string)
 			}
 		}

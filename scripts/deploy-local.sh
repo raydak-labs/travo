@@ -27,6 +27,9 @@
 #
 set -euo pipefail
 
+# Force mise-managed toolchain versions, regardless of caller's PATH order.
+command -v mise >/dev/null 2>&1 && eval "$(mise env -s bash)"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 

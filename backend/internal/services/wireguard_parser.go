@@ -43,8 +43,8 @@ func ParseWireguardConfig(confContent string) (*WireguardParsedConfig, error) {
 	var currentPeer *WireguardParsedPeer
 	foundInterface := false
 
-	lines := strings.Split(confContent, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(confContent, "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 
 		// Skip empty lines and comments
@@ -157,8 +157,8 @@ func SplitWireGuardEndpoint(endpoint string) (host, port string) {
 		if closeIdx > 1 {
 			host = endpoint[1:closeIdx]
 			rest := strings.TrimSpace(endpoint[closeIdx+1:])
-			if strings.HasPrefix(rest, ":") {
-				port = strings.TrimPrefix(rest, ":")
+			if after, ok := strings.CutPrefix(rest, ":"); ok {
+				port = after
 			}
 			if port == "" {
 				port = defaultPort
