@@ -2,13 +2,13 @@ min_version = "2024.1.0"
 
 [tools]
   # Go toolchain
-  go = "1.26.6"
-  golangci-lint = "2.12.2"
+  go = "1.27.0"
+  golangci-lint = "2.13.2"
 
   # Node.js + JS tooling
-  node = "26.7.0" # or "lts" / "latest"
+  node = "26.8.1" # or "lts" / "latest"
   #bun = "latest"
-  pnpm = "11.21.0"
+  pnpm = "11.24.0"
 
   # Python
   python = "3.14.7"
