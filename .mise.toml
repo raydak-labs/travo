@@ -2,7 +2,7 @@ min_version = "2024.1.0"
 
 [tools]
   # Go toolchain
-  go = "1.27.0"
+  go = "1.27.1"
   golangci-lint = "2.13.2"
   "go:golang.org/x/tools/cmd/goimports" = "v0.49.0"
 
