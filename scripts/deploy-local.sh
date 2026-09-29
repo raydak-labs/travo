@@ -41,7 +41,6 @@ DO_BUILD=true
 DO_RESTART=true
 RESTART_ONLY=false
 BINARY_ONLY=false
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}→${NC} $*"; }
@@ -101,6 +100,16 @@ scp_cmd() {
 }
 
 ssh_cmd() { ssh $SSH_OPTS "${REMOTE}" "$@"; }
+
+# Host-key verification is on by default. Set TRAVO_INSECURE_SSH=1 only for a
+# throwaway lab router whose key changes on every flash; silently skipping
+# verification would let a MITM capture the root SSH session this script uses.
+if [[ "${TRAVO_INSECURE_SSH:-0}" == "1" ]]; then
+  SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+  warn "TRAVO_INSECURE_SSH=1: host-key verification disabled for this deploy"
+else
+  SSH_OPTS="-o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ConnectTimeout=5"
+fi
 
 check_connectivity() {
   info "Checking SSH ${REMOTE}..."
@@ -172,7 +181,28 @@ deploy_release() {
 }
 
 restart_service() {
-  ssh_cmd "rm -f /etc/travo/ap-health-in-progress /etc/travo/autoreconnect-crash-guard" || true
+  # Clear the crash guards the Go code actually writes (the authoritative list
+  # lives in docs/adr/0003 section 2). The old list removed ap-health-in-progress,
+  # which no Go code writes, and missed the failover / band-switch / captive
+  # guards -- a stuck guard permanently disables those features, so the
+  # documented recovery path (architecture.md section 4, step 4) did not exist
+  # for them.
+  info "Clearing crash guards..."
+  # autoreconnect-failcount is intentionally NOT cleared: it is the bounded
+  # retry counter that stops a broken saved network being replayed every
+  # minute. A successful reconnect clears it on the device.
+  for guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
+    captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
+    wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
+    firmware-upgrade-in-progress factory-reset-in-progress system-config-in-progress \
+    autoreconnect-crash-guard; do
+    # /etc/travo is the legacy location: guards were split across both
+    # directories before they were unified on /etc/trafo, so a device upgraded
+    # from an older build can still carry a guard there. Clear both.
+    for dir in /etc/trafo /etc/travo; do
+      ssh_cmd "rm -f '${dir}/${guard}'" >/dev/null 2>&1 || true
+    done
+  done
   info "Restarting travo..."
   ssh_cmd "/etc/init.d/travo restart 2>/dev/null || /etc/init.d/travo start 2>/dev/null || true"
   info "Waiting for process..."
@@ -186,7 +216,13 @@ restart_service() {
     attempts=$((attempts + 1))
     [[ $attempts -lt 5 ]] && { warn "retry ${attempts}/5..."; sleep 3; }
   done
-  warn "Not detected. ssh root@${ROUTER_IP} 'logread | grep travo | tail -20'"
+  # Report the failure instead of letting the caller print "OK Done" over a
+  # service that is not running.
+  local logs
+  logs=$(ssh_cmd "logread 2>/dev/null | grep -i travo | tail -20" 2>/dev/null || true)
+  error "travo is not running after restart - deploy NOT verified${logs:+ (see log lines below)}"
+  [[ -n "$logs" ]] && echo "$logs"
+  return 1
 }
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -197,7 +233,7 @@ check_connectivity
 warn_missing_service_script
 
 if $RESTART_ONLY; then
-  restart_service
+  restart_service || exit 1
   exit 0
 fi
 
@@ -209,6 +245,8 @@ case "$METHOD" in
   *)       error "method must be direct or release" ;;
 esac
 
-$DO_RESTART && restart_service
+if $DO_RESTART; then
+  restart_service || exit 1
+fi
 
 echo -e "\n${GREEN}OK${NC} Done — http://${ROUTER_IP}/  (LuCI often :8080)"
