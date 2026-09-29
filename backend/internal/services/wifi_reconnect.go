@@ -61,8 +61,8 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 //     pre-incident bad config) and cron would otherwise replay the failure
 //     forever. Counter is cleared on any successful reconnect or on redeploy.
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
-	"GUARD=\"/etc/trafo/autoreconnect-crash-guard\"\n" +
-	"FAILCOUNT_FILE=\"/etc/trafo/autoreconnect-failcount\"\n" +
+	"GUARD=\"" + crashGuardDir + "/autoreconnect-crash-guard\"\n" +
+	"FAILCOUNT_FILE=\"" + crashGuardDir + "/autoreconnect-failcount\"\n" +
 	"MAX_FAIL=5\n\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
 	"FAILCOUNT=0\n" +

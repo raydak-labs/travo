@@ -84,13 +84,6 @@ type WifiService struct {
 	modeFile            string
 	repeaterOptionsFile string
 	guardDir            string
-	// guardFallbackDir overrides the directory used when guardDir cannot be
-	// created. Empty in production, which falls back to a directory under the
-	// system temp dir. It is a field rather than an env lookup so a test can
-	// exercise the fallback path hermetically: redirecting TMPDIR with t.Setenv
-	// would mutate the whole process environment, and this package runs many
-	// t.Parallel() tests that would then inherit (and lose) the temp dir.
-	guardFallbackDir string
 
 	// uciWriteMu serializes UCI write sequences (Set/AddSection/Commit/revert
 	// against the process-global uci delta). Read-only paths never take it, so
@@ -108,10 +101,8 @@ const defaultReconnectScript = "/etc/travo/wifi-reconnect.sh"
 const defaultWifiModeFile = "/etc/travo/wifi-mode"
 const defaultRepeaterOptionsFile = "/etc/travo/repeater-options.json"
 
-// Crash guards live in /etc/trafo, the single directory every guard check
-// and the redeploy recovery path look at (AGENTS.md, ADR 0003 §2). State
-// files (aliases, priorities, repeater options) stay in /etc/travo.
-const defaultGuardDir = "/etc/trafo"
+// Crash guards live in crashGuardDir (see guards.go); state files (aliases,
+// priorities, repeater options) stay in /etc/travo.
 
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
 // otherwise falls back to the (test-only) reloader.
@@ -121,7 +112,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: defaultGuardDir,
+		guardDir: crashGuardDir,
 	}
 }
 
@@ -132,7 +123,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: defaultGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -142,7 +133,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: defaultGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -152,7 +143,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: defaultGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -162,7 +153,7 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: defaultGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -608,7 +599,7 @@ func (w *WifiService) lockUCIWrite() func() {
 func (w *WifiService) guardPath(feature string) string {
 	dir := w.guardDir
 	if dir == "" {
-		dir = defaultGuardDir
+		dir = crashGuardDir
 	}
 	return filepath.Join(dir, feature+"-in-progress")
 }
@@ -620,16 +611,13 @@ func (w *WifiService) guardPath(feature string) string {
 func (w *WifiService) resolveGuardDir() string {
 	dir := w.guardDir
 	if dir == "" {
-		dir = defaultGuardDir
+		dir = crashGuardDir
 	}
 	mkErr := os.MkdirAll(dir, 0o750)
 	if mkErr == nil {
 		return dir
 	}
-	fallback := w.guardFallbackDir
-	if fallback == "" {
-		fallback = filepath.Join(os.TempDir(), "travo-guards")
-	}
+	fallback := filepath.Join(os.TempDir(), "travo-guards")
 	log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side power loss is NOT protected by a durable marker.", dir, mkErr, fallback)
 	_ = os.MkdirAll(fallback, 0o750)
 	return fallback
@@ -667,7 +655,7 @@ func (w *WifiService) clearCrashGuard(feature string) {
 func (w *WifiService) guardDirs() []string {
 	configured := w.guardDir
 	if configured == "" {
-		configured = defaultGuardDir
+		configured = crashGuardDir
 	}
 	resolved := w.resolveGuardDir()
 	if resolved == configured {

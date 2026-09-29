@@ -28,7 +28,7 @@ const (
 // captiveWwanBounceGuardPath is the crash guard for the wwan DHCP bounce. It is a
 // variable (not a constant) so tests can redirect it; production code must never
 // leave it set after a successful bounce (ADR 0003).
-var captiveWwanBounceGuardPath = "/etc/trafo/captive-wwan-bounce-in-progress"
+var captiveWwanBounceGuardPath = crashGuardDir + "/captive-wwan-bounce-in-progress"
 
 // Bounded waits for the wwan bounce. Variables (not constants) so tests can
 // shrink them; production values must stay small enough for an HTTP handler.

@@ -615,7 +615,7 @@ func (v *VpnService) ToggleWireguard(enable bool) error {
 // vpnGuardPath is the crash guard for VPN live-state changes (ADR 0003). It is
 // set by the production constructor; test constructors leave it empty, which
 // disables the guard for tests.
-const vpnGuardPath = "/etc/trafo/vpn-in-progress"
+const vpnGuardPath = crashGuardDir + "/vpn-in-progress"
 
 // writeVpnGuard creates the VPN crash guard before touching live state.
 func (v *VpnService) writeVpnGuard() error {

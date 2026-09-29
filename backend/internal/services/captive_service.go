@@ -22,7 +22,7 @@ import (
 const captiveProbeURL = "http://connectivitycheck.gstatic.com/generate_204"
 
 // captiveDNSGuardFile stores original DNS config while bypass is active.
-const captiveDNSGuardFile = "/etc/trafo/captive-dns-in-progress"
+const captiveDNSGuardFile = crashGuardDir + "/captive-dns-in-progress"
 
 // captiveDNSRestoreTimeout auto-restores DNS if bypass has been active too long.
 const captiveDNSRestoreTimeout = 5 * time.Minute

@@ -22,7 +22,7 @@ const usbTetherUCIName = "usbtether"
 // usbTetherGuardPath is the crash guard for USB tether (re)configuration.
 // It must exist while the live network/firewall state is being changed and is
 // removed only after the change completed successfully (ADR 0003).
-const usbTetherGuardPath = "/etc/trafo/usbtether-in-progress"
+const usbTetherGuardPath = crashGuardDir + "/usbtether-in-progress"
 
 // USBTetherStatus holds the detected USB tethering state.
 type USBTetherStatus struct {

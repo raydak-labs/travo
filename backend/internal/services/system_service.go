@@ -102,7 +102,7 @@ func (s *SystemService) guardDirOrDefault() string {
 		return s.guardDir
 	}
 	s.guardDirOnce.Do(func() {
-		const prod = "/etc/trafo"
+		const prod = crashGuardDir
 		mkErr := os.MkdirAll(prod, 0o750)
 		if mkErr == nil {
 			s.guardResolved = prod

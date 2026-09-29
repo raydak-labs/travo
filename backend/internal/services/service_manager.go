@@ -266,8 +266,7 @@ func (sm *ServiceManager) guardPath() string {
 	dir := sm.guardDir
 	sm.mu.RUnlock()
 	if dir == "" {
-		// /etc/trafo is the single crash-guard directory (AGENTS.md, ADR 0003 §2).
-		dir = "/etc/trafo"
+		dir = crashGuardDir
 	}
 	return filepath.Join(dir, "pkg-install-in-progress")
 }

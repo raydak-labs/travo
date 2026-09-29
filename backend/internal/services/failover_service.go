@@ -20,7 +20,7 @@ import (
 
 const (
 	failoverConfigPath       = "/etc/travo/failover.json"
-	failoverGuardPath        = "/etc/trafo/failover-in-progress"
+	failoverGuardPath        = crashGuardDir + "/failover-in-progress"
 	failoverBackupPath       = "/etc/travo/failover-mwan3-backup.json"
 	mwan3InitScriptPath      = "/etc/init.d/mwan3"
 	mwan3ConfigName          = "mwan3"

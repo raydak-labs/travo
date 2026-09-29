@@ -31,7 +31,7 @@ const wirelessToggleScript = `#!/bin/sh
 set -u
 
 STATE="${1:-}"
-GUARD=/etc/trafo/wifi-toggle-in-progress
+GUARD=` + crashGuardDir + `/wifi-toggle-in-progress
 ROLLBACK_TIMEOUT=30
 
 case "$STATE" in
