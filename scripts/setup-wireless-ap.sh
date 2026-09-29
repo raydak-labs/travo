@@ -27,7 +27,8 @@ log() { echo "[setup-wireless] $*" >&2; }
 
 # Defaults matching backend/internal/services/ap_health.go
 DEFAULT_COUNTRY="US"
-DEFAULT_CHANNEL="auto"
+# DEFAULT_CHANNEL intentionally not set here: the channel is decided by the
+# backend (backend/internal/services/ap_health.go) from the regulatory domain.
 DEFAULT_SSID_24="OpenWrt-Travel"
 DEFAULT_SSID_5G="OpenWrt-Travel-5G"
 DEFAULT_KEY="travelrouter"

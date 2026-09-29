@@ -24,7 +24,6 @@ set -euo pipefail
 command -v mise >/dev/null 2>&1 && eval "$(mise env -s bash)"
 
 # Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color

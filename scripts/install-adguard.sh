@@ -1,5 +1,9 @@
 #!/bin/sh
 #
+# shellcheck disable=SC3040,SC3043
+# Target shell is BusyBox ash on OpenWrt, not POSIX sh: it supports both
+# `set -o pipefail` and `local`, so those POSIX warnings do not apply here.
+#
 # install-adguard.sh — download, install, and configure AdGuard Home on OpenWrt.
 # Idempotent.
 #
@@ -84,6 +88,9 @@ install_binary() {
 
     local tmpdir
     tmpdir="$(mktemp -d)"
+    # Single quotes inside the double-quoted trap: $tmpdir must expand NOW,
+    # when the trap is set, not when it fires (SC2064 is a false positive here).
+    # shellcheck disable=SC2064
     trap "rm -rf '$tmpdir'" EXIT
 
     log "Downloading ${url} ..."

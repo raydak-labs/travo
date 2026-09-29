@@ -1,5 +1,9 @@
 #!/bin/sh
 #
+# shellcheck disable=SC3040,SC3043
+# Target shell is BusyBox ash on OpenWrt, not POSIX sh: it supports both
+# `set -o pipefail` and `local`, so those POSIX warnings do not apply here.
+#
 # remove-adguard.sh — stop AdGuard Home, remove files, restore dnsmasq (port 53) and WAN peerdns.
 # Idempotent. Intended to run on OpenWrt (ash).
 #
