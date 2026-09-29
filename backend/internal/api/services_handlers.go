@@ -95,16 +95,42 @@ func writeStreamEvent(w *bufio.Writer, evt streamLogEvent) {
 	w.Flush()
 }
 
+// streamLogBuffer is how many log lines may be pending for a slow client.
+const streamLogBuffer = 256
+
 // streamServiceAction sets streaming headers and runs action with real-time NDJSON output.
+//
+// The action is decoupled from the socket through a bounded queue, and a full
+// queue drops lines rather than blocking. Progress output is best-effort: a
+// browser tab that stops reading must not be able to stall the operation it is
+// watching (a blocked write would hold up the command's output reader, which
+// execx.Stream surfaces as a WaitDelay timeout — reporting a failed install
+// that actually succeeded on the device).
 func streamServiceAction(c fiber.Ctx, action func(logFn func(string)) error) error {
 	c.Set("Content-Type", "application/x-ndjson")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("X-Content-Type-Options", "nosniff")
 	c.RequestCtx().SetBodyStreamWriter(func(w *bufio.Writer) {
+		lines := make(chan string, streamLogBuffer)
+		drained := make(chan struct{})
+		go func() {
+			defer close(drained)
+			for line := range lines {
+				writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
+			}
+		}()
+
 		logFn := func(line string) {
-			writeStreamEvent(w, streamLogEvent{Type: "log", Data: line})
+			select {
+			case lines <- line:
+			default: // client is not keeping up; drop rather than block
+			}
 		}
-		if err := action(logFn); err != nil {
+		err := action(logFn)
+		close(lines)
+		<-drained // the writer must finish before the response body is closed
+
+		if err != nil {
 			writeStreamEvent(w, streamLogEvent{Type: "error", Data: err.Error()})
 		} else {
 			writeStreamEvent(w, streamLogEvent{Type: "done"})
