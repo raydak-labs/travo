@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTailscaleAuth } from '@/hooks/use-vpn';
+import { isSafeExternalUrl } from '@/lib/external-url';
 import { tailscaleAuthFormSchema, type TailscaleAuthFormValues } from '@/lib/schemas/vpn-forms';
 
 export function TailscaleAuthSection() {
@@ -17,6 +18,12 @@ export function TailscaleAuthSection() {
   const onSubmit = (data: TailscaleAuthFormValues) => {
     authMutation.mutate(data.auth_key.trim() || undefined);
   };
+
+  // The auth URL comes from the router; never render it without validating
+  // the scheme first.
+  const authUrl = isSafeExternalUrl(authMutation.data?.auth_url)
+    ? authMutation.data?.auth_url
+    : null;
 
   return (
     <div className="space-y-3">
@@ -34,9 +41,9 @@ export function TailscaleAuthSection() {
           Authenticate
         </Button>
       </form>
-      {authMutation.data?.auth_url && (
+      {authUrl && (
         <a
-          href={authMutation.data.auth_url}
+          href={authUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"

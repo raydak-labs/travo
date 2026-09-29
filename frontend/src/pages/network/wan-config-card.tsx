@@ -4,11 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { useNetworkStatus, useDetectWanType } from '@/hooks/use-network';
+import { useNetworkStatus, useDetectWanType, useWanConfig } from '@/hooks/use-network';
+import { networkMedium } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
 
 export function WanConfigCard() {
   const { data: network, isLoading } = useNetworkStatus();
+  const { data: wanConfig } = useWanConfig();
   const detectWanType = useDetectWanType();
 
   return (
@@ -26,8 +28,10 @@ export function WanConfigCard() {
         ) : network?.wan ? (
           <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Type</span>
-              <span className="text-gray-900 dark:text-white">{network.wan.type}</span>
+              <span className="text-gray-500 dark:text-gray-400">Medium</span>
+              <span className="text-gray-900 dark:text-white">{networkMedium(network.wan)}</span>
+              <span className="text-gray-500 dark:text-gray-400">Protocol</span>
+              <span className="text-gray-900 dark:text-white">{wanConfig?.type ?? '—'}</span>
               <span className="text-gray-500 dark:text-gray-400">IP Address</span>
               <span className="text-gray-900 dark:text-white">{network.wan.ip_address}</span>
               <span className="text-gray-500 dark:text-gray-400">Gateway</span>

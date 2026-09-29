@@ -38,7 +38,7 @@ export function WifiQRDialog({ open, onOpenChange, ap }: WifiQRDialogProps) {
           <p className="text-center text-sm text-gray-500 dark:text-gray-400">
             Scan this QR code to connect to <strong>{ap.ssid}</strong>
           </p>
-          <div className="text-center text-xs text-gray-400">
+          <div className="text-center text-xs text-gray-500 dark:text-gray-400">
             {bandLabel} · {encLabel}
           </div>
         </div>

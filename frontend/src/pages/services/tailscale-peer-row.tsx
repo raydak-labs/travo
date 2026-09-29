@@ -19,7 +19,9 @@ export function TailscalePeerRow({ peer, onSetExitNode, isPending }: TailscalePe
         />
         <div className="min-w-0">
           <span className="truncate text-sm font-medium">{peer.hostname}</span>
-          <span className="ml-2 font-mono text-xs text-gray-500 dark:text-gray-400">{peer.tailscale_ip}</span>
+          <span className="ml-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+            {peer.tailscale_ip}
+          </span>
         </div>
         {peer.exit_node && (
           <Badge variant="default" className="shrink-0">

@@ -65,13 +65,19 @@ export function SetupWifiNetworkList({
                         {network.ssid}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">{network.signal_dbm} dBm</span>
-                        <span className="text-xs text-gray-400">{network.band}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {network.signal_dbm} dBm
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {network.band}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {network.encryption !== 'none' && <Lock className="h-3 w-3 text-gray-400" />}
+                    {network.encryption !== 'none' && (
+                      <Lock className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                    )}
                     <Badge variant={tier >= 3 ? 'default' : 'secondary'}>{tier}/4</Badge>
                   </div>
                 </button>

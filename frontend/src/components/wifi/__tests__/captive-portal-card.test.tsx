@@ -63,9 +63,31 @@ describe('CaptivePortalCard', () => {
     });
 
     await user.click(screen.getByText('Open Login'));
-    expect(windowOpen).toHaveBeenCalledWith('http://captive.hotel.com/login', '_blank');
+    expect(windowOpen).toHaveBeenCalledWith(
+      'http://captive.hotel.com/login',
+      '_blank',
+      'noopener,noreferrer',
+    );
 
     windowOpen.mockRestore();
+  });
+
+  it('does not offer a login button for a non-http portal URL', async () => {
+    server.use(
+      http.get('/api/v1/captive/status', () => {
+        return HttpResponse.json({
+          ...mockCaptivePortalDetected,
+          portal_url: 'javascript:alert(document.cookie)',
+        });
+      }),
+    );
+
+    renderCard();
+
+    await waitFor(() => {
+      expect(screen.getByText('Login Required')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Open Login')).not.toBeInTheDocument();
   });
 
   it('shows No Internet when no portal and no internet but sta_connected', async () => {

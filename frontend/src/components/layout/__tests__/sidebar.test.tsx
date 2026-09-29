@@ -172,10 +172,7 @@ describe('Sidebar', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
   });
 

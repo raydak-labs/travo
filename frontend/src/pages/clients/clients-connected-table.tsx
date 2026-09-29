@@ -32,9 +32,7 @@ export function ClientsConnectedTable({
 
   if (filtered.length === 0) {
     return (
-      <EmptyState
-        message={hasSearch ? 'No clients match your search.' : 'No clients connected.'}
-      />
+      <EmptyState message={hasSearch ? 'No clients match your search.' : 'No clients connected.'} />
     );
   }
 
@@ -45,12 +43,18 @@ export function ClientsConnectedTable({
           <tr className="border-b border-gray-200 text-left dark:border-gray-700">
             <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Device</th>
             <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">IP Address</th>
-            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 md:table-cell">Interface</th>
-            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 lg:table-cell">Connected Since</th>
+            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 md:table-cell">
+              Interface
+            </th>
+            <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 lg:table-cell">
+              Connected Since
+            </th>
             <th className="hidden pb-2 font-medium text-gray-500 dark:text-gray-400 sm:table-cell">
               Traffic
             </th>
-            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
+            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,32 +6,52 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useAlerts } from '@/hooks/use-alerts';
 import { headerAlertSeverityVariant } from './header-alert-severity';
 import { formatAlertTime } from './header-format-alert-time';
+import { usePopoverDismiss, type PopoverCloseReason } from './use-popover-dismiss';
+
+const PANEL_ID = 'header-notifications-panel';
 
 export function HeaderNotificationsMenu() {
   const { alerts, unreadCount, markAllRead } = useAlerts();
   const [showPanel, setShowPanel] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const closeReasonRef = useRef<PopoverCloseReason | null>(null);
 
+  const closePanel = (reason: PopoverCloseReason) => {
+    closeReasonRef.current = reason;
+    setShowPanel(false);
+  };
+  const containerRef = usePopoverDismiss<HTMLDivElement>(showPanel, closePanel);
+
+  // Focus the panel on open and return it to the trigger on keyboard
+  // dismissal, so the popover is reachable without a pointer.
   useEffect(() => {
-    if (!showPanel) return;
-    function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setShowPanel(false);
-      }
+    if (showPanel) {
+      panelRef.current?.focus();
+      return;
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    const reason = closeReasonRef.current;
+    if (reason === null) return;
+    closeReasonRef.current = null;
+    if (reason !== 'outside') triggerRef.current?.focus();
   }, [showPanel]);
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative" ref={containerRef}>
       <Button
+        ref={triggerRef}
         variant="ghost"
         size="sm"
         aria-label="Notifications"
+        aria-expanded={showPanel}
+        aria-controls={showPanel ? PANEL_ID : undefined}
         onClick={() => {
-          setShowPanel((v) => !v);
-          if (!showPanel) markAllRead();
+          if (showPanel) {
+            closePanel('activate');
+            return;
+          }
+          setShowPanel(true);
+          markAllRead();
         }}
       >
         <Bell className="h-4 w-4" />
@@ -43,7 +63,17 @@ export function HeaderNotificationsMenu() {
       </Button>
 
       {showPanel && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+        <div
+          id={PANEL_ID}
+          ref={panelRef}
+          role="region"
+          aria-label="Notifications"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Tab') closePanel('tab');
+          }}
+          className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-gray-200 bg-white shadow-lg focus:outline-none dark:border-gray-700 dark:bg-gray-900"
+        >
           <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
               Notifications

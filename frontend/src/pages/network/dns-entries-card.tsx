@@ -68,6 +68,7 @@ export function DnsEntriesCard() {
                             variant="ghost"
                             size="sm"
                             type="button"
+                            aria-label={`Delete DNS entry ${entry.name}`}
                             onClick={() => entry.section && deleteDNSEntry.mutate(entry.section)}
                             disabled={deleteDNSEntry.isPending}
                           >

@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { SourceDef } from '@/hooks/use-topology-data';
+import type { WanType } from '@shared/index';
 import { formatUptime } from '@/lib/utils';
 import { QuickActions } from '@/pages/dashboard/quick-actions';
 import { NetworkChart } from '@/pages/dashboard/network-chart';
@@ -377,6 +378,15 @@ function DetailRow({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+/** Human labels for the WAN connection protocol reported by the WAN config. */
+const WAN_PROTOCOL_LABEL: Record<WanType, string> = {
+  dhcp: 'DHCP',
+  static: 'Static',
+  pppoe: 'PPPoE',
+  usb_tethering: 'USB tethering',
+  none: 'None',
+};
+
 export function DashboardPage() {
   const {
     sources,
@@ -388,6 +398,8 @@ export function DashboardPage() {
     repeaterUp,
     tetherUp,
     wan,
+    wanMedium,
+    wanProtocol,
     wifiConn,
     usbTether,
     sysInfo,
@@ -396,8 +408,12 @@ export function DashboardPage() {
     allClients,
   } = useTopologyData();
 
+  // The interface discriminator is the medium, not an address: prefer the
+  // tethering service's own report and fall back to the USB WAN interface.
   const usbDisplayIp =
-    (usbTether?.ip_address || (wan?.type === 'usb' ? wan?.ip_address : '')) ?? '';
+    usbTether?.ip_address ||
+    (wan?.is_up === true && wanMedium === 'usb' ? wan.ip_address : '') ||
+    '';
 
   return (
     <div className="space-y-6">
@@ -417,10 +433,22 @@ export function DashboardPage() {
           {ethernetUp && wan ? (
             <>
               <DetailRow label="Protocol">
-                <span className="uppercase">{wan.type}</span>
+                {/* The WAN protocol lives in the WAN config, not in the
+                    interface discriminator (which only says "wired"). */}
+                <span className="uppercase">
+                  {wanProtocol ? WAN_PROTOCOL_LABEL[wanProtocol] : '—'}
+                </span>
               </DetailRow>
-              {wan.ip_address && <DetailRow label="IP" mono>{wan.ip_address}</DetailRow>}
-              {wan.gateway && <DetailRow label="Gateway" mono>{wan.gateway}</DetailRow>}
+              {wan.ip_address && (
+                <DetailRow label="IP" mono>
+                  {wan.ip_address}
+                </DetailRow>
+              )}
+              {wan.gateway && (
+                <DetailRow label="Gateway" mono>
+                  {wan.gateway}
+                </DetailRow>
+              )}
             </>
           ) : (
             <p className="text-slate-500">No Ethernet WAN connection detected.</p>
@@ -451,7 +479,11 @@ export function DashboardPage() {
                   <span className="capitalize">{usbTether.device_type || 'Unknown'}</span>
                 </DetailRow>
               )}
-              {usbDisplayIp ? <DetailRow label="IP" mono>{usbDisplayIp}</DetailRow> : null}
+              {usbDisplayIp ? (
+                <DetailRow label="IP" mono>
+                  {usbDisplayIp}
+                </DetailRow>
+              ) : null}
               {tetherUp && !usbTether?.detected && !usbDisplayIp ? (
                 <p className="text-slate-500">USB uplink is active.</p>
               ) : null}

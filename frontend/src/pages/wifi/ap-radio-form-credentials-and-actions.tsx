@@ -44,10 +44,7 @@ export function ApRadioFormCredentialsAndActions({
   return (
     <>
       <div className="space-y-2">
-        <Label
-          htmlFor={`ap-ssid-${ap.section}`}
-          className="flex items-center gap-1"
-        >
+        <Label htmlFor={`ap-ssid-${ap.section}`} className="flex items-center gap-1">
           SSID
           <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
         </Label>
@@ -65,11 +62,7 @@ export function ApRadioFormCredentialsAndActions({
         ) : null}
       </div>
       <div className="space-y-2">
-        <Label
-          htmlFor={`ap-enc-${ap.section}`}
-        >
-          Encryption
-        </Label>
+        <Label htmlFor={`ap-enc-${ap.section}`}>Encryption</Label>
         <Controller
           name="encryption"
           control={control}
@@ -98,10 +91,7 @@ export function ApRadioFormCredentialsAndActions({
       </div>
       {encryption !== 'none' && (
         <div className="space-y-2">
-          <Label
-            htmlFor={`ap-key-${ap.section}`}
-            className="flex items-center gap-1"
-          >
+          <Label htmlFor={`ap-key-${ap.section}`} className="flex items-center gap-1">
             Password
             <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
           </Label>

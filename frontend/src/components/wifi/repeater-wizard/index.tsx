@@ -75,6 +75,7 @@ export function RepeaterWizard({ open, onOpenChange }: RepeaterWizardProps) {
             apConfig={w.apConfig}
             allowApOnStaRadio={w.allowApOnStaRadio}
             applyError={w.applyError}
+            failedStep={w.failedStep}
             applying={w.applying}
             onBack={() => w.setStep('configure-ap')}
             onApply={() => void w.handleApply()}

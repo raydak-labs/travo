@@ -4,6 +4,7 @@ import {
   useWifiScan,
   useWifiConnect,
   useWifiMode,
+  useWifiConnection,
   useAPConfigs,
   useSetAPConfig,
   useRepeaterOptions,
@@ -33,10 +34,12 @@ export function useRepeaterWizard(open: boolean) {
   const [allowApOnStaRadio, setAllowApOnStaRadio] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [failedStep, setFailedStep] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const { data: scanResults = [], isLoading: scanLoading, refetch } = useWifiScan(open);
   const { data: apConfigs } = useAPConfigs();
+  const { data: wifiConn } = useWifiConnection();
   const { data: repeaterOpts } = useRepeaterOptions(open);
   const connectMutation = useWifiConnect();
   const modeMutation = useWifiMode();
@@ -71,6 +74,7 @@ export function useRepeaterWizard(open: boolean) {
     setRepeaterOptsHydrated(true);
     setApplying(false);
     setApplyError(null);
+    setFailedStep(null);
     setDone(false);
   }, []);
 
@@ -121,19 +125,86 @@ export function useRepeaterWizard(open: boolean) {
   const handleApply = useCallback(async () => {
     setApplying(true);
     setApplyError(null);
+    setFailedStep(null);
+
+    // Snapshot the current radio state so a mid-sequence failure can put the
+    // device back where it was (see `rollback` below).
+    const previousMode = wifiConn?.mode ?? null;
+    const previousApConfigs = (apConfigs ?? []).map((ap) => ({
+      section: ap.section,
+      config: { ssid: ap.ssid, encryption: ap.encryption, key: ap.key },
+    }));
+    const previousRepeaterOptions = repeaterOpts?.allow_ap_on_sta_radio ?? null;
+    const appliedSections: string[] = [];
+
+    const rollback = async (): Promise<string[]> => {
+      const failures: string[] = [];
+      // Best effort, in reverse order of application. There is no server-side
+      // batch rollback endpoint for the wizard, so each step is reverted with
+      // the same API it was applied with.
+      for (let i = appliedSections.length - 1; i >= 0; i -= 1) {
+        const applied = appliedSections[i];
+        const previous = previousApConfigs.find((c) => c.section === applied);
+        if (!previous) continue;
+        try {
+          await setAPMutation.mutateAsync({ section: applied, config: previous.config });
+        } catch {
+          failures.push(`restore AP "${applied}"`);
+        }
+      }
+      if (previousRepeaterOptions !== null) {
+        try {
+          await setRepeaterOptsMutation.mutateAsync({
+            allow_ap_on_sta_radio: previousRepeaterOptions,
+          });
+        } catch {
+          failures.push('restore repeater options');
+        }
+      }
+      if (previousMode && previousMode !== 'repeater') {
+        try {
+          await modeMutation.mutateAsync(previousMode);
+        } catch {
+          failures.push(`restore WiFi mode "${previousMode}"`);
+        }
+      }
+      return failures;
+    };
+
+    /**
+     * Runs one step of the sequence. A mode switch is a real uci apply +
+     * confirm + rollback window on the device, so the sequence deliberately
+     * performs it exactly once.
+     */
+    const step = async (label: string, run: () => Promise<unknown>) => {
+      try {
+        return await run();
+      } catch (err) {
+        setFailedStep(label);
+        const rollbackFailures = await rollback();
+        const detail = err instanceof Error ? err.message : 'Setup failed';
+        const suffix = rollbackFailures.length
+          ? ` Partial rollback — these steps could not be restored: ${rollbackFailures.join(', ')}.`
+          : ' The previous WiFi configuration was restored.';
+        throw new Error(`Step ${label} failed: ${detail}.${suffix}`, { cause: err });
+      }
+    };
 
     try {
-      await setRepeaterOptsMutation.mutateAsync({
-        allow_ap_on_sta_radio: allowApOnStaRadio,
-      });
-      await modeMutation.mutateAsync('repeater');
-      await connectMutation.mutateAsync({
-        ssid: upstream.ssid,
-        password: upstream.password,
-        encryption: upstream.encryption,
-        band: selectedNetwork?.band,
-      });
-      await modeMutation.mutateAsync('repeater');
+      await step('repeater options', () =>
+        setRepeaterOptsMutation.mutateAsync({
+          allow_ap_on_sta_radio: allowApOnStaRadio,
+        }),
+      );
+      await step('repeater mode', () => modeMutation.mutateAsync('repeater'));
+      await step('upstream connection', () =>
+        connectMutation.mutateAsync({
+          ssid: upstream.ssid,
+          password: upstream.password,
+          encryption: upstream.encryption,
+          band: selectedNetwork?.band,
+        }),
+      );
 
       if (apConfigs && apConfigs.length > 0) {
         for (const ap of apConfigs) {
@@ -148,9 +219,12 @@ export function useRepeaterWizard(open: boolean) {
               key = pb.encryption === 'none' ? '' : pb.key;
             }
           }
-          await setAPMutation.mutateAsync({
-            section: ap.section,
-            config: { ssid, encryption: enc, key },
+          await step(`AP "${ap.section}"`, async () => {
+            await setAPMutation.mutateAsync({
+              section: ap.section,
+              config: { ssid, encryption: enc, key },
+            });
+            appliedSections.push(ap.section);
           });
         }
       }
@@ -168,6 +242,8 @@ export function useRepeaterWizard(open: boolean) {
     connectMutation,
     apConfigs,
     setAPMutation,
+    repeaterOpts,
+    wifiConn,
     upstream,
     selectedNetwork,
     effectiveAPSSID,
@@ -216,6 +292,7 @@ export function useRepeaterWizard(open: boolean) {
     setAllowApOnStaRadio,
     applying,
     applyError,
+    failedStep,
     done,
     scanResults,
     scanLoading,

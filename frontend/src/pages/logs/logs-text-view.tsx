@@ -30,9 +30,7 @@ export function LogsTextView({
           <Skeleton className="h-4 w-3/4" />
         </div>
       ) : filteredLines.length === 0 ? (
-        <EmptyState
-          message={lineFilter ? 'No log entries matching filter' : 'No log entries'}
-        />
+        <EmptyState message={lineFilter ? 'No log entries matching filter' : 'No log entries'} />
       ) : (
         <pre
           ref={logRef}

@@ -14,6 +14,7 @@ import {
   useSetTailscaleSSH,
   useVpnStatus,
 } from '@/hooks/use-vpn';
+import { isSafeExternalUrl } from '@/lib/external-url';
 import { TailscaleAuthSection } from './tailscale-auth-section';
 import { TailscaleLoggedInPanel } from './tailscale-logged-in-panel';
 
@@ -52,7 +53,9 @@ export function TailscaleSection() {
         <CardContent className="space-y-4">
           {!isInstalled ? (
             <div className="py-4 text-center">
-              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">Tailscale is not installed</p>
+              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                Tailscale is not installed
+              </p>
               <Link
                 to="/services"
                 className="text-sm text-blue-600 hover:underline dark:text-blue-400"
@@ -86,7 +89,7 @@ export function TailscaleSection() {
 
               {!status.logged_in &&
                 status.running &&
-                (status.auth_url ? (
+                (isSafeExternalUrl(status.auth_url) ? (
                   <a
                     href={status.auth_url}
                     target="_blank"

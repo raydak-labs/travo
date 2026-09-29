@@ -17,8 +17,7 @@ const cardInsetVariants = cva('rounded-md border border-gray-200 p-3 dark:border
 });
 
 export interface CardInsetProps
-  extends HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof cardInsetVariants> {}
+  extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardInsetVariants> {}
 
 const CardInset = forwardRef<HTMLDivElement, CardInsetProps>(
   ({ className, variant, ...props }, ref) => (

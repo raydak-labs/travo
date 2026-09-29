@@ -31,7 +31,9 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
           <tr className="border-b border-gray-200 dark:border-gray-700">
             <th className="pb-2 text-left font-medium text-gray-500 dark:text-gray-400">Name</th>
             <th className="pb-2 text-left font-medium text-gray-500 dark:text-gray-400">IP</th>
-            <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell">MAC</th>
+            <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell">
+              MAC
+            </th>
             <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 lg:table-cell">
               Interface
             </th>
@@ -41,7 +43,9 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
             <th className="hidden pb-2 text-right font-medium text-gray-500 dark:text-gray-400 sm:table-cell">
               Traffic
             </th>
-            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">Actions</th>
+            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">

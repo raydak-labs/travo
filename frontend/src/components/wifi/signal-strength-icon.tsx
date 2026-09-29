@@ -18,7 +18,12 @@ export function SignalStrengthIcon({ signalPercent, className }: SignalStrengthI
   const bars = getBars(signalPercent);
 
   if (bars === 0) {
-    return <WifiOff className={clsx('h-5 w-5 text-gray-400', className)} aria-label="No signal" />;
+    return (
+      <WifiOff
+        className={clsx('h-5 w-5 text-gray-500 dark:text-gray-400', className)}
+        aria-label="No signal"
+      />
+    );
   }
 
   const colorMap: Record<number, string> = {

@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import { Wifi, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { CardInset } from '@/components/ui/card-inset';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -112,95 +106,92 @@ export function WifiSavedNetworksCard() {
               const isThisNetwork =
                 connection?.connected === true && connection.ssid === network.ssid;
               const rowBusy =
-                connectMutation.isPending ||
-                priorityMutation.isPending ||
-                deleteMutation.isPending;
+                connectMutation.isPending || priorityMutation.isPending || deleteMutation.isPending;
               return (
-              <li
-                key={network.section}
-                className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <Wifi className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{network.ssid}</p>
-                    <SecurityBadge encryption={network.encryption} />
+                <li
+                  key={network.section}
+                  className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Wifi className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{network.ssid}</p>
+                      <SecurityBadge encryption={network.encryption} />
+                    </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
-                  <Badge variant={network.auto_connect ? 'success' : 'secondary'}>
-                    {network.auto_connect ? 'In use' : 'Standby'}
-                  </Badge>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isThisNetwork || rowBusy}
-                    title={
-                      isThisNetwork
-                        ? 'Already connected to this network'
-                        : 'Connect using saved password'
-                    }
-                    onClick={() =>
-                      connectMutation.mutate({
-                        ssid: network.ssid,
-                        password: '',
-                        encryption: network.encryption,
-                      })
-                    }
-                  >
-                    {connectMutation.isPending &&
-                    connectMutation.variables?.ssid === network.ssid
-                      ? 'Connecting…'
-                      : 'Connect'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const ssids = savedNetworks.map((n) => n.ssid);
-                      const newSsids = [...ssids];
-                      [newSsids[index - 1], newSsids[index]] = [
-                        newSsids[index],
-                        newSsids[index - 1],
-                      ];
-                      priorityMutation.mutate({ ssids: newSsids });
-                    }}
-                    disabled={index === 0 || rowBusy}
-                    title="Higher priority when the router picks among saved profiles"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const ssids = savedNetworks.map((n) => n.ssid);
-                      const newSsids = [...ssids];
-                      [newSsids[index], newSsids[index + 1]] = [
-                        newSsids[index + 1],
-                        newSsids[index],
-                      ];
-                      priorityMutation.mutate({ ssids: newSsids });
-                    }}
-                    disabled={index === savedNetworks.length - 1 || rowBusy}
-                    title="Lower priority"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setPendingDelete({ section: network.section, ssid: network.ssid })
-                    }
-                    disabled={rowBusy}
-                    title="Remove network"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-              </li>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
+                    <Badge variant={network.auto_connect ? 'success' : 'secondary'}>
+                      {network.auto_connect ? 'In use' : 'Standby'}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isThisNetwork || rowBusy}
+                      title={
+                        isThisNetwork
+                          ? 'Already connected to this network'
+                          : 'Connect using saved password'
+                      }
+                      onClick={() =>
+                        connectMutation.mutate({
+                          ssid: network.ssid,
+                          password: '',
+                          encryption: network.encryption,
+                        })
+                      }
+                    >
+                      {connectMutation.isPending && connectMutation.variables?.ssid === network.ssid
+                        ? 'Connecting…'
+                        : 'Connect'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const ssids = savedNetworks.map((n) => n.ssid);
+                        const newSsids = [...ssids];
+                        [newSsids[index - 1], newSsids[index]] = [
+                          newSsids[index],
+                          newSsids[index - 1],
+                        ];
+                        priorityMutation.mutate({ ssids: newSsids });
+                      }}
+                      disabled={index === 0 || rowBusy}
+                      title="Higher priority when the router picks among saved profiles"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const ssids = savedNetworks.map((n) => n.ssid);
+                        const newSsids = [...ssids];
+                        [newSsids[index], newSsids[index + 1]] = [
+                          newSsids[index + 1],
+                          newSsids[index],
+                        ];
+                        priorityMutation.mutate({ ssids: newSsids });
+                      }}
+                      disabled={index === savedNetworks.length - 1 || rowBusy}
+                      title="Lower priority"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setPendingDelete({ section: network.section, ssid: network.ssid })
+                      }
+                      disabled={rowBusy}
+                      title="Remove network"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </li>
               );
             })}
           </ul>

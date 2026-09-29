@@ -87,11 +87,7 @@ export function RepeaterWizardConfigureApStep({
           {!apConfig.separateBandConfig && (
             <CardInset className="space-y-3 p-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="ap-ssid-shared"
-                >
-                  Network name (all bands)
-                </Label>
+                <Label htmlFor="ap-ssid-shared">Network name (all bands)</Label>
                 <Input
                   id="ap-ssid-shared"
                   value={apConfig.ssid}
@@ -101,11 +97,7 @@ export function RepeaterWizardConfigureApStep({
               </div>
 
               <div className="space-y-2">
-                <Label
-                  htmlFor="ap-encryption-shared"
-                >
-                  Encryption
-                </Label>
+                <Label htmlFor="ap-encryption-shared">Encryption</Label>
                 <Select
                   value={apConfig.encryption}
                   onValueChange={(val) =>
@@ -130,11 +122,7 @@ export function RepeaterWizardConfigureApStep({
 
               {apConfig.encryption !== 'none' && (
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="ap-key-shared"
-                  >
-                    Password
-                  </Label>
+                  <Label htmlFor="ap-key-shared">Password</Label>
                   <Input
                     id="ap-key-shared"
                     type="password"
@@ -197,11 +185,7 @@ export function RepeaterWizardConfigureApStep({
                 <CardInset key={ap.section} className="space-y-3 p-4">
                   <p className="text-sm font-medium">{bandLabel(ap.band)}</p>
                   <div className="space-y-2">
-                    <Label
-                      htmlFor={`ap-ssid-${ap.section}`}
-                    >
-                      SSID
-                    </Label>
+                    <Label htmlFor={`ap-ssid-${ap.section}`}>SSID</Label>
                     <Input
                       id={`ap-ssid-${ap.section}`}
                       value={pb.ssid}
@@ -217,11 +201,7 @@ export function RepeaterWizardConfigureApStep({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label
-                      htmlFor={`ap-enc-${ap.section}`}
-                    >
-                      Encryption
-                    </Label>
+                    <Label htmlFor={`ap-enc-${ap.section}`}>Encryption</Label>
                     <Select
                       value={pb.encryption}
                       onValueChange={(val) =>
@@ -251,11 +231,7 @@ export function RepeaterWizardConfigureApStep({
                   </div>
                   {pb.encryption !== 'none' && (
                     <div className="space-y-2">
-                      <Label
-                        htmlFor={`ap-key-${ap.section}`}
-                      >
-                        Password
-                      </Label>
+                      <Label htmlFor={`ap-key-${ap.section}`}>Password</Label>
                       <Input
                         id={`ap-key-${ap.section}`}
                         type="password"

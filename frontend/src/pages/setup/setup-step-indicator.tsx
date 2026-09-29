@@ -15,7 +15,8 @@ export function StepIndicator({ current, total }: { current: number; total: numb
                 i < current && 'bg-blue-600 text-white',
                 i === current &&
                   'border-2 border-blue-600 bg-blue-50 text-blue-600 dark:bg-blue-950',
-                i > current && 'border-2 border-gray-300 text-gray-400 dark:border-gray-600',
+                i > current &&
+                  'border-2 border-gray-300 text-gray-500 dark:border-gray-600 dark:text-gray-400',
               )}
             >
               {i < current ? <CheckCircle2 className="h-5 w-5" /> : i + 1}
@@ -37,7 +38,7 @@ export function StepIndicator({ current, total }: { current: number; total: numb
             key={label}
             className={cn(
               'text-center text-xs',
-              i <= current ? 'font-medium text-blue-600' : 'text-gray-400',
+              i <= current ? 'font-medium text-blue-600' : 'text-gray-500 dark:text-gray-400',
             )}
           >
             {label}
