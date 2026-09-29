@@ -151,3 +151,42 @@ func TestCrashGuardsAllLiveUnderEtcTrafo(t *testing.T) {
 	t.Logf("scanned %d files, %d guard functions, %d guard paths under /etc/trafo, %d legacy under /etc/travo",
 		files, guardFuncs, current, legacy)
 }
+
+// writeCrashGuard falls back to a temp directory when the configured one cannot
+// be created. clearCrashGuard must clear the directory the guard was actually
+// written to — clearing only the configured path left that fallback guard behind
+// forever, and a stale guard means "skip this operation".
+func TestClearCrashGuard_RemovesGuardFromFallbackDir(t *testing.T) {
+	// The resolver falls back to os.TempDir(), which honours $TMPDIR on unix.
+	// Point it at a private directory so the test neither depends on nor
+	// collides with a shared /tmp/travo-guards left by another test or run.
+	t.Setenv("TMPDIR", t.TempDir())
+
+	// A regular file where a directory is needed: MkdirAll fails, so the
+	// resolver must fall back to a writable directory.
+	blocker := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	w, _ := newTestWifiService()
+	w.guardDir = blocker
+	if err := w.writeCrashGuard("probe"); err != nil {
+		t.Fatalf("writeCrashGuard: %v", err)
+	}
+
+	resolved := w.resolveGuardDir()
+	if resolved == blocker {
+		t.Fatal("expected the guard dir resolution to fall back to a writable dir")
+	}
+	guardFile := filepath.Join(resolved, "probe-in-progress")
+	if _, err := os.Stat(guardFile); err != nil {
+		t.Fatalf("expected the guard at the resolved path %s: %v", guardFile, err)
+	}
+
+	w.clearCrashGuard("probe")
+
+	if _, err := os.Stat(guardFile); !os.IsNotExist(err) {
+		t.Errorf("stale crash guard left at %s after a successful operation (stat err: %v)", guardFile, err)
+	}
+}

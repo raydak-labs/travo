@@ -57,7 +57,10 @@ jobs:
       # Race detection is its own job: -race costs several times the wall clock
       # of a plain run, so it must not gate or be blocked by test-backend.
       - name: Test with race detector
-        run: go test ./... -count=1 -race
+        # -timeout is per package. internal/api under -race takes ~2 min on a
+        # developer machine and several times that on a 2-core CI runner, so the
+        # 10m default is not a safe budget there.
+        run: go test ./... -count=1 -race -timeout 20m
         working-directory: backend
 
   test-frontend:
@@ -256,7 +259,7 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: arm64
-          VERSION: 0.0.0-ci
+          VERSION: 0.0.0
         run: |
           go build \
             -ldflags "-s -w -X main.Version=${VERSION}" \
@@ -278,14 +281,14 @@ jobs:
 
       - name: Package install tarball
         env:
-          VERSION: 0.0.0-ci
+          VERSION: 0.0.0
           ARCH: aarch64_cortex-a53
         run: bash scripts/package-tarball.sh
 
       - name: Verify tarball layout
         run: |
           set -euo pipefail
-          tarball="dist/travo_0.0.0-ci_aarch64_cortex-a53.tar.gz"
+          tarball="dist/travo_0.0.0_aarch64_cortex-a53.tar.gz"
           test -f "$tarball" || { echo "::error::missing $tarball"; ls -l dist; exit 1; }
           listing="$(tar -tzf "$tarball")"
           for p in \
@@ -301,9 +304,11 @@ jobs:
             echo "$listing" | grep -qx "$p" \
               || { echo "::error::tarball is missing $p"; echo "$listing"; exit 1; }
           done
-          # install.sh resolves travo_<VERSION>_<arch>.tar.gz from a strict semver;
-          # the staged name must match that pattern exactly.
-          echo "$tarball" | grep -Eq '^dist/travo_[0-9]+\.[0-9]+\.[0-9]+(_[a-z0-9_]+)?\.tar\.gz$' \
+          # install.sh resolves travo_<VERSION>_<arch>.tar.gz, where VERSION is a
+          # strict semver and <arch> is the OpenWrt-style label — which contains
+          # a hyphen, e.g. aarch64_cortex-a53. Both characters must be allowed or
+          # the check rejects the very names it is meant to protect.
+          echo "$tarball" | grep -Eq '^dist/travo_[0-9]+\.[0-9]+\.[0-9]+(_[A-Za-z0-9_-]+)?\.tar\.gz$' \
             || { echo "::error::tarball name is not install.sh-resolvable: $tarball"; exit 1; }
           # tarball is extracted as / on the device: no path may escape it.
           if echo "$listing" | grep -qE '^\.\./'; then

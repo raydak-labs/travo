@@ -25,7 +25,7 @@ jobs:
       # A release must never ship from a red main: re-run the CI checks against
       # the exact tagged commit and fail the release when anything is red.
       - name: Run backend, frontend, lint and format gates
-        uses: ./.github/workflows/ci.yml
+        uses: $/.github/workflows/ci.yml
 
   build-and-release:
     name: Build (${{ matrix.arch }})
