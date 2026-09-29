@@ -309,7 +309,10 @@ func TestDeleteDHCPReservation_Returns200(t *testing.T) {
 	}
 }
 
-func TestKickClient_Returns200(t *testing.T) {
+// The shared test app has no AP interface in its command runner, so a kick
+// cannot succeed: the handler must surface that failure instead of returning a
+// silent 200. The success path is covered in services.TestKickClient_SucceedsWhenAPInterfaceAccepts.
+func TestKickClient_NoAPInterfaceReturns500(t *testing.T) {
 	app, deps := setupTestApp()
 	token, _, _ := deps.Auth.Login("admin")
 
@@ -324,9 +327,9 @@ func TestKickClient_Returns200(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusInternalServerError {
 		b, _ := io.ReadAll(resp.Body)
-		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+		t.Errorf("expected 500 when no client was disassociated, got %d, body: %s", resp.StatusCode, b)
 	}
 }
 

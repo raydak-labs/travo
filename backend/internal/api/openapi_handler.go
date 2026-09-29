@@ -33,8 +33,8 @@ var openAPISpec = map[string]any{
 	"paths": map[string]any{
 		// Auth
 		"/auth/login": map[string]any{
-			"post": endpoint("Login", "Authenticate and receive a JWT token (expires_in is the relative session lifetime in seconds)", false,
-				body("application/json", obj("username", "password")),
+			"post": endpoint("Login", "Authenticate as the hard-coded root user and receive a JWT token (expires_in is the relative session lifetime in seconds)", false,
+				body("application/json", obj("password")),
 				resp200("application/json", obj("token", "expires_at", "expires_in")),
 			),
 		},
@@ -57,6 +57,12 @@ var openAPISpec = map[string]any{
 		"/system/stats": map[string]any{
 			"get": endpoint("GetSystemStats", "CPU, memory, storage usage", true, nil, resp200("application/json", nil)),
 		},
+		"/system/stats/history": map[string]any{
+			"get": endpoint("GetStatsHistory", "Historic CPU/memory/traffic samples; returns a JSON array of {time, cpu, memory, rx_bytes, tx_bytes} points", true, nil,
+				resp200("application/json", obj("time", "cpu", "memory", "rx_bytes", "tx_bytes")),
+				query("since", "Unix seconds; only return points newer than this timestamp"),
+			),
+		},
 		"/system/logs": map[string]any{
 			"get": endpoint("GetSystemLogs", "System log (logread/syslog)", true, nil, resp200("application/json", nil)),
 		},
@@ -68,6 +74,34 @@ var openAPISpec = map[string]any{
 		},
 		"/system/shutdown": map[string]any{
 			"post": endpoint("Shutdown", "Shut down the device", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/system/speed-test": map[string]any{
+			"post": endpoint("RunSpeedTest", "Run a WAN download/upload/ping speed test (takes ~30-60s)", true, nil,
+				resp200("application/json", obj("download_mbps", "upload_mbps", "ping_ms", "server")),
+			),
+		},
+		"/system/alert-thresholds": map[string]any{
+			"get": endpoint("GetAlertThresholds", "Get the storage/CPU/memory percentage thresholds that raise system alerts", true, nil,
+				resp200("application/json", obj("storage_percent", "cpu_percent", "memory_percent")),
+			),
+			"put": endpoint("SetAlertThresholds", "Set the storage/CPU/memory percentage thresholds that raise system alerts", true,
+				body("application/json", obj("storage_percent", "cpu_percent", "memory_percent")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		// SSH key management grants root SSH access — keep it documented.
+		"/system/ssh-keys": map[string]any{
+			"get": endpoint("GetSSHKeys", "List authorized SSH public keys granted root access", true, nil, resp200("application/json", obj("keys"))),
+			"post": endpoint("AddSSHKey", "Append a public key to root's authorized_keys (grants root SSH access)", true,
+				body("application/json", obj("key")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/system/ssh-keys/{index}": map[string]any{
+			"delete": endpoint("DeleteSSHKey", "Delete an authorized SSH public key by index (revokes root SSH access)", true, nil,
+				resp200("application/json", obj("ok")),
+				param("index", "Zero-based index of the key as listed by GET /system/ssh-keys"),
+			),
 		},
 		"/system/speedtest-service": map[string]any{
 			"get": endpoint("GetSpeedtestService", "Ookla speedtest CLI availability and install state", true, nil, resp200("application/json", obj("installed", "supported", "architecture", "version"))),
@@ -161,6 +195,11 @@ var openAPISpec = map[string]any{
 		// Network
 		"/network/status": map[string]any{
 			"get": endpoint("GetNetworkStatus", "WAN/LAN/WWAN interface status, internet reachability", true, nil, resp200("application/json", nil)),
+		},
+		"/network/connection-method": map[string]any{
+			"get": endpoint("GetConnectionMethod", "How the calling client is connected (wifi-client/wifi-ap/ethernet) and its interface/IP", true, nil,
+				resp200("application/json", obj("method", "interface", "ip_address")),
+			),
 		},
 		"/network/wan": map[string]any{
 			"get": endpoint("GetWANConfig", "Get WAN configuration (type, IP, DNS, MTU)", true, nil, resp200("application/json", nil)),
@@ -256,6 +295,88 @@ var openAPISpec = map[string]any{
 		"/network/failover/events": map[string]any{
 			"get": endpoint("GetFailoverEvents", "Get recent failover switch events", true, nil, resp200("application/json", nil)),
 		},
+		// Firewall
+		"/network/firewall/zones": map[string]any{
+			"get": endpoint("GetFirewallZones", "List firewall zones with input/output/forward policies and networks", true, nil, resp200("application/json", obj("zones"))),
+		},
+		"/network/firewall/port-forwards": map[string]any{
+			"get": endpoint("GetPortForwards", "List configured port forward rules", true, nil, resp200("application/json", obj("rules"))),
+			"post": endpoint("AddPortForward", "Create a port forward rule", true,
+				body("application/json", obj("id", "name", "protocol", "src_dport", "dest_ip", "dest_port", "enabled")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/network/firewall/port-forwards/{id}": map[string]any{
+			"delete": endpoint("DeletePortForward", "Delete a port forward rule", true, nil,
+				resp200("application/json", obj("ok")),
+				param("id", "Rule identifier as returned by GET /network/firewall/port-forwards"),
+			),
+		},
+		// Network diagnostics / services
+		"/network/diagnostics": map[string]any{
+			"post": endpoint("RunDiagnostics", "Run a diagnostic tool (ping, traceroute, dns) and return its output", true,
+				body("application/json", obj("type", "target")),
+				resp200("application/json", obj("type", "target", "output", "error")),
+			),
+		},
+		"/network/doh": map[string]any{
+			"get": endpoint("GetDoHConfig", "Get DNS-over-HTTPS configuration (cloudflare/google/quad9/custom)", true, nil,
+				resp200("application/json", obj("enabled", "provider", "url")),
+			),
+			"put": endpoint("SetDoHConfig", "Set DNS-over-HTTPS configuration (url is used when provider is custom)", true,
+				body("application/json", obj("enabled", "provider", "url")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/network/ipv6": map[string]any{
+			"get": endpoint("GetIPv6Status", "Get IPv6 enablement state and global addresses", true, nil,
+				resp200("application/json", obj("enabled", "addresses")),
+			),
+			"put": endpoint("SetIPv6Enabled", "Enable or disable IPv6", true,
+				body("application/json", obj("enabled")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/network/wol": map[string]any{
+			"post": endpoint("SendWoL", "Send a Wake-on-LAN magic packet to a MAC address", true,
+				body("application/json", obj("mac", "interface")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		// Data usage (vnstat)
+		"/network/data-usage": map[string]any{
+			"get": endpoint("GetDataUsage", "Current data usage per interface from vnstat (requires vnstat)", true, nil,
+				resp200("application/json", obj("available", "interfaces")),
+			),
+		},
+		"/network/data-usage/reset": map[string]any{
+			"post": endpoint("ResetDataUsage", "Reset the vnstat counters for a single interface", true,
+				body("application/json", obj("interface")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/network/data-usage/budget": map[string]any{
+			"get": endpoint("GetDataBudget", "Get per-interface monthly data budgets", true, nil, resp200("application/json", obj("budgets"))),
+			"put": endpoint("SetDataBudget", "Set per-interface monthly data budgets", true,
+				body("application/json", obj("budgets")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		// USB tethering
+		"/network/usb-tethering": map[string]any{
+			"get": endpoint("GetUSBTetheringStatus", "USB tethering detection state (device type, interface, IP, configured)", true, nil,
+				resp200("application/json", obj("detected", "device_type", "interface", "is_up", "ip_address", "configured")),
+			),
+		},
+		"/network/usb-tethering/configure": map[string]any{
+			"post": endpoint("ConfigureUSBTethering", "Configure the given USB interface as a WAN source", true,
+				body("application/json", obj("interface")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/network/usb-tethering/unconfigure": map[string]any{
+			"post": endpoint("UnconfigureUSBTethering", "Remove the USB tethering WAN configuration", true, nil, resp200("application/json", obj("ok"))),
+		},
 		// SQM
 		"/sqm/config": map[string]any{
 			"get": endpoint("GetSQMConfig", "Get SQM (traffic shaping) configuration", true, nil, resp200("application/json", nil)),
@@ -282,6 +403,11 @@ var openAPISpec = map[string]any{
 		},
 		"/wifi/connection": map[string]any{
 			"get": endpoint("GetWiFiConnection", "Current upstream WiFi connection status", true, nil, resp200("application/json", nil)),
+		},
+		"/wifi/health": map[string]any{
+			"get": endpoint("GetWiFiHealth", "WiFi health summary with detected issues, STA association and WWAN state", true, nil,
+				resp200("application/json", obj("status", "issues", "repeater_same_radio_ap_sta", "sta", "wwan")),
+			),
 		},
 		"/wifi/mode": map[string]any{
 			"put": endpoint("SetWiFiMode", "Switch WiFi operating mode (ap/client/repeater)", true,
@@ -329,6 +455,38 @@ var openAPISpec = map[string]any{
 		},
 		"/wifi/repeater/reconcile": map[string]any{
 			"post": endpoint("ReconcileRepeaterAPLayout", "Re-apply repeater STA/AP per-radio separation", true, nil, resp200("application/json", obj("ok"))),
+		},
+		"/wifi/radios/{name}/role": map[string]any{
+			"put": endpoint("SetRadioRole", "Assign the sta or ap role to a radio (only one active STA)", true,
+				body("application/json", obj("role")),
+				resp200("application/json", obj("status", "apply")),
+				param("name", "Radio device name, e.g. radio0"),
+			),
+		},
+		"/wifi/band-switching": map[string]any{
+			"get": endpoint("GetBandSwitching", "Automatic 2.4/5 GHz band switching configuration and live monitor state", true, nil,
+				resp200("application/json", obj("config", "status")),
+			),
+			"put": endpoint("SetBandSwitching", "Configure automatic 2.4/5 GHz band switching thresholds and delays", true,
+				body("application/json", obj("enabled", "preferred_band", "check_interval_sec", "down_switch_threshold_dbm", "down_switch_delay_sec", "up_switch_threshold_dbm", "up_switch_delay_sec", "min_viable_signal_dbm")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/wifi/schedule": map[string]any{
+			"get": endpoint("GetWiFiSchedule", "Get the WiFi on/off cron schedule", true, nil,
+				resp200("application/json", obj("enabled", "on_time", "off_time")),
+			),
+			"put": endpoint("SetWiFiSchedule", "Set the WiFi on/off cron schedule (HH:MM, 24h)", true,
+				body("application/json", obj("enabled", "on_time", "off_time")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/wifi/mac-policies": map[string]any{
+			"get": endpoint("GetMACPolicies", "List per-SSID MAC address policies used when connecting", true, nil, resp200("application/json", obj("policies"))),
+			"put": endpoint("SetMACPolicies", "Replace the per-SSID MAC address policies", true,
+				body("application/json", obj("policies")),
+				resp200("application/json", obj("ok")),
+			),
 		},
 		"/wifi/mac": map[string]any{
 			"get": endpoint("GetMAC", "Get MAC addresses for all WiFi interfaces", true, nil, resp200("application/json", nil)),
@@ -409,6 +567,34 @@ var openAPISpec = map[string]any{
 				resp200("application/json", obj("ok")),
 			),
 		},
+		"/vpn/tailscale/auth": map[string]any{
+			"post": endpoint("StartTailscaleAuth", "Run tailscale up and return the browser auth URL when login is required", true,
+				body("application/json", obj("auth_key")),
+				resp200("application/json", obj("auth_url")),
+			),
+		},
+		"/vpn/tailscale/exit-node": map[string]any{
+			"post": endpoint("SetTailscaleExitNode", "Select (or clear) the Tailscale exit node by node IP", true,
+				body("application/json", obj("node_ip", "exit_node")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/vpn/tailscale/ssh": map[string]any{
+			"get": endpoint("GetTailscaleSSH", "Get whether Tailscale SSH is enabled", true, nil, resp200("application/json", obj("enabled"))),
+			"put": endpoint("SetTailscaleSSH", "Enable or disable Tailscale SSH", true,
+				body("application/json", obj("enabled")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/vpn/split-tunnel": map[string]any{
+			"get": endpoint("GetSplitTunnel", "Get WireGuard split tunneling mode and routes", true, nil,
+				resp200("application/json", obj("mode", "routes")),
+			),
+			"put": endpoint("SetSplitTunnel", "Set WireGuard split tunneling (mode is 'all' or 'custom')", true,
+				body("application/json", obj("mode", "routes")),
+				resp200("application/json", obj("ok")),
+			),
+		},
 		"/vpn/dns-leak-test": map[string]any{
 			"get": endpoint("DNSLeakTest", "Router-side check: WireGuard DNS vs effective upstream (resolv.conf; dnsmasq server= when resolv is loopback-only)", true, nil, resp200("application/json", nil)),
 		},
@@ -458,10 +644,21 @@ var openAPISpec = map[string]any{
 			),
 		},
 		"/adguard/config": map[string]any{
-			"get": endpoint("GetAdGuardConfig", "Read AdGuardHome.yaml configuration", true, nil, resp200("application/json", obj("config"))),
-			"put": endpoint("SetAdGuardConfig", "Write AdGuardHome.yaml and restart service", true,
-				body("application/json", obj("config")),
+			"get": endpoint("GetAdGuardConfig", "Read the AdGuardHome.yaml configuration file contents", true, nil, resp200("application/json", obj("content"))),
+			"put": endpoint("SetAdGuardConfig", "Write the AdGuardHome.yaml configuration from the 'content' field and restart the service", true,
+				body("application/json", obj("content")),
 				resp200("application/json", obj("ok")),
+			),
+		},
+		"/adguard/password": map[string]any{
+			"put": endpoint("SetAdGuardPassword", "Set the AdGuard Home web UI password (username defaults to 'admin')", true,
+				body("application/json", obj("username", "password")),
+				resp200("application/json", obj("ok")),
+			),
+		},
+		"/adguard/dns-mode": map[string]any{
+			"get": endpoint("GetAdGuardDNSMode", "Effective LAN DNS mode (default, adguard-forwarding, adguard-direct) and whether DNS is bypassed", true, nil,
+				resp200("application/json", obj("mode", "description", "adguard_running", "dns_bypassed")),
 			),
 		},
 		// Captive portal
@@ -483,8 +680,9 @@ var openAPISpec = map[string]any{
 	},
 }
 
-// endpoint builds an OpenAPI operation object.
-func endpoint(operationID, summary string, requiresAuth bool, requestBody, response map[string]any) map[string]any {
+// endpoint builds an OpenAPI operation object. The optional parameters are
+// path (param) and query (query) parameter objects, in that order.
+func endpoint(operationID, summary string, requiresAuth bool, requestBody, response map[string]any, parameters ...map[string]any) map[string]any {
 	op := map[string]any{
 		"operationId": operationID,
 		"summary":     summary,
@@ -498,7 +696,32 @@ func endpoint(operationID, summary string, requiresAuth bool, requestBody, respo
 	if requestBody != nil {
 		op["requestBody"] = requestBody
 	}
+	if len(parameters) > 0 {
+		op["parameters"] = parameters
+	}
 	return op
+}
+
+// param builds a required path parameter object.
+func param(name, description string) map[string]any {
+	return map[string]any{
+		"name":        name,
+		"in":          "path",
+		"required":    true,
+		"description": description,
+		"schema":      map[string]any{"type": "string"},
+	}
+}
+
+// query builds an optional query parameter object.
+func query(name, description string) map[string]any {
+	return map[string]any{
+		"name":        name,
+		"in":          "query",
+		"required":    false,
+		"description": description,
+		"schema":      map[string]any{"type": "string"},
+	}
 }
 
 // body builds a requestBody object.
