@@ -8,7 +8,7 @@ tags:
   - docs
   - hub
   - travo
-updated: 2026-05-14
+updated: 2026-09-28
 ---
 
 # Travo documentation hub
@@ -26,6 +26,8 @@ updated: 2026-05-14
 - [[adr/0005-multi-wan-failover-mwan3]]
 - [[adr/0006-application-platform-and-api-contract]]
 - [[adr/0007-authentication-and-access-control]]
+- [[adr/0008-ssh-key-management]]
+- [[adr/0009-persistent-store-bbolt]]
 
 ## Backlog and shipped work
 

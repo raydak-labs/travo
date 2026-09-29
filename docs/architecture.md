@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-05-14
+updated: 2026-09-28
 ---
 
 # Architecture Decisions
@@ -70,22 +70,30 @@ Wireless mutation safety is intentionally modeled after LuCI. **Implementation r
 - Scripts and SSH setup flows must **not** run `wifi`, `wifi up`, or `wifi reload` as part of applying user wireless changes.
 - Setup scripts only write UCI. User applies via LuCI "Save & Apply" or by rebooting.
 - `wifi reload` is avoided on ath11k/IPQ6018. Where `wifi up` exists for bounded recovery paths, that exception must stay narrow and documented.
+- **The one helper for scheduled and hotplug toggles** is the generated
+  `/usr/libexec/travo-wireless-toggle.sh` (owned by the backend). It flips
+  `wireless.*.disabled`, commits, and goes through rpcd `apply` (rollback, 30 s) →
+  `confirm`, behind the `wifi-toggle-in-progress` guard. **Both** the WiFi on/off
+  **schedule** (`/etc/cron.d/openwrt-gui-wifi-schedule`) and the **hardware button**
+  hotplug toggle (`/etc/hotplug.d/button/50-gui-button-actions`, run as root) call it,
+  so neither path runs `wifi up` / `wifi down` any more. Details in ADR 0002 §6.1.
 
 ## 4. Crash Guards For Automated Live-State Changes
 
-**Guard catalog and patterns:** [`docs/adr/0003-crash-guards-and-live-state.md`](./adr/0003-crash-guards-and-live-state.md).
+**The authoritative guard catalog (path → owning file → what it protects) is the table in [`docs/adr/0003-crash-guards-and-live-state.md` §2](./adr/0003-crash-guards-and-live-state.md).** Read it before adding a live-state mutation and before debugging "feature won't run" — this file deliberately does not restate the list, because a partial copy is what made the recovery path unverifiable.
 
-Any automated action that can change live system state must use a crash guard:
+Contract:
 
-1. Write guard file to persistent storage under `/etc/travo/` before dangerous operation.
-2. On next startup, if guard file exists, skip operation and log warning.
-3. Remove guard file only after successful completion.
-4. Manual redeploy (`deploy-local.sh`) clears guard files and is the explicit retry signal.
+1. Write a guard file to persistent storage under `/etc/trafo/` **before** the dangerous operation. That single directory is authoritative: `internal/services/crash_guard_paths_test.go` fails the build if a guard path reappears under `/etc/travo/`, and `deploy-local.sh` clears both so a device upgraded from an older build still recovers (see ADR 0003 §2).
+2. While the guard exists, the operation is skipped. Not every skip logs: **check the filesystem** (`ls /etc/trafo`) rather than assuming a log line.
+3. Remove the guard only after the whole operation completed successfully.
+4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and `TestCrashGuardsAllLiveUnderEtcTrafo` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
+5. Startup is also a repair point for pre-fix artifacts: `cmd/server/main.go` reconciles the auto-reconnect script and cron entry in **both** directions (enabled *and* disabled) and re-writes the WiFi schedule cron entry from the stored config, so a device carrying the old `wifi reload` / `/sbin/wifi up` lines converges onto the generated toggle helper without waiting for the user to re-save a setting.
 
 Guard naming convention:
 
 ```text
-/etc/travo/<feature>-in-progress
+/etc/trafo/<feature>-in-progress
 ```
 
 This rule applies to:
@@ -103,6 +111,7 @@ This rule applies to:
 - New zones, forwarding paths, or interfaces must include the full required firewall changes.
 - Follow existing default `wan` patterns instead of inventing a separate one-off policy model.
 - WWAN, WAN, VPN, guest, and future interfaces should be treated as explicit routing and firewall topology decisions, not UI-only toggles.
+- **Two firewall mutations deliberately bypass the rpcd apply/confirm flow** — the `wg0` VPN zone and the `usbtether` entry in the `wan` zone. They are guarded and reversible; the exceptions and the rule for any new direct `commit firewall` path are in **[`docs/adr/0004` §5](./adr/0004-firewall-zones-and-interface-policy.md)**.
 
 ## 6. Networking Invariants
 
@@ -126,20 +135,24 @@ This rule applies to:
 
 ### 6.2 Failover safety guards
 
-- Applying failover configuration writes live routing policy and requires an explicit guard: `/etc/travo/failover-in-progress`.
-- Guard file is only removed after verification succeeds; manual redeploy via `deploy-local.sh` clears stuck guards.
-- Wireless changes during failover apply must preserve LuCI-style rollback semantics.
+- Applying failover configuration writes live routing policy and requires an explicit guard: `/etc/trafo/failover-in-progress`. The **full** guard list, including the other guards a redeploy clears, is in **[`docs/adr/0003` §2](./adr/0003-crash-guards-and-live-state.md)** — do not restate a partial list here.
+- The guard is written before the staged mwan3 apply and removed only after verification succeeds; a manual redeploy via `deploy-local.sh` clears stuck guards. A stuck failover guard silently disables the monitor (the skip path does not log).
+- Wireless changes during failover apply must preserve LuCI-style rollback semantics: the mwan3 apply is **staged** — rpcd `apply` with rollback → verify every managed section → `Confirm`.
 - Any new routes, zones, or firewall changes added for failover must include complete firewall zone configuration.
 
 ### 6.3 DNS resolution, VPN, captive portal, and temporary restore
 
 Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive portal DNS bypass**, and **snapshot/restore** semantics are normative in **[`docs/adr/0001-dns-vpn-captive-portal-architecture.md`](./adr/0001-dns-vpn-captive-portal-architecture.md)**. Read that ADR before changing `CaptiveService`, `VpnService` DNS helpers, `AdGuardService` DNS integration, or `NetworkService` WAN DNS.
 
+The captive auto-accept flow's conditional `wwan` DHCP bounce lives in that ADR (§4.1), not here: it is a captive-portal behavior, and putting the "only when `wwan` is the active uplink" condition next to the DNS bypass rules keeps the whole captive surface in one place.
+
 ## 7. Authentication And API Access
 
 - Administrative login uses the **root** password validated via **rpcd** on device; Travo issues **JWT** bearer tokens for API access.
 - **Session validity is clock-independent**: a monotonic-clock registry decides token lifetime; clients receive relative `expires_in` seconds and must never compare server timestamps against their own clock. Normative details in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
 - Optional **IP allowlist** and auth hardening details are normative in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
+- Changing the password **revokes every live session** and returns a replacement token; token revocations persist in `/etc/trafo/travo.db`, so they survive a backend restart.
+- SSH key management grants root SSH access and has its own rules in **[`docs/adr/0008-ssh-key-management.md`](./adr/0008-ssh-key-management.md)**.
 - Unknown `GET /api/*` paths return a **JSON 404**, never the SPA `index.html`.
 
 ## 8. Device Constraints
@@ -152,9 +165,12 @@ Router hardware is constrained. Every feature must justify its footprint.
 - Prefer SVG assets over raster assets
 - Keep API payloads small; avoid polling where a realtime channel already exists
 - Warn before installing packages that meaningfully consume flash storage
-- **Every shell-out goes through `backend/internal/execx`** with an explicit timeout tier (Quick 30s / Slow 3m / Package 10m); a hung external command must never pin a handler goroutine. Fire-and-forget paths that end in reboot/poweroff/flash are the only exception.
-- **Package operations use the `PackageManager` abstraction** (`service_manager.go`), which detects **apk** (OpenWrt 25.x+) vs **opkg** at runtime and refreshes the package index best-effort before installs (opkg lists live in `/tmp` and vanish on reboot). Never hardcode `opkg` or `apk` in feature code.
-- Every background goroutine registers in the `appLifecycle` shutdown path (`cmd/server/main.go`).
+- **Every shell-out goes through `backend/internal/execx`** with an explicit timeout tier (Quick 30s / Slow 3m / Package 10m); a hung external command must never pin a handler goroutine. Two exceptions exist, and they are exceptions for a stated reason, not by omission:
+  - **fire-and-forget terminal operations** — `reboot`, `poweroff`, `sysupgrade`, `firstboot -y` (all in `system_service.go`). These end in a reboot or a flash, so there is no handler left to protect; each is crash-guarded and runs in a goroutine rather than blocking the request.
+  - **`iw event`** in `network_event_watcher.go`, the only remaining raw `exec.Command` in the backend. It is a long-running event listener whose lifetime is bounded by the service's stop channel and a `Process.Kill()`, not by a timeout tier; forcing it through `execx` would kill it immediately.
+- **Package operations use the `PackageManager` abstraction** (`service_manager.go`), which detects **apk** (OpenWrt 25.x+) vs **opkg** at runtime and refreshes the package index best-effort before installs (opkg lists live in `/tmp` and vanish on reboot). Never hardcode `opkg` or `apk` in feature code. Package install/remove writes init scripts, `/etc/config` and kernel modules, so it is crash-guarded (`pkg-install-in-progress`).
+- **Every long-lived background goroutine is either registered in `appLifecycle` (`cmd/server/main.go`) or stopped through it.** The startup workers (AP repair, auto-reconnect script refresh, radio discovery) and the network event watcher run via `lifecycle.Go` with a `stop` channel, so a worker waiting on a delay bails out on SIGTERM instead of committing UCI afterwards. The services that own their own ticker (`hub`, `alertSvc`, `uptimeTracker`, `bandSwitchSvc`, `failoverSvc`, rate limiters, `statsHistory`, `captiveSvc`) are shut down by `lifecycle.Stop()`, which is `sync.Once`-guarded and runs in order after the HTTP server has drained. The untracked goroutines that remain are the terminal operations named above.
+- **Persistent state is deliberate and bounded.** `/etc/trafo/travo.db` (bbolt) holds only the token-revocation set and the stats-history ring buffer; it batches writes because `/etc/trafo` is NAND-backed overlayfs, and it degrades to memory-only if the open fails rather than blocking the UI. Rules, retention and the bucket table: **[`docs/adr/0009-persistent-store-bbolt.md`](./adr/0009-persistent-store-bbolt.md)**.
 
 ## 9. Documentation Rules
 

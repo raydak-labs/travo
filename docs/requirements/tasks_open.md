@@ -1,7 +1,7 @@
 ---
 title: Open tasks
 description: Active product and engineering backlog; link target for plans and architecture.
-updated: 2026-04-13
+updated: 2026-09-28
 tags: [backlog, requirements, tasks]
 ---
 
@@ -11,7 +11,7 @@ Working backlog only — no duplicate “priority queue”; each item appears on
 
 Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
-> **Last updated:** 2026-05-06
+> **Last updated:** 2026-09-28 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## 1. WiFi Management
 
@@ -30,13 +30,6 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 - [ ] Bluetooth tethering
 
-### 2.7 Connection Failover
-
-- [ ] Priority-based WAN source (Ethernet > WiFi > USB Tether). See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
-- [ ] Health check via periodic ping (configurable target). See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
-- [ ] Auto-switch to next source on failure. See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
-- [ ] Notification on failover event. See [Connection Failover plan](../plans/connection-failover.md). *(implemented — verify on device)*
-
 ## 3. VPN Management
 
 ### 3.3 General VPN UX
@@ -54,11 +47,16 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ### 6.2 Real-Time Monitoring
 
-- [ ] Historical data (store and display last hours/days)
+- [ ] Historical data beyond the current window. The 6 h ring buffer (30 s interval,
+      720 points, persisted in `/etc/trafo/travo.db`) shipped; longer retention is a
+      product decision about flash wear — see [ADR 0009](../adr/0009-persistent-store-bbolt.md)
+      for the write-batching rule any extension must follow.
 
 ## 7. Authentication And Security
 
 - [ ] Two-factor authentication
+- [ ] WebSocket token in a header or `Sec-WebSocket-Protocol` instead of the query
+      string, where it lands in access logs and browser history (ADR 0007 §4).
 
 ## 11. Advanced Networking
 
@@ -79,9 +77,31 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 - [ ] Custom button action scripting
 - [ ] Long-press vs short-press differentiation. See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-4--long-press-vs-short-press-future).
 
+## 15. Follow-Ups From The 2026-09-26 Critical Review
+
+These are real doc↔code gaps that the review surfaced and that the remediation pass
+documented rather than fixed. They are code changes, not doc changes.
+
+- [ ] **Failover guard skip is silent.** A stuck `failover-in-progress` disables the
+      monitor with no log line (`FailoverService.Start` has no logging at all). Either
+      log the skip or make `GET /network/failover` report the guard state, so "failover
+      never fires" is diagnosable from the UI.
+- [ ] **SSH key audit trail.** `POST /api/v1/system/ssh-keys` grants root SSH access and
+      currently writes nothing to the log ([ADR 0008](../adr/0008-ssh-key-management.md)).
+- [ ] **`DeleteSSHKey` is positional.** The index space is positional, so a delete after
+      an add shifts later keys. A fingerprint-addressed delete is a breaking API change.
+- [ ] **Store degradation is invisible.** If `/etc/trafo/travo.db` cannot be opened the
+      backend only logs a warning; the UI cannot tell that history and cross-restart
+      revocations are not persisting ([ADR 0009](../adr/0009-persistent-store-bbolt.md)).
+
 ## 16. Research And Open Questions
 
-- [ ] Investigate whether a lightweight database such as SQLite makes sense for Travo passwords and collected data such as CPU or traffic usage. Evaluate footprint, flash usage, durability, and operational benefit before committing.
+- [x] ~~Investigate whether a lightweight database such as SQLite makes sense for Travo
+      passwords and collected data such as CPU or traffic usage.~~ **Decided and
+      implemented as bbolt** (`/etc/trafo/travo.db`, ADR 0009). Measured: bbolt adds
+      **247 KB** to the stripped binary (12.57 → 12.83 MB) where `modernc.org/sqlite`
+      would add ~10 MB. The current consumers are the token-revocation set and the
+      stats-history ring buffer.
 
 ### Open Questions
 
