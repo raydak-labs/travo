@@ -53,7 +53,7 @@ func openAPIPath(path string) string {
 
 func setupSpecApp(t *testing.T) *fiber.App {
 	t.Helper()
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	// The shared test app already called SetupRoutes; re-registering is not
 	// needed, we only need the app object to introspect and to serve the spec.
 	_ = deps

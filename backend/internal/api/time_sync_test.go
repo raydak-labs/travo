@@ -31,7 +31,7 @@ func postTimeSync(t *testing.T, app *fiber.App, token string, clientTimeMs int64
 // With a plausible clock (now >= MinPlausible) an unauthenticated caller must
 // not be able to change the system time.
 func TestTimeSync_UnauthenticatedPlausibleClockRejected(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	deps.TimeSyncSetTime = func(epochSec int64) error { t.Fatal("SetTime must not be called"); return nil }
 
 	resp := postTimeSync(t, app, "", time.Now().Add(2*time.Hour).UnixMilli())
@@ -45,7 +45,7 @@ func TestTimeSync_UnauthenticatedPlausibleClockRejected(t *testing.T) {
 // When the router clock is implausible (before build time), an unauthenticated
 // pre-login sync is allowed so the user can log in at all.
 func TestTimeSync_UnauthenticatedImplausibleClockAllowed(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	var setTo int64
 	deps.TimeSyncMinPlausible = time.Now().Add(time.Hour) // pretend build time is ahead of clock
 	deps.TimeSyncSetTime = func(epochSec int64) error { setTo = epochSec; return nil }
@@ -64,7 +64,7 @@ func TestTimeSync_UnauthenticatedImplausibleClockAllowed(t *testing.T) {
 
 // Authenticated callers may sync regardless of clock plausibility.
 func TestTimeSync_AuthenticatedAllowed(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	var called bool
 	deps.TimeSyncSetTime = func(epochSec int64) error { called = true; return nil }
 	token, _, _ := deps.Auth.Login("admin")
@@ -82,7 +82,7 @@ func TestTimeSync_AuthenticatedAllowed(t *testing.T) {
 
 // Small skew is a no-op regardless of auth.
 func TestTimeSync_SmallSkewNoOp(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	deps.TimeSyncSetTime = func(epochSec int64) error { t.Fatal("SetTime must not be called"); return nil }
 	token, _, _ := deps.Auth.Login("admin")
 
@@ -102,7 +102,7 @@ func TestTimeSync_SmallSkewNoOp(t *testing.T) {
 
 // Unauthenticated syncs are rate limited per IP.
 func TestTimeSync_UnauthenticatedRateLimited(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	deps.TimeSyncMinPlausible = time.Now().Add(time.Hour)
 	deps.TimeSyncSetTime = func(epochSec int64) error { return nil }
 	deps.TimeSyncLimiter = auth.NewRateLimiter(1, time.Minute)

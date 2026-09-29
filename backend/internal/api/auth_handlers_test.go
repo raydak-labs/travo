@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -17,7 +16,8 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-func setupTestApp() (*fiber.App, *Dependencies) {
+func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
+	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	authSvc := auth.NewAuthService("admin", "test-secret")
@@ -25,7 +25,12 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	authSvc.SetBlocklist(blocklist)
 	rateLimiter := auth.NewRateLimiter(5, time.Minute)
 
-	tmpDir, _ := os.MkdirTemp("", "vpn-test-*")
+	// t.TempDir() is removed when the test finishes and fails the test if it
+	// cannot be created. A bare os.MkdirTemp with a discarded error is worse than
+	// useless here: on failure tmpDir would be "" and every derived path below
+	// would silently become an absolute root path ("/wireguard_profiles.json"),
+	// and each of the ~100 call sites would leak its own directory.
+	tmpDir := t.TempDir()
 	profilesPath := tmpDir + "/wireguard_profiles.json"
 	priorityPath := tmpDir + "/wifi-priorities.json"
 	autoReconnectPath := tmpDir + "/autoreconnect.json"
@@ -68,7 +73,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 }
 
 func TestLoginSuccess(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	body, _ := json.Marshal(map[string]string{"password": "admin"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -84,7 +89,7 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginWrongPassword(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	body, _ := json.Marshal(map[string]string{"password": "wrong"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -99,7 +104,7 @@ func TestLoginWrongPassword(t *testing.T) {
 }
 
 func TestProtectedRouteWithoutToken(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
@@ -112,7 +117,7 @@ func TestProtectedRouteWithoutToken(t *testing.T) {
 }
 
 func TestProtectedRouteWithToken(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
@@ -129,7 +134,7 @@ func TestProtectedRouteWithToken(t *testing.T) {
 }
 
 func TestLogoutBlocksToken(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 
 	// Login to get a token
 	token, _, _ := deps.Auth.Login("admin")
@@ -172,7 +177,7 @@ func TestLogoutBlocksToken(t *testing.T) {
 }
 
 func TestLoginRateLimited(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 
 	// Make 5 failed login attempts
 	for i := range 5 {
@@ -207,7 +212,7 @@ func TestLoginRateLimited(t *testing.T) {
 // A password change must invalidate every other session and hand the caller a
 // fresh token, so a stolen token cannot outlive the change.
 func TestChangePasswordRevokesSessionsAndReturnsToken(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	deps.Auth.SetSessionRegistry(auth.NewSessionRegistry(time.Hour))
 
 	stolen, _, err := deps.Auth.Login("admin")
@@ -279,7 +284,7 @@ func TestChangePasswordRevokesSessionsAndReturnsToken(t *testing.T) {
 }
 
 func TestChangePasswordRejectsShortPassword(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{

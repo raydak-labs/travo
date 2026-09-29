@@ -11,7 +11,7 @@ import (
 )
 
 func TestNetworkStatusEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/status", nil)
@@ -35,7 +35,7 @@ func TestNetworkStatusEndpoint(t *testing.T) {
 }
 
 func TestSetWanConfig_InvalidType_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -56,7 +56,7 @@ func TestSetWanConfig_InvalidType_Returns400(t *testing.T) {
 }
 
 func TestSetWanConfig_InvalidIP_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -80,7 +80,7 @@ func TestSetWanConfig_InvalidIP_Returns400(t *testing.T) {
 }
 
 func TestSetWanConfig_InvalidMTU_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -102,7 +102,7 @@ func TestSetWanConfig_InvalidMTU_Returns400(t *testing.T) {
 }
 
 func TestDetectWanTypeEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/wan/detect", nil)
@@ -130,7 +130,7 @@ func TestDetectWanTypeEndpoint(t *testing.T) {
 }
 
 func TestSetWanConfig_InvalidDNS_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -152,7 +152,7 @@ func TestSetWanConfig_InvalidDNS_Returns400(t *testing.T) {
 }
 
 func TestSetWanConfig_ValidDHCP_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -173,7 +173,7 @@ func TestSetWanConfig_ValidDHCP_Returns200(t *testing.T) {
 }
 
 func TestGetDHCPReservations_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/dhcp/reservations", nil)
@@ -189,7 +189,7 @@ func TestGetDHCPReservations_Returns200(t *testing.T) {
 }
 
 func TestAddDHCPReservation_ValidRequest_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -212,7 +212,7 @@ func TestAddDHCPReservation_ValidRequest_Returns200(t *testing.T) {
 }
 
 func TestAddDHCPReservation_MissingName_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -234,7 +234,7 @@ func TestAddDHCPReservation_MissingName_Returns400(t *testing.T) {
 }
 
 func TestAddDHCPReservation_InvalidMAC_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -257,7 +257,7 @@ func TestAddDHCPReservation_InvalidMAC_Returns400(t *testing.T) {
 }
 
 func TestAddDHCPReservation_InvalidIP_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -280,7 +280,7 @@ func TestAddDHCPReservation_InvalidIP_Returns400(t *testing.T) {
 }
 
 func TestDeleteDHCPReservation_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	// First add a reservation
@@ -313,7 +313,7 @@ func TestDeleteDHCPReservation_Returns200(t *testing.T) {
 // cannot succeed: the handler must surface that failure instead of returning a
 // silent 200. The success path is covered in services.TestKickClient_SucceedsWhenAPInterfaceAccepts.
 func TestKickClient_NoAPInterfaceReturns500(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -334,7 +334,7 @@ func TestKickClient_NoAPInterfaceReturns500(t *testing.T) {
 }
 
 func TestKickClient_MissingMAC_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{})
@@ -353,7 +353,7 @@ func TestKickClient_MissingMAC_Returns400(t *testing.T) {
 }
 
 func TestKickClient_InvalidMAC_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -374,7 +374,7 @@ func TestKickClient_InvalidMAC_Returns400(t *testing.T) {
 }
 
 func TestBlockClient_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -395,7 +395,7 @@ func TestBlockClient_Returns200(t *testing.T) {
 }
 
 func TestBlockClient_InvalidMAC_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -416,7 +416,7 @@ func TestBlockClient_InvalidMAC_Returns400(t *testing.T) {
 }
 
 func TestUnblockClient_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	// Block first
@@ -448,7 +448,7 @@ func TestUnblockClient_Returns200(t *testing.T) {
 }
 
 func TestGetBlockedClients_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/clients/blocked", nil)
@@ -472,7 +472,7 @@ func TestGetBlockedClients_Returns200(t *testing.T) {
 }
 
 func TestSetInterfaceState_Up_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{"up": true})
@@ -491,7 +491,7 @@ func TestSetInterfaceState_Up_Returns200(t *testing.T) {
 }
 
 func TestSetInterfaceState_Down_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{"up": false})
@@ -510,7 +510,7 @@ func TestSetInterfaceState_Down_Returns200(t *testing.T) {
 }
 
 func TestSetInterfaceState_InvalidInterface_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{"up": true})
@@ -529,7 +529,7 @@ func TestSetInterfaceState_InvalidInterface_Returns400(t *testing.T) {
 }
 
 func TestSetInterfaceState_InvalidBody_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/interfaces/wan/state", bytes.NewReader([]byte("not json")))
@@ -547,7 +547,7 @@ func TestSetInterfaceState_InvalidBody_Returns400(t *testing.T) {
 }
 
 func TestGetDDNSConfig_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/ddns", nil)
@@ -564,7 +564,7 @@ func TestGetDDNSConfig_Returns200(t *testing.T) {
 }
 
 func TestSetDDNSConfig_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -590,7 +590,7 @@ func TestSetDDNSConfig_Returns200(t *testing.T) {
 }
 
 func TestSetDDNSConfig_MissingService_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -613,7 +613,7 @@ func TestSetDDNSConfig_MissingService_Returns400(t *testing.T) {
 }
 
 func TestSetDDNSConfig_MissingDomain_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -636,7 +636,7 @@ func TestSetDDNSConfig_MissingDomain_Returns400(t *testing.T) {
 }
 
 func TestSetDDNSConfig_Custom_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -663,7 +663,7 @@ func TestSetDDNSConfig_Custom_Returns200(t *testing.T) {
 }
 
 func TestSetDDNSConfig_Custom_MissingUpdateURL_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -690,7 +690,7 @@ func TestSetDDNSConfig_Custom_MissingUpdateURL_Returns400(t *testing.T) {
 }
 
 func TestSetDDNSConfig_Custom_InvalidURL_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -717,7 +717,7 @@ func TestSetDDNSConfig_Custom_InvalidURL_Returns400(t *testing.T) {
 }
 
 func TestGetDDNSStatus_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/ddns/status", nil)

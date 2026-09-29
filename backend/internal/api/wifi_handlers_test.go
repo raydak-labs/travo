@@ -11,7 +11,7 @@ import (
 )
 
 func TestWifiScanEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/scan", nil)
@@ -35,7 +35,7 @@ func TestWifiScanEndpoint(t *testing.T) {
 }
 
 func TestWifiConnectEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -56,7 +56,7 @@ func TestWifiConnectEndpoint(t *testing.T) {
 }
 
 func TestWifiConnect_EmptySSID_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -83,7 +83,7 @@ func TestWifiConnect_EmptySSID_Returns400(t *testing.T) {
 }
 
 func TestWifiConnect_ShortPassword_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -104,7 +104,7 @@ func TestWifiConnect_ShortPassword_Returns400(t *testing.T) {
 }
 
 func TestWifiConnect_OpenNetworkNoPassword_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -125,7 +125,7 @@ func TestWifiConnect_OpenNetworkNoPassword_Returns200(t *testing.T) {
 }
 
 func TestWifiConnect_NewSecuredWithoutPassword_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -146,7 +146,7 @@ func TestWifiConnect_NewSecuredWithoutPassword_Returns400(t *testing.T) {
 }
 
 func TestWifiConnect_NewWithoutEncryption_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -167,7 +167,7 @@ func TestWifiConnect_NewWithoutEncryption_Returns400(t *testing.T) {
 }
 
 func TestWifiConnectionEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/connection", nil)
@@ -191,7 +191,7 @@ func TestWifiConnectionEndpoint(t *testing.T) {
 }
 
 func TestWifiHealthEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/health", nil)
@@ -215,7 +215,7 @@ func TestWifiHealthEndpoint(t *testing.T) {
 }
 
 func TestWifiRepeaterReconcileEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/repeater/reconcile", nil)
@@ -232,7 +232,7 @@ func TestWifiRepeaterReconcileEndpoint(t *testing.T) {
 }
 
 func TestWifiDisconnectEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/disconnect", nil)
@@ -257,7 +257,7 @@ func TestWifiDisconnectEndpoint(t *testing.T) {
 }
 
 func TestWifiApplyConfirmEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{"token": "apply-123"})
@@ -276,7 +276,7 @@ func TestWifiApplyConfirmEndpoint(t *testing.T) {
 }
 
 func TestWifiDeleteEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/wifi/saved/sta0", nil)
@@ -293,7 +293,7 @@ func TestWifiDeleteEndpoint(t *testing.T) {
 }
 
 func TestWifiDeleteEndpoint_NonexistentSection(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/wifi/saved/nonexistent", nil)
@@ -309,7 +309,7 @@ func TestWifiDeleteEndpoint_NonexistentSection(t *testing.T) {
 }
 
 func TestGuestWifiGetEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/guest", nil)
@@ -334,7 +334,7 @@ func TestGuestWifiGetEndpoint(t *testing.T) {
 }
 
 func TestGuestWifiSetEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -355,7 +355,7 @@ func TestGuestWifiSetEndpoint(t *testing.T) {
 }
 
 func TestGuestWifiSet_EmptySSID_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -376,7 +376,7 @@ func TestGuestWifiSet_EmptySSID_Returns400(t *testing.T) {
 }
 
 func TestGuestWifiSet_ShortPassword_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -397,7 +397,7 @@ func TestGuestWifiSet_ShortPassword_Returns400(t *testing.T) {
 }
 
 func TestRadioStatusGetEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/radio", nil)
@@ -422,7 +422,7 @@ func TestRadioStatusGetEndpoint(t *testing.T) {
 }
 
 func TestRadioStatusSetEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{"enabled": false})
@@ -441,7 +441,7 @@ func TestRadioStatusSetEndpoint(t *testing.T) {
 }
 
 func TestWifiSetPriorityEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -470,7 +470,7 @@ func TestWifiSetPriorityEndpoint(t *testing.T) {
 }
 
 func TestWifiSetPriorityEndpoint_EmptySSIDs(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -491,7 +491,7 @@ func TestWifiSetPriorityEndpoint_EmptySSIDs(t *testing.T) {
 }
 
 func TestGetAutoReconnectEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/autoreconnect", nil)
@@ -516,7 +516,7 @@ func TestGetAutoReconnectEndpoint(t *testing.T) {
 }
 
 func TestSetAutoReconnectEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{"enabled": true})
@@ -543,7 +543,7 @@ func TestSetAutoReconnectEndpoint(t *testing.T) {
 }
 
 func TestRandomizeMACEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/wifi/mac/randomize", nil)

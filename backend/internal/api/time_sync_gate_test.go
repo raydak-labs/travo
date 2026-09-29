@@ -12,7 +12,7 @@ func TestTimeSync_RejectsImplausibleTargetWindow(t *testing.T) {
 	floor := time.Now().Add(time.Hour) // gate stays open: clock looks implausible
 	for _, name := range []string{"epoch", "y2030"} {
 		t.Run(name, func(t *testing.T) {
-			app, deps := setupTestApp()
+			app, deps := setupTestApp(t)
 			deps.TimeSyncMinPlausible = floor
 			deps.TimeSyncGate = NewTimeSyncGate(false)
 			deps.TimeSyncSetTime = func(epochSec int64) error {

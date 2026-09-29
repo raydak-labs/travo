@@ -11,7 +11,7 @@ import (
 )
 
 func TestSetWireguard_InvalidPrivateKey_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -34,7 +34,7 @@ func TestSetWireguard_InvalidPrivateKey_Returns400(t *testing.T) {
 }
 
 func TestSetWireguard_InvalidEndpoint_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -63,7 +63,7 @@ func TestSetWireguard_InvalidEndpoint_Returns400(t *testing.T) {
 }
 
 func TestSetWireguard_InvalidAllowedIPs_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -92,7 +92,7 @@ func TestSetWireguard_InvalidAllowedIPs_Returns400(t *testing.T) {
 }
 
 func TestSetWireguard_ValidConfig_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]any{
@@ -122,7 +122,7 @@ func TestSetWireguard_ValidConfig_Returns200(t *testing.T) {
 }
 
 func TestGetWireguardStatus_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/wireguard/status", nil)
@@ -154,7 +154,7 @@ func TestGetWireguardStatus_Returns200(t *testing.T) {
 }
 
 func TestGetWireguardProfiles_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/wireguard/profiles", nil)
@@ -171,7 +171,7 @@ func TestGetWireguardProfiles_Returns200(t *testing.T) {
 }
 
 func TestToggleWireguard_EnabledField_TogglesOn(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]bool{"enabled": true})
@@ -218,7 +218,7 @@ func TestToggleWireguard_EnabledField_TogglesOn(t *testing.T) {
 }
 
 func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]bool{"enable": true})
@@ -265,7 +265,7 @@ func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
 }
 
 func TestAddWireguardProfile_Returns201(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -287,7 +287,7 @@ func TestAddWireguardProfile_Returns201(t *testing.T) {
 }
 
 func TestAddWireguardProfile_MissingName_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -307,7 +307,7 @@ func TestAddWireguardProfile_MissingName_Returns400(t *testing.T) {
 }
 
 func TestAddWireguardProfile_MissingConfig_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]string{
@@ -327,7 +327,7 @@ func TestAddWireguardProfile_MissingConfig_Returns400(t *testing.T) {
 }
 
 func TestDeleteWireguardProfile_NotFound_Returns404(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodDelete, "/api/v1/vpn/wireguard/profiles/nonexistent", nil)
@@ -344,7 +344,7 @@ func TestDeleteWireguardProfile_NotFound_Returns404(t *testing.T) {
 }
 
 func TestActivateWireguardProfile_NotFound_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/profiles/nonexistent/activate", nil)
@@ -361,7 +361,7 @@ func TestActivateWireguardProfile_NotFound_Returns400(t *testing.T) {
 }
 
 func TestGetKillSwitch_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/vpn/killswitch", nil)
@@ -385,7 +385,7 @@ func TestGetKillSwitch_Returns200(t *testing.T) {
 }
 
 func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body, _ := json.Marshal(map[string]bool{"enabled": true})
@@ -415,7 +415,7 @@ func TestSetKillSwitch_Enable_Returns200(t *testing.T) {
 }
 
 func TestRunWireGuardSpeedTest_Disabled_Returns400(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/speed-test", nil)

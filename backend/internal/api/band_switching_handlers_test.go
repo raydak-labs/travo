@@ -11,7 +11,7 @@ import (
 )
 
 func TestGetBandSwitchingHandler(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/wifi/band-switching", nil)
@@ -39,7 +39,7 @@ func TestGetBandSwitchingHandler(t *testing.T) {
 }
 
 func TestSetBandSwitchingHandler(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	payload := map[string]any{
@@ -77,7 +77,7 @@ func TestSetBandSwitchingHandler(t *testing.T) {
 }
 
 func TestSetBandSwitchingHandler_InvalidBody(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/band-switching", bytes.NewReader([]byte("not-json")))
@@ -94,7 +94,7 @@ func TestSetBandSwitchingHandler_InvalidBody(t *testing.T) {
 }
 
 func TestSetRadioRoleHandler(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	payload := map[string]string{"role": "ap"}
@@ -121,7 +121,7 @@ func TestSetRadioRoleHandler(t *testing.T) {
 }
 
 func TestSetRadioRoleHandler_InvalidRole(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	payload := map[string]string{"role": "invalid-role"}

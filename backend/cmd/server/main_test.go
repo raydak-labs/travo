@@ -82,9 +82,10 @@ func TestCatchAllDoesNotServeHTMLForAPIPaths(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MockMode = true
 	cfg.StaticDir = staticDir
-	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
-		cfg.AuthConfigPath = tmpDir + "/auth.json"
-	}
+	// t.TempDir() instead of a silent os.MkdirTemp fallback: on failure the old
+	// form left cfg.AuthConfigPath pointing at the production path
+	// /etc/travo/auth.json, so the test would read or write the real config.
+	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
 	app, lifecycle := setupAppWithConfig(cfg)
 	lifecycle.Stop()
 
@@ -215,9 +216,10 @@ func TestCORSConfig_KeepsConfiguredOrigins(t *testing.T) {
 func TestSameOriginRequestHasNoCORSHeaders(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MockMode = true
-	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
-		cfg.AuthConfigPath = tmpDir + "/auth.json"
-	}
+	// t.TempDir() instead of a silent os.MkdirTemp fallback: on failure the old
+	// form left cfg.AuthConfigPath pointing at the production path
+	// /etc/travo/auth.json, so the test would read or write the real config.
+	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
 	app, lifecycle := setupAppWithConfig(cfg)
 	defer lifecycle.Stop()
 
@@ -239,9 +241,10 @@ func TestSameOriginRequestHasNoCORSHeaders(t *testing.T) {
 func TestCrossOriginRequestIsNotAllowedByDefault(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MockMode = true
-	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
-		cfg.AuthConfigPath = tmpDir + "/auth.json"
-	}
+	// t.TempDir() instead of a silent os.MkdirTemp fallback: on failure the old
+	// form left cfg.AuthConfigPath pointing at the production path
+	// /etc/travo/auth.json, so the test would read or write the real config.
+	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
 	app, lifecycle := setupAppWithConfig(cfg)
 	defer lifecycle.Stop()
 
@@ -264,9 +267,10 @@ func TestCrossOriginRequestIsNotAllowedByDefault(t *testing.T) {
 func TestAppLifecycle_StopIsIdempotent(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MockMode = true
-	if tmpDir, err := os.MkdirTemp("", "travo-auth-*"); err == nil {
-		cfg.AuthConfigPath = tmpDir + "/auth.json"
-	}
+	// t.TempDir() instead of a silent os.MkdirTemp fallback: on failure the old
+	// form left cfg.AuthConfigPath pointing at the production path
+	// /etc/travo/auth.json, so the test would read or write the real config.
+	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
 	_, lifecycle := setupAppWithConfig(cfg)
 
 	done := make(chan struct{})
