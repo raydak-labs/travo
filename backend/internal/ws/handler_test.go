@@ -403,12 +403,16 @@ func signToken(t *testing.T, jti string, exp time.Time) string {
 // not have to wait 30-90s for the server to notice a revoked session.
 func withFastKeepalive(t *testing.T) {
 	t.Helper()
-	origPing, origDeadline, origRevalidate := pingInterval, readDeadline, revalidateInterval
-	pingInterval = 50 * time.Millisecond
-	revalidateInterval = 50 * time.Millisecond
-	readDeadline = 3 * time.Second
+	// Stored atomically: the server goroutine reads these while a handler is
+	// live, so plain assignment here is a data race the -race job can flag.
+	origPing, origDeadline, origRevalidate := pingInterval.Load(), readDeadline.Load(), revalidateInterval.Load()
+	pingInterval.Store(int64(50 * time.Millisecond))
+	revalidateInterval.Store(int64(50 * time.Millisecond))
+	readDeadline.Store(int64(3 * time.Second))
 	t.Cleanup(func() {
-		pingInterval, readDeadline, revalidateInterval = origPing, origDeadline, origRevalidate
+		pingInterval.Store(origPing)
+		readDeadline.Store(origDeadline)
+		revalidateInterval.Store(origRevalidate)
 	})
 }
 

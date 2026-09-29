@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -811,5 +812,52 @@ func TestSetConfigWithDisabledCandidateStillVerifies(t *testing.T) {
 	}
 	if _, ok := sections["travo_wwan_p2"]; ok {
 		t.Error("a disabled candidate must not get a policy member")
+	}
+}
+
+// rpcd allows only one pending rollback at a time and rejects a second
+// rollback-enabled apply while the first is unconfirmed. After a failed verify
+// the window is still open, so the next apply — including a restore attempt
+// inside the same save — must not be issued. It must also be recognised by the
+// next save rather than surfacing as an opaque "permission denied" from rpcd.
+func TestStagedApplyMwan3_SkipsWhileARollbackIsPending(t *testing.T) {
+	applier := &recordingApplier{}
+	svc, _ := newFailoverTestService(t, uci.NewMockUCI(), applier)
+
+	// First call: StartApply succeeds, verification fails, window stays open.
+	if err := svc.stagedApplyMwan3(func() error { return fmt.Errorf("verification failed") }); err == nil {
+		t.Fatal("expected the failed verification to be reported")
+	}
+	if svc.pendingApplySession == "" {
+		t.Fatal("an unconfirmed apply must stay recorded while its rollback window is open")
+	}
+	first := len(applier.startCalls)
+
+	// Second call while that window is open: skipped, not re-issued.
+	if err := svc.stagedApplyMwan3(nil); err != nil {
+		t.Fatalf("a pending rollback must not turn into an error, got %v", err)
+	}
+	if len(applier.startCalls) != first {
+		t.Errorf("a second StartApply was issued while a rollback was pending (%d -> %d)", first, len(applier.startCalls))
+	}
+}
+
+// Once the pending apply is confirmed the window is closed and applies resume.
+func TestStagedApplyMwan3_ResumesAfterConfirm(t *testing.T) {
+	applier := &recordingApplier{}
+	svc, _ := newFailoverTestService(t, uci.NewMockUCI(), applier)
+
+	if err := svc.stagedApplyMwan3(nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if svc.pendingApplySession != "" {
+		t.Errorf("a confirmed apply must not stay pending, got %q", svc.pendingApplySession)
+	}
+	first := len(applier.startCalls)
+	if err := svc.stagedApplyMwan3(nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(applier.startCalls) != first+1 {
+		t.Errorf("applies should resume after a confirm (%d -> %d)", first, len(applier.startCalls))
 	}
 }

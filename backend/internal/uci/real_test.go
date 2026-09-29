@@ -351,6 +351,8 @@ func TestParseShowConfigOutput_ListValues(t *testing.T) {
 		"network.wg0_peer0.endpoint='1.2.3.4:51820'",
 		"firewall.@zone[1]=zone",
 		"firewall.@zone[1].network='wan' 'wan6'",
+		// An SSID is user data, so an apostrophe in it must survive parsing.
+		"wireless.@wifi-iface[0].ssid='Bob'\\''s WiFi'",
 	}, "\n")
 
 	got := parseShowConfigOutput(show)
@@ -366,6 +368,9 @@ func TestParseShowConfigOutput_ListValues(t *testing.T) {
 	if v := got["@zone[1]"]["network"]; v != "wan,wan6" {
 		t.Errorf("zone network = %q, want %q", v, "wan,wan6")
 	}
+	if v := got["@wifi-iface[0]"]["ssid"]; v != "Bob's WiFi" {
+		t.Errorf("ssid with an apostrophe = %q, want %q", v, "Bob's WiFi")
+	}
 }
 
 func TestSplitUciValue(t *testing.T) {
@@ -375,6 +380,11 @@ func TestSplitUciValue(t *testing.T) {
 		"bare":        {"bare"},
 		"'a'":         {"a"},
 		"":            nil,
+		// uci escapes an apostrophe inside a value the shell way, as '\''.
+		// The quotes around it are content, not element boundaries.
+		`'Bob'\''s WiFi'`: {"Bob's WiFi"},
+		`'it'\''s'`:       {"it's"},
+		`'a'\''b' 'c'`:    {"a'b", "c"},
 	}
 	for in, want := range cases {
 		got := SplitUciValue(in)

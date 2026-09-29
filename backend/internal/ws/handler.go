@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofiber/contrib/v3/websocket"
@@ -27,15 +28,18 @@ var (
 	// pingInterval is how often the server pings an idle client. Pongs
 	// refresh the read deadline, so a dead peer is detected even when the
 	// router's NAT silently drops the socket.
-	pingInterval = 30 * time.Second
+	pingInterval    = atomic.Int64{}
+	pingIntervalVal = int64(30 * time.Second)
 	// readDeadline bounds a blocked read. It is refreshed by every pong, so a
 	// client that cannot answer pings is dropped instead of holding a socket
 	// open (and holding a goroutine) on the router.
-	readDeadline = 90 * time.Second
+	readDeadline    = atomic.Int64{}
+	readDeadlineVal = int64(90 * time.Second)
 	// revalidateInterval is how often an already-upgraded socket re-checks
 	// its session. Without it a logged-out or expired session would keep
 	// receiving system_stats, alerts and network_status until it reconnects.
-	revalidateInterval = 30 * time.Second
+	revalidateInterval    = atomic.Int64{}
+	revalidateIntervalVal = int64(30 * time.Second)
 )
 
 // Handler returns a Fiber handler for WebSocket connections.
@@ -56,9 +60,9 @@ func Handler(hub *Hub, authSvc *auth.AuthService) fiber.Handler {
 		defer hub.Unregister(c)
 
 		c.SetReadLimit(readLimit)
-		_ = c.SetReadDeadline(time.Now().Add(readDeadline))
+		_ = c.SetReadDeadline(time.Now().Add(readDeadlineAfter()))
 		c.SetPongHandler(func(string) error {
-			return c.SetReadDeadline(time.Now().Add(readDeadline))
+			return c.SetReadDeadline(time.Now().Add(readDeadlineAfter()))
 		})
 
 		stopKeepalive := make(chan struct{})
@@ -82,9 +86,9 @@ func Handler(hub *Hub, authSvc *auth.AuthService) fiber.Handler {
 // hub's broadcast writes. On an invalid session the socket is closed, which
 // unblocks the handler's read.
 func keepalive(c *websocket.Conn, authSvc *auth.AuthService, token string, stop <-chan struct{}) {
-	ping := time.NewTicker(pingInterval)
+	ping := time.NewTicker(pingEvery())
 	defer ping.Stop()
-	revalidate := time.NewTicker(revalidateInterval)
+	revalidate := time.NewTicker(revalidateEvery())
 	defer revalidate.Stop()
 	for {
 		select {
@@ -171,6 +175,24 @@ func UpgradeMiddleware(authSvc *auth.AuthService, allowedOrigins ...string) fibe
 // environment, or the --cors-origins command-line flag) so the two policies
 // cannot disagree; a mismatch would let a UI load and then fail to open a
 // socket.
+func init() {
+	// The intervals are atomic because tests override them while server
+	// goroutines are reading them; plain package variables would be a data race
+	// that the -race job would flag.
+	pingInterval.Store(pingIntervalVal)
+	readDeadline.Store(readDeadlineVal)
+	revalidateInterval.Store(revalidateIntervalVal)
+}
+
+// pingEvery returns the currently configured keepalive ping interval.
+func pingEvery() time.Duration { return time.Duration(pingInterval.Load()) }
+
+// readDeadlineAfter returns the currently configured read deadline.
+func readDeadlineAfter() time.Duration { return time.Duration(readDeadline.Load()) }
+
+// revalidateEvery returns the currently configured re-validation interval.
+func revalidateEvery() time.Duration { return time.Duration(revalidateInterval.Load()) }
+
 func resolveAllowedOrigins(explicit []string) []string {
 	return resolveAllowedOriginsFrom(explicit, os.Args[1:], os.Getenv)
 }

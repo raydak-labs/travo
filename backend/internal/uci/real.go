@@ -211,10 +211,10 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 
 // SplitUciValue splits the value of a `uci show` line into its elements.
 //
-// uci prints a list option on a single line as option='a' 'b' 'c' and a scalar
-// as option='a', or unquoted (option=abc). Trimming only the outer quotes turns
-// the first form into the single bogus value "a' 'b", which then defeats every
-// caller that splits on commas or looks for one exact element.
+// uci prints a list option on a single line as option='a' 'b' and a scalar as
+// option='a'. An apostrophe inside a value is escaped the shell way, as
+// '\”, so the quotes around it are part of the value rather than element
+// boundaries — otherwise 'Bob'\”s WiFi' would parse as two elements.
 func SplitUciValue(value string) []string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -223,22 +223,39 @@ func SplitUciValue(value string) []string {
 	if !strings.HasPrefix(value, "'") {
 		return []string{value}
 	}
-	var out []string
-	rest := value
-	for {
-		start := strings.Index(rest, "'")
-		if start < 0 {
-			break
+
+	var (
+		out     []string
+		cur     strings.Builder
+		inQuote bool
+	)
+	for i := 0; i < len(value); i++ {
+		if value[i] != '\'' {
+			if inQuote {
+				cur.WriteByte(value[i])
+			}
+			continue
 		}
-		end := strings.Index(rest[start+1:], "'")
-		if end < 0 {
-			break
+		// A closing quote followed by the escape sequence means the apostrophe
+		// belongs to the value: append it and stay inside the same element.
+		if inQuote && i+3 < len(value) && value[i+1] == '\\' && value[i+2] == '\'' && value[i+3] == '\'' {
+			cur.WriteByte('\'')
+			i += 3 // the escape's final quote re-opens the quoted run
+			continue
 		}
-		out = append(out, rest[start+1:start+1+end])
-		rest = rest[start+1+end+1:]
+		if inQuote {
+			out = append(out, cur.String())
+			cur.Reset()
+			inQuote = false
+		} else {
+			inQuote = true
+		}
+	}
+	if inQuote && cur.Len() > 0 {
+		// Unterminated quote: keep the value rather than dropping it.
+		out = append(out, cur.String())
 	}
 	if len(out) == 0 {
-		// Unbalanced quotes: fall back to the old behaviour rather than drop it.
 		return []string{strings.Trim(value, "'")}
 	}
 	return out

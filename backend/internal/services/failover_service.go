@@ -54,12 +54,21 @@ type FailoverService struct {
 	// mwan3 apply, verify, guard removal) so a concurrent SetConfig or a
 	// concurrent Start() monitor can never interleave with it. It is separate
 	// from mu (events/lastActive) so the monitor never deadlocks against it.
-	applyMu     sync.Mutex
-	events      []models.FailoverEvent
-	lastActive  string
-	stopCh      chan struct{}
-	stopOnce    sync.Once
-	onlineSince map[string]time.Time
+	applyMu sync.Mutex
+	// pendingApplySession is the rpcd session of an apply that was started but
+	// not confirmed, so its rollback window is still open. rpcd allows only one
+	// pending rollback at a time and rejects a second rollback-enabled apply
+	// with "permission denied" until the first resolves, so the session has to be
+	// tracked: while it is set, the open window is already restoring the
+	// pre-apply config, and starting another apply would fail (and would fail
+	// confusingly, in whichever feature happened to ask next). Guarded by
+	// applyMu, which every caller of stagedApplyMwan3 already holds.
+	pendingApplySession string
+	events              []models.FailoverEvent
+	lastActive          string
+	stopCh              chan struct{}
+	stopOnce            sync.Once
+	onlineSince         map[string]time.Time
 }
 
 func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw *auth.RootPassword) *FailoverService {
@@ -766,6 +775,14 @@ func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
 	if !s.serviceInstalled() {
 		return nil
 	}
+	if s.pendingApplySession != "" {
+		// An earlier apply in this service is still unconfirmed, so its rollback
+		// window is open and rpcd is restoring the pre-apply mwan3 config right
+		// now. That is exactly the state this call is trying to reach, and a
+		// second apply would be refused, so treat it as already done.
+		log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
+		return nil
+	}
 	if s.applier == nil {
 		return s.reloadMwan3Script()
 	}
@@ -777,15 +794,19 @@ func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
 		// Applier had nothing to do (Noop / empty session).
 		return nil
 	}
+	s.pendingApplySession = sid
 	if verify != nil {
 		if err := verify(); err != nil {
-			// Rollback window is still open: rpcd reverts to the previous config.
+			// Rollback window is still open: rpcd reverts to the previous config
+			// on its own timer. Keep the session recorded so the next apply waits
+			// for that rollback instead of being rejected by rpcd.
 			return fmt.Errorf("verify mwan3 apply: %w", err)
 		}
 	}
 	if err := s.applier.Confirm(sid); err != nil {
 		return fmt.Errorf("uci confirm mwan3: %w", err)
 	}
+	s.pendingApplySession = ""
 	return nil
 }
 
