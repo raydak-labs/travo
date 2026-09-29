@@ -664,3 +664,97 @@ func TestCheckDNSBypassNeeded_AdGuardPlainDNS(t *testing.T) {
 		t.Error("expected no bypass needed when AdGuardHome already uses plain IP upstream")
 	}
 }
+
+// Once the bypass is committed, the guard is the only record of the original
+// dnsmasq configuration. A failure in the follow-up network writes must not
+// delete it, or RestoreDNS has nothing to restore and LAN DNS stays broken.
+func TestBypassDNS_KeepsGuardWhenNetworkWriteFails(t *testing.T) {
+	cmd := &mockCmdRunner{responses: map[string]string{
+		"uci get dhcp.@dnsmasq[0].noresolv":             "1",
+		"uci get dhcp.@dnsmasq[0].server":               "127.0.0.1#5353",
+		"uci get dhcp.@dnsmasq[0].rebind_protection":    "0",
+		"uci set dhcp.@dnsmasq[0].noresolv=0":           "",
+		"uci delete dhcp.@dnsmasq[0].server":            "",
+		"uci add_list dhcp.@dnsmasq[0].server=10.1.2.3": "",
+		"uci commit dhcp":                               "",
+		"/etc/init.d/dnsmasq restart":                   "",
+		"uci get network.wan.peerdns":                   "0",
+		"uci get network.wan.dns":                       "10.1.2.3",
+	}}
+	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	defer os.RemoveAll(dir)
+	_ = svc.uci.Set("network", "wan", "peerdns", "0")
+	// The dnsmasq bypass commits and applies before the network writes, so
+	// failing this one leaves the device bypassed with the guard as the only
+	// record of the original configuration.
+	svc.uci = &peerdnsFailingUCI{UCI: svc.uci}
+
+	if err := svc.BypassDNS(); err == nil {
+		t.Fatal("expected the bypass to fail on the network write")
+	}
+	if _, err := os.Stat(svc.guardFile); err != nil {
+		t.Fatalf("the crash guard must survive a failure after the bypass is committed: %v", err)
+	}
+}
+
+// The AdGuard-only bypass never creates a dnsmasq `server` list, so the restore
+// must tolerate `uci delete` reporting "Entry not found" instead of failing on
+// every attempt (which kept the guard and IsDNSBypassed stuck true forever).
+func TestRestoreDNS_ToleratesMissingServerList(t *testing.T) {
+	cmd := &mockCmdRunner{responses: map[string]string{
+		"uci get dhcp.@dnsmasq[0].noresolv":                   "1",
+		"uci get dhcp.@dnsmasq[0].server":                     "127.0.0.1#5353",
+		"uci get dhcp.@dnsmasq[0].rebind_protection":          "0",
+		"uci set dhcp.@dnsmasq[0].noresolv=0":                 "",
+		"uci delete dhcp.@dnsmasq[0].server":                  "",
+		"uci add_list dhcp.@dnsmasq[0].server=10.1.2.3":       "",
+		"uci commit dhcp":                                     "",
+		"/etc/init.d/dnsmasq restart":                         "",
+		"uci get network.wan.peerdns":                         "1",
+		"uci set dhcp.@dnsmasq[0].noresolv=1":                 "",
+		"uci set dhcp.@dnsmasq[0].rebind_protection=0":        "",
+		"uci add_list dhcp.@dnsmasq[0].server=127.0.0.1#5353": "",
+	}}
+	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	defer os.RemoveAll(dir)
+	_ = svc.uci.Set("network", "wan", "peerdns", "1")
+
+	if err := svc.BypassDNS(); err != nil {
+		t.Fatalf("BypassDNS: %v", err)
+	}
+
+	// Make the delete report the device's real "Entry not found" failure.
+	orig := svc.cmd
+	svc.cmd = &missingEntryRunner{inner: orig}
+	defer func() { svc.cmd = orig }()
+
+	if err := svc.RestoreDNS(); err != nil {
+		t.Fatalf("RestoreDNS must ignore a missing dnsmasq server list, got %v", err)
+	}
+	if svc.IsDNSBypassed() {
+		t.Error("the bypass must be cleared after a successful restore")
+	}
+}
+
+// missingEntryRunner makes `uci delete dhcp.@dnsmasq[0].server` fail the way a
+// real device does when the option does not exist.
+type missingEntryRunner struct{ inner CommandRunner }
+
+func (m *missingEntryRunner) Run(name string, args ...string) ([]byte, error) {
+	joined := strings.TrimSpace(name + " " + strings.Join(args, " "))
+	if joined == "uci delete dhcp.@dnsmasq[0].server" {
+		return []byte("uci: Entry not found"), fmt.Errorf("exit status 1")
+	}
+	return m.inner.Run(name, args...)
+}
+
+// peerdnsFailingUCI fails only the network.wan.peerdns write, so a test can
+// reach the point where the dnsmasq bypass is already committed.
+type peerdnsFailingUCI struct{ uci.UCI }
+
+func (f *peerdnsFailingUCI) Set(config, section, option, value string) error {
+	if config == "network" && section == "wan" && option == "peerdns" {
+		return fmt.Errorf("uci set network.wan.peerdns: no such device")
+	}
+	return f.UCI.Set(config, section, option, value)
+}

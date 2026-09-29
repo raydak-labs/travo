@@ -89,6 +89,10 @@ type VpnService struct {
 
 const vpnDnsSnapshotPath = "/etc/trafo/vpn-dns-snapshot.json"
 
+// legacyVpnDnsSnapshotPath is where releases before the guard-directory
+// unification wrote the snapshot. Read-only: a restore removes both.
+const legacyVpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
+
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
 	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/travo/wireguard_profiles.json", guardFile: vpnGuardPath}
@@ -775,7 +779,15 @@ func (v *VpnService) writeVpnDnsSnapshot(snap vpnDnsSnapshot) error {
 func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
 	data, err := os.ReadFile(vpnDnsSnapshotPath)
 	if err != nil {
-		return nil, err
+		// Fall back to the pre-unification location. A device upgraded while the
+		// VPN was enabled has its snapshot under the old path; failing to read it
+		// would leave dnsmasq with noresolv=1 forwarding to VPN resolvers that
+		// are no longer reachable, i.e. LAN DNS stays broken after the tunnel
+		// goes down.
+		data, err = os.ReadFile(legacyVpnDnsSnapshotPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var snap vpnDnsSnapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
@@ -861,6 +873,7 @@ func (v *VpnService) disableVpnDNSForwarding() {
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	_ = os.Remove(vpnDnsSnapshotPath)
+	_ = os.Remove(legacyVpnDnsSnapshotPath)
 }
 
 // setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule

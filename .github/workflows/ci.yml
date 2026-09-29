@@ -159,8 +159,13 @@ jobs:
           set -euo pipefail
           version="${SHELLCHECK_VERSION:?SHELLCHECK_VERSION not set}"
           base="https://github.com/koalaman/shellcheck/releases/download/v${version}"
+          # Extract the binary into /usr/local/bin, not /usr/local: the tarball
+          # unpacks to shellcheck-v<version>/{shellcheck,LICENSE.txt,README.txt}
+          # and stripping one component would otherwise put the binary at
+          # /usr/local/shellcheck, which is not on the runner PATH. Selecting
+          # the member also keeps LICENSE.txt and README.txt out of /usr/local.
           curl -fsSL "${base}/shellcheck-v${version}.linux.x86_64.tar.xz" \
-            | sudo tar -xJ -C /usr/local --strip-components=1
+            | sudo tar -xJ -C /usr/local/bin --strip-components=1 "shellcheck-v${version}/shellcheck"
           shellcheck --version
           make shellcheck
         env:

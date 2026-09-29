@@ -57,8 +57,11 @@ func parseShowOutput(output string) map[string]string {
 		option := parts[2]
 
 		// Strip surrounding single quotes
-		val = strings.TrimPrefix(val, "'")
-		val = strings.TrimSuffix(val, "'")
+		// A list option is printed on one line as option='a' 'b' 'c', a scalar
+		// as option='a' (or bare). Normalising through SplitUciValue turns a
+		// list into the comma-joined form callers already split on, instead of
+		// leaving the embedded quotes (a' 'b) in the value.
+		val = strings.Join(SplitUciValue(val), ",")
 
 		result[option] = val
 	}
@@ -206,7 +209,43 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 	return nil
 }
 
-// parseShowConfigOutput parses `uci show <config>` output into a map of section → options.
+// SplitUciValue splits the value of a `uci show` line into its elements.
+//
+// uci prints a list option on a single line as option='a' 'b' 'c' and a scalar
+// as option='a', or unquoted (option=abc). Trimming only the outer quotes turns
+// the first form into the single bogus value "a' 'b", which then defeats every
+// caller that splits on commas or looks for one exact element.
+func SplitUciValue(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	if !strings.HasPrefix(value, "'") {
+		return []string{value}
+	}
+	var out []string
+	rest := value
+	for {
+		start := strings.Index(rest, "'")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(rest[start+1:], "'")
+		if end < 0 {
+			break
+		}
+		out = append(out, rest[start+1:start+1+end])
+		rest = rest[start+1+end+1:]
+	}
+	if len(out) == 0 {
+		// Unbalanced quotes: fall back to the old behaviour rather than drop it.
+		return []string{strings.Trim(value, "'")}
+	}
+	return out
+}
+
+// parseShowConfigOutput parses `uci show <config>` output into a map of
+// section → options.
 func parseShowConfigOutput(output string) map[string]map[string]string {
 	result := make(map[string]map[string]string)
 	for line := range strings.SplitSeq(output, "\n") {
@@ -219,10 +258,11 @@ func parseShowConfigOutput(output string) map[string]map[string]string {
 			continue
 		}
 		key := before
-		val := after
-
-		val = strings.TrimPrefix(val, "'")
-		val = strings.TrimSuffix(val, "'")
+		// A list option is printed on one line as option='a' 'b' 'c' and a scalar
+		// as option='a'. Normalising through SplitUciValue turns the list into
+		// the comma-joined form callers already split on, instead of leaving the
+		// embedded quotes (a' 'b) in the value.
+		val := strings.Join(SplitUciValue(after), ",")
 
 		parts := strings.SplitN(key, ".", 3)
 		if len(parts) == 2 {

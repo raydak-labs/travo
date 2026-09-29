@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // usbCandidateInterfaces lists common names for USB tethering interfaces.
@@ -150,7 +151,10 @@ func parseUciShow(prefix, output string) map[string]map[string][]string {
 			opts = map[string][]string{}
 			sections[section] = opts
 		}
-		opts[option] = append(opts[option], strings.Trim(value, "'"))
+		// uci prints a list as option='a' 'b'; trimming only the outer quotes
+		// would yield the single element "a' 'b", so a multi-network WAN zone
+		// never matches and Unconfigure skips its del_list.
+		opts[option] = append(opts[option], uci.SplitUciValue(value)...)
 	}
 	return sections
 }

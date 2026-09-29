@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useChangePassword } from '@/hooks/use-system';
-import { apiClient, getToken, clearToken, setToken } from '@/lib/api-client';
+import { apiClient, getToken, clearToken, setToken, isTokenRemembered } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -44,6 +44,30 @@ describe('useChangePassword', () => {
       new_password: 'new-password',
     });
     expect(getToken()).toBe('rotated-token');
+  });
+
+  // A "don't remember me" session lives in sessionStorage. Replacing the token
+  // must not promote it to localStorage, where it would outlive the tab.
+  it('keeps a non-remembered session in sessionStorage', async () => {
+    setToken('old-token', false);
+    expect(isTokenRemembered()).toBe(false);
+
+    vi.spyOn(apiClient, 'put').mockResolvedValue({
+      status: 'ok',
+      token: 'rotated-token',
+      expires_at: '2026-09-29T10:00:00Z',
+      expires_in: 86400,
+      revoked_sessions: 1,
+    });
+
+    const { result } = renderHook(() => useChangePassword(), { wrapper });
+    result.current.mutate({ current_password: 'old-password', new_password: 'new-password' });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(getToken()).toBe('rotated-token');
+    expect(isTokenRemembered()).toBe(false);
+    expect(sessionStorage.getItem('openwrt-auth-token')).toBe('rotated-token');
+    expect(localStorage.getItem('openwrt-auth-token')).toBeNull();
   });
 
   it('leaves the existing token untouched when the change fails', async () => {

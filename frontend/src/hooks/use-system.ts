@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient, setToken } from '@/lib/api-client';
+import { apiClient, isTokenRemembered, setToken } from '@/lib/api-client';
 import { resetSetupStatusCache } from '@/lib/setup-status';
 import { routeWithSegment } from '@/lib/api-url';
 import { useWsSubscribe } from '@/lib/ws-context';
@@ -132,7 +132,10 @@ export function useChangePassword() {
       // the very next request fails with 401 — the user is silently logged out
       // right after a successful password change.
       const res = await apiClient.put<ChangePasswordResponse>(API_ROUTES.auth.password, data);
-      setToken(res.token);
+      // Keep the storage the user chose at login: a "don't remember me"
+      // session must not become a localStorage token because the token was
+      // replaced.
+      setToken(res.token, isTokenRemembered());
       return res;
     },
     onSuccess: (res) => {

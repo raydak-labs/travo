@@ -2,6 +2,7 @@ package uci
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -335,5 +336,57 @@ func TestRealUCIGetSections_ParsesSections(t *testing.T) {
 func TestRealUCIRevertValidation(t *testing.T) {
 	if err := NewRealUCI().Revert("net;work"); err == nil {
 		t.Error("expected validation error for config with semicolon")
+	}
+}
+
+// `uci show` prints a list option on ONE line as option='a' 'b' and a scalar as
+// option='a'. Trimming only the outer quotes turned the first form into the
+// single value "a' 'b", which silently defeated callers that split on commas or
+// look for one exact element (split-tunnel peers, WAN zone membership).
+func TestParseShowConfigOutput_ListValues(t *testing.T) {
+	show := strings.Join([]string{
+		"network.wg0_peer0=wirguard_peer",
+		"network.wg0_peer0.allowed_ips='0.0.0.0/0' '::/0'",
+		"network.wg0_peer0.route_allowed_ips='1'",
+		"network.wg0_peer0.endpoint='1.2.3.4:51820'",
+		"firewall.@zone[1]=zone",
+		"firewall.@zone[1].network='wan' 'wan6'",
+	}, "\n")
+
+	got := parseShowConfigOutput(show)
+	if v := got["wg0_peer0"]["allowed_ips"]; v != "0.0.0.0/0,::/0" {
+		t.Errorf("allowed_ips = %q, want %q", v, "0.0.0.0/0,::/0")
+	}
+	if parts := strings.Split(got["wg0_peer0"]["allowed_ips"], ","); len(parts) != 2 {
+		t.Errorf("allowed_ips should split into 2 CIDRs, got %v", parts)
+	}
+	if v := got["wg0_peer0"]["route_allowed_ips"]; v != "1" {
+		t.Errorf("scalar value = %q, want %q", v, "1")
+	}
+	if v := got["@zone[1]"]["network"]; v != "wan,wan6" {
+		t.Errorf("zone network = %q, want %q", v, "wan,wan6")
+	}
+}
+
+func TestSplitUciValue(t *testing.T) {
+	cases := map[string][]string{
+		"'a' 'b' 'c'": {"a", "b", "c"},
+		"'single'":    {"single"},
+		"bare":        {"bare"},
+		"'a'":         {"a"},
+		"":            nil,
+	}
+	for in, want := range cases {
+		got := SplitUciValue(in)
+		if len(got) != len(want) {
+			t.Errorf("SplitUciValue(%q) = %v, want %v", in, got, want)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("SplitUciValue(%q) = %v, want %v", in, got, want)
+				break
+			}
+		}
 	}
 }

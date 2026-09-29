@@ -64,7 +64,11 @@ fail() {
 	exit 1
 }
 
-for dev in $(uci -q show wireless 2>/dev/null | sed -n 's/^wireless\.\(@wifi-device\[[0-9]*\]\)=wifi-device$/\1/p'); do
+# "uci show" prints a named section as wireless.radio0=wifi-device and an
+# anonymous one as wireless.@wifi-device[0]=wifi-device. Stock OpenWrt names
+# its radios, so matching only the anonymous form silently selected nothing and
+# the toggle reported success without changing any radio.
+for dev in $(uci -q show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
 	uci -q set "wireless.${dev}.disabled=${DISABLED}" || fail "uci set wireless.${dev}.disabled"
 done
 

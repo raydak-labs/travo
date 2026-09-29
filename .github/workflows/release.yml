@@ -12,20 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A release must never ship from a red main: re-run the CI checks against the
+  # exact tagged commit and fail the release when anything is red.
+  #
+  # A reusable workflow is called at the job level, never from steps — a job that
+  # calls one has no runs-on and no steps of its own. $/.github/workflows/<file> is
+  # the documented same-repository form (GitHub's recommended syntax; it resolves
+  # against this repository, not the caller's workspace) and, like ./, resolves
+  # to the caller's own commit. It must not carry an @ref.
   verify:
     name: Verify CI green on the tagged commit
-    runs-on: ubuntu-latest
+    uses: $/.github/workflows/ci.yml
     permissions:
       contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # A release must never ship from a red main: re-run the CI checks against
-      # the exact tagged commit and fail the release when anything is red.
-      - name: Run backend, frontend, lint and format gates
-        uses: $/.github/workflows/ci.yml
 
   build-and-release:
     name: Build (${{ matrix.arch }})

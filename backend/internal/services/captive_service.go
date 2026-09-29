@@ -368,16 +368,18 @@ func (c *CaptiveService) BypassDNS() error {
 		}
 	}
 	if wanPeerdns == "0" {
+		// The dnsmasq bypass is already committed and applied at this point, so
+		// the guard is the ONLY record of the pre-bypass configuration. Deleting
+		// it on a failure here would leave RestoreDNS with nothing to restore and
+		// strand LAN DNS on the hotel resolver. A stale guard only means the
+		// restore runs on the next check, so keeping it is the safe direction.
 		if err := c.uci.Set("network", "wan", "peerdns", "1"); err != nil {
-			_ = os.Remove(c.guardFile)
 			return err
 		}
 		if err := c.uci.Set("network", "wan", "dns", ""); err != nil {
-			_ = os.Remove(c.guardFile)
 			return err
 		}
 		if err := c.uci.Commit("network"); err != nil {
-			_ = os.Remove(c.guardFile)
 			return err
 		}
 	}
@@ -684,11 +686,18 @@ func (c *CaptiveService) setDnsmasqOption(option, value string) error {
 }
 
 // deleteDnsmasqOption deletes a dnsmasq option via uci delete.
+// deleteDnsmasqOption removes a dnsmasq option. A missing option is not a
+// failure: the AdGuard-only bypass path never creates a `server` list, and
+// treating "Entry not found" as an error made RestoreDNS fail on every attempt,
+// which kept the guard forever and left IsDNSBypassed stuck true.
 func (c *CaptiveService) deleteDnsmasqOption(option string) error {
 	if c.cmd == nil {
 		return nil
 	}
-	_, err := c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0]."+option)
+	out, err := c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0]."+option)
+	if err != nil && strings.Contains(string(out)+err.Error(), "Entry not found") {
+		return nil
+	}
 	return err
 }
 

@@ -1,6 +1,8 @@
 package services
 
 import (
+	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 
@@ -104,6 +106,54 @@ func TestWirelessToggleScriptIsUCIOnly(t *testing.T) {
 	for _, want := range []string{"uci -q commit wireless", "uci apply", "uci confirm", "GUARD"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("toggle script missing %q", want)
+		}
+	}
+}
+
+// The generated toggle script must select every radio from `uci show wireless`.
+// Stock OpenWrt names its radios (radio0, radio1) and only uses the anonymous
+// `@wifi-device[N]` form when a config does not; a pattern that matches only the
+// anonymous form silently toggles nothing while logging success.
+//
+// The pattern is exercised through `sh -c`, the same interpreter the device
+// uses, rather than by calling sed directly: BSD sed (macOS) and GNU/BusyBox
+// sed (the device) disagree on escaping, and a test that skips is worthless.
+func TestWirelessToggleScriptSelectsNamedAndAnonymousRadios(t *testing.T) {
+	uciShow := strings.Join([]string{
+		"wireless.radio0=wifi-device",
+		"wireless.radio0.type=wifi-device",
+		"wireless.@wifi-device[0]=wifi-device",
+		"wireless.@wifi-iface[0]=wifi-iface",
+		"wireless.default_radio0=wifi-iface",
+		"",
+	}, "\n")
+
+	// Lift the sed expression the script itself uses, so the test cannot drift
+	// from the generated helper.
+	start := strings.Index(wirelessToggleScript, "sed -n 's/")
+	end := strings.Index(wirelessToggleScript[start:], "/p'")
+	if start < 0 || end < 0 {
+		t.Fatal("could not find the sed expression in the toggle script")
+	}
+	expr := wirelessToggleScript[start+len("sed -n '") : start+end]
+
+	cmd := exec.Command("sh", "-c", "sed -n '"+expr+"/p'")
+	cmd.Stdin = strings.NewReader(uciShow)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("running the toggle script's sed expression: %v", err)
+	}
+
+	selected := strings.Fields(string(out))
+	for _, want := range []string{"radio0", "@wifi-device[0]"} {
+		if !slices.Contains(selected, want) {
+			t.Errorf("toggle script does not select radio %q from stock `uci show` output; selected %v",
+				want, selected)
+		}
+	}
+	for _, s := range selected {
+		if strings.Contains(s, "wifi-iface") {
+			t.Errorf("toggle script must not select the wifi-iface section %q", s)
 		}
 	}
 }

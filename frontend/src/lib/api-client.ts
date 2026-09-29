@@ -17,6 +17,18 @@ function notifyTokenChange(): void {
   }
 }
 
+/**
+ * Whether the current session is persisted across browser restarts.
+ *
+ * A token-change flow (e.g. the replacement token returned by a password
+ * change) must preserve the user's original choice: a session started with
+ * "don't remember me" lives in sessionStorage, and re-storing it with the
+ * default would silently promote it to localStorage so it outlived the tab.
+ */
+export function isTokenRemembered(): boolean {
+  return localStorage.getItem(TOKEN_KEY) !== null;
+}
+
 export function setToken(token: string, remember = true): void {
   if (remember) {
     localStorage.setItem(TOKEN_KEY, token);
