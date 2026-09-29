@@ -1,14 +1,22 @@
 name: Race Detector
 
+# Manual re-run of the race suite. The PR path runs the same command in ci.yml
+# (job `test-race`); this workflow exists so a maintainer can re-run it on demand
+# against any ref.
 on:
   workflow_dispatch:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-race:
     name: Test with Race Detector
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -21,13 +29,17 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: Tidy modules
-        run: go mod tidy
+      - name: Verify modules are tidy
+        run: go mod tidy -diff
         working-directory: backend
+
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
 
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: v2.13.2
+          version: v${{ steps.toolchain.outputs.golangci_lint }}
           working-directory: backend
 
       - name: Test with race detector
