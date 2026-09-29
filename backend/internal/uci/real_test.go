@@ -1,6 +1,9 @@
 package uci
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 // Compile-time interface check.
 var _ UCI = (*RealUCI)(nil)
@@ -263,5 +266,74 @@ func TestParseShowConfigOutput_SectionType(t *testing.T) {
 	}
 	if section["ip"] != "10.0.0.1" {
 		t.Errorf("expected ip '10.0.0.1', got %q", section["ip"])
+	}
+}
+
+// errShowFailed stands in for a failed/timed-out `uci show` invocation.
+var errShowFailed = errors.New("simulated uci show failure")
+
+// withStubbedUciShow replaces the `uci show` backend for the duration of a test.
+func withStubbedUciShow(t *testing.T, fn func(config string) ([]byte, error)) {
+	t.Helper()
+	prev := uciShowConfig
+	uciShowConfig = fn
+	t.Cleanup(func() { uciShowConfig = prev })
+}
+
+func TestRealUCIGetSections_ReturnsErrorOnFailure(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return []byte("uci: fatal: Cannot open /etc/config/wireless"), errShowFailed
+	})
+
+	sections, err := NewRealUCI().GetSections("wireless")
+	if err == nil {
+		t.Fatal("expected an error when `uci show` fails; a failed read must not look like an empty config")
+	}
+	if sections != nil {
+		t.Errorf("expected nil sections on error, got %v", sections)
+	}
+}
+
+func TestRealUCIGetSections_TimeoutIsNotEmptyConfig(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return nil, errShowFailed // execx kills the command on timeout, no output
+	})
+
+	if _, err := NewRealUCI().GetSections("wireless"); err == nil {
+		t.Fatal("expected an error for a timed-out `uci show`")
+	}
+}
+
+func TestRealUCIGetSections_MissingConfigIsEmpty(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return []byte("uci: Entry not found"), errShowFailed
+	})
+
+	sections, err := NewRealUCI().GetSections("sqm")
+	if err != nil {
+		t.Fatalf("a config package that is not installed is not an error: %v", err)
+	}
+	if len(sections) != 0 {
+		t.Errorf("expected no sections for a missing config, got %v", sections)
+	}
+}
+
+func TestRealUCIGetSections_ParsesSections(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return []byte("wireless.sta0=wifi-iface\nwireless.sta0.mode='sta'\n"), nil
+	})
+
+	sections, err := NewRealUCI().GetSections("wireless")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sections["sta0"]["mode"] != "sta" || sections["sta0"][".type"] != "wifi-iface" {
+		t.Errorf("unexpected parse result: %v", sections)
+	}
+}
+
+func TestRealUCIRevertValidation(t *testing.T) {
+	if err := NewRealUCI().Revert("net;work"); err == nil {
+		t.Error("expected validation error for config with semicolon")
 	}
 }

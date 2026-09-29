@@ -1,6 +1,8 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -9,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -222,8 +225,8 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	status.Interfaces = append(status.Interfaces, status.LAN)
 
 	if wwanErr == nil {
+		// parseInterface maps the wireless device to the "wifi" discriminator.
 		wwanIface := parseInterface("wwan", "phy0-sta0", wwanData, n.ubus)
-		wwanIface.Type = "wifi"
 		status.Interfaces = append(status.Interfaces, wwanIface)
 		// If wwan is up and wan is not, use wwan as the effective WAN
 		if wwanIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
@@ -286,6 +289,38 @@ type dhcpLease struct {
 	IP       string
 	Expiry   int64
 	Hostname string
+}
+
+// dhcpEpochFloor is the smallest value that can plausibly be a UNIX timestamp
+// in seconds (2001-09-09). `ubus call dhcp ipv4leases` reports `expires` as an
+// absolute timestamp — the same value as the first column of
+// /tmp/dhcp.leases — but some builds have been observed reporting the
+// *remaining* lease duration instead, so both encodings are accepted.
+const dhcpEpochFloor = 1e9
+
+// connectedSinceFromLeaseExpiry converts a DHCP lease expiry into a
+// connected-since timestamp. Both encodings of `expires` are accepted, and in
+// both cases the connection start is the expiry minus the configured lease
+// time: treating an absolute expiry as the connection start reports a client as
+// connected "since the future".
+func connectedSinceFromLeaseExpiry(expires, leaseSec float64) string {
+	if expires <= 0 {
+		return ""
+	}
+	lease := time.Duration(leaseSec) * time.Second
+	if expires >= dhcpEpochFloor {
+		start := time.Unix(int64(expires), 0).Add(-lease)
+		if start.After(time.Now()) {
+			// Lease time larger than the remaining lease: the start is unknown.
+			return ""
+		}
+		return start.UTC().Format(time.RFC3339)
+	}
+	elapsed := leaseSec - expires
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	return time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
 }
 
 // parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of uppercase MAC → lease info.
@@ -406,14 +441,7 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 					mac := strings.ToUpper(fmt.Sprintf("%v", lm["mac"]))
 					hostname, _ := lm["hostname"].(string)
 					expires, _ := lm["expires"].(float64)
-					elapsed := leaseTimeSec - expires
-					if elapsed < 0 {
-						elapsed = 0
-					}
-					var cs string
-					if expires > 0 {
-						cs = time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
-					}
+					cs := connectedSinceFromLeaseExpiry(expires, leaseTimeSec)
 					byMAC[mac] = models.Client{
 						IPAddress: ip, MACAddress: mac,
 						Hostname: hostname, InterfaceName: ifaceName,
@@ -587,9 +615,44 @@ func (n *NetworkService) getWifiClientStats() map[string]wifiClientStat {
 	return result
 }
 
+// interfaceType maps a ubus network interface onto the discriminator the API
+// contract declares in shared/src/api/network.ts:
+// 'wan' | 'lan' | 'wifi' | 'vpn' | 'usb'.
+//
+// Rules (in order):
+//   - logical interfaces named wan/lan keep their name, whatever device carries
+//     them, so the WAN/LAN cards keep working;
+//   - wireguard/tunnel devices (proto=wireguard, wg*, tun*, tap*) are "vpn";
+//   - USB tethering devices (usbtether, usb*, rndis*, cdc_*) are "usb";
+//   - wireless devices (phy*, wlan*, *-sta, *-ap) and the wwan uplink are
+//     "wifi";
+//   - anything else keeps the interface name.
+func interfaceType(name, device, proto string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	d := strings.ToLower(strings.TrimSpace(device))
+	p := strings.ToLower(strings.TrimSpace(proto))
+	if n == "wan" || n == "lan" {
+		return n
+	}
+	switch {
+	case p == "wireguard" ||
+		strings.HasPrefix(d, "wg") || strings.HasPrefix(d, "tun") || strings.HasPrefix(d, "tap") ||
+		strings.HasPrefix(n, "wg") || strings.HasPrefix(n, "vpn"):
+		return "vpn"
+	case n == "usbtether" || strings.HasPrefix(d, "usb") ||
+		strings.HasPrefix(d, "rndis") || strings.HasPrefix(d, "cdc_"):
+		return "usb"
+	case n == "wwan" || strings.HasPrefix(d, "phy") || strings.HasPrefix(d, "wlan") ||
+		strings.Contains(d, "-sta") || strings.Contains(d, "-ap"):
+		return "wifi"
+	default:
+		return n
+	}
+}
+
 func parseInterface(name, device string, data map[string]any, ub ubus.Ubus) models.NetworkInterface {
 	iface := models.NetworkInterface{
-		Name: name, Type: name,
+		Name: name,
 	}
 	if up, ok := data["up"].(bool); ok {
 		iface.IsUp = up
@@ -602,6 +665,8 @@ func parseInterface(name, device string, data map[string]any, ub ubus.Ubus) mode
 	if devName == "" {
 		devName = device
 	}
+	proto, _ := data["proto"].(string)
+	iface.Type = interfaceType(name, devName, proto)
 
 	// Fetch device stats for MAC and traffic
 	if ub != nil && devName != "" {
@@ -833,7 +898,9 @@ func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
 func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
-		return []models.DNSEntry{}, nil
+		// A failed read is not "no entries": returning an empty list would make
+		// the UI invite a duplicate entry for an entry that already exists.
+		return nil, fmt.Errorf("reading dhcp sections: %w", err)
 	}
 	var entries []models.DNSEntry
 	for section, opts := range sections {
@@ -892,7 +959,7 @@ func sanitizeSectionName(name string) string {
 func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error) {
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
-		return []models.DHCPReservation{}, nil
+		return nil, fmt.Errorf("reading dhcp sections: %w", err)
 	}
 	var reservations []models.DHCPReservation
 	for section, opts := range sections {
@@ -969,50 +1036,68 @@ func parseDHCPLeases(data string) []models.DHCPLease {
 }
 
 // KickClient disconnects a WiFi client by deauthentication.
+// It returns an error when no interface accepted the disassociate so the UI can
+// report the failure instead of pretending the client is gone.
 func (n *NetworkService) KickClient(mac string) error {
 	// Discover AP interfaces dynamically using iw dev
 	iwDevOutput, err := n.cmd.Run("iw", "dev")
 	if err != nil {
 		// Fallback to common AP interfaces if iw fails
 		for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
-			_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+			if _, kickErr := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac); kickErr == nil {
+				return nil
+			}
 		}
-		return nil
+		return fmt.Errorf("kick %s: no wireless interface accepted the disassociate", mac)
 	}
 
 	// Parse iw dev output to find AP interfaces
+	attempted := false
 	for _, iface := range parseIwDev(string(iwDevOutput)) {
-		_, err := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
-		if err == nil {
+		attempted = true
+		if _, kickErr := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac); kickErr == nil {
 			// Successfully kicked from this interface
 			return nil
 		}
 	}
-	return nil
+	if !attempted {
+		return fmt.Errorf("kick %s: no AP interface found to disassociate from", mac)
+	}
+	return fmt.Errorf("kick %s: no AP interface accepted the disassociate", mac)
 }
 
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
+// Every failure after the first staged `uci` write reverts the staged firewall
+// delta: the uci CLI keeps uncommitted changes in /tmp/.uci/firewall/changes,
+// so an abandoned half-written rule would be committed by a later, unrelated
+// `uci commit firewall`.
 func (n *NetworkService) BlockClient(mac string) error {
 	section := "block_" + normalizeMACForSection(mac)
 	macUpper := strings.ToUpper(mac)
+
+	// abort drops the staged delta before surfacing the failure.
+	abort := func(err error) error {
+		revertUCIConfig(n.uci, "firewall")
+		return err
+	}
 
 	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
 		return fmt.Errorf("add firewall block rule: %w", err)
 	}
 	if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
-		return err
+		return abort(err)
 	}
 	if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
-		return err
+		return abort(err)
 	}
 	if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
-		return err
+		return abort(err)
 	}
 	if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
-		return err
+		return abort(err)
 	}
 	if err := n.uciCommit("firewall"); err != nil {
-		return err
+		return abort(err)
 	}
 	if err := n.restartService("firewall"); err != nil {
 		return fmt.Errorf("restart firewall: %w", err)
@@ -1028,6 +1113,9 @@ func (n *NetworkService) UnblockClient(mac string) error {
 		return fmt.Errorf("delete firewall block rule: %w", err)
 	}
 	if err := n.uciCommit("firewall"); err != nil {
+		// Restore the still-staged deletion instead of leaving a delta that a
+		// later commit would apply.
+		revertUCIConfig(n.uci, "firewall")
 		return err
 	}
 	if err := n.restartService("firewall"); err != nil {
@@ -1040,7 +1128,9 @@ func (n *NetworkService) UnblockClient(mac string) error {
 func (n *NetworkService) GetBlockedClients() ([]string, error) {
 	sections, err := n.uci.GetSections("firewall")
 	if err != nil {
-		return []string{}, nil
+		// Never report "nothing is blocked" on a failed read: that silently
+		// unblocks clients the operator believes are filtered.
+		return nil, fmt.Errorf("reading firewall sections: %w", err)
 	}
 	var blocked []string
 	for _, opts := range sections {
@@ -1210,12 +1300,40 @@ func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
 }
 
 // AddPortForward adds a new port-forward rule.
+// newPortForwardID returns an ID that cannot collide with an existing rule.
+// The millisecond prefix keeps IDs roughly ordered and human-readable; the
+// random suffix is what makes a same-millisecond collision impossible.
+func newPortForwardID(existing []models.PortForwardRule) string {
+	taken := make(map[string]bool, len(existing))
+	for _, r := range existing {
+		taken[r.ID] = true
+	}
+	for {
+		var suffix [4]byte
+		if _, err := rand.Read(suffix[:]); err != nil {
+			// crypto/rand must not fail in practice; fall back to a counter-like
+			// value rather than reusing an ID that may already be taken.
+			return fmt.Sprintf("pf%d-%s", time.Now().UnixMilli(), strconv.FormatInt(portForwardFallbackID.Add(1), 36))
+		}
+		id := fmt.Sprintf("pf%d-%s", time.Now().UnixMilli(), hex.EncodeToString(suffix[:]))
+		if !taken[id] {
+			return id
+		}
+	}
+}
+
+// portForwardFallbackID only advances if crypto/rand is unavailable.
+var portForwardFallbackID atomic.Int64
+
 func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
 	rules, err := n.GetPortForwards()
 	if err != nil {
 		return err
 	}
-	rule.ID = fmt.Sprintf("pf%d", time.Now().UnixMilli())
+	// Two rules created in the same millisecond used to share an ID, and
+	// DeletePortForward removes every rule matching the ID — so one delete took
+	// out both. A random suffix makes the ID unique per call.
+	rule.ID = newPortForwardID(rules)
 	rules = append(rules, rule)
 	return n.savePortForwards(rules)
 }

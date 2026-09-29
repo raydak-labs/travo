@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -18,6 +19,8 @@ func newTestWifiService() (*WifiService, *uci.MockUCI) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	// Never let a test write crash guards to the real /etc/travo.
+	svc.guardDir = testGuardDir()
 	return svc, u
 }
 
@@ -764,6 +767,7 @@ func TestSetAPConfig_APModeSkipsRepeaterReconcile(t *testing.T) {
 func TestSetMACAddress(t *testing.T) {
 	svc, u := newTestWifiService()
 
+	// Input is canonicalized to lowercase colon notation.
 	_, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -774,8 +778,8 @@ func TestSetMACAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if opts["macaddr"] != "AA:BB:CC:DD:EE:FF" {
-		t.Errorf("expected macaddr 'AA:BB:CC:DD:EE:FF', got '%s'", opts["macaddr"])
+	if opts["macaddr"] != "aa:bb:cc:dd:ee:ff" {
+		t.Errorf("expected macaddr 'aa:bb:cc:dd:ee:ff', got '%s'", opts["macaddr"])
 	}
 }
 
@@ -2203,5 +2207,479 @@ func TestSwitchSTAToRadio_ReconcilesSameRadioAP(t *testing.T) {
 	}
 	if ap1Disabled != "1" {
 		t.Errorf("default_radio1 (AP on radio1, STA now on radio1) should be disabled=1, got %q", ap1Disabled)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// L1: UCI write-sequence safety helpers used by the tests below.
+// ---------------------------------------------------------------------------
+
+// revertingUCI wraps MockUCI and implements the optional Revert(config) seam,
+// recording every staged-delta rollback. It can also fail one specific Set so
+// write sequences can be observed failing half-way.
+type revertingUCI struct {
+	*uci.MockUCI
+	mu        sync.Mutex
+	reverted  []string
+	commits   []string
+	failSet   func(config, section, option string) error
+	revertErr error
+}
+
+func (r *revertingUCI) Set(config, section, option, value string) error {
+	if r.failSet != nil {
+		if err := r.failSet(config, section, option); err != nil {
+			return err
+		}
+	}
+	return r.MockUCI.Set(config, section, option, value)
+}
+
+func (r *revertingUCI) Commit(config string) error {
+	r.mu.Lock()
+	r.commits = append(r.commits, config)
+	r.mu.Unlock()
+	return r.MockUCI.Commit(config)
+}
+
+func (r *revertingUCI) Revert(config string) error {
+	r.mu.Lock()
+	r.reverted = append(r.reverted, config)
+	r.mu.Unlock()
+	return r.revertErr
+}
+
+func (r *revertingUCI) revertCalls() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.reverted...)
+}
+
+func (r *revertingUCI) commitCalls() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.commits...)
+}
+
+// dirtySTAUCI reports a second, permanently-enabled STA bound to wwan. It
+// stands in for a device where the wireless config is already inconsistent, so
+// the post-mutation validation must fail no matter what the mutation writes.
+type dirtySTAUCI struct {
+	*uci.MockUCI
+}
+
+func (d *dirtySTAUCI) GetSections(config string) (map[string]map[string]string, error) {
+	sections, err := d.MockUCI.GetSections(config)
+	if err != nil {
+		return nil, err
+	}
+	if config == "wireless" {
+		sections["rogue_sta"] = map[string]string{"mode": "sta", "network": "wwan"}
+	}
+	return sections, nil
+}
+
+// ---------------------------------------------------------------------------
+// Finding 2: SetRadioRole must validate before Commit, disable other STA
+// sections, and never ship a hard-coded key.
+// ---------------------------------------------------------------------------
+
+func TestSetRadioRole_ValidatesBeforeCommit(t *testing.T) {
+	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
+	svc := NewWifiServiceWithReloader(&dirtySTAUCI{u.MockUCI}, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	if _, err := svc.SetRadioRole("radio1", "sta"); !errors.Is(err, ErrMultipleActiveSTA) {
+		t.Fatalf("expected ErrMultipleActiveSTA, got %v", err)
+	}
+	// The invalid config must never reach the committed state: an rpcd rollback
+	// after the fact would restore the very same broken config.
+	for _, c := range u.commitCalls() {
+		if c == "wireless" {
+			t.Error("wireless was committed before validation ran")
+		}
+	}
+}
+
+func TestSetRadioRole_DisablesOtherSTASections(t *testing.T) {
+	svc, u := newTestWifiService()
+	// sta0 is an enabled STA on radio0 bound to wwan; asking radio1 for the STA
+	// role would create a second active wwan STA without disabling the first.
+	if _, err := svc.SetRadioRole("radio1", "sta"); err != nil {
+		t.Fatalf("SetRadioRole: %v", err)
+	}
+	dis, _ := u.Get("wireless", "sta0", "disabled")
+	if dis != "1" {
+		t.Errorf("expected the other STA section to be disabled, got disabled=%q", dis)
+	}
+	newDis, _ := u.Get("wireless", "sta_radio1", "disabled")
+	if newDis != "0" {
+		t.Errorf("expected new STA section enabled, got disabled=%q", newDis)
+	}
+}
+
+func TestSetRadioRole_NewAPGetsRandomKey(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Remove the AP sections so a default AP has to be created.
+	if err := u.DeleteSection("wireless", "default_radio0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.DeleteSection("wireless", "default_radio1"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The apply result only exists on the rpcd apply path used in production.
+	svc.applier = &fakeWirelessApplier{startToken: "token-1"}
+	apply, err := svc.SetRadioRole("radio0", "ap")
+	if err != nil {
+		t.Fatalf("SetRadioRole: %v", err)
+	}
+	key, _ := u.Get("wireless", "ap_radio0", "key")
+	if key == "changeme123" {
+		t.Error("default AP must not use the hard-coded changeme123 key")
+	}
+	if len(key) < 8 {
+		t.Errorf("generated key %q is too short for WPA (min 8)", key)
+	}
+	if apply == nil || apply.GeneratedKey != key {
+		t.Errorf("expected the generated key to be reported in the apply result, got %+v (key %q)", apply, key)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Finding 9: disabling guest WiFi must tear the whole guest network down.
+// ---------------------------------------------------------------------------
+
+func TestSetGuestWifi_DisableTearsDownGuestNetwork(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{
+		Enabled: true, SSID: "Guest-Travel", Encryption: "psk2", Key: "guestpass123",
+	}); err != nil {
+		t.Fatalf("enable guest: %v", err)
+	}
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}); err != nil {
+		t.Fatalf("disable guest: %v", err)
+	}
+
+	if dis, _ := u.Get("wireless", "guest", "disabled"); dis != "1" {
+		t.Errorf("expected wireless.guest disabled=1, got %q", dis)
+	}
+	removed := []struct{ config, section string }{
+		{"network", "guest"},
+		{"dhcp", "guest"},
+		{"firewall", "guest_zone"},
+		{"firewall", "guest_fwd"},
+		{"firewall", "guest_dns"},
+		{"firewall", "guest_dhcp"},
+	}
+	for _, r := range removed {
+		if _, err := u.GetAll(r.config, r.section); err == nil {
+			t.Errorf("expected %s.%s to be removed when guest WiFi is disabled", r.config, r.section)
+		}
+	}
+}
+
+func TestSetGuestWifi_DisableThenEnableRestoresNetwork(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{
+		Enabled: true, SSID: "Guest-Travel", Encryption: "psk2", Key: "guestpass123",
+	}); err != nil {
+		t.Fatalf("enable guest: %v", err)
+	}
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}); err != nil {
+		t.Fatalf("disable guest: %v", err)
+	}
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{
+		Enabled: true, SSID: "Guest-2", Encryption: "psk2", Key: "guestpass123",
+	}); err != nil {
+		t.Fatalf("re-enable guest: %v", err)
+	}
+	net, err := u.GetAll("network", "guest")
+	if err != nil {
+		t.Fatalf("expected network.guest to be restored: %v", err)
+	}
+	if net["ipaddr"] != "192.168.2.1" {
+		t.Errorf("expected guest network to be rebuilt with ipaddr 192.168.2.1, got %q", net["ipaddr"])
+	}
+	fw, err := u.GetAll("firewall", "guest_zone")
+	if err != nil {
+		t.Fatalf("expected firewall.guest_zone to be restored: %v", err)
+	}
+	if fw["name"] != "guest" {
+		t.Errorf("expected guest zone to be restored, got %v", fw)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Finding 6: Connect must drop its staged UCI delta on every error return.
+// ---------------------------------------------------------------------------
+
+func TestConnect_RevertsStagedWritesOnFailure(t *testing.T) {
+	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
+	u.failSet = func(config, section, option string) error {
+		if config == "wireless" && option == "ssid" {
+			return fmt.Errorf("disk full")
+		}
+		return nil
+	}
+	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", Password: "newpass123", Encryption: "psk2",
+	}); err == nil {
+		t.Fatal("expected Connect to fail")
+	}
+	// The staged delta must be dropped: the uci CLI keeps it in the
+	// process-global /tmp/.uci/wireless/changes, where a later unrelated
+	// `uci commit wireless` would persist it.
+	if !slices.Contains(u.revertCalls(), "wireless") {
+		t.Errorf("expected the staged wireless delta to be reverted, got %v", u.revertCalls())
+	}
+}
+
+func TestConnect_DoesNotRevertOnSuccess(t *testing.T) {
+	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
+	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Hotel-WiFi", Password: "newpass123", Encryption: "psk2",
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls := u.revertCalls(); len(calls) != 0 {
+		t.Errorf("successful Connect must not revert the config it just committed, got %v", calls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Finding 8: MAC address handling.
+// ---------------------------------------------------------------------------
+
+func TestSetMACAddress_RejectsInvalidMAC(t *testing.T) {
+	svc, u := newTestWifiService()
+	for _, mac := range []string{"not-a-mac", "AA:BB:CC:DD:EE", "ZZ:BB:CC:DD:EE:FF", "AA:BB:CC:DD:EE:FF:00", "AABBCCDDEEFF"} {
+		if _, err := svc.SetMACAddress(mac); err == nil {
+			t.Errorf("expected %q to be rejected as a MAC address", mac)
+		}
+		if opts, _ := u.GetAll("wireless", "sta0"); opts["macaddr"] != "" {
+			t.Errorf("invalid MAC %q must not be written to wireless.sta0.macaddr", mac)
+		}
+	}
+}
+
+func TestSetMACAddress_AcceptsValidVariants(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Accepted spellings are canonicalized to lowercase colon notation, which
+	// is what netifd and mac80211.sh expect.
+	for mac, want := range map[string]string{
+		"AA:BB:CC:DD:EE:FF":     "aa:bb:cc:dd:ee:ff",
+		"aa:bb:cc:dd:ee:ff":     "aa:bb:cc:dd:ee:ff",
+		"AA-BB-CC-DD-EE-FF":     "aa:bb:cc:dd:ee:ff",
+		"  AA:BB:CC:DD:EE:FF  ": "aa:bb:cc:dd:ee:ff",
+	} {
+		if _, err := svc.SetMACAddress(mac); err != nil {
+			t.Errorf("expected %q to be accepted: %v", mac, err)
+		}
+		opts, _ := u.GetAll("wireless", "sta0")
+		if opts["macaddr"] != want {
+			t.Errorf("input %q: expected macaddr %q, got %q", mac, want, opts["macaddr"])
+		}
+	}
+}
+
+// newMACTestService wires a service whose STA device resolves to phy0-sta0 and
+// records every command run, so apply order and crash-guard use can be asserted.
+func newMACTestService(t *testing.T, guardDir string, applier UCIApplyConfirm, cmds *[]string) (*WifiService, *uci.MockUCI) {
+	t.Helper()
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("network.wireless.status", map[string]any{
+		"radio0": map[string]any{
+			"interfaces": []any{
+				map[string]any{
+					"ifname":  "phy0-sta0",
+					"section": "sta0",
+					"config":  map[string]any{"mode": "sta"},
+				},
+			},
+		},
+	})
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		*cmds = append(*cmds, strings.Join(append([]string{name}, args...), " "))
+		return nil, nil
+	}}
+	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	svc.cmd = runner
+	svc.guardDir = guardDir
+	svc.applier = applier
+	return svc, u
+}
+
+func TestSetMACAddress_GuardRemovedAndLinkTouchedAfterApply(t *testing.T) {
+	guardDir := t.TempDir()
+	var cmds []string
+	svc, u := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
+
+	guard := filepath.Join(guardDir, "mac-in-progress")
+	applied, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if applied == nil {
+		t.Fatal("expected an apply result")
+	}
+	if _, statErr := os.Stat(guard); !os.IsNotExist(statErr) {
+		t.Errorf("expected the crash guard %s to be removed after success", guard)
+	}
+	if opts, _ := u.GetAll("wireless", "sta0"); opts["macaddr"] != "aa:bb:cc:dd:ee:ff" {
+		t.Errorf("expected macaddr to be committed, got %v", opts)
+	}
+	if len(cmds) == 0 {
+		t.Fatal("expected the MAC to be applied to the live link")
+	}
+	// The link must only be touched once the config is staged and verified, so
+	// it can be the first and only thing that runs.
+	for i, c := range cmds {
+		if !strings.HasPrefix(c, "ip link set") {
+			t.Errorf("command %d (%q) is not link manipulation: %v", i, c, cmds)
+		}
+	}
+	if !strings.Contains(strings.Join(cmds, " "), "address aa:bb:cc:dd:ee:ff") {
+		t.Errorf("expected the new MAC to be set on the link, commands: %v", cmds)
+	}
+}
+
+func TestSetMACAddress_ApplyFailureKeepsGuardAndLeavesLinkAlone(t *testing.T) {
+	guardDir := t.TempDir()
+	var cmds []string
+	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startErr: errors.New("apply failed")}, &cmds)
+
+	if _, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected the apply failure to surface")
+	}
+	if len(cmds) != 0 {
+		t.Errorf("the live link must not be touched when the apply failed, commands: %v", cmds)
+	}
+	guard := filepath.Join(guardDir, "mac-in-progress")
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("expected crash guard %s to remain so recovery can act on it: %v", guard, err)
+	}
+}
+
+func TestSetMACAddress_GuardWrittenBeforeUCIWrites(t *testing.T) {
+	guardDir := t.TempDir()
+	var cmds []string
+	// An applier that inspects the guard while the apply is being staged.
+	guardPath := filepath.Join(guardDir, "mac-in-progress")
+	applier := &guardCheckingApplier{guardPath: guardPath, guardMissing: func() bool {
+		_, err := os.Stat(guardPath)
+		return os.IsNotExist(err)
+	}}
+	svc, _ := newMACTestService(t, guardDir, applier, &cmds)
+
+	if _, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if applier.guardWasMissing {
+		t.Error("the crash guard must be written before the wireless config is applied")
+	}
+}
+
+// guardCheckingApplier records whether the crash guard existed when the apply
+// was staged.
+type guardCheckingApplier struct {
+	UCIApplyConfirm
+	guardPath       string
+	guardMissing    func() bool
+	guardWasMissing bool
+}
+
+func (g *guardCheckingApplier) StartApply(configs []string) (string, error) {
+	g.guardWasMissing = g.guardMissing()
+	return "token-guard", nil
+}
+
+// Finding 1: a failed `uci show` must never look like an empty config in the
+// wireless read paths either.
+func TestGetRadios_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	radios, err := svc.GetRadios()
+	if err == nil {
+		t.Fatal("expected an error instead of an empty radio list when the UCI read fails")
+	}
+	if radios != nil {
+		t.Errorf("expected no list on error, got %v", radios)
+	}
+}
+
+func TestGetSavedNetworks_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	networks, err := svc.GetSavedNetworks()
+	if err == nil {
+		t.Fatal("expected an error instead of an empty saved-network list when the UCI read fails")
+	}
+	if networks != nil {
+		t.Errorf("expected no list on error, got %v", networks)
+	}
+}
+
+// Finding 3: nextSTASectionName must not fall back to a name that may exist.
+func TestNextSTASectionName_PropagatesReadFailure(t *testing.T) {
+	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	name, err := svc.nextSTASectionName()
+	if err == nil {
+		t.Fatal("expected an error when the wireless sections cannot be read")
+	}
+	if name != "" {
+		t.Errorf("expected no fallback name, got %q (writing it would hijack an existing section)", name)
+	}
+}
+
+// Finding 4: ensureNamedSection must correct a wrong section type.
+func TestEnsureNamedSection_FixesWrongType(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// A section that already exists with the wrong type.
+	if err := u.AddSection("wireless", "guest", "wifi-device"); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ensureNamedSection("wireless", "guest", "wifi-iface"); err != nil {
+		t.Fatalf("ensureNamedSection: %v", err)
+	}
+	opts, err := u.GetAll("wireless", "guest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts[".type"] != "wifi-iface" {
+		t.Errorf("expected the section type to be corrected to wifi-iface, got %q", opts[".type"])
+	}
+}
+
+func TestEnsureNamedSection_CreatesMissingSection(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	if err := svc.ensureNamedSection("dhcp", "guest", "dhcp"); err != nil {
+		t.Fatalf("ensureNamedSection: %v", err)
+	}
+	opts, err := u.GetAll("dhcp", "guest")
+	if err != nil {
+		t.Fatalf("expected the section to be created: %v", err)
+	}
+	if opts[".type"] != "dhcp" {
+		t.Errorf("expected type dhcp, got %q", opts[".type"])
+	}
+}
+
+// A read failure must not be mistaken for a missing section.
+func TestEnsureNamedSection_PropagatesReadFailure(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{u}, ubus.NewMockUbus(), &NoopWifiReloader{})
+
+	if err := svc.ensureNamedSection("wireless", "guest", "wifi-iface"); err == nil {
+		t.Fatal("expected the read failure to surface instead of silently creating a section")
 	}
 }

@@ -66,7 +66,9 @@ func (w *WifiService) SetRadioEnabled(enabled bool) (*WirelessApplyResult, error
 func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
-		return []models.RadioInfo{}, nil
+		// Reporting "no radios" on a failed read would tell the operator the
+		// hardware vanished instead of surfacing the read failure.
+		return nil, fmt.Errorf("reading wireless sections: %w", err)
 	}
 	// Build role map: for each radio name, detect active AP/STA ifaces.
 	type roleFlags struct{ ap, sta bool }
@@ -127,6 +129,14 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 // SetRadioRole assigns a role (ap/sta/both/none) to a specific radio.
 // It enables/disables existing iface sections and creates them if needed.
 func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult, error) {
+	defer w.lockUCIWrite()()
+	// abort drops the staged wireless delta before surfacing a failure: the uci
+	// CLI delta is process-global, so an abandoned write would be committed by a
+	// later, unrelated `uci commit wireless`.
+	abort := func(err error) (*WirelessApplyResult, error) {
+		revertUCIConfig(w.uci, "wireless", "network")
+		return nil, err
+	}
 	switch role {
 	case "ap", "sta", "both", "none":
 	default:
@@ -134,6 +144,8 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 	}
 	enableAP := role == "ap" || role == "both"
 	enableSTA := role == "sta" || role == "both"
+	// Set when this call had to invent a WPA key for a default AP.
+	var generatedKey string
 
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
@@ -154,27 +166,63 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 		}
 	}
 
+	// A radio that is about to gain an STA section must not leave another saved
+	// STA enabled: two active wifi-ifaces bound to network=wwan is the
+	// inconsistent config that rpcd rollback cannot repair.
+	newSTASection := ""
+	if enableSTA && len(staSections) == 0 {
+		newSTASection = "sta_" + radioName
+	}
+	// Only when a new STA section is created: this radio gains a second active
+	// wwan client otherwise. Other STA profiles are disabled, not deleted, so
+	// saved networks survive.
+	if newSTASection != "" {
+		if err := w.disableOtherSTASections(newSTASection); err != nil {
+			return abort(err)
+		}
+	}
+
 	// Handle AP sections.
 	if enableAP && len(apSections) == 0 {
 		apName := "ap_" + radioName
 		if err := w.uci.AddSection("wireless", apName, "wifi-iface"); err != nil {
-			return nil, fmt.Errorf("creating AP section: %w", err)
+			return abort(fmt.Errorf("creating AP section: %w", err))
 		}
-		_ = w.uci.Set("wireless", apName, "device", radioName)
-		_ = w.uci.Set("wireless", apName, "mode", "ap")
-		_ = w.uci.Set("wireless", apName, "ssid", "OpenWRT")
-		_ = w.uci.Set("wireless", apName, "encryption", "psk2")
-		_ = w.uci.Set("wireless", apName, "key", "changeme123")
-		_ = w.uci.Set("wireless", apName, "network", "lan")
+		// A shipped default passphrase is a public credential: every unit
+		// running this firmware would expose the same open-ish network. Generate
+		// a random WPA2 key and report it back so the operator can use it.
+		key, err := generateRandomWPAKey()
+		if err != nil {
+			return abort(fmt.Errorf("generating default AP key: %w", err))
+		}
+		generatedKey = key
+		if err := w.uci.Set("wireless", apName, "device", radioName); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", apName, "mode", "ap"); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", apName, "ssid", "OpenWRT"); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", apName, "encryption", "psk2"); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", apName, "key", key); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", apName, "network", "lan"); err != nil {
+			return abort(err)
+		}
 		apSections = append(apSections, apName)
 	}
 	for _, section := range apSections {
 		if err := w.setIfaceDisabled(section, !enableAP); err != nil {
-			return nil, err
+			return abort(err)
 		}
 		if enableAP {
 			if err := w.ensureSectionRadioEnabled(section); err != nil {
-				return nil, err
+				return abort(err)
 			}
 		}
 	}
@@ -182,34 +230,57 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 	// Handle STA sections.
 	if enableSTA && len(staSections) == 0 {
 		if err := w.ensureWwanNetwork(); err != nil {
-			return nil, fmt.Errorf("ensuring wwan network: %w", err)
+			return abort(fmt.Errorf("ensuring wwan network: %w", err))
 		}
-		staName := "sta_" + radioName
+		staName := newSTASection
 		if err := w.uci.AddSection("wireless", staName, "wifi-iface"); err != nil {
-			return nil, fmt.Errorf("creating STA section: %w", err)
+			return abort(fmt.Errorf("creating STA section: %w", err))
 		}
-		_ = w.uci.Set("wireless", staName, "device", radioName)
-		_ = w.uci.Set("wireless", staName, "mode", "sta")
-		_ = w.uci.Set("wireless", staName, "network", "wwan")
-		_ = w.uci.Set("wireless", staName, "ssid", "")
-		_ = w.uci.Set("wireless", staName, "disabled", "0")
+		if err := w.uci.Set("wireless", staName, "device", radioName); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", staName, "mode", "sta"); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", staName, "network", "wwan"); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", staName, "ssid", ""); err != nil {
+			return abort(err)
+		}
+		if err := w.uci.Set("wireless", staName, "disabled", "0"); err != nil {
+			return abort(err)
+		}
 		staSections = append(staSections, staName)
 	}
 	for _, section := range staSections {
 		if err := w.setIfaceDisabled(section, !enableSTA); err != nil {
-			return nil, err
+			return abort(err)
 		}
 		if enableSTA {
 			if err := w.ensureSectionRadioEnabled(section); err != nil {
-				return nil, err
+				return abort(err)
 			}
 		}
 	}
 
+	// Validate BEFORE Commit: stageWirelessApply would otherwise run the same
+	// check after the bad config is already committed, and the rpcd rollback it
+	// triggers would restore the very same broken config.
+	if err := w.validateWirelessConsistency(); err != nil {
+		return abort(err)
+	}
 	if err := w.uci.Commit("wireless"); err != nil {
+		return abort(err)
+	}
+	apply, err := w.stageWirelessApply()
+	if err != nil {
 		return nil, err
 	}
-	return w.stageWirelessApply()
+	if apply != nil {
+		apply.GeneratedKey = generatedKey
+	}
+	return apply, nil
 }
 
 // GetAPConfigs returns the AP configuration for all radios.
@@ -311,163 +382,226 @@ func (w *WifiService) GetGuestWifi() (*models.GuestWifiConfig, error) {
 
 // SetGuestWifi creates or updates the guest WiFi network with full isolation.
 func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyResult, error) {
+	defer w.lockUCIWrite()()
+	// abort drops every staged delta touched so far: the uci CLI delta is
+	// process-global, so an abandoned write would be committed later by an
+	// unrelated `uci commit <config>`.
+	abort := func(err error) (*WirelessApplyResult, error) {
+		revertUCIConfig(w.uci, "wireless", "network", "dhcp", "firewall")
+		return nil, err
+	}
 	if !cfg.Enabled {
-		_, err := w.uci.GetAll("wireless", "guest")
-		if err == nil {
-			if err := w.uci.Set("wireless", "guest", "disabled", "1"); err != nil {
-				return nil, err
-			}
-			if err := w.uci.Commit("wireless"); err != nil {
-				return nil, err
-			}
-			return w.stageWirelessApply()
-		}
-		return nil, nil
+		return w.teardownGuestWifi()
 	}
 
 	// Network interface for guest subnet
 	if err := w.ensureNamedSection("network", "guest", "interface"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("network", "guest", "proto", "static"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("network", "guest", "ipaddr", "192.168.2.1"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("network", "guest", "netmask", "255.255.255.0"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Commit("network"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	// DHCP for guest network
 	if err := w.ensureNamedSection("dhcp", "guest", "dhcp"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("dhcp", "guest", "interface", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("dhcp", "guest", "start", "100"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("dhcp", "guest", "limit", "50"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("dhcp", "guest", "leasetime", "2h"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Commit("dhcp"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	// Wireless interface for guest AP
 	guestRadio, err := w.preferredGuestRadio()
 	if err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.ensureNamedSection("wireless", "guest", "wifi-iface"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "device", guestRadio); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "mode", "ap"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "network", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "ssid", cfg.SSID); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "encryption", cfg.Encryption); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "key", cfg.Key); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "isolate", "1"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("wireless", "guest", "disabled", "0"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.ensureSectionRadioEnabled("guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Commit("wireless"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	// Firewall zone for guest
 	if err := w.ensureNamedSection("firewall", "guest_zone", "zone"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_zone", "name", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_zone", "network", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_zone", "input", "REJECT"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_zone", "output", "ACCEPT"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_zone", "forward", "REJECT"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	// Forwarding: guest -> wan
 	if err := w.ensureNamedSection("firewall", "guest_fwd", "forwarding"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_fwd", "src", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_fwd", "dest", "wan"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	// Allow DNS from guest
 	if err := w.ensureNamedSection("firewall", "guest_dns", "rule"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dns", "name", "Allow-Guest-DNS"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dns", "src", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dns", "dest_port", "53"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dns", "target", "ACCEPT"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	// Allow DHCP from guest
 	if err := w.ensureNamedSection("firewall", "guest_dhcp", "rule"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dhcp", "name", "Allow-Guest-DHCP"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dhcp", "src", "guest"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dhcp", "dest_port", "67-68"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Set("firewall", "guest_dhcp", "target", "ACCEPT"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 	if err := w.uci.Commit("firewall"); err != nil {
-		return nil, err
+		return abort(err)
 	}
 
 	return w.stageWirelessApply()
+}
+
+// teardownGuestWifi disables the guest AP and removes the guest subnet it
+// owned. Setting wireless.guest.disabled=1 alone leaves network.guest,
+// dhcp.guest and the four firewall.guest_* sections in place, so the
+// 192.168.2.0/24 interface, its DHCP scope and the guest zone stay up and
+// continue to route and answer on a network the operator switched off.
+func (w *WifiService) teardownGuestWifi() (*WirelessApplyResult, error) {
+	abort := func(err error) (*WirelessApplyResult, error) {
+		revertUCIConfig(w.uci, "wireless", "network", "dhcp", "firewall")
+		return nil, err
+	}
+	if _, err := w.uci.GetAll("wireless", "guest"); err != nil {
+		// Guest WiFi was never configured: nothing to tear down.
+		return nil, nil
+	}
+
+	// 1. Take the AP down first so no client is left on a subnet that is about
+	//    to disappear.
+	if err := w.uci.Set("wireless", "guest", "disabled", "1"); err != nil {
+		return abort(err)
+	}
+	if err := w.uci.Commit("wireless"); err != nil {
+		return abort(err)
+	}
+
+	// 2. Remove the DHCP scope before the interface it is bound to.
+	if err := w.deleteSectionIfPresent("dhcp", "guest"); err != nil {
+		return abort(err)
+	}
+	if err := w.uci.Commit("dhcp"); err != nil {
+		return abort(err)
+	}
+
+	// 3. Remove the guest network interface (192.168.2.0/24).
+	if err := w.deleteSectionIfPresent("network", "guest"); err != nil {
+		return abort(err)
+	}
+	if err := w.uci.Commit("network"); err != nil {
+		return abort(err)
+	}
+
+	// 4. Remove the guest firewall zone and its rules/forwarding.
+	for _, section := range []string{"guest_dhcp", "guest_dns", "guest_fwd", "guest_zone"} {
+		if err := w.deleteSectionIfPresent("firewall", section); err != nil {
+			return abort(err)
+		}
+	}
+	if err := w.uci.Commit("firewall"); err != nil {
+		return abort(err)
+	}
+
+	return w.stageWirelessApply()
+}
+
+// deleteSectionIfPresent removes config/section when it exists. A section that
+// was never created is not an error: teardown must be idempotent.
+func (w *WifiService) deleteSectionIfPresent(config, section string) error {
+	if _, err := w.uci.GetAll(config, section); err != nil {
+		return nil
+	}
+	if err := w.uci.DeleteSection(config, section); err != nil {
+		return fmt.Errorf("removing %s.%s: %w", config, section, err)
+	}
+	return nil
 }

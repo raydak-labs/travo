@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -1112,14 +1113,49 @@ func TestUnblockClient_NotBlocked(t *testing.T) {
 	}
 }
 
-func TestKickClient(t *testing.T) {
+func TestKickClient_SucceedsWhenAPInterfaceAccepts(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	iwDev := "phy0\n\tInterface phy0-ap0\n\t\ttype AP\n\tInterface phy0-sta0\n\t\ttype managed\n"
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "iw" {
+			return []byte(iwDev), nil
+		}
+		return nil, nil // hostapd_cli disassociate succeeds
+	}}
+	svc := NewNetworkServiceWithRunner(u, ub, runner)
 
-	err := svc.KickClient("AA:BB:CC:DD:EE:FF")
-	if err != nil {
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// KickClient must report failure when nothing was actually disassociated,
+// instead of returning nil and letting the UI claim success.
+func TestKickClient_ErrorsWhenNoAPInterfaceFound(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{Output: []byte("phy0\n")})
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Error("expected an error when no AP interface exists")
+	}
+}
+
+func TestKickClient_ErrorsWhenAPInterfaceRejects(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	iwDev := "phy0\n\tInterface phy0-ap0\n\t\ttype AP\n"
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "iw" {
+			return []byte(iwDev), nil
+		}
+		return nil, fmt.Errorf("disassociate failed")
+	}}
+	svc := NewNetworkServiceWithRunner(u, ub, runner)
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Error("expected an error when every AP interface rejects the disassociate")
 	}
 }
 
@@ -1800,5 +1836,209 @@ func TestGetClients_HostnamesFromUbus(t *testing.T) {
 	}
 	if hostnameCount == 0 {
 		t.Error("expected at least one client with a hostname")
+	}
+}
+
+// failingGetSectionsUCI wraps MockUCI but fails every GetSections read, standing
+// in for a timed-out / failed `uci show` on the device.
+type failingGetSectionsUCI struct {
+	*uci.MockUCI
+}
+
+func (f *failingGetSectionsUCI) GetSections(_ string) (map[string]map[string]string, error) {
+	return nil, fmt.Errorf("uci show: timed out")
+}
+
+func TestGetBlockedClients_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+
+	blocked, err := svc.GetBlockedClients()
+	if err == nil {
+		t.Fatal("expected an error instead of an empty blocked list when the UCI read fails")
+	}
+	if blocked != nil {
+		t.Errorf("expected no list on error, got %v", blocked)
+	}
+}
+
+func TestGetDNSEntries_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+
+	if _, err := svc.GetDNSEntries(); err == nil {
+		t.Fatal("expected an error instead of an empty DNS entry list when the UCI read fails")
+	}
+}
+
+func TestGetDHCPReservations_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+
+	if _, err := svc.GetDHCPReservations(); err == nil {
+		t.Fatal("expected an error instead of an empty reservation list when the UCI read fails")
+	}
+}
+
+func TestKickClient_NoInterfaceAcceptedReturnsError(t *testing.T) {
+	calls := 0
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		calls++
+		return nil, fmt.Errorf("no such interface")
+	}}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), runner)
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected an error when no interface accepted the disassociate")
+	}
+	if calls == 0 {
+		t.Error("expected KickClient to try the discovered AP interfaces")
+	}
+}
+
+func TestKickClient_SuccessWhenOneInterfaceAccepts(t *testing.T) {
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		return []byte("Interface phy0-ap0\ntype AP\n"), nil
+	}}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), runner)
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseInterface_EmitsContractTypes(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	tests := []struct {
+		name   string
+		iface  string
+		device string
+		data   map[string]any
+		want   string
+	}{
+		{"wan stays wan", "wan", "eth0", map[string]any{"device": "eth0"}, "wan"},
+		{"lan stays lan", "lan", "br-lan", map[string]any{"device": "br-lan"}, "lan"},
+		{"wwan is wifi", "wwan", "phy0-sta0", map[string]any{"device": "phy0-sta0"}, "wifi"},
+		{"wlan ap is wifi", "guest", "phy1-ap0", map[string]any{"device": "phy1-ap0"}, "wifi"},
+		{"usb tether is usb", "usbtether", "usb0", map[string]any{"device": "usb0", "proto": "dhcp"}, "usb"},
+		{"wireguard is vpn", "wg0", "wg0", map[string]any{"device": "wg0", "proto": "wireguard"}, "vpn"},
+		{"wireguard tunnel device is vpn", "vpn0", "tun0", map[string]any{"device": "tun0", "proto": "none"}, "vpn"},
+		{"unknown keeps name", "guest", "br-guest", map[string]any{"device": "br-guest"}, "guest"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseInterface(tt.iface, tt.device, tt.data, ub).Type
+			if got != tt.want {
+				t.Errorf("expected type %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestGetNetworkStatus_EmitsContractTypes(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("network.interface.wwan.status", map[string]any{
+		"up": true, "device": "phy0-sta0", "l3_device": "wwan", "proto": "dhcp",
+	})
+	svc := NewNetworkService(uci.NewMockUCI(), ub)
+
+	status, err := svc.GetNetworkStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]string{"wan": "wan", "lan": "lan", "wwan": "wifi"}
+	for _, iface := range status.Interfaces {
+		if w, ok := want[iface.Name]; ok {
+			if iface.Type != w {
+				t.Errorf("interface %s: expected type %q, got %q", iface.Name, w, iface.Type)
+			}
+			delete(want, iface.Name)
+		}
+	}
+	for name := range want {
+		t.Errorf("interface %s missing from status", name)
+	}
+}
+
+func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsEpoch(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	// A lease that started 1h ago with a 12h lease expires in 11h: 11*3600
+	// seconds *after* the epoch.
+	expires := float64(time.Now().Unix() + 11*3600)
+	ub.RegisterResponse("dhcp.ipv4leases", map[string]any{
+		"device": map[string]any{
+			"br-lan": map[string]any{
+				"leases": []any{
+					map[string]any{"mac": "AA:BB:CC:11:22:33", "ip": "192.168.8.100", "hostname": "laptop", "expires": expires},
+				},
+			},
+		},
+	})
+	runner := &MockCommandRunner{Err: fmt.Errorf("iw not available")}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ub, runner)
+
+	clients := svc.fetchDHCPClients()
+	if len(clients) != 1 {
+		t.Fatalf("expected 1 client, got %d", len(clients))
+	}
+	connected, err := time.Parse(time.RFC3339, clients[0].ConnectedSince)
+	if err != nil {
+		t.Fatalf("ConnectedSince %q is not RFC3339: %v", clients[0].ConnectedSince, err)
+	}
+	age := time.Since(connected)
+	if age < 30*time.Minute || age > 90*time.Minute {
+		t.Errorf("expected ~1h uptime from the epoch expiry, got %s", age.Round(time.Minute))
+	}
+}
+
+func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsRemainingDuration(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("dhcp.ipv4leases", map[string]any{
+		"device": map[string]any{
+			"br-lan": map[string]any{
+				"leases": []any{
+					// 11h left of a 12h lease => connected ~1h ago (old build semantics).
+					map[string]any{"mac": "AA:BB:CC:11:22:33", "ip": "192.168.8.100", "hostname": "laptop", "expires": float64(11 * 3600)},
+				},
+			},
+		},
+	})
+	runner := &MockCommandRunner{Err: fmt.Errorf("iw not available")}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ub, runner)
+
+	clients := svc.fetchDHCPClients()
+	if len(clients) != 1 {
+		t.Fatalf("expected 1 client, got %d", len(clients))
+	}
+	connected, err := time.Parse(time.RFC3339, clients[0].ConnectedSince)
+	if err != nil {
+		t.Fatalf("ConnectedSince %q is not RFC3339: %v", clients[0].ConnectedSince, err)
+	}
+	if age := time.Since(connected); age < 30*time.Minute || age > 90*time.Minute {
+		t.Errorf("expected ~1h uptime from the remaining-duration expiry, got %s", age.Round(time.Minute))
+	}
+}
+
+// Two rules created in the same millisecond must get different IDs, otherwise
+// DeletePortForward (which removes every rule matching the ID) takes out both.
+func TestNewPortForwardID_UniqueWithinTheSameMillisecond(t *testing.T) {
+	var rules []models.PortForwardRule
+	seen := make(map[string]bool, 64)
+	for i := 0; i < 64; i++ {
+		id := newPortForwardID(rules)
+		if id == "" {
+			t.Fatal("empty ID")
+		}
+		if seen[id] {
+			t.Fatalf("duplicate port-forward ID %q", id)
+		}
+		seen[id] = true
+		rules = append(rules, models.PortForwardRule{ID: id})
+	}
+}
+
+// An ID that already exists in the rule set must never be handed out again,
+// even if it is generated within the same millisecond.
+func TestNewPortForwardID_AvoidsExistingIDs(t *testing.T) {
+	existing := []models.PortForwardRule{{ID: newPortForwardID(nil)}}
+	if got := newPortForwardID(existing); got == existing[0].ID {
+		t.Fatalf("reused existing ID %q", got)
 	}
 }

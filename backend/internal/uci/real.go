@@ -245,14 +245,51 @@ func parseShowConfigOutput(output string) map[string]map[string]string {
 	return result
 }
 
+// uciShowConfig runs `uci show <config>`. It is a package-level seam so tests
+// can exercise GetSections error handling without the uci binary.
+var uciShowConfig = func(config string) ([]byte, error) {
+	return execx.CombinedOutput(execx.Quick, "uci", "show", config)
+}
+
+// isMissingUCIConfig reports whether a failed `uci show` means "this config
+// package is not installed" (uci exits non-zero with "Entry not found").
+// That is the one failure that legitimately means "no sections"; every other
+// failure (timeout, unreadable file, lock contention) must surface, otherwise
+// callers cannot tell a broken system from an empty config.
+func isMissingUCIConfig(out string) bool {
+	lower := strings.ToLower(out)
+	return strings.Contains(lower, "entry not found") ||
+		strings.Contains(lower, "no such file") ||
+		strings.Contains(lower, "not found")
+}
+
 func (r *RealUCI) GetSections(config string) (map[string]map[string]string, error) {
 	if err := validateIdentifier("config", config); err != nil {
 		return nil, err
 	}
 
-	out, err := execx.CombinedOutput(execx.Quick, "uci", "show", config)
+	out, err := uciShowConfig(config)
 	if err != nil {
-		return map[string]map[string]string{}, nil
+		if isMissingUCIConfig(string(out)) {
+			return map[string]map[string]string{}, nil
+		}
+		return nil, fmt.Errorf("uci show %s: %s", config, strings.TrimSpace(string(out)))
 	}
 	return parseShowConfigOutput(string(out)), nil
+}
+
+// Revert discards staged (uncommitted) changes for a config. The uci CLI keeps
+// its delta in /tmp/.uci/<config>/changes, which is process-global: a staged
+// write that is abandoned would be committed by a later, unrelated
+// `uci commit <config>`. Callers use this to roll back a failed write sequence.
+func (r *RealUCI) Revert(config string) error {
+	if err := validateIdentifier("config", config); err != nil {
+		return err
+	}
+
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "revert", config)
+	if err != nil {
+		return fmt.Errorf("uci revert %s: %s", config, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
