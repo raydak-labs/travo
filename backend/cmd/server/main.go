@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -44,10 +46,39 @@ func minPlausibleTime() time.Time {
 	return floor
 }
 
+// HTTP server limits. Fiber's zero-value config inherits fasthttp's
+// effectively-unbounded read/write behaviour, which lets a handful of idle
+// sockets hold every connection slot (Slowloris) and makes graceful shutdown
+// wait on keep-alives that never send another byte.
+const (
+	// readTimeout bounds the time spent reading one request (headers + body).
+	// It must stay well above a slow firmware/backup upload over a hotel uplink,
+	// and far below "forever".
+	readTimeout = 5 * time.Minute
+	// writeTimeout bounds the response write. The package-install SSE endpoints
+	// legitimately stream for 3 packages x execx.Package (10 min), so this is
+	// set above that ceiling rather than to a tight value.
+	writeTimeout = 45 * time.Minute
+	// idleTimeout closes keep-alive connections that go quiet, so Shutdown
+	// completes instead of blocking on an idle client.
+	idleTimeout = 60 * time.Second
+	// shutdownTimeout bounds the graceful drain; after it elapses the process
+	// stops anyway (a stuck handler must not prevent shutdown).
+	shutdownTimeout = 20 * time.Second
+	// goroutineDrainTimeout bounds how long Stop() waits for tracked background
+	// goroutines before giving up and closing the store anyway.
+	goroutineDrainTimeout = 10 * time.Second
+)
+
+// bodyLimit replaces Fiber's 4 MB default. OpenWrt sysupgrade images and
+// configuration backups routinely exceed that, and the firmware/restore
+// upload endpoints would otherwise answer 413 for legitimate images.
+const bodyLimit = 64 * 1024 * 1024
+
+// splitCORSOrigins parses the configured origin allowlist. An unset (or
+// blank) value yields an empty slice, which means "no cross-origin access
+// allowed" (same-origin only) — see corsConfig.
 func splitCORSOrigins(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return []string{"*"}
-	}
 	parts := strings.Split(s, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -56,10 +87,26 @@ func splitCORSOrigins(s string) []string {
 			out = append(out, p)
 		}
 	}
-	if len(out) == 0 {
-		return []string{"*"}
-	}
 	return out
+}
+
+// corsConfig builds the CORS middleware config. Fiber treats an empty
+// AllowOrigins list as "allow everything", so same-origin-only has to be
+// expressed with an explicit deny-all AllowOriginsFunc instead.
+func corsConfig(rawOrigins string) cors.Config {
+	cfg := cors.Config{
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{"Authorization", "Content-Type"},
+	}
+	origins := splitCORSOrigins(rawOrigins)
+	if len(origins) == 0 {
+		// No Access-Control-Allow-Origin is emitted for any Origin header, so
+		// the browser blocks the response. Same-origin requests are unaffected.
+		cfg.AllowOriginsFunc = func(string) bool { return false }
+		return cfg
+	}
+	cfg.AllowOrigins = origins
+	return cfg
 }
 
 // appLifecycle bundles every component with a background goroutine so callers
@@ -76,25 +123,89 @@ type appLifecycle struct {
 	rateLimiter     *auth.RateLimiter
 	timeSyncLimiter *auth.RateLimiter
 	statsHistory    *services.StatsHistoryService
+	captiveSvc      *services.CaptiveService
 	db              *store.Store // may be nil (memory-only fallback)
+
+	stopCh   chan struct{}
+	stopOnce sync.Once
+	wg       sync.WaitGroup
+	// live counts goroutines registered via Go that have not returned yet.
+	live atomic.Int64
 }
 
-// Stop shuts down all background goroutines, then closes the store —
-// last, because statsHistory.Stop flushes into it.
-func (l *appLifecycle) Stop() {
-	l.blocklist.Stop()
-	l.hub.Stop()
-	l.netWatcher.Stop()
-	l.alertSvc.Stop()
-	l.uptimeTracker.Stop()
-	l.bandSwitchSvc.Stop()
-	l.failoverSvc.Stop()
-	l.rateLimiter.Stop()
-	l.timeSyncLimiter.Stop()
-	l.statsHistory.Stop()
-	if l.db != nil {
-		_ = l.db.Close()
+// newAppLifecycle returns a lifecycle with the shutdown signal channel ready.
+func newAppLifecycle() *appLifecycle {
+	return &appLifecycle{stopCh: make(chan struct{})}
+}
+
+// Go runs fn as a tracked background goroutine. fn receives a channel that is
+// closed when Stop() begins, so work that waits (startup delays, retries) can
+// bail out instead of committing UCI changes after SIGTERM. Untracked
+// goroutines are the reason a detached worker used to be able to flash or
+// reconfigure the device after the HTTP server was already gone.
+func (l *appLifecycle) Go(fn func(stop <-chan struct{})) {
+	l.wg.Add(1)
+	l.live.Add(1)
+	go func() {
+		defer l.wg.Done()
+		defer l.live.Add(-1)
+		fn(l.stopCh)
+	}()
+}
+
+// sleepOrStop waits for d and reports whether it completed (false = stop
+// requested).
+func sleepOrStop(stop <-chan struct{}, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-stop:
+		return false
 	}
+}
+
+// Stop signals every tracked goroutine, shuts the services down, then closes
+// the store last (statsHistory.Stop flushes into it). It is safe to call
+// multiple times and from multiple goroutines. Callers must have stopped
+// accepting requests (app.Shutdown) first, otherwise in-flight handlers can
+// still touch a closed store.
+func (l *appLifecycle) Stop() {
+	l.stopOnce.Do(func() {
+		close(l.stopCh)
+
+		l.blocklist.Stop()
+		l.hub.Stop()
+		l.netWatcher.Stop()
+		l.alertSvc.Stop()
+		l.uptimeTracker.Stop()
+		l.bandSwitchSvc.Stop()
+		l.failoverSvc.Stop()
+		l.rateLimiter.Stop()
+		l.timeSyncLimiter.Stop()
+		l.statsHistory.Stop()
+		if l.captiveSvc != nil {
+			l.captiveSvc.Stop()
+		}
+
+		// Give tracked goroutines a bounded window to unwind. A worker stuck in
+		// a long exec must not hold up shutdown, so we log and continue.
+		drained := make(chan struct{})
+		go func() {
+			l.wg.Wait()
+			close(drained)
+		}()
+		select {
+		case <-drained:
+		case <-time.After(goroutineDrainTimeout):
+			log.Printf("WARNING: %d background goroutine(s) still running after %v; continuing shutdown", l.live.Load(), goroutineDrainTimeout)
+		}
+
+		if l.db != nil {
+			_ = l.db.Close()
+		}
+	})
 }
 
 // setupApp creates and configures the Fiber application with all routes.
@@ -112,14 +223,18 @@ func setupApp() *fiber.App {
 // setupAppWithConfig creates and configures the Fiber application with the given config.
 // The returned lifecycle owns every background goroutine started here.
 func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
-	app := fiber.New(fiber.Config{AppName: "travo"})
+	lifecycle := newAppLifecycle()
+
+	app := fiber.New(fiber.Config{
+		AppName:      "travo",
+		BodyLimit:    bodyLimit,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
+	})
 
 	// CORS middleware
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: splitCORSOrigins(cfg.CorsOrigins),
-		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{"Authorization", "Content-Type"},
-	}))
+	app.Use(cors.New(corsConfig(cfg.CorsOrigins)))
 
 	nets, err := auth.ParseCIDRList(cfg.AllowedAdminCIDRs)
 	if err != nil {
@@ -184,6 +299,11 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	}
 
 	systemSvc := services.NewSystemService(ub, u, storage)
+	if !cfg.MockMode {
+		// Surface crash guards left behind by an interrupted run (flash,
+		// restore, factory reset) so the state is not silently forgotten.
+		systemSvc.LogStaleCrashGuards()
+	}
 	networkSvc := services.NewNetworkService(u, ub)
 	sqmSvc := services.NewSQMService(u)
 
@@ -194,7 +314,8 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	} else {
 		netWatcher = services.NewNetworkEventWatcher(networkSvc)
 	}
-	go netWatcher.Start()
+	lifecycle.netWatcher = netWatcher
+	lifecycle.Go(func(stop <-chan struct{}) { netWatcher.Start() })
 	var wifiSvc *services.WifiService
 	if cfg.MockMode {
 		wifiSvc = services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{})
@@ -207,8 +328,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// browser in the loop to confirm rpcd rollback safely, so we commit the repair
 	// and require LuCI Save & Apply or reboot for runtime activation.
 	if !cfg.MockMode {
-		go func() {
-			time.Sleep(30 * time.Second)
+		lifecycle.Go(func(stop <-chan struct{}) {
+			if !sleepOrStop(stop, 30*time.Second) {
+				return
+			}
 			fixed, needApply, err := wifiSvc.EnsureAPRunning()
 			if err != nil {
 				log.Printf("WARNING: WiFi AP health check failed: %v", err)
@@ -219,29 +342,55 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 			} else if fixed {
 				log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
 			}
-		}()
+		})
 		// Ensure auto-reconnect script is present and up-to-date when enabled.
 		// Uses SetAutoReconnect to recreate a missing script (e.g. after a crash or
 		// accidental deletion) and to upgrade any old "wifi reload" script to the safe
 		// "wifi up" version. Safe to call idempotently: it rewrites the cron entry and
 		// script atomically, which is the same state SetAutoReconnect(true) produces.
-		go func() {
-			time.Sleep(5 * time.Second)
-			if enabled, _ := wifiSvc.GetAutoReconnect(); enabled {
-				if err := wifiSvc.SetAutoReconnect(true); err != nil {
-					log.Printf("WARNING: could not refresh auto-reconnect script: %v", err)
-				}
+		lifecycle.Go(func(stop <-chan struct{}) {
+			if !sleepOrStop(stop, 5*time.Second) {
+				return
 			}
-		}()
+			// Repair in BOTH directions, not just when the feature is on.
+			// A device carrying a pre-rename cron entry or script keeps running
+			// `wifi reload` / `wifi up` on a timer even though auto-reconnect is
+			// disabled, and `wifi reload` is the documented ath11k crash trigger.
+			// SetAutoReconnect rewrites the script and the cron entry to match the
+			// configured state, so calling it unconditionally converges the device
+			// onto the safe script in both cases.
+			enabled, _ := wifiSvc.GetAutoReconnect()
+			if err := wifiSvc.SetAutoReconnect(enabled); err != nil {
+				log.Printf("WARNING: could not reconcile auto-reconnect script: %v", err)
+			}
+		})
+		// Same for the WiFi on/off schedule: an existing /etc/cron.d entry still
+		// holds the pre-fix `/sbin/wifi up` / `/sbin/wifi down` lines until the
+		// user re-saves the schedule. Re-writing it from the stored config points
+		// the cron entries at the generated UCI toggle helper instead.
+		lifecycle.Go(func(stop <-chan struct{}) {
+			if !sleepOrStop(stop, 6*time.Second) {
+				return
+			}
+			sched, err := wifiSvc.GetWiFiSchedule()
+			if err != nil || !sched.Enabled || sched.OnTime == "" || sched.OffTime == "" {
+				return
+			}
+			if err := wifiSvc.SetWiFiSchedule(sched); err != nil {
+				log.Printf("WARNING: could not reconcile WiFi schedule cron entry: %v", err)
+			}
+		})
 		// Auto-discover radio hardware and persist config on first boot.
-		go func() {
-			time.Sleep(10 * time.Second)
+		lifecycle.Go(func(stop <-chan struct{}) {
+			if !sleepOrStop(stop, 10*time.Second) {
+				return
+			}
 			if discovered, err := wifiSvc.DiscoverAndPersistRadios(); err != nil {
 				log.Printf("WARNING: radio discovery failed: %v", err)
 			} else if discovered {
 				log.Printf("Radio auto-discovery completed on first boot.")
 			}
-		}()
+		})
 	}
 
 	vpnSvc := services.NewVpnService(u)
@@ -327,6 +476,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 
 		TimeSyncMinPlausible: minPlausibleTime(),
 		TimeSyncLimiter:      timeSyncLimiter,
+		TimeSyncGate:         api.NewTimeSyncGate(!time.Now().Before(minPlausibleTime())),
 	}
 	api.SetupRoutes(app, deps)
 
@@ -338,7 +488,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	alertSvc.Start()
 	uptimeTracker.Start()
 	bandSwitchSvc.Start()
-	go failoverSvc.Start()
+	lifecycle.Go(func(stop <-chan struct{}) { failoverSvc.Start() })
 
 	// Static files (if configured)
 	if cfg.StaticDir != "" {
@@ -354,19 +504,18 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		})
 	}
 
-	return app, &appLifecycle{
-		hub:             hub,
-		alertSvc:        alertSvc,
-		uptimeTracker:   uptimeTracker,
-		bandSwitchSvc:   bandSwitchSvc,
-		failoverSvc:     failoverSvc,
-		blocklist:       blocklist,
-		netWatcher:      netWatcher,
-		rateLimiter:     rateLimiter,
-		timeSyncLimiter: timeSyncLimiter,
-		statsHistory:    statsHistory,
-		db:              db,
-	}
+	lifecycle.hub = hub
+	lifecycle.alertSvc = alertSvc
+	lifecycle.uptimeTracker = uptimeTracker
+	lifecycle.bandSwitchSvc = bandSwitchSvc
+	lifecycle.failoverSvc = failoverSvc
+	lifecycle.blocklist = blocklist
+	lifecycle.rateLimiter = rateLimiter
+	lifecycle.timeSyncLimiter = timeSyncLimiter
+	lifecycle.statsHistory = statsHistory
+	lifecycle.captiveSvc = captiveSvc
+	lifecycle.db = db
+	return app, lifecycle
 }
 
 func main() {
@@ -390,10 +539,14 @@ func main() {
 	go func() {
 		<-quit
 		log.Println("Shutting down server...")
-		lifecycle.Stop()
-		if err := app.Shutdown(); err != nil {
+		// Order matters: stop accepting requests and let in-flight handlers
+		// finish BEFORE the services (and the store) are torn down. Doing it the
+		// other way round made every in-flight DB read fail against a closed
+		// bbolt handle, with the error swallowed inside the store.
+		if err := app.ShutdownWithTimeout(shutdownTimeout); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}
+		lifecycle.Stop()
 		log.Println("Server stopped")
 	}()
 

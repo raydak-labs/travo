@@ -44,8 +44,22 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	if cfg.StaticDir != "" {
 		t.Errorf("expected empty StaticDir, got %q", cfg.StaticDir)
 	}
-	if cfg.CorsOrigins != "*" {
-		t.Errorf("expected CorsOrigins '*', got %q", cfg.CorsOrigins)
+	// Same-origin by default: an unset allowlist must not become "*".
+	if cfg.CorsOrigins != "" {
+		t.Errorf("expected empty CorsOrigins by default, got %q", cfg.CorsOrigins)
+	}
+}
+
+// A blank CORS_ORIGINS env var must not re-enable the wildcard default.
+func TestLoadConfig_BlankCorsOriginsEnvKeepsSameOriginDefault(t *testing.T) {
+	t.Setenv("CORS_ORIGINS", "   ")
+
+	cfg, _, err := LoadConfig([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.CorsOrigins != "" {
+		t.Errorf("expected same-origin default with blank env value, got %q", cfg.CorsOrigins)
 	}
 }
 

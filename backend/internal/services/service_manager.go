@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -105,12 +106,22 @@ var knownServices = []serviceDefinition{
 
 // ServiceManager manages installable services.
 type ServiceManager struct {
-	mu               sync.RWMutex
-	defs             []serviceDefinition
-	pkg              PackageManager
-	probe            SystemProbe
-	cache            map[string]models.ServiceInfo
+	// mu guards the cache snapshot only. It is deliberately NOT held across
+	// package-manager or init.d calls: those run for up to execx.Package
+	// (10 min) per package, and holding the write lock blocked
+	// ListServices/GetServiceStatus for the whole install.
+	mu    sync.RWMutex
+	defs  []serviceDefinition
+	pkg   PackageManager
+	probe SystemProbe
+	cache map[string]models.ServiceInfo
+	// opMu serializes mutating operations (install/remove/start/stop) against
+	// each other while leaving reads lock-free.
+	opMu             sync.Mutex
 	postInstallHooks map[string]func() error
+	// guardDir holds the crash-guard file for package installs (ADR 0003);
+	// empty means /etc/travo. Tests point it at a temp dir.
+	guardDir string
 }
 
 // SetPostInstallHook registers a callback that runs after successful package install
@@ -150,14 +161,27 @@ func (sm *ServiceManager) RefreshCache() {
 	}
 }
 
-// refreshOne updates the cache for a single service (must hold write lock).
+// refreshOne recomputes and publishes the cached state for a single service.
+//
+// The live-state probe runs OUTSIDE the lock (it shells out to opkg/init.d),
+// and only the map write is serialized by the write lock. Two properties this
+// must keep:
+//   - sm.cache is never written without the write lock, while ListServices and
+//     GetServiceStatus read it under the read lock. A lock-free write here is
+//     a Go map read/write data race, which aborts the whole process.
+//   - the write lock is not held across the probe, so a long-running
+//     pkg.Update()/Install() (execx.Package = 10 min) cannot block readers.
 func (sm *ServiceManager) refreshOne(serviceID string) {
-	for _, def := range sm.defs {
-		if def.ID == serviceID {
-			sm.cache[def.ID] = sm.buildInfo(def)
-			return
-		}
+	sm.mu.RLock()
+	def, ok := sm.findDefLocked(serviceID)
+	sm.mu.RUnlock()
+	if !ok {
+		return
 	}
+	info := sm.buildInfo(def)
+	sm.mu.Lock()
+	sm.cache[def.ID] = info
+	sm.mu.Unlock()
 }
 
 // ListServices returns all known services from cache.
@@ -227,12 +251,87 @@ func (sm *ServiceManager) buildInfo(def serviceDefinition) models.ServiceInfo {
 	return info
 }
 
-// Install installs the packages for a service.
-func (sm *ServiceManager) Install(serviceID string) error {
+// SetGuardDir overrides the directory used for crash-guard files (tests).
+func (sm *ServiceManager) SetGuardDir(dir string) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+	sm.guardDir = dir
+}
+
+// pkgInstallGuardFile is the crash guard for package installs. Installing a
+// package rewrites init scripts, /etc/config and kernel modules, so a power cut
+// mid-install leaves a half-configured system with no marker (ADR 0003).
+func (sm *ServiceManager) guardPath() string {
+	sm.mu.RLock()
+	dir := sm.guardDir
+	sm.mu.RUnlock()
+	if dir == "" {
+		// /etc/trafo is the single crash-guard directory (AGENTS.md, ADR 0003 §2).
+		dir = "/etc/trafo"
+	}
+	return filepath.Join(dir, "pkg-install-in-progress")
+}
+
+// writeInstallGuard records that a mutating package operation has started.
+func (sm *ServiceManager) writeInstallGuard(reason string) error {
+	path := sm.guardPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+		return fmt.Errorf("pkg guard: mkdir: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(reason+"\n"), 0600); err != nil {
+		return fmt.Errorf("pkg guard: write: %w", err)
+	}
+	return nil
+}
+
+// clearInstallGuard removes the guard after a fully successful operation.
+func (sm *ServiceManager) clearInstallGuard() {
+	_ = os.Remove(sm.guardPath())
+}
+
+// findDef resolves a service ID to its definition. defs are immutable after
+// construction, so this needs no lock and can safely run outside the write
+// lock.
+func (sm *ServiceManager) findDef(serviceID string) (serviceDefinition, error) {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	if def, ok := sm.findDefLocked(serviceID); ok {
+		return def, nil
+	}
+	return serviceDefinition{}, fmt.Errorf("service not found: %s", serviceID)
+}
+
+// findDefLocked resolves a service ID; the caller must already hold sm.mu
+// (read or write). defs are immutable after construction.
+func (sm *ServiceManager) findDefLocked(serviceID string) (serviceDefinition, bool) {
+	for _, def := range sm.defs {
+		if def.ID == serviceID {
+			return def, true
+		}
+	}
+	return serviceDefinition{}, false
+}
+
+// postInstallHook returns the registered hook for a service, if any.
+func (sm *ServiceManager) postInstallHook(serviceID string) func() error {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return sm.postInstallHooks[serviceID]
+}
+
+// Install installs the packages for a service.
+func (sm *ServiceManager) Install(serviceID string) error {
+	// opMu serializes mutating work; the cache write lock is only taken for the
+	// short refreshOne call at the end, so reads stay responsive while a
+	// 3-package install runs (previously 30 minutes of blocking).
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
+		return err
+	}
+	if err := sm.writeInstallGuard("install " + serviceID); err != nil {
 		return err
 	}
 	// Best-effort index refresh: a failure (e.g. offline) still leaves the
@@ -240,22 +339,34 @@ func (sm *ServiceManager) Install(serviceID string) error {
 	_, _ = sm.pkg.Update()
 	for _, pkg := range def.Packages {
 		if out, err := sm.pkg.Install(pkg); err != nil {
+			// Guard stays: the system may be half-installed and an operator
+			// needs the marker (ADR 0003).
 			return fmt.Errorf("failed to install %s: %w\n%s", pkg, err, out)
 		}
 	}
 	sm.refreshOne(serviceID)
-	if hook, ok := sm.postInstallHooks[serviceID]; ok {
-		_ = hook() // Non-fatal: log but don't fail install
+	if hook := sm.postInstallHook(serviceID); hook != nil {
+		// The hook configures the freshly installed service (e.g. AdGuard
+		// Home). Swallowing its error made the API report success for a service
+		// that is installed but unconfigured.
+		if err := hook(); err != nil {
+			return fmt.Errorf("post-install configuration for %s failed: %w", serviceID, err)
+		}
 	}
+	sm.clearInstallGuard()
 	return nil
 }
 
 // Remove removes the packages for a service.
 func (sm *ServiceManager) Remove(serviceID string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
+		return err
+	}
+	if err := sm.writeInstallGuard("remove " + serviceID); err != nil {
 		return err
 	}
 	// Stop first if running
@@ -268,15 +379,21 @@ func (sm *ServiceManager) Remove(serviceID string) error {
 		}
 	}
 	sm.refreshOne(serviceID)
+	sm.clearInstallGuard()
 	return nil
 }
 
 // InstallWithLog installs packages and streams output line by line via logFn.
 func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
+		return err
+	}
+	if err := sm.writeInstallGuard("install " + serviceID); err != nil {
+		logFn(fmt.Sprintf("Cannot start: %v", err))
 		return err
 	}
 	logFn("Updating package index…")
@@ -290,23 +407,28 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 		}
 	}
 	sm.refreshOne(serviceID)
-	if hook, ok := sm.postInstallHooks[serviceID]; ok {
+	if hook := sm.postInstallHook(serviceID); hook != nil {
 		logFn("Running post-install configuration…")
 		if err := hook(); err != nil {
-			logFn(fmt.Sprintf("Post-install warning: %s", err.Error()))
-		} else {
-			logFn("Post-install configuration complete.")
+			return fmt.Errorf("post-install configuration for %s failed: %w", serviceID, err)
 		}
+		logFn("Post-install configuration complete.")
 	}
+	sm.clearInstallGuard()
 	return nil
 }
 
 // RemoveWithLog removes packages and streams output line by line via logFn.
 func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
+		return err
+	}
+	if err := sm.writeInstallGuard("remove " + serviceID); err != nil {
+		logFn(fmt.Sprintf("Cannot start: %v", err))
 		return err
 	}
 	// Stop first if running
@@ -321,13 +443,15 @@ func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) er
 		}
 	}
 	sm.refreshOne(serviceID)
+	sm.clearInstallGuard()
 	return nil
 }
 
 // Start starts a service via init.d.
 func (sm *ServiceManager) Start(serviceID string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
 		return err
@@ -348,8 +472,9 @@ func (sm *ServiceManager) Start(serviceID string) error {
 
 // Stop stops a service via init.d.
 func (sm *ServiceManager) Stop(serviceID string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
 		return err
@@ -367,8 +492,9 @@ func (sm *ServiceManager) Stop(serviceID string) error {
 
 // SetAutoStart enables or disables auto-start for a service.
 func (sm *ServiceManager) SetAutoStart(serviceID string, enabled bool) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
+	sm.opMu.Lock()
+	defer sm.opMu.Unlock()
+
 	def, err := sm.findDef(serviceID)
 	if err != nil {
 		return err
@@ -376,7 +502,9 @@ func (sm *ServiceManager) SetAutoStart(serviceID string, enabled bool) error {
 	if def.InitName == "" {
 		return fmt.Errorf("service %s does not have an init script", serviceID)
 	}
+	sm.mu.RLock()
 	info, ok := sm.cache[def.ID]
+	sm.mu.RUnlock()
 	if !ok || info.State == "not_installed" {
 		return fmt.Errorf("service %s is not installed", serviceID)
 	}
@@ -391,15 +519,6 @@ func (sm *ServiceManager) SetAutoStart(serviceID string, enabled bool) error {
 	}
 	sm.refreshOne(serviceID)
 	return nil
-}
-
-func (sm *ServiceManager) findDef(serviceID string) (serviceDefinition, error) {
-	for _, def := range sm.defs {
-		if def.ID == serviceID {
-			return def, nil
-		}
-	}
-	return serviceDefinition{}, fmt.Errorf("service not found: %s", serviceID)
 }
 
 // --- Real implementations ---

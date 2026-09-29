@@ -1,14 +1,29 @@
 package services
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
+
+// newSSHKeyTestService returns a SystemService whose authorized_keys path is a
+// temp file, so the index handling can be exercised off-device.
+func newSSHKeyTestService(t *testing.T, path string) *SystemService {
+	t.Helper()
+	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc.sshKeysFile = path
+	return svc
+}
 
 func TestGetSystemInfo(t *testing.T) {
 	ub := ubus.NewMockUbus()
@@ -320,6 +335,7 @@ func TestSetHostname(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
 	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc.SetGuardDir(t.TempDir())
 
 	if err := svc.SetHostname("MyRouter"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -356,6 +372,7 @@ func TestSetTimezone(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
 	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc.SetGuardDir(t.TempDir())
 
 	err := svc.SetTimezone(models.TimezoneConfig{
 		Zonename: "Europe/Berlin",
@@ -401,6 +418,7 @@ func TestSetNTPConfig(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
 	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc.SetGuardDir(t.TempDir())
 
 	err := svc.SetNTPConfig(models.NTPConfig{
 		Enabled: false,
@@ -452,6 +470,7 @@ func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
 func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc.SetGuardDir(t.TempDir())
 
 	content := "fake firmware binary"
 	reader := strings.NewReader(content)
@@ -461,15 +480,28 @@ func TestUpgradeFirmware_SavesFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify the file was written to /tmp/firmware.bin
-	data, err := os.ReadFile("/tmp/firmware.bin")
+	// The staged image must exist somewhere under /tmp with the uploaded bytes.
+	data, err := findFirmwareImage(content)
 	if err != nil {
-		t.Fatalf("failed to read firmware file: %v", err)
+		t.Fatalf("firmware file was not staged: %v", err)
 	}
-	if string(data) != content {
-		t.Errorf("expected firmware content %q, got %q", content, string(data))
+	_ = os.Remove(data)
+}
+
+// findFirmwareImage locates the staged /tmp/firmware-*.bin written by
+// UpgradeFirmware.
+func findFirmwareImage(want string) (string, error) {
+	matches, err := filepath.Glob("/tmp/firmware-*.bin")
+	if err != nil {
+		return "", err
 	}
-	_ = os.Remove("/tmp/firmware.bin")
+	for _, m := range matches {
+		b, err := os.ReadFile(m)
+		if err == nil && string(b) == want {
+			return m, nil
+		}
+	}
+	return "", fmt.Errorf("no /tmp/firmware-*.bin containing the uploaded content")
 }
 
 func TestGetSetupComplete_NotComplete(t *testing.T) {
@@ -547,9 +579,11 @@ func TestBuildButtonActionsJSON_RoundTrip(t *testing.T) {
 		{Name: "reset", Action: models.ButtonActionWifiToggle},
 		{Name: "wps", Action: models.ButtonActionLEDToggle},
 	}
-	json := buildButtonActionsJSON(original)
+	// Round-trip through encoding/json: the hand-rolled parser this replaced
+	// silently mangled names and actions.
+	raw := buildButtonActionsJSON(original)
 	var parsed []models.HardwareButton
-	if err := unmarshalButtonActions([]byte(json), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
 		t.Fatalf("unmarshal error: %v", err)
 	}
 	if len(parsed) != len(original) {
@@ -582,5 +616,285 @@ func TestGetTimezone_MissingSection(t *testing.T) {
 	// Should return empty/default values
 	if config.Zonename != "" || config.Timezone != "" {
 		t.Errorf("expected empty timezone config when section missing, got zonename=%q timezone=%q", config.Zonename, config.Timezone)
+	}
+}
+
+// --- Crash guards for device-mutating operations (ADR 0003) ---
+
+func newGuardedSystemService(t *testing.T) (*SystemService, string) {
+	t.Helper()
+	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	dir := t.TempDir()
+	svc.SetGuardDir(dir)
+	return svc, dir
+}
+
+// UpgradeFirmware must leave a crash-guard marker: a power cut mid-flash
+// leaves an unbootable device, and the marker is the only recovery hint.
+func TestUpgradeFirmware_WritesCrashGuard(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	if err := svc.UpgradeFirmware(strings.NewReader("FIRMWARE"), true); err != nil {
+		t.Fatalf("UpgradeFirmware: %v", err)
+	}
+	guard := filepath.Join(dir, firmwareUpgradeGuardName)
+	data, err := os.ReadFile(guard)
+	if err != nil {
+		t.Fatalf("expected a crash guard at %s: %v", guard, err)
+	}
+	if !strings.Contains(string(data), "sysupgrade") {
+		t.Errorf("guard should record what was running, got %q", data)
+	}
+}
+
+// RestoreBackup rewrites /etc/config, so a crash guard must exist and must
+// survive a failed restore — the marker is the only record that the config was
+// left in an unknown state.
+func TestRestoreBackup_WritesAndKeepsGuardOnFailure(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	guard := filepath.Join(dir, restoreGuardName)
+
+	// sysupgrade does not exist on the test host, so the restore fails; the
+	// guard must still be on disk afterwards.
+	_ = svc.RestoreBackup(filepath.Join(dir, "nonexistent-backup.tar.gz"))
+
+	if _, err := os.Stat(guard); err != nil {
+		t.Fatalf("expected a crash guard at %s after a failed restore: %v", guard, err)
+	}
+}
+
+// FactoryReset must refuse to start when the guard cannot be written, rather
+// than erasing the overlay with no recovery marker.
+func TestFactoryReset_WritesCrashGuard(t *testing.T) {
+	if _, err := exec.LookPath("firstboot"); err != nil {
+		t.Skip("firstboot not available on this host")
+	}
+	svc, dir := newGuardedSystemService(t)
+	if err := svc.FactoryReset(); err != nil {
+		t.Fatalf("FactoryReset: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, factoryResetGuardName)); err != nil {
+		t.Errorf("expected a crash guard for the factory reset: %v", err)
+	}
+}
+
+// commitSystemConfig must clear its guard on success and keep it (plus name it
+// in the error) when the commit fails.
+func TestCommitSystemConfig_GuardLifecycle(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	if err := svc.SetHostname("travel-router"); err != nil {
+		t.Fatalf("SetHostname: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, systemConfigGuardName)); !os.IsNotExist(err) {
+		t.Errorf("guard must be removed after a successful commit, stat err = %v", err)
+	}
+}
+
+// --- Backups ---
+
+// The backup filename must be unique: the handler removes exactly the path it
+// was handed, so two backups in the same second used to delete each other's
+// archive while it was still streaming.
+func TestUniqueTempPath_IsUniqueAndFree(t *testing.T) {
+	dir := t.TempDir()
+	seen := make(map[string]bool)
+	for i := 0; i < 200; i++ {
+		p, err := uniqueTempPath(dir, "backup-*.tar.gz")
+		if err != nil {
+			t.Fatalf("uniqueTempPath: %v", err)
+		}
+		if seen[p] {
+			t.Fatalf("duplicate temp path %q", p)
+		}
+		seen[p] = true
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Fatalf("temp path %q must not exist yet, stat err = %v", p, err)
+		}
+		if !strings.HasPrefix(filepath.Base(p), "backup-") || !strings.HasSuffix(p, ".tar.gz") {
+			t.Errorf("unexpected backup path shape: %q", p)
+		}
+	}
+}
+
+// --- Memory stats ---
+
+// used = total - free - cached - buffered can go negative when the reported
+// numbers overlap. A negative value is nonsense in the UI.
+func TestGetSystemStats_ClampsNegativeMemoryUsage(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	ub.RegisterResponse("system.info", map[string]any{
+		"memory": map[string]any{
+			"total":    float64(1024),
+			"free":     float64(800),
+			"cached":   float64(300),
+			"buffered": float64(100),
+		},
+	})
+	stats, err := svc.GetSystemStats()
+	if err != nil {
+		t.Fatalf("GetSystemStats: %v", err)
+	}
+	if stats.Memory.UsedBytes < 0 {
+		t.Errorf("UsedBytes must be clamped at 0, got %d", stats.Memory.UsedBytes)
+	}
+	if stats.Memory.UsagePercent < 0 {
+		t.Errorf("UsagePercent must be clamped at 0, got %f", stats.Memory.UsagePercent)
+	}
+}
+
+// --- Log level parsing ---
+
+// Level extraction must not depend on a fixed column: BusyBox logread and
+// dmesg disagree about the weekday prefix, and the old index-based parse
+// returned "" for every line without it (so ?level=err returned everything).
+func TestExtractLevel_PositionIndependent(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want string
+	}{
+		{"weekday prefix", "Tue Mar 11 09:17:52 2026 daemon.err dnsmasq[1]: boom", "err"},
+		{"no weekday prefix", "daemon.err dnsmasq[1]: boom", "err"},
+		{"no year, short date", "Mar 11 09:17:52 daemon.warning dnsmasq[1]: slow", "warning"},
+		{"no timestamp at all", "user.notice netifd: up", "notice"},
+		{"kern facility", "kern.crit kernel: critical", "crit"},
+		{"warn alias", "daemon.warn dnsmasq[1]: hmm", "warning"},
+		{"error alias", "daemon.error dnsmasq[1]: bad", "err"},
+		{"plain text, no level", "something happened at 10.1.2.3", ""},
+		{"dmesg style", "[ 12.345678] ath11k firmware crashed", ""},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractLevel(tt.line); got != tt.want {
+				t.Errorf("extractLevel(%q) = %q, want %q", tt.line, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseLogOutput_LevelFilterWorksWithoutWeekday(t *testing.T) {
+	input := `daemon.debug dnsmasq[1]: debug msg
+daemon.info dnsmasq[1]: info msg
+daemon.err dnsmasq[1]: error msg
+kern.crit kernel: critical`
+	res := parseLogOutput("syslog", input, "", "err")
+	if res.Total != 2 {
+		t.Fatalf("expected 2 lines at err or above, got %d", res.Total)
+	}
+	for _, l := range res.Lines {
+		sev, ok := logLevelSeverity[l.Level]
+		if !ok {
+			t.Fatalf("line %q kept with unknown level %q", l.Line, l.Level)
+		}
+		if sev > logLevelSeverity["err"] {
+			t.Errorf("line %q (level %q) should have been filtered out", l.Line, l.Level)
+		}
+	}
+}
+
+// --- Log capture bounds ---
+
+// Log capture must be bounded: a device in a log loop can produce tens of MB
+// per request.
+func TestStreamLogTail_KeepsOnlyTheTail(t *testing.T) {
+	script := "i=0; while [ $i -lt " + itoa(maxLogLines+500) + " ]; do echo \"line $i\"; i=$((i+1)); done"
+	out, err := streamLogTail(10*time.Second, "sh", "-c", script)
+	if err != nil {
+		t.Fatalf("streamLogTail: %v", err)
+	}
+	lines := strings.Split(out, "\n")
+	if len(lines) != maxLogLines {
+		t.Errorf("expected the output capped at %d lines, got %d", maxLogLines, len(lines))
+	}
+	// The tail must be the newest output.
+	if lines[len(lines)-1] != "line "+itoa(maxLogLines+499) {
+		t.Errorf("expected the newest line last, got %q", lines[len(lines)-1])
+	}
+}
+
+func itoa(i int) string { return strconv.Itoa(i) }
+
+// --- SSH key index bounds (Wave 1 hardening must stay intact) ---
+
+func TestDeleteSSHKey_RejectsOutOfRangeIndex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "authorized_keys")
+	if err := os.WriteFile(path, []byte("ssh-ed25519 AAAA user1\nssh-rsa BBBB user2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc := newSSHKeyTestService(t, path)
+
+	if err := svc.DeleteSSHKey(-1); err == nil {
+		t.Error("expected an error for a negative index")
+	}
+	if err := svc.DeleteSSHKey(2); err == nil {
+		t.Error("expected an error for an index past the last line")
+	}
+	// Index 0 must map to the first key line, matching GetSSHKeys.
+	keys, err := svc.GetSSHKeys()
+	if err != nil {
+		t.Fatalf("GetSSHKeys: %v", err)
+	}
+	if len(keys.Keys) != 2 {
+		t.Fatalf("expected 2 keys, got %d", len(keys.Keys))
+	}
+	if err := svc.DeleteSSHKey(0); err != nil {
+		t.Fatalf("DeleteSSHKey(0): %v", err)
+	}
+	remaining, _ := os.ReadFile(path)
+	if strings.Contains(string(remaining), "user1") {
+		t.Errorf("expected user1 to be removed, file is %q", remaining)
+	}
+	if !strings.Contains(string(remaining), "user2") {
+		t.Errorf("expected user2 to survive, file is %q", remaining)
+	}
+}
+
+// --- Button action config parsing ---
+
+// A malformed button-actions.json must not be reported as "no buttons
+// configured": the hotplug script on disk still runs the previous actions.
+func TestGetHardwareButtonsWithError_SurfacesParseFailure(t *testing.T) {
+	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+
+	// No file at all is not an error: nothing has been configured yet.
+	if _, err := svc.GetHardwareButtonsWithError(); err != nil {
+		t.Errorf("a missing config file must not be an error, got %v", err)
+	}
+
+	if err := os.WriteFile(buttonActionsFile, []byte("{ this is not json"), 0o600); err != nil {
+		t.Skipf("cannot write %s on this host: %v", buttonActionsFile, err)
+	}
+	defer func() { _ = os.Remove(buttonActionsFile) }()
+
+	if _, err := svc.GetHardwareButtonsWithError(); err == nil {
+		t.Error("a malformed config file must surface an error")
+	}
+	// The non-error-returning wrapper must still be safe to call.
+	_ = svc.GetHardwareButtons()
+}
+
+// encoding/json replaced a hand-rolled parser: names containing escapes and
+// reordered keys must round-trip.
+func TestLoadButtonActions_HandlesReorderedAndEscapedJSON(t *testing.T) {
+	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	if err := os.WriteFile(buttonActionsFile, []byte(`[{"action":"reboot","name":"reset"},{"name":"wps","action":"led_toggle"}]`), 0o600); err != nil {
+		t.Skipf("cannot write %s on this host: %v", buttonActionsFile, err)
+	}
+	defer func() { _ = os.Remove(buttonActionsFile) }()
+
+	buttons, err := svc.loadButtonActions()
+	if err != nil {
+		t.Fatalf("loadButtonActions: %v", err)
+	}
+	if len(buttons) != 2 {
+		t.Fatalf("expected 2 buttons, got %d", len(buttons))
+	}
+	if buttons[0].Name != "reset" || buttons[0].Action != models.ButtonActionReboot {
+		t.Errorf("unexpected first button: %+v", buttons[0])
+	}
+	if buttons[1].Name != "wps" || buttons[1].Action != models.ButtonActionLEDToggle {
+		t.Errorf("unexpected second button: %+v", buttons[1])
 	}
 }

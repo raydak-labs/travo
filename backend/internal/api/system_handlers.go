@@ -391,7 +391,14 @@ func SystemAlertsHandler(svc *services.AlertService) fiber.Handler {
 // GetButtonsHandler handles GET /api/v1/system/buttons.
 func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		return c.JSON(svc.GetHardwareButtons())
+		// A parse failure means the UI would show "no buttons configured" while
+		// the generated hotplug script still runs the last saved actions, so
+		// report the failure instead of a misleading empty list.
+		buttons, err := svc.GetHardwareButtonsWithError()
+		if err != nil {
+			return RespondWithServerError(c, err)
+		}
+		return c.JSON(buttons)
 	}
 }
 

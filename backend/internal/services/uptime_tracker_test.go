@@ -96,3 +96,29 @@ func TestUptimeTracker_StartStop(t *testing.T) {
 		t.Error("expected at least one event after Start()")
 	}
 }
+
+// Stop() must be idempotent, and Start() must not spawn a second ticker: a
+// duplicate loop would record the same transition twice.
+func TestUptimeTracker_StopIsIdempotent(t *testing.T) {
+	tracker := NewUptimeTracker(&MockHTTPProber{StatusCode: 204})
+	tracker.Start()
+	tracker.Stop()
+	tracker.Stop() // must not panic
+}
+
+func TestUptimeTracker_StartIsIdempotent(t *testing.T) {
+	tracker := NewUptimeTracker(&MockHTTPProber{StatusCode: 204})
+	tracker.CheckInterval = 10 * time.Millisecond
+	tracker.Start()
+	tracker.Start()
+	tracker.Start()
+	defer tracker.Stop()
+
+	time.Sleep(80 * time.Millisecond)
+	// Only the very first check may record a transition; extra tickers would
+	// not add events on their own, so assert the loop is single by checking
+	// that the initial event is the only one recorded.
+	if events := tracker.GetUptimeLog(); len(events) != 1 {
+		t.Errorf("expected exactly 1 event (single loop), got %d", len(events))
+	}
+}

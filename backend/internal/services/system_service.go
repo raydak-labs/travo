@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -54,11 +57,98 @@ type SystemService struct {
 	ubus    ubus.Ubus
 	uci     uci.UCI
 	storage StorageProvider
+	// guardDir holds the crash-guard files (ADR 0003). Empty means
+	// /etc/trafo; tests point it at a temp dir.
+	guardDir     string
+	guardDirOnce sync.Once
+	// guardResolved caches the resolved guard directory.
+	guardResolved string
+	// sshKeysFile overrides authorizedKeysFile (tests only).
+	sshKeysFile string
+}
+
+// sshKeysPath returns the authorized_keys path in use.
+func (s *SystemService) sshKeysPath() string {
+	if s.sshKeysFile != "" {
+		return s.sshKeysFile
+	}
+	return authorizedKeysFile
 }
 
 // NewSystemService creates a new SystemService.
 func NewSystemService(ub ubus.Ubus, u uci.UCI, storage StorageProvider) *SystemService {
 	return &SystemService{ubus: ub, uci: u, storage: storage}
+}
+
+// SetGuardDir overrides the directory used for crash-guard files (tests).
+func (s *SystemService) SetGuardDir(dir string) {
+	s.guardDir = dir
+	s.guardResolved = ""
+	s.guardDirOnce = sync.Once{}
+}
+
+// Crash-guard file names. Each marks a live-state mutation that is unsafe to
+// blindly retry after a power cut; the guard is removed only once the whole
+// operation succeeded (AGENTS.md, ADR 0003).
+const (
+	restoreGuardName         = "restore-in-progress"
+	firmwareUpgradeGuardName = "firmware-upgrade-in-progress"
+	factoryResetGuardName    = "factory-reset-in-progress"
+	systemConfigGuardName    = "system-config-in-progress"
+)
+
+func (s *SystemService) guardDirOrDefault() string {
+	if s.guardDir != "" {
+		return s.guardDir
+	}
+	s.guardDirOnce.Do(func() {
+		const prod = "/etc/trafo"
+		mkErr := os.MkdirAll(prod, 0o750)
+		if mkErr == nil {
+			s.guardResolved = prod
+			return
+		}
+		// Not running in the normal deployment (dev host, unit tests) or the
+		// installation is broken. Do not skip the guard: fall back to a temp
+		// directory and say so loudly.
+		fallback := filepath.Join(os.TempDir(), "travo-guards")
+		log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side flash or reset is NOT protected by a durable marker.", prod, mkErr, fallback)
+		_ = os.MkdirAll(fallback, 0o750)
+		s.guardResolved = fallback
+	})
+	return s.guardResolved
+}
+
+// writeGuard records that a dangerous operation has started. name is the
+// file name, e.g. "firmware-upgrade-in-progress".
+func (s *SystemService) writeGuard(name, reason string) error {
+	dir := s.guardDirOrDefault()
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return fmt.Errorf("crash guard: mkdir %s: %w", dir, err)
+	}
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(reason+"\n"), 0o600); err != nil {
+		return fmt.Errorf("crash guard: write %s: %w", path, err)
+	}
+	return nil
+}
+
+// clearGuard removes the crash guard after a successful operation.
+func (s *SystemService) clearGuard(name string) {
+	_ = os.Remove(filepath.Join(s.guardDirOrDefault(), name))
+}
+
+// LogStaleCrashGuards warns about guards left behind by an interrupted run so
+// the operator can see (and clear) them after a power cut mid-flash.
+func (s *SystemService) LogStaleCrashGuards() {
+	for _, name := range []string{restoreGuardName, firmwareUpgradeGuardName, factoryResetGuardName, systemConfigGuardName} {
+		path := filepath.Join(s.guardDirOrDefault(), name)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		log.Printf("WARNING: crash guard present: %s (%s). The previous operation did not finish; clear it manually if the system looks healthy.", path, strings.TrimSpace(string(data)))
+	}
 }
 
 // GetSystemInfo returns system identification information.
@@ -111,14 +201,25 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 		cached, _ := mem["cached"].(float64)
 		buffered, _ := mem["buffered"].(float64)
 
+		// cached/buffered can overlap with what procd already counted as free,
+		// which makes the subtraction go negative. A negative "used" is worse
+		// than a slightly wrong one (it renders as a nonsensical percentage).
+		used := int64(total - free - cached - buffered)
+		if used < 0 {
+			used = 0
+		}
+		if used > int64(total) {
+			used = int64(total)
+		}
+
 		stats.Memory = models.MemoryStats{
 			TotalBytes:  int64(total),
 			FreeBytes:   int64(free),
 			CachedBytes: int64(cached + buffered),
-			UsedBytes:   int64(total - free - cached - buffered),
+			UsedBytes:   used,
 		}
 		if total > 0 {
-			stats.Memory.UsagePercent = float64(stats.Memory.UsedBytes) / total * 100
+			stats.Memory.UsagePercent = float64(used) / total * 100
 		}
 	}
 
@@ -199,11 +300,14 @@ func (s *SystemService) Reboot() error {
 }
 
 // Shutdown initiates a system poweroff.
-// The call is async so the HTTP response returns before the system goes down.
+// The call is async so the HTTP response returns before the system goes down,
+// and it goes through execx so a hung poweroff cannot leak a process.
 func (s *SystemService) Shutdown() error {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		_ = exec.Command("poweroff").Run()
+		if err := execx.Run(execx.Quick, "poweroff"); err != nil {
+			log.Printf("ERROR: poweroff failed: %v", err)
+		}
 	}()
 	return nil
 }
@@ -241,7 +345,34 @@ func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
 	}, nil
 }
 
-// SetTimezone updates the timezone configuration.
+// commitSystemConfig commits /etc/config/system under a crash guard and
+// reports honestly what the caller must tell the user.
+//
+// These settings (timezone, hostname, NTP servers) are committed to UCI but
+// NOT applied: the running procd/sysntpd instances keep the old values until
+// the next boot. We deliberately do not start an rpcd apply here. An apply
+// without a browser in the loop has no rollback confirmation, and the
+// SystemService has no rpcd session available; a reboot is the safe activation
+// path and is the same contract the restore endpoint already advertises
+// ("Configuration restored. Reboot to apply changes.").
+//
+// The crash guard is removed as soon as the commit succeeds, so what it really
+// protects is the commit itself: a failure leaves a marker plus a half-written
+// /etc/config/system, which is exactly the state an operator must be told about
+// rather than silently overwritten by the next request.
+func (s *SystemService) commitSystemConfig(what string) error {
+	if err := s.writeGuard(systemConfigGuardName, what); err != nil {
+		return err
+	}
+	if err := s.uci.Commit("system"); err != nil {
+		return fmt.Errorf("committing system config for %s (crash guard %s kept, /etc/config/system may be incomplete): %w", what, systemConfigGuardName, err)
+	}
+	s.clearGuard(systemConfigGuardName)
+	return nil
+}
+
+// SetTimezone updates the timezone configuration in /etc/config/system.
+// The change takes effect on the next reboot (see commitSystemConfig).
 func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
 	section, _, err := s.findSystemSection()
 	if err != nil {
@@ -253,7 +384,7 @@ func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
 	if err := s.uci.Set("system", section, "timezone", config.Timezone); err != nil {
 		return fmt.Errorf("setting timezone: %w", err)
 	}
-	return s.uci.Commit("system")
+	return s.commitSystemConfig("timezone " + config.Zonename)
 }
 
 // GetNTPConfig returns the NTP time synchronization configuration.
@@ -276,6 +407,8 @@ func (s *SystemService) GetNTPConfig() (models.NTPConfig, error) {
 }
 
 // SetNTPConfig updates the NTP time synchronization configuration.
+// The change takes effect on the next reboot (see commitSystemConfig); use
+// SyncNTP for an immediate one-shot resync.
 func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 	enabled := "1"
 	if !config.Enabled {
@@ -287,7 +420,7 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 	if err := s.uci.Set("system", "ntp", "server", strings.Join(config.Servers, " ")); err != nil {
 		return fmt.Errorf("setting ntp servers: %w", err)
 	}
-	return s.uci.Commit("system")
+	return s.commitSystemConfig("ntp " + strings.Join(config.Servers, " "))
 }
 
 // SyncNTP forces a one-shot NTP sync using ntpd.
@@ -299,7 +432,8 @@ func (s *SystemService) SyncNTP() error {
 	return nil
 }
 
-// SetHostname changes the device hostname via UCI and applies it.
+// SetHostname changes the device hostname in /etc/config/system.
+// The change takes effect on the next reboot (see commitSystemConfig).
 func (s *SystemService) SetHostname(hostname string) error {
 	section, _, err := s.findSystemSection()
 	if err != nil {
@@ -308,7 +442,7 @@ func (s *SystemService) SetHostname(hostname string) error {
 	if err := s.uci.Set("system", section, "hostname", hostname); err != nil {
 		return err
 	}
-	return s.uci.Commit("system")
+	return s.commitSystemConfig("hostname " + hostname)
 }
 
 // GetLEDStatus returns the current stealth mode state by checking LED brightness.
@@ -407,14 +541,20 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 		lines = append(lines, line)
 	}
 	if schedule.Enabled && schedule.OffTime != "" && schedule.OnTime != "" {
+		// Times are formatted into a root crontab line, so they must be strict
+		// HH:MM — a newline would inject a second attacker-controlled entry.
+		if err := ValidateHHMM(schedule.OffTime); err != nil {
+			return fmt.Errorf("off_time: %w", err)
+		}
+		if err := ValidateHHMM(schedule.OnTime); err != nil {
+			return fmt.Errorf("on_time: %w", err)
+		}
 		offParts := strings.SplitN(schedule.OffTime, ":", 2)
 		onParts := strings.SplitN(schedule.OnTime, ":", 2)
-		if len(offParts) == 2 && len(onParts) == 2 {
-			ledScript := "for f in /sys/class/leds/*/brightness; do echo %s > $f; done"
-			offLine := fmt.Sprintf("%s %s * * * %s %s", offParts[1], offParts[0], fmt.Sprintf(ledScript, "0"), ledCronTag+" brightness-off")
-			onLine := fmt.Sprintf("%s %s * * * %s %s", onParts[1], onParts[0], fmt.Sprintf(ledScript, "255"), ledCronTag+" brightness-on")
-			lines = append(lines, offLine, onLine)
-		}
+		ledScript := "for f in /sys/class/leds/*/brightness; do echo %s > $f; done"
+		offLine := fmt.Sprintf("%s %s * * * %s %s", offParts[1], offParts[0], fmt.Sprintf(ledScript, "0"), ledCronTag+" brightness-off")
+		onLine := fmt.Sprintf("%s %s * * * %s %s", onParts[1], onParts[0], fmt.Sprintf(ledScript, "255"), ledCronTag+" brightness-on")
+		lines = append(lines, offLine, onLine)
 	}
 	lines = append(lines, "")
 	if err := os.WriteFile("/etc/crontabs/root", []byte(strings.Join(lines, "\n")), 0600); err != nil {
@@ -424,50 +564,117 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 	return nil
 }
 
+// Bounds for log capture. logread/dmesg on a device in a log loop can be tens
+// of megabytes; buffering all of it per request exhausts the router's RAM.
+const (
+	maxLogLines    = 2000
+	maxLogLineRune = 1000
+)
+
+// streamLogTail runs a log-producing command and keeps only the tail, so peak
+// memory stays bounded no matter how chatty the system is.
+func streamLogTail(timeout time.Duration, name string, args ...string) (string, error) {
+	lines := make([]string, 0, 256)
+	truncated := 0
+	err := execx.Stream(timeout, func(line string) {
+		if len(line) > maxLogLineRune {
+			line = line[:maxLogLineRune]
+		}
+		lines = append(lines, line)
+		if len(lines) > maxLogLines {
+			// Drop from the front: the newest entries are the useful ones.
+			lines = lines[1:]
+			truncated++
+		}
+	}, name, args...)
+	if err != nil {
+		return "", err
+	}
+	if truncated > 0 {
+		log.Printf("WARNING: %s output truncated to the last %d lines (%d older lines dropped)", name, maxLogLines, truncated)
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
 // GetLogs retrieves system logs from logread.
 // If service is non-empty, only lines containing that service name (case-insensitive) are returned.
 // If level is non-empty, only lines at or above that severity are returned.
 func (s *SystemService) GetLogs(service, level string) (models.LogResponse, error) {
-	out, err := execx.CombinedOutput(execx.Quick, "logread")
+	out, err := streamLogTail(execx.Quick, "logread")
 	if err != nil {
 		return models.LogResponse{}, err
 	}
-	return parseLogOutput("syslog", string(out), service, level), nil
+	return parseLogOutput("syslog", out, service, level), nil
 }
 
 // GetKernelLogs retrieves kernel logs from dmesg.
 func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
-	out, err := execx.CombinedOutput(execx.Quick, "dmesg")
+	out, err := streamLogTail(execx.Quick, "dmesg")
 	if err != nil {
 		return models.LogResponse{}, err
 	}
-	return parseLogOutput("kernel", string(out), "", ""), nil
+	return parseLogOutput("kernel", out, "", ""), nil
 }
 
 // CreateBackup generates a configuration backup archive and returns its path.
+// The path is unique per call: the handler removes exactly what it created, so
+// two backups started in the same second must not share a filename.
 func (s *SystemService) CreateBackup() (string, error) {
-	path := "/tmp/backup-" + strconv.FormatInt(time.Now().Unix(), 10) + ".tar.gz"
+	path, err := uniqueTempPath("/tmp", "backup-*.tar.gz")
+	if err != nil {
+		return "", err
+	}
 	out, err := execx.CombinedOutput(execx.Slow, "sysupgrade", "-b", path)
 	if err != nil {
+		_ = os.Remove(path)
 		return "", fmt.Errorf("creating backup: %w: %s", err, string(out))
 	}
 	return path, nil
 }
 
+// uniqueTempPath reserves a name that does not yet exist and returns it.
+func uniqueTempPath(dir, pattern string) (string, error) {
+	f, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return "", fmt.Errorf("creating temp path: %w", err)
+	}
+	name := f.Name()
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	// sysupgrade -b wants to create the file itself.
+	if err := os.Remove(name); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
 // RestoreBackup applies a configuration backup from the given file path.
+// `sysupgrade -r` rewrites /etc/config, so a crash guard is written first and
+// removed only after the restore returned successfully (ADR 0003).
 func (s *SystemService) RestoreBackup(path string) error {
+	if err := s.writeGuard(restoreGuardName, "restore backup "+path); err != nil {
+		return err
+	}
 	out, err := execx.CombinedOutput(execx.Slow, "sysupgrade", "-r", path)
 	if err != nil {
-		return fmt.Errorf("restoring backup: %w: %s", err, string(out))
+		// Guard stays: the restore may have left /etc/config half-written.
+		return fmt.Errorf("restoring backup (guard %s kept): %w: %s", restoreGuardName, err, string(out))
 	}
+	s.clearGuard(restoreGuardName)
 	return nil
 }
 
 // UpgradeFirmware saves the uploaded firmware image and flashes it via sysupgrade.
 // If keepSettings is true, current configuration is preserved (-v flag).
 // If keepSettings is false, settings are discarded (-n flag).
+// The flash is asynchronous — it takes minutes and reboots the device — and
+// runs under a crash guard so a power cut mid-write is visible after reboot.
 func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error {
-	firmwarePath := "/tmp/firmware.bin"
+	firmwarePath, err := uniqueTempPath("/tmp", "firmware-*.bin")
+	if err != nil {
+		return err
+	}
 	out, err := os.Create(firmwarePath)
 	if err != nil {
 		return fmt.Errorf("creating firmware file: %w", err)
@@ -486,24 +693,49 @@ func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error
 		args = []string{"-n", firmwarePath}
 	}
 
-	// Run sysupgrade asynchronously — the device will reboot
+	reason := "sysupgrade " + strings.Join(args, " ")
+	if err := s.writeGuard(firmwareUpgradeGuardName, reason); err != nil {
+		_ = os.Remove(firmwarePath)
+		return err
+	}
+
+	// Run sysupgrade asynchronously — the device will reboot. The guard is
+	// intentionally NOT removed: the marker must survive the reboot so an
+	// interrupted flash is discoverable.
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		_ = exec.Command("sysupgrade", args...).Run()
+		// Firmware writes to the MTD partition take minutes on a router.
+		if err := execx.Run(execx.Package, "sysupgrade", args...); err != nil {
+			log.Printf("ERROR: sysupgrade %s failed: %v (crash guard %s kept)", firmwarePath, err, firmwareUpgradeGuardName)
+		}
 	}()
 
 	return nil
 }
 
-// FactoryReset clears the overlay partition and reboots, restoring factory defaults.
+// FactoryReset erases the overlay partition and reboots, restoring factory
+// defaults. Both steps are asynchronous: firstboot can take tens of seconds on
+// a large overlay, and blocking here would pin the HTTP handler (and, with
+// fasthttp, every other connection) for that long. Only the pre-flight
+// failures are reported synchronously; the guard file stays on disk because the
+// device reboots before anyone could clear it.
 func (s *SystemService) FactoryReset() error {
-	cmd := exec.Command("firstboot", "-y")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("factory reset failed: %s: %w", string(out), err)
+	// Pre-flight only: a missing binary is a real, reportable failure. The
+	// long-running firstboot itself happens in the background below.
+	if _, err := exec.LookPath("firstboot"); err != nil {
+		return fmt.Errorf("factory reset unavailable: %w", err)
+	}
+	if err := s.writeGuard(factoryResetGuardName, "firstboot -y && reboot"); err != nil {
+		return err
 	}
 	go func() {
-		time.Sleep(500 * time.Millisecond)
-		_ = exec.Command("reboot").Run()
+		if err := execx.Run(execx.Package, "firstboot", "-y"); err != nil {
+			log.Printf("ERROR: firstboot failed: %v (crash guard %s kept; device not reset)", err, factoryResetGuardName)
+			return
+		}
+		if err := execx.Run(execx.Quick, "reboot"); err != nil {
+			log.Printf("ERROR: reboot after firstboot failed: %v", err)
+		}
 	}()
 	return nil
 }
@@ -568,9 +800,23 @@ func detectButtonNames() []string {
 
 // GetHardwareButtons returns the detected hardware buttons with their configured actions.
 func (s *SystemService) GetHardwareButtons() []models.HardwareButton {
+	buttons, err := s.GetHardwareButtonsWithError()
+	if err != nil {
+		// The on-disk hotplug script still runs the previous actions, so the
+		// user must not be shown "no buttons configured" without a hint.
+		log.Printf("ERROR: reading %s: %v (the generated hotplug script still uses the last saved actions)", buttonActionsFile, err)
+	}
+	return buttons
+}
+
+// GetHardwareButtonsWithError is GetHardwareButtons with the config-parse
+// error surfaced, so a caller that can report it does.
+func (s *SystemService) GetHardwareButtonsWithError() ([]models.HardwareButton, error) {
 	names := detectButtonNames()
-	// Merge with configured actions
-	configured := s.loadButtonActions()
+	configured, err := s.loadButtonActions()
+	if err != nil {
+		return nil, err
+	}
 	actionMap := make(map[string]models.ButtonAction, len(configured))
 	for _, b := range configured {
 		actionMap[b.Name] = b.Action
@@ -583,12 +829,15 @@ func (s *SystemService) GetHardwareButtons() []models.HardwareButton {
 		}
 		result = append(result, models.HardwareButton{Name: name, Action: action})
 	}
-	return result
+	return result, nil
 }
 
 // SetButtonActions saves button action config and regenerates the hotplug script.
 func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error {
-	// Validate actions
+	// Validate actions and names. Names become `case` labels in a root hotplug
+	// shell script, so anything outside the detected devicetree labels (and
+	// outside [A-Za-z0-9_-]) must be rejected before the script is written.
+	discovered := detectButtonNames()
 	for _, b := range buttons {
 		switch b.Action {
 		case models.ButtonActionNone, models.ButtonActionVPNToggle,
@@ -597,6 +846,12 @@ func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error 
 		default:
 			return fmt.Errorf("unknown action %q for button %q", b.Action, b.Name)
 		}
+		if err := ValidateButtonName(b.Name, discovered); err != nil {
+			return err
+		}
+	}
+	if err := writeWirelessToggleScript(); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(buttonActionsDir, 0o755); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
@@ -617,15 +872,23 @@ func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error 
 	return nil
 }
 
-func (s *SystemService) loadButtonActions() []models.HardwareButton {
+// loadButtonActions reads the button-action config from disk.
+// A missing file is not an error (nothing configured yet); a malformed one is,
+// because silently reporting "no buttons configured" while the hotplug script
+// keeps firing the previous actions is a real misconfiguration.
+func (s *SystemService) loadButtonActions() ([]models.HardwareButton, error) {
 	data, err := os.ReadFile(buttonActionsFile)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading %s: %w", buttonActionsFile, err)
 	}
 	var buttons []models.HardwareButton
-	// Simple JSON parse without encoding/json to avoid import cycle — use encoding/json directly
-	_ = unmarshalButtonActions(data, &buttons)
-	return buttons
+	if err := json.Unmarshal(data, &buttons); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", buttonActionsFile, err)
+	}
+	return buttons, nil
 }
 
 func buildButtonActionsJSON(buttons []models.HardwareButton) string {
@@ -640,54 +903,6 @@ func buildButtonActionsJSON(buttons []models.HardwareButton) string {
 	}
 	sb.WriteString("]\n")
 	return sb.String()
-}
-
-// unmarshalButtonActions is a minimal JSON parser for the button actions file.
-// We use encoding/json via a local import to avoid a circular reference.
-func unmarshalButtonActions(data []byte, out *[]models.HardwareButton) error {
-	// Parse manually: find pairs of "name":"..." "action":"..."
-	text := string(data)
-	var result []models.HardwareButton
-	for {
-		ni := strings.Index(text, `"name":`)
-		if ni < 0 {
-			break
-		}
-		text = text[ni+len(`"name":`):]
-		name := extractJSONString(text)
-		ai := strings.Index(text, `"action":`)
-		if ai < 0 {
-			break
-		}
-		text = text[ai+len(`"action":`):]
-		action := extractJSONString(text)
-		result = append(result, models.HardwareButton{
-			Name:   name,
-			Action: models.ButtonAction(action),
-		})
-		// advance past the action value
-		text = text[strings.Index(text, `"`)+1:]
-		rest := strings.Index(text, `"`)
-		if rest < 0 {
-			break
-		}
-		text = text[rest+1:]
-	}
-	*out = result
-	return nil
-}
-
-func extractJSONString(s string) string {
-	start := strings.Index(s, `"`)
-	if start < 0 {
-		return ""
-	}
-	s = s[start+1:]
-	before, _, ok := strings.Cut(s, `"`)
-	if !ok {
-		return ""
-	}
-	return before
 }
 
 func buildButtonHotplugScript(buttons []models.HardwareButton) string {
@@ -710,10 +925,12 @@ func buildButtonHotplugScript(buttons []models.HardwareButton) string {
 			sb.WriteString("      /sbin/ifup wg0 2>/dev/null || true\n")
 			sb.WriteString("    fi\n")
 		case models.ButtonActionWifiToggle:
+			// Never `wifi up`/`wifi down` from a script: delegate to the
+			// generated toggle helper, which writes UCI and applies via rpcd.
 			sb.WriteString("    if iwinfo 2>/dev/null | grep -q '^'; then\n")
-			sb.WriteString("      wifi down\n")
+			sb.WriteString("      " + wirelessToggleScriptPath + " down\n")
 			sb.WriteString("    else\n")
-			sb.WriteString("      wifi up\n")
+			sb.WriteString("      " + wirelessToggleScriptPath + " up\n")
 			sb.WriteString("    fi\n")
 		case models.ButtonActionLEDToggle:
 			sb.WriteString("    for led in /sys/class/leds/*/brightness; do\n")
@@ -742,24 +959,32 @@ var logLevelSeverity = map[string]int{
 	"debug":   7,
 }
 
-// extractLevel extracts the syslog level from a log line.
-// Syslog format: "Tue Mar 10 22:00:34 2026 kern.info kernel: ..."
+// logLevelPattern finds the severity token of a syslog line wherever it sits.
+// Matching the token itself (instead of a fixed column) keeps level filtering
+// working for every logread variant: with or without the "dow mon day time
+// year" prefix, and with a trailing ':' on the token.
+var logLevelPattern = regexp.MustCompile(`\b[a-z][a-z0-9_-]*\.(emerg|alert|crit|err|error|warning|warn|notice|info|debug)\b`)
+
+// extractLevel extracts the syslog level from a log line, independently of the
+// column the timestamp occupies. BusyBox logread emits
+// "Tue Mar 10 22:00:34 2026 kern.info kernel: ..." but other producers (and
+// dmesg) drop the weekday, and a fixed index then yields "" for every line —
+// which silently disabled GET /logs?level=… filtering.
 // Returns the level string (e.g. "info", "err") or empty string if not found.
 func extractLevel(line string) string {
-	// Find facility.level pattern — appears after the timestamp (first 5 fields)
-	parts := strings.Fields(line)
-	if len(parts) < 6 {
+	m := logLevelPattern.FindStringSubmatch(line)
+	if m == nil {
 		return ""
 	}
-	// The facility.level field is typically at index 5 (after: dow mon day time year)
-	facLevel := parts[5]
-	if idx := strings.IndexByte(facLevel, '.'); idx >= 0 && idx < len(facLevel)-1 {
-		level := facLevel[idx+1:]
-		if _, ok := logLevelSeverity[level]; ok {
-			return level
-		}
+	level := m[1]
+	// Aliases that map onto the canonical severity names.
+	switch level {
+	case "error":
+		return "err"
+	case "warn":
+		return "warning"
 	}
-	return ""
+	return level
 }
 
 func parseLogOutput(source, output, service, level string) models.LogResponse {
@@ -805,7 +1030,7 @@ const authorizedKeysFile = "/etc/dropbear/authorized_keys"
 
 // GetSSHKeys returns all public keys from the authorized_keys file.
 func (s *SystemService) GetSSHKeys() (models.SSHKeysResponse, error) {
-	data, err := os.ReadFile(authorizedKeysFile)
+	data, err := os.ReadFile(s.sshKeysPath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return models.SSHKeysResponse{Keys: []models.SSHKey{}}, nil
@@ -837,10 +1062,18 @@ func (s *SystemService) AddSSHKey(key string) error {
 	if key == "" {
 		return fmt.Errorf("key must not be empty")
 	}
-	if err := os.MkdirAll(filepath.Dir(authorizedKeysFile), 0700); err != nil {
+	// The key is appended verbatim to authorized_keys: a newline would add
+	// extra authorized_keys lines (i.e. grant access to another key).
+	if strings.ContainsAny(key, "\n\r") {
+		return fmt.Errorf("key must be a single line")
+	}
+	if !sshKeyRe.MatchString(key) {
+		return fmt.Errorf("invalid SSH public key: expected [type] [base64] [comment]")
+	}
+	if err := os.MkdirAll(filepath.Dir(s.sshKeysPath()), 0700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(authorizedKeysFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(s.sshKeysPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -850,17 +1083,25 @@ func (s *SystemService) AddSSHKey(key string) error {
 }
 
 // DeleteSSHKey removes the key at the given line index from authorized_keys.
+// The index space is byte-for-byte the same one GetSSHKeys reports (both split
+// the trimmed file content on "\n"), so the number a client saw always maps to
+// the same line. Negative and out-of-range indexes are rejected instead of
+// silently truncating the file.
 func (s *SystemService) DeleteSSHKey(index int) error {
-	data, err := os.ReadFile(authorizedKeysFile)
+	path := s.sshKeysPath()
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	lines := strings.Split(string(data), "\n")
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if index < 0 || index >= len(lines) {
-		return fmt.Errorf("key index %d out of range", index)
+		return fmt.Errorf("key index %d out of range (file has %d line(s))", index, len(lines))
 	}
 	lines = append(lines[:index], lines[index+1:]...)
-	return os.WriteFile(authorizedKeysFile, []byte(strings.Join(lines, "\n")), 0600)
+	if len(lines) == 0 {
+		return os.WriteFile(path, nil, 0600)
+	}
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0600)
 }
 
 const speedTestResultFile = "/tmp/openwrt-speed-test.json"

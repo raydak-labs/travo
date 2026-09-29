@@ -84,6 +84,8 @@ type AlertService struct {
 	alerts         []models.Alert
 	alertCh        chan models.Alert
 	stopCh         chan struct{}
+	startOnce      sync.Once
+	stopOnce       sync.Once
 	CheckInterval  time.Duration
 
 	// Track active conditions to avoid duplicate alerts
@@ -126,27 +128,34 @@ func (a *AlertService) GetAlerts() []models.Alert {
 	return result
 }
 
-// Start begins the periodic alert checking loop.
+// Start begins the periodic alert checking loop. Calling it more than once is
+// a no-op: a second call would otherwise spawn a duplicate ticker and double
+// every alert.
 func (a *AlertService) Start() {
-	go func() {
-		// Run an initial check immediately
-		a.checkConditions()
-		ticker := time.NewTicker(a.CheckInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				a.checkConditions()
-			case <-a.stopCh:
-				return
+	a.startOnce.Do(func() {
+		go func() {
+			// Run an initial check immediately
+			a.checkConditions()
+			ticker := time.NewTicker(a.CheckInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					a.checkConditions()
+				case <-a.stopCh:
+					return
+				}
 			}
-		}
-	}()
+		}()
+	})
 }
 
-// Stop stops the alert checking loop.
+// Stop stops the alert checking loop. Safe to call multiple times and before
+// Start.
 func (a *AlertService) Stop() {
-	close(a.stopCh)
+	a.stopOnce.Do(func() {
+		close(a.stopCh)
+	})
 }
 
 func (a *AlertService) checkConditions() {

@@ -18,7 +18,7 @@ const (
 	defaultUpSwitchDelaySec        = 60
 	defaultMinViableSignalDBm      = -80
 	bandSwitchCooldownSec          = 120
-	bandSwitchGuardFile            = "/etc/travo/band-switch-in-progress"
+	bandSwitchGuardFile            = "/etc/trafo/band-switch-in-progress"
 )
 
 // BandSwitchConfig holds user-configurable parameters for automatic band switching.

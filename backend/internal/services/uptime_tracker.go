@@ -22,6 +22,8 @@ type UptimeTracker struct {
 	lastState     *bool // nil = unknown (first run)
 	CheckInterval time.Duration
 	stopCh        chan struct{}
+	startOnce     sync.Once
+	stopOnce      sync.Once
 }
 
 // NewUptimeTracker creates a new UptimeTracker using the given prober.
@@ -34,26 +36,32 @@ func NewUptimeTracker(prober HTTPProber) *UptimeTracker {
 	}
 }
 
-// Start begins periodic connectivity checks in the background.
+// Start begins periodic connectivity checks in the background. Calling it
+// more than once is a no-op so a second caller cannot spawn a duplicate
+// ticker (which would double-count every state transition).
 func (t *UptimeTracker) Start() {
-	go func() {
-		t.check()
-		ticker := time.NewTicker(t.CheckInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				t.check()
-			case <-t.stopCh:
-				return
+	t.startOnce.Do(func() {
+		go func() {
+			t.check()
+			ticker := time.NewTicker(t.CheckInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					t.check()
+				case <-t.stopCh:
+					return
+				}
 			}
-		}
-	}()
+		}()
+	})
 }
 
-// Stop halts the periodic checks.
+// Stop halts the periodic checks. Safe to call multiple times and before Start.
 func (t *UptimeTracker) Stop() {
-	close(t.stopCh)
+	t.stopOnce.Do(func() {
+		close(t.stopCh)
+	})
 }
 
 // GetUptimeLog returns all recorded state transitions, newest first.

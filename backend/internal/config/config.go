@@ -1,8 +1,6 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -12,10 +10,14 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Port              int
-	MockMode          bool
-	AuthConfigPath    string
-	StaticDir         string
+	Port           int
+	MockMode       bool
+	AuthConfigPath string
+	StaticDir      string
+	// CorsOrigins is a comma-separated allowlist of browser origins allowed to
+	// call the API. Empty (the default) means SAME-ORIGIN ONLY: no
+	// Access-Control-Allow-Origin header is emitted, so browsers block
+	// cross-origin reads. Set it explicitly (or to "*") to opt in.
 	CorsOrigins       string
 	AllowedAdminCIDRs string
 	// TLS options
@@ -28,11 +30,15 @@ type Config struct {
 // DefaultConfig returns config with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		Port:              3000,
-		MockMode:          false,
-		AuthConfigPath:    "/etc/travo/auth.json",
-		StaticDir:         "",
-		CorsOrigins:       "*",
+		Port:           3000,
+		MockMode:       false,
+		AuthConfigPath: "/etc/travo/auth.json",
+		StaticDir:      "",
+		// Same-origin by default: the UI is served by this same process, so
+		// there is no legitimate cross-origin caller. "*" here would let any
+		// page the user visits issue credentialed requests against the router
+		// API (browsers attach cookies/session state for the target host).
+		CorsOrigins:       "",
 		AllowedAdminCIDRs: "",
 		TLSEnabled:        false,
 		TLSPort:           443,
@@ -62,7 +68,9 @@ func LoadConfig(args []string) (Config, bool, error) {
 	if v := os.Getenv("STATIC_DIR"); v != "" {
 		cfg.StaticDir = v
 	}
-	if v := os.Getenv("CORS_ORIGINS"); v != "" {
+	// Empty CORS_ORIGINS is treated as "unset" (same-origin only), so the
+	// default stays secure when the variable is present but blank.
+	if v := os.Getenv("CORS_ORIGINS"); strings.TrimSpace(v) != "" {
 		cfg.CorsOrigins = v
 	}
 	if v := os.Getenv("ALLOWED_ADMIN_CIDRS"); v != "" {
@@ -90,7 +98,7 @@ func LoadConfig(args []string) (Config, bool, error) {
 	mock := fs.Bool("mock", cfg.MockMode, "Enable mock mode")
 	authConfigPath := fs.String("auth-config-path", cfg.AuthConfigPath, "Path to auth config file (stores password hash + JWT secret)")
 	staticDir := fs.String("static-dir", cfg.StaticDir, "Path to static frontend files")
-	corsOrigins := fs.String("cors-origins", cfg.CorsOrigins, "CORS allowed origins")
+	corsOrigins := fs.String("cors-origins", cfg.CorsOrigins, "CORS allowed origins (comma-separated; empty = same-origin only)")
 	allowedCIDRs := fs.String("allowed-admin-cidrs", cfg.AllowedAdminCIDRs, "Comma-separated admin IP/CIDR allowlist (empty disables)")
 	showVersion := fs.Bool("version", false, "Print version and exit")
 	tlsEnabled := fs.Bool("tls", cfg.TLSEnabled, "Enable HTTPS/TLS listener")
@@ -121,16 +129,4 @@ func LoadConfig(args []string) (Config, bool, error) {
 func LoadConfigFromEnv() Config {
 	cfg, _, _ := LoadConfig([]string{})
 	return cfg
-}
-
-// generateRandomSecret is retained for backwards compatibility with tests that
-// expect a non-empty secret-like value from DefaultConfig.
-//
-//lint:ignore U1000 kept for test compatibility
-func generateRandomSecret() string {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "default-jwt-secret-change-me"
-	}
-	return hex.EncodeToString(b)
 }
