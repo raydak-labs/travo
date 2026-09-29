@@ -155,9 +155,10 @@ func TestUpgradeMiddleware_AcceptsValidToken(t *testing.T) {
 		t.Fatalf("expected the upgrade to succeed, got %v", err)
 	}
 	defer conn.Close()
-	if ts.Hub.ClientCount() != 1 {
-		t.Errorf("expected the client to be registered, count=%d", ts.Hub.ClientCount())
-	}
+	// Registration happens in the server-side handler, which runs after the
+	// client's Dial returns, so the count is not observable yet. Asserting
+	// immediately is a race that only shows up on a loaded runner.
+	waitForClientCount(t, ts.Hub, 1)
 }
 
 // --- origin ----------------------------------------------------------------
@@ -411,9 +412,13 @@ func withFastKeepalive(t *testing.T) {
 	})
 }
 
+// waitForClientCount polls until the hub holds want clients, or fails. The
+// registration runs on the server goroutine, so it is not observable the
+// instant the client's handshake returns; the budget is generous because a
+// loaded CI runner can schedule that goroutine well after the dial completes.
 func waitForClientCount(t *testing.T, hub *Hub, want int) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if hub.ClientCount() == want {
 			return
