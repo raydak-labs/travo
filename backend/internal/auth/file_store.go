@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -26,18 +27,32 @@ func NewFileAuthStore(path string) *FileAuthStore {
 	return &FileAuthStore{path: path}
 }
 
-func randomSecretHex() string {
+// randRead is the entropy source for generated secrets. It is a package
+// variable so tests can simulate an entropy failure; production always uses
+// crypto/rand.
+var randRead = rand.Read
+
+// randomSecretHex returns a fresh 256-bit hex secret. It never falls back to a
+// hard-coded value: the secret is the HS256 signing key, so a predictable one
+// would let anyone who has read this source forge an admin token. An entropy
+// failure is returned as an error so the caller refuses to start instead of
+// persisting a known key.
+func randomSecretHex() (string, error) {
 	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "default-jwt-secret-change-me"
+	if _, err := randRead(b); err != nil {
+		return "", fmt.Errorf("generating jwt secret: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 func defaultAuthConfig() (AuthConfig, error) {
+	secret, err := randomSecretHex()
+	if err != nil {
+		return AuthConfig{}, err
+	}
 	return AuthConfig{
 		Version:   1,
-		JWTSecret: randomSecretHex(),
+		JWTSecret: secret,
 	}, nil
 }
 

@@ -93,6 +93,49 @@ func (f *fakeConn) Close() error {
 	return nil
 }
 
+func TestHub_StopClosesRegisteredClients(t *testing.T) {
+	hub := newTestHub()
+	a, b := &fakeConn{}, &fakeConn{}
+	hub.Register(a)
+	hub.Register(b)
+
+	hub.Stop()
+
+	for i, c := range []*fakeConn{a, b} {
+		c.mu.Lock()
+		closed := c.closed
+		c.mu.Unlock()
+		if !closed {
+			t.Errorf("client %d: expected Stop to close the connection", i)
+		}
+	}
+	if got := hub.ClientCount(); got != 0 {
+		t.Errorf("expected the client list to be empty after Stop, got %d", got)
+	}
+}
+
+func TestHub_StopIsIdempotent(t *testing.T) {
+	hub := newTestHub()
+	hub.Start()
+	conn := &fakeConn{}
+	hub.Register(conn)
+
+	hub.Stop()
+	hub.Stop() // must not panic on a double close of the stop channel
+	hub.Stop()
+
+	// A client registering after Stop must not keep the hub alive, but the
+	// broadcast loop is gone: no write happens.
+	hub.Register(&fakeConn{})
+	time.Sleep(30 * time.Millisecond)
+	conn.mu.Lock()
+	writes := len(conn.written)
+	conn.mu.Unlock()
+	if writes != 0 {
+		t.Errorf("expected no broadcasts after Stop, got %d", writes)
+	}
+}
+
 func newTestHub() *Hub {
 	ub := ubus.NewMockUbus()
 	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})

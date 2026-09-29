@@ -50,6 +50,20 @@ func (r *SessionRegistry) Remove(jti string) {
 	delete(r.sessions, jti)
 }
 
+// RevokeAll drops every live session and returns the revoked jtis. A plain
+// Remove would leave the tokens valid through the exp fallback (an unknown jti
+// is judged by wall-clock exp), so callers block the returned jtis as well.
+func (r *SessionRegistry) RevokeAll() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	revoked := make([]string, 0, len(r.sessions))
+	for jti := range r.sessions {
+		revoked = append(revoked, jti)
+		delete(r.sessions, jti)
+	}
+	return revoked
+}
+
 // Status reports the remaining lifetime of a session. known is false when the
 // jti was never registered (or has been swept); remaining <= 0 means the
 // session is known and expired.

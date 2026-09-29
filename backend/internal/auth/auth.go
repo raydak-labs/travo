@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -19,12 +20,20 @@ import (
 // defaultTokenTTL is the session lifetime when no session registry is attached.
 const defaultTokenTTL = 24 * time.Hour
 
+// MinPasswordLength is the policy floor for a new admin password. It is a
+// named constant (not a literal at the call site) so the API docs, the client
+// and the tests all quote the same rule.
+const MinPasswordLength = 8
+
 // expValidationLeeway tolerates small clock skew when falling back to
 // wall-clock exp validation (tokens issued before a backend restart).
 const expValidationLeeway = 2 * time.Minute
 
 // AuthService handles authentication and JWT tokens.
 type AuthService struct {
+	// mu guards passwordHash, which ChangePassword rewrites while Login
+	// reads it. Every read goes through passwordHashBytes/setPasswordHash.
+	mu             sync.RWMutex
 	passwordHash   []byte
 	jwtSecret      []byte
 	blocklist      *TokenBlocklist
@@ -32,6 +41,21 @@ type AuthService struct {
 	ubus           ubus.Ubus
 	rootPassword   *RootPassword
 	authConfigPath string // path to auth.json; used to persist sealed rpcd login password
+}
+
+// passwordHashBytes returns the current bcrypt hash. The returned slice is
+// never mutated in place (ChangePassword replaces it), so callers may use it
+// outside the lock.
+func (a *AuthService) passwordHashBytes() []byte {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.passwordHash
+}
+
+func (a *AuthService) setPasswordHash(hash []byte) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.passwordHash = hash
 }
 
 // SetBlocklist attaches a token blocklist to the auth service.
@@ -95,11 +119,16 @@ func (a *AuthService) Login(password string) (string, time.Time, error) {
 			return "", time.Time{}, errors.New("invalid password")
 		}
 	} else {
-		if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)); err != nil {
+		if err := bcrypt.CompareHashAndPassword(a.passwordHashBytes(), []byte(password)); err != nil {
 			return "", time.Time{}, errors.New("invalid password")
 		}
 	}
 
+	return a.issueToken()
+}
+
+// issueToken mints a signed session token and registers its jti.
+func (a *AuthService) issueToken() (string, time.Time, error) {
 	jti := newJTI()
 	expiry := time.Now().Add(a.TokenTTL())
 	claims := jwt.RegisteredClaims{
@@ -187,12 +216,29 @@ func (a *AuthService) parseSignedClaims(tokenStr string) (jwt.MapClaims, error) 
 }
 
 // validateLifetime decides whether a token's session is still alive.
-// Registry verdicts (monotonic clock) win over the wall-clock exp claim; the
-// exp fallback only applies to tokens the registry does not know (issued
-// before a restart, or no registry attached).
+//
+// Order of authority:
+//  1. Revocations (jti blocklist). Persisted, so logout and password-change
+//     revocations survive a backend restart — this is what keeps a revoked
+//     token from being resurrected by the exp fallback below.
+//  2. The session registry verdict (monotonic clock, immune to wall-clock
+//     jumps such as NTP or the time-sync endpoint).
+//  3. The wall-clock exp claim, only for a jti the registry does not know —
+//     a token issued before a restart, or any token when no registry is
+//     attached. This fallback is required: a redeploy must not log every
+//     logged-in user out. It is safe because the clock cannot be moved
+//     backwards (api.TimeSyncGate latches the plausible-clock decision), and
+//     because a password change revokes and blocklists every live session, so
+//     no session can outlive the credential that created it. The residual gap
+//     is a token issued before a restart, whose jti was never revoked: it
+//     stays valid until its exp (≤ TokenTTL).
 func (a *AuthService) validateLifetime(claims jwt.MapClaims) error {
-	if a.sessions != nil {
-		if jti, _ := claims["jti"].(string); jti != "" {
+	jti, _ := claims["jti"].(string)
+	if jti != "" {
+		if a.blocklist != nil && a.blocklist.IsJTIBlocked(jti) {
+			return errors.New("session revoked")
+		}
+		if a.sessions != nil {
 			if remaining, known := a.sessions.Status(jti); known {
 				if remaining <= 0 {
 					return errors.New("session expired")
@@ -242,19 +288,33 @@ func (a *AuthService) TokenRemaining(tokenStr string) (time.Duration, error) {
 	return time.Until(exp.Time), nil
 }
 
-// RevokeSession removes the token's session from the registry (logout).
-// Blocklist entries handle tokens the registry does not know.
-func (a *AuthService) RevokeSession(tokenStr string) {
-	if a.sessions == nil {
+// blockJTI records a revocation for a token id until the longest lifetime a
+// token issued now could have. Persisted with the blocklist, so the revocation
+// still applies after a backend restart when the in-memory session registry is
+// gone.
+func (a *AuthService) blockJTI(jti string) {
+	if a.blocklist == nil || jti == "" {
 		return
 	}
+	a.blocklist.BlockJTI(jti, time.Now().Add(a.TokenTTL()+expValidationLeeway))
+}
+
+// RevokeSession removes the token's session from the registry (logout) and
+// blocklists its jti so a logged-out token cannot be resurrected by a restart.
+// Blocklist entries handle tokens the registry does not know.
+func (a *AuthService) RevokeSession(tokenStr string) {
 	claims, err := a.parseSignedClaims(tokenStr)
 	if err != nil {
 		return
 	}
-	if jti, _ := claims["jti"].(string); jti != "" {
+	jti, _ := claims["jti"].(string)
+	if jti == "" {
+		return
+	}
+	if a.sessions != nil {
 		a.sessions.Remove(jti)
 	}
+	a.blockJTI(jti)
 }
 
 // TokenExpiry parses a JWT token and returns its expiration time.
@@ -279,41 +339,69 @@ func (a *AuthService) TokenExpiry(tokenStr string) (time.Time, error) {
 	return exp.Time, nil
 }
 
-// ChangePassword verifies the current password and updates to the new one.
-func (a *AuthService) ChangePassword(currentPassword, newPassword string) error {
+// ChangePasswordResult carries the session issued after a password change.
+type ChangePasswordResult struct {
+	// Token is a freshly minted session for the caller: the change revoked
+	// every live session, including the one used to make the request.
+	Token     string
+	ExpiresAt time.Time
+	// RevokedSessions counts the live sessions invalidated by the change.
+	RevokedSessions int
+}
+
+// ChangePassword verifies the current password, updates to the new one, then
+// revokes every live session and issues a fresh token for the caller. Without
+// the revocation a token stolen before the change would stay valid for the
+// full token TTL.
+func (a *AuthService) ChangePassword(currentPassword, newPassword string) (ChangePasswordResult, error) {
+	if len(newPassword) < MinPasswordLength {
+		return ChangePasswordResult{}, fmt.Errorf("new password must be at least %d characters", MinPasswordLength)
+	}
+
 	if a.ubus != nil {
 		if err := a.tryUbusLogin(currentPassword); err != nil {
-			return errors.New("invalid current password")
-		}
-		if len(newPassword) < 6 {
-			return errors.New("new password must be at least 6 characters")
+			return ChangePasswordResult{}, errors.New("invalid current password")
 		}
 		_, err := a.ubus.Call("luci", "setPassword", map[string]any{
 			"username": "root",
 			"password": newPassword,
 		})
 		if err != nil {
-			return err
+			return ChangePasswordResult{}, err
 		}
 		if a.rootPassword != nil {
 			a.rootPassword.Set(newPassword)
 		}
 		a.persistSealedLogin(newPassword)
-		return nil
+	} else {
+		if err := bcrypt.CompareHashAndPassword(a.passwordHashBytes(), []byte(currentPassword)); err != nil {
+			return ChangePasswordResult{}, errors.New("invalid current password")
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return ChangePasswordResult{}, err
+		}
+		a.setPasswordHash(hash)
 	}
 
-	if err := bcrypt.CompareHashAndPassword(a.passwordHash, []byte(currentPassword)); err != nil {
-		return errors.New("invalid current password")
+	return a.rotateSessions()
+}
+
+// rotateSessions revokes every live session (registry + persisted jti
+// blocklist) and mints a replacement for the caller.
+func (a *AuthService) rotateSessions() (ChangePasswordResult, error) {
+	revoked := 0
+	if a.sessions != nil {
+		for _, jti := range a.sessions.RevokeAll() {
+			a.blockJTI(jti)
+			revoked++
+		}
 	}
-	if len(newPassword) < 6 {
-		return errors.New("new password must be at least 6 characters")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	token, expiry, err := a.issueToken()
 	if err != nil {
-		return err
+		return ChangePasswordResult{}, err
 	}
-	a.passwordHash = hash
-	return nil
+	return ChangePasswordResult{Token: token, ExpiresAt: expiry, RevokedSessions: revoked}, nil
 }
 
 // Middleware returns a Fiber middleware that checks for a valid Bearer token.
