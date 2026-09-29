@@ -861,3 +861,37 @@ func TestStagedApplyMwan3_ResumesAfterConfirm(t *testing.T) {
 		t.Errorf("applies should resume after a confirm (%d -> %d)", first, len(applier.startCalls))
 	}
 }
+
+// rpcd rolls a failed apply back on its own timer and never tells us, so the
+// record of the unconfirmed session has to expire on its own. Otherwise it
+// survives the rollback and every later failover apply is skipped for the life
+// of the process.
+func TestStagedApplyMwan3_ResumesAfterTheRollbackWindowExpires(t *testing.T) {
+	applier := &recordingApplier{}
+	svc, _ := newFailoverTestService(t, uci.NewMockUCI(), applier)
+
+	if err := svc.stagedApplyMwan3(func() error { return fmt.Errorf("verification failed") }); err == nil {
+		t.Fatal("expected the failed verification to be reported")
+	}
+	if svc.pendingApplySession == "" {
+		t.Fatal("an unconfirmed apply must stay recorded while its rollback window is open")
+	}
+	first := len(applier.startCalls)
+
+	// Still inside the window: skipped.
+	if err := svc.stagedApplyMwan3(nil); err != nil {
+		t.Fatalf("unexpected error while a rollback is pending: %v", err)
+	}
+	if len(applier.startCalls) != first {
+		t.Fatalf("an apply was issued while the rollback window was still open")
+	}
+
+	// Once the window has passed, applies must resume.
+	svc.pendingApplyDeadline = time.Now().Add(-time.Second)
+	if err := svc.stagedApplyMwan3(nil); err != nil {
+		t.Fatalf("unexpected error after the rollback window: %v", err)
+	}
+	if len(applier.startCalls) != first+1 {
+		t.Errorf("applies did not resume after the rollback window expired (%d -> %d)", first, len(applier.startCalls))
+	}
+}

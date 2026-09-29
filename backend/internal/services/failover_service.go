@@ -37,6 +37,10 @@ type failoverConfigFile struct {
 	Health     models.FailoverHealthConfig `json:"health"`
 }
 
+// rollbackGracePeriod is how long after the rpcd rollback timeout a pending
+// apply is still considered in flight.
+const rollbackGracePeriod = time.Duration(uciApplyRollbackTimeout)*time.Second + 2*time.Second
+
 type FailoverService struct {
 	uci        uci.UCI
 	ubus       ubus.Ubus
@@ -61,14 +65,21 @@ type FailoverService struct {
 	// with "permission denied" until the first resolves, so the session has to be
 	// tracked: while it is set, the open window is already restoring the
 	// pre-apply config, and starting another apply would fail (and would fail
-	// confusingly, in whichever feature happened to ask next). Guarded by
-	// applyMu, which every caller of stagedApplyMwan3 already holds.
-	pendingApplySession string
-	events              []models.FailoverEvent
-	lastActive          string
-	stopCh              chan struct{}
-	stopOnce            sync.Once
-	onlineSince         map[string]time.Time
+	// confusingly, in whichever feature happened to ask next).
+	//
+	// pendingApplyDeadline is when that window has expired. rpcd rolls the
+	// session back on its own timer and nothing calls us when it does, so the
+	// deadline is what clears the record; without it the flag would survive the
+	// rollback and every later apply would be skipped for the life of the
+	// process. Both fields are guarded by applyMu, which every caller of
+	// stagedApplyMwan3 already holds.
+	pendingApplySession  string
+	pendingApplyDeadline time.Time
+	events               []models.FailoverEvent
+	lastActive           string
+	stopCh               chan struct{}
+	stopOnce             sync.Once
+	onlineSince          map[string]time.Time
 }
 
 func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw *auth.RootPassword) *FailoverService {
@@ -776,12 +787,17 @@ func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
 		return nil
 	}
 	if s.pendingApplySession != "" {
-		// An earlier apply in this service is still unconfirmed, so its rollback
-		// window is open and rpcd is restoring the pre-apply mwan3 config right
-		// now. That is exactly the state this call is trying to reach, and a
-		// second apply would be refused, so treat it as already done.
-		log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
-		return nil
+		if time.Now().Before(s.pendingApplyDeadline) {
+			// An earlier apply in this service is still unconfirmed, so its
+			// rollback window is open and rpcd is restoring the pre-apply mwan3
+			// config right now. That is exactly the state this call is trying to
+			// reach, and a second apply would be refused, so treat it as done.
+			log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
+			return nil
+		}
+		// The window has expired and rpcd has rolled the session back; nothing
+		// confirms that, so the deadline is the signal. Forget it and apply.
+		s.pendingApplySession = ""
 	}
 	if s.applier == nil {
 		return s.reloadMwan3Script()
@@ -795,11 +811,14 @@ func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
 		return nil
 	}
 	s.pendingApplySession = sid
+	// rpcd rolls back after its own timeout; add a margin so the record is only
+	// dropped once the rollback has certainly happened.
+	s.pendingApplyDeadline = time.Now().Add(rollbackGracePeriod)
 	if verify != nil {
 		if err := verify(); err != nil {
 			// Rollback window is still open: rpcd reverts to the previous config
-			// on its own timer. Keep the session recorded so the next apply waits
-			// for that rollback instead of being rejected by rpcd.
+			// on its own timer. Keep the session recorded until that deadline so
+			// the next apply waits for the rollback instead of being rejected.
 			return fmt.Errorf("verify mwan3 apply: %w", err)
 		}
 	}
