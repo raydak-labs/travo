@@ -101,9 +101,6 @@ const defaultReconnectScript = "/etc/travo/wifi-reconnect.sh"
 const defaultWifiModeFile = "/etc/travo/wifi-mode"
 const defaultRepeaterOptionsFile = "/etc/travo/repeater-options.json"
 
-// Crash guards live in crashGuardDir (see guards.go); state files (aliases,
-// priorities, repeater options) stay in /etc/travo.
-
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
 // otherwise falls back to the (test-only) reloader.
 func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService {
