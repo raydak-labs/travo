@@ -1,11 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import React from 'react';
 import { WsProvider, useWsSubscribe } from '../ws-context';
-
-vi.mock('../api-client', () => ({
-  getToken: () => 'test-token',
-}));
+import { clearToken, setToken, TOKEN_CHANGE_EVENT } from '../api-client';
 
 class MockWebSocket {
   static OPEN = 1;
@@ -18,17 +15,26 @@ class MockWebSocket {
   send = vi.fn();
 }
 
-let mockWsInstance: MockWebSocket;
+let sockets: MockWebSocket[] = [];
+let current: MockWebSocket;
 
 beforeEach(() => {
+  sockets = [];
   class WebSocketCtor {
     constructor(...args: unknown[]) {
       void args;
-      mockWsInstance = new MockWebSocket();
-      return mockWsInstance as unknown as WebSocket;
+      current = new MockWebSocket();
+      sockets.push(current);
+      return current as unknown as WebSocket;
     }
   }
   vi.stubGlobal('WebSocket', WebSocketCtor as unknown as typeof WebSocket);
+  setToken('test-token');
+});
+
+afterEach(() => {
+  clearToken();
+  vi.useRealTimers();
 });
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -45,7 +51,7 @@ describe('WsProvider', () => {
     });
 
     act(() => {
-      mockWsInstance.onmessage?.({
+      current.onmessage?.({
         data: JSON.stringify({ type: 'network_status', data: { wan: null } }),
       } as MessageEvent);
     });
@@ -62,7 +68,7 @@ describe('WsProvider', () => {
     });
 
     act(() => {
-      mockWsInstance.onmessage?.({
+      current.onmessage?.({
         data: JSON.stringify({ type: 'network_status', data: {} }),
       } as MessageEvent);
     });
@@ -83,7 +89,7 @@ describe('WsProvider', () => {
     });
 
     act(() => {
-      mockWsInstance.onmessage?.({
+      current.onmessage?.({
         data: JSON.stringify({ type: 'network_status', data: {} }),
       } as MessageEvent);
     });
@@ -96,9 +102,126 @@ describe('WsProvider', () => {
     expect(result.current.connected).toBe(false);
 
     act(() => {
-      mockWsInstance.onopen?.(new Event('open'));
+      current.onopen?.(new Event('open'));
     });
 
     expect(result.current.connected).toBe(true);
+  });
+});
+
+describe('WsProvider — auth token lifecycle', () => {
+  it('opens no socket while there is no session', () => {
+    clearToken();
+    const { result } = renderHook(() => useWsSubscribe(), { wrapper });
+
+    expect(sockets).toHaveLength(0);
+    expect(result.current.connected).toBe(false);
+  });
+
+  it('connects after a client-side login and disconnects again on logout', () => {
+    clearToken();
+    const { result } = renderHook(() => useWsSubscribe(), { wrapper });
+    expect(sockets).toHaveLength(0);
+
+    // login page stores the token without a page reload
+    act(() => {
+      setToken('fresh-token');
+    });
+
+    expect(sockets).toHaveLength(1);
+    act(() => {
+      sockets[0].onopen?.(new Event('open'));
+    });
+    expect(result.current.connected).toBe(true);
+
+    act(() => {
+      clearToken();
+    });
+
+    expect(sockets[0].close).toHaveBeenCalled();
+    expect(result.current.connected).toBe(false);
+  });
+
+  it('keeps exactly one socket and ignores a stale socket onclose', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useWsSubscribe(), { wrapper });
+
+    const first = sockets[0];
+    act(() => {
+      first.onopen?.(new Event('open'));
+    });
+    expect(result.current.connected).toBe(true);
+
+    // Simulate a StrictMode-style remount: cleanup closes the old socket
+    // without detaching handlers reaching state, then a new socket opens.
+    const staleClose = first.onclose;
+    const staleOpen = first.onopen;
+    act(() => {
+      setToken('rotated-token');
+    });
+    expect(sockets).toHaveLength(2);
+    act(() => {
+      sockets[1].onopen?.(new Event('open'));
+    });
+    expect(result.current.connected).toBe(true);
+
+    // The obsolete socket closing must not disconnect the live one nor
+    // schedule a third socket.
+    act(() => {
+      staleClose?.(new CloseEvent('close'));
+      staleOpen?.(new Event('open'));
+    });
+    expect(result.current.connected).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('reconnects after an unexpected close', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useWsSubscribe(), { wrapper });
+    expect(sockets).toHaveLength(1);
+
+    act(() => {
+      sockets[0].onopen?.(new Event('open'));
+    });
+    act(() => {
+      sockets[0].onclose?.(new CloseEvent('close'));
+    });
+    expect(result.current.connected).toBe(false);
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('does not reconnect when the session was revoked while offline', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useWsSubscribe(), { wrapper });
+
+    act(() => {
+      sockets[0].onclose?.(new CloseEvent('close'));
+      clearToken();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(sockets).toHaveLength(1);
+    expect(result.current.connected).toBe(false);
+  });
+
+  it('uses the token change event as the session signal', () => {
+    clearToken();
+    renderHook(() => useWsSubscribe(), { wrapper });
+    expect(sockets).toHaveLength(0);
+
+    act(() => {
+      window.dispatchEvent(new Event(TOKEN_CHANGE_EVENT));
+    });
+    expect(sockets).toHaveLength(0);
   });
 });

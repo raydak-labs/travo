@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   isNetworkStatus,
+  networkMedium,
   type NetworkInterface,
+  type NetworkInterfaceType,
   type WanConfig,
   type WanDetectResult,
   type Client,
@@ -98,5 +100,42 @@ describe('NetworkStatus', () => {
     };
     expect(result.detected_type).toBe('pppoe');
     expect(result.current_type).toBe('dhcp');
+  });
+});
+
+describe('networkMedium', () => {
+  const iface = (name: string, type: NetworkInterfaceType): NetworkInterface => ({
+    name,
+    type,
+    ip_address: '',
+    netmask: '',
+    gateway: '',
+    dns_servers: [],
+    mac_address: '',
+    is_up: true,
+    rx_bytes: 0,
+    tx_bytes: 0,
+  });
+
+  it('maps every discriminator emitted by the router', () => {
+    expect(networkMedium(iface('eth2', 'wan'))).toBe('ethernet');
+    expect(networkMedium(iface('br-lan', 'lan'))).toBe('lan');
+    expect(networkMedium(iface('phy0-sta0', 'wifi'))).toBe('wifi');
+    expect(networkMedium(iface('wg0', 'vpn'))).toBe('vpn');
+    expect(networkMedium(iface('usb0', 'usb'))).toBe('usb');
+  });
+
+  it('falls back to the interface name for firmware reporting the raw ubus name', () => {
+    expect(networkMedium(iface('wwan', 'wwan' as NetworkInterfaceType))).toBe('wifi');
+    expect(networkMedium(iface('wlan-sta0', 'wlan-sta0' as NetworkInterfaceType))).toBe('wifi');
+    expect(networkMedium(iface('usb0', 'usb0' as NetworkInterfaceType))).toBe('usb');
+    expect(networkMedium(iface('wg0', 'wg0' as NetworkInterfaceType))).toBe('vpn');
+    expect(networkMedium(iface('eth0', 'eth0' as NetworkInterfaceType))).toBe('ethernet');
+    expect(networkMedium(iface('tun0', 'tun0' as NetworkInterfaceType))).toBe('unknown');
+  });
+
+  it('reports unknown for a missing interface', () => {
+    expect(networkMedium(null)).toBe('unknown');
+    expect(networkMedium(undefined)).toBe('unknown');
   });
 });

@@ -1,7 +1,20 @@
 const TOKEN_KEY = 'openwrt-auth-token';
 
+/**
+ * Fired on `window` whenever the auth token is set or cleared so that
+ * long-lived singletons (the WebSocket provider) can react without polling
+ * storage on every render.
+ */
+export const TOKEN_CHANGE_EVENT = 'openwrt-travel-gui:token-change';
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
+}
+
+function notifyTokenChange(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(TOKEN_CHANGE_EVENT));
+  }
 }
 
 export function setToken(token: string, remember = true): void {
@@ -12,11 +25,13 @@ export function setToken(token: string, remember = true): void {
     sessionStorage.setItem(TOKEN_KEY, token);
     localStorage.removeItem(TOKEN_KEY);
   }
+  notifyTokenChange();
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  notifyTokenChange();
 }
 
 /** Clears auth state and redirects to the login page. Exported for testability. */
@@ -27,48 +42,107 @@ export function handleUnauthorized(): void {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+/** An HTTP error response, carrying the status code for callers that must branch on it. */
+export class ApiError extends Error {
+  readonly status: number;
 
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/**
+ * Extracts a human-readable error message from a failed response.
+ *
+ * A router can answer with an HTML error page (502 from a proxy, 401 from a
+ * captive portal, …), so the JSON body is parsed defensively and the HTTP
+ * status line is used as the fallback instead of a `SyntaxError`.
+ */
+export async function errorMessageFromResponse(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown } | null;
+    if (body && typeof body.error === 'string' && body.error.length > 0) {
+      return body.error;
+    }
+  } catch {
+    // Non-JSON body (HTML error page, empty body) — keep the fallback.
+  }
+  return fallback;
+}
+
+function buildHeaders(body: unknown): Record<string, string> {
+  const headers: Record<string, string> = {};
+  // FormData must set its own multipart boundary, and bodyless requests
+  // (every GET/DELETE) must not claim a JSON content type at all.
+  if (body !== undefined && !(typeof FormData !== 'undefined' && body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
   const token = getToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  return headers;
+}
 
+function bodyToRequestBody(body: unknown): BodyInit | undefined {
+  if (body === undefined) return undefined;
+  if (typeof FormData !== 'undefined' && body instanceof FormData) return body;
+  return JSON.stringify(body);
+}
+
+/**
+ * Performs a request and normalises failures: a 401 (except on the login
+ * endpoint) clears the session, and every non-2xx becomes an `ApiError` whose
+ * message survives a non-JSON body.
+ */
+async function send(path: string, method: string, body?: unknown, signal?: AbortSignal) {
   const response = await fetch(path, {
     method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+    headers: buildHeaders(body),
+    body: bodyToRequestBody(body),
+    signal,
   });
 
   if (!response.ok) {
     if (response.status === 401 && !path.endsWith('/auth/login')) {
       handleUnauthorized();
     }
-
-    let message = `Request failed with status ${response.status}`;
-    try {
-      const errorBody = (await response.json()) as { error?: string };
-      if (errorBody.error) {
-        message = errorBody.error;
-      }
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
+    throw new ApiError(
+      response.status,
+      await errorMessageFromResponse(response, `Request failed with status ${response.status}`),
+    );
   }
 
-  return response.json() as Promise<T>;
+  return response;
+}
+
+function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  return send(path, method, body).then((response) => response.json() as Promise<T>);
+}
+
+/** GET that returns a binary body (e.g. a backup archive). */
+function requestBlob(path: string): Promise<Blob> {
+  return send(path, 'GET').then((response) => response.blob());
 }
 
 export const apiClient = {
   get<T>(path: string): Promise<T> {
     return request<T>('GET', path);
   },
+  getBlob(path: string): Promise<Blob> {
+    return requestBlob(path);
+  },
   post<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('POST', path, body);
+  },
+  /** POST with a `multipart/form-data` body (backup restore, firmware upload). */
+  postForm<T>(path: string, formData: FormData): Promise<T> {
+    return request<T>('POST', path, formData);
   },
   put<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('PUT', path, body);
@@ -87,57 +161,66 @@ export interface StreamEvent {
 /**
  * Makes a POST request that returns an NDJSON stream.
  * Calls onEvent for each parsed event. Resolves when the stream ends.
+ *
+ * Pass `signal` to abort an in-flight stream (e.g. when a log dialog closes);
+ * the reader is cancelled, no further events fire and the promise settles.
  */
 export async function streamRequest(
   path: string,
   onEvent: (event: StreamEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const headers: Record<string, string> = {};
-  const token = getToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(path, { method: 'POST', headers });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      handleUnauthorized();
-    }
-    throw new Error(`Request failed with status ${response.status}`);
-  }
+  const response = await send(path, 'POST', undefined, signal);
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('No response body');
 
+  // `fetch` only rejects the request while it is still in flight; once the body
+  // is streaming, the signal must cancel the reader explicitly.
+  const onAbort = () => {
+    void reader.cancel().catch(() => {});
+  };
+  if (signal?.aborted) onAbort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+
   const decoder = new TextDecoder();
   let buffer = '';
 
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        onEvent(JSON.parse(trimmed) as StreamEvent);
-      } catch {
-        // skip malformed lines
+      for (const line of lines) {
+        emitStreamLine(onEvent, line);
       }
     }
-  }
 
-  // Process any remaining buffer
-  if (buffer.trim()) {
-    try {
-      onEvent(JSON.parse(buffer.trim()) as StreamEvent);
-    } catch {
-      // skip
-    }
+    // Flush the decoder: a multi-byte character can be split across the last
+    // chunk boundary and would otherwise be silently dropped.
+    buffer += decoder.decode();
+
+    // Process any remaining buffer
+    emitStreamLine(onEvent, buffer);
+  } catch (error) {
+    // Release the socket when the caller aborts; the reader is done either way.
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+function emitStreamLine(onEvent: (event: StreamEvent) => void, line: string): void {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  try {
+    onEvent(JSON.parse(trimmed) as StreamEvent);
+  } catch {
+    // skip malformed lines
   }
 }

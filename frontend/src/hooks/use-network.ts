@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { routeWithParam, routeWithSegment } from '@/lib/api-url';
 import { useWsSubscribe } from '@/lib/ws-context';
 import { API_ROUTES } from '@shared/index';
 import type {
@@ -173,7 +174,7 @@ export function useDeleteDNSEntry() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (section: string) =>
-      apiClient.del<{ status: string }>(`${API_ROUTES.network.dnsEntries}/${section}`),
+      apiClient.del<{ status: string }>(routeWithSegment(API_ROUTES.network.dnsEntries, section)),
     onSuccess: () => {
       toast.success('DNS entry deleted');
       void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
@@ -210,7 +211,9 @@ export function useDeleteDHCPReservation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (section: string) =>
-      apiClient.del<{ status: string }>(`${API_ROUTES.network.dhcpReservations}/${section}`),
+      apiClient.del<{ status: string }>(
+        routeWithSegment(API_ROUTES.network.dhcpReservations, section),
+      ),
     onSuccess: () => {
       toast.success('DHCP reservation deleted');
       void queryClient.invalidateQueries({ queryKey: ['network', 'dhcpReservations'] });
@@ -275,7 +278,7 @@ export function useSetInterfaceState() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ name, up }: { name: string; up: boolean }) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.interfaceState.replace(':name', name), {
+      apiClient.post<{ status: string }>(routeWithParam(API_ROUTES.network.interfaceState, name), {
         up,
       }),
     onSuccess: (_data, variables) => {
@@ -409,7 +412,7 @@ export function useDeletePortForward() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.del<{ ok: boolean }>(`${API_ROUTES.network.portForwards}/${id}`),
+      apiClient.del<{ ok: boolean }>(routeWithSegment(API_ROUTES.network.portForwards, id)),
     onSuccess: () => {
       toast.success('Port forward deleted');
       void queryClient.invalidateQueries({ queryKey: ['network', 'portForwards'] });

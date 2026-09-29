@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { API_ROUTES } from '@shared/index';
+import { API_ROUTES, MIN_PASSWORD_LENGTH } from '@shared/index';
 import {
   mockSystemInfo,
   mockSystemStats,
@@ -458,13 +458,23 @@ export const handlers = [
     if (body.current_password !== 'admin') {
       return HttpResponse.json({ error: 'invalid current password' }, { status: 401 });
     }
-    if (body.new_password.length < 6) {
+    // Must match the backend: a change revokes every session (the caller's
+    // included) and returns a replacement token, which the client MUST store.
+    // A response without `token` makes the client persist "undefined" as its
+    // session token. See shared/src/api/auth.ts ChangePasswordResponse.
+    if (body.new_password.length < MIN_PASSWORD_LENGTH) {
       return HttpResponse.json(
-        { error: 'new password must be at least 6 characters' },
+        { error: `new password must be at least ${MIN_PASSWORD_LENGTH} characters` },
         { status: 400 },
       );
     }
-    return HttpResponse.json({ status: 'ok' });
+    return HttpResponse.json({
+      status: 'ok',
+      token: 'mock-rotation-token',
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      expires_in: 24 * 60 * 60,
+      revoked_sessions: 1,
+    });
   }),
 
   http.post(API_ROUTES.system.reboot, () => {

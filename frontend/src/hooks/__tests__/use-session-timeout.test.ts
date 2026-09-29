@@ -131,6 +131,44 @@ describe('useSessionTimeout', () => {
     expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
   });
 
+  it('warns again after the server issues a longer-lived session', async () => {
+    mockedGetToken.mockReturnValue('token');
+    mockSession(280); // 4m40s — inside the warning window
+    renderHook(() => useSessionTimeout());
+    await flush();
+
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(mockedToastWarning).toHaveBeenCalledTimes(1);
+
+    // A re-issued, longer-lived session re-validates when the old deadline
+    // passes; the one-shot warning latch must be cleared so the new session can
+    // warn in turn.
+    mockSession(1800); // 30 minutes
+    await act(async () => {
+      vi.advanceTimersByTime(300_000);
+      await Promise.resolve();
+    });
+    expect(mockedToastWarning).toHaveBeenCalledTimes(1);
+
+    // The new session then enters its own warning window.
+    mockSession(120);
+    await act(async () => {
+      vi.advanceTimersByTime(1_800_000);
+      await Promise.resolve();
+    });
+    const warningsBeforeFinalTick = mockedToastWarning.mock.calls.length;
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(mockedToastWarning.mock.calls.length).toBeGreaterThan(warningsBeforeFinalTick);
+    expect(mockedToastWarning).toHaveBeenLastCalledWith(
+      'Session expiring soon',
+      expect.objectContaining({ description: expect.stringContaining('minute') }),
+    );
+  });
+
   it('cleans up interval on unmount', async () => {
     mockedGetToken.mockReturnValue('token');
     mockSession(280);

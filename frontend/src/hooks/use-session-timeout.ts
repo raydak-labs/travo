@@ -34,7 +34,13 @@ export function useSessionTimeout(): void {
       try {
         const session = await apiClient.get<SessionResponse>(API_ROUTES.auth.session);
         if (!cancelled && session.expires_in > 0) {
-          deadline = performance.now() + session.expires_in * 1000;
+          const nextDeadline = performance.now() + session.expires_in * 1000;
+          // A deadline that moved forwards is a re-issued session, so clear the
+          // one-shot warning latch and let the new session warn again.
+          if (deadline !== null && nextDeadline > deadline) {
+            warnedRef.current = false;
+          }
+          deadline = nextDeadline;
         }
       } catch {
         // A 401 is handled globally by api-client (redirect to login).

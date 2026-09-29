@@ -8,6 +8,7 @@ import { useWebSocket } from '../use-websocket';
 vi.mock('@/lib/api-client', () => ({
   getToken: () => 'test-token',
   apiClient: {},
+  TOKEN_CHANGE_EVENT: 'openwrt-travel-gui:token-change',
 }));
 
 let mockWsInstance: {

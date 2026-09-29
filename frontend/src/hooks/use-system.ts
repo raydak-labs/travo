@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient, getToken } from '@/lib/api-client';
+import { apiClient, setToken } from '@/lib/api-client';
+import { resetSetupStatusCache } from '@/lib/setup-status';
+import { routeWithSegment } from '@/lib/api-url';
 import { useWsSubscribe } from '@/lib/ws-context';
 import { API_ROUTES } from '@shared/index';
 import type {
@@ -9,6 +11,7 @@ import type {
   SystemStats,
   LogResponse,
   ChangePasswordRequest,
+  ChangePasswordResponse,
   SetHostnameRequest,
   LEDStatus,
   SetLEDRequest,
@@ -123,10 +126,23 @@ export function useKernelLogs() {
 
 export function useChangePassword() {
   return useMutation({
-    mutationFn: (data: ChangePasswordRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.auth.password, data),
-    onSuccess: () => {
-      toast.success('Password changed successfully');
+    mutationFn: async (data: ChangePasswordRequest) => {
+      // A password change revokes every session, including this one, and the
+      // server issues a replacement token. Keep using the old token here and
+      // the very next request fails with 401 — the user is silently logged out
+      // right after a successful password change.
+      const res = await apiClient.put<ChangePasswordResponse>(API_ROUTES.auth.password, data);
+      setToken(res.token);
+      return res;
+    },
+    onSuccess: (res) => {
+      const otherSessions = Math.max(0, res.revoked_sessions - 1);
+      toast.success('Password changed successfully', {
+        description:
+          otherSessions > 0
+            ? `Signed out of ${otherSessions} other session${otherSessions === 1 ? '' : 's'}.`
+            : 'This is the only active session.',
+      });
     },
     onError: (error) => {
       toast.error('Failed to change password', { description: error.message });
@@ -200,13 +216,9 @@ export function useTimezone() {
 export function useBackup() {
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch(API_ROUTES.system.backup, {
-        headers: {
-          Authorization: `Bearer ${getToken() ?? ''}`,
-        },
-      });
-      if (!response.ok) throw new Error('Backup failed');
-      const blob = await response.blob();
+      // Routed through the shared client so an expired session triggers the
+      // global 401 handling instead of a bare "Backup failed".
+      const blob = await apiClient.getBlob(API_ROUTES.system.backup);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -228,18 +240,7 @@ export function useRestore() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('backup', file);
-      const response = await fetch(API_ROUTES.system.restore, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${getToken() ?? ''}`,
-        },
-        body: formData,
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Restore failed');
-      }
-      return response.json();
+      return apiClient.postForm<{ status?: string }>(API_ROUTES.system.restore, formData);
     },
     onSuccess: () => {
       toast.success('Configuration restored. Reboot to apply changes.');
@@ -271,18 +272,7 @@ export function useFirmwareUpgrade() {
       const formData = new FormData();
       formData.append('firmware', file);
       formData.append('keep_settings', String(keepSettings));
-      const response = await fetch(API_ROUTES.system.firmwareUpgrade, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${getToken() ?? ''}`,
-        },
-        body: formData,
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Firmware upgrade failed');
-      }
-      return response.json();
+      return apiClient.postForm<{ status?: string }>(API_ROUTES.system.firmwareUpgrade, formData);
     },
     onSuccess: () => {
       toast.success('Firmware upgrade initiated', {
@@ -365,6 +355,9 @@ export function useCompleteSetup() {
   return useMutation({
     mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.setupComplete),
     onSuccess: () => {
+      // The route guard caches the setup answer; finishing setup must not
+      // redirect the user straight back to /setup.
+      resetSetupStatusCache();
       void queryClient.invalidateQueries({ queryKey: ['system', 'setup-complete'] });
     },
   });
@@ -399,7 +392,7 @@ export function useDeleteSSHKey() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (index: number) =>
-      apiClient.del<{ ok: boolean }>(`${API_ROUTES.system.sshKeys}/${index}`),
+      apiClient.del<{ ok: boolean }>(routeWithSegment(API_ROUTES.system.sshKeys, index)),
     onSuccess: () => {
       toast.success('SSH key deleted');
       void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });

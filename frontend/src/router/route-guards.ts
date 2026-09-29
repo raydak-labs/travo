@@ -1,6 +1,6 @@
 import { redirect } from '@tanstack/react-router';
-import { getToken, apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
+import { getToken } from '@/lib/api-client';
+import { getSetupComplete } from '@/lib/setup-status';
 
 export function requireAuth() {
   if (!getToken()) {
@@ -8,15 +8,23 @@ export function requireAuth() {
   }
 }
 
-/** Check setup status and redirect to /setup if not complete */
+/**
+ * Check setup status and redirect to /setup if not complete.
+ *
+ * The answer is cached (see `getSetupComplete`) so navigation does not refetch
+ * it. An unavailable router is *not* treated as "setup complete": the error is
+ * re-thrown so the route surfaces an error instead of quietly unlocking the
+ * app.
+ */
 export async function requireSetupComplete() {
   requireAuth();
-  try {
-    const data = await apiClient.get<{ complete: boolean }>(API_ROUTES.system.setupComplete);
-    if (!data.complete) {
-      throw redirect({ to: '/setup' });
-    }
-  } catch (e: unknown) {
-    if (e !== null && typeof e === 'object' && 'to' in e) throw e;
+
+  // Any failure (5xx, transport) propagates: rendering the protected route as
+  // if setup were complete would expose the app behind a half-configured
+  // router, which is exactly what the old `catch {}` did.
+  const complete = await getSetupComplete();
+
+  if (!complete) {
+    throw redirect({ to: '/setup' });
   }
 }
