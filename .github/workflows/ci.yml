@@ -35,7 +35,10 @@ jobs:
         working-directory: backend
 
       - name: Test
-        run: go test ./... -count=1
+        # -timeout is per package. internal/api builds an AuthService per test
+        # and each one runs bcrypt at DefaultCost, so the suite is CPU-bound on
+        # a 2-core runner and the 10m default leaves little headroom.
+        run: go test ./... -count=1 -timeout 20m
         working-directory: backend
 
   test-race:

@@ -157,11 +157,6 @@ func TestCrashGuardsAllLiveUnderEtcTrafo(t *testing.T) {
 // written to — clearing only the configured path left that fallback guard behind
 // forever, and a stale guard means "skip this operation".
 func TestClearCrashGuard_RemovesGuardFromFallbackDir(t *testing.T) {
-	// The resolver falls back to os.TempDir(), which honours $TMPDIR on unix.
-	// Point it at a private directory so the test neither depends on nor
-	// collides with a shared /tmp/travo-guards left by another test or run.
-	t.Setenv("TMPDIR", t.TempDir())
-
 	// A regular file where a directory is needed: MkdirAll fails, so the
 	// resolver must fall back to a writable directory.
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
@@ -171,6 +166,10 @@ func TestClearCrashGuard_RemovesGuardFromFallbackDir(t *testing.T) {
 
 	w, _ := newTestWifiService()
 	w.guardDir = blocker
+	// Point the fallback at a private directory instead of redirecting TMPDIR:
+	// this package runs many t.Parallel() tests, which would inherit a temp dir
+	// that is removed when this test ends.
+	w.guardFallbackDir = t.TempDir()
 	if err := w.writeCrashGuard("probe"); err != nil {
 		t.Fatalf("writeCrashGuard: %v", err)
 	}

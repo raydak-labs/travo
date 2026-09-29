@@ -84,6 +84,13 @@ type WifiService struct {
 	modeFile            string
 	repeaterOptionsFile string
 	guardDir            string
+	// guardFallbackDir overrides the directory used when guardDir cannot be
+	// created. Empty in production, which falls back to a directory under the
+	// system temp dir. It is a field rather than an env lookup so a test can
+	// exercise the fallback path hermetically: redirecting TMPDIR with t.Setenv
+	// would mutate the whole process environment, and this package runs many
+	// t.Parallel() tests that would then inherit (and lose) the temp dir.
+	guardFallbackDir string
 
 	// uciWriteMu serializes UCI write sequences (Set/AddSection/Commit/revert
 	// against the process-global uci delta). Read-only paths never take it, so
@@ -619,7 +626,10 @@ func (w *WifiService) resolveGuardDir() string {
 	if mkErr == nil {
 		return dir
 	}
-	fallback := filepath.Join(os.TempDir(), "travo-guards")
+	fallback := w.guardFallbackDir
+	if fallback == "" {
+		fallback = filepath.Join(os.TempDir(), "travo-guards")
+	}
 	log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side power loss is NOT protected by a durable marker.", dir, mkErr, fallback)
 	_ = os.MkdirAll(fallback, 0o750)
 	return fallback
