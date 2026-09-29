@@ -2,11 +2,14 @@ package services
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -17,6 +20,25 @@ import (
 const (
 	captiveAutoAcceptMaxBodyBytes = 256 * 1024
 	captiveMaxSteps               = 8 // max pages to follow in a multi-step portal
+
+	// captiveUbusBin is the ubus CLI used for interface state probes.
+	captiveUbusBin = "/sbin/ubus"
+)
+
+// captiveWwanBounceGuardPath is the crash guard for the wwan DHCP bounce. It is a
+// variable (not a constant) so tests can redirect it; production code must never
+// leave it set after a successful bounce (ADR 0003).
+var captiveWwanBounceGuardPath = "/etc/trafo/captive-wwan-bounce-in-progress"
+
+// Bounded waits for the wwan bounce. Variables (not constants) so tests can
+// shrink them; production values must stay small enough for an HTTP handler.
+var (
+	// captiveWwanDownSettle is the pause after ifdown so netifd releases the lease.
+	captiveWwanDownSettle = 2 * time.Second
+	// captiveWwanUpSettle bounds the wait for a fresh DHCP lease after ifup.
+	captiveWwanUpSettle = 8 * time.Second
+	// captiveWwanPollInterval is the retry interval while waiting for a lease.
+	captiveWwanPollInterval = 200 * time.Millisecond
 )
 
 var (
@@ -314,6 +336,7 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 
 	ua := "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 	attempted := 0
+	bounceNote := ""
 	currentURL := portalURL
 	visitedURLs := map[string]bool{}
 
@@ -335,13 +358,16 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 				}
 				html, pageBase, fetchErr = c.fetchPortalPage(noRedirectClient, client, ua, fallbackURL.String())
 			}
-			// If still failing on step 0, bounce DHCP to get fresh lease
-			// (needed after MAC change when gateway blocks stale MAC-IP)
+			// If still failing on step 0, bounce the active uplink's DHCP lease
+			// to get a fresh one (needed after a MAC change when the gateway
+			// blocks a stale MAC/IP). Only wwan is ever bounced, and only while
+			// it is the active uplink, so ethernet-only or USB-tether setups are
+			// not disturbed. The bounce is crash-guarded and bounded.
 			if (fetchErr != nil || html == "") && step == 0 && c.cmd != nil {
-				_, _ = c.cmd.Run("ifdown", "wwan")
-				time.Sleep(2 * time.Second)
-				_, _ = c.cmd.Run("ifup", "wwan")
-				time.Sleep(8 * time.Second) // wait for DHCP
+				if bounceErr := c.bounceActiveWwanDHCP(); bounceErr != nil {
+					bounceNote = "wwan bounce failed: " + bounceErr.Error()
+					break
+				}
 				html, pageBase, fetchErr = c.fetchPortalPage(noRedirectClient, client, ua, currentURL)
 			}
 			if fetchErr != nil || html == "" {
@@ -489,6 +515,9 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 	} else if attempted == 0 {
 		msg = "no requests were sent"
 	}
+	if bounceNote != "" {
+		msg += " (" + bounceNote + ")"
+	}
 
 	return models.CaptiveAutoAcceptResult{
 		OK:               ok,
@@ -498,6 +527,127 @@ func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.Capti
 		PortalURL:        st.PortalURL,
 		Attempts:         attempted,
 	}, nil
+}
+
+// bounceActiveWwanDHCP renews the wwan DHCP lease, but only when wwan is the
+// active uplink. It is a live network mutation, so it writes a crash guard
+// before ifdown/ifup and removes it only after the lease came back. Every step
+// error is returned; a failed bounce leaves the guard in place because the
+// interface may be half down.
+func (c *CaptiveService) bounceActiveWwanDHCP() error {
+	active, err := c.wwanIsActiveUplink()
+	if err != nil {
+		return err
+	}
+	if !active {
+		// wwan is not carrying the default route: bouncing it would only
+		// disturb an unrelated interface.
+		return nil
+	}
+	if err := writeCaptiveBounceGuard(captiveWwanBounceGuardPath); err != nil {
+		return err
+	}
+	if _, err := c.cmd.Run(openwrtIfdownBin, "wwan"); err != nil {
+		return fmt.Errorf("ifdown wwan: %w", err)
+	}
+	time.Sleep(captiveWwanDownSettle)
+	if _, err := c.cmd.Run(openwrtIfupBin, "wwan"); err != nil {
+		return fmt.Errorf("ifup wwan: %w", err)
+	}
+	if err := c.waitForWwanLease(captiveWwanUpSettle); err != nil {
+		return err
+	}
+	_ = os.Remove(captiveWwanBounceGuardPath)
+	return nil
+}
+
+// wwanIsActiveUplink reports whether netifd currently has wwan up with an IPv4
+// default route. Errors are returned so callers do not guess.
+func (c *CaptiveService) wwanIsActiveUplink() (bool, error) {
+	out, err := c.cmd.Run(captiveUbusBin, "-S", "call", "network.interface", "dump")
+	if err != nil {
+		return false, fmt.Errorf("ubus network.interface dump: %w", err)
+	}
+	return ubusInterfaceDumpHasDefaultRoute(out, "wwan"), nil
+}
+
+// waitForWwanLease polls the wwan interface status until it has an IPv4 address
+// or the timeout expires, so the handler does not sleep for a fixed 8s.
+func (c *CaptiveService) waitForWwanLease(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if out, err := c.cmd.Run(captiveUbusBin, "call", "network.interface.wwan", "status"); err == nil {
+			if ubusInterfaceStatusHasAddress(out) {
+				return nil
+			}
+		}
+		if !time.Now().Before(deadline) {
+			return fmt.Errorf("wwan did not obtain a lease within %s", timeout)
+		}
+		time.Sleep(captiveWwanPollInterval)
+	}
+}
+
+// ubusInterfaceDumpHasDefaultRoute reports whether the named netifd interface
+// is up and owns an IPv4 default route.
+func ubusInterfaceDumpHasDefaultRoute(out []byte, name string) bool {
+	var raw map[string]any
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return false
+	}
+	ifaces, ok := raw["interface"].([]any)
+	if !ok {
+		return false
+	}
+	for _, entry := range ifaces {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		if ifaceName, _ := m["interface"].(string); ifaceName != name {
+			continue
+		}
+		up, _ := m["up"].(bool)
+		if !up {
+			return false
+		}
+		routes, _ := m["route"].([]any)
+		for _, r := range routes {
+			rm, ok := r.(map[string]any)
+			if !ok {
+				continue
+			}
+			target, _ := rm["target"].(string)
+			mask, _ := rm["mask"].(float64)
+			if target == "0.0.0.0" && int(mask) == 0 {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+// ubusInterfaceStatusHasAddress reports whether an interface status reply
+// contains an IPv4 address.
+func ubusInterfaceStatusHasAddress(out []byte) bool {
+	var raw map[string]any
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return false
+	}
+	addrs, ok := raw["ipv4-address"].([]any)
+	return ok && len(addrs) > 0
+}
+
+// writeCaptiveBounceGuard creates the crash guard file for the wwan bounce.
+func writeCaptiveBounceGuard(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+		return fmt.Errorf("create wwan bounce guard dir: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
+		return fmt.Errorf("write wwan bounce guard: %w", err)
+	}
+	return nil
 }
 
 // chainAutoSubmit checks if an HTML response contains auto-submit forms and submits them.

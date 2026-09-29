@@ -1,8 +1,12 @@
 package services
 
 import (
+	"errors"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestExtractCaptiveAcceptTargets(t *testing.T) {
@@ -206,5 +210,194 @@ func TestResolveCaptiveURL(t *testing.T) {
 		if !tt.wantErr && got != tt.want {
 			t.Errorf("resolveCaptiveURL(%q) = %q, want %q", tt.href, got, tt.want)
 		}
+	}
+}
+
+// captiveBounceRunner is a scripted CommandRunner for the wwan DHCP bounce.
+type captiveBounceRunner struct {
+	dump      string
+	dumpErr   error
+	status    string
+	statusErr error
+	ifdownErr error
+	ifupErr   error
+	calls     []string
+}
+
+func (r *captiveBounceRunner) Run(name string, args ...string) ([]byte, error) {
+	call := name
+	for _, a := range args {
+		call += " " + a
+	}
+	r.calls = append(r.calls, call)
+	switch call {
+	case "/sbin/ubus -S call network.interface dump":
+		return []byte(r.dump), r.dumpErr
+	case "/sbin/ubus call network.interface.wwan status":
+		return []byte(r.status), r.statusErr
+	case "/sbin/ifdown wwan":
+		return nil, r.ifdownErr
+	case "/sbin/ifup wwan":
+		return nil, r.ifupErr
+	}
+	return nil, nil
+}
+
+func (r *captiveBounceRunner) called(prefix string) bool {
+	for _, c := range r.calls {
+		if c == prefix {
+			return true
+		}
+	}
+	return false
+}
+
+const wwanActiveDump = `{"interface":[
+  {"interface":"lan","up":true,"route":[{"target":"0.0.0.0","mask":255}]},
+  {"interface":"wwan","up":true,"route":[{"target":"0.0.0.0","mask":0}]}
+]}`
+
+const wwanUpNoDefaultRouteDump = `{"interface":[
+  {"interface":"wan","up":true,"route":[{"target":"0.0.0.0","mask":0}]},
+  {"interface":"wwan","up":true,"route":[{"target":"10.0.0.0","mask":8}]}
+]}`
+
+const wwanLeaseStatus = `{"up":true,"ipv4-address":[{"address":"10.0.0.50","mask":24}]}`
+
+// useTempBounceGuard points the wwan bounce crash guard at a temp dir and
+// shrinks the production sleeps so the bounce tests stay fast.
+func useTempBounceGuard(t *testing.T) string {
+	t.Helper()
+	origPath, origDown, origUp, origPoll := captiveWwanBounceGuardPath, captiveWwanDownSettle, captiveWwanUpSettle, captiveWwanPollInterval
+	path := filepath.Join(t.TempDir(), "captive-wwan-bounce-in-progress")
+	captiveWwanBounceGuardPath = path
+	captiveWwanDownSettle = time.Millisecond
+	captiveWwanUpSettle = 20 * time.Millisecond
+	captiveWwanPollInterval = time.Millisecond
+	t.Cleanup(func() {
+		captiveWwanBounceGuardPath = origPath
+		captiveWwanDownSettle, captiveWwanUpSettle, captiveWwanPollInterval = origDown, origUp, origPoll
+	})
+	return path
+}
+
+func newBounceCaptiveService(r CommandRunner) *CaptiveService {
+	return &CaptiveService{prober: &MockHTTPProber{}, cmd: r, guardFile: captiveDNSGuardFile}
+}
+
+func TestUbusInterfaceDumpHasDefaultRoute(t *testing.T) {
+	t.Parallel()
+
+	if !ubusInterfaceDumpHasDefaultRoute([]byte(wwanActiveDump), "wwan") {
+		t.Error("expected wwan to be the active uplink (up with a default route)")
+	}
+	if ubusInterfaceDumpHasDefaultRoute([]byte(wwanUpNoDefaultRouteDump), "wwan") {
+		t.Error("wwan without a default route must not count as the active uplink")
+	}
+	if ubusInterfaceDumpHasDefaultRoute([]byte(wwanActiveDump), "usb0") {
+		t.Error("unknown interface must not count as the active uplink")
+	}
+	if ubusInterfaceDumpHasDefaultRoute([]byte("not json"), "wwan") {
+		t.Error("unparsable dump must not count as the active uplink")
+	}
+}
+
+func TestWwanIsActiveUplinkPropagatesDumpError(t *testing.T) {
+	t.Parallel()
+
+	runner := &captiveBounceRunner{dumpErr: errors.New("ubus down")}
+	svc := newBounceCaptiveService(runner)
+	if _, err := svc.wwanIsActiveUplink(); err == nil {
+		t.Error("expected an error when the interface dump fails")
+	}
+}
+
+func TestBounceActiveWwanDHCPBouncesActiveWwan(t *testing.T) {
+	guard := useTempBounceGuard(t)
+	runner := &captiveBounceRunner{dump: wwanActiveDump, status: wwanLeaseStatus}
+	svc := newBounceCaptiveService(runner)
+
+	if err := svc.bounceActiveWwanDHCP(); err != nil {
+		t.Fatalf("bounceActiveWwanDHCP: %v", err)
+	}
+	if !runner.called("/sbin/ifdown wwan") {
+		t.Errorf("expected ifdown wwan, calls = %v", runner.calls)
+	}
+	if !runner.called("/sbin/ifup wwan") {
+		t.Errorf("expected ifup wwan, calls = %v", runner.calls)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("expected crash guard removed after a successful bounce, stat err = %v", err)
+	}
+}
+
+func TestBounceActiveWwanDHCPSkipsInactiveWwan(t *testing.T) {
+	guard := useTempBounceGuard(t)
+	runner := &captiveBounceRunner{dump: wwanUpNoDefaultRouteDump, status: wwanLeaseStatus}
+	svc := newBounceCaptiveService(runner)
+
+	if err := svc.bounceActiveWwanDHCP(); err != nil {
+		t.Fatalf("bounceActiveWwanDHCP: %v", err)
+	}
+	if runner.called("/sbin/ifdown wwan") || runner.called("/sbin/ifup wwan") {
+		t.Errorf("must not bounce wwan when it is not the active uplink, calls = %v", runner.calls)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("no bounce means no guard, stat err = %v", err)
+	}
+}
+
+func TestBounceActiveWwanDHCPKeepsGuardOnIfupFailure(t *testing.T) {
+	guard := useTempBounceGuard(t)
+	runner := &captiveBounceRunner{dump: wwanActiveDump, status: wwanLeaseStatus, ifupErr: errors.New("ifup failed")}
+	svc := newBounceCaptiveService(runner)
+
+	if err := svc.bounceActiveWwanDHCP(); err == nil {
+		t.Fatal("expected an error when ifup wwan fails")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain when the bounce did not complete: %v", err)
+	}
+}
+
+func TestBounceActiveWwanDHCPKeepsGuardOnIfdownFailure(t *testing.T) {
+	guard := useTempBounceGuard(t)
+	runner := &captiveBounceRunner{dump: wwanActiveDump, status: wwanLeaseStatus, ifdownErr: errors.New("ifdown failed")}
+	svc := newBounceCaptiveService(runner)
+
+	if err := svc.bounceActiveWwanDHCP(); err == nil {
+		t.Fatal("expected an error when ifdown wwan fails")
+	}
+	if runner.called("/sbin/ifup wwan") {
+		t.Error("must not run ifup after a failed ifdown")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain when the bounce did not complete: %v", err)
+	}
+}
+
+func TestBounceActiveWwanDHCPKeepsGuardWhenLeaseMissing(t *testing.T) {
+	guard := useTempBounceGuard(t)
+	runner := &captiveBounceRunner{dump: wwanActiveDump, status: `{"up":false}`}
+	svc := newBounceCaptiveService(runner)
+
+	if err := svc.bounceActiveWwanDHCP(); err == nil {
+		t.Fatal("expected an error when wwan never gets a lease")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain when the bounce did not complete: %v", err)
+	}
+}
+
+func TestBounceActiveWwanDHCPDoesNotBounceWhenUplinkUnknown(t *testing.T) {
+	_ = useTempBounceGuard(t)
+	runner := &captiveBounceRunner{dumpErr: errors.New("ubus down"), status: wwanLeaseStatus}
+	svc := newBounceCaptiveService(runner)
+
+	if err := svc.bounceActiveWwanDHCP(); err == nil {
+		t.Fatal("expected an error when the active uplink cannot be determined")
+	}
+	if runner.called("/sbin/ifdown wwan") {
+		t.Error("must not bounce wwan when the active uplink is unknown")
 	}
 }

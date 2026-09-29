@@ -1,11 +1,14 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
 )
@@ -15,6 +18,11 @@ import (
 var usbCandidateInterfaces = []string{"usb0", "usb1", "eth1", "eth2"}
 
 const usbTetherUCIName = "usbtether"
+
+// usbTetherGuardPath is the crash guard for USB tether (re)configuration.
+// It must exist while the live network/firewall state is being changed and is
+// removed only after the change completed successfully (ADR 0003).
+const usbTetherGuardPath = "/etc/trafo/usbtether-in-progress"
 
 // USBTetherStatus holds the detected USB tethering state.
 type USBTetherStatus struct {
@@ -86,16 +94,98 @@ func (r *RealUSBTetherRunner) RunCommand(name string, args ...string) (string, e
 // USBTetheringService detects and configures USB-tethered devices.
 type USBTetheringService struct {
 	runner USBTetherRunner
+	// guardFile is the crash-guard path (overridable in tests).
+	guardFile string
 }
 
 // NewUSBTetheringService creates a service backed by the real system.
 func NewUSBTetheringService() *USBTetheringService {
-	return &USBTetheringService{runner: &RealUSBTetherRunner{}}
+	return &USBTetheringService{runner: &RealUSBTetherRunner{}, guardFile: usbTetherGuardPath}
 }
 
 // NewUSBTetheringServiceWithRunner creates a service with a custom runner (tests).
 func NewUSBTetheringServiceWithRunner(r USBTetherRunner) *USBTetheringService {
-	return &USBTetheringService{runner: r}
+	return &USBTetheringService{runner: r, guardFile: usbTetherGuardPath}
+}
+
+// writeGuard creates the crash guard file before mutating live state.
+func (s *USBTetheringService) writeGuard() error {
+	if err := os.MkdirAll(filepath.Dir(s.guardFile), 0750); err != nil {
+		return fmt.Errorf("create usb tether guard dir: %w", err)
+	}
+	if err := os.WriteFile(s.guardFile, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
+		return fmt.Errorf("write usb tether guard: %w", err)
+	}
+	return nil
+}
+
+// clearGuard removes the crash guard after a successful change.
+func (s *USBTetheringService) clearGuard() {
+	if s.guardFile == "" {
+		return
+	}
+	_ = os.Remove(s.guardFile)
+}
+
+// parseUciShow parses `uci show <prefix>` output into section -> option -> values.
+// List options appear once per value, anonymous sections are keyed as "@zone[0]".
+func parseUciShow(prefix, output string) map[string]map[string][]string {
+	sections := map[string]map[string][]string{}
+	for line := range strings.SplitSeq(output, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, prefix+".") {
+			continue
+		}
+		name, value, found := strings.Cut(strings.TrimPrefix(line, prefix+"."), "=")
+		if !found {
+			continue
+		}
+		section, option, ok := strings.Cut(name, ".")
+		if !ok {
+			// Section header line, e.g. "firewall.@zone[0]=zone".
+			continue
+		}
+		opts, exists := sections[section]
+		if !exists {
+			opts = map[string][]string{}
+			sections[section] = opts
+		}
+		opts[option] = append(opts[option], strings.Trim(value, "'"))
+	}
+	return sections
+}
+
+// wanZoneSection resolves the firewall WAN zone by its `name` option instead of
+// assuming a fixed index (the same resolution WifiService uses), and returns the
+// zone's current network list.
+func (s *USBTetheringService) wanZoneSection() (string, []string, error) {
+	out, err := s.runner.RunCommand("uci", "show", "firewall")
+	if err != nil {
+		return "", nil, fmt.Errorf("uci show firewall: %w", err)
+	}
+	sections := parseUciShow("firewall", out)
+	names := make([]string, 0, len(sections))
+	for name := range sections {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		opts := sections[name]
+		sectionType := ""
+		if len(opts[".type"]) > 0 {
+			sectionType = opts[".type"][0]
+		}
+		zoneName := ""
+		if len(opts["name"]) > 0 {
+			zoneName = opts["name"][0]
+		}
+		isZone := sectionType == "zone" || len(opts["input"]) > 0
+		if !isZone || zoneName != "wan" {
+			continue
+		}
+		return name, opts["network"], nil
+	}
+	return "", nil, errors.New("wan firewall zone not found")
 }
 
 // isUSBInterface returns true when the kernel interface is backed by a USB device.
@@ -149,6 +239,12 @@ func (s *USBTetheringService) isConfigured() bool {
 // Configure creates a UCI DHCP interface for the detected USB tethering device
 // and adds it to the WAN firewall zone.
 func (s *USBTetheringService) Configure(ifaceName string) error {
+	if strings.TrimSpace(ifaceName) == "" {
+		return errors.New("usb tethering interface name is required")
+	}
+	if err := s.writeGuard(); err != nil {
+		return err
+	}
 	cmds := [][]string{
 		{"uci", "set", fmt.Sprintf("network.%s=interface", usbTetherUCIName)},
 		{"uci", "set", fmt.Sprintf("network.%s.proto=dhcp", usbTetherUCIName)},
@@ -157,32 +253,74 @@ func (s *USBTetheringService) Configure(ifaceName string) error {
 	}
 	for _, args := range cmds {
 		if _, err := s.runner.RunCommand(args[0], args[1:]...); err != nil {
+			s.clearGuard()
 			return fmt.Errorf("uci set failed (%v): %w", args, err)
 		}
 	}
 
-	// Add usbtether to WAN zone (add_list is idempotent).
-	_, _ = s.runner.RunCommand("uci", "add_list", fmt.Sprintf("firewall.@zone[1].network=%s", usbTetherUCIName))
+	// Add usbtether to the WAN zone (add_list is idempotent).
+	wanZone, zoneNetworks, err := s.wanZoneSection()
+	if err != nil {
+		s.clearGuard()
+		return err
+	}
+	if !slices.Contains(zoneNetworks, usbTetherUCIName) {
+		if _, err := s.runner.RunCommand("uci", "add_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, usbTetherUCIName)); err != nil {
+			s.clearGuard()
+			return fmt.Errorf("uci add_list firewall wan zone: %w", err)
+		}
+	}
 
 	if _, err := s.runner.RunCommand("uci", "commit", "network"); err != nil {
+		s.clearGuard()
 		return fmt.Errorf("uci commit network: %w", err)
 	}
-	_, _ = s.runner.RunCommand("uci", "commit", "firewall")
+	if _, err := s.runner.RunCommand("uci", "commit", "firewall"); err != nil {
+		s.clearGuard()
+		return fmt.Errorf("uci commit firewall: %w", err)
+	}
 
-	// Bring up the interface.
+	// Bring up the interface. Best effort: the UCI config is committed and
+	// netifd retries on its own, so a transient ifup failure is not fatal.
 	_, _ = s.runner.RunCommand("ifup", usbTetherUCIName)
 
+	s.clearGuard()
 	return nil
 }
 
-// Unconfigure removes the usbtether UCI interface.
+// Unconfigure removes the usbtether UCI interface and its WAN zone reference.
 func (s *USBTetheringService) Unconfigure() error {
+	if err := s.writeGuard(); err != nil {
+		return err
+	}
 	_, _ = s.runner.RunCommand("ifdown", usbTetherUCIName)
+
+	// Remove the firewall reference first so a failure never leaves a dangling
+	// network in the WAN zone after the interface is gone.
+	wanZone, zoneNetworks, err := s.wanZoneSection()
+	if err != nil {
+		s.clearGuard()
+		return err
+	}
+	if slices.Contains(zoneNetworks, usbTetherUCIName) {
+		if _, err := s.runner.RunCommand("uci", "del_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, usbTetherUCIName)); err != nil {
+			s.clearGuard()
+			return fmt.Errorf("uci del_list firewall wan zone: %w", err)
+		}
+		if _, err := s.runner.RunCommand("uci", "commit", "firewall"); err != nil {
+			s.clearGuard()
+			return fmt.Errorf("uci commit firewall: %w", err)
+		}
+	}
+
 	if _, err := s.runner.RunCommand("uci", "delete", fmt.Sprintf("network.%s", usbTetherUCIName)); err != nil {
+		s.clearGuard()
 		return fmt.Errorf("uci delete: %w", err)
 	}
 	if _, err := s.runner.RunCommand("uci", "commit", "network"); err != nil {
+		s.clearGuard()
 		return fmt.Errorf("uci commit network: %w", err)
 	}
+	s.clearGuard()
 	return nil
 }

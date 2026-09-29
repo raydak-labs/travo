@@ -29,19 +29,28 @@ type UCIApplyConfirm interface {
 
 const (
 	uciApplyRollbackTimeout = 30
-	etcConfigDir            = "/etc/config"
-	rpcdRunDir              = "/var/run/rpcd"
+	defaultEtcConfigDir     = "/etc/config"
+	defaultRpcdRunDir       = "/var/run/rpcd"
 )
 
 // RealUCIApplyConfirm uses ubus session + rpcd uci apply/confirm.
 type RealUCIApplyConfirm struct {
 	ubus     ubus.Ubus
 	password *auth.RootPassword
+	// rpcdRunDir and etcConfigDir are struct fields (not constants) so the
+	// apply/confirm flow can be exercised in tests against a temp directory.
+	rpcdRunDir   string
+	etcConfigDir string
 }
 
 // NewRealUCIApplyConfirm returns a real applier that uses the given ubus and password holder.
 func NewRealUCIApplyConfirm(ub ubus.Ubus, pw *auth.RootPassword) *RealUCIApplyConfirm {
-	return &RealUCIApplyConfirm{ubus: ub, password: pw}
+	return &RealUCIApplyConfirm{
+		ubus:         ub,
+		password:     pw,
+		rpcdRunDir:   defaultRpcdRunDir,
+		etcConfigDir: defaultEtcConfigDir,
+	}
 }
 
 // StartApply stages an rpcd rollback apply and returns the session ID.
@@ -53,12 +62,21 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	if err != nil || sid == "" {
 		return "", fmt.Errorf("uci apply: no session (login failed): %w", err)
 	}
-	sessionDir := filepath.Join(rpcdRunDir, "uci-"+sid)
+	sessionDir := filepath.Join(r.rpcdRunDir, "uci-"+sid)
 	if err := os.MkdirAll(sessionDir, 0700); err != nil {
 		return "", fmt.Errorf("uci apply: mkdir session dir: %w", err)
 	}
+	// The staged copy under /var/run/rpcd is only useful if the apply call
+	// actually starts. Any failure below leaves nothing running, so the session
+	// dir must be removed instead of lingering as a half-staged session.
+	applyStarted := false
+	defer func() {
+		if !applyStarted {
+			_ = os.RemoveAll(sessionDir)
+		}
+	}()
 	for _, name := range configs {
-		src := filepath.Join(etcConfigDir, name)
+		src := filepath.Join(r.etcConfigDir, name)
 		dst := filepath.Join(sessionDir, name)
 		if err := copyFile(src, dst); err != nil {
 			return "", fmt.Errorf("uci apply: copy %s: %w", name, err)
@@ -72,6 +90,7 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	if _, err := r.ubus.Call("uci", "apply", applyArgs); err != nil {
 		return "", fmt.Errorf("uci apply: %w", err)
 	}
+	applyStarted = true
 	return sid, nil
 }
 
@@ -91,6 +110,11 @@ func (r *RealUCIApplyConfirm) Confirm(sessionID string) error {
 
 // ApplyAndConfirm implements UCIApplyConfirm.
 func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
+	// Consistent with StartApply: nothing to apply is a successful no-op, not an
+	// error (an empty list must not fail later in Confirm with an empty session).
+	if len(configs) == 0 {
+		return nil
+	}
 	sid, err := r.StartApply(configs)
 	if err != nil {
 		return err

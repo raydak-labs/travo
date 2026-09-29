@@ -1,8 +1,26 @@
 package services
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 )
+
+const mockFirewallShow = `firewall.@zone[0]=zone
+firewall.@zone[0].name='lan'
+firewall.@zone[0].input='ACCEPT'
+firewall.@zone[0].output='ACCEPT'
+firewall.@zone[0].network='lan'
+firewall.@zone[1]=zone
+firewall.@zone[1].name='wan'
+firewall.@zone[1].input='REJECT'
+firewall.@zone[1].output='ACCEPT'
+firewall.@zone[1].forward='REJECT'
+firewall.@zone[1].masq='1'
+firewall.@zone[1].network='wan'
+firewall.@zone[1].network='wwan'
+`
 
 // mockUSBTetherRunner simulates OS calls.
 type mockUSBTetherRunner struct {
@@ -69,7 +87,18 @@ func (m *mockUSBTetherRunner) RunCommand(name string, args ...string) (string, e
 	if r, ok := m.uciOutputs[key]; ok {
 		return r.out, r.err
 	}
+	if key == "uci show firewall" {
+		return mockFirewallShow, nil
+	}
 	return "", nil
+}
+
+// newTestUSBTetherService returns a service whose crash guard lives in a temp dir.
+func newTestUSBTetherService(t *testing.T, r *mockUSBTetherRunner) *USBTetheringService {
+	t.Helper()
+	svc := NewUSBTetheringServiceWithRunner(r)
+	svc.guardFile = filepath.Join(t.TempDir(), "usbtether-in-progress")
+	return svc
 }
 
 func TestGetUSBTetherStatus_NoDevice(t *testing.T) {
@@ -107,7 +136,7 @@ func TestGetUSBTetherStatus_AndroidDetected(t *testing.T) {
 
 func TestConfigure_SetsUCIAndBringsUpInterface(t *testing.T) {
 	runner := newMockUSBTetherRunner()
-	svc := NewUSBTetheringServiceWithRunner(runner)
+	svc := newTestUSBTetherService(t, runner)
 	err := svc.Configure("usb0")
 	if err != nil {
 		t.Fatalf("Configure: %v", err)
@@ -127,11 +156,128 @@ func TestConfigure_SetsUCIAndBringsUpInterface(t *testing.T) {
 	if !seen["uci commit network"] {
 		t.Error("expected uci commit network")
 	}
+	if !seen["uci commit firewall"] {
+		t.Error("expected uci commit firewall")
+	}
+	if !seen["uci add_list firewall.@zone[1].network=usbtether"] {
+		t.Errorf("expected usbtether added to the resolved wan zone, got %v", runner.commands)
+	}
+	if !seen["ifup usbtether"] {
+		t.Error("expected ifup usbtether")
+	}
+	if _, err := os.Stat(svc.guardFile); !os.IsNotExist(err) {
+		t.Errorf("expected crash guard removed after success, stat err = %v", err)
+	}
+}
+
+func TestConfigure_ResolvesWanZoneByNameNotIndex(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	// wan is the third zone here, so a hard-coded @zone[1] would target "dmz".
+	runner.uciOutputs["uci show firewall"] = struct {
+		out string
+		err error
+	}{out: `firewall.@zone[0].name='lan'
+firewall.@zone[0].input='ACCEPT'
+firewall.@zone[0].network='lan'
+firewall.@zone[1].name='dmz'
+firewall.@zone[1].input='REJECT'
+firewall.@zone[1].network='dmz'
+firewall.@zone[2].name='wan'
+firewall.@zone[2].input='REJECT'
+firewall.@zone[2].network='wan'
+`, err: nil}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Configure("usb0"); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, cmd := range runner.commands {
+		seen[cmd] = true
+	}
+	if !seen["uci add_list firewall.@zone[2].network=usbtether"] {
+		t.Errorf("expected add_list against the wan zone by name, got %v", runner.commands)
+	}
+	if seen["uci add_list firewall.@zone[1].network=usbtether"] {
+		t.Error("must not assume firewall.@zone[1] is the wan zone")
+	}
+}
+
+func TestConfigure_PropagatesAddListError(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	runner.uciOutputs["uci add_list firewall.@zone[1].network=usbtether"] = struct {
+		out string
+		err error
+	}{out: "", err: errors.New("add_list failed")}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Configure("usb0"); err == nil {
+		t.Fatal("expected Configure to fail when add_list fails")
+	}
+	if _, err := os.Stat(svc.guardFile); !os.IsNotExist(err) {
+		t.Errorf("expected crash guard removed on failure, stat err = %v", err)
+	}
+}
+
+func TestConfigure_PropagatesFirewallCommitError(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	runner.uciOutputs["uci commit firewall"] = struct {
+		out string
+		err error
+	}{out: "", err: errors.New("commit failed")}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Configure("usb0"); err == nil {
+		t.Fatal("expected Configure to fail when the firewall commit fails")
+	}
+}
+
+func TestConfigure_FailsWhenWanZoneMissing(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	runner.uciOutputs["uci show firewall"] = struct {
+		out string
+		err error
+	}{out: "firewall.@zone[0].name='lan'\nfirewall.@zone[0].input='ACCEPT'\n", err: nil}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Configure("usb0"); err == nil {
+		t.Fatal("expected Configure to fail when no wan zone exists")
+	}
+}
+
+func TestConfigure_SkipsDuplicateAddList(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	runner.uciOutputs["uci show firewall"] = struct {
+		out string
+		err error
+	}{out: `firewall.@zone[1].name='wan'
+firewall.@zone[1].input='REJECT'
+firewall.@zone[1].network='wan'
+firewall.@zone[1].network='usbtether'
+`, err: nil}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Configure("usb0"); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+	for _, cmd := range runner.commands {
+		if cmd == "uci add_list firewall.@zone[1].network=usbtether" {
+			t.Error("expected no duplicate add_list when usbtether is already in the wan zone")
+		}
+	}
+}
+
+func TestConfigure_RequiresInterfaceName(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	svc := newTestUSBTetherService(t, runner)
+	if err := svc.Configure("  "); err == nil {
+		t.Fatal("expected error for an empty interface name")
+	}
 }
 
 func TestUnconfigure_DeletesAndCommits(t *testing.T) {
 	runner := newMockUSBTetherRunner()
-	svc := NewUSBTetheringServiceWithRunner(runner)
+	svc := newTestUSBTetherService(t, runner)
 	err := svc.Unconfigure()
 	if err != nil {
 		t.Fatalf("Unconfigure: %v", err)
@@ -145,5 +291,60 @@ func TestUnconfigure_DeletesAndCommits(t *testing.T) {
 	}
 	if !seen["uci commit network"] {
 		t.Error("expected uci commit network")
+	}
+	if _, err := os.Stat(svc.guardFile); !os.IsNotExist(err) {
+		t.Errorf("expected crash guard removed after success, stat err = %v", err)
+	}
+}
+
+func TestUnconfigure_DelistsUsbtetherFromWanZone(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	runner.uciOutputs["uci show firewall"] = struct {
+		out string
+		err error
+	}{out: `firewall.@zone[1].name='wan'
+firewall.@zone[1].input='REJECT'
+firewall.@zone[1].network='wan'
+firewall.@zone[1].network='usbtether'
+`, err: nil}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Unconfigure(); err != nil {
+		t.Fatalf("Unconfigure: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, cmd := range runner.commands {
+		seen[cmd] = true
+	}
+	if !seen["uci del_list firewall.@zone[1].network=usbtether"] {
+		t.Errorf("expected del_list from the wan zone, got %v", runner.commands)
+	}
+	if !seen["uci commit firewall"] {
+		t.Error("expected firewall commit after del_list")
+	}
+}
+
+func TestUnconfigure_KeepsInterfaceWhenDelListFails(t *testing.T) {
+	runner := newMockUSBTetherRunner()
+	runner.uciOutputs["uci show firewall"] = struct {
+		out string
+		err error
+	}{out: `firewall.@zone[1].name='wan'
+firewall.@zone[1].input='REJECT'
+firewall.@zone[1].network='usbtether'
+`, err: nil}
+	runner.uciOutputs["uci del_list firewall.@zone[1].network=usbtether"] = struct {
+		out string
+		err error
+	}{out: "", err: errors.New("del_list failed")}
+	svc := newTestUSBTetherService(t, runner)
+
+	if err := svc.Unconfigure(); err == nil {
+		t.Fatal("expected Unconfigure to fail when del_list fails")
+	}
+	for _, cmd := range runner.commands {
+		if cmd == "uci delete network.usbtether" {
+			t.Error("must not delete the network interface while the firewall still references it")
+		}
 	}
 }

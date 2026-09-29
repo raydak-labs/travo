@@ -1,13 +1,16 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -1111,5 +1114,342 @@ func TestApplyAndVerifyWireGuard_RetriesThenFails(t *testing.T) {
 	}
 	if ifupCalls < 2 {
 		t.Errorf("expected retries when wg0 stays down, got %d ifup calls", ifupCalls)
+	}
+}
+
+// failingUCI wraps a real uci.UCI and injects write errors for safety tests.
+type failingUCI struct {
+	uci.UCI
+	addSectionErr error
+	setErr        map[string]error
+	addListErr    map[string]error
+	// addListErrOnce fails the first matching call only, so a retry (e.g. the
+	// revert path) can succeed.
+	addListErrOnce map[string]error
+	commitErr      error
+	commits        int
+}
+
+func (f *failingUCI) AddSection(config, section, stype string) error {
+	if f.addSectionErr != nil {
+		return f.addSectionErr
+	}
+	return f.UCI.AddSection(config, section, stype)
+}
+
+func (f *failingUCI) Set(config, section, option, value string) error {
+	if err, ok := f.setErr[config+"."+section+"."+option]; ok && err != nil {
+		return err
+	}
+	return f.UCI.Set(config, section, option, value)
+}
+
+func (f *failingUCI) AddList(config, section, option, value string) error {
+	key := config + "." + section + "." + option
+	if err, ok := f.addListErr[key]; ok && err != nil {
+		return err
+	}
+	if err, ok := f.addListErrOnce[key]; ok && err != nil {
+		delete(f.addListErrOnce, key)
+		return err
+	}
+	return f.UCI.AddList(config, section, option, value)
+}
+
+func (f *failingUCI) Commit(config string) error {
+	f.commits++
+	if f.commitErr != nil {
+		return f.commitErr
+	}
+	return f.UCI.Commit(config)
+}
+
+// newGuardedVpnService returns a service whose VPN crash guard lives in a temp dir.
+func newGuardedVpnService(t *testing.T, u uci.UCI, cmd CommandRunner) (*VpnService, string) {
+	t.Helper()
+	svc := NewVpnServiceWithRunner(u, cmd)
+	guard := filepath.Join(t.TempDir(), "vpn-in-progress")
+	svc.guardFile = guard
+	return svc, guard
+}
+
+func TestToggleWireguard_EnableVerifiesTunnelBeforeFirewallAndDNS(t *testing.T) {
+	prev := wireGuardVerifyTimeout
+	wireGuardVerifyTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { wireGuardVerifyTimeout = prev })
+
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "tailscale", "/etc/init.d/firewall", "/sbin/ubus", "/sbin/ifup", "/sbin/ifdown":
+			return nil, nil
+		case "/usr/bin/wg":
+			return nil, fmt.Errorf("no interface")
+		case "/sbin/ip":
+			return []byte("3: wg0: state DOWN"), nil
+		default:
+			return nil, nil
+		}
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	if err := svc.ToggleWireguard(true); err == nil {
+		t.Fatal("expected error when wg0 does not come up")
+	}
+
+	// Dependent firewall plumbing must NOT exist: it would send LAN traffic to
+	// a tunnel that is down.
+	if _, err := u.GetAll("firewall", "wg0_zone"); err == nil {
+		t.Error("wg0 firewall zone must not be created when the tunnel failed to start")
+	}
+	if _, err := u.GetAll("firewall", "wg0_fwd"); err == nil {
+		t.Error("wg0 forwarding must not be created when the tunnel failed to start")
+	}
+	// wg0 must be disabled again.
+	disabled, _ := u.Get("network", "wg0", "disabled")
+	if disabled != "1" {
+		t.Errorf("expected wg0 re-disabled after failed enable, got %q", disabled)
+	}
+}
+
+func TestToggleWireguard_EnableRollsBackAfterTunnelFailure(t *testing.T) {
+	prev := wireGuardVerifyTimeout
+	wireGuardVerifyTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { wireGuardVerifyTimeout = prev })
+
+	u := uci.NewMockUCI()
+	// wg0 starts disabled=0 (user had it enabled in UCI but the link is dead).
+	_ = u.AddSection("network", "wg0", "interface")
+	_ = u.Set("network", "wg0", "disabled", "0")
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "tailscale", "/etc/init.d/firewall", "/sbin/ubus", "/sbin/ifup", "/sbin/ifdown":
+			return nil, nil
+		case "/usr/bin/wg":
+			return nil, fmt.Errorf("no interface")
+		case "/sbin/ip":
+			return []byte("3: wg0: state DOWN"), nil
+		default:
+			return nil, nil
+		}
+	}}
+	svc, guard := newGuardedVpnService(t, u, cmd)
+
+	if err := svc.ToggleWireguard(true); err == nil {
+		t.Fatal("expected error when wg0 does not come up")
+	}
+	disabled, _ := u.Get("network", "wg0", "disabled")
+	if disabled != "0" {
+		t.Errorf("expected previous disabled=0 restored, got %q", disabled)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("expected crash guard removed after a complete rollback, stat err = %v", err)
+	}
+}
+
+func TestToggleWireguard_EnableFailsWithoutCrashGuard(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnServiceWithRunner(u, &MockCommandRunner{RunFunc: mockRunWireGuardEnableOK})
+	// A regular file cannot be a parent directory, so the guard cannot be created.
+	blocker := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0600); err != nil {
+		t.Fatalf("write blocker file: %v", err)
+	}
+	svc.guardFile = filepath.Join(blocker, "vpn-in-progress")
+
+	if err := svc.ToggleWireguard(true); err == nil {
+		t.Fatal("expected enable to fail when the crash guard cannot be written")
+	}
+	disabled, _ := u.Get("network", "wg0", "disabled")
+	if disabled == "0" {
+		t.Error("must not enable the tunnel when the crash guard could not be written")
+	}
+}
+
+func TestToggleWireguard_EnableRemovesCrashGuardOnSuccess(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc, guard := newGuardedVpnService(t, u, &MockCommandRunner{RunFunc: mockRunWireGuardEnableOK})
+
+	if err := svc.ToggleWireguard(true); err != nil {
+		t.Fatalf("ToggleWireguard(true): %v", err)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("expected crash guard removed after success, stat err = %v", err)
+	}
+	if _, err := u.GetAll("firewall", "wg0_zone"); err != nil {
+		t.Error("expected wg0 firewall zone after a successful enable")
+	}
+}
+
+func TestSetKillSwitch_PropagatesAddSectionError(t *testing.T) {
+	base := uci.NewMockUCI()
+	fu := &failingUCI{UCI: base, addSectionErr: errors.New("uci readonly")}
+	svc := NewVpnServiceWithRunner(fu, &MockCommandRunner{})
+
+	if err := svc.SetKillSwitch(true); err == nil {
+		t.Fatal("expected SetKillSwitch to fail when the rule cannot be created")
+	}
+	if _, err := base.GetAll("firewall", "vpn_killswitch"); err == nil {
+		t.Error("must not create a partial kill switch rule")
+	}
+}
+
+func TestSetKillSwitch_PropagatesSetErrorWithoutCommit(t *testing.T) {
+	base := uci.NewMockUCI()
+	fu := &failingUCI{UCI: base, setErr: map[string]error{
+		"firewall.vpn_killswitch.target": errors.New("uci set failed"),
+	}}
+	svc := NewVpnServiceWithRunner(fu, &MockCommandRunner{})
+
+	if err := svc.SetKillSwitch(true); err == nil {
+		t.Fatal("expected SetKillSwitch to fail when an option cannot be written")
+	}
+	if fu.commits != 0 {
+		t.Errorf("must not commit a partial kill switch rule, commits = %d", fu.commits)
+	}
+}
+
+func TestSetKillSwitch_MarksUserOwnership(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnServiceWithRunner(u, &MockCommandRunner{})
+
+	if err := svc.SetKillSwitch(true); err != nil {
+		t.Fatalf("SetKillSwitch(true): %v", err)
+	}
+	opts, err := u.GetAll("firewall", "vpn_killswitch")
+	if err != nil {
+		t.Fatalf("expected kill switch rule: %v", err)
+	}
+	if opts["target"] != "REJECT" {
+		t.Errorf("expected target=REJECT, got %q", opts["target"])
+	}
+	if opts[vpnKillSwitchOwnerOption] != vpnKillSwitchOwnerUser {
+		t.Errorf("expected %s=%s, got %q", vpnKillSwitchOwnerOption, vpnKillSwitchOwnerUser, opts[vpnKillSwitchOwnerOption])
+	}
+}
+
+func TestSetKillSwitch_DisableWithoutRuleIsNoop(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnServiceWithRunner(u, &MockCommandRunner{})
+
+	if err := svc.SetKillSwitch(false); err != nil {
+		t.Fatalf("SetKillSwitch(false) on a clean router: %v", err)
+	}
+}
+
+func TestToggleWireguard_DisableKeepsUserKillSwitch(t *testing.T) {
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" && args[1] == "show" && args[2] == "default" {
+			return []byte("default via 10.0.1.1 dev phy1-sta0"), nil
+		}
+		return nil, nil
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	if err := svc.SetKillSwitch(true); err != nil {
+		t.Fatalf("SetKillSwitch(true): %v", err)
+	}
+	if err := svc.ToggleWireguard(false); err != nil {
+		t.Fatalf("ToggleWireguard(false): %v", err)
+	}
+	if _, err := u.GetAll("firewall", "vpn_killswitch"); err != nil {
+		t.Error("a user-configured kill switch must survive a VPN toggle")
+	}
+}
+
+func TestToggleWireguard_DisableRemovesVPNOwnedKillSwitch(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.AddSection("firewall", "vpn_killswitch", "rule")
+	_ = u.Set("firewall", "vpn_killswitch", "src", "lan")
+	_ = u.Set("firewall", "vpn_killswitch", "dest", "wan")
+	_ = u.Set("firewall", "vpn_killswitch", "target", "REJECT")
+	_ = u.Set("firewall", "vpn_killswitch", vpnKillSwitchOwnerOption, vpnKillSwitchOwnerToggle)
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" && args[1] == "show" && args[2] == "default" {
+			return []byte("default via 10.0.1.1 dev phy1-sta0"), nil
+		}
+		return nil, nil
+	}}
+	svc := NewVpnServiceWithRunner(u, cmd)
+
+	if err := svc.ToggleWireguard(false); err != nil {
+		t.Fatalf("ToggleWireguard(false): %v", err)
+	}
+	if _, err := u.GetAll("firewall", "vpn_killswitch"); err == nil {
+		t.Error("a VPN-toggle owned kill switch must be removed when the tunnel is disabled")
+	}
+}
+
+func TestSetSplitTunnel_CustomWithoutRoutesIsRejected(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.AddSection("network", "wg0_peer0", "wireguard_wg0")
+	_ = u.Set("network", "wg0_peer0", "allowed_ips", "10.0.0.0/24")
+	svc := NewVpnServiceWithRunner(u, &MockCommandRunner{})
+
+	err := svc.SetSplitTunnel(models.SplitTunnelConfig{Mode: "custom"})
+	if err == nil {
+		t.Fatal("expected a validation error for custom split tunnel with no routes")
+	}
+	allowed, _ := u.Get("network", "wg0_peer0", "allowed_ips")
+	if allowed != "10.0.0.0/24" {
+		t.Errorf("peer allowed_ips must be untouched, got %q", allowed)
+	}
+}
+
+func TestSetSplitTunnel_UnknownModeIsRejected(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewVpnServiceWithRunner(u, &MockCommandRunner{})
+	if err := svc.SetSplitTunnel(models.SplitTunnelConfig{Mode: "sideways"}); err == nil {
+		t.Fatal("expected a validation error for an unknown split tunnel mode")
+	}
+}
+
+func TestSplitTunnelAllowedIPs(t *testing.T) {
+	t.Parallel()
+
+	got, err := splitTunnelAllowedIPs(models.SplitTunnelConfig{Mode: "all"})
+	if err != nil {
+		t.Fatalf("mode all: %v", err)
+	}
+	if !slices.Equal(got, []string{"0.0.0.0/0", "::/0"}) {
+		t.Errorf("mode all = %v", got)
+	}
+
+	got, err = splitTunnelAllowedIPs(models.SplitTunnelConfig{Mode: "custom", Routes: []string{" 10.0.0.0/8 ", ""}})
+	if err != nil {
+		t.Fatalf("mode custom: %v", err)
+	}
+	if !slices.Equal(got, []string{"10.0.0.0/8"}) {
+		t.Errorf("mode custom = %v", got)
+	}
+
+	if _, err := splitTunnelAllowedIPs(models.SplitTunnelConfig{Mode: "custom", Routes: []string{"  "}}); err == nil {
+		t.Error("expected an error for custom mode with only blank routes")
+	}
+}
+
+func TestSetSplitTunnel_RevertsStagedDeltasOnWriteError(t *testing.T) {
+	base := uci.NewMockUCI()
+	_ = base.AddSection("network", "wg0_peer0", "wireguard_wg0")
+	_ = base.Set("network", "wg0_peer0", "allowed_ips", "10.0.0.0/24")
+	_ = base.AddSection("network", "wg0_peer1", "wireguard_wg0")
+	_ = base.Set("network", "wg0_peer1", "allowed_ips", "192.168.0.0/16")
+	fu := &failingUCI{UCI: base, addListErrOnce: map[string]error{
+		"network.wg0_peer1.allowed_ips": errors.New("uci add_list failed"),
+	}}
+	svc := NewVpnServiceWithRunner(fu, &MockCommandRunner{})
+
+	err := svc.SetSplitTunnel(models.SplitTunnelConfig{Mode: "custom", Routes: []string{"0.0.0.0/0"}})
+	if err == nil {
+		t.Fatal("expected SetSplitTunnel to fail when a peer cannot be written")
+	}
+	peer0, _ := base.Get("network", "wg0_peer0", "allowed_ips")
+	if peer0 != "10.0.0.0/24" {
+		t.Errorf("expected wg0_peer0 allowed_ips reverted to 10.0.0.0/24, got %q", peer0)
+	}
+	peer1, _ := base.Get("network", "wg0_peer1", "allowed_ips")
+	if peer1 != "192.168.0.0/16" {
+		t.Errorf("expected wg0_peer1 allowed_ips reverted to 192.168.0.0/16, got %q", peer1)
 	}
 }
