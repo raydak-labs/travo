@@ -441,6 +441,15 @@ func SetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
 		if err := c.Bind().Body(&schedule); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
+		// These land in a root crontab line; validate at the boundary.
+		if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
+			if err := services.ValidateHHMM(schedule.OnTime); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, "on_time: "+err.Error())
+			}
+			if err := services.ValidateHHMM(schedule.OffTime); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, "off_time: "+err.Error())
+			}
+		}
 		if err := svc.SetWiFiSchedule(schedule); err != nil {
 			return RespondWithServerError(c, err)
 		}

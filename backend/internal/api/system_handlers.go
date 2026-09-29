@@ -93,7 +93,7 @@ func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetHostname(req.Hostname); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return RespondOK(c)
+		return c.JSON(fiber.Map{"status": "ok", "reboot_required": true})
 	}
 }
 
@@ -124,7 +124,7 @@ func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetTimezone(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return RespondOK(c)
+		return c.JSON(fiber.Map{"status": "ok", "reboot_required": true})
 	}
 }
 
@@ -235,6 +235,16 @@ func SetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
 		if err := c.Bind().Body(&req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
 		}
+		// Times are interpolated into a root crontab line; validate at the
+		// boundary so a bad value is a 400, not a 500 from the service layer.
+		if req.Enabled && req.OnTime != "" && req.OffTime != "" {
+			if err := services.ValidateHHMM(req.OnTime); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, "on_time: "+err.Error())
+			}
+			if err := services.ValidateHHMM(req.OffTime); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, "off_time: "+err.Error())
+			}
+		}
 		if err := svc.SetLEDSchedule(req); err != nil {
 			return RespondWithServerError(c, err)
 		}
@@ -263,7 +273,7 @@ func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 		if err := svc.SetNTPConfig(config); err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return RespondOK(c)
+		return c.JSON(fiber.Map{"status": "ok", "reboot_required": true})
 	}
 }
 
@@ -330,12 +340,23 @@ func SyncTimeHandler(deps *Dependencies) fiber.Handler {
 				}
 				deps.TimeSyncLimiter.Record(c.IP())
 			}
-			if !time.Now().Before(deps.TimeSyncMinPlausible) {
+			if deps.TimeSyncGate != nil {
+				if deps.TimeSyncGate.UnauthBlocked(time.Now(), deps.TimeSyncMinPlausible) {
+					return RespondWithError(c, fiber.StatusForbidden, "system clock is plausible; authentication required to change time")
+				}
+			} else if !time.Now().Before(deps.TimeSyncMinPlausible) {
 				return RespondWithError(c, fiber.StatusForbidden, "system clock is plausible; authentication required to change time")
 			}
 		}
 
 		clientTime := time.UnixMilli(req.ClientTimeMs)
+		// Clamp the target: an unauthenticated caller must not be able to park
+		// the clock far outside the plausible window (see time_sync_gate.go).
+		if !authorized {
+			if err := validateClientTimeWindow(clientTime, deps.TimeSyncMinPlausible); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			}
+		}
 		skew := time.Until(clientTime)
 		if skew < 0 {
 			skew = -skew
@@ -350,6 +371,9 @@ func SyncTimeHandler(deps *Dependencies) fiber.Handler {
 		}
 		if err := setTime(clientTime.Unix()); err != nil {
 			return RespondWithError(c, fiber.StatusInternalServerError, "failed to set system time")
+		}
+		if deps.TimeSyncGate != nil {
+			deps.TimeSyncGate.NoteClockSet(clientTime, deps.TimeSyncMinPlausible)
 		}
 
 		return c.JSON(fiber.Map{"synced": true, "set_to": clientTime.UTC().Format(time.RFC3339)})

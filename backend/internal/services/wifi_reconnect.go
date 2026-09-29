@@ -61,8 +61,8 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 //     pre-incident bad config) and cron would otherwise replay the failure
 //     forever. Counter is cleared on any successful reconnect or on redeploy.
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
-	"GUARD=\"/etc/travo/autoreconnect-crash-guard\"\n" +
-	"FAILCOUNT_FILE=\"/etc/travo/autoreconnect-failcount\"\n" +
+	"GUARD=\"/etc/trafo/autoreconnect-crash-guard\"\n" +
+	"FAILCOUNT_FILE=\"/etc/trafo/autoreconnect-failcount\"\n" +
 	"MAX_FAIL=5\n\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
 	"FAILCOUNT=0\n" +
@@ -151,14 +151,27 @@ func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 		return nil
 	}
 
-	onParts := strings.Split(schedule.OnTime, ":")
-	offParts := strings.Split(schedule.OffTime, ":")
-	if len(onParts) != 2 || len(offParts) != 2 {
-		return fmt.Errorf("invalid time format, expected HH:MM")
+	// The times are formatted straight into a crontab line, so they must be
+	// strict HH:MM: a newline would inject an extra attacker-controlled cron
+	// entry that runs as root.
+	if err := ValidateHHMM(schedule.OnTime); err != nil {
+		return fmt.Errorf("on_time: %w", err)
+	}
+	if err := ValidateHHMM(schedule.OffTime); err != nil {
+		return fmt.Errorf("off_time: %w", err)
+	}
+	onParts := strings.SplitN(schedule.OnTime, ":", 2)
+	offParts := strings.SplitN(schedule.OffTime, ":", 2)
+
+	// The cron entries must not run `wifi up` / `wifi down`; they call the
+	// generated toggle helper, which writes UCI and applies via rpcd.
+	if err := writeWirelessToggleScript(); err != nil {
+		return err
 	}
 
 	// cron format: MM HH * * * user command
-	cronContent := fmt.Sprintf("%s %s * * * root /sbin/wifi up\n%s %s * * * root /sbin/wifi down\n",
-		onParts[1], onParts[0], offParts[1], offParts[0])
+	cronContent := fmt.Sprintf("%s %s * * * root %s up\n%s %s * * * root %s down\n",
+		onParts[1], onParts[0], wirelessToggleScriptPath,
+		offParts[1], offParts[0], wirelessToggleScriptPath)
 	return os.WriteFile(wifiScheduleCronPath, []byte(cronContent), 0o644)
 }
