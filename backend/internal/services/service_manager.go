@@ -120,7 +120,7 @@ type ServiceManager struct {
 	opMu             sync.Mutex
 	postInstallHooks map[string]func() error
 	// guardDir holds the crash-guard file for package installs (ADR 0003);
-	// empty means /etc/travo. Tests point it at a temp dir.
+	// empty means crashGuardDir (/etc/trafo). Tests point it at a temp dir.
 	guardDir string
 }
 
@@ -172,10 +172,8 @@ func (sm *ServiceManager) RefreshCache() {
 //   - the write lock is not held across the probe, so a long-running
 //     pkg.Update()/Install() (execx.Package = 10 min) cannot block readers.
 func (sm *ServiceManager) refreshOne(serviceID string) {
-	sm.mu.RLock()
-	def, ok := sm.findDefLocked(serviceID)
-	sm.mu.RUnlock()
-	if !ok {
+	def, err := sm.findDef(serviceID)
+	if err != nil {
 		return
 	}
 	info := sm.buildInfo(def)
@@ -284,8 +282,23 @@ func (sm *ServiceManager) writeInstallGuard(reason string) error {
 }
 
 // clearInstallGuard removes the guard after a fully successful operation.
+// clearInstallGuard removes the package-install crash guard. Best-effort by
+// design: the operation has already succeeded, and a stale guard only makes the
+// next install wait for a redeploy, so the removal error is deliberately dropped.
 func (sm *ServiceManager) clearInstallGuard() {
 	_ = os.Remove(sm.guardPath())
+}
+
+// findDefUnlocked scans the immutable service catalog. sm.defs is assigned once
+// in the constructor and never mutated, so reading it needs no lock; the lock in
+// findDef exists to keep the pair safe to call from anywhere.
+func (sm *ServiceManager) findDefUnlocked(serviceID string) (serviceDefinition, bool) {
+	for _, def := range sm.defs {
+		if def.ID == serviceID {
+			return def, true
+		}
+	}
+	return serviceDefinition{}, false
 }
 
 // findDef resolves a service ID to its definition. defs are immutable after
@@ -294,21 +307,10 @@ func (sm *ServiceManager) clearInstallGuard() {
 func (sm *ServiceManager) findDef(serviceID string) (serviceDefinition, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	if def, ok := sm.findDefLocked(serviceID); ok {
+	if def, ok := sm.findDefUnlocked(serviceID); ok {
 		return def, nil
 	}
 	return serviceDefinition{}, fmt.Errorf("service not found: %s", serviceID)
-}
-
-// findDefLocked resolves a service ID; the caller must already hold sm.mu
-// (read or write). defs are immutable after construction.
-func (sm *ServiceManager) findDefLocked(serviceID string) (serviceDefinition, bool) {
-	for _, def := range sm.defs {
-		if def.ID == serviceID {
-			return def, true
-		}
-	}
-	return serviceDefinition{}, false
 }
 
 // postInstallHook returns the registered hook for a service, if any.

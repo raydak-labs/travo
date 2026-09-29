@@ -457,7 +457,7 @@ func TestInstall_WritesAndClearsCrashGuard(t *testing.T) {
 	}
 
 	// A failing install must leave the marker behind.
-	sm2 := NewServiceManagerWith(&failingPkgManager{}, NewMockSystemProbe())
+	sm2 := NewServiceManagerWith(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
 	sm2.SetGuardDir(guardDir)
 	if err := sm2.Install("tailscale"); err == nil {
 		t.Fatal("expected install failure")
@@ -467,7 +467,7 @@ func TestInstall_WritesAndClearsCrashGuard(t *testing.T) {
 	}
 }
 
-type failingPkgManager struct{ MockPackageManager }
+type failingPkgManager struct{ *MockPackageManager }
 
 func (f *failingPkgManager) Install(string) (string, error) {
 	return "boom", fmt.Errorf("apk add failed")
@@ -588,4 +588,68 @@ func TestInstall_ConcurrentReadsDoNotRaceWithCachePublish(t *testing.T) {
 	}
 	close(stop)
 	wg.Wait()
+}
+
+// failingRemovePkgManager fails only the remove path, so a test can reach the
+// Remove guard without also failing Install.
+type failingRemovePkgManager struct{ *MockPackageManager }
+
+func (f *failingRemovePkgManager) Remove(string) (string, error) {
+	return "boom", fmt.Errorf("opkg remove failed")
+}
+
+// Remove writes the crash guard before touching the package manager, and a
+// failed removal must leave it in place: the device is mid-change and a redeploy
+// is the recovery path (ADR 0003).
+func TestRemove_KeepsGuardOnFailure(t *testing.T) {
+	guardDir := t.TempDir()
+	sm := newTestServiceManagerWithGuard(t, &failingRemovePkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	if err := sm.Remove("tailscale"); err == nil {
+		t.Fatal("expected the removal to fail")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain after a failed removal: %v", err)
+	}
+}
+
+func TestRemove_ClearsGuardOnSuccess(t *testing.T) {
+	guardDir := t.TempDir()
+	sm, _, _ := newTestServiceManager(t)
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	if err := sm.Remove("tailscale"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("guard file must be removed after a successful removal, stat err = %v", err)
+	}
+}
+
+// failingStreamPkgManager fails the streaming install path, which is the one
+// InstallWithLog uses.
+type failingStreamPkgManager struct{ *MockPackageManager }
+
+func (f *failingStreamPkgManager) InstallStream(string, func(string)) error {
+	return fmt.Errorf("apk add failed")
+}
+
+// The streaming variant writes the same guard, so its failure path needs
+// coverage too: it is the path the browser actually uses.
+func TestInstallWithLog_KeepsGuardOnFailure(t *testing.T) {
+	guardDir := t.TempDir()
+	sm := newTestServiceManagerWithGuard(t, &failingStreamPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	var lines []string
+	if err := sm.InstallWithLog("tailscale", func(s string) { lines = append(lines, s) }); err == nil {
+		t.Fatal("expected the install to fail")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain after a failed install: %v", err)
+	}
 }

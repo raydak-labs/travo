@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -102,6 +103,13 @@ func (s *FailoverService) SetAlertService(alertSvc *AlertService) {
 func (s *FailoverService) Start() {
 	ticker := time.NewTicker(failoverTickerInterval)
 	defer ticker.Stop()
+
+	// A stuck guard disables failover with no other symptom, so say so once
+	// instead of silently skipping forever (band-switching logs the same case).
+	// ADR 0003 §1.2.
+	if _, err := os.Stat(s.guardPath); err == nil {
+		log.Printf("failover: crash guard found at %s — automatic switching is disabled; remove it or redeploy to re-enable", s.guardPath)
+	}
 
 	for {
 		if _, err := os.Stat(s.guardPath); err == nil {

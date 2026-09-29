@@ -83,6 +83,11 @@ Moved here from `tasks_open.md` because the code shipped; the items were still l
   directories for devices upgraded from an older build. Non-guard state stays in `/etc/travo/`.
   Normative detail: [ADR 0003 §2](../adr/0003-crash-guards-and-live-state.md).
 
+- **Failover guard skip is no longer silent.** A stuck `failover-in-progress` disabled the monitor
+  with no log line at all, so "failover never fires" was undiagnosable from either the device log or
+  the UI. `FailoverService.Start` now logs the guard once at startup, matching `BandSwitchingService`.
+  Normative detail: [ADR 0003 §1.2](../adr/0003-crash-guards-and-live-state.md).
+
 ## Critical Review Remediation — 2026-09-26 Review (2026-09-28)
 
 Recorded here because several of these change normative behavior and now have ADRs.

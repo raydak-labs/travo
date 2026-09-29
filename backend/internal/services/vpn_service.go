@@ -682,10 +682,7 @@ func (v *VpnService) enableWireguard() error {
 		return fmt.Errorf("setting up WireGuard firewall: %w", err)
 	}
 
-	// DNS forwarding is best effort: the tunnel is already up, so a failure
-	// here cannot strand LAN DNS on unreachable resolvers. It must therefore
-	// never fail the whole toggle.
-	_ = v.enableVpnDNSForwarding()
+	v.enableVpnDNSForwarding()
 	v.clearVpnGuard()
 	return nil
 }
@@ -697,9 +694,7 @@ func (v *VpnService) rollbackWireguardEnable(prevDisabled string) error {
 	if err := v.teardownWireGuardFirewall(); err != nil {
 		errs = append(errs, fmt.Errorf("tearing down WireGuard firewall: %w", err))
 	}
-	if err := v.disableVpnDNSForwarding(); err != nil {
-		errs = append(errs, fmt.Errorf("restoring dnsmasq config: %w", err))
-	}
+	v.disableVpnDNSForwarding()
 	disabled := strings.TrimSpace(prevDisabled)
 	if disabled == "" {
 		disabled = "1"
@@ -724,7 +719,7 @@ func (v *VpnService) disableWireguard() error {
 	// set up as a standalone policy must survive a VPN toggle.
 	_ = v.removeVPNOwnedKillSwitch()
 	_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
-	_ = v.disableVpnDNSForwarding()
+	v.disableVpnDNSForwarding()
 	// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
 	// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
 	// route even though the uplink interface still shows “up”. We recover by
@@ -815,10 +810,14 @@ func (v *VpnService) wgConfiguredDNSServers() []string {
 	return splitWireGuardDNSOption(dns)
 }
 
-func (v *VpnService) enableVpnDNSForwarding() error {
+// enableVpnDNSForwarding points dnsmasq at the tunnel's resolvers. It is
+// best-effort by design and cannot report failure: the tunnel is already
+// verified up before it runs, so a failure here cannot strand LAN DNS on
+// unreachable resolvers and must never fail the toggle.
+func (v *VpnService) enableVpnDNSForwarding() {
 	vpnDNS := v.wgConfiguredDNSServers()
 	if len(vpnDNS) == 0 {
-		return nil
+		return
 	}
 
 	currentServers := v.readDnsmasqServers()
@@ -838,14 +837,15 @@ func (v *VpnService) enableVpnDNSForwarding() error {
 	_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=1")
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
-	return nil
 }
 
-func (v *VpnService) disableVpnDNSForwarding() error {
+// disableVpnDNSForwarding restores the dnsmasq snapshot taken when forwarding
+// was enabled. Like enable, it is best-effort and reports nothing.
+func (v *VpnService) disableVpnDNSForwarding() {
 	snap, err := v.loadVpnDnsSnapshot()
 	if err != nil {
 		// Nothing to restore.
-		return nil
+		return
 	}
 
 	// Restore previous servers/noresolv.
@@ -861,7 +861,6 @@ func (v *VpnService) disableVpnDNSForwarding() error {
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	_ = os.Remove(vpnDnsSnapshotPath)
-	return nil
 }
 
 // setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule

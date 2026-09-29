@@ -82,10 +82,6 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 These are real doc↔code gaps that the review surfaced and that the remediation pass
 documented rather than fixed. They are code changes, not doc changes.
 
-- [ ] **Failover guard skip is silent.** A stuck `failover-in-progress` disables the
-      monitor with no log line (`FailoverService.Start` has no logging at all). Either
-      log the skip or make `GET /network/failover` report the guard state, so "failover
-      never fires" is diagnosable from the UI.
 - [ ] **SSH key audit trail.** `POST /api/v1/system/ssh-keys` grants root SSH access and
       currently writes nothing to the log ([ADR 0008](../adr/0008-ssh-key-management.md)).
 - [ ] **`DeleteSSHKey` is positional.** The index space is positional, so a delete after

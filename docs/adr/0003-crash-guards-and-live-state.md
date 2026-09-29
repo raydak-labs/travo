@@ -31,10 +31,13 @@ Any automated action that **materially changes live system state** and is **unsa
 
 Notes on step 2, as implemented:
 
-- The skip is **silent for failover** (`FailoverService.Start` contains no `log` calls at all; a present guard just makes each tick a no-op). Other features do log: band switching logs
-  `band-switching: crash guard found at … — skipping auto switch` (`band_switching_service.go`), `SystemService.LogStaleCrashGuards` warns for the four system guards, and the generated
-  wireless toggle helper logs through `logger -t travo-wifi-toggle`. **Do not assume a
-  visible log line exists; check the filesystem.**
+- Failover and band switching both log the skip once at startup
+  (`failover: crash guard found at … — automatic switching is disabled`,
+  `band-switching: crash guard found at … — skipping auto switch`). `SystemService.LogStaleCrashGuards`
+  warns for the four system guards, and the generated wireless toggle helper logs through
+  `logger -t travo-wifi-toggle`. Failover used to skip silently, which made "failover never fires"
+  undiagnosable; it now logs. **Do not assume a visible log line exists** — a guard written after
+  startup is still silent — so check the filesystem.
 - Where the guard directory is not writable (dev host, unit tests, broken install),
   the guard is **not skipped**: it is written to a temp fallback directory and an
   `ERROR:` line is logged saying that a device-side power loss is *not* protected

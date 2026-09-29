@@ -94,6 +94,9 @@ frontend/shared suites, then an independent read-only review of the full diff.
 
 ## Known limitations carried out of this pass
 
+- The `FailoverService` guard skip used to be silent, which made "failover never fires"
+  undiagnosable; it now logs once at startup like band switching does, and ADR 0003 §1.2 has
+  been updated to match.
 - The repeater wizard cannot undo the upstream STA connection: there is no disconnect endpoint in the
   shared contract. It now names the failing step and whether rollback succeeded.
 - The WebSocket token still travels in the query string (`/api/v1/ws?token=`), where it lands in
