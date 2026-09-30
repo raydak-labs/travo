@@ -1,4 +1,4 @@
-import { apiClient, ApiError } from '@/lib/api-client';
+import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
 import type { SetupStatus } from '@shared/index';
 
@@ -35,11 +35,11 @@ export function resetSetupStatusCache(): void {
  * treating a 5xx or a transport failure as "setup complete" would expose the
  * whole app behind a half-configured router.
  */
-export async function getSetupComplete(force = false): Promise<boolean> {
-  if (!force && cached && Date.now() - cached.at < TTL_MS) {
+export async function getSetupComplete(): Promise<boolean> {
+  if (cached && Date.now() - cached.at < TTL_MS) {
     return cached.value;
   }
-  if (!force && inFlight) return inFlight;
+  if (inFlight) return inFlight;
 
   const request = (async () => {
     try {
@@ -57,13 +57,4 @@ export async function getSetupComplete(force = false): Promise<boolean> {
 
   inFlight = request;
   return request;
-}
-
-/** Human-readable reason, for logs and error surfaces. */
-export function setupStatusErrorDetail(error: unknown): string {
-  if (error instanceof SetupStatusUnavailableError && error.cause instanceof ApiError) {
-    return `setup check failed with status ${error.cause.status}`;
-  }
-  if (error instanceof Error) return error.message;
-  return 'unknown error';
 }

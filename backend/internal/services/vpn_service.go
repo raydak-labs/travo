@@ -879,46 +879,50 @@ func (v *VpnService) disableVpnDNSForwarding() {
 // setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule
 // exist in UCI and commits the firewall config. Called when activating a WireGuard profile.
 func (v *VpnService) setupWireGuardFirewall() error {
-	// Ensure the wg0 zone exists.
-	if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
-		if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
-			return fmt.Errorf("creating wg0 firewall zone: %w", addErr)
+	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+		// Ensure the wg0 zone exists.
+		if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
+			if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
+				return fmt.Errorf("creating wg0 firewall zone: %w", addErr)
+			}
 		}
-	}
-	_ = v.uci.Set("firewall", "wg0_zone", "name", "wg0")
-	_ = v.uci.Set("firewall", "wg0_zone", "network", "wg0")
-	_ = v.uci.Set("firewall", "wg0_zone", "input", "DROP")
-	_ = v.uci.Set("firewall", "wg0_zone", "output", "ACCEPT")
-	_ = v.uci.Set("firewall", "wg0_zone", "forward", "DROP")
-	_ = v.uci.Set("firewall", "wg0_zone", "masq", "1")
-	_ = v.uci.Set("firewall", "wg0_zone", "mtu_fix", "1")
+		_ = v.uci.Set("firewall", "wg0_zone", "name", "wg0")
+		_ = v.uci.Set("firewall", "wg0_zone", "network", "wg0")
+		_ = v.uci.Set("firewall", "wg0_zone", "input", "DROP")
+		_ = v.uci.Set("firewall", "wg0_zone", "output", "ACCEPT")
+		_ = v.uci.Set("firewall", "wg0_zone", "forward", "DROP")
+		_ = v.uci.Set("firewall", "wg0_zone", "masq", "1")
+		_ = v.uci.Set("firewall", "wg0_zone", "mtu_fix", "1")
 
-	// Ensure lan→wg0 forwarding exists.
-	if _, err := v.uci.GetAll("firewall", "wg0_fwd"); err != nil {
-		if addErr := v.uci.AddSection("firewall", "wg0_fwd", "forwarding"); addErr != nil {
-			return fmt.Errorf("creating wg0 forwarding rule: %w", addErr)
+		// Ensure lan→wg0 forwarding exists.
+		if _, err := v.uci.GetAll("firewall", "wg0_fwd"); err != nil {
+			if addErr := v.uci.AddSection("firewall", "wg0_fwd", "forwarding"); addErr != nil {
+				return fmt.Errorf("creating wg0 forwarding rule: %w", addErr)
+			}
 		}
-	}
-	_ = v.uci.Set("firewall", "wg0_fwd", "src", "lan")
-	_ = v.uci.Set("firewall", "wg0_fwd", "dest", "wg0")
+		_ = v.uci.Set("firewall", "wg0_fwd", "src", "lan")
+		_ = v.uci.Set("firewall", "wg0_fwd", "dest", "wg0")
 
-	if err := v.uci.Commit("firewall"); err != nil {
-		return err
-	}
-	v.reloadFirewall()
-	return nil
+		if err := v.uci.Commit("firewall"); err != nil {
+			return err
+		}
+		v.reloadFirewall()
+		return nil
+	})
 }
 
 // teardownWireGuardFirewall removes the wg0 firewall zone and forwarding rule from UCI.
 // Called when deactivating WireGuard. Errors are non-fatal (section may not exist).
 func (v *VpnService) teardownWireGuardFirewall() error {
-	_ = v.uci.DeleteSection("firewall", "wg0_zone")
-	_ = v.uci.DeleteSection("firewall", "wg0_fwd")
-	if err := v.uci.Commit("firewall"); err != nil {
-		return err
-	}
-	v.reloadFirewall()
-	return nil
+	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+		_ = v.uci.DeleteSection("firewall", "wg0_zone")
+		_ = v.uci.DeleteSection("firewall", "wg0_fwd")
+		if err := v.uci.Commit("firewall"); err != nil {
+			return err
+		}
+		v.reloadFirewall()
+		return nil
+	})
 }
 
 // VerifyWireGuard checks the health of the WireGuard tunnel:
@@ -1159,60 +1163,64 @@ const (
 // Every write error is propagated: a partial rule would be committed with the
 // default target (ACCEPT), i.e. a "kill switch" that allows all traffic.
 func (v *VpnService) SetKillSwitch(enabled bool) error {
-	if enabled {
-		// Create the firewall rule that blocks LAN→WAN when VPN is down.
-		if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err != nil {
-			if addErr := v.uci.AddSection("firewall", vpnKillSwitchSection, "rule"); addErr != nil {
-				return fmt.Errorf("creating vpn kill switch rule: %w", addErr)
+	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+		if enabled {
+			// Create the firewall rule that blocks LAN→WAN when VPN is down.
+			if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err != nil {
+				if addErr := v.uci.AddSection("firewall", vpnKillSwitchSection, "rule"); addErr != nil {
+					return fmt.Errorf("creating vpn kill switch rule: %w", addErr)
+				}
+			}
+			settings := [][2]string{
+				{"name", "VPN Kill Switch"},
+				{"src", "lan"},
+				{"dest", "wan"},
+				{"target", "REJECT"},
+				{vpnKillSwitchOwnerOption, vpnKillSwitchOwnerUser},
+			}
+			for _, kv := range settings {
+				if err := v.uci.Set("firewall", vpnKillSwitchSection, kv[0], kv[1]); err != nil {
+					return fmt.Errorf("set vpn kill switch %s: %w", kv[0], err)
+				}
+			}
+		} else {
+			// Remove the firewall rule; a missing section is not an error.
+			if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err == nil {
+				if delErr := v.uci.DeleteSection("firewall", vpnKillSwitchSection); delErr != nil {
+					return fmt.Errorf("removing vpn kill switch rule: %w", delErr)
+				}
 			}
 		}
-		settings := [][2]string{
-			{"name", "VPN Kill Switch"},
-			{"src", "lan"},
-			{"dest", "wan"},
-			{"target", "REJECT"},
-			{vpnKillSwitchOwnerOption, vpnKillSwitchOwnerUser},
+		if err := v.uci.Commit("firewall"); err != nil {
+			return err
 		}
-		for _, kv := range settings {
-			if err := v.uci.Set("firewall", vpnKillSwitchSection, kv[0], kv[1]); err != nil {
-				return fmt.Errorf("set vpn kill switch %s: %w", kv[0], err)
-			}
-		}
-	} else {
-		// Remove the firewall rule; a missing section is not an error.
-		if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err == nil {
-			if delErr := v.uci.DeleteSection("firewall", vpnKillSwitchSection); delErr != nil {
-				return fmt.Errorf("removing vpn kill switch rule: %w", delErr)
-			}
-		}
-	}
-	if err := v.uci.Commit("firewall"); err != nil {
-		return err
-	}
-	v.reloadFirewall()
-	return nil
+		v.reloadFirewall()
+		return nil
+	})
 }
 
 // removeVPNOwnedKillSwitch deletes the kill switch rule only when the VPN toggle
 // created it. A kill switch configured by the user as a standalone policy is
 // left untouched.
 func (v *VpnService) removeVPNOwnedKillSwitch() error {
-	opts, err := v.uci.GetAll("firewall", vpnKillSwitchSection)
-	if err != nil {
-		// Nothing to remove.
+	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+		opts, err := v.uci.GetAll("firewall", vpnKillSwitchSection)
+		if err != nil {
+			// Nothing to remove.
+			return nil
+		}
+		if opts[vpnKillSwitchOwnerOption] != vpnKillSwitchOwnerToggle {
+			return nil
+		}
+		if err := v.uci.DeleteSection("firewall", vpnKillSwitchSection); err != nil {
+			return fmt.Errorf("removing vpn kill switch rule: %w", err)
+		}
+		if err := v.uci.Commit("firewall"); err != nil {
+			return fmt.Errorf("committing firewall: %w", err)
+		}
+		v.reloadFirewall()
 		return nil
-	}
-	if opts[vpnKillSwitchOwnerOption] != vpnKillSwitchOwnerToggle {
-		return nil
-	}
-	if err := v.uci.DeleteSection("firewall", vpnKillSwitchSection); err != nil {
-		return fmt.Errorf("removing vpn kill switch rule: %w", err)
-	}
-	if err := v.uci.Commit("firewall"); err != nil {
-		return fmt.Errorf("committing firewall: %w", err)
-	}
-	v.reloadFirewall()
-	return nil
+	})
 }
 
 // ImportWireguardConfig parses a .conf file, normalizes the UCI structure,

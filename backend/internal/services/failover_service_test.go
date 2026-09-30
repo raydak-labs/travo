@@ -833,9 +833,12 @@ func TestStagedApplyMwan3_SkipsWhileARollbackIsPending(t *testing.T) {
 	}
 	first := len(applier.startCalls)
 
-	// Second call while that window is open: skipped, not re-issued.
-	if err := svc.stagedApplyMwan3(nil); err != nil {
-		t.Fatalf("a pending rollback must not turn into an error, got %v", err)
+	// Second call while that window is open: refused, not re-issued, and
+	// reported as a failure. Returning nil here acknowledged a save that rpcd
+	// was about to revert, so the caller dropped its crash guard and answered
+	// 200 for a change that never became live.
+	if err := svc.stagedApplyMwan3(nil); !errors.Is(err, errApplyRollingBack) {
+		t.Fatalf("a save inside a pending rollback window must fail with errApplyRollingBack, got %v", err)
 	}
 	if len(applier.startCalls) != first {
 		t.Errorf("a second StartApply was issued while a rollback was pending (%d -> %d)", first, len(applier.startCalls))
@@ -878,9 +881,9 @@ func TestStagedApplyMwan3_ResumesAfterTheRollbackWindowExpires(t *testing.T) {
 	}
 	first := len(applier.startCalls)
 
-	// Still inside the window: skipped.
-	if err := svc.stagedApplyMwan3(nil); err != nil {
-		t.Fatalf("unexpected error while a rollback is pending: %v", err)
+	// Still inside the window: refused.
+	if err := svc.stagedApplyMwan3(nil); !errors.Is(err, errApplyRollingBack) {
+		t.Fatalf("a save inside the rollback window must report errApplyRollingBack, got %v", err)
 	}
 	if len(applier.startCalls) != first {
 		t.Fatalf("an apply was issued while the rollback window was still open")
@@ -894,4 +897,104 @@ func TestStagedApplyMwan3_ResumesAfterTheRollbackWindowExpires(t *testing.T) {
 	if len(applier.startCalls) != first+1 {
 		t.Errorf("applies did not resume after the rollback window expired (%d -> %d)", first, len(applier.startCalls))
 	}
+}
+
+// The crash guard is the whole point of a guarded live-state write: it must be
+// present while a save is in flight and gone once the save succeeded.
+//
+// The interesting case is the one that regressed. An apply that STARTS and then
+// fails verification leaves a pending rpcd session, and the restore that follows
+// runs while that window is still open. The restore is the recovery path, so it
+// must not be refused just because a window is open — and because it succeeded,
+// the guard must be cleared, or Start() skips every monitoring tick until a
+// manual rm or a redeploy and failover silently stops working.
+func TestSetConfigGuardLifecycle(t *testing.T) {
+	t.Parallel()
+
+	guardExists := func(svc *FailoverService) bool {
+		_, err := os.Stat(svc.guardPath)
+		return err == nil
+	}
+	candidate := failoverTestConfig(models.FailoverCandidate{
+		InterfaceName: "wan", Priority: 1, Enabled: true,
+	})
+
+	t.Run("removed after a successful save", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newFailoverTestService(t, uci.NewMockUCI(), &recordingApplier{})
+		if err := svc.SetConfig(candidate); err != nil {
+			t.Fatalf("SetConfig: %v", err)
+		}
+		if guardExists(svc) {
+			t.Errorf("a successful save must not leave %s behind", svc.guardPath)
+		}
+	})
+
+	t.Run("restore completes while a rollback window is open", func(t *testing.T) {
+		t.Parallel()
+		applier := &recordingApplier{}
+		svc, _ := newFailoverTestService(t, uci.NewMockUCI(), applier)
+		if err := svc.SetConfig(candidate); err != nil {
+			t.Fatalf("seed save: %v", err)
+		}
+
+		// Arm the window exactly the way a failed in-apply verification does:
+		// StartApply succeeds and records the session, the verify callback then
+		// fails, so the session stays pending and unconfirmed.
+		verifyErr := fmt.Errorf("candidate is not readable at runtime")
+		if err := svc.stagedApplyMwan3(func() error { return verifyErr }); err == nil {
+			t.Fatal("expected the failed verification to be reported")
+		}
+		if svc.pendingApplySession == "" {
+			t.Fatal("an unconfirmed apply must stay recorded while its rollback window is open")
+		}
+
+		// A save now correctly refuses...
+		if err := svc.stagedApplyMwan3(nil); !errors.Is(err, errApplyRollingBack) {
+			t.Fatalf("a save inside an open window must fail with errApplyRollingBack, got %v", err)
+		}
+		// ...but the restore, which is the recovery path, must still go through.
+		if err := svc.restoreManagedSections(); err != nil {
+			t.Errorf("the restore must not be refused by its own rollback window: %v", err)
+		}
+	})
+
+	// The clear-on-success branch, pinned directly. A real save first, so the
+	// mwan3/network backup the restore reads exists on disk; the guard is then
+	// re-armed to stand in for "a save is in flight". With a working applier the
+	// restore completes, so the guard must go.
+	t.Run("guard cleared when the rollback succeeds", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newFailoverTestService(t, uci.NewMockUCI(), &recordingApplier{})
+		if err := svc.SetConfig(candidate); err != nil {
+			t.Fatalf("seed save: %v", err)
+		}
+		if err := os.WriteFile(svc.guardPath, []byte("marker"), 0o600); err != nil {
+			t.Fatalf("seed guard: %v", err)
+		}
+
+		svc.rollbackOrKeepGuard()
+
+		if guardExists(svc) {
+			t.Errorf("a successful rollback must clear %s: the running config is known-good again", svc.guardPath)
+		}
+	})
+
+	t.Run("kept when the rollback itself fails", func(t *testing.T) {
+		t.Parallel()
+		// rpcd is unavailable: the apply fails, and so does the restore that
+		// ends in the same apply. The running config is then unknown, so the
+		// guard has to stay.
+		applier := &recordingApplier{startErr: fmt.Errorf("rpcd unavailable")}
+		svc, _ := newFailoverTestService(t, uci.NewMockUCI(), applier)
+
+		if err := svc.SetConfig(failoverTestConfig(models.FailoverCandidate{
+			InterfaceName: "wan", Priority: 1, Enabled: true,
+		})); err == nil {
+			t.Fatal("expected the failed apply to be reported")
+		}
+		if !guardExists(svc) {
+			t.Errorf("a failed rollback must keep %s: the running config is unknown", svc.guardPath)
+		}
+	})
 }

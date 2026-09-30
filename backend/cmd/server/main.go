@@ -482,8 +482,8 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 
 	// WebSocket (with auth from query parameter)
 	hub := ws.NewHub(systemSvc, alertSvc, netWatcher.Ch())
-	app.Use("/api/v1/ws", ws.UpgradeMiddleware(authSvc))
-	app.Get("/api/v1/ws", ws.Handler(hub, authSvc))
+	app.Use("/api/v1/ws", ws.UpgradeMiddleware(authSvc, splitCORSOrigins(cfg.CorsOrigins)))
+	app.Get("/api/v1/ws", ws.Handler(hub, authSvc, ws.HandlerOptions{}))
 	hub.Start()
 	alertSvc.Start()
 	uptimeTracker.Start()

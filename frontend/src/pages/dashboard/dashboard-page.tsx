@@ -434,9 +434,15 @@ export function DashboardPage() {
             <>
               <DetailRow label="Protocol">
                 {/* The WAN protocol lives in the WAN config, not in the
-                    interface discriminator (which only says "wired"). */}
+                    interface discriminator (which only says "wired").
+
+                    The backend passes UCI's `proto` through unvalidated, and
+                    OpenWrt accepts more than the typed union (dhcpv6, 6rd,
+                    6to4, wwan, qmi, ncm, directip). Fall back to the raw value
+                    so an unlisted proto renders as text rather than as an
+                    empty cell. */}
                 <span className="uppercase">
-                  {wanProtocol ? WAN_PROTOCOL_LABEL[wanProtocol] : '—'}
+                  {wanProtocol ? (WAN_PROTOCOL_LABEL[wanProtocol] ?? wanProtocol) : '—'}
                 </span>
               </DetailRow>
               {wan.ip_address && (

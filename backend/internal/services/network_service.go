@@ -421,12 +421,13 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 	// ── 3. Build a deduplicated client map (keyed by uppercase MAC) ───────
 	byMAC := make(map[string]models.Client)
 
+	// The lease file is read on builds that report EITHER an absolute epoch or
+	// a remaining duration in `expires` (see connectedSinceFromLeaseExpiry), so
+	// this must go through the shared helper rather than assuming an epoch —
+	// doing the conversion inline rendered "connected since 1970" for every
+	// client on duration-reporting builds.
 	connectedSinceFromLease := func(expiry int64) string {
-		if expiry <= 0 {
-			return ""
-		}
-		t := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
-		return t.UTC().Format(time.RFC3339)
+		return connectedSinceFromLeaseExpiry(float64(expiry), leaseTimeSec)
 	}
 
 	// 3a. Try ubus dhcp ipv4leases (works on some builds).
@@ -739,27 +740,29 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 
 // SetWanConfig updates the WAN configuration.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
-	if config.Type != "" {
-		if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
-			return err
+	return mutateUCI(n.uci, []string{"network"}, func() error {
+		if config.Type != "" {
+			if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
+				return err
+			}
 		}
-	}
-	if config.IPAddress != "" {
-		if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
-			return err
+		if config.IPAddress != "" {
+			if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
+				return err
+			}
 		}
-	}
-	if config.Netmask != "" {
-		if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
-			return err
+		if config.Netmask != "" {
+			if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
+				return err
+			}
 		}
-	}
-	if config.Gateway != "" {
-		if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
-			return err
+		if config.Gateway != "" {
+			if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+				return err
+			}
 		}
-	}
-	return n.uciCommit("network")
+		return n.uciCommit("network")
+	})
 }
 
 // DetectWanType auto-detects the WAN connection type and returns
@@ -981,28 +984,32 @@ func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error)
 
 // AddDHCPReservation adds a static DHCP reservation as a named UCI section in dhcp config.
 func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
-	section := "host_" + sanitizeSectionName(reservation.Name)
-	if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
-		return fmt.Errorf("adding DHCP reservation section: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "name", reservation.Name); err != nil {
-		return fmt.Errorf("setting DHCP reservation name: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "mac", reservation.MAC); err != nil {
-		return fmt.Errorf("setting DHCP reservation MAC: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "ip", reservation.IP); err != nil {
-		return fmt.Errorf("setting DHCP reservation IP: %w", err)
-	}
-	return n.uci.Commit("dhcp")
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		section := "host_" + sanitizeSectionName(reservation.Name)
+		if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
+			return fmt.Errorf("adding DHCP reservation section: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "name", reservation.Name); err != nil {
+			return fmt.Errorf("setting DHCP reservation name: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "mac", reservation.MAC); err != nil {
+			return fmt.Errorf("setting DHCP reservation MAC: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "ip", reservation.IP); err != nil {
+			return fmt.Errorf("setting DHCP reservation IP: %w", err)
+		}
+		return n.uci.Commit("dhcp")
+	})
 }
 
 // DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
 func (n *NetworkService) DeleteDHCPReservation(section string) error {
-	if err := n.uci.DeleteSection("dhcp", section); err != nil {
-		return fmt.Errorf("deleting DHCP reservation: %w", err)
-	}
-	return n.uci.Commit("dhcp")
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.uci.DeleteSection("dhcp", section); err != nil {
+			return fmt.Errorf("deleting DHCP reservation: %w", err)
+		}
+		return n.uci.Commit("dhcp")
+	})
 }
 
 // parseDHCPLeases parses the content of /tmp/dhcp.leases into a slice of DHCPLease.
@@ -1072,56 +1079,52 @@ func (n *NetworkService) KickClient(mac string) error {
 // so an abandoned half-written rule would be committed by a later, unrelated
 // `uci commit firewall`.
 func (n *NetworkService) BlockClient(mac string) error {
-	section := "block_" + normalizeMACForSection(mac)
-	macUpper := strings.ToUpper(mac)
+	return mutateUCI(n.uci, []string{"firewall"}, func() error {
+		section := "block_" + normalizeMACForSection(mac)
+		macUpper := strings.ToUpper(mac)
 
-	// abort drops the staged delta before surfacing the failure.
-	abort := func(err error) error {
-		revertUCIConfig(n.uci, "firewall")
-		return err
-	}
-
-	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
-		return fmt.Errorf("add firewall block rule: %w", err)
-	}
-	if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
-		return abort(err)
-	}
-	if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
-		return abort(err)
-	}
-	if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
-		return abort(err)
-	}
-	if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
-		return abort(err)
-	}
-	if err := n.uciCommit("firewall"); err != nil {
-		return abort(err)
-	}
-	if err := n.restartService("firewall"); err != nil {
-		return fmt.Errorf("restart firewall: %w", err)
-	}
-	return nil
+		if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
+			return fmt.Errorf("add firewall block rule: %w", err)
+		}
+		if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
+			return err
+		}
+		if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
+			return err
+		}
+		if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
+			return err
+		}
+		if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
+			return err
+		}
+		if err := n.uciCommit("firewall"); err != nil {
+			return err
+		}
+		if err := n.restartService("firewall"); err != nil {
+			return fmt.Errorf("restart firewall: %w", err)
+		}
+		return nil
+	})
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
-	section := "block_" + normalizeMACForSection(mac)
+	return mutateUCI(n.uci, []string{"firewall"}, func() error {
+		section := "block_" + normalizeMACForSection(mac)
 
-	if err := n.uci.DeleteSection("firewall", section); err != nil {
-		return fmt.Errorf("delete firewall block rule: %w", err)
-	}
-	if err := n.uciCommit("firewall"); err != nil {
-		// Restore the still-staged deletion instead of leaving a delta that a
-		// later commit would apply.
-		revertUCIConfig(n.uci, "firewall")
-		return err
-	}
-	if err := n.restartService("firewall"); err != nil {
-		return fmt.Errorf("restart firewall: %w", err)
-	}
-	return nil
+		if err := n.uci.DeleteSection("firewall", section); err != nil {
+			return fmt.Errorf("delete firewall block rule: %w", err)
+		}
+		// A failed commit leaves the deletion staged; mutateUCI reverts it.
+		if err := n.uciCommit("firewall"); err != nil {
+			return err
+		}
+		if err := n.restartService("firewall"); err != nil {
+			return fmt.Errorf("restart firewall: %w", err)
+		}
+		return nil
+	})
 }
 
 // GetBlockedClients returns a list of blocked MAC addresses.

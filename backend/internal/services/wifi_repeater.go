@@ -168,122 +168,119 @@ func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
 // the rollback is cancelled. This prevents soft-brick scenarios without needing a separate
 // guard file (which is only required for background tasks that run without user oversight).
 func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
-	validModes := map[string]bool{"ap": true, "client": true, "repeater": true}
-	if !validModes[mode] {
-		return nil, fmt.Errorf("unsupported wifi mode %q", mode)
-	}
-
-	apSections, err := w.getWifiSectionsByMode("ap")
-	if err != nil {
-		return nil, err
-	}
-	staSections, err := w.getWifiSectionsByMode("sta")
-	if err != nil {
-		return nil, err
-	}
-
-	enableAP := false
-	enableSTA := false
-	switch mode {
-	case "ap":
-		enableAP = true
-	case "client":
-		enableSTA = true
-	case "repeater":
-		enableAP = true
-		enableSTA = true
-	}
-
-	if enableSTA && len(staSections) == 0 {
-		section, err := w.ensureSTASectionForScan()
+	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
+		validModes := map[string]bool{"ap": true, "client": true, "repeater": true}
+		if !validModes[mode] {
+			return nil, fmt.Errorf("unsupported wifi mode %q", mode)
+		}
+		apSections, err := w.getWifiSectionsByMode("ap")
 		if err != nil {
 			return nil, err
 		}
-		staSections = append(staSections, section)
-	}
-
-	// At most one STA may be enabled at a time: two STA wifi-iface sections pointing at
-	// network=wwan race for the interface in netifd, and the losing binding leaves the
-	// actually-connected STA without DHCP. Pick the single preferred profile and disable the rest.
-	var activeSTA string
-	if enableSTA {
-		var err error
-		activeSTA, err = w.selectActiveSTA()
+		staSections, err := w.getWifiSectionsByMode("sta")
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// In repeater mode, separate STA and AP onto different radios when possible.
-	// On ath11k/IPQ6018, an AP sharing a radio with a STA is forced to follow the STA's
-	// channel and cannot start until the STA associates — a failing STA takes the AP with it.
-	// With only one radio, coexistence is unavoidable, so we allow it.
-	staRadio := ""
-	if mode == "repeater" && activeSTA != "" {
-		if opts, err := w.uci.GetAll("wireless", activeSTA); err == nil {
-			staRadio = opts["device"]
+		enableAP := false
+		enableSTA := false
+		switch mode {
+		case "ap":
+			enableAP = true
+		case "client":
+			enableSTA = true
+		case "repeater":
+			enableAP = true
+			enableSTA = true
 		}
-	}
-	radios, err := w.getWifiRadioNames()
-	if err != nil {
-		return nil, err
-	}
-	multiRadio := len(radios) >= 2
-	apOnOtherRadio := func() bool {
-		if !multiRadio || staRadio == "" {
-			return false
-		}
-		for _, section := range apSections {
-			opts, err := w.uci.GetAll("wireless", section)
+		if enableSTA && len(staSections) == 0 {
+			section, err := w.ensureSTASectionForScan()
 			if err != nil {
-				continue
+				return nil, err
 			}
-			if opts["device"] != "" && opts["device"] != staRadio {
-				return true
-			}
+			staSections = append(staSections, section)
 		}
-		return false
-	}()
-
-	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
-
-	if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
-		return nil, err
-	}
-	for _, section := range staSections {
-		enable := enableSTA && section == activeSTA
-		if err := w.setIfaceDisabled(section, !enable); err != nil {
-			return nil, err
-		}
-		if enable {
-			if err := w.ensureSectionRadioEnabled(section); err != nil {
+		// At most one STA may be enabled at a time: two STA wifi-iface sections pointing at
+		// network=wwan race for the interface in netifd, and the losing binding leaves the
+		// actually-connected STA without DHCP. Pick the single preferred profile and disable the rest.
+		var activeSTA string
+		if enableSTA {
+			var err error
+			activeSTA, err = w.selectActiveSTA()
+			if err != nil {
 				return nil, err
 			}
 		}
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		return nil, err
-	}
-	if w.modeFile != "" {
-		if err := os.MkdirAll(filepath.Dir(w.modeFile), 0750); err == nil {
-			_ = os.WriteFile(w.modeFile, []byte(mode), 0600)
+		// In repeater mode, separate STA and AP onto different radios when possible.
+		// On ath11k/IPQ6018, an AP sharing a radio with a STA is forced to follow the STA's
+		// channel and cannot start until the STA associates — a failing STA takes the AP with it.
+		// With only one radio, coexistence is unavoidable, so we allow it.
+		staRadio := ""
+		if mode == "repeater" && activeSTA != "" {
+			if opts, err := w.uci.GetAll("wireless", activeSTA); err == nil {
+				staRadio = opts["device"]
+			}
 		}
-	}
-	return w.stageWirelessApply()
+		radios, err := w.getWifiRadioNames()
+		if err != nil {
+			return nil, err
+		}
+		multiRadio := len(radios) >= 2
+		apOnOtherRadio := func() bool {
+			if !multiRadio || staRadio == "" {
+				return false
+			}
+			for _, section := range apSections {
+				opts, err := w.uci.GetAll("wireless", section)
+				if err != nil {
+					continue
+				}
+				if opts["device"] != "" && opts["device"] != staRadio {
+					return true
+				}
+			}
+			return false
+		}()
+		allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+		if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
+			return nil, err
+		}
+		for _, section := range staSections {
+			enable := enableSTA && section == activeSTA
+			if err := w.setIfaceDisabled(section, !enable); err != nil {
+				return nil, err
+			}
+			if enable {
+				if err := w.ensureSectionRadioEnabled(section); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, err
+		}
+		if w.modeFile != "" {
+			if err := os.MkdirAll(filepath.Dir(w.modeFile), 0750); err == nil {
+				_ = os.WriteFile(w.modeFile, []byte(mode), 0600)
+			}
+		}
+		return w.stageWirelessApply()
+	})
 }
 
 // ReconcileRepeaterAPLayout re-applies STA/AP radio separation (repeater mode only).
 func (w *WifiService) ReconcileRepeaterAPLayout() (*WirelessApplyResult, error) {
-	if w.deriveWifiMode() != "repeater" {
-		return nil, fmt.Errorf("repeater radio reconcile only applies in repeater mode")
-	}
-	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
-		return nil, err
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		return nil, fmt.Errorf("committing wireless: %w", err)
-	}
-	return w.stageWirelessApply()
+	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		if w.deriveWifiMode() != "repeater" {
+			return nil, fmt.Errorf("repeater radio reconcile only applies in repeater mode")
+		}
+		if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+			return nil, err
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, fmt.Errorf("committing wireless: %w", err)
+		}
+		return w.stageWirelessApply()
+	})
 }
 
 // sameRadioRepeaterAPSTAConflict reports whether an enabled AP shares the STA radio while

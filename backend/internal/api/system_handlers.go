@@ -373,7 +373,7 @@ func SyncTimeHandler(deps *Dependencies) fiber.Handler {
 			return RespondWithError(c, fiber.StatusInternalServerError, "failed to set system time")
 		}
 		if deps.TimeSyncGate != nil {
-			deps.TimeSyncGate.NoteClockSet(clientTime, deps.TimeSyncMinPlausible)
+			deps.TimeSyncGate.NoteClockSet()
 		}
 
 		return c.JSON(fiber.Map{"synced": true, "set_to": clientTime.UTC().Format(time.RFC3339)})

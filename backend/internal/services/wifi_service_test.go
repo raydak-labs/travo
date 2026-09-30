@@ -1,14 +1,18 @@
 package services
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -2682,4 +2686,305 @@ func TestEnsureNamedSection_PropagatesReadFailure(t *testing.T) {
 	if err := svc.ensureNamedSection("wireless", "guest", "wifi-iface"); err == nil {
 		t.Fatal("expected the read failure to surface instead of silently creating a section")
 	}
+}
+
+// blockingUCI pauses the first Commit of a given config until release is
+// closed, so a test can hold a mutator mid-sequence at a deterministic point.
+type blockingUCI struct {
+	uci.UCI
+	config  string
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingUCI) Commit(config string) error {
+	if config == b.config {
+		b.once.Do(func() { close(b.entered) })
+		<-b.release
+	}
+	return b.UCI.Commit(config)
+}
+
+// The uci CLI keeps uncommitted changes in the process-global
+// /tmp/.uci/<config>/changes file, so two writers of the same config corrupt
+// each other: one commits the other's half-written section, and one reverts the
+// other's staged work on its way out.
+//
+// `firewall` is written by two different services — WifiService (guest
+// isolation) and NetworkService (client block rules) — so a per-service mutex
+// cannot serialise them. Each mutator must hold the shared per-config lock for
+// its whole read-modify-write sequence.
+func TestFirewallWritersAreMutuallyExclusive(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newTestWifiService()
+	blocker := &blockingUCI{
+		UCI:     uci.NewMockUCI(),
+		config:  "firewall",
+		entered: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	svc.uci = blocker
+	svc.reloader = &NoopWifiReloader{}
+	svc.applier = &fakeWirelessApplier{}
+	net := NewNetworkServiceWithRunner(blocker, ubus.NewMockUbus(), &MockCommandRunner{})
+
+	// The guest-WiFi write is parked at its firewall commit, still holding the
+	// config lock and with a staged delta it may yet revert.
+	guestDone := make(chan error, 1)
+	go func() {
+		_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: true, SSID: "guest", Key: "guestpass1"})
+		guestDone <- err
+	}()
+	<-blocker.entered
+
+	// A concurrent client block must not get anywhere near the delta.
+	blockDone := make(chan error, 1)
+	go func() { blockDone <- net.BlockClient("AA:BB:CC:DD:EE:FF") }()
+
+	select {
+	case err := <-blockDone:
+		t.Fatalf("BlockClient completed while a guest-WiFi write held the firewall delta (err=%v)", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(blocker.release)
+	if err := <-guestDone; err != nil {
+		t.Fatalf("guest wifi: %v", err)
+	}
+	if err := <-blockDone; err != nil {
+		t.Fatalf("block client: %v", err)
+	}
+}
+
+// Every mutator that takes a per-UCI-config lock must do so exactly once, and
+// the lock order is always uciWriteMu first, then the config locks. sync.Mutex
+// is not reentrant, so a nested acquire deadlocks the whole process rather than
+// failing a test — in production that is a router whose wireless save never
+// returns.
+//
+// Every mutator below is therefore invoked together, and the test fails fast
+// on its own short deadline instead of waiting out the package -timeout. A
+// deadlock introduced by adding a new locked mutator, or by making one of these
+// call another, shows up here immediately.
+func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
+	t.Parallel()
+
+	svc, mockUCI := newTestWifiService()
+	svc.reloader = &NoopWifiReloader{}
+	svc.applier = &fakeWirelessApplier{}
+	if err := mockUCI.Set("wireless", "default_radio0", "mode", "ap"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	net := NewNetworkServiceWithRunner(mockUCI, ubus.NewMockUbus(), &MockCommandRunner{})
+
+	enabled := true
+	mutators := map[string]func(){
+		"SetAPConfig": func() {
+			_, _ = svc.SetAPConfig("default_radio0", models.APConfigUpdate{SSID: "travo", Enabled: &enabled})
+		},
+		"SetRadioRole":  func() { _, _ = svc.SetRadioRole("radio0", "ap") },
+		"SetMode":       func() { _, _ = svc.SetMode("ap") },
+		"SetMACAddress": func() { _, _ = svc.SetMACAddress("AA:BB:CC:DD:EE:01") },
+		"RandomizeMAC":  func() { _, _, _ = svc.RandomizeMAC() },
+		"Connect":       func() { _, _ = svc.Connect(models.WifiConfig{SSID: "upstream", Password: "secret1234"}) },
+		"Disconnect":    func() { _, _ = svc.Disconnect() },
+		"DeleteNetwork": func() { _, _ = svc.DeleteNetwork("nonexistent") },
+		"SetGuestWifi": func() {
+			_, _ = svc.SetGuestWifi(models.GuestWifiConfig{Enabled: true, SSID: "guest", Key: "guestpass1"})
+		},
+		// The disable branch is the only way to reach teardownGuestWifi, which
+		// is deliberately NOT wrapped: it is called from inside SetGuestWifi's
+		// mutateWireless closure, so wrapping it would self-deadlock. It is
+		// listed here precisely so that adding that wrapper — the obvious next
+		// "simplification", since its body is shaped like every other mutator —
+		// fails this test instead of wedging the guest-WiFi endpoint in
+		// production while CI stays green.
+		"teardownGuestWifi": func() {
+			_, _ = svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+		},
+		"BlockClient":   func() { _ = net.BlockClient("AA:BB:CC:DD:EE:02") },
+		"UnblockClient": func() { _ = net.UnblockClient("AA:BB:CC:DD:EE:02") },
+		// The other services that share the same UCI deltas. They hold the same
+		// per-config locks for the same reason, and any of them acquiring a lock
+		// it already holds would wedge the device.
+		"SetWanConfig": func() { _ = net.SetWanConfig(models.WanConfig{Type: "dhcp"}) },
+		"AddDHCPReservation": func() {
+			_ = net.AddDHCPReservation(models.DHCPReservation{Name: "laptop", MAC: "AA:BB:CC:DD:EE:03", IP: "192.168.1.50"})
+		},
+		"DeleteDHCPReservation": func() { _ = net.DeleteDHCPReservation("host_laptop") },
+		"ReconcileRepeaterAPLayout": func() {
+			_, _ = svc.ReconcileRepeaterAPLayout()
+		},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		var wg sync.WaitGroup
+		for _, fn := range mutators {
+			wg.Add(1)
+			go func(fn func()) {
+				defer wg.Done()
+				fn()
+			}(fn)
+		}
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatalf("%d wireless mutators did not finish in 30s: a per-config lock is almost certainly held twice (sync.Mutex is not reentrant)", len(mutators))
+	}
+}
+
+// mutateWireless derives the lock set and the revert set from ONE list, which
+// is what makes "locked it but forgot to revert it" unrepresentable. That only
+// holds while it is the single place the config locks are taken: a mutator that
+// called lockUCIConfigs directly could still lock without reverting, and the
+// bug would be invisible to the deadlock test.
+//
+// A source grep is the right shape for this — a few lines, no parser. What
+// matters is that the string `lockUCIConfigs(` appears in exactly one non-test
+// file.
+func TestOnlyMutateWirelessTakesUCIConfigLocks(t *testing.T) {
+	t.Parallel()
+
+	matches := 0
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		src, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", path, readErr)
+		}
+		if !bytes.Contains(src, []byte("lockUCIConfigs(")) {
+			continue
+		}
+		// mutateWireless is the only WifiService mutator; the other services go
+		// through mutateUCI, which lives here too.
+		if path != "wifi_service.go" {
+			t.Errorf("%s calls lockUCIConfigs directly; only mutateWireless/mutateUCI may, "+
+				"so the lock set and the revert set stay the same list", path)
+		}
+		matches++
+	}
+	if matches != 1 {
+		t.Errorf("expected exactly one file to take UCI config locks (wifi_service.go), found %d", matches)
+	}
+}
+
+// mutateWireless / mutateUCI derive the lock set and the revert set from ONE
+// list, so they cannot disagree with each other. What they CAN get wrong is the
+// list itself: a mutator that reaches `uci.Commit("dhcp")` while listing only
+// {"network"} reverts the wrong config, and a failed save leaves the dhcp delta
+// staged for the next unrelated dhcp writer to commit.
+//
+// This is the check that catches that. It scans source rather than the AST
+// because the shape being asserted is simple, and it follows one level of
+// helper calls so that a config reached through `c.commitDhcp()` counts just
+// as much as a literal `uci.Commit("dhcp")` in the mutator's own body.
+func TestMutateCallsCoverEveryConfigTheyTouch(t *testing.T) {
+	t.Parallel()
+
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+
+	// bodyOf: function name -> source, for every non-test file in the package.
+	funcRe := regexp.MustCompile(`^func (?:\([^)]*\) )?(\w+)\(`)
+	bodyOf := map[string]string{}
+	var current string
+	var b strings.Builder
+	flush := func() {
+		if current != "" {
+			bodyOf[current] = b.String()
+		}
+		b.Reset()
+	}
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", path, readErr)
+		}
+		for _, ln := range strings.Split(string(raw), "\n") {
+			if m := funcRe.FindStringSubmatch(ln); m != nil {
+				flush()
+				current = m[1]
+			}
+			b.WriteString(ln)
+			b.WriteByte('\n')
+		}
+	}
+	flush()
+
+	wrapCall := regexp.MustCompile(`(?:mutateWireless|mutateUCI)\((?:\w+\.uci, )?\[\]string\{([^}]*)\}`)
+	// Two ways a config gets written, and both must be caught:
+	//   - through the uci.UCI interface: uci.Commit("dhcp"), n.uciSet("firewall", ...)
+	//   - shelled out, which writes the same process-global delta: cmd.Run("uci", "commit", "dhcp")
+	uciIface := regexp.MustCompile(`(?:Commit|AddSection|AddList|DeleteSection|DeleteOption|uciSet)\("([a-z]+)"`)
+	uciShellCommit := regexp.MustCompile(`"uci",\s*"(?:commit|add|delete)",\s*"([a-z]+)"`)
+	uciShellSet := regexp.MustCompile(`"uci",\s*"set",\s*"([a-z]+)[.@]`)
+	callRe := regexp.MustCompile(`\.(\w+)\(`)
+	strLit := regexp.MustCompile(`"([a-z]+)"`)
+
+	// Every function that calls a mutate* helper, and the configs it listed.
+	listed := map[string]map[string]bool{}
+	for name, src := range bodyOf {
+		m := wrapCall.FindStringSubmatch(src)
+		if m == nil {
+			continue
+		}
+		set := map[string]bool{}
+		for _, q := range strLit.FindAllStringSubmatch(m[1], -1) {
+			set[q[1]] = true
+		}
+		listed[name] = set
+	}
+	if len(listed) == 0 {
+		t.Fatal("no mutateWireless/mutateUCI calls found — this test is not checking anything")
+	}
+
+	for fn, configs := range listed {
+		// The mutator's own body, plus the bodies of the helpers it calls.
+		reached := bodyOf[fn]
+		for _, call := range callRe.FindAllStringSubmatch(reached, -1) {
+			if helper, ok := bodyOf[call[1]]; ok && call[1] != fn {
+				reached += helper
+			}
+		}
+		seen := map[string]bool{}
+		for _, re := range []*regexp.Regexp{uciIface, uciShellCommit, uciShellSet} {
+			for _, m := range re.FindAllStringSubmatch(reached, -1) {
+				seen[m[1]] = true
+			}
+		}
+		for cfg := range seen {
+			if !configs[cfg] {
+				t.Errorf("%s reaches uci config %q but its mutate* call lists only %v: "+
+					"a failed save would leave a staged %q delta for the next "+
+					"unrelated writer to commit", fn, cfg, keys(configs), cfg)
+			}
+		}
+	}
+}
+
+func keys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

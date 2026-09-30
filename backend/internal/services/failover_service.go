@@ -37,6 +37,51 @@ type failoverConfigFile struct {
 	Health     models.FailoverHealthConfig `json:"health"`
 }
 
+// errApplyRollingBack is returned when a save lands inside an rpcd rollback
+// window that a previous apply left open. The change is NOT live, and rpcd is
+// still armed to restore the pre-apply config underneath it, so the caller must
+// report the failure rather than acknowledging a save that will be reverted.
+var errApplyRollingBack = errors.New("an mwan3 apply from a previous save is still rolling back; retry in a few seconds")
+
+// rollbackOrKeepGuard restores the previous mwan3/network sections after a
+// failed apply, and clears the crash guard — but only when doing so leaves the
+// device in a state we can vouch for.
+//
+// The guard is kept in two cases:
+//
+//  1. The restore itself failed. Then the running config is unknown. Same
+//     contract as vpn_service.go.
+//
+//  2. rpcd still has an armed rollback timer from the apply that just failed.
+//     Confirming the restore's own session does NOT cancel that timer, so
+//     ~30s later rpcd would drop the service's own post-restore snapshot back
+//     in — a config this service already judged bad.
+//
+// Either way the guard stays until the window expires and a later save
+// succeeds. That is the documented contract (ADR 0003): an unresolved rollback
+// is what a human or a redeploy should clear, and deploy-local.sh and
+// install.sh both clear it.
+func (s *FailoverService) rollbackOrKeepGuard() {
+	if err := s.restoreManagedSections(); err != nil {
+		log.Printf("failover: rollback failed, crash guard kept at %s: %v", s.guardPath, err)
+		return
+	}
+	if s.rollbackStillPending() {
+		log.Printf("failover: restored, but rpcd rollback %s is still armed; crash guard kept at %s",
+			s.pendingApplySession, s.guardPath)
+		return
+	}
+	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("failover: remove crash guard %s: %v", s.guardPath, err)
+	}
+}
+
+// rollbackStillPending reports whether an rpcd session is still armed to roll
+// the config back on its own timer.
+func (s *FailoverService) rollbackStillPending() bool {
+	return s.pendingApplySession != "" && time.Now().Before(s.pendingApplyDeadline)
+}
+
 // rollbackGracePeriod is how long after the rpcd rollback timeout a pending
 // apply is still considered in flight.
 const rollbackGracePeriod = time.Duration(uciApplyRollbackTimeout)*time.Second + 2*time.Second
@@ -208,11 +253,11 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 		return fmt.Errorf("write failover guard: %w", err)
 	}
 	if err := s.applyManagedConfig(cfgFile); err != nil {
-		_ = s.restoreManagedSections()
+		s.rollbackOrKeepGuard()
 		return err
 	}
 	if err := s.verifyApply(cfgFile); err != nil {
-		_ = s.restoreManagedSections()
+		s.rollbackOrKeepGuard()
 		return err
 	}
 	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -316,8 +361,22 @@ func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus,
 		}
 	}
 
+	// Iterate the candidates in a stable order. Ranging over the map directly
+	// assigned fallback priorities in Go's randomised map order, so every
+	// candidate that is not in the saved config came back with a different
+	// priority on each call. GetConfig() is polled every 10s and by the UI, and
+	// computeActiveInterface picks the active link in priority order, so the
+	// reported active interface could flip between equally-ranked links for no
+	// reason.
+	names := make([]string, 0, len(known))
+	for name := range known {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
 	candidates := make([]models.FailoverCandidate, 0, len(known))
-	for _, candidate := range known {
+	for _, name := range names {
+		candidate := known[name]
 		for _, saved := range cfgFile.Candidates {
 			if saved.InterfaceName == candidate.InterfaceName {
 				candidate.Enabled = saved.Enabled
@@ -572,9 +631,16 @@ func (s *FailoverService) backupManagedSections(cfg models.FailoverConfig) error
 	return os.WriteFile(s.backupPath, data, 0600)
 }
 
-// restoreManagedSections puts the backed-up mwan3 sections back and reloads
-// them through the staged apply flow, so the running mwan3 does not keep the
-// broken partial policy while the user is told the save failed.
+// restoreManagedSections puts the backed-up mwan3/network sections back and
+// re-applies them, so the running mwan3 does not keep the broken partial policy
+// while the user is told the save failed.
+//
+// The re-apply deliberately BYPASSES the pending-rollback-window check that
+// stagedApplyMwan3 normally enforces. This function is the recovery path for a
+// failed apply, so it runs precisely when a session is still pending; letting it
+// short-circuit on errApplyRollingBack would make every failed save leave the
+// crash guard behind and permanently disable failover, which is the opposite of
+// what the restore is for.
 func (s *FailoverService) restoreManagedSections() error {
 	data, err := os.ReadFile(s.backupPath)
 	if err != nil {
@@ -607,7 +673,7 @@ func (s *FailoverService) restoreManagedSections() error {
 	if err := s.uci.Commit(mwan3ConfigName); err != nil {
 		return err
 	}
-	return s.stagedApplyMwan3(func() error { return s.verifyManagedSections(sections) })
+	return s.restoreApplyMwan3(func() error { return s.verifyManagedSections(sections) })
 }
 
 func (s *FailoverService) deleteManagedSections() error {
@@ -777,27 +843,43 @@ func (s *FailoverService) verifyManagedSections(expect map[string]map[string]str
 
 var mwan3UCIConfigs = []string{"network", "mwan3"}
 
-// stagedApplyMwan3 runs the rpcd apply+confirm flow with a real rollback window:
-// the apply is started first, the config is verified while the previous config is
+// stagedApplyMwan3 applies the mwan3 config for a user save, refusing to start
+// while an earlier apply is still rolling back.
+func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
+	if s.rollbackStillPending() {
+		// An earlier apply in this service is unconfirmed, so its rollback window
+		// is open and rpcd is restoring the pre-apply mwan3 config right now. A
+		// second apply would be refused, and reporting success would be worse: the
+		// caller deleted the guard and answered 200 while rpcd's timer was about
+		// to restore the config from *before* the earlier save — silently
+		// discarding both the failed config and this acknowledged one.
+		log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
+		return errApplyRollingBack
+	}
+	// The window expired and rpcd rolled the session back; nothing confirms
+	// that, so the deadline is the signal. Forget it and apply.
+	s.pendingApplySession = ""
+	return s.applyMwan3(verify)
+}
+
+// restoreApplyMwan3 is the recovery-path variant: it runs even while an earlier
+// apply is still rolling back, because restoring is exactly what must be able to
+// happen then. The stale session id is dropped first — rpcd has a single apply
+// slot, so carrying it into the restore's own apply would record the restore's
+// session under the old deadline if the restore then failed.
+func (s *FailoverService) restoreApplyMwan3(verify func() error) error {
+	s.pendingApplySession = ""
+	return s.applyMwan3(verify)
+}
+
+// applyMwan3 runs the rpcd apply+confirm flow with a real rollback window: the
+// apply is started first, the config is verified while the previous config is
 // still restorable, and only then is the change confirmed. An immediate
 // apply+confirm on a policy that re-routes the WAN would close the rollback
 // window before anything was checked.
-func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
+func (s *FailoverService) applyMwan3(verify func() error) error {
 	if !s.serviceInstalled() {
 		return nil
-	}
-	if s.pendingApplySession != "" {
-		if time.Now().Before(s.pendingApplyDeadline) {
-			// An earlier apply in this service is still unconfirmed, so its
-			// rollback window is open and rpcd is restoring the pre-apply mwan3
-			// config right now. That is exactly the state this call is trying to
-			// reach, and a second apply would be refused, so treat it as done.
-			log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
-			return nil
-		}
-		// The window has expired and rpcd has rolled the session back; nothing
-		// confirms that, so the deadline is the signal. Forget it and apply.
-		s.pendingApplySession = ""
 	}
 	if s.applier == nil {
 		return s.reloadMwan3Script()

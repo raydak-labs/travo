@@ -3,9 +3,7 @@ package ws
 import (
 	"net"
 	"net/url"
-	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/gofiber/contrib/v3/websocket"
@@ -14,36 +12,47 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 )
 
-// corsOriginsEnv mirrors the environment variable the CORS middleware reads
-// (internal/config). It is duplicated as a constant rather than imported so
-// the WebSocket package does not pull in the whole configuration loader.
-const corsOriginsEnv = "CORS_ORIGINS"
-
 // readLimit caps a single inbound frame. The protocol is server → client
 // push; the browser client never sends anything, so a few KiB is generous.
 // Without a limit a single multi-GB frame is buffered on a 128 MB router.
 const readLimit = 4 << 10
 
-var (
-	// pingInterval is how often the server pings an idle client. Pongs
-	// refresh the read deadline, so a dead peer is detected even when the
-	// router's NAT silently drops the socket.
-	pingInterval    = atomic.Int64{}
-	pingIntervalVal = int64(30 * time.Second)
-	// readDeadline bounds a blocked read. It is refreshed by every pong, so a
+// HandlerOptions tunes the keepalive loop. The zero value is the production
+// default; tests shorten the intervals so they do not have to wait 30-90s for
+// the server to notice a revoked session.
+type HandlerOptions struct {
+	// PingInterval is how often the server pings an idle client. Pongs refresh
+	// the read deadline, so a dead peer is detected even when the router's NAT
+	// silently drops the socket.
+	PingInterval time.Duration
+	// ReadDeadline bounds a blocked read. It is refreshed by every pong, so a
 	// client that cannot answer pings is dropped instead of holding a socket
 	// open (and holding a goroutine) on the router.
-	readDeadline    = atomic.Int64{}
-	readDeadlineVal = int64(90 * time.Second)
-	// revalidateInterval is how often an already-upgraded socket re-checks
-	// its session. Without it a logged-out or expired session would keep
-	// receiving system_stats, alerts and network_status until it reconnects.
-	revalidateInterval    = atomic.Int64{}
-	revalidateIntervalVal = int64(30 * time.Second)
-)
+	ReadDeadline time.Duration
+	// RevalidateInterval is how often an already-upgraded socket re-checks its
+	// session. Without it a logged-out or expired session would keep receiving
+	// system_stats, alerts and network_status until it reconnects.
+	RevalidateInterval time.Duration
+}
 
-// Handler returns a Fiber handler for WebSocket connections.
-func Handler(hub *Hub, authSvc *auth.AuthService) fiber.Handler {
+// withDefaults fills in any unset field.
+func (o HandlerOptions) withDefaults() HandlerOptions {
+	if o.PingInterval <= 0 {
+		o.PingInterval = 30 * time.Second
+	}
+	if o.ReadDeadline <= 0 {
+		o.ReadDeadline = 90 * time.Second
+	}
+	if o.RevalidateInterval <= 0 {
+		o.RevalidateInterval = 30 * time.Second
+	}
+	return o
+}
+
+// Handler returns a Fiber handler for WebSocket connections. opts tunes the
+// keepalive loop; pass a zero HandlerOptions for the production defaults.
+func Handler(hub *Hub, authSvc *auth.AuthService, opts HandlerOptions) fiber.Handler {
+	opts = opts.withDefaults()
 	return websocket.New(func(c *websocket.Conn) {
 		// The middleware already validated the token; the handler keeps it
 		// so the session can be re-validated while the socket is open.
@@ -60,20 +69,20 @@ func Handler(hub *Hub, authSvc *auth.AuthService) fiber.Handler {
 		defer hub.Unregister(c)
 
 		c.SetReadLimit(readLimit)
-		_ = c.SetReadDeadline(time.Now().Add(readDeadlineAfter()))
+		_ = c.SetReadDeadline(time.Now().Add(opts.ReadDeadline))
 		c.SetPongHandler(func(string) error {
-			return c.SetReadDeadline(time.Now().Add(readDeadlineAfter()))
+			return c.SetReadDeadline(time.Now().Add(opts.ReadDeadline))
 		})
 
 		stopKeepalive := make(chan struct{})
 		defer close(stopKeepalive)
-		go keepalive(c, authSvc, token, stopKeepalive)
+		go keepalive(c, authSvc, token, stopKeepalive, opts)
 
 		for {
 			if _, _, err := c.ReadMessage(); err != nil {
 				// Any read error ends the session: the peer went away, sent a
 				// frame beyond the read limit, or failed to answer pings
-				// within readDeadline. The deadline is only ever refreshed by
+				// within ReadDeadline. The deadline is only ever refreshed by
 				// a pong, so it is a real liveness check, not an idle timer.
 				return
 			}
@@ -85,10 +94,10 @@ func Handler(hub *Hub, authSvc *auth.AuthService) fiber.Handler {
 // use WriteControl, which the WebSocket library allows concurrently with the
 // hub's broadcast writes. On an invalid session the socket is closed, which
 // unblocks the handler's read.
-func keepalive(c *websocket.Conn, authSvc *auth.AuthService, token string, stop <-chan struct{}) {
-	ping := time.NewTicker(pingEvery())
+func keepalive(c *websocket.Conn, authSvc *auth.AuthService, token string, stop <-chan struct{}, opts HandlerOptions) {
+	ping := time.NewTicker(opts.PingInterval)
 	defer ping.Stop()
-	revalidate := time.NewTicker(revalidateEvery())
+	revalidate := time.NewTicker(opts.RevalidateInterval)
 	defer revalidate.Stop()
 	for {
 		select {
@@ -123,11 +132,12 @@ func closeWithPolicyViolation(c *websocket.Conn, reason string) {
 }
 
 // UpgradeMiddleware checks if the request is a WebSocket upgrade and validates
-// the JWT token. allowedOrigins optionally pins the Origin allowlist; without
-// it the CORS setting is read from the environment or the --cors-origins flag
-// (see resolveAllowedOrigins).
-func UpgradeMiddleware(authSvc *auth.AuthService, allowedOrigins ...string) fiber.Handler {
-	origins := resolveAllowedOrigins(allowedOrigins)
+// the JWT token. allowedOrigins is the same list the CORS middleware was built
+// from (cfg.CorsOrigins, split and passed in by the caller), so the two
+// policies cannot disagree; a mismatch would let a UI load and then fail to
+// open a socket. An empty list means same-origin only.
+func UpgradeMiddleware(authSvc *auth.AuthService, allowedOrigins []string) fiber.Handler {
+	origins := normalizeOrigins(allowedOrigins)
 	return func(c fiber.Ctx) error {
 		if !websocket.IsWebSocketUpgrade(c) {
 			return fiber.ErrUpgradeRequired
@@ -170,46 +180,11 @@ func UpgradeMiddleware(authSvc *auth.AuthService, allowedOrigins ...string) fibe
 	}
 }
 
-// resolveAllowedOrigins returns the Origin allowlist for WebSocket upgrades.
-// The sources are the same ones the CORS middleware reads (CORS_ORIGINS in the
-// environment, or the --cors-origins command-line flag) so the two policies
-// cannot disagree; a mismatch would let a UI load and then fail to open a
-// socket.
-func init() {
-	// The intervals are atomic because tests override them while server
-	// goroutines are reading them; plain package variables would be a data race
-	// that the -race job would flag.
-	pingInterval.Store(pingIntervalVal)
-	readDeadline.Store(readDeadlineVal)
-	revalidateInterval.Store(revalidateIntervalVal)
-}
-
-// pingEvery returns the currently configured keepalive ping interval.
-func pingEvery() time.Duration { return time.Duration(pingInterval.Load()) }
-
-// readDeadlineAfter returns the currently configured read deadline.
-func readDeadlineAfter() time.Duration { return time.Duration(readDeadline.Load()) }
-
-// revalidateEvery returns the currently configured re-validation interval.
-func revalidateEvery() time.Duration { return time.Duration(revalidateInterval.Load()) }
-
-func resolveAllowedOrigins(explicit []string) []string {
-	return resolveAllowedOriginsFrom(explicit, os.Args[1:], os.Getenv)
-}
-
-// resolveAllowedOriginsFrom builds the allowlist from explicit > env > argv.
-// A wildcard ("*") is deliberately dropped: unlike a CORS preflight, a
-// cross-site WebSocket is a credentialed request, so the effective policy is
-// same-origin plus whatever origins were actually configured.
-func resolveAllowedOriginsFrom(explicit, args []string, getenv func(string) string) []string {
-	list := explicit
-	if len(list) == 0 {
-		if v := strings.TrimSpace(getenv(corsOriginsEnv)); v != "" {
-			list = strings.Split(v, ",")
-		} else {
-			list = []string{corsOriginsFromArgs(args)}
-		}
-	}
+// normalizeOrigins trims a configured origin list. A wildcard ("*") is
+// deliberately dropped: unlike a CORS preflight, a cross-site WebSocket is a
+// credentialed request, so the effective policy is same-origin plus whatever
+// origins were actually configured.
+func normalizeOrigins(list []string) []string {
 	out := make([]string, 0, len(list))
 	for _, o := range list {
 		o = strings.TrimRight(strings.TrimSpace(o), "/")
@@ -219,32 +194,6 @@ func resolveAllowedOriginsFrom(explicit, args []string, getenv func(string) stri
 		out = append(out, o)
 	}
 	return out
-}
-
-// corsOriginsArgNames are the spellings the config flag package accepts for
-// --cors-origins (single or double dash, "=" or a following value).
-var corsOriginsArgNames = []string{"-cors-origins", "--cors-origins"}
-
-// corsOriginsFromArgs picks the value of the --cors-origins flag out of the
-// process arguments. The config package is not used here on purpose: parsing
-// the full flag set twice would print usage text when the arguments belong to
-// another program (a test binary), and this middleware only needs one field.
-func corsOriginsFromArgs(args []string) string {
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		for _, name := range corsOriginsArgNames {
-			if arg == name {
-				if i+1 < len(args) {
-					return args[i+1]
-				}
-				return ""
-			}
-			if after, ok := strings.CutPrefix(arg, name+"="); ok {
-				return after
-			}
-		}
-	}
-	return ""
 }
 
 // originAllowed reports whether a request with this Origin may open a socket.

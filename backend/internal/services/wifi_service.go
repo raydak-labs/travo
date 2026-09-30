@@ -40,12 +40,61 @@ type uciReverter interface {
 	Revert(config string) error
 }
 
+// uciConfigLocks maps a config name to its lock, so a writer of `firewall` and
+// a writer of `dhcp` never block each other.
+var uciConfigLocks sync.Map // config name -> *sync.Mutex
+
+// lockUCIConfigs locks each named config and returns a single unlock func.
+// Callers must pass the names in a consistent order to stay deadlock-free.
+//
+// The lock exists because the uci CLI keeps uncommitted changes in the
+// process-global /tmp/.uci/<config>/changes file, so two independent writers of
+// the same config — or one reverting while another is mid-sequence — corrupt
+// each other. A per-service mutex cannot prevent this: WifiService and
+// NetworkService both write `firewall` (guest WiFi isolation vs. client block
+// rules), so SetGuestWifi's abort could revert a block rule the user had just
+// saved and still answered 200. Hence keyed by config name, not by service.
+//
+// SCOPE: opt-in per mutator, not a global guarantee. A writer that does not
+// list its configs here is still exposed to the same corruption; the known
+// remaining gaps are AddDNSEntry / DeleteDNSEntry (`dhcp`) and the top-level VPN
+// flows (`network`), which cannot be wrapped as they are because they call the
+// already-wrapped firewall helpers. New writers should go through mutateUCI /
+// mutateWireless, which derive the lock set and the revert set from one list.
+//
+// Lock order is always: WifiService.uciWriteMu, then these config locks. Never
+// the reverse, and never take these twice on one path (they are not reentrant) —
+// revertUCIConfig deliberately does not lock, so a writer that holds the config
+// lock can still abort safely.
+//
+// The lock is also held across blocking work — a commit, an rpcd apply, an
+// `/etc/init.d/... reload` — so a slow reload blocks every other mutator listing
+// the same config. That is the intended trade: these sequences are short, and
+// the alternative is corruption. Do not add a second reload inside a mutator.
+func lockUCIConfigs(configs ...string) func() {
+	locks := make([]*sync.Mutex, 0, len(configs))
+	for _, c := range configs {
+		v, _ := uciConfigLocks.LoadOrStore(c, &sync.Mutex{})
+		m := v.(*sync.Mutex)
+		m.Lock()
+		locks = append(locks, m)
+	}
+	return func() {
+		for i := len(locks) - 1; i >= 0; i-- {
+			locks[i].Unlock()
+		}
+	}
+}
+
 // revertUCIConfig drops the staged UCI delta for each config that has one.
 //
 // The uci CLI keeps uncommitted changes in the process-global
 // /tmp/.uci/<config>/changes file, so a write sequence that fails half-way
 // must be reverted: otherwise a later, unrelated `uci commit <config>` (a WAN
 // save, a DHCP change, …) silently persists the abandoned delta.
+//
+// The caller must already hold the config lock for every name it passes, since
+// the revert discards whatever *anyone* has staged for that config.
 func revertUCIConfig(u uci.UCI, configs ...string) {
 	reverter, ok := u.(uciReverter)
 	if !ok {
@@ -56,6 +105,48 @@ func revertUCIConfig(u uci.UCI, configs ...string) {
 			log.Printf("WARNING: uci revert %s: %v", config, err)
 		}
 	}
+}
+
+// mutateWireless runs a wireless write sequence with the wireless write lock
+// and the shared per-config locks held, reverting every named config if fn
+// fails.
+//
+// Passing the config list ONCE is the point. The uci CLI keeps uncommitted
+// changes in the process-global /tmp/.uci/<config>/changes file, so a config
+// left staged by a failed write is committed by the next unrelated writer of
+// that config — putting a change the API reported as failed into the running
+// config. Deriving the lock set and the revert set from the same list is what
+// keeps them in agreement.
+//
+// Lock order is always: uciWriteMu, then the config locks. Neither is
+// reentrant, so mutateWireless must not be nested and no fn passed to it may
+// take either lock itself. Callers that only read UCI should not use this.
+func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApplyResult, error)) (*WirelessApplyResult, error) {
+	defer w.lockUCIWrite()()
+
+	var res *WirelessApplyResult
+	err := mutateUCI(w.uci, configs, func() error {
+		var err error
+		res, err = fn()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// mutateUCI is mutateWireless for the other services: it holds the named
+// configs' locks for the duration of fn and reverts all of them if fn fails.
+// Same one-list rule, same reason — see mutateWireless.
+func mutateUCI(u uci.UCI, configs []string, fn func() error) error {
+	defer lockUCIConfigs(configs...)()
+
+	if err := fn(); err != nil {
+		revertUCIConfig(u, configs...)
+		return err
+	}
+	return nil
 }
 
 // WirelessApplyResult describes a staged rollback apply that still needs

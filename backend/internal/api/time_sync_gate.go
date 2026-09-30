@@ -14,6 +14,20 @@ import (
 // parking the clock in 1970 (which keeps JWT `exp` checks valid forever) or in
 // a far-future year (which breaks TLS, cron and hwclock and permanently locks
 // out the pre-login recovery path).
+//
+// The window is deliberately WIDE, and the real protection is that it is
+// single-use. floor is the build time, not "now", and the build-to-install lag
+// is unbounded: a user who installs a release three months old on an RTC-less
+// device posts a clock that is legitimately months past floor. A tight upper
+// bound (a few days was tried) does not close the attack — it just breaks the
+// documented pre-login recovery path, on a device where losing the clock also
+// makes JWT `exp` meaningless, leaving no way back in.
+//
+// What stops a repeated attack is NoteClockSet latching the gate shut after the
+// FIRST accepted unauthenticated sync. That is a single bounded jump, on a
+// device whose clock was already unusable, to a client on the LAN — an
+// availability nuisance, not an auth bypass, since a forward jump can only
+// shorten a token's remaining life and a backward one is refused outright.
 const (
 	timeSyncMinClientOffset = -30 * 24 * time.Hour
 	timeSyncMaxClientOffset = 400 * 24 * time.Hour
@@ -47,12 +61,19 @@ func (g *TimeSyncGate) UnauthBlocked(now, floor time.Time) bool {
 	return g.plausible
 }
 
-// NoteClockSet latches the gate when a clock value the router has just adopted
-// is itself plausible — an attacker cannot rewind past their own write.
-func (g *TimeSyncGate) NoteClockSet(setTo, floor time.Time) {
-	if setTo.Before(floor) {
-		return
-	}
+// NoteClockSet latches the gate after a successful clock change.
+//
+// Latching on *every* accepted write — not only on writes that land at or
+// after the build time — is what closes the pin-the-clock-lowly attack. If the
+// gate only latched for plausible values, an attacker could keep setting the
+// clock to floor-61s, floor-121s, ... forever (the lower bound is 30 days
+// wide, so this is always available). The gate would never latch, the
+// unauthenticated clock-set primitive would stay reachable indefinitely, and
+// the endpoint the gate exists to protect would never close. The only cost is
+// that a device which legitimately needed several successive corrections gets
+// one fewer of them, and re-authenticating is the documented way to set the
+// clock again.
+func (g *TimeSyncGate) NoteClockSet() {
 	g.mu.Lock()
 	g.plausible = true
 	g.mu.Unlock()

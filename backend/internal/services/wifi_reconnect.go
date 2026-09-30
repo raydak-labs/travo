@@ -135,6 +135,24 @@ func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
 
 // SetWiFiSchedule saves the WiFi schedule and updates the cron file.
 func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
+	// The times are formatted straight into a crontab line, so they must be
+	// strict HH:MM: a newline would inject an extra attacker-controlled cron
+	// entry that runs as root.
+	//
+	// Validate BEFORE persisting. Writing first left the rejected value in
+	// wifi-schedule.json (so GetWiFiSchedule reported it back to the UI and the
+	// startup reconcile goroutine re-read it) while the previously written cron
+	// file kept toggling WiFi — a request that returned 400 had in fact changed
+	// persisted state.
+	if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
+		if err := ValidateHHMM(schedule.OnTime); err != nil {
+			return fmt.Errorf("on_time: %w", err)
+		}
+		if err := ValidateHHMM(schedule.OffTime); err != nil {
+			return fmt.Errorf("off_time: %w", err)
+		}
+	}
+
 	data, err := json.Marshal(schedule)
 	if err != nil {
 		return err
@@ -151,15 +169,6 @@ func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 		return nil
 	}
 
-	// The times are formatted straight into a crontab line, so they must be
-	// strict HH:MM: a newline would inject an extra attacker-controlled cron
-	// entry that runs as root.
-	if err := ValidateHHMM(schedule.OnTime); err != nil {
-		return fmt.Errorf("on_time: %w", err)
-	}
-	if err := ValidateHHMM(schedule.OffTime); err != nil {
-		return fmt.Errorf("off_time: %w", err)
-	}
 	onParts := strings.SplitN(schedule.OnTime, ":", 2)
 	offParts := strings.SplitN(schedule.OffTime, ":", 2)
 

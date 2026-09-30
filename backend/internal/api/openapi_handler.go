@@ -45,9 +45,12 @@ var openAPISpec = map[string]any{
 			"get": endpoint("GetSession", "Get current session info (expires_in = remaining seconds relative to the server clock)", true, nil, resp200("application/json", obj("valid", "expires_in"))),
 		},
 		"/auth/password": map[string]any{
-			"put": endpoint("ChangePassword", "Change the admin password", true,
+			// Changing the password revokes EVERY session, including the
+			// caller's, and returns a fresh token for it. A client that keeps
+			// using the token it sent is logged out on its very next request.
+			"put": endpoint("ChangePassword", "Change the admin password. Revokes all sessions and returns a replacement token for the caller.", true,
 				body("application/json", obj("current_password", "new_password")),
-				resp200("application/json", obj("status")),
+				resp200("application/json", obj("status", "token", "expires_at", "expires_in", "revoked_sessions")),
 			),
 		},
 		// System
@@ -121,7 +124,7 @@ var openAPISpec = map[string]any{
 		"/system/hostname": map[string]any{
 			"put": endpoint("SetHostname", "Change the device hostname", true,
 				body("application/json", obj("hostname")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status", "reboot_required")),
 			),
 		},
 		"/system/leds": map[string]any{
@@ -140,9 +143,9 @@ var openAPISpec = map[string]any{
 		},
 		"/system/timezone": map[string]any{
 			"get": endpoint("GetTimezone", "Get current timezone", true, nil, resp200("application/json", obj("timezone"))),
-			"put": endpoint("SetTimezone", "Set device timezone", true,
-				body("application/json", obj("timezone")),
-				resp200("application/json", obj("ok")),
+			"put": endpoint("SetTimezone", "Set device timezone. Both zonename and timezone are required.", true,
+				body("application/json", obj("zonename", "timezone")),
+				resp200("application/json", obj("status", "reboot_required")),
 			),
 		},
 		"/system/backup": map[string]any{
@@ -164,7 +167,7 @@ var openAPISpec = map[string]any{
 			"get": endpoint("GetNTP", "Get NTP server configuration", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetNTP", "Set NTP servers", true,
 				body("application/json", obj("servers")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status", "reboot_required")),
 			),
 		},
 		"/system/ntp/sync": map[string]any{

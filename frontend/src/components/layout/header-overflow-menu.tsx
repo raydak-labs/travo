@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { LogOut, MoreVertical, RotateCcw, PowerOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +16,7 @@ import { moveMenuFocus, usePopoverDismiss, type PopoverCloseReason } from './use
 const MENU_ID = 'header-overflow-menu';
 
 export function HeaderOverflowMenu() {
+  const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
   const rebootMutation = useReboot();
   const shutdownMutation = useShutdown();
@@ -110,6 +112,11 @@ export function HeaderOverflowMenu() {
               onClick={() => {
                 closeMenu('activate');
                 logout();
+                // Leave the protected route now. Nothing else watches
+                // isAuthenticated, so without this the whole app stays
+                // rendered until some poll (up to 15s) fires a 401 and
+                // api-client hard-navigates the browser to /login.
+                void navigate({ to: '/login' });
               }}
             >
               <LogOut className="h-4 w-4" />

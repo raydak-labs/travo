@@ -63,13 +63,16 @@ func TestTimeSyncGate_ClockSetLatches(t *testing.T) {
 	if g.Plausible() {
 		t.Fatal("new gate must not be latched")
 	}
-	g.NoteClockSet(floor.Add(-365*24*time.Hour), floor)
-	if g.Plausible() {
-		t.Error("a still-implausible clock must not latch the gate")
-	}
-	g.NoteClockSet(floor, floor)
+	// Any accepted write latches, including one that lands below the floor.
+	// Otherwise an attacker can keep pinning the clock just under the build
+	// time (floor-61s, floor-121s, …) and the unauthenticated primitive the
+	// gate exists to close stays reachable forever.
+	g.NoteClockSet()
 	if !g.Plausible() {
-		t.Error("adopting a plausible clock must latch the gate")
+		t.Error("adopting a clock value must latch the gate")
+	}
+	if !g.UnauthBlocked(floor.Add(-24*time.Hour), floor) {
+		t.Error("gate must stay closed after any successful clock set")
 	}
 }
 
@@ -83,6 +86,13 @@ func TestValidateClientTimeWindow(t *testing.T) {
 	}
 	if err := validateClientTimeWindow(time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC), floor); err == nil {
 		t.Error("1970 must be rejected")
+	}
+	// The window must stay wide enough to cover the build-to-install lag. floor
+	// is the BUILD time, so a user installing an old release on an RTC-less
+	// device legitimately posts a clock months past it, and rejecting that
+	// breaks the only pre-login recovery path such a device has.
+	if err := validateClientTimeWindow(floor.Add(90*24*time.Hour), floor); err != nil {
+		t.Errorf("a 3-month build-to-install lag must still be recoverable: %v", err)
 	}
 	if err := validateClientTimeWindow(floor.Add(10000*24*time.Hour), floor); err == nil {
 		t.Error("far-future clock must be rejected")

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // hhmmRe matches a strict 24-hour "HH:MM" clock time.
@@ -26,11 +25,11 @@ func ValidateHHMM(s string) error {
 	if s == "" {
 		return fmt.Errorf("time is required")
 	}
+	// hhmmRe is a full-string match, so it is strictly tighter than
+	// time.Parse("15:04", ...) — a second parse here could never reject anything
+	// the regex already accepted.
 	if !hhmmRe.MatchString(s) {
 		return fmt.Errorf("invalid time %q: expected HH:MM (00:00-23:59)", s)
-	}
-	if _, err := time.Parse("15:04", s); err != nil {
-		return fmt.Errorf("invalid time %q: %w", s, err)
 	}
 	return nil
 }

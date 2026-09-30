@@ -287,20 +287,23 @@ func (w *WifiService) ScanRadioForSSID(radioName, ssid string) (int, bool, error
 // applies the change. This is for automated background switches; it uses
 // applyWireless (ApplyAndConfirm) rather than the staged browser-confirm flow.
 func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
-	section, err := w.findSTASection()
-	if err != nil {
-		return fmt.Errorf("no STA section to switch: %w", err)
-	}
-	if err := w.uci.Set("wireless", section, "device", targetRadio); err != nil {
-		return fmt.Errorf("uci set device: %w", err)
-	}
-	// Reconcile AP layout: the target radio may host an AP that must be disabled
-	// (and the previous radio's AP re-enabled) to avoid ath11k/IPQ6018 crash.
-	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
-		return fmt.Errorf("reconciling AP radio layout: %w", err)
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		return fmt.Errorf("uci commit: %w", err)
-	}
-	return w.applyWireless()
+	_, err := w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		section, err := w.findSTASection()
+		if err != nil {
+			return nil, fmt.Errorf("no STA section to switch: %w", err)
+		}
+		if err := w.uci.Set("wireless", section, "device", targetRadio); err != nil {
+			return nil, fmt.Errorf("uci set device: %w", err)
+		}
+		// Reconcile AP layout: the target radio may host an AP that must be disabled
+		// (and the previous radio's AP re-enabled) to avoid ath11k/IPQ6018 crash.
+		if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+			return nil, fmt.Errorf("reconciling AP radio layout: %w", err)
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, fmt.Errorf("uci commit: %w", err)
+		}
+		return nil, w.applyWireless()
+	})
+	return err
 }

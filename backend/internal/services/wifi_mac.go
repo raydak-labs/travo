@@ -68,69 +68,59 @@ func normalizeMAC(mac string) (string, error) {
 // touch the live link with "ip link": doing that before would take the interface
 // down with a possibly invalid address and outside any crash guard.
 func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
-	defer w.lockUCIWrite()()
-
-	targetMAC := ""
-	if strings.TrimSpace(mac) != "" {
-		// netifd replays wireless.<sta>.macaddr on every wifi up, so an invalid
-		// value committed here would keep breaking the interface across reboots.
-		normalized, err := normalizeMAC(mac)
+	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		targetMAC := ""
+		if strings.TrimSpace(mac) != "" {
+			// netifd replays wireless.<sta>.macaddr on every wifi up, so an invalid
+			// value committed here would keep breaking the interface across reboots.
+			normalized, err := normalizeMAC(mac)
+			if err != nil {
+				return nil, err
+			}
+			targetMAC = normalized
+		}
+		staSection, err := w.findSTASection()
 		if err != nil {
+			return nil, fmt.Errorf("STA interface not found")
+		}
+		// Crash guard first: from here on the sequence changes live state, and a
+		// crash mid-way must be recoverable on the next boot (ADR 0003).
+		if err := w.writeCrashGuard(macGuardFeature); err != nil {
 			return nil, err
 		}
-		targetMAC = normalized
-	}
-
-	staSection, err := w.findSTASection()
-	if err != nil {
-		return nil, fmt.Errorf("STA interface not found")
-	}
-
-	// Crash guard first: from here on the sequence changes live state, and a
-	// crash mid-way must be recoverable on the next boot (ADR 0003).
-	if err := w.writeCrashGuard(macGuardFeature); err != nil {
-		return nil, err
-	}
-	guardStays := true
-	defer func() {
-		if guardStays {
-			// The apply did not complete; leave the guard for recovery.
-			log.Printf("WARNING: %s MAC change incomplete, crash guard kept at %s", macGuardFeature, w.guardPath(macGuardFeature))
+		guardStays := true
+		defer func() {
+			if guardStays {
+				// The apply did not complete; leave the guard for recovery.
+				log.Printf("WARNING: %s MAC change incomplete, crash guard kept at %s", macGuardFeature, w.guardPath(macGuardFeature))
+			}
+		}()
+		if err := w.uci.Set("wireless", staSection, "macaddr", targetMAC); err != nil {
+			return nil, fmt.Errorf("setting MAC: %w", err)
 		}
-	}()
-
-	if err := w.uci.Set("wireless", staSection, "macaddr", targetMAC); err != nil {
-		revertUCIConfig(w.uci, "wireless")
-		return nil, fmt.Errorf("setting MAC: %w", err)
-	}
-	// Verify what was actually staged before committing it.
-	staged, err := w.uci.Get("wireless", staSection, "macaddr")
-	if err != nil {
-		revertUCIConfig(w.uci, "wireless")
-		return nil, fmt.Errorf("verifying MAC: %w", err)
-	}
-	if staged != targetMAC {
-		revertUCIConfig(w.uci, "wireless")
-		return nil, fmt.Errorf("MAC verification failed: wanted %q, wireless config holds %q", targetMAC, staged)
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		revertUCIConfig(w.uci, "wireless")
-		return nil, fmt.Errorf("committing wireless: %w", err)
-	}
-
-	apply, err := w.stageWirelessApply()
-	if err != nil {
-		// The config is committed but not applied: keep the guard so the next
-		// boot / recovery path can settle it, and do not touch the link.
-		return nil, err
-	}
-
-	// The apply is in flight; only now is it safe to change the live link.
-	w.applyMACImmediate(targetMAC)
-
-	guardStays = false
-	w.clearCrashGuard(macGuardFeature)
-	return apply, nil
+		// Verify what was actually staged before committing it.
+		staged, err := w.uci.Get("wireless", staSection, "macaddr")
+		if err != nil {
+			return nil, fmt.Errorf("verifying MAC: %w", err)
+		}
+		if staged != targetMAC {
+			return nil, fmt.Errorf("MAC verification failed: wanted %q, wireless config holds %q", targetMAC, staged)
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, fmt.Errorf("committing wireless: %w", err)
+		}
+		apply, err := w.stageWirelessApply()
+		if err != nil {
+			// The config is committed but not applied: keep the guard so the next
+			// boot / recovery path can settle it, and do not touch the link.
+			return nil, err
+		}
+		// The apply is in flight; only now is it safe to change the live link.
+		w.applyMACImmediate(targetMAC)
+		guardStays = false
+		w.clearCrashGuard(macGuardFeature)
+		return apply, nil
+	})
 }
 
 // applyMACImmediate applies (or restores) the MAC address on the live STA

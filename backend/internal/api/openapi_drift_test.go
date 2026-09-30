@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -182,5 +183,129 @@ func TestOpenAPIOperationsAreDescribed(t *testing.T) {
 				t.Errorf("%s has no 200 response", where)
 			}
 		}
+	}
+}
+
+// specResponseKeys returns the property names the spec declares in the 200
+// response example of an operation, e.g. ["status", "token"].
+//
+// path is a real request path ("/api/v1/system/hostname"); spec paths are
+// declared relative to the "/api/v1" server entry, so the prefix is stripped.
+func specResponseKeys(t *testing.T, spec map[string]any, path, method string) []string {
+	t.Helper()
+	paths, _ := spec["paths"].(map[string]any)
+	path = strings.TrimPrefix(path, "/api/v1")
+	ops, _ := paths[path].(map[string]any)
+	op, _ := ops[strings.ToLower(method)].(map[string]any)
+	responses, _ := op["responses"].(map[string]any)
+	ok, _ := responses["200"].(map[string]any)
+	content, _ := ok["content"].(map[string]any)
+	// The spec declares a single content type per operation; take whichever
+	// is there rather than hardcoding "application/json".
+	for _, v := range content {
+		schema, _ := v.(map[string]any)["schema"].(map[string]any)
+		example, _ := schema["example"].(map[string]any)
+		keys := make([]string, 0, len(example))
+		for k := range example {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	}
+	return nil
+}
+
+// The drift test above compares (method, path) only, so it structurally cannot
+// see a handler that changes the SHAPE of its response while keeping its route.
+// That is not hypothetical: this branch changed four responses in place — most
+// importantly PUT /auth/password, which now returns a replacement token because
+// the change revokes every session. A client written against the documented
+// contract keeps using the revoked token and is silently logged out.
+//
+// This pins the 200-response keys of those endpoints in BOTH directions: the
+// spec must declare them, the handler must return them, and neither may carry a
+// key the other lacks.
+func TestOpenAPIResponseShapesMatchHandlers(t *testing.T) {
+	spec := openAPISpec
+
+	tests := []struct {
+		name      string
+		method    string
+		path      string
+		body      string
+		authToken string
+		wantKeys  []string
+	}{
+		{
+			name:   "ChangePassword returns the replacement token",
+			method: "PUT", path: "/api/v1/auth/password",
+			body:     `{"current_password":"admin","new_password":"newpassword123"}`,
+			wantKeys: []string{"status", "token", "expires_at", "expires_in", "revoked_sessions"},
+		},
+		{
+			name:   "SetHostname reports reboot_required",
+			method: "PUT", path: "/api/v1/system/hostname",
+			body:     `{"hostname":"travo-test"}`,
+			wantKeys: []string{"status", "reboot_required"},
+		},
+		{
+			name:   "SetTimezone reports reboot_required",
+			method: "PUT", path: "/api/v1/system/timezone",
+			body:     `{"zonename":"Europe/Berlin","timezone":"CET"}`,
+			wantKeys: []string{"status", "reboot_required"},
+		},
+		{
+			name:   "SetNTP reports reboot_required",
+			method: "PUT", path: "/api/v1/system/ntp",
+			body:     `{"servers":["0.openwrt.pool.ntp.org"]}`,
+			wantKeys: []string{"status", "reboot_required"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// A fresh app per subtest: PUT /auth/password changes the password,
+			// so sharing one AuthService would make every later subtest fail to
+			// log in.
+			app, deps := setupTestApp(t)
+			token, _, err := deps.Auth.Login("admin")
+			if err != nil {
+				t.Fatalf("login: %v", err)
+			}
+
+			declared := specResponseKeys(t, spec, tc.path, tc.method)
+			for _, want := range tc.wantKeys {
+				if !slices.Contains(declared, want) {
+					t.Errorf("OpenAPI %s %s does not declare %q (declares %v)", tc.method, tc.path, want, declared)
+				}
+			}
+
+			req, _ := http.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+			if err != nil {
+				t.Fatalf("request: %v", err)
+			}
+			respBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("handler returned %d: %s", resp.StatusCode, respBody)
+			}
+			var got map[string]any
+			if err := json.Unmarshal(respBody, &got); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			for _, want := range tc.wantKeys {
+				if _, ok := got[want]; !ok {
+					t.Errorf("handler is missing %q, which the spec documents; got %s", want, respBody)
+				}
+			}
+			for key := range got {
+				if !slices.Contains(tc.wantKeys, key) {
+					t.Errorf("handler returns %q but the spec does not declare it", key)
+				}
+			}
+		})
 	}
 }

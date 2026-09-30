@@ -29,6 +29,14 @@ type wsTestServer struct {
 	done chan struct{}
 }
 
+// fastKeepalive shortens the keepalive/revalidation cadence so tests do not
+// have to wait 30-90s for the server to notice a revoked session.
+var fastKeepalive = HandlerOptions{
+	PingInterval:       50 * time.Millisecond,
+	ReadDeadline:       3 * time.Second,
+	RevalidateInterval: 50 * time.Millisecond,
+}
+
 func newWSTestServer(t *testing.T, opts ...func(*wsTestServer)) *wsTestServer {
 	t.Helper()
 
@@ -49,8 +57,8 @@ func newWSTestServer(t *testing.T, opts ...func(*wsTestServer)) *wsTestServer {
 	ts.Hub.Start()
 
 	app := fiber.New()
-	app.Use("/api/v1/ws", UpgradeMiddleware(ts.Auth))
-	app.Get("/api/v1/ws", Handler(ts.Hub, ts.Auth))
+	app.Use("/api/v1/ws", UpgradeMiddleware(ts.Auth, nil))
+	app.Get("/api/v1/ws", Handler(ts.Hub, ts.Auth, fastKeepalive))
 
 	// A real listener is required: the upgrade hijacks the fasthttp
 	// connection, which the in-process test transports do not provide.
@@ -217,62 +225,32 @@ func TestOriginAllowed(t *testing.T) {
 	}
 }
 
-// A wildcard CORS setting must not become "every origin may open a socket".
-func TestResolveAllowedOrigins_DropsWildcard(t *testing.T) {
-	if got := resolveAllowedOrigins([]string{"*", "http://ui.example"}); len(got) != 1 || got[0] != "http://ui.example" {
-		t.Errorf("expected the wildcard to be dropped, got %v", got)
+// A wildcard CORS setting must not become "every origin may open a socket",
+// and a configured list is normalized the same way the CORS middleware
+// normalizes it (trim, drop the trailing slash, drop blanks).
+func TestNormalizeOrigins(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"nil is same-origin only", nil, []string{}},
+		{"blank is same-origin only", []string{"  ", ""}, []string{}},
+		{"wildcard is dropped", []string{"*", "http://ui.example"}, []string{"http://ui.example"}},
+		{"trailing slash and blanks trimmed", []string{" http://localhost:5173 ", "https://travo.example/"}, []string{"http://localhost:5173", "https://travo.example"}},
 	}
-}
-
-// The CORS allowlist and the WebSocket origin check must agree, otherwise an
-// operator who passes --cors-origins on the command line ends up with a UI that
-// loads but a socket that never opens.
-func TestResolveAllowedOrigins_ReadsEnvCORSOrigins(t *testing.T) {
-	env := func(k string) string {
-		if k == "CORS_ORIGINS" {
-			return "http://localhost:5173, https://travo.example/"
-		}
-		return ""
-	}
-	got := resolveAllowedOriginsFrom(nil, nil, env)
-	want := []string{"http://localhost:5173", "https://travo.example"}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Errorf("resolveAllowedOriginsFrom(env) = %v, want %v", got, want)
-	}
-}
-
-func TestResolveAllowedOrigins_FallsBackToCLIArg(t *testing.T) {
-	env := func(string) string { return "" }
-	for _, args := range [][]string{
-		{"--cors-origins=http://localhost:5173"},
-		{"-cors-origins", "http://localhost:5173"},
-		{"--port", "8080", "--cors-origins=http://localhost:5173"},
-		{"--static-dir", "--cors-origins=http://localhost:5173"},
-	} {
-		got := resolveAllowedOriginsFrom(nil, args, env)
-		if len(got) != 1 || got[0] != "http://localhost:5173" {
-			t.Errorf("resolveAllowedOriginsFrom(%v) = %v, want [http://localhost:5173]", args, got)
-		}
-	}
-}
-
-func TestResolveAllowedOrigins_ExplicitListWinsOverEnvAndArgs(t *testing.T) {
-	env := func(string) string { return "http://from-env.example" }
-	got := resolveAllowedOriginsFrom(
-		[]string{"http://explicit.example"},
-		[]string{"--cors-origins=http://from-cli.example"},
-		env,
-	)
-	if len(got) != 1 || got[0] != "http://explicit.example" {
-		t.Errorf("expected the explicit list to win, got %v", got)
-	}
-}
-
-// No configuration at all must mean same-origin only, never "any origin".
-func TestResolveAllowedOrigins_NoConfigIsSameOriginOnly(t *testing.T) {
-	env := func(string) string { return "   " }
-	if got := resolveAllowedOriginsFrom(nil, []string{"--mock"}, env); len(got) != 0 {
-		t.Errorf("expected an empty allowlist, got %v", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := normalizeOrigins(tc.in)
+			if len(got) != len(tc.want) {
+				t.Fatalf("normalizeOrigins(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("normalizeOrigins(%v) = %v, want %v", tc.in, got, tc.want)
+				}
+			}
+		})
 	}
 }
 
@@ -282,7 +260,6 @@ func TestResolveAllowedOrigins_NoConfigIsSameOriginOnly(t *testing.T) {
 // re-validates the session and closes the connection.
 func TestHandler_StopsStreamingAfterLogout(t *testing.T) {
 	ts := newWSTestServer(t)
-	withFastKeepalive(t)
 	token := loginToken(t, ts)
 
 	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+token, nil)
@@ -352,7 +329,6 @@ func TestHandler_SetsReadLimit(t *testing.T) {
 // keepalive is live on an upgraded socket.
 func TestHandler_SendsPings(t *testing.T) {
 	ts := newWSTestServer(t)
-	withFastKeepalive(t)
 	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), nil)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
@@ -397,23 +373,6 @@ func signToken(t *testing.T, jti string, exp time.Time) string {
 		t.Fatalf("signing token: %v", err)
 	}
 	return signed
-}
-
-// withFastKeepalive shrinks the keepalive/revalidation cadence so the tests do
-// not have to wait 30-90s for the server to notice a revoked session.
-func withFastKeepalive(t *testing.T) {
-	t.Helper()
-	// Stored atomically: the server goroutine reads these while a handler is
-	// live, so plain assignment here is a data race the -race job can flag.
-	origPing, origDeadline, origRevalidate := pingInterval.Load(), readDeadline.Load(), revalidateInterval.Load()
-	pingInterval.Store(int64(50 * time.Millisecond))
-	revalidateInterval.Store(int64(50 * time.Millisecond))
-	readDeadline.Store(int64(3 * time.Second))
-	t.Cleanup(func() {
-		pingInterval.Store(origPing)
-		readDeadline.Store(origDeadline)
-		revalidateInterval.Store(origRevalidate)
-	})
 }
 
 // waitForClientCount polls until the hub holds want clients, or fails. The
