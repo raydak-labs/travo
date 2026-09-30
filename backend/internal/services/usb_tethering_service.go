@@ -25,6 +25,9 @@ const usbTetherUCIName = "usbtether"
 // removed only after the change completed successfully (ADR 0003).
 const usbTetherGuardPath = crashGuardDir + "/usbtether-in-progress"
 
+// usbTetherConfigs is every UCI config this service mutates.
+var usbTetherConfigs = []string{"firewall", "network"}
+
 // USBTetherStatus holds the detected USB tethering state.
 type USBTetherStatus struct {
 	Detected   bool   `json:"detected"`
@@ -242,7 +245,21 @@ func (s *USBTetheringService) isConfigured() bool {
 
 // Configure creates a UCI DHCP interface for the detected USB tethering device
 // and adds it to the WAN firewall zone.
+// Configure writes `network` (the usbtether interface) and `firewall` (adding it
+// to the WAN zone) through shelled `uci`.
+//
+// Takes both locks. This is the only place found that mutates `network` and
+// `firewall` outside the lock model, and it is invisible to the usual audit
+// because it never goes through uci.Set — it shells out. Unlocked, its
+// `uci commit firewall` can commit a VPN toggle's half-torn-down wg0 zone.
+//
+// withConfigLocks, not mutateUCI: no uci.UCI handle here to revert through, so a
+// failure leaves this flow's staged delta for the next writer of those configs.
 func (s *USBTetheringService) Configure(ifaceName string) error {
+	return withConfigLocks(usbTetherConfigs, func() error { return s.configureLocked(ifaceName) })
+}
+
+func (s *USBTetheringService) configureLocked(ifaceName string) error {
 	if strings.TrimSpace(ifaceName) == "" {
 		return errors.New("usb tethering interface name is required")
 	}
@@ -293,7 +310,13 @@ func (s *USBTetheringService) Configure(ifaceName string) error {
 }
 
 // Unconfigure removes the usbtether UCI interface and its WAN zone reference.
+// Unconfigure removes the interface and its firewall membership; see Configure
+// for why it is locked.
 func (s *USBTetheringService) Unconfigure() error {
+	return withConfigLocks(usbTetherConfigs, func() error { return s.unconfigureLocked() })
+}
+
+func (s *USBTetheringService) unconfigureLocked() error {
 	if err := s.writeGuard(); err != nil {
 		return err
 	}

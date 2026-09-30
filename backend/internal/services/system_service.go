@@ -65,6 +65,9 @@ type SystemService struct {
 	guardResolved string
 	// sshKeysFile overrides authorizedKeysFile (tests only).
 	sshKeysFile string
+	// toggleScriptPath overrides where the generated wireless toggle helper is
+	// written (tests only); empty means the production /usr/libexec path.
+	toggleScriptPath string
 }
 
 // sshKeysPath returns the authorized_keys path in use.
@@ -502,6 +505,11 @@ func listLEDs() []string {
 
 const ledCronTag = "# openwrt-travel-gui-led-schedule"
 
+// ledCrontabPath is busybox crond's per-user crontab. It is the ONLY file it
+// reads (it is built with -c /etc/crontabs), which is also why the WiFi schedule
+// targets the same file.
+const ledCrontabPath = "/etc/crontabs/root"
+
 // GetLEDSchedule reads the LED stealth schedule from crontab.
 func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 	data, err := os.ReadFile("/etc/crontabs/root")
@@ -531,8 +539,15 @@ func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 }
 
 // SetLEDSchedule writes or removes LED schedule cron entries.
+//
+// Shares crontabMu with the WiFi schedule: both rewrite /etc/crontabs/root
+// while preserving the lines they do not own, so a concurrent pair would drop
+// one another's entries.
 func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
-	data, _ := os.ReadFile("/etc/crontabs/root")
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
+
+	data, _ := os.ReadFile(ledCrontabPath)
 	var lines []string
 	for line := range strings.SplitSeq(string(data), "\n") {
 		if line == "" || strings.Contains(line, ledCronTag) {
@@ -557,7 +572,7 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 		lines = append(lines, offLine, onLine)
 	}
 	lines = append(lines, "")
-	if err := os.WriteFile("/etc/crontabs/root", []byte(strings.Join(lines, "\n")), 0600); err != nil {
+	if err := writeFileAtomic(ledCrontabPath, []byte(strings.Join(lines, "\n")), 0600); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")
@@ -850,7 +865,7 @@ func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error 
 			return err
 		}
 	}
-	if err := writeWirelessToggleScript(); err != nil {
+	if err := writeWirelessToggleScriptTo(s.toggleScriptPath); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(buttonActionsDir, 0o755); err != nil {

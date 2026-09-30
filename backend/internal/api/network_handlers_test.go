@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
@@ -730,5 +731,66 @@ func TestGetDDNSStatus_Returns200(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Errorf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+// Without ddns-scripts there is nothing that can service a `ddns` UCI config,
+// and ddns is not in the service catalog so the UI cannot install it either. The
+// endpoint used to answer 500 with `uci: Entry not found`, which named neither
+// the cause nor a way out. It must answer 503 and name the package.
+func TestSetDDNSConfig_MissingPackage_Returns503(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+	deps.Network.SetDDNSInitScript(t.TempDir() + "/definitely-not-installed")
+
+	body, _ := json.Marshal(map[string]any{
+		"enabled": true,
+		"service": "duckdns.org",
+		"domain":  "test.duckdns.org",
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/network/ddns", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d, body: %s", resp.StatusCode, b)
+	}
+	if !strings.Contains(string(b), "ddns-scripts") {
+		t.Errorf("response does not name the missing package: %s", b)
+	}
+}
+
+// The UI needs to know up front that DDNS cannot be configured, otherwise it
+// offers a form whose only possible outcome is the 503 above.
+func TestGetDDNSConfig_ReportsAvailability(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+
+	get := func() map[string]any {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/ddns", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return out
+	}
+
+	if avail, ok := get()["available"].(bool); !ok || avail != true {
+		t.Errorf("with ddns-scripts present, available should be true, got %v", get()["available"])
+	}
+	deps.Network.SetDDNSInitScript(t.TempDir() + "/definitely-not-installed")
+	if avail, ok := get()["available"].(bool); !ok || avail != false {
+		t.Errorf("without ddns-scripts, available should be false, got %v", get()["available"])
 	}
 }

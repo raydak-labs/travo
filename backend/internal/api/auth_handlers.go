@@ -21,7 +21,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 
 		var req models.LoginRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
 		token, expiry, err := authSvc.Login(req.Password)
@@ -84,7 +84,7 @@ func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ChangePasswordRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		res, err := authSvc.ChangePassword(req.CurrentPassword, req.NewPassword)
 		if err != nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -40,6 +41,15 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	authStore := auth.NewFileAuthStore(authConfigPath)
 
 	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
+
+	networkSvc := services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{})
+	// Pretend ddns-scripts is installed, so the DDNS endpoints exercise their
+	// normal path. TestSetDDNSConfig_MissingPackage_Returns503 covers the other
+	// case explicitly.
+	if err := os.WriteFile(tmpDir+"/init.d-ddns", []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write fake ddns init script: %v", err)
+	}
+	networkSvc.SetDDNSInitScript(tmpDir + "/init.d-ddns")
 	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
 
 	deps := &Dependencies{
@@ -48,7 +58,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
 		System:      systemSvc,
-		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
+		Network:     networkSvc,
 		Wifi:        wifiSvc,
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),

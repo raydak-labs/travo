@@ -137,7 +137,7 @@ var openAPISpec = map[string]any{
 		"/system/leds/schedule": map[string]any{
 			"get": endpoint("GetLEDSchedule", "Get LED cron schedule", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetLEDSchedule", "Set LED on/off cron schedule", true,
-				body("application/json", obj("on_cron", "off_cron")),
+				body("application/json", obj("enabled", "on_time", "off_time")),
 				resp200("application/json", obj("ok")),
 			),
 		},
@@ -207,7 +207,7 @@ var openAPISpec = map[string]any{
 		"/network/wan": map[string]any{
 			"get": endpoint("GetWANConfig", "Get WAN configuration (type, IP, DNS, MTU)", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetWANConfig", "Update WAN configuration", true,
-				body("application/json", obj("proto", "ipaddr", "netmask", "gateway", "dns", "mtu")),
+				body("application/json", obj("type", "interface_name", "ip_address", "netmask", "gateway", "dns_servers", "mtu")),
 				resp200("application/json", obj("ok")),
 			),
 		},
@@ -247,7 +247,7 @@ var openAPISpec = map[string]any{
 		"/network/dhcp": map[string]any{
 			"get": endpoint("GetDHCPConfig", "Get DHCP pool configuration", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetDHCPConfig", "Update DHCP pool (range, lease time)", true,
-				body("application/json", obj("start", "limit", "leasetime")),
+				body("application/json", obj("start", "limit", "lease_time")),
 				resp200("application/json", obj("ok")),
 			),
 		},
@@ -256,7 +256,7 @@ var openAPISpec = map[string]any{
 		},
 		"/network/dhcp/reservations": map[string]any{
 			"get":  endpoint("GetDHCPReservations", "List static DHCP reservations", true, nil, resp200("application/json", nil)),
-			"post": endpoint("AddDHCPReservation", "Add a static DHCP reservation", true, body("application/json", obj("mac", "ip", "hostname")), resp200("application/json", obj("ok"))),
+			"post": endpoint("AddDHCPReservation", "Add a static DHCP reservation", true, body("application/json", obj("name", "mac", "ip")), resp200("application/json", obj("ok"))),
 		},
 		"/network/dhcp/reservations/{section}": map[string]any{
 			"delete": endpoint("DeleteDHCPReservation", "Remove a static DHCP reservation", true, nil, resp200("application/json", obj("ok"))),
@@ -267,7 +267,7 @@ var openAPISpec = map[string]any{
 		},
 		"/network/dns/entries": map[string]any{
 			"get":  endpoint("GetDNSEntries", "List local DNS hostname→IP entries", true, nil, resp200("application/json", nil)),
-			"post": endpoint("AddDNSEntry", "Add a local DNS entry", true, body("application/json", obj("hostname", "ip")), resp200("application/json", obj("ok"))),
+			"post": endpoint("AddDNSEntry", "Add a local DNS entry", true, body("application/json", obj("name", "ip")), resp200("application/json", obj("ok"))),
 		},
 		"/network/dns/entries/{section}": map[string]any{
 			"delete": endpoint("DeleteDNSEntry", "Remove a local DNS entry", true, nil, resp200("application/json", obj("ok"))),
@@ -279,8 +279,8 @@ var openAPISpec = map[string]any{
 			),
 		},
 		"/network/ddns": map[string]any{
-			"get": endpoint("GetDDNSConfig", "Get Dynamic DNS provider configuration", true, nil, resp200("application/json", nil)),
-			"put": endpoint("SetDDNSConfig", "Update DDNS configuration", true, body("application/json", nil), resp200("application/json", obj("ok"))),
+			"get": endpoint("GetDDNSConfig", "Get Dynamic DNS provider configuration. `available` is false when ddns-scripts is not installed, in which case every write answers 503.", true, nil, resp200("application/json", obj("config", "available"))),
+			"put": endpoint("SetDDNSConfig", "Update DDNS configuration. Answers 503 when ddns-scripts is not installed.", true, body("application/json", obj("enabled", "service", "domain", "username", "password", "lookup_host", "update_url")), resp200("application/json", obj("ok"))),
 		},
 		"/network/ddns/status": map[string]any{
 			"get": endpoint("GetDDNSStatus", "Get DDNS current public IP and last update", true, nil, resp200("application/json", nil)),
@@ -291,7 +291,7 @@ var openAPISpec = map[string]any{
 		"/network/failover": map[string]any{
 			"get": endpoint("GetFailoverConfig", "Get connection failover configuration and runtime status", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetFailoverConfig", "Update connection failover ordering, enabled uplinks, and health tracking", true,
-				body("application/json", nil),
+				body("application/json", obj("enabled", "active_interface", "candidates", "health")),
 				resp200("application/json", obj("status")),
 			),
 		},
@@ -384,7 +384,7 @@ var openAPISpec = map[string]any{
 		"/sqm/config": map[string]any{
 			"get": endpoint("GetSQMConfig", "Get SQM (traffic shaping) configuration", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetSQMConfig", "Update SQM configuration (does not restart sqm)", true,
-				body("application/json", nil),
+				body("application/json", obj("enabled", "interface", "download_kbit", "upload_kbit", "qdisc", "script")),
 				resp200("application/json", obj("status")),
 			),
 		},
@@ -527,7 +527,7 @@ var openAPISpec = map[string]any{
 		},
 		"/vpn/wireguard": map[string]any{
 			"get": endpoint("GetWireGuard", "Get WireGuard UCI configuration", true, nil, resp200("application/json", nil)),
-			"put": endpoint("SetWireGuard", "Update WireGuard configuration", true, body("application/json", nil), resp200("application/json", obj("ok"))),
+			"put": endpoint("SetWireGuard", "Update WireGuard configuration", true, body("application/json", obj("private_key", "address", "dns", "peers")), resp200("application/json", obj("ok"))),
 		},
 		"/vpn/wireguard/toggle": map[string]any{
 			"post": endpoint("ToggleWireGuard", "Enable or disable the WireGuard tunnel", true,

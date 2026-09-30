@@ -10,8 +10,22 @@ import (
 
 var validIdentifier = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 var validSectionType = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`) // OpenWrt uses wifi-iface, wifi-device, etc.
-// validSectionNameForList allows named sections (zone_wan) and anonymous (@zone[0]) for firewall etc.
-var validSectionNameForList = regexp.MustCompile(`^([a-zA-Z0-9_]+|@[a-zA-Z0-9_]+\[\d+\])$`)
+// validSectionName allows a named section (zone_wan) or an anonymous one
+// (@zone[0]). Anonymous sections are not optional here: on a factory-fresh
+// OpenWrt /etc/config/system declares the system section anonymously, so
+// `uci show system` hands back "@system[0]" and every read-then-write path —
+// SetTimezone, SetHostname — carries that string straight into the next call.
+// The uci CLI accepts it in the dotted form (`uci set system.@system[0].zonename=UTC`
+// works), but rejecting it here made both endpoints fail with
+// `uci: invalid section "@system[0]"` on every stock device.
+//
+// Safe to widen: the pattern admits no dots, quotes, spaces or shell
+// metacharacters, so the value is still a single literal argv entry.
+var validSectionName = regexp.MustCompile(`^([a-zA-Z0-9_]+|@[a-zA-Z0-9_]+\[\d+\])$`)
+
+// validSectionNameForList is the same rule, kept as its own name at the
+// original call sites that read as "this is the list form".
+var validSectionNameForList = validSectionName
 
 // validListValue allows identifiers + hyphens + dots + slashes + colons for IPs/CIDRs/interface names.
 var validListValue = regexp.MustCompile(`^[a-zA-Z0-9_.:/+-]+$`)
@@ -24,10 +38,20 @@ func NewRealUCI() *RealUCI {
 	return &RealUCI{}
 }
 
-// validateIdentifier ensures a UCI config/section/option name contains only safe characters.
+// validateIdentifier ensures a UCI config/option name contains only safe characters.
 func validateIdentifier(name, value string) error {
 	if !validIdentifier.MatchString(value) {
 		return fmt.Errorf("uci: invalid %s %q", name, value)
+	}
+	return nil
+}
+
+// validateSection ensures a UCI section reference is a named section
+// (zone_wan) or an anonymous one (@zone[0]) — see validSectionName for why the
+// anonymous form has to be accepted.
+func validateSection(section string) error {
+	if !validSectionName.MatchString(section) {
+		return fmt.Errorf("uci: invalid section %q", section)
 	}
 	return nil
 }
@@ -72,7 +96,7 @@ func (r *RealUCI) Get(config, section, option string) (string, error) {
 	if err := validateIdentifier("config", config); err != nil {
 		return "", err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return "", err
 	}
 	if err := validateIdentifier("option", option); err != nil {
@@ -91,7 +115,7 @@ func (r *RealUCI) Set(config, section, option, value string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return err
 	}
 	if err := validateIdentifier("option", option); err != nil {
@@ -110,7 +134,7 @@ func (r *RealUCI) GetAll(config, section string) (map[string]string, error) {
 	if err := validateIdentifier("config", config); err != nil {
 		return nil, err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return nil, err
 	}
 
@@ -139,6 +163,9 @@ func (r *RealUCI) AddSection(config, section, stype string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
+	// Named only: this CREATES a section, and `uci set config.@type[0]=stype`
+	// is not a way to create one. Every caller passes a generated name
+	// (dns_pi_smoke, host_pi_smoke, ...).
 	if err := validateIdentifier("section", section); err != nil {
 		return err
 	}
@@ -182,7 +209,7 @@ func (r *RealUCI) DeleteOption(config, section, option string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return err
 	}
 	if err := validateIdentifier("option", option); err != nil {
@@ -197,7 +224,7 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return err
 	}
 

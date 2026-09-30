@@ -68,11 +68,36 @@ timer- or button-driven `wifi down` has no rollback. Those paths therefore call 
   `wireless.@wifi-device[*].disabled=0`; `down` sets it to `1`. Any other argument
   exits `2`.
 - **Mechanism:** `uci set` → `uci commit wireless` → rpcd
-  `ubus call uci apply '{"rollback":true,"timeout":30,"uci":"wireless"}'` → extract
-  the session with `jsonfilter` → `ubus call uci confirm`. A missing apply session, a
-  failed set/commit, or a failed confirm runs `uci revert wireless` and exits
+  `ubus call session login` → stage `wireless` into `/var/run/rpcd/uci-<sid>` →
+  `ubus call uci apply '{"ubus_rpc_session":"<sid>","rollback":true,"timeout":30}'`
+  → `ubus call uci confirm '{"ubus_rpc_session":"<sid>"}'`. A missing apply session,
+  a failed set/commit, or a failed confirm runs `uci revert wireless` and exits
   non-zero. This is the same rollback-then-confirm shape as §5, expressed in shell
-  because the caller is cron/procd rather than a browser.
+  because the caller is cron/procd rather than a browser. It mirrors
+  `RealUCIApplyConfirm.StartApply` / `Confirm` in `uci_apply.go` and
+  `scripts/setup-wireless-ap.sh`.
+- **Session-scoped apply, and why the login cannot be anonymous:** rpcd's
+  `uci apply`/`uci confirm` are session-scoped. `rpc_uci_apply` returns
+  `INVALID_ARGUMENT` unless the caller presents a `ubus_rpc_session`, and the bare
+  `ubus` CLI injects none — so the helper must log in first and pass that id on
+  **both** calls. It cannot log in with an empty password: stock
+  `/etc/config/rpcd` ships `option password '$p$root'`, which makes rpcd verify
+  against the real system root password, so an anonymous login succeeds only on a
+  device whose root account has no password at all.
+- **Login-argument file (operational constraint):** because the helper runs from
+  cron and hotplug with no travo process to ask, the backend writes the whole
+  `ubus call session login` argument — JSON-encoded by `encoding/json`, root-only
+  `0600` — to **`/etc/travo/rpcd-login.json`** (`auth.RPCDLoginHelperPath`), beside
+  `rpcd-login.sealed`. It is written on every successful login and refreshed at
+  startup from the seal. The helper passes those bytes to `ubus` verbatim; it never
+  escapes anything itself, because reimplementing JSON string escaping in `sed` is
+  not portable (BSD sed and BusyBox sed disagree on `s/\\/\\\\/g`). The sealed blob
+  cannot serve the helper directly — unsealing needs the `jwt_secret`, which lives
+  in the same root-only `auth.json`. With no such file the helper falls back to an
+  empty password, which is correct only on a device with no root password. **If
+  this file goes missing, every scheduled and button-driven WiFi toggle silently
+  becomes a no-op**; `/etc/trafo/wifi-toggle-in-progress` will not appear, because
+  the helper fails before the first mutation.
 - **Guard:** writes `/etc/trafo/wifi-toggle-in-progress` before the first mutation
   and removes it only after a confirmed apply. While the guard exists the helper logs
   and exits `0` without touching the radios (ADR 0003 §2).

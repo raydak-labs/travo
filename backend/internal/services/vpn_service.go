@@ -28,6 +28,42 @@ const openwrtTailscaleBinAlt = "/usr/bin/tailscale"
 
 var wireGuardVerifyTimeout = 12 * time.Second
 
+// tailscaleInitScript is the procd service for the tailscale package.
+const tailscaleInitScript = "/etc/init.d/tailscale"
+
+// ErrTailscaleNotInstalled is returned when the tailscale package is absent, so
+// none of its operations can run. Handlers map this to 503.
+//
+// Without it, every Tailscale mutation surfaced the raw exec error
+// ("exec: \"tailscale\": executable file not found in $PATH") as a 500, which
+// reads as a server fault and tells the operator nothing. Verified on the
+// device: PUT /api/v1/vpn/tailscale/ssh returned
+// 500 {"error":"exec: \"tailscale\": executable file not found in $PATH"}.
+var ErrTailscaleNotInstalled = errors.New("tailscale is not installed on this router")
+
+// TailscaleInstalled reports whether the tailscale package is present.
+//
+// Either artefact is enough: the binary is what the `tailscale` subcommands need,
+// and the init script is what the start/stop toggle needs. A router can have one
+// without the other mid-upgrade, so both are checked rather than assuming.
+func TailscaleInstalled() bool {
+	for _, p := range []string{openwrtTailscaleBin, openwrtTailscaleBinAlt, tailscaleInitScript} {
+		if _, err := os.Stat(p); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// requireTailscale returns ErrTailscaleNotInstalled when the package is absent, so
+// a Tailscale mutation fails with an actionable message instead of an exec error.
+func requireTailscale() error {
+	if !TailscaleInstalled() {
+		return fmt.Errorf("%w: install the tailscale package to use Tailscale", ErrTailscaleNotInstalled)
+	}
+	return nil
+}
+
 func tailscaleBin() string {
 	if _, err := os.Stat(openwrtTailscaleBin); err == nil {
 		return openwrtTailscaleBin
@@ -568,8 +604,17 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	return config, nil
 }
 
-// SetWireguardConfig updates the WireGuard configuration.
+// SetWireguardConfig is the entry point from the API. It takes the UCI transaction for every
+// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
+// the middle of a VPN toggle and revert half of it.
 func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.SetWireguardConfigLocked(config)
+	})
+}
+
+// SetWireguardConfig updates the WireGuard configuration.
+func (v *VpnService) SetWireguardConfigLocked(config models.WireguardConfig) error {
 	if err := v.ensureWireGuardInterface(); err != nil {
 		return err
 	}
@@ -609,11 +654,18 @@ func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
 // tunnel is up would leave DNS resolving through resolvers that are unreachable.
 // If the tunnel does not come up, the dependent changes are never made and any
 // partially applied change is torn down again.
+// ToggleWireguard enables or disables the tunnel. It is the widest UCI writer in
+// the service — network, firewall and dhcp — so the whole toggle is one
+// transaction: a failure anywhere reverts all three together instead of leaving
+// a half-applied tunnel whose firewall zone and resolver list disagree with its
+// interface state.
 func (v *VpnService) ToggleWireguard(enable bool) error {
-	if enable {
-		return v.enableWireguard()
-	}
-	return v.disableWireguard()
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		if enable {
+			return v.enableWireguard()
+		}
+		return v.disableWireguard()
+	})
 }
 
 // vpnGuardPath is the crash guard for VPN live-state changes (ADR 0003). It is
@@ -876,10 +928,37 @@ func (v *VpnService) disableVpnDNSForwarding() {
 	_ = os.Remove(legacyVpnDnsSnapshotPath)
 }
 
+// Config sets for the VPN flows.
+//
+// vpnFirewallConfigs is the standalone firewall entry points (kill switch and the
+// firewall helpers called cold).
+//
+// vpnFlowConfigs is what a full VPN toggle actually touches, and it is more than
+// the `network` writes suggest:
+//   - network:  the wg0 interface, peer, addresses and split-tunnel allowed IPs
+//   - firewall: the wg0 zone/forwarding rule and the toggle-owned kill switch
+//   - dhcp:     enableVpnDNSForwarding / disableVpnDNSForwarding rewrite
+//     dnsmasq's server list and noresolv
+//
+// dhcp was the one nobody listed: those two helpers shell out to `uci` directly
+// rather than going through the UCI interface, so they were invisible to every
+// audit of "which configs does this write" and held no lock at all. A WiFi save
+// committing `dhcp` while a VPN toggle was rewriting the resolver list is exactly
+// the corruption these locks exist to prevent.
+var (
+	vpnFirewallConfigs = []string{"firewall"}
+	vpnFlowConfigs     = []string{"dhcp", "firewall", "network"}
+)
+
 // setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule
 // exist in UCI and commits the firewall config. Called when activating a WireGuard profile.
+// setupWireGuardFirewall ensures the wg0 firewall zone and lan->wg0 forwarding
+// rule exist and commits. It does NOT take a config lock: every caller is inside
+// the VPN transaction, which already holds `firewall`, and the config locks are
+// not reentrant. TestVPNFlowsDoNotNestConfigLocks fails the build if that ever
+// stops being true.
 func (v *VpnService) setupWireGuardFirewall() error {
-	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+	{
 		// Ensure the wg0 zone exists.
 		if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
 			if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
@@ -908,21 +987,21 @@ func (v *VpnService) setupWireGuardFirewall() error {
 		}
 		v.reloadFirewall()
 		return nil
-	})
+	}
 }
 
 // teardownWireGuardFirewall removes the wg0 firewall zone and forwarding rule from UCI.
 // Called when deactivating WireGuard. Errors are non-fatal (section may not exist).
+// teardownWireGuardFirewall removes the wg0 zone and forwarding rule. It does
+// NOT take a config lock; see setupWireGuardFirewall.
 func (v *VpnService) teardownWireGuardFirewall() error {
-	return mutateUCI(v.uci, []string{"firewall"}, func() error {
-		_ = v.uci.DeleteSection("firewall", "wg0_zone")
-		_ = v.uci.DeleteSection("firewall", "wg0_fwd")
-		if err := v.uci.Commit("firewall"); err != nil {
-			return err
-		}
-		v.reloadFirewall()
-		return nil
-	})
+	_ = v.uci.DeleteSection("firewall", "wg0_zone")
+	_ = v.uci.DeleteSection("firewall", "wg0_fwd")
+	if err := v.uci.Commit("firewall"); err != nil {
+		return err
+	}
+	v.reloadFirewall()
+	return nil
 }
 
 // VerifyWireGuard checks the health of the WireGuard tunnel:
@@ -1098,6 +1177,9 @@ func (v *VpnService) GetTailscaleStatus() (models.TailscaleStatus, error) {
 
 // StartTailscaleAuth runs `tailscale up` and returns the auth URL if login is required.
 func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
+	if err := requireTailscale(); err != nil {
+		return "", err
+	}
 	args := []string{"up", "--accept-routes"}
 	if authKey != "" {
 		args = append(args, "--auth-key="+authKey)
@@ -1120,6 +1202,9 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 // When a non-empty exit node is set, WireGuard is turned off first so only one
 // full-tunnel-style path is active (see requirements: single active VPN policy).
 func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
+	if err := requireTailscale(); err != nil {
+		return err
+	}
 	nodeIP = strings.TrimSpace(nodeIP)
 	if nodeIP != "" {
 		if opts, err := v.uci.GetAll("network", "wg0"); err == nil && opts["disabled"] != "1" {
@@ -1163,7 +1248,7 @@ const (
 // Every write error is propagated: a partial rule would be committed with the
 // default target (ACCEPT), i.e. a "kill switch" that allows all traffic.
 func (v *VpnService) SetKillSwitch(enabled bool) error {
-	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+	return mutateUCI(v.uci, vpnFirewallConfigs, func() error {
 		if enabled {
 			// Create the firewall rule that blocks LAN→WAN when VPN is down.
 			if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err != nil {
@@ -1200,10 +1285,13 @@ func (v *VpnService) SetKillSwitch(enabled bool) error {
 }
 
 // removeVPNOwnedKillSwitch deletes the kill switch rule only when the VPN toggle
-// created it. A kill switch configured by the user as a standalone policy is
-// left untouched.
+// created it. A kill switch the user configured as a standalone policy is left
+// untouched.
+//
+// It does NOT take a config lock: every caller is already inside the VPN
+// transaction that holds `firewall`, and the config locks are not reentrant.
 func (v *VpnService) removeVPNOwnedKillSwitch() error {
-	return mutateUCI(v.uci, []string{"firewall"}, func() error {
+	{
 		opts, err := v.uci.GetAll("firewall", vpnKillSwitchSection)
 		if err != nil {
 			// Nothing to remove.
@@ -1220,12 +1308,21 @@ func (v *VpnService) removeVPNOwnedKillSwitch() error {
 		}
 		v.reloadFirewall()
 		return nil
+	}
+}
+
+// ImportWireguardConfig is the entry point from the API. It takes the UCI transaction for every
+// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
+// the middle of a VPN toggle and revert half of it.
+func (v *VpnService) ImportWireguardConfig(confContent string) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.ImportWireguardConfigLocked(confContent)
 	})
 }
 
 // ImportWireguardConfig parses a .conf file, normalizes the UCI structure,
 // applies the config, and verifies the tunnel comes up.
-func (v *VpnService) ImportWireguardConfig(confContent string) error {
+func (v *VpnService) ImportWireguardConfigLocked(confContent string) error {
 	parsed, err := ParseWireguardConfig(confContent)
 	if err != nil {
 		return err
@@ -1264,6 +1361,9 @@ func (v *VpnService) ImportWireguardConfig(confContent string) error {
 
 // ToggleTailscale starts or stops the Tailscale daemon via init.d.
 func (v *VpnService) ToggleTailscale(enable bool) error {
+	if err := requireTailscale(); err != nil {
+		return err
+	}
 	if enable {
 		_, err := v.cmd.Run("/etc/init.d/tailscale", "start")
 		return err
@@ -1345,6 +1445,13 @@ func (v *VpnService) AddProfile(name, config string) (*models.WireGuardProfile, 
 	return &profile, nil
 }
 
+// ActivateProfile is the entry point from the API; see ActivateProfileLocked.
+func (v *VpnService) ActivateProfile(id string) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.ActivateProfileLocked(id)
+	})
+}
+
 // DeleteProfile removes a profile by ID.
 func (v *VpnService) DeleteProfile(id string) error {
 	profiles, err := v.loadProfiles()
@@ -1368,8 +1475,11 @@ func (v *VpnService) DeleteProfile(id string) error {
 	return v.saveProfiles(filtered)
 }
 
-// ActivateProfile loads a profile's config into UCI and marks it as active.
-func (v *VpnService) ActivateProfile(id string) error {
+// ActivateProfileLocked loads a profile's config into UCI and marks it as
+// active. It writes network (via the import)
+// and firewall (the wg0 zone), so it runs inside the VPN transaction and calls
+// the lock-free cores.
+func (v *VpnService) ActivateProfileLocked(id string) error {
 	profiles, err := v.loadProfiles()
 	if err != nil {
 		return err
@@ -1387,7 +1497,7 @@ func (v *VpnService) ActivateProfile(id string) error {
 	}
 
 	// Apply the config via the existing import logic
-	if err := v.ImportWireguardConfig(target.Config); err != nil {
+	if err := v.ImportWireguardConfigLocked(target.Config); err != nil {
 		return fmt.Errorf("applying profile config: %w", err)
 	}
 
@@ -1613,6 +1723,15 @@ func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
 	return cfg, nil
 }
 
+// SetSplitTunnel is the entry point from the API. It takes the UCI transaction for every
+// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
+// the middle of a VPN toggle and revert half of it.
+func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.SetSplitTunnelLocked(cfg)
+	})
+}
+
 // SetSplitTunnel saves the split tunnel config and updates WireGuard allowed IPs in UCI.
 // mode "all" = route everything through VPN (0.0.0.0/0,::/0)
 // mode "custom" = only route the specified CIDR ranges (at least one is required;
@@ -1621,7 +1740,7 @@ func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
 //
 // Staged UCI deltas are reverted when any write fails, so a failed save cannot
 // leave peers with a half-written allowed_ips list.
-func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
+func (v *VpnService) SetSplitTunnelLocked(cfg models.SplitTunnelConfig) error {
 	allowedParts, err := splitTunnelAllowedIPs(cfg)
 	if err != nil {
 		return err
@@ -1753,6 +1872,9 @@ func (v *VpnService) GetTailscaleSSHEnabled() (bool, error) {
 
 // SetTailscaleSSHEnabled enables or disables Tailscale SSH.
 func (v *VpnService) SetTailscaleSSHEnabled(enabled bool) error {
+	if err := requireTailscale(); err != nil {
+		return err
+	}
 	arg := "--ssh=false"
 	if enabled {
 		arg = "--ssh"

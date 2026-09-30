@@ -18,6 +18,7 @@ import type {
   DNSEntry,
   DHCPReservation,
   DDNSConfig,
+  DDNSConfigResponse,
   DDNSStatus,
   UptimeEvent,
   FailoverConfig,
@@ -303,7 +304,7 @@ export function useDetectWanType() {
 export function useDDNSConfig() {
   return useQuery({
     queryKey: ['network', 'ddns'],
-    queryFn: () => apiClient.get<DDNSConfig>(API_ROUTES.network.ddns),
+    queryFn: () => apiClient.get<DDNSConfigResponse>(API_ROUTES.network.ddns),
   });
 }
 

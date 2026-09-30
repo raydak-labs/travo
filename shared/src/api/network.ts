@@ -141,6 +141,19 @@ export interface DDNSConfig {
   readonly update_url: string;
 }
 
+/**
+ * GET /network/ddns response.
+ *
+ * `available` is false when the ddns-scripts package is not installed: nothing
+ * on the router can then service a `ddns` config, and ddns is not in the service
+ * catalog, so the UI cannot offer an install. The UI uses this to explain that
+ * instead of presenting a form whose only possible outcome is a 503.
+ */
+export interface DDNSConfigResponse {
+  readonly config: DDNSConfig;
+  readonly available: boolean;
+}
+
 /** Dynamic DNS service status */
 export interface DDNSStatus {
   readonly running: boolean;

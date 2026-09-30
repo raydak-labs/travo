@@ -17,6 +17,15 @@ import (
 // docs/architecture.md §3.
 const wirelessToggleScriptPath = "/usr/libexec/travo-wireless-toggle.sh"
 
+// rpcdLoginHelperPath is the root-only (0600) file holding the plaintext rpcd
+// login password that the generated helper below reads. It must match
+// auth.RPCDLoginHelperPath for the production --auth-config-path
+// (/etc/travo/auth.json); TestRPCDLoginHelperPathMatchesAuth pins that, because
+// a silent mismatch here is exactly the bug this constant exists to prevent:
+// the helper would fall back to an empty password, rpcd would refuse the
+// login, and every scheduled or button-driven toggle would be a no-op again.
+const rpcdLoginHelperPath = "/etc/travo/rpcd-login.json"
+
 // wirelessToggleScript is the generated helper. `up` enables every radio,
 // `down` disables every radio, replacing the old `wifi up` / `wifi down` calls.
 //
@@ -33,6 +42,7 @@ set -u
 STATE="${1:-}"
 RPCD_RUN_DIR=/var/run/rpcd
 RPCD_UCI_DIR=/etc/config
+RPCD_LOGIN_ARG_FILE=` + rpcdLoginHelperPath + `
 SESSION=""
 APPLY_STARTED=0
 GUARD=` + crashGuardDir + `/wifi-toggle-in-progress
@@ -105,11 +115,30 @@ uci -q commit wireless || fail "uci commit wireless"
 # session of its own, so log in first and hand rpcd that session id on both
 # calls. Passing a config name or a "session" key instead fails, which made this
 # helper a silent no-op. Same flow as scripts/setup-wireless-ap.sh and
-# RealUCIApplyConfirm in uci_apply.go: rpcd accepts a root login with an empty
-# password over the local ubus socket, which is where cron and hotplug run.
-LOGIN_OUT=$(ubus -S call session login '{"username":"root","password":""}' 2>/dev/null) || true
+# RealUCIApplyConfirm in uci_apply.go.
+#
+# The password CANNOT be left empty. /etc/config/rpcd ships
+# "option password '$p$root'", which makes rpcd verify against the real system
+# root password, so an empty-password login succeeds only on a device whose
+# root account has no password at all. Everywhere else the login returned no
+# session and the toggle stayed a no-op -- with the radios left in whatever
+# state the schedule asked them NOT to be in. The backend writes the login
+# argument to a root-only file beside its seal (auth.RPCDLoginHelperPath)
+# because cron and the hotplug script have no travo process to ask.
+#
+# The file holds the WHOLE JSON argument, already encoded, and is handed to
+# ubus verbatim. Escaping the password here instead would mean reimplementing
+# JSON string escaping in sed, and that is not portable: BSD sed and BusyBox
+# sed disagree on 's/\\/\\\\/g', so a password containing a backslash would be
+# sent differently depending on what ran this script.
+LOGIN_ARG=""
+[ -r "$RPCD_LOGIN_ARG_FILE" ] && LOGIN_ARG=$(cat "$RPCD_LOGIN_ARG_FILE" 2>/dev/null)
+# No helper file at all: a device whose root account genuinely has no password
+# still works, because rpcd then accepts an empty one.
+[ -n "$LOGIN_ARG" ] || LOGIN_ARG='{"username":"root","password":""}'
+LOGIN_OUT=$(ubus -S call session login "$LOGIN_ARG" 2>/dev/null) || true
 SESSION=$(printf '%s' "$LOGIN_OUT" | sed -n 's/.*"ubus_rpc_session":"\([^"]*\)".*/\1/p')
-[ -n "$SESSION" ] || fail "no rpcd session (apply via LuCI Save & Apply or reboot)"
+[ -n "$SESSION" ] || fail "no rpcd session (checked $RPCD_LOGIN_ARG_FILE; apply via LuCI Save & Apply or reboot)"
 
 # Stage the committed config into the session dir: rpcd rolls back from this
 # snapshot, and reads the config from here for the duration of the apply.
@@ -138,12 +167,35 @@ exit 0
 // writeWirelessToggleScript installs (or refreshes) the generated toggle
 // helper. It is idempotent and safe to call from every configuration path that
 // can schedule a toggle.
-func writeWirelessToggleScript() error {
-	if err := os.MkdirAll(filepath.Dir(wirelessToggleScriptPath), 0o755); err != nil {
+//
+// The destination is a field rather than the bare const so a test can exercise
+// the callers without writing to /usr/libexec: on a non-root dev machine that
+// write fails with EPERM, which is why the schedule path could not be covered
+// end to end until now.
+func (w *WifiService) writeWirelessToggleScript() error {
+	return writeWirelessToggleScriptTo(w.toggleScriptPathOrDefault())
+}
+
+// toggleScriptPathOrDefault returns the toggle-helper destination in use.
+func (w *WifiService) toggleScriptPathOrDefault() string {
+	if w.toggleScriptPath != "" {
+		return w.toggleScriptPath
+	}
+	return wirelessToggleScriptPath
+}
+
+// writeWirelessToggleScriptTo is the shared implementation behind both the
+// schedule path (WifiService) and the hardware-button path (SystemService).
+// An empty path means the production destination.
+func writeWirelessToggleScriptTo(path string) error {
+	if path == "" {
+		path = wirelessToggleScriptPath
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create libexec dir: %w", err)
 	}
-	if err := os.WriteFile(wirelessToggleScriptPath, []byte(wirelessToggleScript), 0o755); err != nil {
-		return fmt.Errorf("write %s: %w", wirelessToggleScriptPath, err)
+	if err := os.WriteFile(path, []byte(wirelessToggleScript), 0o755); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }

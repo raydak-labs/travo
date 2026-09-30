@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 // The served /api/openapi.json is the contract automation and tests depend on,
@@ -308,4 +311,216 @@ func TestOpenAPIResponseShapesMatchHandlers(t *testing.T) {
 			}
 		})
 	}
+}
+
+// specRequestKeys returns the property names the spec declares in an
+// operation's requestBody example, e.g. ["ip", "name"].
+func specRequestKeys(t *testing.T, spec map[string]any, path, method string) []string {
+	t.Helper()
+	paths, _ := spec["paths"].(map[string]any)
+	path = strings.TrimPrefix(path, "/api/v1")
+	ops, _ := paths[path].(map[string]any)
+	op, _ := ops[strings.ToLower(method)].(map[string]any)
+	body, _ := op["requestBody"].(map[string]any)
+	content, _ := body["content"].(map[string]any)
+	for _, v := range content {
+		schema, _ := v.(map[string]any)["schema"].(map[string]any)
+		example, _ := schema["example"].(map[string]any)
+		keys := make([]string, 0, len(example))
+		for k := range example {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	}
+	return nil
+}
+
+// The response-shape test above only covers operations whose 200 shape this
+// branch happened to change, and it compares the SPEC to a HANDLER-WRITTEN
+// expectation — never the spec to the handler for request bodies. So a spec
+// that names a request field the handler does not accept is invisible: the
+// documented request is simply rejected.
+//
+// That is not hypothetical. /api/openapi.json advertised "hostname" for
+// POST /network/dns/entries and POST /network/dhcp/reservations, while both
+// handlers bind models.DNSEntry / models.DHCPReservation, whose field is
+// "name". A client generated from the documented contract got a 400 on both,
+// with no failing test anywhere.
+//
+// This sends each documented example, filled in with values the handler
+// accepts, and requires it to be accepted. The keys come from the spec, so
+// renaming a field in either place fails here.
+func TestOpenAPIRequestBodiesAreAccepted(t *testing.T) {
+	spec := openAPISpec
+
+	// A plausible value per field, so the handler's own validation is not what
+	// rejects the request. Only the FIELD NAMES come from the spec.
+	values := map[string]any{
+		"name": "openapi-drift-probe", "ip": "10.9.9.9", "mac": "aa:bb:cc:dd:ee:ff",
+		"hostname": "openapi-drift-probe", "servers": []string{"1.1.1.1"},
+	}
+
+	// Endpoints whose handler can be driven end to end against the shared test
+	// app. Deliberately excludes the live-state operations (reboot, factory
+	// reset, firmware, wifi connect/disconnect, interface state) and anything
+	// needing hardware or an installed package.
+	//
+	// This is intentionally short. It is the only assertion that needs a running
+	// app, and the static TestOpenAPIRequestFieldNamesMatchModels below covers
+	// the same class of drift for every documented request body without one.
+	endpoints := []struct{ method, path string }{
+		{"POST", "/api/v1/network/dns/entries"},
+		{"POST", "/api/v1/network/dhcp/reservations"},
+	}
+
+	for _, ep := range endpoints {
+		t.Run(ep.method+" "+ep.path, func(t *testing.T) {
+			// A fresh app per subtest: these write persisted config, and sharing
+			// one app would let one subtest's state satisfy another's assertions.
+			app, deps := setupTestApp(t)
+			token, _, err := deps.Auth.Login("admin")
+			if err != nil {
+				t.Fatalf("login: %v", err)
+			}
+
+			keys := specRequestKeys(t, spec, ep.path, ep.method)
+			if len(keys) == 0 {
+				t.Fatalf("the spec declares no requestBody example for %s %s, so this test would be vacuous",
+					ep.method, ep.path)
+			}
+			payload := map[string]any{}
+			for _, k := range keys {
+				v, ok := values[k]
+				if !ok {
+					t.Fatalf("no probe value for documented field %q; add one so this test keeps testing the contract", k)
+				}
+				payload[k] = v
+			}
+			raw, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatalf("marshal payload: %v", err)
+			}
+
+			req, _ := http.NewRequest(ep.method, ep.path, strings.NewReader(string(raw)))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+			resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+			if err != nil {
+				t.Fatalf("request: %v", err)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			if resp.StatusCode >= 400 {
+				t.Errorf("the request the spec documents (%s) was rejected with %d: %s\n"+
+					"a client generated from /api/openapi.json cannot use this endpoint",
+					raw, resp.StatusCode, body)
+			}
+		})
+	}
+}
+
+// The drift tests above compare (method, path) and the 200-response shape. A spec
+// that names a request field the handler does not accept is a third, separate
+// class — and it is the one that breaks generated clients, because the request
+// they build is rejected with a 400 that says nothing about the field name.
+//
+// Two real instances, both found on the device by this test class:
+//   - POST /network/dns/entries and POST /network/dhcp/reservations documented
+//     "hostname" while the handlers bind models.DNSEntry / models.DHCPReservation,
+//     whose field is "name" → 400 "name is required".
+//   - PUT /network/dhcp documented "leasetime" while models.DHCPConfig tags it
+//     "lease_time" → 400 "lease_time is required".
+//
+// This compares the spec's declared request keys against the JSON tags of the
+// struct each handler binds, by reflection. It needs no running app, so it covers
+// every documented config endpoint rather than the two that can be driven here.
+func TestOpenAPIRequestFieldNamesMatchModels(t *testing.T) {
+	spec := openAPISpec
+
+	tests := []struct {
+		method string
+		path   string
+		model  any // a pointer to the struct the handler binds
+	}{
+		{"POST", "/api/v1/network/dns/entries", &models.DNSEntry{}},
+		{"POST", "/api/v1/network/dhcp/reservations", &models.DHCPReservation{}},
+		{"PUT", "/api/v1/network/dhcp", &models.DHCPConfig{}},
+		{"PUT", "/api/v1/network/dns", &models.DNSConfig{}},
+		{"PUT", "/api/v1/network/doh", &models.DoHConfig{}},
+		{"PUT", "/api/v1/network/ddns", &models.DDNSConfig{}},
+		{"PUT", "/api/v1/network/failover", &models.FailoverConfig{}},
+		{"PUT", "/api/v1/wifi/schedule", &models.WiFiSchedule{}},
+		{"PUT", "/api/v1/wifi/ap/{section}", &models.APConfigUpdate{}},
+		{"PUT", "/api/v1/system/timezone", &models.TimezoneConfig{}},
+		{"PUT", "/api/v1/system/ntp", &models.NTPConfig{}},
+		{"PUT", "/api/v1/system/alert-thresholds", &models.AlertThresholds{}},
+		{"PUT", "/api/v1/sqm/config", &models.SQMConfig{}},
+		{"PUT", "/api/v1/vpn/split-tunnel", &models.SplitTunnelConfig{}},
+		{"PUT", "/api/v1/vpn/wireguard", &models.WireguardConfig{}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			declared := specRequestKeys(t, spec, tc.path, tc.method)
+			if len(declared) == 0 {
+				t.Fatalf("the spec declares no requestBody example for %s %s, so this test would be vacuous",
+					tc.method, tc.path)
+			}
+
+			accepted := jsonFieldNames(reflect.TypeOf(tc.model))
+
+			// Direction 1: the spec must not promise a field the handler drops.
+			for _, d := range declared {
+				if !slices.Contains(accepted, d) {
+					t.Errorf("the spec documents request field %q but %s has no such field (accepts %v): "+
+						"a generated client sends it and gets 400", d, tc.model, accepted)
+				}
+			}
+			// Direction 2: the handler must not require a field the spec omits.
+			// Not every model field is required, so this lists them for review
+			// rather than failing outright — an empty documented example is the
+			// usual cause and is itself worth seeing.
+			var undeclared []string
+			for _, a := range accepted {
+				if !slices.Contains(declared, a) {
+					undeclared = append(undeclared, a)
+				}
+			}
+			if len(undeclared) > 0 {
+				t.Logf("note: %s accepts %v, which the spec does not document", tc.model, undeclared)
+			}
+		})
+	}
+}
+
+// jsonFieldNames returns the JSON names a struct will decode from, following
+// embedded structs the way encoding/json does.
+func jsonFieldNames(t reflect.Type) []string {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	var out []string
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		tag := f.Tag.Get("json")
+		if tag == "-" {
+			continue
+		}
+		name, _, _ := strings.Cut(tag, ",")
+		if name == "" {
+			if f.Anonymous && f.Type.Kind() == reflect.Struct {
+				out = append(out, jsonFieldNames(f.Type)...)
+				continue
+			}
+			name = f.Name
+		}
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }

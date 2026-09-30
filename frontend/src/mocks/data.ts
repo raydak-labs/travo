@@ -28,6 +28,7 @@ import type {
   RadioInfo,
   KillSwitchStatus,
   DDNSConfig,
+  DDNSConfigResponse,
   DDNSStatus,
   SQMConfig,
 } from '@shared/index';
@@ -728,6 +729,12 @@ export const mockDDNSConfig: DDNSConfig = {
   update_url: '',
 };
 
+
+/** GET /network/ddns returns the config plus whether ddns-scripts is installed. */
+export const mockDDNSConfigResponse: DDNSConfigResponse = {
+  config: mockDDNSConfig,
+  available: true,
+};
 export const mockDDNSStatus: DDNSStatus = {
   running: false,
   public_ip: '',

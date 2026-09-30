@@ -2,6 +2,7 @@ package uci
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
@@ -398,5 +399,75 @@ func TestSplitUciValue(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+// A factory-fresh OpenWrt declares the system section ANONYMOUSLY, so
+// `uci show system` hands back the key "@system[0]" and every read-then-write
+// path (SetTimezone, SetHostname) carries that string into the next call.
+//
+// The wrapper used to reject it — the section check was the same
+// identifiers-only pattern used for configs and options — so both endpoints
+// failed on every stock device with `uci: invalid section "@system[0]"`,
+// while every test passed because the mock UCI returned a named "system"
+// section. Verified on real hardware: both PUT /system/timezone and
+// PUT /system/hostname returned 500 and changed nothing.
+func TestAnonymousSectionIsAccepted(t *testing.T) {
+	if err := validateSection("@system[0]"); err != nil {
+		t.Errorf("anonymous section rejected by validation: %v", err)
+	}
+	// Still rejected: anything that could break out of the single argv entry or
+	// address a different config.
+	for _, bad := range []string{
+		"@system",              // no index
+		"@system[]",            // empty index
+		"@system[0]; rm -rf /", // command injection
+		"@system[0].zonename",  // option smuggled into the section
+		"../etc/passwd",        // path traversal
+		"@syst em[0]",          // space
+		"@system[0] extra",
+	} {
+		if err := validateSection(bad); err == nil {
+			t.Errorf("validateSection(%q) accepted an invalid section reference", bad)
+		}
+	}
+}
+
+// The validation tests above prove the wrapper no longer rejects the form;
+// this proves the dotted argument the wrapper builds is what the uci CLI
+// actually accepts. The stub mirrors the real CLI: it fails on the three-argument
+// form and succeeds on the dotted one.
+func TestSetOnAnonymousSectionUsesDottedForm(t *testing.T) {
+	dir := t.TempDir()
+	logPath := dir + "/uci.log"
+	// The real CLI takes `set <config>.<section>.<option>=<value>`; the
+	// three-argument form is a usage error. Matched with a case pattern so the
+	// stub needs no nested quoting of its own.
+	stub := strings.Join([]string{
+		"#!/bin/sh",
+		`printf '%s\\n' "$*" >> ` + logPath,
+		`case "$2" in`,
+		"  *'.'*) : ;;",
+		`  *) echo 'uci: invalid entry' >&2; exit 255 ;;`,
+		"esac",
+		"exit 0",
+		"",
+	}, "\n")
+	stubPath := dir + "/uci"
+	if err := os.WriteFile(stubPath, []byte(stub), 0o755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+
+	if err := NewRealUCI().Set("system", "@system[0]", "zonename", "Europe/Berlin"); err != nil {
+		t.Fatalf("Set on an anonymous section failed: %v", err)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	want := "set system.@system[0].zonename=Europe/Berlin"
+	if !strings.Contains(string(log), want) {
+		t.Errorf("uci was called with %q, want it to contain %q", log, want)
 	}
 }

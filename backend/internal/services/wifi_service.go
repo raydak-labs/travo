@@ -45,35 +45,32 @@ type uciReverter interface {
 var uciConfigLocks sync.Map // config name -> *sync.Mutex
 
 // lockUCIConfigs locks each named config and returns a single unlock func.
-// Callers must pass the names in a consistent order to stay deadlock-free.
 //
-// The lock exists because the uci CLI keeps uncommitted changes in the
-// process-global /tmp/.uci/<config>/changes file, so two independent writers of
-// the same config — or one reverting while another is mid-sequence — corrupt
-// each other. A per-service mutex cannot prevent this: WifiService and
-// NetworkService both write `firewall` (guest WiFi isolation vs. client block
-// rules), so SetGuestWifi's abort could revert a block rule the user had just
-// saved and still answered 200. Hence keyed by config name, not by service.
+// The names are sorted before locking, which makes the acquisition order GLOBAL
+// and identical on every path. That is what makes nesting safe: with a fixed
+// order, no two goroutines can hold overlapping sets in opposite orders, so the
+// wait-for graph is acyclic and deadlock is impossible. Without the sort, two
+// flows that each need {network, firewall} but list them in opposite order
+// would deadlock the moment they met — and on a router that means every other
+// endpoint that touches a config also stops responding, because they all queue
+// on the same per-config locks.
 //
-// SCOPE: opt-in per mutator, not a global guarantee. A writer that does not
-// list its configs here is still exposed to the same corruption; the known
-// remaining gaps are AddDNSEntry / DeleteDNSEntry (`dhcp`) and the top-level VPN
-// flows (`network`), which cannot be wrapped as they are because they call the
-// already-wrapped firewall helpers. New writers should go through mutateUCI /
-// mutateWireless, which derive the lock set and the revert set from one list.
-//
-// Lock order is always: WifiService.uciWriteMu, then these config locks. Never
-// the reverse, and never take these twice on one path (they are not reentrant) —
-// revertUCIConfig deliberately does not lock, so a writer that holds the config
-// lock can still abort safely.
-//
-// The lock is also held across blocking work — a commit, an rpcd apply, an
-// `/etc/init.d/... reload` — so a slow reload blocks every other mutator listing
-// the same config. That is the intended trade: these sequences are short, and
-// the alternative is corruption. Do not add a second reload inside a mutator.
+// The locks are still NOT reentrant: a flow that holds a config must not ask for
+// it again. Helpers called from inside a transaction therefore have a lock-free
+// core (…Locked) that the transaction calls, while the thin exported wrapper
+// takes the lock for callers that enter cold. See setupWireGuardFirewallLocked.
 func lockUCIConfigs(configs ...string) func() {
-	locks := make([]*sync.Mutex, 0, len(configs))
-	for _, c := range configs {
+	// Sorted + de-duplicated: acquiring the same mutex twice on one path would
+	// self-deadlock, and mutateUCI callers legitimately pass a set.
+	names := append([]string(nil), configs...)
+	slices.Sort(names)
+	locks := make([]*sync.Mutex, 0, len(names))
+	prev := ""
+	for i, c := range names {
+		if i > 0 && c == prev {
+			continue
+		}
+		prev = c
 		v, _ := uciConfigLocks.LoadOrStore(c, &sync.Mutex{})
 		m := v.(*sync.Mutex)
 		m.Lock()
@@ -136,6 +133,22 @@ func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApply
 	return res, nil
 }
 
+// withConfigLocks holds the named configs' locks for the duration of fn, in the
+// same globally ordered way, but does NOT revert on failure.
+//
+// For the writers that shell out to `uci` instead of going through the UCI
+// interface — AdGuardService and USBTetheringService do this — and therefore have
+// no uci.UCI to revert through. Taking the locks is still the point: without them
+// those writers interleave with the ones that DO revert, and the abandoned delta
+// gets committed by whoever commits next. The missing half is stated rather than
+// hidden: a failure in fn leaves its staged delta in place, and the next writer of
+// that config will commit it. Passing a uci.UCI and using mutateUCI where one is
+// available is preferred; this exists for the services that genuinely have none.
+func withConfigLocks(configs []string, fn func() error) error {
+	defer lockUCIConfigs(configs...)()
+	return fn()
+}
+
 // mutateUCI is mutateWireless for the other services: it holds the named
 // configs' locks for the duration of fn and reverts all of them if fn fails.
 // Same one-list rule, same reason — see mutateWireless.
@@ -174,7 +187,14 @@ type WifiService struct {
 	reconnectScript     string
 	modeFile            string
 	repeaterOptionsFile string
-	guardDir            string
+	// crontabFile and scheduleFile override the WiFi on/off schedule's crontab
+	// and state-JSON paths (tests only), like the fields above.
+	crontabFile  string
+	scheduleFile string
+	// toggleScriptPath overrides where the generated toggle helper is written
+	// (tests only).
+	toggleScriptPath string
+	guardDir         string
 
 	// uciWriteMu serializes UCI write sequences (Set/AddSection/Commit/revert
 	// against the process-global uci delta). Read-only paths never take it, so

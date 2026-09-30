@@ -51,7 +51,7 @@ func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := adguard.SetDNS(body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
@@ -82,7 +82,7 @@ func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
 			Password string `json:"password"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if body.Password == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "password is required")
@@ -104,7 +104,7 @@ func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 			Content string `json:"content"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if body.Content == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "content is required")

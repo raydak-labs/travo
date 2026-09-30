@@ -2,9 +2,11 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1570,6 +1572,20 @@ func TestGetDDNSConfig_CustomUpdateURL_ServiceDash(t *testing.T) {
 	}
 }
 
+// fakeDDNSScript points svc at a ddns-scripts init script that exists, so the
+// availability precondition passes. Without it every DDNS write correctly
+// reports the package as missing, which is the behaviour on a real router that
+// has not installed ddns-scripts.
+func fakeDDNSScript(t *testing.T, svc *NetworkService) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ddns")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake ddns init script: %v", err)
+	}
+	svc.SetDDNSInitScript(path)
+	return path
+}
+
 func TestSetDDNSConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
@@ -1579,6 +1595,7 @@ func TestSetDDNSConfig(t *testing.T) {
 		},
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
 
 	newConfig := models.DDNSConfig{
 		Enabled:    true,
@@ -1629,6 +1646,7 @@ func TestSetDDNSConfig_CustomUpdateURL(t *testing.T) {
 		},
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
 
 	customURL := "https://provider.example/nic/update?hostname=[DOMAIN]&myip=[IP]"
 	newConfig := models.DDNSConfig{
@@ -1675,6 +1693,7 @@ func TestSetDDNSConfig_FromCustomToBuiltInClearsUpdateURL(t *testing.T) {
 		},
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
 
 	customURL := "https://provider.example/update"
 	if err := svc.SetDDNSConfig(models.DDNSConfig{
@@ -2040,5 +2059,79 @@ func TestNewPortForwardID_AvoidsExistingIDs(t *testing.T) {
 	existing := []models.PortForwardRule{{ID: newPortForwardID(nil)}}
 	if got := newPortForwardID(existing); got == existing[0].ID {
 		t.Fatalf("reused existing ID %q", got)
+	}
+}
+
+// ddns-scripts is what can actually service a `ddns` UCI config, and it is not
+// in the service catalog, so the UI cannot install it and can only explain.
+// Without this check every write failed with a bare
+// `uci: Entry not found` 500 that said nothing about the real cause — verified on
+// the device, where PUT /api/v1/network/ddns returned
+// 500 {"error":"set ddns.myddns.enabled: uci: Entry not found"}.
+func TestSetDDNSConfig_ReportsMissingPackageClearly(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) { return []byte("ok"), nil },
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	// Deliberately no fakeDDNSScript: this is the router-without-ddns-scripts case.
+
+	if svc.DDNSAvailable() {
+		t.Fatal("DDNSAvailable must be false when the init script is absent")
+	}
+
+	err := svc.SetDDNSConfig(models.DDNSConfig{
+		Enabled: true, Service: "no-ip.com", Domain: "test.no-ip.org",
+	})
+	if !errors.Is(err, ErrDDNSNotAvailable) {
+		t.Fatalf("got %v, want ErrDDNSNotAvailable", err)
+	}
+	// The message has to name the package, or the operator cannot act on it.
+	if !strings.Contains(err.Error(), "ddns-scripts") {
+		t.Errorf("error %q does not name the missing package", err)
+	}
+	// And nothing may have been written: a refused write must not leave a
+	// half-updated config behind.
+	opts, getErr := u.GetAll("ddns", "myddns")
+	if getErr != nil {
+		t.Fatalf("read back ddns.myddns: %v", getErr)
+	}
+	if opts["domain"] != "myrouter.duckdns.org" || opts["enabled"] != "0" {
+		t.Errorf("a refused DDNS write still modified the config: %v", opts)
+	}
+}
+
+// The `myddns` section does not exist on a router where DDNS was never
+// configured, and `uci set` on a missing section fails outright — so before this
+// the endpoint could only ever succeed on a device that already had DDNS set up.
+func TestSetDDNSConfig_CreatesSectionWhenAbsent(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) { return []byte("ok"), nil },
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
+
+	// Reproduce a router that has never had DDNS configured.
+	if err := u.DeleteSection("ddns", "myddns"); err != nil {
+		t.Fatalf("DeleteSection: %v", err)
+	}
+	if _, err := u.GetAll("ddns", "myddns"); err == nil {
+		t.Fatal("precondition: the ddns.myddns section should be gone")
+	}
+
+	if err := svc.SetDDNSConfig(models.DDNSConfig{
+		Enabled: true, Service: "no-ip.com", Domain: "test.no-ip.org",
+	}); err != nil {
+		t.Fatalf("SetDDNSConfig on a router with no existing ddns section: %v", err)
+	}
+	cfg, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("GetDDNSConfig: %v", err)
+	}
+	if !cfg.Enabled || cfg.Domain != "test.no-ip.org" {
+		t.Errorf("config not persisted correctly: %+v", cfg)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
@@ -177,7 +178,7 @@ func TestWirelessToggleScriptApplyCallSequence(t *testing.T) {
 	}
 
 	_, calls, guardDir := runToggleScript(t, `#!/bin/sh
-echo "ubus $*" >> "$CALLS"
+printf '%s\n' "ubus $*" >> "$CALLS"
 if [ "$1" = "-S" ]; then shift; fi
 case "$3" in
   login) echo '{"ubus_rpc_session":"sid-1"}' ;;
@@ -217,7 +218,7 @@ exit 0
 // permanently blocked by a guard this helper can never resolve on its own.
 func TestWirelessToggleScriptRevertsAndClearsGuardOnApplyFailure(t *testing.T) {
 	_, _, guardDir := runToggleScript(t, `#!/bin/sh
-echo "ubus $*" >> "$CALLS"
+printf '%s\n' "ubus $*" >> "$CALLS"
 if [ "$1" = "-S" ]; then shift; fi
 case "$3" in
   login) echo '{"ubus_rpc_session":"sid-1"}' ;;
@@ -239,7 +240,7 @@ exit 0
 // apply against rpcd's single apply slot while the first is still pending).
 func TestWirelessToggleScriptKeepsGuardAndSessionAfterApplyStarted(t *testing.T) {
 	binDir, _, guardDir := runToggleScript(t, `#!/bin/sh
-echo "ubus $*" >> "$CALLS"
+printf '%s\n' "ubus $*" >> "$CALLS"
 if [ "$1" = "-S" ]; then shift; fi
 case "$3" in
   login) echo '{"ubus_rpc_session":"sid-1"}' ;;
@@ -255,6 +256,121 @@ exit 0
 	// The session dir is what rpcd restores from, so it must not be deleted.
 	if _, err := os.Stat(filepath.Join(binDir, "run", "uci-sid-1")); err != nil {
 		t.Error("the rpcd session dir must survive a post-apply failure; it holds the rollback snapshot")
+	}
+}
+
+// rpcLoginArgPath is where the fixture stages the rpcd login argument, so the
+// helper never reads the real /etc/travo/rpcd-login.json.
+func rpcLoginArgPath(binDir string) string { return filepath.Join(binDir, "rpcd-login.json") }
+
+// writeRPCDLoginArg stages the login argument the generated helper reads,
+// mirroring what auth.SaveRPCDLoginHelper does on the device.
+func writeRPCDLoginArg(t *testing.T, binDir, password string) {
+	t.Helper()
+	arg, err := auth.BuildRPCDLoginArg(password)
+	if err != nil {
+		t.Fatalf("build login arg: %v", err)
+	}
+	if err := os.WriteFile(rpcLoginArgPath(binDir), []byte(arg+"\n"), 0o600); err != nil {
+		t.Fatalf("stage rpcd login arg: %v", err)
+	}
+}
+
+// The helper runs from cron and hotplug with no travo process to ask, so it
+// reads the rpcd login argument from a root-only file. /etc/config/rpcd ships
+// "option password '$p$root'", which makes rpcd verify against the real system
+// root password: an empty-password login succeeds only on a device whose root
+// account has NO password, and returns no session everywhere else. That made
+// every scheduled and button-driven toggle a silent no-op on any normally
+// secured router -- verified on real hardware, where the login came back empty
+// and the helper bailed out with "no rpcd session".
+//
+// The password here deliberately contains a space, a double quote and a
+// backslash, and Go's JSON encoder is the oracle for what the argument must
+// look like. The helper passes the file to ubus byte for byte precisely so it
+// never has to escape anything itself: doing that in sed is not portable, and
+// BSD sed (macOS) and BusyBox sed (the device) really do disagree on
+// 's/\\/\\\\/g'. A test that ran the escaping through the dev machine's
+// sed would have passed a script that is broken on the only platform that
+// matters, and failed one that works.
+func TestWirelessToggleScriptSendsRPCDLoginArg(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	binDir, calls, _, scriptPath := writeToggleScriptFixture(t, `#!/bin/sh
+printf '%s\n' "ubus $*" >> "$CALLS"
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`)
+	writeRPCDLoginArg(t, binDir, `s3cr3t pa"ss\word`)
+
+	cmd := exec.Command("sh", scriptPath, "up")
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "CALLS="+calls)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("toggle helper failed: %v\n%s", err, out)
+	}
+
+	log, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	want, err := auth.BuildRPCDLoginArg(`s3cr3t pa"ss\word`)
+	if err != nil {
+		t.Fatalf("build login arg: %v", err)
+	}
+	if !strings.Contains(string(log), want) {
+		t.Errorf("login argument was not %s; recorded calls:\n%s", want, log)
+	}
+	// Having a session is the whole point: without it the helper cannot apply,
+	// and it exits 1 having changed nothing.
+	if !strings.Contains(string(log), "sid-1") {
+		t.Errorf("the helper never obtained a session, so it cannot apply; calls:\n%s", log)
+	}
+}
+
+// With no helper file at all the helper must fall back to an empty password
+// rather than fail earlier, so a device whose root account genuinely has no
+// password keeps working.
+func TestWirelessToggleScriptToleratesMissingLoginArgFile(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	_, calls, _ := runToggleScript(t, `#!/bin/sh
+printf '%s\n' "ubus $*" >> "$CALLS"
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`, "up", true)
+
+	log, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	if !strings.Contains(string(log), `{"username":"root","password":""}`) {
+		t.Errorf("with no helper file the helper must log in with an empty password; calls:\n%s", log)
+	}
+}
+
+// rpcdLoginHelperPath in the services package and auth.RPCDLoginHelperPath in
+// the auth package describe the SAME file, from the writer's side and the
+// generated script's side. A silent divergence reintroduces exactly the bug
+// above — the helper reads nothing, falls back to an empty password, and every
+// toggle becomes a no-op — with no compile error and no other test failing.
+func TestRPcdLoginHelperPathMatchesAuth(t *testing.T) {
+	if got, want := rpcdLoginHelperPath, auth.RPCDLoginHelperPath("/etc/travo/auth.json"); got != want {
+		t.Errorf("toggle helper reads %s but the backend writes %s; scheduled and button toggles would silently no-op", got, want)
+	}
+	if _, err := os.Stat(rpcdLoginHelperPath); err == nil {
+		t.Errorf("%s exists on the test machine; the fixture rewrite would not have been exercised", rpcdLoginHelperPath)
 	}
 }
 
@@ -300,6 +416,7 @@ func writeToggleScriptFixture(t *testing.T, ubusStub string) (binDir, calls, gua
 	script := strings.ReplaceAll(wirelessToggleScript, crashGuardDir, guardDir)
 	script = strings.ReplaceAll(script, "RPCD_RUN_DIR=/var/run/rpcd", "RPCD_RUN_DIR="+filepath.Join(binDir, "run"))
 	script = strings.ReplaceAll(script, "RPCD_UCI_DIR=/etc/config", "RPCD_UCI_DIR="+filepath.Join(binDir, "config"))
+	script = strings.ReplaceAll(script, "RPCD_LOGIN_ARG_FILE="+rpcdLoginHelperPath, "RPCD_LOGIN_ARG_FILE="+rpcLoginArgPath(binDir))
 	if err := os.MkdirAll(filepath.Join(binDir, "config"), 0o755); err != nil {
 		t.Fatalf("config dir: %v", err)
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/static"
 
 	"github.com/openwrt-travel-gui/backend/internal/api"
@@ -233,6 +234,18 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		IdleTimeout:  idleTimeout,
 	})
 
+	// Recover middleware — registered FIRST, before CORS and the auth
+	// middleware, so it wraps everything downstream.
+	//
+	// Without it a panic in any of the ~250 handlers takes the whole process
+	// down: the router keeps routing traffic but the UI is gone until something
+	// restarts travo, on a device that may have no supervisor. A nil service
+	// dereference is the easy way to hit this (several handlers assume their
+	// dependency is wired), and it is exactly what a contract test that exercises
+	// every documented endpoint will stumble into.
+	app.Use(recover.New(recover.Config{EnableStackTrace: true}))
+	log.Printf("Panic recovery enabled: a handler panic returns 500 instead of killing the process")
+
 	// CORS middleware
 	app.Use(cors.New(corsConfig(cfg.CorsOrigins)))
 
@@ -277,6 +290,14 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	if !cfg.MockMode {
 		if p := auth.LoadSealedRPCDPassword(cfg.AuthConfigPath, authCfg.JWTSecret); p != "" {
 			rootPassword.Set(p)
+			// Refresh the helper file for the generated wireless toggle script at
+			// startup too, not only on login. It is written from the seal on a
+			// reboot or an upgrade that did not involve a fresh login, and without
+			// it every scheduled or button-driven toggle falls back to an empty
+			// password that rpcd rejects.
+			if err := auth.SaveRPCDLoginHelper(cfg.AuthConfigPath, p); err != nil {
+				log.Printf("WARNING: could not refresh rpcd-login helper file: %v", err)
+			}
 		}
 	}
 	var authSvc *auth.AuthService

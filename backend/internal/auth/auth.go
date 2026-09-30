@@ -181,6 +181,12 @@ func (a *AuthService) persistSealedLogin(password string) {
 	if err := SaveSealedRPCDPassword(a.authConfigPath, string(a.jwtSecret), password); err != nil {
 		log.Printf("WARNING: could not persist rpcd-login seal: %v", err)
 	}
+	// The generated wireless toggle helper runs from cron/hotplug with no
+	// travo process to ask, so it needs the plaintext on disk to be able to
+	// log in to rpcd. Written here, next to the seal, so the two cannot drift.
+	if err := SaveRPCDLoginHelper(a.authConfigPath, password); err != nil {
+		log.Printf("WARNING: could not persist rpcd-login helper file: %v", err)
+	}
 }
 
 func (a *AuthService) verifyWithUbus(password string) error {

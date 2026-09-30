@@ -85,7 +85,7 @@ func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetHostnameRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.Hostname == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "hostname is required")
@@ -112,8 +112,8 @@ func GetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 func SetTimezoneHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.TimezoneConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if config.Zonename == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "zonename is required")
@@ -212,7 +212,7 @@ func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetLEDRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetLEDStealthMode(req.StealthMode); err != nil {
 			return RespondWithServerError(c, err)
@@ -232,8 +232,12 @@ func GetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
 func SetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.LEDSchedule
-		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		// Strict: this persists the whole schedule. On the permissive binder a
+		// body naming fields this handler does not bind decoded to an empty
+		// schedule, skipped validation, and answered 200 with the LEDs unchanged —
+		// silent data loss behind a success code.
+		if err := BindStrictBodyConfig(c, &req); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		// Times are interpolated into a root crontab line; validate at the
 		// boundary so a bad value is a 400, not a 500 from the service layer.
@@ -267,8 +271,8 @@ func GetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 func SetNTPConfigHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.NTPConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetNTPConfig(config); err != nil {
 			return RespondWithServerError(c, err)
@@ -354,7 +358,7 @@ func SyncTimeHandler(deps *Dependencies) fiber.Handler {
 		// the clock far outside the plausible window (see time_sync_gate.go).
 		if !authorized {
 			if err := validateClientTimeWindow(clientTime, deps.TimeSyncMinPlausible); err != nil {
-				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+				return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 			}
 		}
 		skew := time.Until(clientTime)
@@ -407,10 +411,10 @@ func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ButtonActionsRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetButtonActions(req.Buttons); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -432,10 +436,10 @@ func AddSSHKeyHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.AddSSHKeyRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.AddSSHKey(req.Key); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return c.Status(fiber.StatusCreated).JSON(fiber.Map{"ok": true})
 	}
@@ -450,7 +454,7 @@ func DeleteSSHKeyHandler(svc *services.SystemService) fiber.Handler {
 			return RespondWithError(c, fiber.StatusBadRequest, "invalid index")
 		}
 		if err := svc.DeleteSSHKey(index); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return c.JSON(fiber.Map{"ok": true})
 	}
@@ -478,8 +482,14 @@ func GetAlertThresholdsHandler(svc *services.AlertService) fiber.Handler {
 func SetAlertThresholdsHandler(svc *services.AlertService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var t models.AlertThresholds
-		if err := c.Bind().Body(&t); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+		if err := BindStrictBodyConfig(c, &t); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+		}
+		// Without this, storage_percent=500 was accepted and persisted: a
+		// threshold no usage level can reach, so the alert silently never fires
+		// while the UI shows a saved configuration.
+		if err := services.ValidateAlertThresholds(t); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetAlertThresholds(t); err != nil {
 			return RespondWithServerError(c, err)

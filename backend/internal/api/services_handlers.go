@@ -26,7 +26,7 @@ func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Install(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -37,7 +37,7 @@ func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Remove(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -48,7 +48,7 @@ func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Start(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -59,7 +59,7 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Stop(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -73,7 +73,7 @@ func SetAutoStartHandler(mgr *services.ServiceManager) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := mgr.SetAutoStart(id, body.Enabled); err != nil {
 			return RespondWithServerError(c, err)

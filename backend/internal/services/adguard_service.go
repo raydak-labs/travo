@@ -343,7 +343,23 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 // When enabling, it first verifies that AdGuard is running and its DNS listener
 // is reachable. If the pre-flight check fails, no dnsmasq changes are made and
 // the error is returned (safe: DNS resolution is never left in a broken state).
+// SetDNS points dnsmasq at AdGuard's resolver.
+//
+// Takes the `dhcp` lock. This writes dhcp.@dnsmasq[0].server and .noresolv — the
+// SAME section and options that the VPN's enableVpnDNSForwarding /
+// disableVpnDNSForwarding and CaptiveService's dnsmasq helpers mutate. Holding the
+// lock on the VPN side while this side does not achieves nothing: whichever
+// sequence commits last wins, and the loser's commit persists whatever the other
+// had staged.
+//
+// withConfigLocks rather than mutateUCI: this shells out to `uci` and has no
+// uci.UCI handle to revert through, so a failure here leaves its staged delta for
+// the next writer of `dhcp`.
 func (s *AdGuardService) SetDNS(enabled bool) error {
+	return withConfigLocks([]string{"dhcp"}, func() error { return s.setDNSLocked(enabled) })
+}
+
+func (s *AdGuardService) setDNSLocked(enabled bool) error {
 	port := s.getDNSPort()
 	entry := dnsmasqServerEntry(port)
 
