@@ -31,6 +31,10 @@ const wirelessToggleScript = `#!/bin/sh
 set -u
 
 STATE="${1:-}"
+RPCD_RUN_DIR=/var/run/rpcd
+RPCD_UCI_DIR=/etc/config
+SESSION=""
+APPLY_STARTED=0
 GUARD=` + crashGuardDir + `/wifi-toggle-in-progress
 ROLLBACK_TIMEOUT=30
 
@@ -55,12 +59,33 @@ fi
 mkdir -p "$(dirname "$GUARD")" || exit 1
 : > "$GUARD" || exit 1
 
+cleanup_session() {
+	# Only safe once the apply has NOT started. After "uci apply" succeeds,
+	# rpcd reads its rollback snapshot from this session dir when its timer
+	# fires; removing it first would leave the rollback with nothing to
+	# restore. This mirrors RealUCIApplyConfirm.StartApply, which removes the
+	# session dir only when the apply did not start.
+	[ -n "$SESSION" ] && [ "$APPLY_STARTED" -eq 0 ] && rm -rf "$RPCD_RUN_DIR/uci-$SESSION"
+	return 0
+}
+
 fail() {
 	log "toggle failed: $*"
 	# Drop staged changes so the running config is never left half-applied;
 	# rpcd rolls the apply back on its own when the session is not confirmed.
 	uci -q revert wireless 2>/dev/null
-	rm -f "$GUARD"
+	cleanup_session
+	if [ "$APPLY_STARTED" -eq 1 ]; then
+		# An apply is live and its rollback timer is armed. Clearing the guard
+		# here would let the next cron/hotplug run start a second apply against
+		# the same single apply slot while the first is still pending. Keep the
+		# guard as the marker that says "unresolved", exactly as the guard
+		# contract requires; the next run will skip and an operator (or a
+		# deploy/reinstall, which clears guards) clears it.
+		log "apply already started; leaving $GUARD in place until the rollback resolves"
+	else
+		rm -f "$GUARD"
+	fi
 	exit 1
 }
 
@@ -74,14 +99,37 @@ done
 
 uci -q commit wireless || fail "uci commit wireless"
 
-APPLY_OUT=$(ubus call uci apply "{\"rollback\":true,\"timeout\":${ROLLBACK_TIMEOUT},\"uci\":\"wireless\"}" 2>/dev/null) \
-	|| fail "uci apply: not available"
+# rpcd's uci apply/confirm are session-scoped: rpc_uci_apply returns
+# INVALID_ARGUMENT unless the caller presents a ubus_rpc_session, and the
+# rollback policy behind confirm accepts the same key. The "ubus" CLI injects no
+# session of its own, so log in first and hand rpcd that session id on both
+# calls. Passing a config name or a "session" key instead fails, which made this
+# helper a silent no-op. Same flow as scripts/setup-wireless-ap.sh and
+# RealUCIApplyConfirm in uci_apply.go: rpcd accepts a root login with an empty
+# password over the local ubus socket, which is where cron and hotplug run.
+LOGIN_OUT=$(ubus -S call session login '{"username":"root","password":""}' 2>/dev/null) || true
+SESSION=$(printf '%s' "$LOGIN_OUT" | sed -n 's/.*"ubus_rpc_session":"\([^"]*\)".*/\1/p')
+[ -n "$SESSION" ] || fail "no rpcd session (apply via LuCI Save & Apply or reboot)"
 
-SESSION=$(printf '%s' "$APPLY_OUT" | jsonfilter -e '@.session' 2>/dev/null)
-[ -n "$SESSION" ] || fail "rpcd returned no apply session"
+# Stage the committed config into the session dir: rpcd rolls back from this
+# snapshot, and reads the config from here for the duration of the apply.
+SESSION_DIR="$RPCD_RUN_DIR/uci-$SESSION"
+mkdir -p "$SESSION_DIR" || fail "mkdir $SESSION_DIR"
+cp "$RPCD_UCI_DIR/wireless" "$SESSION_DIR/wireless" || fail "stage wireless"
 
-ubus call uci confirm "{\"session\":\"${SESSION}\"}" >/dev/null 2>&1 || fail "uci confirm"
+ubus call uci apply \
+	"{\"ubus_rpc_session\":\"$SESSION\",\"rollback\":true,\"timeout\":${ROLLBACK_TIMEOUT}}" \
+	>/dev/null 2>&1 || fail "uci apply"
 
+# From here on rpcd holds the rollback snapshot in the session dir and its
+# timer is armed, so the session dir and the guard must both survive a later
+# failure. See fail().
+APPLY_STARTED=1
+
+ubus call uci confirm "{\"ubus_rpc_session\":\"$SESSION\"}" >/dev/null 2>&1 || fail "uci confirm"
+
+APPLY_STARTED=0
+cleanup_session
 rm -f "$GUARD"
 log "wireless toggled ${STATE} (session ${SESSION})"
 exit 0

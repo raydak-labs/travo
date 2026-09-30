@@ -1,7 +1,9 @@
 package services
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -156,4 +158,177 @@ func TestWirelessToggleScriptSelectsNamedAndAnonymousRadios(t *testing.T) {
 			t.Errorf("toggle script must not select the wifi-iface section %q", s)
 		}
 	}
+}
+
+// The generated toggle helper is what actually runs on the device, from cron
+// and from the button hotplug script, with no way to report an error to anyone
+// but syslog. The only test that existed for it matched substrings, so a helper
+// that could never apply still passed.
+//
+// This runs the real script under /bin/sh with a stub `ubus` on PATH and
+// asserts the actual call sequence: rpcd's uci apply/confirm are session
+// scoped, so the script must log in, stage the config into the session dir, and
+// pass "ubus_rpc_session" on BOTH calls. Passing a config name or a bare
+// "session" key makes rpcd return INVALID_ARGUMENT, which turned every
+// scheduled and button-driven WiFi toggle into a silent no-op.
+func TestWirelessToggleScriptApplyCallSequence(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	_, calls, guardDir := runToggleScript(t, `#!/bin/sh
+echo "ubus $*" >> "$CALLS"
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`, "up", true)
+
+	log, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	seq := string(log)
+	for _, want := range []string{
+		"call session login",               // establish a session first
+		`uci apply {"ubus_rpc_session":`,   // apply must carry the session
+		`uci confirm {"ubus_rpc_session":`, // confirm takes the same key
+	} {
+		if !strings.Contains(seq, want) {
+			t.Errorf("toggle helper did not issue %q; recorded calls:\n%s", want, seq)
+		}
+	}
+	// The session id login returned must be the one both calls carry. The login
+	// call itself does not echo it back, so it appears exactly twice.
+	if n := strings.Count(seq, "sid-1"); n != 2 {
+		t.Errorf("expected the login session id in exactly the apply and confirm calls, saw %d:\n%s", n, seq)
+	}
+	// A guard is written before the first mutation and removed only after a
+	// confirmed apply; the script must not leave it behind on success.
+	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-in-progress")); !os.IsNotExist(err) {
+		t.Errorf("a successful toggle must remove %s", filepath.Join(guardDir, "wifi-toggle-in-progress"))
+	}
+}
+
+// A failing apply — before rpcd's rollback window is armed — must revert the
+// staged wireless delta and clear the guard, so the next scheduled run is not
+// permanently blocked by a guard this helper can never resolve on its own.
+func TestWirelessToggleScriptRevertsAndClearsGuardOnApplyFailure(t *testing.T) {
+	_, _, guardDir := runToggleScript(t, `#!/bin/sh
+echo "ubus $*" >> "$CALLS"
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  apply) echo "apply refused" >&2; exit 1 ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`, "down", false)
+
+	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-in-progress")); !os.IsNotExist(err) {
+		t.Error("a failed apply must clear its guard, or every later run is blocked")
+	}
+}
+
+// A CONFIRM failure happens AFTER `uci apply` succeeded, so rpcd is holding the
+// rollback snapshot in the session dir and its timer is already armed. The
+// helper must then keep BOTH the session dir (it is where the snapshot lives)
+// and the crash guard (removing it would let the next cron run start a second
+// apply against rpcd's single apply slot while the first is still pending).
+func TestWirelessToggleScriptKeepsGuardAndSessionAfterApplyStarted(t *testing.T) {
+	binDir, _, guardDir := runToggleScript(t, `#!/bin/sh
+echo "ubus $*" >> "$CALLS"
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  confirm) echo "confirm refused" >&2; exit 1 ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`, "up", false)
+
+	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-in-progress")); err != nil {
+		t.Error("the guard must survive a post-apply failure: it is the only marker that the rollback is unresolved")
+	}
+	// The session dir is what rpcd restores from, so it must not be deleted.
+	if _, err := os.Stat(filepath.Join(binDir, "run", "uci-sid-1")); err != nil {
+		t.Error("the rpcd session dir must survive a post-apply failure; it holds the rollback snapshot")
+	}
+}
+
+// writeToggleScriptFixture stages the REAL generated helper in a temp bin
+// directory alongside a stub ubus, and returns (binDir, callsLog, guardDir,
+// scriptPath) ready to be executed. The paths inside the script are rewritten
+// so it never touches the test machine's /etc or /var.
+func writeToggleScriptFixture(t *testing.T, ubusStub string) (binDir, calls, guardDir, scriptPath string) {
+	t.Helper()
+
+	binDir = t.TempDir()
+	calls = filepath.Join(binDir, "calls.log")
+	guardDir = filepath.Join(binDir, "trafo")
+
+	if err := os.WriteFile(filepath.Join(binDir, "ubus"), []byte(ubusStub), 0o755); err != nil {
+		t.Fatalf("write ubus stub: %v", err)
+	}
+	// binDir goes FIRST on PATH, so these stubs shadow the real binaries.
+	// uci and logger only have to succeed. cp, mkdir and rm must really act,
+	// because the guard-lifecycle assertions check the filesystem afterwards —
+	// so each shim execs the real binary by ABSOLUTE path. A bare `rm "$@"`
+	// would resolve through PATH straight back into this shim and recurse
+	// forever.
+	for _, name := range []string{"cp", "mkdir", "rm"} {
+		real, err := exec.LookPath(name)
+		if err != nil {
+			t.Fatalf("locate real %s: %v", name, err)
+		}
+		body := "#!/bin/sh\nexec " + real + " \"$@\"\n"
+		if name == "mkdir" {
+			body = "#!/bin/sh\nexec " + real + " -p \"$@\"\n"
+		}
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte(body), 0o755); err != nil {
+			t.Fatalf("write %s stub: %v", name, err)
+		}
+	}
+	for _, name := range []string{"uci", "logger"} {
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatalf("write %s stub: %v", name, err)
+		}
+	}
+
+	script := strings.ReplaceAll(wirelessToggleScript, crashGuardDir, guardDir)
+	script = strings.ReplaceAll(script, "RPCD_RUN_DIR=/var/run/rpcd", "RPCD_RUN_DIR="+filepath.Join(binDir, "run"))
+	script = strings.ReplaceAll(script, "RPCD_UCI_DIR=/etc/config", "RPCD_UCI_DIR="+filepath.Join(binDir, "config"))
+	if err := os.MkdirAll(filepath.Join(binDir, "config"), 0o755); err != nil {
+		t.Fatalf("config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(binDir, "config", "wireless"), []byte("wireless\n"), 0o644); err != nil {
+		t.Fatalf("stage wireless: %v", err)
+	}
+
+	scriptPath = filepath.Join(binDir, "toggle.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	return binDir, calls, guardDir, scriptPath
+}
+
+// runToggleScript writes the fixture with the given ubus stub, runs the helper
+// and reports whether it exited zero. It returns the binDir (so a caller can
+// inspect the rpcd session dir) and the guardDir.
+func runToggleScript(t *testing.T, ubusStub, state string, wantSuccess bool) (binDir, calls, guardDir string) {
+	t.Helper()
+
+	binDir, calls, guardDir, scriptPath := writeToggleScriptFixture(t, ubusStub)
+	cmd := exec.Command("sh", scriptPath, state)
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "CALLS="+calls)
+	out, err := cmd.CombinedOutput()
+	if wantSuccess && err != nil {
+		t.Fatalf("toggle helper failed: %v\n%s", err, out)
+	}
+	if !wantSuccess && err == nil {
+		t.Fatal("expected the helper to exit non-zero")
+	}
+	return binDir, calls, guardDir
 }
