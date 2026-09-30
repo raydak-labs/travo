@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )

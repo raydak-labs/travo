@@ -729,7 +729,6 @@ export const mockDDNSConfig: DDNSConfig = {
   update_url: '',
 };
 
-
 /** GET /network/ddns returns the config plus whether ddns-scripts is installed. */
 export const mockDDNSConfigResponse: DDNSConfigResponse = {
   config: mockDDNSConfig,

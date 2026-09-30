@@ -29,6 +29,28 @@ const MinPasswordLength = 8
 // wall-clock exp validation (tokens issued before a backend restart).
 const expValidationLeeway = 2 * time.Minute
 
+// bcryptCost is the work factor used when hashing a password. It is a variable
+// only so tests can drop it: bcrypt.DefaultCost costs ~100ms per hash *and* per
+// verification, and the API suite builds a fresh AuthService per test case, so
+// the default makes the suite CPU-bound and its wall clock scales with runner
+// speed. Production never calls SetBcryptCost, so the deployed cost stays
+// bcrypt.DefaultCost.
+var bcryptCost = bcrypt.DefaultCost
+
+// SetBcryptCostForTesting lowers the bcrypt work factor used by
+// NewAuthService and ChangePassword, and returns a function that restores the
+// previous cost.
+//
+// It is meant to be called once from a package's TestMain, before any test
+// runs: the cost is read without a lock, so changing it while other goroutines
+// hash passwords is a data race. Hashes stay self-describing (the cost is
+// embedded in the hash), so a hash created at MinCost still verifies.
+func SetBcryptCostForTesting(cost int) (restore func()) {
+	previous := bcryptCost
+	bcryptCost = cost
+	return func() { bcryptCost = previous }
+}
+
 // AuthService handles authentication and JWT tokens.
 type AuthService struct {
 	// mu guards passwordHash, which ChangePassword rewrites while Login
@@ -85,7 +107,7 @@ func (a *AuthService) TokenTTL() time.Duration {
 
 // NewAuthService creates an AuthService with the given password and JWT secret.
 func NewAuthService(password, jwtSecret string) *AuthService {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	return &AuthService{
 		passwordHash: hash,
 		jwtSecret:    []byte(jwtSecret),
@@ -383,7 +405,7 @@ func (a *AuthService) ChangePassword(currentPassword, newPassword string) (Chang
 		if err := bcrypt.CompareHashAndPassword(a.passwordHashBytes(), []byte(currentPassword)); err != nil {
 			return ChangePasswordResult{}, errors.New("invalid current password")
 		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptCost)
 		if err != nil {
 			return ChangePasswordResult{}, err
 		}

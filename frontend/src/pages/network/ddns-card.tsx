@@ -108,8 +108,9 @@ export function DdnsCard() {
               // config and the backend answers 503 to every write. Say so here
               // rather than offering a form that cannot succeed.
               <p className="text-sm text-muted-foreground">
-                Dynamic DNS is unavailable: the <code>ddns-scripts</code> package is not installed on this
-                router. Install it with <code>opkg install ddns-scripts</code> to enable these settings.
+                Dynamic DNS is unavailable: the <code>ddns-scripts</code> package is not installed
+                on this router. Install it with <code>opkg install ddns-scripts</code> to enable
+                these settings.
               </p>
             )}
           </form>
