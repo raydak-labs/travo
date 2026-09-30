@@ -193,10 +193,18 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
       # goimports is NOT part of a Go toolchain and is not on the runner image,
       # so it must be installed explicitly or the goimports half of
       # `make format-check` silently checks nothing. The version comes from
       # .mise.toml, like every other tool version.
+      #
+      # This step must come AFTER "Read pinned toolchain versions", which is what
+      # populates steps.toolchain.outputs.goimports. Installed earlier, the
+      # version resolves to the empty string and `go install ...@v` fails.
       #
       # The version is passed through env, not expanded into the run block: zizmor
       # flags template expansion inside `run:` as a code-injection vector.
@@ -207,10 +215,6 @@ jobs:
         run: |
           go install "golang.org/x/tools/cmd/goimports@v$GOIMPORTS_VERSION"
           echo "$GOBIN" >> "$GITHUB_PATH"
-
-      - name: Read pinned toolchain versions
-        id: toolchain
-        run: make toolchain-versions >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
