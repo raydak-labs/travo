@@ -22,12 +22,24 @@ dev:
 # second hardcoded copy (.mise.toml stays the single source of truth).
 # Uses awk only, so it works in a bare CI runner with no mise/pnpm installed.
 toolchain-versions:
-	@awk '/^[[:space:]]*(node|pnpm|golangci-lint|shellcheck)[[:space:]]*=/ { \
-		key = $$1; \
-		val = $$3; gsub(/"/, "", val); \
-		gsub(/-/, "_", key); \
-		print key "=" val; \
-	}' .mise.toml
+	@awk 'BEGIN { FS = "=" } \
+		/^[[:space:]]*(node|pnpm|golangci-lint|shellcheck)[[:space:]]*=/ { \
+			key = $$1; val = $$2; \
+			gsub(/[[:space:]]/, "", key); \
+			gsub(/-/, "_", key); \
+			sub(/^[[:space:]]+/, "", val); \
+			sub(/[[:space:]].*$$/, "", val); \
+			gsub(/"/, "", val); \
+			print key "=" val; \
+		} \
+		/^[[:space:]]*"go:golang.org\/x\/tools\/cmd\/goimports"[[:space:]]*=/ { \
+			val = $$2; \
+			sub(/^[[:space:]]+/, "", val); \
+			sub(/[[:space:]].*$$/, "", val); \
+			gsub(/"/, "", val); \
+			gsub(/^v/, "", val); \
+			print "goimports=" val; \
+		}' .mise.toml
 
 # Build frontend and backend
 build:
@@ -63,7 +75,12 @@ format:
 # Format check gate: fails (non-zero) when any file is unformatted.
 format-check:
 	@$(RUN) pnpm format:check
-	@cd backend && out="$$($(RUN) gofmt -l . 2>/dev/null; $(RUN) goimports -l . 2>/dev/null)"; \
+	@cd backend && \
+	  for tool in gofmt goimports; do \
+	    $(RUN) sh -c "command -v $$tool" >/dev/null 2>&1 \
+	      || { echo "$$tool is not available via the pinned toolchain; the format gate would silently pass."; exit 1; }; \
+	  done; \
+	  out="$$($(RUN) sh -c 'gofmt -l .; goimports -l .')"; \
 	  if [ -n "$$out" ]; then \
 	    echo "Unformatted Go files:"; echo "$$out" | sort -u; \
 	    echo "Run 'make format' to fix."; exit 1; \

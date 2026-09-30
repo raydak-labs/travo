@@ -10,8 +10,12 @@ on:
 
 permissions: {}
 
+# Prefixed so the group differs from any caller: release.yml calls this workflow
+# as a reusable workflow, and a called workflow resolves github.workflow to its
+# CALLER's name — sharing the group would make the verify job cancel the release
+# run that started it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -181,6 +185,29 @@ jobs:
         with:
           persist-credentials: false
 
+      # Go is needed here too: without it this job falls back to whatever the
+      # runner image happens to ship, and the gate below is not the same one
+      # `make format-check` runs locally.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # goimports is NOT part of a Go toolchain and is not on the runner image,
+      # so it must be installed explicitly or the goimports half of
+      # `make format-check` silently checks nothing. The version comes from
+      # .mise.toml, like every other tool version.
+      #
+      # The version is passed through env, not expanded into the run block: zizmor
+      # flags template expansion inside `run:` as a code-injection vector.
+      - name: Install goimports
+        env:
+          GOBIN: ${{ runner.temp }}/gobin
+          GOIMPORTS_VERSION: ${{ steps.toolchain.outputs.goimports }}
+        run: |
+          go install "golang.org/x/tools/cmd/goimports@v$GOIMPORTS_VERSION"
+          echo "$GOBIN" >> "$GITHUB_PATH"
+
       - name: Read pinned toolchain versions
         id: toolchain
         run: make toolchain-versions >> "$GITHUB_OUTPUT"
@@ -197,15 +224,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Prettier
-        run: pnpm format:check
-
-      - name: gofmt / goimports
-        run: |
-          out="$(gofmt -l backend)"
-          if [ -n "$out" ]; then
-            echo "::error::gofmt needed:"; echo "$out"; exit 1
-          fi
+      # One command for both halves of the gate (gofmt AND goimports) so CI
+      # cannot pass on a state `make format-check` rejects locally.
+      - name: Prettier + gofmt / goimports
+        run: make format-check
 
   build-check:
     name: Build Check

@@ -191,18 +191,30 @@ restart_service() {
   # autoreconnect-failcount is intentionally NOT cleared: it is the bounded
   # retry counter that stops a broken saved network being replayed every
   # minute. A successful reconnect clears it on the device.
+  # firmware-upgrade-in-progress and factory-reset-in-progress are also NOT
+  # cleared: ADR 0003 section 2 keeps them so an interrupted sysupgrade or
+  # firstboot stays discoverable after the reboot. deploy-local.sh restarts the
+  # service but must not erase the record of a device mid-recovery.
+  #
+  # One ssh call, not one per guard per directory: 12 guards x 2 directories is
+  # 24 round-trips, and a device that accepts TCP but then hangs costs
+  # ConnectTimeout seconds on each of them before the restart even starts.
+  # The paths are expanded here rather than with a remote brace expansion,
+  # which BusyBox ash does not support.
+  #
+  # /etc/travo is the legacy location: guards were split across both directories
+  # before they were unified on /etc/trafo, so a device upgraded from an older
+  # build can still carry a guard there. Clear both.
+  local guard_paths=()
   for guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
     captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
     wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
-    firmware-upgrade-in-progress factory-reset-in-progress system-config-in-progress \
-    autoreconnect-crash-guard; do
-    # /etc/travo is the legacy location: guards were split across both
-    # directories before they were unified on /etc/trafo, so a device upgraded
-    # from an older build can still carry a guard there. Clear both.
+    system-config-in-progress autoreconnect-crash-guard; do
     for dir in /etc/trafo /etc/travo; do
-      ssh_cmd "rm -f '${dir}/${guard}'" >/dev/null 2>&1 || true
+      guard_paths+=("${dir}/${guard}")
     done
   done
+  ssh_cmd "rm -f ${guard_paths[*]}" >/dev/null 2>&1 || true
   info "Restarting travo..."
   ssh_cmd "/etc/init.d/travo restart 2>/dev/null || /etc/init.d/travo start 2>/dev/null || true"
   info "Waiting for process..."
@@ -218,11 +230,18 @@ restart_service() {
   done
   # Report the failure instead of letting the caller print "OK Done" over a
   # service that is not running.
+  #
+  # error() exits, so the log lines have to be printed BEFORE it is called:
+  # collecting them and then exiting discarded the one thing a failed deploy
+  # needs to diagnose itself.
   local logs
   logs=$(ssh_cmd "logread 2>/dev/null | grep -i travo | tail -20" 2>/dev/null || true)
-  error "travo is not running after restart - deploy NOT verified${logs:+ (see log lines below)}"
-  [[ -n "$logs" ]] && echo "$logs"
-  return 1
+  if [[ -n "$logs" ]]; then
+    echo "$logs" >&2
+    error "travo is not running after restart - deploy NOT verified (log lines above)"
+  else
+    error "travo is not running after restart - deploy NOT verified"
+  fi
 }
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

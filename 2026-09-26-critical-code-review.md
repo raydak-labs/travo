@@ -3,7 +3,7 @@ title: Critical code review — 2026-09-26
 date: 2026-09-26
 scope: backend (Go), frontend/shared (React/TS), tests/CI/build, docs↔code consistency
 method: 5 parallel read-only review lanes + independent verification by the parent agent
-status: open — no fixes applied
+status: remediated on fix/critical-review-remediation
 ---
 
 # Critical code review — 2026-09-26

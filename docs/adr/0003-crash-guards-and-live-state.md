@@ -73,7 +73,7 @@ feature (a stuck guard permanently disables it).
 `captive-wwan-bounce-in-progress` in the other). A guard written to one directory was invisible
 to a check that only looked at the other, and `deploy-local.sh` could not clear all of them, so
 a stale guard permanently disabled a feature with no log line. **Every crash guard is now
-written to `/etc/trafo/`**; `internal/services/crash_guard_paths_test.go` scans the service
+written to `/etc/trafo/`**; `internal/services/guards_test.go` scans the service
 sources and fails if a `-in-progress` / `-crash-guard` / `-failcount` path reappears under
 `/etc/travo/`. Non-guard state (aliases, WiFi priorities, repeater options, the bbolt store)
 stays in `/etc/travo/` — moving it would lose user data on upgrade. `deploy-local.sh` clears

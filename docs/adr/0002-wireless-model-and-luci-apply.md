@@ -73,7 +73,7 @@ timer- or button-driven `wifi down` has no rollback. Those paths therefore call 
   failed set/commit, or a failed confirm runs `uci revert wireless` and exits
   non-zero. This is the same rollback-then-confirm shape as §5, expressed in shell
   because the caller is cron/procd rather than a browser.
-- **Guard:** writes `/etc/travo/wifi-toggle-in-progress` before the first mutation
+- **Guard:** writes `/etc/trafo/wifi-toggle-in-progress` before the first mutation
   and removes it only after a confirmed apply. While the guard exists the helper logs
   and exits `0` without touching the radios (ADR 0003 §2).
 

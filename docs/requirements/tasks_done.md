@@ -79,7 +79,7 @@ Moved here from `tasks_open.md` because the code shipped; the items were still l
   `captive-wwan-bounce-in-progress`). A guard written to one directory was invisible to a check
   that only looked at the other, so a stale guard permanently disabled a feature with no log
   line, and `deploy-local.sh` could not clear all of them. All guards now live in `/etc/trafo/`,
-  enforced by `internal/services/crash_guard_paths_test.go`; the deploy script clears both
+  enforced by `internal/services/guards_test.go`; the deploy script clears both
   directories for devices upgraded from an older build. Non-guard state stays in `/etc/travo/`.
   Normative detail: [ADR 0003 §2](../adr/0003-crash-guards-and-live-state.md).
 
