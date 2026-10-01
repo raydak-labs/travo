@@ -90,7 +90,11 @@ func (w *WifiService) enableAutoReconnect() error {
 		return fmt.Errorf("writing reconnect script: %w", err)
 	}
 
-	// Add cron entry (every minute)
+	// Add cron entry (every minute). Under crontabMu: this is a read-modify-write
+	// of /etc/crontabs/root, the same file the WiFi/LED schedules rewrite, and
+	// an unlocked rewrite here drops their entries (and vice versa).
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
 	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s'; echo '* * * * * %s') | crontab -`,
 		w.reconnectScript, w.reconnectScript)
 	if _, err := w.cmd.Run("sh", "-c", cronCmd); err != nil {
@@ -110,7 +114,10 @@ func (w *WifiService) WriteReconnectScriptSafe() {
 }
 
 func (w *WifiService) disableAutoReconnect() error {
-	// Remove cron entry
+	// Remove cron entry, under the same lock enableAutoReconnect takes: both
+	// rewrite /etc/crontabs/root in place.
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
 	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s') | crontab -`, w.reconnectScript)
 	_, _ = w.cmd.Run("sh", "-c", cronCmd)
 
@@ -172,11 +179,16 @@ func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
 
 // crontabMu serialises read-modify-write of /etc/crontabs/root.
 //
-// The WiFi schedule and the LED schedule both rewrite the whole crontab,
-// preserving the lines they do not own. Two concurrent rewrites each read the
-// same base and each wrote their own version, so one silently dropped the
-// other's entries. Keyed on the FILE, not on a UCI config: this is a plain
-// crontab, with no uci delta involved.
+// Every writer of that one file takes it: the WiFi schedule, the LED schedule,
+// AND the auto-reconnect cron entry. The auto-reconnect path rewrites the file
+// through `crontab -l | grep -v ... | crontab -`, which is the same
+// read-modify-write as the others — two concurrent rewrites each read the same
+// base and each wrote their own version, so one silently dropped the other's
+// entries. That is not hypothetical at boot: main.go reconciles auto-reconnect
+// at 5s and the schedules at 6s.
+//
+// Keyed on the FILE, not on a UCI config: this is a plain crontab, with no
+// uci delta involved.
 var crontabMu sync.Mutex
 
 // SetWiFiSchedule saves the WiFi schedule and updates the crontab.
@@ -283,7 +295,11 @@ func (w *WifiService) removeWiFiScheduleCronLines() error {
 		lines = append(lines, line)
 	}
 	lines = append(lines, "")
-	if err := os.WriteFile(w.crontabPath(), []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+	// Atomic, like writeWiFiScheduleCronLines: busybox crond re-reads
+	// /etc/crontabs/root while it runs, and a truncating os.WriteFile can hand it
+	// a half-written file — which it then parses as the real crontab, dropping
+	// the auto-reconnect and LED entries it did not manage to read.
+	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n")), 0o600); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")

@@ -5,8 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // The WiFi schedule used to be written to /etc/cron.d/openwrt-gui-wifi-schedule.
@@ -101,5 +104,96 @@ func TestWiFiScheduleInvalidTimeChangesNothing(t *testing.T) {
 	jsonAfter, _ := os.ReadFile(jsonPath)
 	if !strings.Contains(string(jsonAfter), `"07:00"`) {
 		t.Errorf("a rejected schedule changed the persisted schedule: %s", jsonAfter)
+	}
+}
+
+// The auto-reconnect cron entry and the WiFi/LED schedules all rewrite the one
+// crontab file in place. They must therefore share crontabMu: without it, a
+// SetAutoReconnect concurrent with a SetWiFiSchedule has both read the same base
+// and each writes its own version, so one silently drops the other's entries.
+// main.go reconciles auto-reconnect at 5s and the schedules at 6s, so the two
+// writers really do overlap on every boot.
+func TestAutoReconnectWaitsForTheCrontabLock(t *testing.T) {
+	dir := t.TempDir()
+
+	var ran bool
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		ran = true
+		return nil, nil
+	}}
+
+	w := NewWifiServiceForTesting(uci.NewMockUCI(), ubus.NewMockUbus(), &NoopWifiReloader{}, cmd,
+		filepath.Join(dir, "priorities.json"),
+		filepath.Join(dir, "autoreconnect.json"),
+		filepath.Join(dir, "wifi-reconnect.sh"))
+
+	// Hold the lock the schedule writers take, then ask for a crontab rewrite.
+	crontabMu.Lock()
+	done := make(chan error, 1)
+	go func() { done <- w.SetAutoReconnect(true) }()
+
+	select {
+	case <-done:
+		crontabMu.Unlock()
+		t.Fatal("auto-reconnect rewrote the crontab while another writer held the lock")
+	case <-time.After(200 * time.Millisecond):
+		// Expected: the rewrite is waiting, not racing.
+	}
+	crontabMu.Unlock()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("SetAutoReconnect: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SetAutoReconnect never completed after the lock was released")
+	}
+	if !ran {
+		t.Error("expected the crontab command to run once the lock was free")
+	}
+}
+
+// busybox crond re-reads /etc/crontabs/root while it runs, so removing the
+// schedule lines must swap the file by rename rather than truncate it in place:
+// a crond that reads a half-written file parses it as the real crontab and drops
+// the auto-reconnect and LED entries. A truncating os.WriteFile shows up as the
+// same inode before and after the rewrite.
+func TestRemoveWiFiScheduleCronLinesReplacesTheFileAtomically(t *testing.T) {
+	dir := t.TempDir()
+	crontab := filepath.Join(dir, "root")
+	seed := "* * * * * /etc/trafo/wifi-reconnect.sh\n"
+	if err := os.WriteFile(crontab, []byte(seed), 0o600); err != nil {
+		t.Fatalf("seed crontab: %v", err)
+	}
+	before, err := os.Stat(crontab)
+	if err != nil {
+		t.Fatalf("stat crontab: %v", err)
+	}
+
+	w := &WifiService{
+		crontabFile:  crontab,
+		scheduleFile: filepath.Join(dir, "wifi-schedule.json"),
+	}
+	if err := w.removeWiFiScheduleCronLines(); err != nil {
+		t.Fatalf("removeWiFiScheduleCronLines: %v", err)
+	}
+
+	after, err := os.Stat(crontab)
+	if err != nil {
+		t.Fatalf("stat crontab after: %v", err)
+	}
+	if os.SameFile(before, after) {
+		t.Error("the crontab was rewritten in place; it must be replaced by rename so crond never reads a partial file")
+	}
+	got, err := os.ReadFile(crontab)
+	if err != nil {
+		t.Fatalf("read crontab: %v", err)
+	}
+	if !strings.Contains(string(got), "/etc/trafo/wifi-reconnect.sh") {
+		t.Errorf("unrelated crontab entries were lost:\n%s", got)
+	}
+	if _, err := os.Stat(crontab + ".tmp"); !os.IsNotExist(err) {
+		t.Error("the atomic write left its temp file behind")
 	}
 }

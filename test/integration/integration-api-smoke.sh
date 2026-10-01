@@ -145,6 +145,42 @@ check_integrity() {
   fi
 }
 
+# ------------------------------------------------- object-count bookkeeping
+# The collections this run writes into. Anything already in them belongs to the
+# router's owner and must survive the run untouched.
+COLLECTIONS="network/firewall/port-forwards network/dns/entries network/dhcp/reservations network/clients/blocked"
+
+# count_coll prints the number of objects in one collection, or "?" when the
+# listing could not be read. The list endpoints are inconsistent — port forwards
+# come back wrapped as {"rules": [...]}, the others as bare arrays — so the
+# wrapper is unwrapped here rather than at every call site.
+count_coll() {
+  curl -sS -m 20 "$API/$1" -H "Authorization: Bearer $TOKEN" 2>/dev/null | python3 -c '
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("?"); raise SystemExit
+if isinstance(d, dict):
+    d = d.get("rules", d.get("entries", d.get("reservations", [])))
+print(len(d) if isinstance(d, list) else "?")' 2>/dev/null || echo "?"
+}
+
+# snapshot_counts records "collection count" lines before anything is written.
+# The post-run check compares against these instead of demanding zero: a router
+# that already had its own port forward or blocked client was never dirty, and
+# failing it would contradict the "safe on any test device" promise in the
+# header. It would also mask a real leak — a leftover of this run's objects is
+# invisible when the collection only has to come back to zero.
+snapshot_counts() {
+  : >"$RUN_DIR/baseline_counts"
+  local coll n
+  for coll in $COLLECTIONS; do
+    n=$(count_coll "$coll")
+    echo "$coll $n" >>"$RUN_DIR/baseline_counts"
+  done
+}
+
 # ------------------------------------------------- 1. documented GET sweep
 echo
 echo "== 1. Every documented GET endpoint (2xx/3xx, no 5xx) =="
@@ -200,6 +236,9 @@ fi
 # ------------------------------------------------ 3/4. write round-trips
 echo
 echo "== 3. Reversible write round-trips =="
+# Taken before the first write: sections 3-5 add objects to these collections,
+# and the final check compares the post-cleanup state against this.
+snapshot_counts
 cat > "$RUN_DIR/cleanup.py" <<'PY'
 import json, sys, urllib.request, urllib.error
 api, token = sys.argv[sys.argv.index("--api") + 1], sys.argv[sys.argv.index("--token") + 1]
@@ -451,18 +490,34 @@ for t in threads: t.join()
 
 # Everything claimed as created must actually be there: a lost update means a
 # request answered 200 for a write that was then overwritten.
+#
+# Count only THIS run's objects. The device may already hold entries the owner
+# created, and those inflate the total enough to hide a genuinely lost write —
+# which is the exact failure this section exists to catch. Every object written
+# here is named cc-w*, which is also the prefix cleanup.py removes.
 lost = []
-code, body = call("GET", "/network/dns/entries")
-if code == 200 and len(json.loads(body)) < created["dns"]:
-    lost.append(f"dns: {created['dns']} created, {len(json.loads(body))} present")
-code, body = call("GET", "/network/dhcp/reservations")
-if code == 200 and len(json.loads(body)) < created["res"]:
-    lost.append(f"reservations: {created['res']} created, {len(json.loads(body))} present")
-code, body = call("GET", "/network/firewall/port-forwards")
-if code == 200:
-    rules = json.loads(body).get("rules", [])
-    if len(rules) < created["pf"]:
-        lost.append(f"port-forwards: {created['pf']} created, {len(rules)} present")
+
+def mine(path, key=None):
+    """Objects in a collection that this run created."""
+    code, body = call("GET", path)
+    if code != 200:
+        return None
+    data = json.loads(body)
+    if key is not None:
+        data = data.get(key, [])
+    if not isinstance(data, list):
+        return None
+    return [e for e in data if str(e.get("name", "")).startswith("cc-w")]
+
+present = mine("/network/dns/entries")
+if present is not None and len(present) < created["dns"]:
+    lost.append(f"dns: {created['dns']} created, {len(present)} present")
+present = mine("/network/dhcp/reservations")
+if present is not None and len(present) < created["res"]:
+    lost.append(f"reservations: {created['res']} created, {len(present)} present")
+present = mine("/network/firewall/port-forwards", "rules")
+if present is not None and len(present) < created["pf"]:
+    lost.append(f"port-forwards: {created['pf']} created, {len(present)} present")
 
 print(f"{len(errors)} {len(lost)}")
 for e in errors[:10]: print("ERR " + e)
@@ -496,19 +551,20 @@ if [ -n "$GUARDS" ]; then note_fail "crash guard at exit: $GUARDS"; fi
 if ! ssh_cmd 'pidof travo' >/dev/null 2>&1; then
   note_fail "travo is not running after the smoke run"
 fi
-# The device must be left as it was found, not merely non-crashed.
-for coll in network/firewall/port-forwards network/dns/entries network/dhcp/reservations network/clients/blocked; do
-  n=$(curl -sS -m 20 "$API/$coll" -H "Authorization: Bearer $TOKEN" 2>/dev/null | python3 -c '
-import sys, json
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    print("?"); raise SystemExit
-if isinstance(d, dict):
-    d = d.get("rules", d.get("entries", d.get("reservations", [])))
-print(len(d) if isinstance(d, list) else "?")' 2>/dev/null || echo "?")
-  if [ "$n" != "0" ]; then
-    note_fail "$coll still has $n object(s) after cleanup"
+# The device must be left as it was found, not merely non-crashed. "As found" is
+# measured against the counts taken before section 3 wrote anything: demanding an
+# empty collection failed on any router that already had its own port forward,
+# DNS entry, reservation or blocked client, even when cleanup removed everything
+# this run created.
+for coll in $COLLECTIONS; do
+  base=$(awk -v c="$coll" '$1 == c {print $2}' "$RUN_DIR/baseline_counts" 2>/dev/null || echo "?")
+  n=$(count_coll "$coll")
+  if [ "$base" = "?" ] || [ "$n" = "?" ]; then
+    note_fail "$coll could not be compared (baseline=$base now=$n)"
+    continue
+  fi
+  if [ "$n" != "$base" ]; then
+    note_fail "$coll has $n object(s) after cleanup, was $base before the run (delta $((n - base)))"
   fi
 done
 echo "travo pid before=${BEFORE_PID:-?} after=$(ssh_cmd 'pidof travo' 2>/dev/null || echo none)"

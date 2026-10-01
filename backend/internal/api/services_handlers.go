@@ -21,12 +21,24 @@ func ListServicesHandler(sm *services.ServiceManager) fiber.Handler {
 	}
 }
 
+// These four endpoints take no request body, so none of their errors can be a
+// malformed body. Prefixing them with ErrInvalidRequestBody told the operator
+// their request was invalid when the real cause was an opkg/initd failure, and
+// these messages are shown verbatim in the UI. The service layer already names
+// the failing package, so the error is passed through as-is. The status code is
+// deliberately left alone: an unknown service id is a genuine 400, and telling
+// a failed install from an unknown id needs an error type the service manager
+// does not have yet.
+func installErr(c fiber.Ctx, err error) error {
+	return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+}
+
 // InstallServiceHandler handles POST /api/v1/services/:id/install.
 func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Install(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+			return installErr(c, err)
 		}
 		return RespondOK(c)
 	}
@@ -37,7 +49,7 @@ func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Remove(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+			return installErr(c, err)
 		}
 		return RespondOK(c)
 	}
@@ -48,7 +60,7 @@ func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Start(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+			return installErr(c, err)
 		}
 		return RespondOK(c)
 	}
@@ -59,7 +71,7 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Stop(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+			return installErr(c, err)
 		}
 		return RespondOK(c)
 	}
