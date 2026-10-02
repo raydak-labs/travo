@@ -15,6 +15,12 @@ import (
 // credentials.
 const blocklistBucket = "blocklist"
 
+// jtiKeyPrefix namespaces revoked jti entries inside the same map and store
+// bucket as token hashes. A jti is not a credential on its own (it only
+// appears inside a signed token) but it is hashed all the same, so flash
+// contents stay uniform hashes.
+const jtiKeyPrefix = "jti:"
+
 // TokenBlocklist maintains a set of blocked (revoked) JWT tokens, keyed by
 // token hash. With a store attached, revocations survive backend restarts
 // (previously a restart resurrected logged-out tokens for up to 24h).
@@ -66,9 +72,26 @@ func hashToken(tokenString string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func hashJTI(jti string) string {
+	return jtiKeyPrefix + hashToken(jti)
+}
+
 // Block adds a token to the blocklist with its expiry time.
 func (b *TokenBlocklist) Block(tokenString string, expiry time.Time) {
-	key := hashToken(tokenString)
+	b.block(hashToken(tokenString), expiry)
+}
+
+// BlockJTI revokes every token carrying this jti until expiry. Unlike the
+// in-memory session registry, jti revocations survive a backend restart, which
+// is what makes a password change (or logout) stick across a redeploy.
+func (b *TokenBlocklist) BlockJTI(jti string, expiry time.Time) {
+	if jti == "" {
+		return
+	}
+	b.block(hashJTI(jti), expiry)
+}
+
+func (b *TokenBlocklist) block(key string, expiry time.Time) {
 	b.mu.Lock()
 	b.tokens[key] = expiry
 	b.mu.Unlock()
@@ -80,7 +103,18 @@ func (b *TokenBlocklist) Block(tokenString string, expiry time.Time) {
 
 // IsBlocked checks if a token is in the blocklist.
 func (b *TokenBlocklist) IsBlocked(tokenString string) bool {
-	key := hashToken(tokenString)
+	return b.isBlocked(hashToken(tokenString))
+}
+
+// IsJTIBlocked checks if a token id was revoked.
+func (b *TokenBlocklist) IsJTIBlocked(jti string) bool {
+	if jti == "" {
+		return false
+	}
+	return b.isBlocked(hashJTI(jti))
+}
+
+func (b *TokenBlocklist) isBlocked(key string) bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	_, ok := b.tokens[key]

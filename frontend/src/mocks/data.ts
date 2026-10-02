@@ -28,6 +28,7 @@ import type {
   RadioInfo,
   KillSwitchStatus,
   DDNSConfig,
+  DDNSConfigResponse,
   DDNSStatus,
   SQMConfig,
 } from '@shared/index';
@@ -66,9 +67,13 @@ export const mockSystemStats: SystemStats = {
   ],
 };
 
+// Mirrors GET /api/v1/network/status as the router actually answers it:
+// `name` is the ubus network section and `type` is the medium/role
+// discriminator. In repeater mode the `wan` field carries the wwan (WiFi STA)
+// interface, because it is the effective uplink.
 export const mockNetworkStatus: NetworkStatus = {
   wan: {
-    name: 'wlan-sta0',
+    name: 'wwan',
     type: 'wifi',
     ip_address: '192.168.1.105',
     netmask: '255.255.255.0',
@@ -80,7 +85,7 @@ export const mockNetworkStatus: NetworkStatus = {
     tx_bytes: 536870912,
   },
   lan: {
-    name: 'br-lan',
+    name: 'lan',
     type: 'lan',
     ip_address: '192.168.8.1',
     netmask: '255.255.255.0',
@@ -105,7 +110,7 @@ export const mockNetworkStatus: NetworkStatus = {
       tx_bytes: 0,
     },
     {
-      name: 'wlan-sta0',
+      name: 'wwan',
       type: 'wifi',
       ip_address: '192.168.1.105',
       netmask: '255.255.255.0',
@@ -117,7 +122,7 @@ export const mockNetworkStatus: NetworkStatus = {
       tx_bytes: 536870912,
     },
     {
-      name: 'br-lan',
+      name: 'lan',
       type: 'lan',
       ip_address: '192.168.8.1',
       netmask: '255.255.255.0',
@@ -724,6 +729,11 @@ export const mockDDNSConfig: DDNSConfig = {
   update_url: '',
 };
 
+/** GET /network/ddns returns the config plus whether ddns-scripts is installed. */
+export const mockDDNSConfigResponse: DDNSConfigResponse = {
+  config: mockDDNSConfig,
+  available: true,
+};
 export const mockDDNSStatus: DDNSStatus = {
   running: false,
   public_ip: '',

@@ -38,9 +38,13 @@ mkdir -p "${BUILD_DIR}"
 echo "→ Building frontend..."
 (cd frontend && pnpm build)
 
-# Step 2: Tidy Go modules
-echo "→ Tidying Go modules..."
-(cd backend && go mod tidy)
+# Step 2: Verify Go modules are tidy (a build must never mutate go.mod/go.sum;
+# CI enforces the same check with `go mod tidy -diff`).
+echo "→ Verifying Go modules are tidy..."
+if ! (cd backend && go mod tidy -diff >/dev/null); then
+  echo "ERROR: backend/go.mod is not tidy. Run 'cd backend && go mod tidy' and commit the result." >&2
+  exit 1
+fi
 
 # Step 3: Cross-compile Go backend
 echo "→ Cross-compiling backend for ${TARGET_OS}/${TARGET_ARCH}..."

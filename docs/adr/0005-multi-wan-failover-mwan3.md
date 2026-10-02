@@ -2,6 +2,7 @@
 title: "ADR 0005: Multi-WAN connection failover (mwan3)"
 status: Accepted
 date: 2026-05-14
+updated: 2026-09-28
 tags: [adr, mwan3, failover, routing, ipv4]
 ---
 
@@ -34,8 +35,9 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 
 ### 4. Apply path
 
-- Failover uses **`UCIApplyConfirm`** for **`network`** and **`mwan3`** configs (`mwan3UCIConfigs`) where the real applier is wired—aligning high-impact routing changes with the same **apply / confirm** philosophy as other dangerous UCI batches when applicable.
-- **mwan3** service reload/restart is invoked after successful UCI commit paths as implemented in code.
+- Failover uses **`UCIApplyConfirm`** for **`network`** and **`mwan3`** configs (`mwan3UCIConfigs`) where the real applier is wired.
+- The apply is **staged**, not immediate: `stagedApplyMwan3` starts the rpcd apply with `rollback: true`, **verifies every managed section** while the previous config is still restorable, and only then calls `Confirm`. Confirming straight after the apply would close the rollback window before anything was checked on a policy that re-routes the WAN. When no applier is wired (tests) it falls back to `/etc/init.d/mwan3 reload` (then `restart`).
+- `SetConfig` takes a dedicated **apply lock** covering backup → guard write → generate → staged apply → verify → guard removal, so two concurrent saves cannot interleave (the service's own `mu` guards only the event list).
 
 ### 5. Failback behavior
 

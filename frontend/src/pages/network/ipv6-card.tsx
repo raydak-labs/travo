@@ -32,7 +32,9 @@ export function IPv6Card() {
               />
             </div>
             <div>
-              <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">Global IPv6 Addresses</p>
+              <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                Global IPv6 Addresses
+              </p>
               {status?.addresses && status.addresses.length > 0 ? (
                 <ul className="space-y-1">
                   {status.addresses.map((addr) => (

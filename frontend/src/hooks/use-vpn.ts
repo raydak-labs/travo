@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { routeWithSegment } from '@/lib/api-url';
 import { refreshRouterState } from '@/lib/router-state-refresh';
 import { API_ROUTES } from '@shared/index';
 import type {
@@ -128,7 +129,7 @@ export function useDeleteWireguardProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.del<{ status: string }>(`${API_ROUTES.vpn.wireguard.profiles}/${id}`),
+      apiClient.del<{ status: string }>(routeWithSegment(API_ROUTES.vpn.wireguard.profiles, id)),
     onSuccess: () => {
       toast.success('WireGuard profile deleted');
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'wireguard', 'profiles'] });
@@ -143,7 +144,9 @@ export function useActivateWireguardProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<{ status: string }>(`${API_ROUTES.vpn.wireguard.profiles}/${id}/activate`),
+      apiClient.post<{ status: string }>(
+        `${routeWithSegment(API_ROUTES.vpn.wireguard.profiles, id)}/activate`,
+      ),
     onSuccess: () => {
       toast.success('WireGuard profile activated');
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });

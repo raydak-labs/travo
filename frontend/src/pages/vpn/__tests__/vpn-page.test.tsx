@@ -107,9 +107,7 @@ describe('VpnPage', () => {
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /DNS Leak Test/i }));
-    expect(
-      screen.getByText(/Verify that DNS queries are routed through the VPN/i),
-    ).toBeVisible();
+    expect(screen.getByText(/Verify that DNS queries are routed through the VPN/i)).toBeVisible();
   });
 
   it('shows not-installed message when WireGuard is not installed', async () => {

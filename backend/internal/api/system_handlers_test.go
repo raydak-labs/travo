@@ -13,7 +13,7 @@ import (
 )
 
 func TestSystemInfoEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
@@ -37,7 +37,7 @@ func TestSystemInfoEndpoint(t *testing.T) {
 }
 
 func TestSystemStatsEndpoint(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/stats", nil)
@@ -61,7 +61,7 @@ func TestSystemStatsEndpoint(t *testing.T) {
 }
 
 func TestReboot_ReturnsOk(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/reboot", nil)
@@ -84,7 +84,7 @@ func TestReboot_ReturnsOk(t *testing.T) {
 func TestFactoryReset_ReturnsError(t *testing.T) {
 	// Factory reset calls exec.Command("firstboot") which won't exist in test env,
 	// so we expect a 500 error.
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/factory-reset", nil)
@@ -101,7 +101,7 @@ func TestFactoryReset_ReturnsError(t *testing.T) {
 }
 
 func TestFirmwareUpgrade_NoFile(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/firmware/upgrade", nil)
@@ -117,7 +117,7 @@ func TestFirmwareUpgrade_NoFile(t *testing.T) {
 }
 
 func TestFirmwareUpgrade_InvalidExtension(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body := &bytes.Buffer{}
@@ -140,7 +140,7 @@ func TestFirmwareUpgrade_InvalidExtension(t *testing.T) {
 }
 
 func TestFirmwareUpgrade_ValidFile(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	body := &bytes.Buffer{}
@@ -166,7 +166,7 @@ func TestFirmwareUpgrade_ValidFile(t *testing.T) {
 }
 
 func TestGetNTPConfig(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/ntp", nil)
@@ -193,7 +193,7 @@ func TestGetNTPConfig(t *testing.T) {
 }
 
 func TestSetNTPConfig(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	payload := `{"enabled":true,"servers":["pool.ntp.org","time.google.com"]}`
@@ -212,7 +212,7 @@ func TestSetNTPConfig(t *testing.T) {
 }
 
 func TestGetSetupComplete(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/setup-complete", nil)

@@ -38,7 +38,9 @@ export function InterfacesCard() {
                       {iface.name.toUpperCase()}
                     </span>
                     {iface.ip_address && (
-                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{iface.ip_address}</span>
+                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                        {iface.ip_address}
+                      </span>
                     )}
                   </div>
                 </div>

@@ -11,7 +11,7 @@ import (
 // The speedtest-service endpoints are called by the frontend; they must be
 // registered (they were once defined but never routed).
 func TestSpeedtestServiceStatusRouteRegistered(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/speedtest-service", nil)

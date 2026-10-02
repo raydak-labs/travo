@@ -14,6 +14,7 @@ type ReviewStepProps = {
   apConfig: RepeaterApFormConfig;
   allowApOnStaRadio: boolean;
   applyError: string | null;
+  failedStep: string | null;
   applying: boolean;
   onBack: () => void;
   onApply: () => void;
@@ -27,6 +28,7 @@ export function RepeaterWizardReviewStep({
   apConfig,
   allowApOnStaRadio,
   applyError,
+  failedStep,
   applying,
   onBack,
   onApply,
@@ -66,9 +68,16 @@ export function RepeaterWizardReviewStep({
       </div>
 
       {applyError && (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {applyError}
-        </p>
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/30">
+          {failedStep && (
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">
+              Failed while applying: {failedStep}
+            </p>
+          )}
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+            {applyError}
+          </p>
+        </div>
       )}
 
       <DialogFooter>

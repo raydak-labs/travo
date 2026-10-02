@@ -40,6 +40,7 @@ export function DhcpReservationsTable({
                   variant="ghost"
                   size="sm"
                   type="button"
+                  aria-label={`Delete reservation for ${reservation.name || reservation.mac}`}
                   onClick={() => reservation.section && onDeleteSection(reservation.section)}
                   disabled={deletePending}
                 >

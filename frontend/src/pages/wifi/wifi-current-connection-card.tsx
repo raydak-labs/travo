@@ -21,7 +21,7 @@ export function WifiCurrentConnectionCard() {
         {connection?.connected ? (
           <Wifi className="h-4 w-4 text-green-500" />
         ) : (
-          <WifiOff className="h-4 w-4 text-gray-400" />
+          <WifiOff className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         )}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">

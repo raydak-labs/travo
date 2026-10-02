@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAPConfigs } from '@/hooks/use-wifi';
 import { apiClient } from '@/lib/api-client';
+import { routeWithSegment } from '@/lib/api-url';
 import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { APStepCredentialsFields } from '@/pages/setup/ap-step-credentials-fields';
 import { APStepIntro } from '@/pages/setup/ap-step-intro';
@@ -37,7 +38,10 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
           enabled: ap.enabled,
         };
         await finalizeWifiMutation(
-          apiClient.put<WifiMutationResponse>(`${API_ROUTES.wifi.ap}/${ap.section}`, config),
+          apiClient.put<WifiMutationResponse>(
+            routeWithSegment(API_ROUTES.wifi.ap, ap.section),
+            config,
+          ),
         );
       }
     },
@@ -112,7 +116,7 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
       <button
         type="button"
         onClick={onNext}
-        className="block w-full text-center text-sm text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-gray-300"
+        className="block w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:text-gray-300"
       >
         Skip for now
       </button>

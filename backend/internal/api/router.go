@@ -38,6 +38,9 @@ type Dependencies struct {
 	TimeSyncMinPlausible time.Time
 	TimeSyncSetTime      func(epochSec int64) error
 	TimeSyncLimiter      *auth.RateLimiter
+	// TimeSyncGate latches the "clock was plausible" decision so an
+	// unauthenticated caller cannot rewind the clock to reopen the endpoint.
+	TimeSyncGate *TimeSyncGate
 }
 
 // SetupRoutes registers all API routes under /api/v1/.

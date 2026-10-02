@@ -48,6 +48,36 @@ func TestSessionRegistry_Remove(t *testing.T) {
 	}
 }
 
+func TestSessionRegistry_RevokeAll(t *testing.T) {
+	r := NewSessionRegistry(24 * time.Hour)
+	r.Register("a")
+	r.Register("b")
+	r.Register("c")
+
+	revoked := r.RevokeAll()
+	if len(revoked) != 3 {
+		t.Fatalf("expected 3 revoked jtis, got %d (%v)", len(revoked), revoked)
+	}
+	for _, jti := range []string{"a", "b", "c"} {
+		if _, known := r.Status(jti); known {
+			t.Errorf("expected %q to be gone from the registry", jti)
+		}
+	}
+	if got := r.RevokeAll(); len(got) != 0 {
+		t.Errorf("expected an empty second RevokeAll, got %v", got)
+	}
+}
+
+func TestSessionRegistry_RegisterAfterRevokeAll(t *testing.T) {
+	r := NewSessionRegistry(24 * time.Hour)
+	r.Register("a")
+	r.RevokeAll()
+	r.Register("fresh")
+	if remaining, known := r.Status("fresh"); !known || remaining <= 0 {
+		t.Errorf("expected the post-revocation session to be live, known=%v remaining=%v", known, remaining)
+	}
+}
+
 // issueToken creates a signed token with the given jti and exp for test scenarios.
 func issueToken(t *testing.T, secret, jti string, exp time.Time) string {
 	t.Helper()

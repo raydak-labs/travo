@@ -1,6 +1,11 @@
 package uci
 
-import "testing"
+import (
+	"errors"
+	"os"
+	"strings"
+	"testing"
+)
 
 // Compile-time interface check.
 var _ UCI = (*RealUCI)(nil)
@@ -263,5 +268,206 @@ func TestParseShowConfigOutput_SectionType(t *testing.T) {
 	}
 	if section["ip"] != "10.0.0.1" {
 		t.Errorf("expected ip '10.0.0.1', got %q", section["ip"])
+	}
+}
+
+// errShowFailed stands in for a failed/timed-out `uci show` invocation.
+var errShowFailed = errors.New("simulated uci show failure")
+
+// withStubbedUciShow replaces the `uci show` backend for the duration of a test.
+func withStubbedUciShow(t *testing.T, fn func(config string) ([]byte, error)) {
+	t.Helper()
+	prev := uciShowConfig
+	uciShowConfig = fn
+	t.Cleanup(func() { uciShowConfig = prev })
+}
+
+func TestRealUCIGetSections_ReturnsErrorOnFailure(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return []byte("uci: fatal: Cannot open /etc/config/wireless"), errShowFailed
+	})
+
+	sections, err := NewRealUCI().GetSections("wireless")
+	if err == nil {
+		t.Fatal("expected an error when `uci show` fails; a failed read must not look like an empty config")
+	}
+	if sections != nil {
+		t.Errorf("expected nil sections on error, got %v", sections)
+	}
+}
+
+func TestRealUCIGetSections_TimeoutIsNotEmptyConfig(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return nil, errShowFailed // execx kills the command on timeout, no output
+	})
+
+	if _, err := NewRealUCI().GetSections("wireless"); err == nil {
+		t.Fatal("expected an error for a timed-out `uci show`")
+	}
+}
+
+func TestRealUCIGetSections_MissingConfigIsEmpty(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return []byte("uci: Entry not found"), errShowFailed
+	})
+
+	sections, err := NewRealUCI().GetSections("sqm")
+	if err != nil {
+		t.Fatalf("a config package that is not installed is not an error: %v", err)
+	}
+	if len(sections) != 0 {
+		t.Errorf("expected no sections for a missing config, got %v", sections)
+	}
+}
+
+func TestRealUCIGetSections_ParsesSections(t *testing.T) {
+	withStubbedUciShow(t, func(config string) ([]byte, error) {
+		return []byte("wireless.sta0=wifi-iface\nwireless.sta0.mode='sta'\n"), nil
+	})
+
+	sections, err := NewRealUCI().GetSections("wireless")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sections["sta0"]["mode"] != "sta" || sections["sta0"][".type"] != "wifi-iface" {
+		t.Errorf("unexpected parse result: %v", sections)
+	}
+}
+
+func TestRealUCIRevertValidation(t *testing.T) {
+	if err := NewRealUCI().Revert("net;work"); err == nil {
+		t.Error("expected validation error for config with semicolon")
+	}
+}
+
+// `uci show` prints a list option on ONE line as option='a' 'b' and a scalar as
+// option='a'. Trimming only the outer quotes turned the first form into the
+// single value "a' 'b", which silently defeated callers that split on commas or
+// look for one exact element (split-tunnel peers, WAN zone membership).
+func TestParseShowConfigOutput_ListValues(t *testing.T) {
+	show := strings.Join([]string{
+		"network.wg0_peer0=wirguard_peer",
+		"network.wg0_peer0.allowed_ips='0.0.0.0/0' '::/0'",
+		"network.wg0_peer0.route_allowed_ips='1'",
+		"network.wg0_peer0.endpoint='1.2.3.4:51820'",
+		"firewall.@zone[1]=zone",
+		"firewall.@zone[1].network='wan' 'wan6'",
+		// An SSID is user data, so an apostrophe in it must survive parsing.
+		"wireless.@wifi-iface[0].ssid='Bob'\\''s WiFi'",
+	}, "\n")
+
+	got := parseShowConfigOutput(show)
+	if v := got["wg0_peer0"]["allowed_ips"]; v != "0.0.0.0/0,::/0" {
+		t.Errorf("allowed_ips = %q, want %q", v, "0.0.0.0/0,::/0")
+	}
+	if parts := strings.Split(got["wg0_peer0"]["allowed_ips"], ","); len(parts) != 2 {
+		t.Errorf("allowed_ips should split into 2 CIDRs, got %v", parts)
+	}
+	if v := got["wg0_peer0"]["route_allowed_ips"]; v != "1" {
+		t.Errorf("scalar value = %q, want %q", v, "1")
+	}
+	if v := got["@zone[1]"]["network"]; v != "wan,wan6" {
+		t.Errorf("zone network = %q, want %q", v, "wan,wan6")
+	}
+	if v := got["@wifi-iface[0]"]["ssid"]; v != "Bob's WiFi" {
+		t.Errorf("ssid with an apostrophe = %q, want %q", v, "Bob's WiFi")
+	}
+}
+
+func TestSplitUciValue(t *testing.T) {
+	cases := map[string][]string{
+		"'a' 'b' 'c'": {"a", "b", "c"},
+		"'single'":    {"single"},
+		"bare":        {"bare"},
+		"'a'":         {"a"},
+		"":            nil,
+		// uci escapes an apostrophe inside a value the shell way, as '\''.
+		// The quotes around it are content, not element boundaries.
+		`'Bob'\''s WiFi'`: {"Bob's WiFi"},
+		`'it'\''s'`:       {"it's"},
+		`'a'\''b' 'c'`:    {"a'b", "c"},
+	}
+	for in, want := range cases {
+		got := SplitUciValue(in)
+		if len(got) != len(want) {
+			t.Errorf("SplitUciValue(%q) = %v, want %v", in, got, want)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("SplitUciValue(%q) = %v, want %v", in, got, want)
+				break
+			}
+		}
+	}
+}
+
+// A factory-fresh OpenWrt declares the system section ANONYMOUSLY, so
+// `uci show system` hands back the key "@system[0]" and every read-then-write
+// path (SetTimezone, SetHostname) carries that string into the next call.
+//
+// The wrapper used to reject it — the section check was the same
+// identifiers-only pattern used for configs and options — so both endpoints
+// failed on every stock device with `uci: invalid section "@system[0]"`,
+// while every test passed because the mock UCI returned a named "system"
+// section. Verified on real hardware: both PUT /system/timezone and
+// PUT /system/hostname returned 500 and changed nothing.
+func TestAnonymousSectionIsAccepted(t *testing.T) {
+	if err := validateSection("@system[0]"); err != nil {
+		t.Errorf("anonymous section rejected by validation: %v", err)
+	}
+	// Still rejected: anything that could break out of the single argv entry or
+	// address a different config.
+	for _, bad := range []string{
+		"@system",              // no index
+		"@system[]",            // empty index
+		"@system[0]; rm -rf /", // command injection
+		"@system[0].zonename",  // option smuggled into the section
+		"../etc/passwd",        // path traversal
+		"@syst em[0]",          // space
+		"@system[0] extra",
+	} {
+		if err := validateSection(bad); err == nil {
+			t.Errorf("validateSection(%q) accepted an invalid section reference", bad)
+		}
+	}
+}
+
+// The validation tests above prove the wrapper no longer rejects the form;
+// this proves the dotted argument the wrapper builds is what the uci CLI
+// actually accepts. The stub mirrors the real CLI: it fails on the three-argument
+// form and succeeds on the dotted one.
+func TestSetOnAnonymousSectionUsesDottedForm(t *testing.T) {
+	dir := t.TempDir()
+	logPath := dir + "/uci.log"
+	// The real CLI takes `set <config>.<section>.<option>=<value>`; the
+	// three-argument form is a usage error. Matched with a case pattern so the
+	// stub needs no nested quoting of its own.
+	stub := strings.Join([]string{
+		"#!/bin/sh",
+		`printf '%s\\n' "$*" >> ` + logPath,
+		`case "$2" in`,
+		"  *'.'*) : ;;",
+		`  *) echo 'uci: invalid entry' >&2; exit 255 ;;`,
+		"esac",
+		"exit 0",
+		"",
+	}, "\n")
+	stubPath := dir + "/uci"
+	if err := os.WriteFile(stubPath, []byte(stub), 0o755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+
+	if err := NewRealUCI().Set("system", "@system[0]", "zonename", "Europe/Berlin"); err != nil {
+		t.Fatalf("Set on an anonymous section failed: %v", err)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	want := "set system.@system[0].zonename=Europe/Berlin"
+	if !strings.Contains(string(log), want) {
+		t.Errorf("uci was called with %q, want it to contain %q", log, want)
 	}
 }

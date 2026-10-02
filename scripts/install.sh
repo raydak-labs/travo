@@ -366,6 +366,33 @@ do_install() {
         sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports
     fi
     /etc/init.d/travo enable 2>/dev/null || true
+
+    # Clear crash guards left by an interrupted mutation on a PREVIOUS run.
+    # A stuck guard permanently disables its feature (failover, captive DNS,
+    # VPN, ...) with no log line and no other recovery path, and a power cut
+    # mid-mutation is exactly when a reinstall or upgrade follows. deploy-local.sh
+    # already did this; the production install path did not, so a user following
+    # the release notes had no way back. The authoritative list is in
+    # docs/adr/0003 section 2. /etc/travo is the legacy location (guards were
+    # unified on /etc/trafo), so both are cleared.
+    #
+    # Two names are deliberately ABSENT, because ADR 0003 section 2 says they
+    # must survive an install:
+    #   firmware-upgrade-in-progress  the marker that an interrupted sysupgrade
+    #                                 left behind, so the failed flash stays
+    #                                 discoverable;
+    #   factory-reset-in-progress     same, for a half-completed firstboot.
+    # Clearing either here would erase the only record of a device that is in
+    # exactly the state the operator is trying to recover.
+    for _guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
+        captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
+        wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
+        system-config-in-progress autoreconnect-crash-guard; do
+        # autoreconnect-failcount is deliberately NOT cleared either: it is the
+        # bounded retry counter that stops a broken saved network being
+        # replayed every minute.
+        rm -f "/etc/trafo/${_guard}" "/etc/travo/${_guard}" 2>/dev/null || true
+    done
     success "Files installed"
 
     # --- Step 3: Set root password (LuCI + Travo) ---

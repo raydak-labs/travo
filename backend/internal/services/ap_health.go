@@ -28,6 +28,26 @@ const (
 //
 // Returns: fixed (any UCI changes committed), needWifiUp (at least one AP was re-enabled).
 func (w *WifiService) EnsureAPRunning() (fixed bool, needWifiUp bool, err error) {
+	// This stages and commits `wireless`, so it takes the wireless write lock
+	// like any other mutator. It runs from a background goroutine ~30s after
+	// start — exactly when an operator (or the captive-portal flow) is reconnecting
+	// — and was previously unprotected: a mutator mid-sequence could be committed
+	// over, and a mutator's revert could silently discard these fixes moments
+	// after they were logged as applied.
+	_, err = w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		f, n, e := w.ensureAPRunningLocked()
+		fixed, needWifiUp = f, n
+		return nil, e
+	})
+	if err != nil {
+		return false, false, err
+	}
+	return fixed, needWifiUp, nil
+}
+
+// ensureAPRunningLocked is the lock-free core; see wifi_toggle_script.go for why
+// the split exists.
+func (w *WifiService) ensureAPRunningLocked() (fixed bool, needWifiUp bool, err error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return false, false, fmt.Errorf("reading wireless sections: %w", err)

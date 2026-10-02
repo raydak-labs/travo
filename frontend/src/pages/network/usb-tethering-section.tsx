@@ -45,7 +45,9 @@ export function USBTetheringSection() {
               )}
             </div>
             {status.ip_address && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{status.ip_address}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                {status.ip_address}
+              </p>
             )}
             {status.configured ? (
               <div className="flex items-center gap-2">

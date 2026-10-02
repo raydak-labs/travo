@@ -12,10 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import {
-  clearPortalNotification,
-  notifyPortalOnce,
-} from '@/lib/captive-portal-notifier';
+import { clearPortalNotification, notifyPortalOnce } from '@/lib/captive-portal-notifier';
+import { isSafeExternalUrl, openExternalUrl } from '@/lib/external-url';
 
 const AUTO_TRY_KEY = 'openwrt-travel-gui:captive-auto-try';
 
@@ -46,8 +44,8 @@ export function CaptivePortalCard() {
         description: `Portal: ${portalUrl}`,
         duration: 10000,
         action:
-          portalUrl !== 'unknown'
-            ? { label: 'Open Login', onClick: () => window.open(portalUrl, '_blank') }
+          portalUrl !== 'unknown' && isSafeExternalUrl(portalUrl)
+            ? { label: 'Open Login', onClick: () => openExternalUrl(portalUrl) }
             : undefined,
       });
     });
@@ -158,7 +156,7 @@ export function CaptivePortalCard() {
         {/* Status indicator */}
         {!staConnected && (
           <div className="flex items-center gap-2.5">
-            <WifiOff className="h-5 w-5 shrink-0 text-gray-400" />
+            <WifiOff className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" />
             <div>
               <p className="text-sm font-medium leading-none">No Upstream</p>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -264,12 +262,8 @@ export function CaptivePortalCard() {
                   {dnsRestore.isPending ? 'Restoring…' : 'Restore DNS'}
                 </Button>
               )}
-              {portalUrl && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => window.open(portalUrl, '_blank')}
-                >
+              {isSafeExternalUrl(portalUrl) && (
+                <Button size="sm" variant="secondary" onClick={() => openExternalUrl(portalUrl)}>
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                   Open Login
                 </Button>

@@ -27,124 +27,150 @@ var ErrEncryptionRequiredForNewSTA = errors.New("encryption is required when add
 // For an existing saved profile, an empty Password leaves the stored UCI key unchanged
 // (one-tap reconnect from the saved list).
 func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
-	// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN
-	if err := w.ensureWwanNetwork(); err != nil {
-		return nil, err
-	}
-
-	// Find or create a dedicated UCI section for this SSID.
-	section, err := w.findSTASectionBySSID(config.SSID)
-	isNewSection := err != nil
-	if isNewSection {
-		enc := strings.TrimSpace(config.Encryption)
-		if enc == "" {
-			return nil, ErrEncryptionRequiredForNewSTA
-		}
-		if enc != "none" && strings.TrimSpace(config.Password) == "" {
-			return nil, ErrPasswordRequiredForNewSTA
-		}
-		// No saved profile for this SSID yet — allocate a new section.
-		section = w.nextSTASectionName()
-		sections, _ := w.uci.GetSections("wireless")
-		var firstRadio string
-		for name, opts := range sections {
-			if opts["type"] != "" {
-				firstRadio = name
-				break
-			}
-		}
-		if firstRadio == "" {
-			return nil, fmt.Errorf("no radio found in wireless config")
-		}
-		if err := w.uci.AddSection("wireless", section, "wifi-iface"); err != nil {
-			return nil, fmt.Errorf("creating STA section %s: %w", section, err)
-		}
-		_ = w.uci.Set("wireless", section, "device", firstRadio)
-		_ = w.uci.Set("wireless", section, "mode", "sta")
-		_ = w.uci.Set("wireless", section, "network", "wwan")
-	}
-
-	// Ensure wwan binding is correct.
-	if net, err := w.uci.Get("wireless", section, "network"); err != nil || net != "wwan" {
-		if err := w.uci.Set("wireless", section, "network", "wwan"); err != nil {
-			return nil, fmt.Errorf("setting STA network: %w", err)
-		}
-	}
-	// When band is specified (dual-band connect), attach STA to the radio that has that band
-	if config.Band != "" {
-		radio, err := w.getRadioForBand(config.Band)
-		if err != nil {
+	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
+		// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN
+		if err := w.ensureWwanNetwork(); err != nil {
 			return nil, err
 		}
-		if err := w.uci.Set("wireless", section, "device", radio); err != nil {
-			return nil, fmt.Errorf("setting STA radio: %w", err)
+
+		// Find or create a dedicated UCI section for this SSID.
+		section, err := w.findSTASectionBySSID(config.SSID)
+		if err != nil && !errors.Is(err, ErrNoSTASection) {
+			// A real failure (e.g. the wireless config could not be read) must not
+			// be treated as "not found": doing so creates a duplicate profile and
+			// hides the real error behind a confusing UCI conflict.
+			return nil, err
 		}
-	}
-	if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
-		return nil, fmt.Errorf("setting STA ssid: %w", err)
-	}
-	reuseCredentials := !isNewSection && strings.TrimSpace(config.Password) == ""
-	if strings.TrimSpace(config.Password) != "" {
-		if err := w.uci.Set("wireless", section, "key", config.Password); err != nil {
-			return nil, fmt.Errorf("setting STA key: %w", err)
-		}
-	}
-	if config.Encryption != "" && !reuseCredentials {
-		if err := w.uci.Set("wireless", section, "encryption", config.Encryption); err != nil {
-			return nil, fmt.Errorf("setting STA encryption: %w", err)
-		}
-	}
-	if !reuseCredentials {
-		if config.Hidden {
-			if err := w.uci.Set("wireless", section, "hidden", "1"); err != nil {
-				return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+		isNewSection := errors.Is(err, ErrNoSTASection)
+		if isNewSection {
+			enc := strings.TrimSpace(config.Encryption)
+			if enc == "" {
+				return nil, ErrEncryptionRequiredForNewSTA
 			}
-		} else {
-			if err := w.uci.Set("wireless", section, "hidden", "0"); err != nil {
-				return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+			if enc != "none" && strings.TrimSpace(config.Password) == "" {
+				return nil, ErrPasswordRequiredForNewSTA
+			}
+			// No saved profile for this SSID yet — allocate a new section.
+			section, err = w.nextSTASectionName()
+			if err != nil {
+				return nil, err
+			}
+			sections, err := w.uci.GetSections("wireless")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get wireless sections: %w", err)
+			}
+			var firstRadio string
+			for name, opts := range sections {
+				if opts["type"] != "" {
+					firstRadio = name
+					break
+				}
+			}
+			if firstRadio == "" {
+				return nil, fmt.Errorf("no radio found in wireless config")
+			}
+			if err := w.uci.AddSection("wireless", section, "wifi-iface"); err != nil {
+				return nil, fmt.Errorf("creating STA section %s: %w", section, err)
+			}
+			// Every write is checked: a silently ignored `uci set` (read-only
+			// overlay, ENOSPC on the delta) left an empty wifi-iface that was then
+			// committed and applied, and the API reported a successful connection to
+			// an SSID that was never actually configured.
+			if err := w.uci.Set("wireless", section, "device", firstRadio); err != nil {
+				return nil, fmt.Errorf("setting STA radio: %w", err)
+			}
+			if err := w.uci.Set("wireless", section, "mode", "sta"); err != nil {
+				return nil, fmt.Errorf("setting STA mode: %w", err)
+			}
+			if err := w.uci.Set("wireless", section, "network", "wwan"); err != nil {
+				return nil, fmt.Errorf("setting STA network: %w", err)
 			}
 		}
-	}
-	if err := w.uci.Set("wireless", section, "disabled", "0"); err != nil {
-		return nil, fmt.Errorf("enabling STA section: %w", err)
-	}
-	if err := w.ensureSectionRadioEnabled(section); err != nil {
-		return nil, fmt.Errorf("enabling STA radio: %w", err)
-	}
-	// Disable all other saved STA profiles so only this one connects at runtime.
-	if err := w.disableOtherSTASections(section); err != nil {
-		return nil, err
-	}
-	// Reconcile AP radio layout atomically with the STA activation: in repeater mode
-	// with ≥2 radios, disable any AP that shares the STA's radio before applying.
-	// Skipping this step would commit AP+STA on the same PHY, which crashes the
-	// ath11k/IPQ6018 driver and requires a second user-triggered "Fix" apply to recover.
-	if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
-		return nil, fmt.Errorf("reconciling AP radio layout: %w", err)
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		return nil, err
-	}
-	return w.stageWirelessApply()
+
+		// Ensure wwan binding is correct.
+		if net, err := w.uci.Get("wireless", section, "network"); err != nil || net != "wwan" {
+			if err := w.uci.Set("wireless", section, "network", "wwan"); err != nil {
+				return nil, fmt.Errorf("setting STA network: %w", err)
+			}
+		}
+		// When band is specified (dual-band connect), attach STA to the radio that has that band
+		if config.Band != "" {
+			radio, err := w.getRadioForBand(config.Band)
+			if err != nil {
+				return nil, err
+			}
+			if err := w.uci.Set("wireless", section, "device", radio); err != nil {
+				return nil, fmt.Errorf("setting STA radio: %w", err)
+			}
+		}
+		if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
+			return nil, fmt.Errorf("setting STA ssid: %w", err)
+		}
+		reuseCredentials := !isNewSection && strings.TrimSpace(config.Password) == ""
+		if strings.TrimSpace(config.Password) != "" {
+			if err := w.uci.Set("wireless", section, "key", config.Password); err != nil {
+				return nil, fmt.Errorf("setting STA key: %w", err)
+			}
+		}
+		if config.Encryption != "" && !reuseCredentials {
+			if err := w.uci.Set("wireless", section, "encryption", config.Encryption); err != nil {
+				return nil, fmt.Errorf("setting STA encryption: %w", err)
+			}
+		}
+		if !reuseCredentials {
+			if config.Hidden {
+				if err := w.uci.Set("wireless", section, "hidden", "1"); err != nil {
+					return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+				}
+			} else {
+				if err := w.uci.Set("wireless", section, "hidden", "0"); err != nil {
+					return nil, fmt.Errorf("setting STA hidden flag: %w", err)
+				}
+			}
+		}
+		if err := w.uci.Set("wireless", section, "disabled", "0"); err != nil {
+			return nil, fmt.Errorf("enabling STA section: %w", err)
+		}
+		if err := w.ensureSectionRadioEnabled(section); err != nil {
+			return nil, fmt.Errorf("enabling STA radio: %w", err)
+		}
+		// Disable all other saved STA profiles so only this one connects at runtime.
+		if err := w.disableOtherSTASections(section); err != nil {
+			return nil, err
+		}
+		// Reconcile AP radio layout atomically with the STA activation: in repeater mode
+		// with ≥2 radios, disable any AP that shares the STA's radio before applying.
+		// Skipping this step would commit AP+STA on the same PHY, which crashes the
+		// ath11k/IPQ6018 driver and requires a second user-triggered "Fix" apply to recover.
+		if err := w.reconcileRepeaterAPRadioLayout(); err != nil {
+			return nil, fmt.Errorf("reconciling AP radio layout: %w", err)
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, err
+		}
+		return w.stageWirelessApply()
+	})
 }
 
 // Disconnect disconnects from the current WiFi network.
 func (w *WifiService) Disconnect() (*WirelessApplyResult, error) {
-	_, section, err := w.findSTADevice()
-	if err != nil {
-		// STA interface may already be disabled; fall back to UCI-based lookup
-		section, err = w.findSTASection()
+	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		_, section, err := w.findSTADevice()
 		if err != nil {
-			return nil, fmt.Errorf("no STA interface found: %w", err)
+			// STA interface may already be disabled; fall back to UCI-based lookup
+			section, err = w.findSTASection()
+			if err != nil {
+				return nil, fmt.Errorf("no STA interface found: %w", err)
+			}
 		}
-	}
-	if err := w.uci.Set("wireless", section, "disabled", "1"); err != nil {
-		return nil, fmt.Errorf("disabling STA section: %w", err)
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		return nil, err
-	}
-	return w.stageWirelessApply()
+		if err := w.uci.Set("wireless", section, "disabled", "1"); err != nil {
+			return nil, fmt.Errorf("disabling STA section: %w", err)
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, err
+		}
+		return w.stageWirelessApply()
+	})
 }
 
 // GetConnection returns the current WiFi connection info.
@@ -232,7 +258,10 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 	var networks []models.SavedNetwork
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
-		return []models.SavedNetwork{}, nil
+		// An empty saved-networks list on a failed read would let the UI offer a
+		// "forget network" flow for profiles it cannot see, and hides the
+		// failure that actually needs attention.
+		return nil, fmt.Errorf("reading wireless sections: %w", err)
 	}
 	for section, opts := range sections {
 		if opts["mode"] != "sta" {
@@ -279,14 +308,16 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 
 // DeleteNetwork removes a saved WiFi network by its UCI section name.
 func (w *WifiService) DeleteNetwork(section string) (*WirelessApplyResult, error) {
-	if section == "" {
-		return nil, fmt.Errorf("section name is required")
-	}
-	if err := w.uci.DeleteSection("wireless", section); err != nil {
-		return nil, fmt.Errorf("failed to delete network: %w", err)
-	}
-	if err := w.uci.Commit("wireless"); err != nil {
-		return nil, err
-	}
-	return w.stageWirelessApply()
+	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		if section == "" {
+			return nil, fmt.Errorf("section name is required")
+		}
+		if err := w.uci.DeleteSection("wireless", section); err != nil {
+			return nil, fmt.Errorf("failed to delete network: %w", err)
+		}
+		if err := w.uci.Commit("wireless"); err != nil {
+			return nil, err
+		}
+		return w.stageWirelessApply()
+	})
 }

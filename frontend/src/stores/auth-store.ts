@@ -27,6 +27,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    // Revoke the session server-side. `apiClient` reads the token
+    // synchronously, so the Authorization header is still attached even
+    // though local state is cleared immediately afterwards. Local state is
+    // cleared unconditionally: a failed revocation must not trap the user in
+    // the app with a token the server has already forgotten.
+    void apiClient.post(API_ROUTES.auth.logout).catch(() => {
+      // best-effort — the local session is gone either way
+    });
     clearToken();
     set({ token: null, isAuthenticated: false });
   },

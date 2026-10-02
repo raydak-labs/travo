@@ -1,9 +1,23 @@
 import { API_ROUTES } from '@shared/index';
 import type { WifiMutationResponse } from '@shared/index';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, ApiError } from '@/lib/api-client';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Whether a failed apply-confirm can possibly succeed on a later attempt.
+ *
+ * Retrying only makes sense while the router is unreachable or busy. A 4xx is
+ * the device's final answer: 400/401/403 in particular were previously
+ * swallowed and re-POSTed ~20 times, which cleared the session token ~20 times
+ * and fired ~20 `location.assign('/login')` redirects. 408 and 429 stay
+ * retryable because they are transient by definition.
+ */
+export function isTerminalApplyStatus(status: number): boolean {
+  if (status < 400 || status >= 500) return false;
+  return status !== 408 && status !== 429;
 }
 
 export async function confirmWifiApply(
@@ -20,6 +34,11 @@ export async function confirmWifiApply(
       return;
     } catch (error) {
       lastError = error;
+      if (error instanceof ApiError && isTerminalApplyStatus(error.status)) {
+        // Surface the device's answer immediately instead of waiting for the
+        // rollback window to expire.
+        throw error;
+      }
       if (Date.now() + intervalMs > deadline) {
         break;
       }

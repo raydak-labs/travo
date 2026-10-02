@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v3"
@@ -8,6 +9,18 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
+
+// respondVPNError maps a domain error to a status code.
+//
+// A missing optional package is a capability gap, not a server fault: reporting
+// it as 500 made the UI look broken and told the operator nothing. 503 plus the
+// reason lets it say "install tailscale".
+func respondVPNError(c fiber.Ctx, err error) error {
+	if errors.Is(err, services.ErrTailscaleNotInstalled) {
+		return RespondWithError(c, fiber.StatusServiceUnavailable, err.Error())
+	}
+	return RespondWithServerError(c, err)
+}
 
 // parseToggleEnabled extracts the boolean "enable/enabled" field from a request
 // body, handling the legacy "enable" key for backward-compatibility.
@@ -54,8 +67,8 @@ func GetWireguardHandler(svc *services.VpnService) fiber.Handler {
 func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WireguardConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
 		// Validate private key
@@ -87,7 +100,7 @@ func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := parseToggleEnabled(c)
 		if err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.ToggleWireguard(enabled); err != nil {
 			return RespondWithServerError(c, err)
@@ -112,10 +125,10 @@ func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := parseToggleEnabled(c)
 		if err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.ToggleTailscale(enabled); err != nil {
-			return RespondWithServerError(c, err)
+			return respondVPNError(c, err)
 		}
 		return RespondOK(c)
 	}
@@ -131,7 +144,7 @@ func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
 		_ = c.Bind().Body(&body)
 		authURL, err := svc.StartTailscaleAuth(body.AuthKey)
 		if err != nil {
-			return RespondWithServerError(c, err)
+			return respondVPNError(c, err)
 		}
 		return c.JSON(fiber.Map{"auth_url": authURL})
 	}
@@ -145,14 +158,14 @@ func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 			ExitNode string `json:"exit_node"` // legacy / alternate key from older clients
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		ip := body.NodeIP
 		if ip == "" {
 			ip = body.ExitNode
 		}
 		if err := svc.SetTailscaleExitNode(ip); err != nil {
-			return RespondWithServerError(c, err)
+			return respondVPNError(c, err)
 		}
 		return RespondOK(c)
 	}
@@ -165,13 +178,13 @@ func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 			Config string `json:"config"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if body.Config == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "config field is required")
 		}
 		if err := svc.ImportWireguardConfig(body.Config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -207,7 +220,7 @@ func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 			Config string `json:"config"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if body.Name == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "name is required")
@@ -217,7 +230,7 @@ func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 		}
 		profile, err := svc.AddProfile(body.Name, body.Config)
 		if err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return c.Status(fiber.StatusCreated).JSON(profile)
 	}
@@ -245,7 +258,7 @@ func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 			return RespondWithError(c, fiber.StatusBadRequest, "profile id is required")
 		}
 		if err := svc.ActivateProfile(id); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}
@@ -269,7 +282,7 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetKillSwitch(body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
@@ -292,7 +305,7 @@ func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
 		result, err := svc.RunWireGuardSpeedTest()
 		if err != nil {
 			// All current errors are preconditions (tunnel not usable for the test).
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return c.JSON(result)
 	}
@@ -322,8 +335,8 @@ func GetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.SplitTunnelConfig
-		if err := c.Bind().Body(&cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &cfg); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if cfg.Mode != "all" && cfg.Mode != "custom" {
 			return RespondWithError(c, fiber.StatusBadRequest, "mode must be 'all' or 'custom'")
@@ -353,10 +366,10 @@ func SetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetTailscaleSSHEnabled(req.Enabled); err != nil {
-			return RespondWithServerError(c, err)
+			return respondVPNError(c, err)
 		}
 		return c.JSON(fiber.Map{"ok": true})
 	}

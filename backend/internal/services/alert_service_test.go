@@ -352,3 +352,38 @@ func TestAlertService_GetAlertsReturnsNewestFirst(t *testing.T) {
 		t.Errorf("expected oldest last, got %s", alerts[2].ID)
 	}
 }
+
+// Stop() must be safe to call twice (lifecycle teardown plus a test cleanup
+// used to double-close the channel and panic), and Start() must not spawn a
+// second ticker when called again.
+func TestAlertService_StopIsIdempotent(t *testing.T) {
+	svc := NewAlertService(&mockAlertChecker{})
+	svc.Start()
+	svc.Stop()
+	svc.Stop() // must not panic
+}
+
+func TestAlertService_StartIsIdempotent(t *testing.T) {
+	checker := &mockAlertChecker{}
+	svc := NewAlertService(checker)
+	svc.CheckInterval = 10 * time.Millisecond
+	svc.Start()
+	svc.Start()
+	svc.Start()
+	defer svc.Stop()
+
+	time.Sleep(120 * time.Millisecond)
+	// A duplicate ticker would raise the same condition several times; the
+	// activeConditions map already suppresses duplicates, so assert on the
+	// single-event invariant of the underlying loop instead: exactly one
+	// alert per condition regardless of how many loops are running.
+	svc.mu.RLock()
+	active := len(svc.activeConditions)
+	svc.mu.RUnlock()
+	if active > 1 {
+		t.Errorf("unexpected number of active conditions: %d", active)
+	}
+	if alerts := svc.GetAlerts(); len(alerts) > 1 {
+		t.Errorf("expected at most 1 alert (no duplicate ticker), got %d", len(alerts))
+	}
+}

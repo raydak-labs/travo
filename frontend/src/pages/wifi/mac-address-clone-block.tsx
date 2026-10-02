@@ -61,9 +61,7 @@ export function MacAddressCloneBlock({
         </div>
       )}
       <div className="space-y-2">
-        <Label htmlFor="mac-input">
-          Custom MAC Address
-        </Label>
+        <Label htmlFor="mac-input">Custom MAC Address</Label>
         <Input
           id="mac-input"
           placeholder="AA:BB:CC:DD:EE:FF"

@@ -58,11 +58,7 @@ export function RepeaterWizardSelectUpstreamStep({
 
           {needsPassword && (
             <div className="space-y-2">
-              <Label
-                htmlFor="upstream-password"
-              >
-                Password
-              </Label>
+              <Label htmlFor="upstream-password">Password</Label>
               <Input
                 id="upstream-password"
                 type="password"

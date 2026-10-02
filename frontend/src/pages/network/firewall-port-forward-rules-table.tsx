@@ -30,7 +30,9 @@ export function FirewallPortForwardRulesTable({
           {rules.map((rule) => (
             <tr key={rule.id} className="border-b last:border-0">
               <td className="py-2 text-gray-900 dark:text-white">{rule.name}</td>
-              <td className="py-2 font-mono uppercase text-gray-500 dark:text-gray-400">{rule.protocol}</td>
+              <td className="py-2 font-mono uppercase text-gray-500 dark:text-gray-400">
+                {rule.protocol}
+              </td>
               <td className="py-2 font-mono text-gray-900 dark:text-white">{rule.src_dport}</td>
               <td className="py-2 font-mono text-gray-900 dark:text-white">{rule.dest_ip}</td>
               <td className="py-2 font-mono text-gray-900 dark:text-white">{rule.dest_port}</td>
@@ -39,6 +41,7 @@ export function FirewallPortForwardRulesTable({
                   variant="ghost"
                   size="sm"
                   type="button"
+                  aria-label={`Delete port forward rule ${rule.name}`}
                   onClick={() => deleteRule.mutate(rule.id)}
                   disabled={deleteRule.isPending}
                 >

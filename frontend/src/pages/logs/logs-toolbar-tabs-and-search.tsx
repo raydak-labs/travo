@@ -43,7 +43,7 @@ export function LogsToolbarTabsAndSearch({
       </div>
       <div className="flex gap-2">
         <div className="relative flex-1 sm:w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
           <Input placeholder="Filter logs…" className="pl-9" {...register('lineFilter')} />
         </div>
         <Button

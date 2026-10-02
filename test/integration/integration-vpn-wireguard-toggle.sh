@@ -21,7 +21,13 @@ set -euo pipefail
 ROUTER_IP="192.168.1.1"
 LOGIN_PASSWORD="admin"
 
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+# Host-key verification on by default; set TRAVO_INSECURE_SSH=1 for a lab router
+# whose key changes on every flash.
+if [ "${TRAVO_INSECURE_SSH:-0}" = "1" ]; then
+  SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+else
+  SSH_OPTS="-o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ConnectTimeout=5"
+fi
 
 usage() {
   cat <<EOF

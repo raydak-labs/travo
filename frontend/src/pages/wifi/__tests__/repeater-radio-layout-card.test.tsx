@@ -23,9 +23,7 @@ describe('RepeaterRadioLayoutCard', () => {
 
     render(<RepeaterRadioLayoutCard />);
 
-    expect(
-      screen.getByText(/available in travel \/ repeater mode/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/available in travel \/ repeater mode/i)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /re-apply sta\/ap separation/i }),
     ).not.toBeInTheDocument();

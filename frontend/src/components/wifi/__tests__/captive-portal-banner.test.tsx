@@ -63,7 +63,11 @@ describe('CaptivePortalCard', () => {
     });
 
     await user.click(screen.getByText('Open Login'));
-    expect(windowOpen).toHaveBeenCalledWith('http://captive.hotel.com/login', '_blank');
+    expect(windowOpen).toHaveBeenCalledWith(
+      'http://captive.hotel.com/login',
+      '_blank',
+      'noopener,noreferrer',
+    );
 
     windowOpen.mockRestore();
   });

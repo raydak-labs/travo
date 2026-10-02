@@ -1,12 +1,7 @@
 export type FailoverCandidateKind = 'ethernet' | 'wifi' | 'usb';
 
 export type FailoverTrackingState =
-  | 'online'
-  | 'offline'
-  | 'disabled'
-  | 'not_installed'
-  | 'not_available'
-  | 'unknown';
+  'online' | 'offline' | 'disabled' | 'not_installed' | 'not_available' | 'unknown';
 
 export interface FailoverHealthConfig {
   readonly track_ips: readonly string[];

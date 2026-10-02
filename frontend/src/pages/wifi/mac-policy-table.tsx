@@ -28,13 +28,16 @@ export function MACPolicyTable({ policies, onDelete, isPending }: MACPolicyTable
           <tr key={`${i}-${policy.ssid}-${policy.mac ?? ''}`} className="border-b last:border-0">
             <td className="py-1.5 font-mono text-xs">{policy.ssid}</td>
             <td className="py-1.5 font-mono text-xs text-gray-600 dark:text-gray-400">
-              {policy.mac || <span className="italic text-gray-400">default</span>}
+              {policy.mac || (
+                <span className="italic text-gray-500 dark:text-gray-400">default</span>
+              )}
             </td>
             <td className="py-1.5 text-right">
               <Button
                 variant="ghost"
                 size="sm"
                 type="button"
+                aria-label={`Delete MAC policy for ${policy.ssid}`}
                 onClick={() => onDelete(i)}
                 disabled={isPending}
                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700"

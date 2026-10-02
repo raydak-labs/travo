@@ -1,7 +1,10 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/netip"
 	"os"
@@ -9,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -23,12 +27,34 @@ type NetworkService struct {
 	aliasFile string
 	cmd       CommandRunner
 
+	// portForwardsFile overrides the const path (tests only), following the
+	// same pattern as aliasFile.
+	portForwardsFile string
+
+	// ddnsInitScript is the ddns-scripts init script. Its absence is how we know
+	// the package is not installed, because that is the only thing on the device
+	// that can service a `ddns` config. Overridable for tests.
+	ddnsInitScript string
+
 	// wifiMACsMu guards wifiMACsSeen.
 	wifiMACsMu sync.Mutex
 	// wifiMACsSeen tracks MACs recently seen in WiFi station dumps, with the
 	// timestamp of their last appearance. Used to suppress "disconnected WiFi
 	// client appears as LAN" during the ARP cache staleness window.
 	wifiMACsSeen map[string]time.Time
+
+	// portForwardsMu serialises the port-forward read-modify-write.
+	//
+	// This is NOT the per-config UCI lock (see lockUCIConfigs), which guards the
+	// process-global /tmp/.uci/<config>/changes file. Port forwards are a
+	// read-modify-write over BOTH /etc/travo/port-forwards.json and the firewall
+	// config, and the config lock cannot cover the JSON file. Unserialised, two
+	// concurrent adds each read the same rule list and each wrote its own
+	// version, so one add silently vanished; and because os.WriteFile truncates
+	// before writing, a reader could observe a half-written file and fail with
+	// "unexpected end of JSON input". Both were reproduced on the device with
+	// 24 concurrent writers: 35 successful creates, 1 rule on disk.
+	portForwardsMu sync.Mutex
 }
 
 // wifiMACTTL is how long a MAC stays in the wifiMACsSeen set after it was
@@ -55,7 +81,9 @@ func stringFromBytes(data []byte) string {
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
 	return &NetworkService{
 		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
-		wifiMACsSeen: make(map[string]time.Time),
+		wifiMACsSeen:     make(map[string]time.Time),
+		portForwardsFile: defaultPortForwardsFile,
+		ddnsInitScript:   ddnsInitScriptPath,
 	}
 }
 
@@ -222,8 +250,8 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	status.Interfaces = append(status.Interfaces, status.LAN)
 
 	if wwanErr == nil {
+		// parseInterface maps the wireless device to the "wifi" discriminator.
 		wwanIface := parseInterface("wwan", "phy0-sta0", wwanData, n.ubus)
-		wwanIface.Type = "wifi"
 		status.Interfaces = append(status.Interfaces, wwanIface)
 		// If wwan is up and wan is not, use wwan as the effective WAN
 		if wwanIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
@@ -286,6 +314,38 @@ type dhcpLease struct {
 	IP       string
 	Expiry   int64
 	Hostname string
+}
+
+// dhcpEpochFloor is the smallest value that can plausibly be a UNIX timestamp
+// in seconds (2001-09-09). `ubus call dhcp ipv4leases` reports `expires` as an
+// absolute timestamp — the same value as the first column of
+// /tmp/dhcp.leases — but some builds have been observed reporting the
+// *remaining* lease duration instead, so both encodings are accepted.
+const dhcpEpochFloor = 1e9
+
+// connectedSinceFromLeaseExpiry converts a DHCP lease expiry into a
+// connected-since timestamp. Both encodings of `expires` are accepted, and in
+// both cases the connection start is the expiry minus the configured lease
+// time: treating an absolute expiry as the connection start reports a client as
+// connected "since the future".
+func connectedSinceFromLeaseExpiry(expires, leaseSec float64) string {
+	if expires <= 0 {
+		return ""
+	}
+	lease := time.Duration(leaseSec) * time.Second
+	if expires >= dhcpEpochFloor {
+		start := time.Unix(int64(expires), 0).Add(-lease)
+		if start.After(time.Now()) {
+			// Lease time larger than the remaining lease: the start is unknown.
+			return ""
+		}
+		return start.UTC().Format(time.RFC3339)
+	}
+	elapsed := leaseSec - expires
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	return time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
 }
 
 // parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of uppercase MAC → lease info.
@@ -386,12 +446,13 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 	// ── 3. Build a deduplicated client map (keyed by uppercase MAC) ───────
 	byMAC := make(map[string]models.Client)
 
+	// The lease file is read on builds that report EITHER an absolute epoch or
+	// a remaining duration in `expires` (see connectedSinceFromLeaseExpiry), so
+	// this must go through the shared helper rather than assuming an epoch —
+	// doing the conversion inline rendered "connected since 1970" for every
+	// client on duration-reporting builds.
 	connectedSinceFromLease := func(expiry int64) string {
-		if expiry <= 0 {
-			return ""
-		}
-		t := time.Unix(expiry, 0).Add(-time.Duration(leaseTimeSec) * time.Second)
-		return t.UTC().Format(time.RFC3339)
+		return connectedSinceFromLeaseExpiry(float64(expiry), leaseTimeSec)
 	}
 
 	// 3a. Try ubus dhcp ipv4leases (works on some builds).
@@ -406,14 +467,7 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 					mac := strings.ToUpper(fmt.Sprintf("%v", lm["mac"]))
 					hostname, _ := lm["hostname"].(string)
 					expires, _ := lm["expires"].(float64)
-					elapsed := leaseTimeSec - expires
-					if elapsed < 0 {
-						elapsed = 0
-					}
-					var cs string
-					if expires > 0 {
-						cs = time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
-					}
+					cs := connectedSinceFromLeaseExpiry(expires, leaseTimeSec)
 					byMAC[mac] = models.Client{
 						IPAddress: ip, MACAddress: mac,
 						Hostname: hostname, InterfaceName: ifaceName,
@@ -587,9 +641,44 @@ func (n *NetworkService) getWifiClientStats() map[string]wifiClientStat {
 	return result
 }
 
+// interfaceType maps a ubus network interface onto the discriminator the API
+// contract declares in shared/src/api/network.ts:
+// 'wan' | 'lan' | 'wifi' | 'vpn' | 'usb'.
+//
+// Rules (in order):
+//   - logical interfaces named wan/lan keep their name, whatever device carries
+//     them, so the WAN/LAN cards keep working;
+//   - wireguard/tunnel devices (proto=wireguard, wg*, tun*, tap*) are "vpn";
+//   - USB tethering devices (usbtether, usb*, rndis*, cdc_*) are "usb";
+//   - wireless devices (phy*, wlan*, *-sta, *-ap) and the wwan uplink are
+//     "wifi";
+//   - anything else keeps the interface name.
+func interfaceType(name, device, proto string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	d := strings.ToLower(strings.TrimSpace(device))
+	p := strings.ToLower(strings.TrimSpace(proto))
+	if n == "wan" || n == "lan" {
+		return n
+	}
+	switch {
+	case p == "wireguard" ||
+		strings.HasPrefix(d, "wg") || strings.HasPrefix(d, "tun") || strings.HasPrefix(d, "tap") ||
+		strings.HasPrefix(n, "wg") || strings.HasPrefix(n, "vpn"):
+		return "vpn"
+	case n == "usbtether" || strings.HasPrefix(d, "usb") ||
+		strings.HasPrefix(d, "rndis") || strings.HasPrefix(d, "cdc_"):
+		return "usb"
+	case n == "wwan" || strings.HasPrefix(d, "phy") || strings.HasPrefix(d, "wlan") ||
+		strings.Contains(d, "-sta") || strings.Contains(d, "-ap"):
+		return "wifi"
+	default:
+		return n
+	}
+}
+
 func parseInterface(name, device string, data map[string]any, ub ubus.Ubus) models.NetworkInterface {
 	iface := models.NetworkInterface{
-		Name: name, Type: name,
+		Name: name,
 	}
 	if up, ok := data["up"].(bool); ok {
 		iface.IsUp = up
@@ -602,6 +691,8 @@ func parseInterface(name, device string, data map[string]any, ub ubus.Ubus) mode
 	if devName == "" {
 		devName = device
 	}
+	proto, _ := data["proto"].(string)
+	iface.Type = interfaceType(name, devName, proto)
 
 	// Fetch device stats for MAC and traffic
 	if ub != nil && devName != "" {
@@ -674,27 +765,29 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 
 // SetWanConfig updates the WAN configuration.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
-	if config.Type != "" {
-		if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
-			return err
+	return mutateUCI(n.uci, []string{"network"}, func() error {
+		if config.Type != "" {
+			if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
+				return err
+			}
 		}
-	}
-	if config.IPAddress != "" {
-		if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
-			return err
+		if config.IPAddress != "" {
+			if err := n.uciSet("network", "wan", "ip4addr", config.IPAddress); err != nil {
+				return err
+			}
 		}
-	}
-	if config.Netmask != "" {
-		if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
-			return err
+		if config.Netmask != "" {
+			if err := n.uciSet("network", "wan", "netmask", config.Netmask); err != nil {
+				return err
+			}
 		}
-	}
-	if config.Gateway != "" {
-		if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
-			return err
+		if config.Gateway != "" {
+			if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+				return err
+			}
 		}
-	}
-	return n.uciCommit("network")
+		return n.uciCommit("network")
+	})
 }
 
 // DetectWanType auto-detects the WAN connection type and returns
@@ -786,38 +879,53 @@ func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
 }
 
 // SetDNSConfig updates the custom DNS configuration.
+// SetDNSConfig sets the WAN DNS servers.
+//
+// Locked, not just committed: `network` is in the VPN transaction's revert set, so
+// an unlocked writer here can have its staged delta discarded by a failing VPN
+// toggle and still answer 200 — the user is told the WAN DNS changed and it did
+// not. It was also the mirror image: its own `uci commit network` could commit the
+// VPN's half-written peer, leaving a wg0 peer with new allowed_ips and no matching
+// public_key.
 func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
-	if config.UseCustomDNS {
-		if err := n.uciSet("network", "wan", "peerdns", "0"); err != nil {
-			return err
+	return mutateUCI(n.uci, []string{"network"}, func() error {
+		if config.UseCustomDNS {
+			if err := n.uciSet("network", "wan", "peerdns", "0"); err != nil {
+				return err
+			}
+			dns := strings.Join(config.Servers, " ")
+			if err := n.uciSet("network", "wan", "dns", dns); err != nil {
+				return err
+			}
+		} else {
+			if err := n.uciSet("network", "wan", "peerdns", "1"); err != nil {
+				return err
+			}
+			if err := n.uciSet("network", "wan", "dns", ""); err != nil {
+				return err
+			}
 		}
-		dns := strings.Join(config.Servers, " ")
-		if err := n.uciSet("network", "wan", "dns", dns); err != nil {
-			return err
-		}
-	} else {
-		if err := n.uciSet("network", "wan", "peerdns", "1"); err != nil {
-			return err
-		}
-		if err := n.uciSet("network", "wan", "dns", ""); err != nil {
-			return err
-		}
-	}
-	return n.uciCommit("network")
+		return n.uciCommit("network")
+	})
 }
 
 // SetDHCPConfig updates the DHCP configuration for the LAN.
+// SetDHCPConfig updates the LAN DHCP pool. Locked for the same reason as
+// SetDNSConfig: `dhcp` is in the VPN transaction's revert set, and the VPN's
+// DNS-forwarding helpers delete and re-add this same dhcp.@dnsmasq[0] section.
 func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
-	if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
-		return err
-	}
-	if err := n.uciSet("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
-		return err
-	}
-	if err := n.uciSet("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
-		return err
-	}
-	return n.uciCommit("dhcp")
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
+			return err
+		}
+		if err := n.uciSet("dhcp", "lan", "limit", strconv.Itoa(config.Limit)); err != nil {
+			return err
+		}
+		if err := n.uciSet("dhcp", "lan", "leasetime", config.LeaseTime); err != nil {
+			return err
+		}
+		return n.uciCommit("dhcp")
+	})
 }
 
 // GetDHCPLeases reads active DHCP leases from /tmp/dhcp.leases.
@@ -833,7 +941,9 @@ func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
 func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
-		return []models.DNSEntry{}, nil
+		// A failed read is not "no entries": returning an empty list would make
+		// the UI invite a duplicate entry for an entry that already exists.
+		return nil, fmt.Errorf("reading dhcp sections: %w", err)
 	}
 	var entries []models.DNSEntry
 	for section, opts := range sections {
@@ -854,25 +964,39 @@ func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
 
 // AddDNSEntry adds a new local DNS entry as a named UCI section in dhcp config.
 func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
-	section := "dns_" + sanitizeSectionName(entry.Name)
-	if err := n.uci.AddSection("dhcp", section, "domain"); err != nil {
-		return fmt.Errorf("adding DNS entry section: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "name", entry.Name); err != nil {
-		return fmt.Errorf("setting DNS entry name: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "ip", entry.IP); err != nil {
-		return fmt.Errorf("setting DNS entry IP: %w", err)
-	}
-	return n.uci.Commit("dhcp")
+	// `dhcp` is locked, not just committed-and-hoped: the uci CLI keeps
+	// uncommitted changes in the process-global /tmp/.uci/dhcp/changes file, so
+	// an unlocked writer interleaves with AddDHCPReservation (which IS wrapped)
+	// and destroys its staged delta. Verified on the device: concurrent adds to
+	// these two endpoints failed with "uci: Invalid argument" and "uci set
+	// dhcp.dns_...name", i.e. each request's own section was clobbered by the
+	// other. This was a documented gap in the mutateUCI rollout; it is not a
+	// theoretical one.
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		section := "dns_" + sanitizeSectionName(entry.Name)
+		if err := n.uci.AddSection("dhcp", section, "domain"); err != nil {
+			return fmt.Errorf("adding DNS entry section: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "name", entry.Name); err != nil {
+			return fmt.Errorf("setting DNS entry name: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "ip", entry.IP); err != nil {
+			return fmt.Errorf("setting DNS entry IP: %w", err)
+		}
+		return n.uci.Commit("dhcp")
+	})
 }
 
 // DeleteDNSEntry removes a local DNS entry by its UCI section name.
 func (n *NetworkService) DeleteDNSEntry(section string) error {
-	if err := n.uci.DeleteSection("dhcp", section); err != nil {
-		return fmt.Errorf("deleting DNS entry: %w", err)
-	}
-	return n.uci.Commit("dhcp")
+	// Same lock as AddDNSEntry, and for the same reason: a delete that reverts
+	// or commits `dhcp` concurrently with an add silently discards the add.
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.uci.DeleteSection("dhcp", section); err != nil {
+			return fmt.Errorf("deleting DNS entry: %w", err)
+		}
+		return n.uci.Commit("dhcp")
+	})
 }
 
 // sanitizeSectionName converts a hostname to a valid UCI section name.
@@ -892,7 +1016,7 @@ func sanitizeSectionName(name string) string {
 func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error) {
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
-		return []models.DHCPReservation{}, nil
+		return nil, fmt.Errorf("reading dhcp sections: %w", err)
 	}
 	var reservations []models.DHCPReservation
 	for section, opts := range sections {
@@ -914,28 +1038,32 @@ func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error)
 
 // AddDHCPReservation adds a static DHCP reservation as a named UCI section in dhcp config.
 func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
-	section := "host_" + sanitizeSectionName(reservation.Name)
-	if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
-		return fmt.Errorf("adding DHCP reservation section: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "name", reservation.Name); err != nil {
-		return fmt.Errorf("setting DHCP reservation name: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "mac", reservation.MAC); err != nil {
-		return fmt.Errorf("setting DHCP reservation MAC: %w", err)
-	}
-	if err := n.uci.Set("dhcp", section, "ip", reservation.IP); err != nil {
-		return fmt.Errorf("setting DHCP reservation IP: %w", err)
-	}
-	return n.uci.Commit("dhcp")
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		section := "host_" + sanitizeSectionName(reservation.Name)
+		if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
+			return fmt.Errorf("adding DHCP reservation section: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "name", reservation.Name); err != nil {
+			return fmt.Errorf("setting DHCP reservation name: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "mac", reservation.MAC); err != nil {
+			return fmt.Errorf("setting DHCP reservation MAC: %w", err)
+		}
+		if err := n.uci.Set("dhcp", section, "ip", reservation.IP); err != nil {
+			return fmt.Errorf("setting DHCP reservation IP: %w", err)
+		}
+		return n.uci.Commit("dhcp")
+	})
 }
 
 // DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
 func (n *NetworkService) DeleteDHCPReservation(section string) error {
-	if err := n.uci.DeleteSection("dhcp", section); err != nil {
-		return fmt.Errorf("deleting DHCP reservation: %w", err)
-	}
-	return n.uci.Commit("dhcp")
+	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.uci.DeleteSection("dhcp", section); err != nil {
+			return fmt.Errorf("deleting DHCP reservation: %w", err)
+		}
+		return n.uci.Commit("dhcp")
+	})
 }
 
 // parseDHCPLeases parses the content of /tmp/dhcp.leases into a slice of DHCPLease.
@@ -969,78 +1097,97 @@ func parseDHCPLeases(data string) []models.DHCPLease {
 }
 
 // KickClient disconnects a WiFi client by deauthentication.
+// It returns an error when no interface accepted the disassociate so the UI can
+// report the failure instead of pretending the client is gone.
 func (n *NetworkService) KickClient(mac string) error {
 	// Discover AP interfaces dynamically using iw dev
 	iwDevOutput, err := n.cmd.Run("iw", "dev")
 	if err != nil {
 		// Fallback to common AP interfaces if iw fails
 		for _, iface := range []string{"phy0-ap0", "phy1-ap0", "wlan0", "wlan1"} {
-			_, _ = n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
+			if _, kickErr := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac); kickErr == nil {
+				return nil
+			}
 		}
-		return nil
+		return fmt.Errorf("kick %s: no wireless interface accepted the disassociate", mac)
 	}
 
 	// Parse iw dev output to find AP interfaces
+	attempted := false
 	for _, iface := range parseIwDev(string(iwDevOutput)) {
-		_, err := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac)
-		if err == nil {
+		attempted = true
+		if _, kickErr := n.cmd.Run("hostapd_cli", "-i", iface, "disassociate", mac); kickErr == nil {
 			// Successfully kicked from this interface
 			return nil
 		}
 	}
-	return nil
+	if !attempted {
+		return fmt.Errorf("kick %s: no AP interface found to disassociate from", mac)
+	}
+	return fmt.Errorf("kick %s: no AP interface accepted the disassociate", mac)
 }
 
 // BlockClient adds a firewall rule to drop all traffic from a MAC address.
+// Every failure after the first staged `uci` write reverts the staged firewall
+// delta: the uci CLI keeps uncommitted changes in /tmp/.uci/firewall/changes,
+// so an abandoned half-written rule would be committed by a later, unrelated
+// `uci commit firewall`.
 func (n *NetworkService) BlockClient(mac string) error {
-	section := "block_" + normalizeMACForSection(mac)
-	macUpper := strings.ToUpper(mac)
+	return mutateUCI(n.uci, []string{"firewall"}, func() error {
+		section := "block_" + normalizeMACForSection(mac)
+		macUpper := strings.ToUpper(mac)
 
-	if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
-		return fmt.Errorf("add firewall block rule: %w", err)
-	}
-	if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
-		return err
-	}
-	if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
-		return err
-	}
-	if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
-		return err
-	}
-	if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
-		return err
-	}
-	if err := n.uciCommit("firewall"); err != nil {
-		return err
-	}
-	if err := n.restartService("firewall"); err != nil {
-		return fmt.Errorf("restart firewall: %w", err)
-	}
-	return nil
+		if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
+			return fmt.Errorf("add firewall block rule: %w", err)
+		}
+		if err := n.uciSet("firewall", section, "name", "Block-"+macUpper); err != nil {
+			return err
+		}
+		if err := n.uciSet("firewall", section, "src", "lan"); err != nil {
+			return err
+		}
+		if err := n.uciSet("firewall", section, "src_mac", macUpper); err != nil {
+			return err
+		}
+		if err := n.uciSet("firewall", section, "target", "DROP"); err != nil {
+			return err
+		}
+		if err := n.uciCommit("firewall"); err != nil {
+			return err
+		}
+		if err := n.restartService("firewall"); err != nil {
+			return fmt.Errorf("restart firewall: %w", err)
+		}
+		return nil
+	})
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
-	section := "block_" + normalizeMACForSection(mac)
+	return mutateUCI(n.uci, []string{"firewall"}, func() error {
+		section := "block_" + normalizeMACForSection(mac)
 
-	if err := n.uci.DeleteSection("firewall", section); err != nil {
-		return fmt.Errorf("delete firewall block rule: %w", err)
-	}
-	if err := n.uciCommit("firewall"); err != nil {
-		return err
-	}
-	if err := n.restartService("firewall"); err != nil {
-		return fmt.Errorf("restart firewall: %w", err)
-	}
-	return nil
+		if err := n.uci.DeleteSection("firewall", section); err != nil {
+			return fmt.Errorf("delete firewall block rule: %w", err)
+		}
+		// A failed commit leaves the deletion staged; mutateUCI reverts it.
+		if err := n.uciCommit("firewall"); err != nil {
+			return err
+		}
+		if err := n.restartService("firewall"); err != nil {
+			return fmt.Errorf("restart firewall: %w", err)
+		}
+		return nil
+	})
 }
 
 // GetBlockedClients returns a list of blocked MAC addresses.
 func (n *NetworkService) GetBlockedClients() ([]string, error) {
 	sections, err := n.uci.GetSections("firewall")
 	if err != nil {
-		return []string{}, nil
+		// Never report "nothing is blocked" on a failed read: that silently
+		// unblocks clients the operator believes are filtered.
+		return nil, fmt.Errorf("reading firewall sections: %w", err)
 	}
 	var blocked []string
 	for _, opts := range sections {
@@ -1080,45 +1227,100 @@ func (n *NetworkService) GetDDNSConfig() (models.DDNSConfig, error) {
 	}, nil
 }
 
+// ddnsSectionName is the ddns-scripts service section this service owns.
+const ddnsSectionName = "myddns"
+
+// ErrDDNSNotAvailable is returned when ddns-scripts is not installed, so there
+// is nothing that can act on a `ddns` UCI config. Handlers map this to 503 with
+// an actionable message rather than surfacing uci's "Entry not found".
+var ErrDDNSNotAvailable = errors.New("ddns-scripts is not installed on this router")
+
+// ddnsInitScriptPath is the production ddns-scripts init script.
+const ddnsInitScriptPath = initdPath + "ddns"
+
+// SetDDNSInitScript overrides the ddns-scripts init script path (tests only).
+// Tests that exercise DDNS configuration need it to point at a file that exists,
+// otherwise every write correctly reports the package as missing.
+func (n *NetworkService) SetDDNSInitScript(path string) {
+	n.ddnsInitScript = path
+}
+
+// DDNSAvailable reports whether ddns-scripts is installed.
+//
+// Checked via the init script rather than the `ddns` UCI config, because the
+// config is what the user is trying to create: on a device without the package
+// there is no config AND no way for the UI to install one (ddns is not in the
+// service catalog), so the only honest signal is the missing script.
+func (n *NetworkService) DDNSAvailable() bool {
+	path := n.ddnsInitScript
+	if path == "" {
+		path = ddnsInitScriptPath
+	}
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // SetDDNSConfig writes the DDNS configuration to UCI and restarts ddns-scripts.
 func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
+	// Check the precondition BEFORE touching UCI. The old order wrote half the
+	// config and then failed, and on a device without the package every write
+	// failed with a bare `uci: Entry not found` 500 that said nothing about the
+	// real cause.
+	if !n.DDNSAvailable() {
+		return fmt.Errorf("%w: install the ddns-scripts package to configure dynamic DNS", ErrDDNSNotAvailable)
+	}
+
 	enabled := "0"
 	if config.Enabled {
 		enabled = "1"
 	}
-	if err := n.uciSet("ddns", "myddns", "enabled", enabled); err != nil {
-		return err
-	}
-	if strings.EqualFold(strings.TrimSpace(config.Service), "custom") {
-		_ = n.uci.DeleteOption("ddns", "myddns", "service_name")
-		if err := n.uciSet("ddns", "myddns", "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
+
+	// `ddns` is locked like every other UCI mutator: the uci CLI keeps
+	// uncommitted changes in the process-global /tmp/.uci/ddns/changes file.
+	return mutateUCI(n.uci, []string{"ddns"}, func() error {
+		// The `myddns` section is created on demand. It does not exist on a
+		// router where DDNS was never configured, and `uci set` on a missing
+		// section fails outright, so without this the endpoint could only ever
+		// succeed on a device that already had DDNS set up.
+		if _, err := n.uci.GetAll("ddns", ddnsSectionName); err != nil {
+			if err := n.uci.AddSection("ddns", ddnsSectionName, "service"); err != nil {
+				return fmt.Errorf("creating ddns section: %w", err)
+			}
+		}
+		if err := n.uciSet("ddns", ddnsSectionName, "enabled", enabled); err != nil {
 			return err
 		}
-	} else {
-		_ = n.uci.DeleteOption("ddns", "myddns", "update_url")
-		if err := n.uciSet("ddns", "myddns", "service_name", config.Service); err != nil {
+		if strings.EqualFold(strings.TrimSpace(config.Service), "custom") {
+			_ = n.uci.DeleteOption("ddns", ddnsSectionName, "service_name")
+			if err := n.uciSet("ddns", ddnsSectionName, "update_url", strings.TrimSpace(config.UpdateURL)); err != nil {
+				return err
+			}
+		} else {
+			_ = n.uci.DeleteOption("ddns", ddnsSectionName, "update_url")
+			if err := n.uciSet("ddns", ddnsSectionName, "service_name", config.Service); err != nil {
+				return err
+			}
+		}
+		if err := n.uciSet("ddns", ddnsSectionName, "domain", config.Domain); err != nil {
 			return err
 		}
-	}
-	if err := n.uciSet("ddns", "myddns", "domain", config.Domain); err != nil {
-		return err
-	}
-	if err := n.uciSet("ddns", "myddns", "username", config.Username); err != nil {
-		return err
-	}
-	if err := n.uciSet("ddns", "myddns", "password", config.Password); err != nil {
-		return err
-	}
-	if err := n.uciSet("ddns", "myddns", "lookup_host", config.LookupHost); err != nil {
-		return err
-	}
-	if err := n.uciCommit("ddns"); err != nil {
-		return err
-	}
-	if err := n.restartService("ddns"); err != nil {
-		return fmt.Errorf("restart ddns: %w", err)
-	}
-	return nil
+		if err := n.uciSet("ddns", ddnsSectionName, "username", config.Username); err != nil {
+			return err
+		}
+		if err := n.uciSet("ddns", ddnsSectionName, "password", config.Password); err != nil {
+			return err
+		}
+		if err := n.uciSet("ddns", ddnsSectionName, "lookup_host", config.LookupHost); err != nil {
+			return err
+		}
+		if err := n.uciCommit("ddns"); err != nil {
+			return err
+		}
+		if err := n.restartService("ddns"); err != nil {
+			return fmt.Errorf("restart ddns: %w", err)
+		}
+		return nil
+	})
 }
 
 // GetDDNSStatus checks whether the ddns service is running and returns public IP info.
@@ -1191,11 +1393,19 @@ func (n *NetworkService) GetFirewallZones() ([]models.FirewallZone, error) {
 	return zones, nil
 }
 
-const portForwardsFile = "/etc/travo/port-forwards.json"
+const defaultPortForwardsFile = "/etc/travo/port-forwards.json"
+
+// portForwardsPath returns the port-forward store in use.
+func (n *NetworkService) portForwardsPath() string {
+	if n.portForwardsFile != "" {
+		return n.portForwardsFile
+	}
+	return defaultPortForwardsFile
+}
 
 // GetPortForwards returns stored port-forward rules.
 func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
-	data, err := os.ReadFile(portForwardsFile)
+	data, err := os.ReadFile(n.portForwardsPath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []models.PortForwardRule{}, nil
@@ -1210,18 +1420,52 @@ func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
 }
 
 // AddPortForward adds a new port-forward rule.
+// newPortForwardID returns an ID that cannot collide with an existing rule.
+// The millisecond prefix keeps IDs roughly ordered and human-readable; the
+// random suffix is what makes a same-millisecond collision impossible.
+func newPortForwardID(existing []models.PortForwardRule) string {
+	taken := make(map[string]bool, len(existing))
+	for _, r := range existing {
+		taken[r.ID] = true
+	}
+	for {
+		var suffix [4]byte
+		if _, err := rand.Read(suffix[:]); err != nil {
+			// crypto/rand must not fail in practice; fall back to a counter-like
+			// value rather than reusing an ID that may already be taken.
+			return fmt.Sprintf("pf%d-%s", time.Now().UnixMilli(), strconv.FormatInt(portForwardFallbackID.Add(1), 36))
+		}
+		id := fmt.Sprintf("pf%d-%s", time.Now().UnixMilli(), hex.EncodeToString(suffix[:]))
+		if !taken[id] {
+			return id
+		}
+	}
+}
+
+// portForwardFallbackID only advances if crypto/rand is unavailable.
+var portForwardFallbackID atomic.Int64
+
 func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
+	n.portForwardsMu.Lock()
+	defer n.portForwardsMu.Unlock()
+
 	rules, err := n.GetPortForwards()
 	if err != nil {
 		return err
 	}
-	rule.ID = fmt.Sprintf("pf%d", time.Now().UnixMilli())
+	// Two rules created in the same millisecond used to share an ID, and
+	// DeletePortForward removes every rule matching the ID — so one delete took
+	// out both. A random suffix makes the ID unique per call.
+	rule.ID = newPortForwardID(rules)
 	rules = append(rules, rule)
 	return n.savePortForwards(rules)
 }
 
 // DeletePortForward removes a port-forward rule by ID.
 func (n *NetworkService) DeletePortForward(id string) error {
+	n.portForwardsMu.Lock()
+	defer n.portForwardsMu.Unlock()
+
 	rules, err := n.GetPortForwards()
 	if err != nil {
 		return err
@@ -1236,14 +1480,22 @@ func (n *NetworkService) DeletePortForward(id string) error {
 }
 
 func (n *NetworkService) savePortForwards(rules []models.PortForwardRule) error {
-	if err := os.MkdirAll(filepath.Dir(portForwardsFile), 0750); err != nil {
+	path := n.portForwardsPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return err
 	}
 	data, err := json.Marshal(rules)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(portForwardsFile, data, 0600)
+	// Write to a sibling temp file and rename, so a reader never observes a
+	// truncated file. os.WriteFile truncates first, which is what produced
+	// "unexpected end of JSON input" on the device when a GET raced a POST.
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // RunDiagnostics runs ping, traceroute, or DNS lookup and returns the output.
@@ -1310,7 +1562,10 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 			}
 		}
 		_ = url // DoH proxy integration stored in config file; dnsmasq-over-HTTPS requires https-dns-proxy
-		_, _ = n.cmd.Run("uci", "commit", "dhcp")
+		// No `uci commit dhcp` here: nothing above stages a dhcp change, so a
+		// commit would only persist whatever ELSE had a delta in flight — the
+		// VPN's DNS-forwarding sequence, a DHCP reservation, an AdGuard
+		// resolver switch. It was a pure liability.
 		_, _ = n.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	}
 	return nil
@@ -1526,4 +1781,19 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		Interface: matchedIface.name,
 		IPAddress: clientIP,
 	}, nil
+}
+
+// writeFileAtomic writes via a sibling temp file and renames, so a concurrent
+// reader never observes a truncated file.
+//
+// os.WriteFile truncates before writing, and /etc/crontabs/root is read by a
+// running busybox crond. A reader that catches the window sees a partial
+// crontab and can stop scheduling — the same defect class that produced
+// "unexpected end of JSON input" on the port-forward store.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }

@@ -22,11 +22,13 @@ func GetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
 func SetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.SQMConfig
-		if err := c.Bind().Body(&cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		// Strict: this handler persists the whole config, so an unrecognised
+		// field must not decode to the zero value and wipe the user's settings.
+		if err := BindStrictBodyConfig(c, &cfg); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetConfig(cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}

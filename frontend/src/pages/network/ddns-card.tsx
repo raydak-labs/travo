@@ -38,19 +38,21 @@ export function DdnsCard() {
     mode: 'onChange',
   });
 
+  // undefined while loading; the form is not rendered in that state.
+  const available = ddnsConfig?.available ?? false;
   const enabled = watch('enabled');
   const service = watch('service');
 
   useEffect(() => {
     if (ddnsConfig) {
       reset({
-        enabled: ddnsConfig.enabled,
-        service: ddnsConfig.service,
-        domain: ddnsConfig.domain,
-        username: ddnsConfig.username,
-        password: ddnsConfig.password,
-        lookup_host: ddnsConfig.lookup_host,
-        update_url: ddnsConfig.update_url ?? '',
+        enabled: ddnsConfig.config.enabled,
+        service: ddnsConfig.config.service,
+        domain: ddnsConfig.config.domain,
+        username: ddnsConfig.config.username,
+        password: ddnsConfig.config.password,
+        lookup_host: ddnsConfig.config.lookup_host,
+        update_url: ddnsConfig.config.update_url ?? '',
       });
     }
   }, [ddnsConfig, reset]);
@@ -82,22 +84,35 @@ export function DdnsCard() {
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <DdnsStatusPanel status={ddnsStatus} />
-            <div className="flex items-center gap-2">
-              <Switch {...register('enabled')} />
-              <span className="text-sm">Enable Dynamic DNS</span>
-            </div>
-            {enabled && (
-              <DdnsEnabledFields
-                control={control}
-                register={register}
-                errors={errors}
-                service={service}
-                setValue={setValue}
-              />
+            {available ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Switch {...register('enabled')} />
+                  <span className="text-sm">Enable Dynamic DNS</span>
+                </div>
+                {enabled && (
+                  <DdnsEnabledFields
+                    control={control}
+                    register={register}
+                    errors={errors}
+                    service={service}
+                    setValue={setValue}
+                  />
+                )}
+                <Button type="submit" size="sm" disabled={setDDNS.isPending}>
+                  {setDDNS.isPending ? 'Saving…' : 'Save DDNS Settings'}
+                </Button>
+              </>
+            ) : (
+              // ddns-scripts is not installed, so nothing can service a `ddns`
+              // config and the backend answers 503 to every write. Say so here
+              // rather than offering a form that cannot succeed.
+              <p className="text-sm text-muted-foreground">
+                Dynamic DNS is unavailable: the <code>ddns-scripts</code> package is not installed
+                on this router. Install it with <code>opkg install ddns-scripts</code> to enable
+                these settings.
+              </p>
             )}
-            <Button type="submit" size="sm" disabled={setDDNS.isPending}>
-              {setDDNS.isPending ? 'Saving…' : 'Save DDNS Settings'}
-            </Button>
           </form>
         )}
       </CardContent>

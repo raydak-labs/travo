@@ -90,7 +90,7 @@ export function WifiStep({ onNext, onBack }: { onNext: () => void; onBack: () =>
       <button
         type="button"
         onClick={onNext}
-        className="block w-full text-center text-sm text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-gray-300"
+        className="block w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:text-gray-300"
       >
         Skip for now
       </button>

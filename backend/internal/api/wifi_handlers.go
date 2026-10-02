@@ -38,7 +38,7 @@ func WifiConnectHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WifiConfig
 		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
 		// Validate SSID
@@ -55,7 +55,7 @@ func WifiConnectHandler(svc *services.WifiService) fiber.Handler {
 		if err != nil {
 			if errors.Is(err, services.ErrPasswordRequiredForNewSTA) ||
 				errors.Is(err, services.ErrEncryptionRequiredForNewSTA) {
-				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+				return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 			}
 			return RespondWithServerError(c, err)
 		}
@@ -103,7 +103,7 @@ func WifiSetModeHandler(svc *services.WifiService) fiber.Handler {
 			Mode string `json:"mode"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if strings.TrimSpace(body.Mode) == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "mode is required")
@@ -163,7 +163,7 @@ func SetRadioEnabledHandler(svc *services.WifiService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		apply, err := svc.SetRadioEnabled(body.Enabled)
 		if err != nil {
@@ -193,7 +193,7 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 		}
 		var update models.APConfigUpdate
 		if err := c.Bind().Body(&update); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if update.SSID == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "ssid is required")
@@ -228,7 +228,7 @@ func SetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body models.RepeaterOptions
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		apply, err := svc.SetRepeaterOptions(body)
 		if err != nil {
@@ -245,7 +245,7 @@ func ReconcileRepeaterAPLayoutHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		apply, err := svc.ReconcileRepeaterAPLayout()
 		if err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return c.JSON(wifiMutationResponse(apply))
 	}
@@ -267,7 +267,7 @@ func SetMACHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetMACRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		// Validate MAC format if provided (empty means reset)
 		if req.MAC != "" && !isValidMAC(req.MAC) {
@@ -301,7 +301,7 @@ func WifiSetPriorityHandler(svc *services.WifiService) fiber.Handler {
 			SSIDs []string `json:"ssids"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if len(body.SSIDs) == 0 {
 			return RespondWithError(c, fiber.StatusBadRequest, "ssids list must not be empty")
@@ -330,7 +330,7 @@ func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
 		radioName := c.Params("name")
 		var req models.RadioRoleRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		result, err := svc.SetRadioRole(radioName, req.Role)
 		if err != nil {
@@ -355,8 +355,8 @@ func GetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 func SetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.GuestWifiConfig
-		if err := c.Bind().Body(&cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &cfg); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if cfg.Enabled {
 			if strings.TrimSpace(cfg.SSID) == "" {
@@ -395,7 +395,7 @@ func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetAutoReconnect(body.Enabled); err != nil {
 			return RespondWithServerError(c, err)
@@ -411,7 +411,7 @@ func ConfirmWifiApplyHandler(svc *services.WifiService) fiber.Handler {
 			Token string `json:"token"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if strings.TrimSpace(body.Token) == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "token is required")
@@ -438,8 +438,17 @@ func GetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
 func SetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var schedule models.WiFiSchedule
-		if err := c.Bind().Body(&schedule); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &schedule); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+		}
+		// These land in a root crontab line; validate at the boundary.
+		if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
+			if err := services.ValidateHHMM(schedule.OnTime); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, "on_time: "+err.Error())
+			}
+			if err := services.ValidateHHMM(schedule.OffTime); err != nil {
+				return RespondWithError(c, fiber.StatusBadRequest, "off_time: "+err.Error())
+			}
 		}
 		if err := svc.SetWiFiSchedule(schedule); err != nil {
 			return RespondWithServerError(c, err)
@@ -463,8 +472,8 @@ func GetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
 func SetMACPoliciesHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var policies models.MACPolicies
-		if err := c.Bind().Body(&policies); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &policies); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetMACPolicies(policies); err != nil {
 			return RespondWithServerError(c, err)

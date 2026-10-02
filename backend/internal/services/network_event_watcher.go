@@ -5,6 +5,8 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -20,8 +22,10 @@ type EventWatcher interface {
 // NoopEventWatcher satisfies EventWatcher but never emits anything.
 // Used in mock mode and tests.
 type NoopEventWatcher struct {
-	ch     chan models.NetworkStatus
-	stopCh chan struct{}
+	ch       chan models.NetworkStatus
+	stopCh   chan struct{}
+	started  atomic.Bool
+	stopOnce sync.Once
 }
 
 func NewNoopEventWatcher() *NoopEventWatcher {
@@ -31,12 +35,18 @@ func NewNoopEventWatcher() *NoopEventWatcher {
 	}
 }
 
+// Start blocks until Stop is called. A second call returns immediately instead
+// of spawning a second loop.
 func (w *NoopEventWatcher) Start() {
-	<-w.stopCh // block until Stop is called
+	if !w.started.CompareAndSwap(false, true) {
+		return
+	}
+	<-w.stopCh
 }
 
+// Stop is safe to call multiple times.
 func (w *NoopEventWatcher) Stop() {
-	close(w.stopCh)
+	w.stopOnce.Do(func() { close(w.stopCh) })
 }
 
 func (w *NoopEventWatcher) Ch() <-chan models.NetworkStatus {
@@ -110,6 +120,8 @@ type NetworkEventWatcher struct {
 	runner     subprocessRunner
 	ch         chan models.NetworkStatus
 	stopCh     chan struct{}
+	started    atomic.Bool
+	stopOnce   sync.Once
 }
 
 func NewNetworkEventWatcher(networkSvc *NetworkService) *NetworkEventWatcher {
@@ -126,11 +138,22 @@ func newNetworkEventWatcherWithRunner(networkSvc *NetworkService, runner subproc
 }
 
 func (w *NetworkEventWatcher) Ch() <-chan models.NetworkStatus { return w.ch }
-func (w *NetworkEventWatcher) Stop()                           { close(w.stopCh) }
+
+// Stop is safe to call multiple times: the stop channel is closed exactly once.
+func (w *NetworkEventWatcher) Stop() {
+	w.stopOnce.Do(func() { close(w.stopCh) })
+}
 
 const pollInterval = 10 * time.Second
 
 func (w *NetworkEventWatcher) Start() {
+	// Start is normally driven from a tracked goroutine, but a double start
+	// (e.g. a retrying bootstrapper) would run two `iw event` loops and fight
+	// over the same channel. Second call returns immediately.
+	if !w.started.CompareAndSwap(false, true) {
+		return
+	}
+
 	// Emit an initial snapshot so the first WebSocket client gets data immediately.
 	w.emitSnapshot()
 

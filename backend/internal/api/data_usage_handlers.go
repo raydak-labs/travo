@@ -49,8 +49,8 @@ func GetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
 func SetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.DataBudgetConfig
-		if err := c.Bind().Body(&cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &cfg); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if cfg.Budgets == nil {
 			cfg.Budgets = []models.DataBudget{}

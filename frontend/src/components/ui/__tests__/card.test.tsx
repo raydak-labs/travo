@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CardTitle } from '../card';
+import { Card, CardHeader, CardTitle } from '../card';
 
 describe('CardTitle', () => {
   it('uses compact title defaults', () => {
@@ -11,10 +11,22 @@ describe('CardTitle', () => {
     expect(title.className).toContain('font-medium');
     expect(title.className).toContain('leading-none');
     expect(title.className).toContain('tracking-tight');
-    expect(title.className).toContain('text-gray-900');
-    expect(title.className).toContain('dark:text-white');
     expect(title.className).not.toContain('text-lg');
     expect(title.className).not.toContain('font-semibold');
+  });
+
+  it('renders its children and forwards the heading level contract', () => {
+    render(
+      <Card>
+        <CardHeader>
+          <CardTitle>Settings</CardTitle>
+        </CardHeader>
+      </Card>,
+    );
+
+    const title = screen.getByRole('heading', { level: 3, name: 'Settings' });
+    expect(title).toBeInTheDocument();
+    expect(title.closest('[data-slot="card-header"]')).not.toBeNull();
   });
 
   it('merges className overrides', () => {

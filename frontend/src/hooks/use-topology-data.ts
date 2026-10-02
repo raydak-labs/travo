@@ -1,11 +1,13 @@
 import { Cable, Wifi, Smartphone, Signal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { NetworkStatus } from '@shared/index';
-import { useNetworkStatus, useIPv6Status } from './use-network';
+import type { NetworkStatus, WanType } from '@shared/index';
+import { networkMedium, type NetworkMedium } from '@shared/index';
+import { useNetworkStatus, useIPv6Status, useWanConfig } from './use-network';
 import { useWifiConnection } from './use-wifi';
 import { useVpnStatus } from './use-vpn';
 import { useSystemInfo } from './use-system';
 import { useUSBTetherStatus } from './use-usb-tether';
+import { useWsSubscribe } from '@/lib/ws-context';
 
 export interface SourceDef {
   label: string;
@@ -27,6 +29,10 @@ export interface TopologyData {
   tetherUp: boolean;
   // Raw data for dashboard source / detail cards
   wan: NetworkStatus['wan'];
+  /** Medium the WAN uplink runs over (ethernet / wifi / usb / …). */
+  wanMedium: NetworkMedium;
+  /** WAN connection protocol (dhcp / static / pppoe), from the WAN config. */
+  wanProtocol: WanType | null;
   wifiConn: ReturnType<typeof useWifiConnection>['data'];
   usbTether: ReturnType<typeof useUSBTetherStatus>['data'];
   sysInfo: ReturnType<typeof useSystemInfo>['data'];
@@ -36,26 +42,46 @@ export interface TopologyData {
   allClients: NonNullable<NetworkStatus['clients']>;
 }
 
+/**
+ * HTTP polling cadence for the topology query.
+ *
+ * While the WebSocket is connected its `network_status` pushes keep the cache
+ * fresh, so polling is pure overhead; with the socket down (or before the
+ * first login connects it) polling is what heals a frozen dashboard.
+ * Exported for tests.
+ */
+export function topologyRefetchInterval(wsConnected: boolean): number | false {
+  return wsConnected ? false : 15_000;
+}
+
 export function useTopologyData(): TopologyData {
-  // staleTime: Infinity prevents HTTP refetches from overwriting WS-fresh data
-  // (useNetworkStatus itself feeds WS network_status pushes into the cache).
-  // Other components using useNetworkStatus() without this option are unaffected.
+  const { connected } = useWsSubscribe();
+  // A finite staleTime (instead of `Infinity`) plus focus/reconnect refetching
+  // is what makes the dashboard heal when the WebSocket never delivered a
+  // push: `staleTime: Infinity` also disabled refetchOnWindowFocus and
+  // refetchOnReconnect, so a single failed fetch froze the page forever.
   const { data: network, isLoading: networkLoading } = useNetworkStatus({
-    staleTime: Infinity,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: topologyRefetchInterval(connected),
   });
   const { data: wifiConn, isLoading: wifiLoading } = useWifiConnection();
   const { data: vpnStatus } = useVpnStatus();
   const { data: sysInfo, isLoading: sysLoading } = useSystemInfo();
   const { data: ipv6Status } = useIPv6Status();
   const { data: usbTether } = useUSBTetherStatus();
+  const { data: wanConfig } = useWanConfig();
 
-  // Connection type derivation — wan.type tells us the actual upstream medium.
+  // Connection type derivation — the interface discriminator says which
+  // medium the uplink actually runs over (see NetworkInterfaceType).
   const wan = network?.wan ?? null;
-  const ethernetUp = wan?.is_up === true && wan.type !== 'wifi' && wan.type !== 'usb';
+  const wanMedium = networkMedium(wan);
+  const ethernetUp = wan?.is_up === true && wanMedium === 'ethernet';
   const repeaterUp =
-    (wan?.is_up === true && wan.type === 'wifi') ||
+    (wan?.is_up === true && wanMedium === 'wifi') ||
     (wifiConn?.connected === true && wifiConn.mode === 'client');
-  const tetherUp = (wan?.is_up === true && wan.type === 'usb') || usbTether?.is_up === true;
+  const tetherUp = (wan?.is_up === true && wanMedium === 'usb') || usbTether?.is_up === true;
 
   const vpnActive = vpnStatus?.some((v) => v.connected) ?? false;
   const ipv6Enabled = ipv6Status?.enabled ?? false;
@@ -116,6 +142,8 @@ export function useTopologyData(): TopologyData {
     repeaterUp,
     tetherUp,
     wan,
+    wanMedium,
+    wanProtocol: wanConfig?.type ?? null,
     wifiConn,
     usbTether,
     sysInfo,

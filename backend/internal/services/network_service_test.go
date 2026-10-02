@@ -2,10 +2,13 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -1112,14 +1115,49 @@ func TestUnblockClient_NotBlocked(t *testing.T) {
 	}
 }
 
-func TestKickClient(t *testing.T) {
+func TestKickClient_SucceedsWhenAPInterfaceAccepts(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	iwDev := "phy0\n\tInterface phy0-ap0\n\t\ttype AP\n\tInterface phy0-sta0\n\t\ttype managed\n"
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "iw" {
+			return []byte(iwDev), nil
+		}
+		return nil, nil // hostapd_cli disassociate succeeds
+	}}
+	svc := NewNetworkServiceWithRunner(u, ub, runner)
 
-	err := svc.KickClient("AA:BB:CC:DD:EE:FF")
-	if err != nil {
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// KickClient must report failure when nothing was actually disassociated,
+// instead of returning nil and letting the UI claim success.
+func TestKickClient_ErrorsWhenNoAPInterfaceFound(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{Output: []byte("phy0\n")})
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Error("expected an error when no AP interface exists")
+	}
+}
+
+func TestKickClient_ErrorsWhenAPInterfaceRejects(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	iwDev := "phy0\n\tInterface phy0-ap0\n\t\ttype AP\n"
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "iw" {
+			return []byte(iwDev), nil
+		}
+		return nil, fmt.Errorf("disassociate failed")
+	}}
+	svc := NewNetworkServiceWithRunner(u, ub, runner)
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Error("expected an error when every AP interface rejects the disassociate")
 	}
 }
 
@@ -1534,6 +1572,20 @@ func TestGetDDNSConfig_CustomUpdateURL_ServiceDash(t *testing.T) {
 	}
 }
 
+// fakeDDNSScript points svc at a ddns-scripts init script that exists, so the
+// availability precondition passes. Without it every DDNS write correctly
+// reports the package as missing, which is the behaviour on a real router that
+// has not installed ddns-scripts.
+func fakeDDNSScript(t *testing.T, svc *NetworkService) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ddns")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake ddns init script: %v", err)
+	}
+	svc.SetDDNSInitScript(path)
+	return path
+}
+
 func TestSetDDNSConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
@@ -1543,6 +1595,7 @@ func TestSetDDNSConfig(t *testing.T) {
 		},
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
 
 	newConfig := models.DDNSConfig{
 		Enabled:    true,
@@ -1593,6 +1646,7 @@ func TestSetDDNSConfig_CustomUpdateURL(t *testing.T) {
 		},
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
 
 	customURL := "https://provider.example/nic/update?hostname=[DOMAIN]&myip=[IP]"
 	newConfig := models.DDNSConfig{
@@ -1639,6 +1693,7 @@ func TestSetDDNSConfig_FromCustomToBuiltInClearsUpdateURL(t *testing.T) {
 		},
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
 
 	customURL := "https://provider.example/update"
 	if err := svc.SetDDNSConfig(models.DDNSConfig{
@@ -1800,5 +1855,283 @@ func TestGetClients_HostnamesFromUbus(t *testing.T) {
 	}
 	if hostnameCount == 0 {
 		t.Error("expected at least one client with a hostname")
+	}
+}
+
+// failingGetSectionsUCI wraps MockUCI but fails every GetSections read, standing
+// in for a timed-out / failed `uci show` on the device.
+type failingGetSectionsUCI struct {
+	*uci.MockUCI
+}
+
+func (f *failingGetSectionsUCI) GetSections(_ string) (map[string]map[string]string, error) {
+	return nil, fmt.Errorf("uci show: timed out")
+}
+
+func TestGetBlockedClients_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+
+	blocked, err := svc.GetBlockedClients()
+	if err == nil {
+		t.Fatal("expected an error instead of an empty blocked list when the UCI read fails")
+	}
+	if blocked != nil {
+		t.Errorf("expected no list on error, got %v", blocked)
+	}
+}
+
+func TestGetDNSEntries_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+
+	if _, err := svc.GetDNSEntries(); err == nil {
+		t.Fatal("expected an error instead of an empty DNS entry list when the UCI read fails")
+	}
+}
+
+func TestGetDHCPReservations_SurfacesGetSectionsError(t *testing.T) {
+	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+
+	if _, err := svc.GetDHCPReservations(); err == nil {
+		t.Fatal("expected an error instead of an empty reservation list when the UCI read fails")
+	}
+}
+
+func TestKickClient_NoInterfaceAcceptedReturnsError(t *testing.T) {
+	calls := 0
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		calls++
+		return nil, fmt.Errorf("no such interface")
+	}}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), runner)
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected an error when no interface accepted the disassociate")
+	}
+	if calls == 0 {
+		t.Error("expected KickClient to try the discovered AP interfaces")
+	}
+}
+
+func TestKickClient_SuccessWhenOneInterfaceAccepts(t *testing.T) {
+	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		return []byte("Interface phy0-ap0\ntype AP\n"), nil
+	}}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), runner)
+
+	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseInterface_EmitsContractTypes(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	tests := []struct {
+		name   string
+		iface  string
+		device string
+		data   map[string]any
+		want   string
+	}{
+		{"wan stays wan", "wan", "eth0", map[string]any{"device": "eth0"}, "wan"},
+		{"lan stays lan", "lan", "br-lan", map[string]any{"device": "br-lan"}, "lan"},
+		{"wwan is wifi", "wwan", "phy0-sta0", map[string]any{"device": "phy0-sta0"}, "wifi"},
+		{"wlan ap is wifi", "guest", "phy1-ap0", map[string]any{"device": "phy1-ap0"}, "wifi"},
+		{"usb tether is usb", "usbtether", "usb0", map[string]any{"device": "usb0", "proto": "dhcp"}, "usb"},
+		{"wireguard is vpn", "wg0", "wg0", map[string]any{"device": "wg0", "proto": "wireguard"}, "vpn"},
+		{"wireguard tunnel device is vpn", "vpn0", "tun0", map[string]any{"device": "tun0", "proto": "none"}, "vpn"},
+		{"unknown keeps name", "guest", "br-guest", map[string]any{"device": "br-guest"}, "guest"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseInterface(tt.iface, tt.device, tt.data, ub).Type
+			if got != tt.want {
+				t.Errorf("expected type %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestGetNetworkStatus_EmitsContractTypes(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("network.interface.wwan.status", map[string]any{
+		"up": true, "device": "phy0-sta0", "l3_device": "wwan", "proto": "dhcp",
+	})
+	svc := NewNetworkService(uci.NewMockUCI(), ub)
+
+	status, err := svc.GetNetworkStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]string{"wan": "wan", "lan": "lan", "wwan": "wifi"}
+	for _, iface := range status.Interfaces {
+		if w, ok := want[iface.Name]; ok {
+			if iface.Type != w {
+				t.Errorf("interface %s: expected type %q, got %q", iface.Name, w, iface.Type)
+			}
+			delete(want, iface.Name)
+		}
+	}
+	for name := range want {
+		t.Errorf("interface %s missing from status", name)
+	}
+}
+
+func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsEpoch(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	// A lease that started 1h ago with a 12h lease expires in 11h: 11*3600
+	// seconds *after* the epoch.
+	expires := float64(time.Now().Unix() + 11*3600)
+	ub.RegisterResponse("dhcp.ipv4leases", map[string]any{
+		"device": map[string]any{
+			"br-lan": map[string]any{
+				"leases": []any{
+					map[string]any{"mac": "AA:BB:CC:11:22:33", "ip": "192.168.8.100", "hostname": "laptop", "expires": expires},
+				},
+			},
+		},
+	})
+	runner := &MockCommandRunner{Err: fmt.Errorf("iw not available")}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ub, runner)
+
+	clients := svc.fetchDHCPClients()
+	if len(clients) != 1 {
+		t.Fatalf("expected 1 client, got %d", len(clients))
+	}
+	connected, err := time.Parse(time.RFC3339, clients[0].ConnectedSince)
+	if err != nil {
+		t.Fatalf("ConnectedSince %q is not RFC3339: %v", clients[0].ConnectedSince, err)
+	}
+	age := time.Since(connected)
+	if age < 30*time.Minute || age > 90*time.Minute {
+		t.Errorf("expected ~1h uptime from the epoch expiry, got %s", age.Round(time.Minute))
+	}
+}
+
+func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsRemainingDuration(t *testing.T) {
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("dhcp.ipv4leases", map[string]any{
+		"device": map[string]any{
+			"br-lan": map[string]any{
+				"leases": []any{
+					// 11h left of a 12h lease => connected ~1h ago (old build semantics).
+					map[string]any{"mac": "AA:BB:CC:11:22:33", "ip": "192.168.8.100", "hostname": "laptop", "expires": float64(11 * 3600)},
+				},
+			},
+		},
+	})
+	runner := &MockCommandRunner{Err: fmt.Errorf("iw not available")}
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ub, runner)
+
+	clients := svc.fetchDHCPClients()
+	if len(clients) != 1 {
+		t.Fatalf("expected 1 client, got %d", len(clients))
+	}
+	connected, err := time.Parse(time.RFC3339, clients[0].ConnectedSince)
+	if err != nil {
+		t.Fatalf("ConnectedSince %q is not RFC3339: %v", clients[0].ConnectedSince, err)
+	}
+	if age := time.Since(connected); age < 30*time.Minute || age > 90*time.Minute {
+		t.Errorf("expected ~1h uptime from the remaining-duration expiry, got %s", age.Round(time.Minute))
+	}
+}
+
+// Two rules created in the same millisecond must get different IDs, otherwise
+// DeletePortForward (which removes every rule matching the ID) takes out both.
+func TestNewPortForwardID_UniqueWithinTheSameMillisecond(t *testing.T) {
+	var rules []models.PortForwardRule
+	seen := make(map[string]bool, 64)
+	for i := 0; i < 64; i++ {
+		id := newPortForwardID(rules)
+		if id == "" {
+			t.Fatal("empty ID")
+		}
+		if seen[id] {
+			t.Fatalf("duplicate port-forward ID %q", id)
+		}
+		seen[id] = true
+		rules = append(rules, models.PortForwardRule{ID: id})
+	}
+}
+
+// An ID that already exists in the rule set must never be handed out again,
+// even if it is generated within the same millisecond.
+func TestNewPortForwardID_AvoidsExistingIDs(t *testing.T) {
+	existing := []models.PortForwardRule{{ID: newPortForwardID(nil)}}
+	if got := newPortForwardID(existing); got == existing[0].ID {
+		t.Fatalf("reused existing ID %q", got)
+	}
+}
+
+// ddns-scripts is what can actually service a `ddns` UCI config, and it is not
+// in the service catalog, so the UI cannot install it and can only explain.
+// Without this check every write failed with a bare
+// `uci: Entry not found` 500 that said nothing about the real cause — verified on
+// the device, where PUT /api/v1/network/ddns returned
+// 500 {"error":"set ddns.myddns.enabled: uci: Entry not found"}.
+func TestSetDDNSConfig_ReportsMissingPackageClearly(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) { return []byte("ok"), nil },
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	// Deliberately no fakeDDNSScript: this is the router-without-ddns-scripts case.
+
+	if svc.DDNSAvailable() {
+		t.Fatal("DDNSAvailable must be false when the init script is absent")
+	}
+
+	err := svc.SetDDNSConfig(models.DDNSConfig{
+		Enabled: true, Service: "no-ip.com", Domain: "test.no-ip.org",
+	})
+	if !errors.Is(err, ErrDDNSNotAvailable) {
+		t.Fatalf("got %v, want ErrDDNSNotAvailable", err)
+	}
+	// The message has to name the package, or the operator cannot act on it.
+	if !strings.Contains(err.Error(), "ddns-scripts") {
+		t.Errorf("error %q does not name the missing package", err)
+	}
+	// And nothing may have been written: a refused write must not leave a
+	// half-updated config behind.
+	opts, getErr := u.GetAll("ddns", "myddns")
+	if getErr != nil {
+		t.Fatalf("read back ddns.myddns: %v", getErr)
+	}
+	if opts["domain"] != "myrouter.duckdns.org" || opts["enabled"] != "0" {
+		t.Errorf("a refused DDNS write still modified the config: %v", opts)
+	}
+}
+
+// The `myddns` section does not exist on a router where DDNS was never
+// configured, and `uci set` on a missing section fails outright — so before this
+// the endpoint could only ever succeed on a device that already had DDNS set up.
+func TestSetDDNSConfig_CreatesSectionWhenAbsent(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	cmdRunner := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) { return []byte("ok"), nil },
+	}
+	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
+	_ = fakeDDNSScript(t, svc)
+
+	// Reproduce a router that has never had DDNS configured.
+	if err := u.DeleteSection("ddns", "myddns"); err != nil {
+		t.Fatalf("DeleteSection: %v", err)
+	}
+	if _, err := u.GetAll("ddns", "myddns"); err == nil {
+		t.Fatal("precondition: the ddns.myddns section should be gone")
+	}
+
+	if err := svc.SetDDNSConfig(models.DDNSConfig{
+		Enabled: true, Service: "no-ip.com", Domain: "test.no-ip.org",
+	}); err != nil {
+		t.Fatalf("SetDDNSConfig on a router with no existing ddns section: %v", err)
+	}
+	cfg, err := svc.GetDDNSConfig()
+	if err != nil {
+		t.Fatalf("GetDDNSConfig: %v", err)
+	}
+	if !cfg.Enabled || cfg.Domain != "test.no-ip.org" {
+		t.Errorf("config not persisted correctly: %+v", cfg)
 	}
 }

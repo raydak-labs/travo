@@ -2,6 +2,7 @@
 title: "ADR 0001: DNS resolution, VPN, captive portal, and restore semantics"
 status: Accepted
 date: 2026-05-14
+updated: 2026-09-28
 tags: [adr, dns, dnsmasq, adguard, vpn, wireguard, captive-portal, openwrt, luci]
 ---
 
@@ -56,7 +57,7 @@ We need:
 ### 3. WireGuard VPN and DNS
 
 - **Tunnel DNS** is read from **`network.wg0.dns`** (space- or comma-separated, normalized in `VpnService`).
-- **When WireGuard is enabled** and `wg0.dns` is non-empty, Travo applies **VPN DNS forwarding** to dnsmasq: it **snapshots** current `dhcp.@dnsmasq[0].server` list and `noresolv` to **`/etc/travo/vpn-dns-snapshot.json`**, replaces `server` entries with the VPN resolvers, sets `noresolv=1`, commits `dhcp`, and restarts dnsmasq.
+- **When WireGuard is enabled** and `wg0.dns` is non-empty, Travo applies **VPN DNS forwarding** to dnsmasq: it **snapshots** current `dhcp.@dnsmasq[0].server` list and `noresolv` to **`/etc/trafo/vpn-dns-snapshot.json`** (the pre-unification `/etc/travo/vpn-dns-snapshot.json` is still read, so a device upgraded while the VPN was enabled can be restored), replaces `server` entries with the VPN resolvers, sets `noresolv=1`, commits `dhcp`, and restarts dnsmasq.
 - **When WireGuard is disabled**, it **restores** dnsmasq from that snapshot file and **deletes** the snapshot. If no snapshot exists, disable is a no-op for DNS.
 - **Interaction with AdGuard forwarding**: the snapshot taken at **VPN enable** may contain `127.0.0.1#5353` (or another AdGuard port). After disable, that forwarding chain is restored, so AdGuard can resume its prior role without a second manual toggle.
 - **Interaction with AdGuard upstreams**: AdGuard’s own upstream list (DoH/DoT/plain) determines where **AdGuard** sends queries; those packets follow normal routing (and therefore the tunnel when policy routing sends them via wg). Travo does not automatically rewrite AdGuard YAML when VPN toggles except where **captive portal** logic touches upstreams (below). UI hints (`vpn-adguard-hint` and related copy) document that operators may need to align AdGuard upstreams with VPN DNS in advanced setups.
@@ -74,6 +75,32 @@ We need:
   - points **AdGuard upstream** at plain **hotel DNS** when available so the resolver that actually handles queries can see portal names.
 - **Restore** (`RestoreDNS`) reapplies the backup, removes the guard file, and restarts dnsmasq; AdGuard upstreams are restored when the backup captured them.
 - **Automatic restore**: when connectivity checks show the internet is reachable, **`MaybeAutoRestoreDNS`** triggers restore; a **5-minute** safety timeout also forces restore if bypass stayed on too long (`captiveDNSRestoreTimeout`).
+
+### 4.1 Captive auto-accept: the wwan bounce is conditional
+
+When the first page fetch of a detected portal fails, the auto-accept flow may renew
+the **`wwan` DHCP lease** (needed after a MAC change, when the gateway blocks a stale
+MAC/IP pair). This is a **live network mutation inside an HTTP request**, so it is
+bounded and gated:
+
+- It happens **only on step 0** and **only when the first fetch failed**, never later in
+  the multi-step portal walk.
+- It runs **only when `wwan` is the active uplink** — netifd must report `wwan` up with
+  an IPv4 default route (`wwanIsActiveUplink`). On an ethernet-only or USB-tether
+  setup, `wwan` carries nothing, so bouncing it would only disturb an unrelated
+  interface; the bounce is then skipped, not failed.
+- It is **crash-guarded** (`/etc/trafo/captive-wwan-bounce-in-progress`, ADR 0003 §2):
+  the guard is written before `ifdown` and removed **only** after a fresh lease came
+  back. A failure at any step returns the error and **keeps** the guard, because the
+  interface may be half down.
+- The waits are bounded constants (2 s after `ifdown`, 8 s for the lease, with a poll
+  interval) so the handler goroutine cannot be pinned indefinitely. Every step's error
+  is returned instead of discarded, and a failure is reported in the result message
+  rather than swallowed.
+
+**Stance:** the bounce is a last resort scoped to the interface that is actually
+carrying the portal connection. It is not a general "reset the network" tool, and
+new callers must not widen the condition.
 
 ### 5. Consistent UX and “return to original state”
 
@@ -102,6 +129,7 @@ We need:
 - `backend/internal/services/adguard_service.go` — forwarding, `GetDNSMode`, auto-configure
 - `backend/internal/services/vpn_service.go` — `vpn-dns-snapshot.json`, enable/disable forwarding
 - `backend/internal/services/captive_service.go` — bypass/restore, guard file, timeouts
+- `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan bounce
 - `backend/internal/services/network_service.go` — WAN custom DNS (`SetDNSConfig`)
 - `docs/plans/adguard-auto-configure.md` — historical plan including primary vs forwarding
 - `docs/plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md` — VPN DNS restore rationale

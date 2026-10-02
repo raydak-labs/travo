@@ -180,7 +180,7 @@ func TestMiddlewareAllowsOpenAPIWithoutToken(t *testing.T) {
 
 func TestChangePasswordSuccess(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
-	if err := svc.ChangePassword("admin", "newpassword123"); err != nil {
+	if _, err := svc.ChangePassword("admin", "newpassword123"); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 	// Old password should no longer work
@@ -195,7 +195,7 @@ func TestChangePasswordSuccess(t *testing.T) {
 
 func TestChangePasswordWrongCurrent(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
-	err := svc.ChangePassword("wrongpassword", "newpassword123")
+	_, err := svc.ChangePassword("wrongpassword", "newpassword123")
 	if err == nil {
 		t.Error("expected error for wrong current password")
 	}
@@ -206,11 +206,11 @@ func TestChangePasswordWrongCurrent(t *testing.T) {
 
 func TestChangePasswordTooShort(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
-	err := svc.ChangePassword("admin", "short")
+	_, err := svc.ChangePassword("admin", "short")
 	if err == nil {
 		t.Error("expected error for short password")
 	}
-	if err.Error() != "new password must be at least 6 characters" {
+	if err.Error() != "new password must be at least 8 characters" {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -303,7 +303,7 @@ func TestAuthServiceWithUbus_ChangePasswordUpdatesRootPasswordAndSeal(t *testing
 	pw := NewRootPassword()
 	svc := NewAuthServiceWithUbus(mub, "jwt-change", pw, authPath)
 
-	if err := svc.ChangePassword("current-ok", "newpassword99"); err != nil {
+	if _, err := svc.ChangePassword("current-ok", "newpassword99"); err != nil {
 		t.Fatalf("ChangePassword: %v", err)
 	}
 	if pw.Get() != "newpassword99" {
@@ -324,7 +324,7 @@ func TestAuthServiceWithUbus_ChangePasswordWrongCurrentNoUbusSession(t *testing.
 	pw.Set("unchanged-holder")
 	svc := NewAuthServiceWithUbus(mub, "jwt-x", pw, authPath)
 
-	err := svc.ChangePassword("wrong-current", "newpassword99")
+	_, err := svc.ChangePassword("wrong-current", "newpassword99")
 	if err == nil {
 		t.Fatal("expected error")
 	}

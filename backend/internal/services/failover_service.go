@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ import (
 
 const (
 	failoverConfigPath       = "/etc/travo/failover.json"
-	failoverGuardPath        = "/etc/travo/failover-in-progress"
+	failoverGuardPath        = crashGuardDir + "/failover-in-progress"
 	failoverBackupPath       = "/etc/travo/failover-mwan3-backup.json"
 	mwan3InitScriptPath      = "/etc/init.d/mwan3"
 	mwan3ConfigName          = "mwan3"
@@ -36,6 +37,55 @@ type failoverConfigFile struct {
 	Health     models.FailoverHealthConfig `json:"health"`
 }
 
+// errApplyRollingBack is returned when a save lands inside an rpcd rollback
+// window that a previous apply left open. The change is NOT live, and rpcd is
+// still armed to restore the pre-apply config underneath it, so the caller must
+// report the failure rather than acknowledging a save that will be reverted.
+var errApplyRollingBack = errors.New("an mwan3 apply from a previous save is still rolling back; retry in a few seconds")
+
+// rollbackOrKeepGuard restores the previous mwan3/network sections after a
+// failed apply, and clears the crash guard — but only when doing so leaves the
+// device in a state we can vouch for.
+//
+// The guard is kept in two cases:
+//
+//  1. The restore itself failed. Then the running config is unknown. Same
+//     contract as vpn_service.go.
+//
+//  2. rpcd still has an armed rollback timer from the apply that just failed.
+//     Confirming the restore's own session does NOT cancel that timer, so
+//     ~30s later rpcd would drop the service's own post-restore snapshot back
+//     in — a config this service already judged bad.
+//
+// Either way the guard stays until the window expires and a later save
+// succeeds. That is the documented contract (ADR 0003): an unresolved rollback
+// is what a human or a redeploy should clear, and deploy-local.sh and
+// install.sh both clear it.
+func (s *FailoverService) rollbackOrKeepGuard() {
+	if err := s.restoreManagedSections(); err != nil {
+		log.Printf("failover: rollback failed, crash guard kept at %s: %v", s.guardPath, err)
+		return
+	}
+	if s.rollbackStillPending() {
+		log.Printf("failover: restored, but rpcd rollback %s is still armed; crash guard kept at %s",
+			s.pendingApplySession, s.guardPath)
+		return
+	}
+	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("failover: remove crash guard %s: %v", s.guardPath, err)
+	}
+}
+
+// rollbackStillPending reports whether an rpcd session is still armed to roll
+// the config back on its own timer.
+func (s *FailoverService) rollbackStillPending() bool {
+	return s.pendingApplySession != "" && time.Now().Before(s.pendingApplyDeadline)
+}
+
+// rollbackGracePeriod is how long after the rpcd rollback timeout a pending
+// apply is still considered in flight.
+const rollbackGracePeriod = time.Duration(uciApplyRollbackTimeout)*time.Second + 2*time.Second
+
 type FailoverService struct {
 	uci        uci.UCI
 	ubus       ubus.Ubus
@@ -43,17 +93,38 @@ type FailoverService struct {
 	cmd        CommandRunner
 	applier    UCIApplyConfirm
 
-	configPath  string
-	guardPath   string
-	backupPath  string
-	initScript  string
-	alertSvc    *AlertService
-	mu          sync.RWMutex
-	events      []models.FailoverEvent
-	lastActive  string
-	stopCh      chan struct{}
-	stopOnce    sync.Once
-	onlineSince map[string]time.Time
+	configPath string
+	guardPath  string
+	backupPath string
+	initScript string
+	alertSvc   *AlertService
+	mu         sync.RWMutex
+	// applyMu serializes the whole live-state change (guard write, backup,
+	// mwan3 apply, verify, guard removal) so a concurrent SetConfig or a
+	// concurrent Start() monitor can never interleave with it. It is separate
+	// from mu (events/lastActive) so the monitor never deadlocks against it.
+	applyMu sync.Mutex
+	// pendingApplySession is the rpcd session of an apply that was started but
+	// not confirmed, so its rollback window is still open. rpcd allows only one
+	// pending rollback at a time and rejects a second rollback-enabled apply
+	// with "permission denied" until the first resolves, so the session has to be
+	// tracked: while it is set, the open window is already restoring the
+	// pre-apply config, and starting another apply would fail (and would fail
+	// confusingly, in whichever feature happened to ask next).
+	//
+	// pendingApplyDeadline is when that window has expired. rpcd rolls the
+	// session back on its own timer and nothing calls us when it does, so the
+	// deadline is what clears the record; without it the flag would survive the
+	// rollback and every later apply would be skipped for the life of the
+	// process. Both fields are guarded by applyMu, which every caller of
+	// stagedApplyMwan3 already holds.
+	pendingApplySession  string
+	pendingApplyDeadline time.Time
+	events               []models.FailoverEvent
+	lastActive           string
+	stopCh               chan struct{}
+	stopOnce             sync.Once
+	onlineSince          map[string]time.Time
 }
 
 func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw *auth.RootPassword) *FailoverService {
@@ -97,6 +168,13 @@ func (s *FailoverService) SetAlertService(alertSvc *AlertService) {
 func (s *FailoverService) Start() {
 	ticker := time.NewTicker(failoverTickerInterval)
 	defer ticker.Stop()
+
+	// A stuck guard disables failover with no other symptom, so say so once
+	// instead of silently skipping forever (band-switching logs the same case).
+	// ADR 0003 §1.2.
+	if _, err := os.Stat(s.guardPath); err == nil {
+		log.Printf("failover: crash guard found at %s — automatic switching is disabled; remove it or redeploy to re-enable", s.guardPath)
+	}
 
 	for {
 		if _, err := os.Stat(s.guardPath); err == nil {
@@ -144,10 +222,16 @@ func (s *FailoverService) GetEvents() []models.FailoverEvent {
 	return out
 }
 
+// SetConfig validates, backs up and applies a new failover configuration. The
+// whole live-state sequence is serialized: two concurrent saves would otherwise
+// interleave their guard file, backup and mwan3 apply steps.
 func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 	if err := s.validateConfig(cfg); err != nil {
 		return err
 	}
+	s.applyMu.Lock()
+	defer s.applyMu.Unlock()
+
 	if err := os.MkdirAll(filepath.Dir(s.configPath), 0750); err != nil {
 		return fmt.Errorf("create failover config dir: %w", err)
 	}
@@ -169,11 +253,11 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 		return fmt.Errorf("write failover guard: %w", err)
 	}
 	if err := s.applyManagedConfig(cfgFile); err != nil {
-		_ = s.restoreManagedSections()
+		s.rollbackOrKeepGuard()
 		return err
 	}
 	if err := s.verifyApply(cfgFile); err != nil {
-		_ = s.restoreManagedSections()
+		s.rollbackOrKeepGuard()
 		return err
 	}
 	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -277,8 +361,22 @@ func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus,
 		}
 	}
 
+	// Iterate the candidates in a stable order. Ranging over the map directly
+	// assigned fallback priorities in Go's randomised map order, so every
+	// candidate that is not in the saved config came back with a different
+	// priority on each call. GetConfig() is polled every 10s and by the UI, and
+	// computeActiveInterface picks the active link in priority order, so the
+	// reported active interface could flip between equally-ranked links for no
+	// reason.
+	names := make([]string, 0, len(known))
+	for name := range known {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
 	candidates := make([]models.FailoverCandidate, 0, len(known))
-	for _, candidate := range known {
+	for _, name := range names {
+		candidate := known[name]
 		for _, saved := range cfgFile.Candidates {
 			if saved.InterfaceName == candidate.InterfaceName {
 				candidate.Enabled = saved.Enabled
@@ -459,8 +557,33 @@ func (s *FailoverService) loadConfigFile() (failoverConfigFile, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return failoverConfigFile{}, fmt.Errorf("parse failover config: %w", err)
 	}
-	cfg.Health = normalizeHealth(cfg.Health)
+	cfg.Health = normalizeStoredHealth(cfg.Health, healthKeyPresenceOf(data))
 	return cfg, nil
+}
+
+// healthKeyPresence records which optional health keys the stored config
+// actually contained, so a missing key can be defaulted while an explicit 0
+// ("do not use interval-based failure detection") is preserved.
+type healthKeyPresence struct {
+	failureInterval  bool
+	recoveryInterval bool
+}
+
+// healthKeyPresenceOf inspects the raw stored config for the optional health keys.
+func healthKeyPresenceOf(data []byte) healthKeyPresence {
+	var envelope struct {
+		Health json.RawMessage `json:"health"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil || len(envelope.Health) == 0 {
+		return healthKeyPresence{}
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(envelope.Health, &keys); err != nil {
+		return healthKeyPresence{}
+	}
+	_, failure := keys["failure_interval"]
+	_, recovery := keys["recovery_interval"]
+	return healthKeyPresence{failureInterval: failure, recoveryInterval: recovery}
 }
 
 func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
@@ -471,15 +594,33 @@ func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
 	return os.WriteFile(s.configPath, data, 0600)
 }
 
+// isManagedSection reports whether an mwan3 section belongs to the failover
+// service. Besides our own travo_* sections this covers every mwan3 interface
+// section, so a candidate that was removed or renamed is backed up and deleted
+// instead of being health-pinged forever.
+func isManagedSection(name string, opts map[string]string) bool {
+	if strings.HasPrefix(name, "travo_") {
+		return true
+	}
+	if name == failoverPolicySection || name == failoverRuleSection {
+		return true
+	}
+	if name == "wan" || name == "wwan" || name == usbTetherUCIName {
+		return true
+	}
+	return opts[".type"] == "interface"
+}
+
 func (s *FailoverService) backupManagedSections(cfg models.FailoverConfig) error {
 	sections, err := s.uci.GetSections(mwan3ConfigName)
 	if err != nil {
 		sections = map[string]map[string]string{}
 	}
 	managed := map[string]map[string]string{}
-	names := managedSectionNames(cfg.Candidates)
 	for name, opts := range sections {
-		if names[name] || strings.HasPrefix(name, "travo_") {
+		// Backup by section shape, not by the new candidate list: a section left
+		// over from a removed candidate must still be restorable.
+		if isManagedSection(name, opts) {
 			managed[name] = opts
 		}
 	}
@@ -490,6 +631,16 @@ func (s *FailoverService) backupManagedSections(cfg models.FailoverConfig) error
 	return os.WriteFile(s.backupPath, data, 0600)
 }
 
+// restoreManagedSections puts the backed-up mwan3/network sections back and
+// re-applies them, so the running mwan3 does not keep the broken partial policy
+// while the user is told the save failed.
+//
+// The re-apply deliberately BYPASSES the pending-rollback-window check that
+// stagedApplyMwan3 normally enforces. This function is the recovery path for a
+// failed apply, so it runs precisely when a session is still pending; letting it
+// short-circuit on errApplyRollingBack would make every failed save leave the
+// crash guard behind and permanently disable failover, which is the opposite of
+// what the restore is for.
 func (s *FailoverService) restoreManagedSections() error {
 	data, err := os.ReadFile(s.backupPath)
 	if err != nil {
@@ -519,7 +670,10 @@ func (s *FailoverService) restoreManagedSections() error {
 			}
 		}
 	}
-	return s.uci.Commit(mwan3ConfigName)
+	if err := s.uci.Commit(mwan3ConfigName); err != nil {
+		return err
+	}
+	return s.restoreApplyMwan3(func() error { return s.verifyManagedSections(sections) })
 }
 
 func (s *FailoverService) deleteManagedSections() error {
@@ -527,8 +681,8 @@ func (s *FailoverService) deleteManagedSections() error {
 	if err != nil {
 		return nil
 	}
-	for name := range sections {
-		if strings.HasPrefix(name, "travo_") || name == "wan" || name == "wwan" || name == usbTetherUCIName {
+	for name, opts := range sections {
+		if isManagedSection(name, opts) {
 			_ = s.uci.DeleteSection(mwan3ConfigName, name)
 		}
 	}
@@ -540,7 +694,7 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 		return err
 	}
 	if !cfg.Enabled || !s.serviceInstalled() {
-		return s.reloadMwan3()
+		return s.stagedApplyMwan3(nil)
 	}
 
 	for _, candidate := range cfg.Candidates {
@@ -590,7 +744,7 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 	if err := s.uci.Commit(mwan3ConfigName); err != nil {
 		return err
 	}
-	return s.reloadMwan3()
+	return s.stagedApplyMwan3(func() error { return s.verifyManagedSections(managedSectionNames(cfg.Candidates)) })
 }
 
 func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandidate, health models.FailoverHealthConfig) error {
@@ -639,45 +793,126 @@ func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandida
 }
 
 func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
-	sections, err := s.uci.GetSections(mwan3ConfigName)
-	if err != nil {
-		return fmt.Errorf("verify mwan3 config: %w", err)
-	}
+	var expect map[string]map[string]string
 	if cfg.Enabled {
-		if _, ok := sections[failoverPolicySection]; !ok {
-			return errors.New("expected failover policy missing after apply")
-		}
-		if _, ok := sections[failoverRuleSection]; !ok {
-			return errors.New("expected failover rule missing after apply")
-		}
+		expect = map[string]map[string]string{failoverPolicySection: nil, failoverRuleSection: nil}
+	}
+	if err := s.verifyManagedSections(expect); err != nil {
+		return err
 	}
 	networkStatus, err := s.networkSvc.GetNetworkStatus()
 	if err != nil {
 		return err
 	}
+	// Every enabled, available candidate must be readable at runtime. Requiring
+	// only one of them would let a misconfigured uplink verify clean while the
+	// others work, and the user would only find out when that link is needed.
+	var expected []string
 	for _, candidate := range cfg.Candidates {
-		if candidate.Enabled && interfacePresent(networkStatus.Interfaces, candidate.InterfaceName) {
-			return nil
+		if candidate.Enabled && candidate.Available {
+			expected = append(expected, candidate.InterfaceName)
 		}
 	}
-	if cfg.Enabled {
-		return errors.New("no enabled failover candidate is readable at runtime")
+	for _, name := range expected {
+		if !interfacePresent(networkStatus.Interfaces, name) {
+			return fmt.Errorf("enabled failover candidate %s is not readable at runtime", name)
+		}
+	}
+	return nil
+}
+
+// verifyManagedSections checks that the mwan3 config the service wrote is
+// readable. When expect is non-nil, the given sections must be present.
+func (s *FailoverService) verifyManagedSections(expect map[string]map[string]string) error {
+	sections, err := s.uci.GetSections(mwan3ConfigName)
+	if err != nil {
+		return fmt.Errorf("verify mwan3 config: %w", err)
+	}
+	for name, opts := range expect {
+		if _, ok := sections[name]; !ok {
+			return fmt.Errorf("mwan3 section %s missing after apply", name)
+		}
+		if opts["family"] != "" {
+			if got, _ := s.uci.Get(mwan3ConfigName, name, "family"); got != opts["family"] {
+				return fmt.Errorf("mwan3 section %s: family = %q, want %q", name, got, opts["family"])
+			}
+		}
 	}
 	return nil
 }
 
 var mwan3UCIConfigs = []string{"network", "mwan3"}
 
-func (s *FailoverService) reloadMwan3() error {
+// stagedApplyMwan3 applies the mwan3 config for a user save, refusing to start
+// while an earlier apply is still rolling back.
+func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
+	if s.rollbackStillPending() {
+		// An earlier apply in this service is unconfirmed, so its rollback window
+		// is open and rpcd is restoring the pre-apply mwan3 config right now. A
+		// second apply would be refused, and reporting success would be worse: the
+		// caller deleted the guard and answered 200 while rpcd's timer was about
+		// to restore the config from *before* the earlier save — silently
+		// discarding both the failed config and this acknowledged one.
+		log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
+		return errApplyRollingBack
+	}
+	// The window expired and rpcd rolled the session back; nothing confirms
+	// that, so the deadline is the signal. Forget it and apply.
+	s.pendingApplySession = ""
+	return s.applyMwan3(verify)
+}
+
+// restoreApplyMwan3 is the recovery-path variant: it runs even while an earlier
+// apply is still rolling back, because restoring is exactly what must be able to
+// happen then. The stale session id is dropped first — rpcd has a single apply
+// slot, so carrying it into the restore's own apply would record the restore's
+// session under the old deadline if the restore then failed.
+func (s *FailoverService) restoreApplyMwan3(verify func() error) error {
+	s.pendingApplySession = ""
+	return s.applyMwan3(verify)
+}
+
+// applyMwan3 runs the rpcd apply+confirm flow with a real rollback window: the
+// apply is started first, the config is verified while the previous config is
+// still restorable, and only then is the change confirmed. An immediate
+// apply+confirm on a policy that re-routes the WAN would close the rollback
+// window before anything was checked.
+func (s *FailoverService) applyMwan3(verify func() error) error {
 	if !s.serviceInstalled() {
 		return nil
 	}
-	if s.applier != nil {
-		if err := s.applier.ApplyAndConfirm(mwan3UCIConfigs); err != nil {
-			return fmt.Errorf("uci apply mwan3: %w", err)
-		}
+	if s.applier == nil {
+		return s.reloadMwan3Script()
+	}
+	sid, err := s.applier.StartApply(mwan3UCIConfigs)
+	if err != nil {
+		return fmt.Errorf("uci apply mwan3: %w", err)
+	}
+	if sid == "" {
+		// Applier had nothing to do (Noop / empty session).
 		return nil
 	}
+	s.pendingApplySession = sid
+	// rpcd rolls back after its own timeout; add a margin so the record is only
+	// dropped once the rollback has certainly happened.
+	s.pendingApplyDeadline = time.Now().Add(rollbackGracePeriod)
+	if verify != nil {
+		if err := verify(); err != nil {
+			// Rollback window is still open: rpcd reverts to the previous config
+			// on its own timer. Keep the session recorded until that deadline so
+			// the next apply waits for the rollback instead of being rejected.
+			return fmt.Errorf("verify mwan3 apply: %w", err)
+		}
+	}
+	if err := s.applier.Confirm(sid); err != nil {
+		return fmt.Errorf("uci confirm mwan3: %w", err)
+	}
+	s.pendingApplySession = ""
+	return nil
+}
+
+// reloadMwan3Script is the fallback for services without an rpcd applier.
+func (s *FailoverService) reloadMwan3Script() error {
 	if _, err := s.cmd.Run(s.initScript, "reload"); err != nil {
 		if _, restartErr := s.cmd.Run(s.initScript, "restart"); restartErr != nil {
 			return fmt.Errorf("reload mwan3: %w", err)
@@ -705,6 +940,9 @@ func defaultFailoverHealth() models.FailoverHealthConfig {
 	}
 }
 
+// normalizeHealth fills in defaults for unset values. An explicit zero
+// FailureInterval / RecoveryInterval is meaningful (mwan3 then does not use
+// interval-based failure/recovery detection), so it is preserved.
 func normalizeHealth(health models.FailoverHealthConfig) models.FailoverHealthConfig {
 	def := defaultFailoverHealth()
 	if len(health.TrackIPs) > 0 {
@@ -722,12 +960,8 @@ func normalizeHealth(health models.FailoverHealthConfig) models.FailoverHealthCo
 	if health.Interval > 0 {
 		def.Interval = health.Interval
 	}
-	if health.FailureInterval > 0 {
-		def.FailureInterval = health.FailureInterval
-	}
-	if health.RecoveryInterval > 0 {
-		def.RecoveryInterval = health.RecoveryInterval
-	}
+	def.FailureInterval = health.FailureInterval
+	def.RecoveryInterval = health.RecoveryInterval
 	if health.Down > 0 {
 		def.Down = health.Down
 	}
@@ -735,6 +969,18 @@ func normalizeHealth(health models.FailoverHealthConfig) models.FailoverHealthCo
 		def.Up = health.Up
 	}
 	return def
+}
+
+// normalizeStoredHealth normalizes a config read from disk. Only keys that were
+// actually present may carry a meaningful zero; a missing key gets the default.
+func normalizeStoredHealth(health models.FailoverHealthConfig, present healthKeyPresence) models.FailoverHealthConfig {
+	if !present.failureInterval {
+		health.FailureInterval = defaultFailoverHealth().FailureInterval
+	}
+	if !present.recoveryInterval {
+		health.RecoveryInterval = defaultFailoverHealth().RecoveryInterval
+	}
+	return normalizeHealth(health)
 }
 
 func (s *FailoverService) readTrackerStates() map[string]models.FailoverTrackingState {
@@ -807,14 +1053,18 @@ func failoverSectionName(value string) string {
 	return value
 }
 
-func managedSectionNames(candidates []models.FailoverCandidate) map[string]bool {
-	names := map[string]bool{
-		failoverPolicySection: true,
-		failoverRuleSection:   true,
+// managedSectionNames lists the mwan3 sections the apply is expected to create
+// for a candidate list. Members are only written for enabled candidates.
+func managedSectionNames(candidates []models.FailoverCandidate) map[string]map[string]string {
+	names := map[string]map[string]string{
+		failoverPolicySection: nil,
+		failoverRuleSection:   nil,
 	}
 	for _, candidate := range candidates {
-		names[candidate.InterfaceName] = true
-		names[fmt.Sprintf("travo_%s_p%d", failoverSectionName(candidate.InterfaceName), candidate.Priority)] = true
+		names[candidate.InterfaceName] = nil
+		if candidate.Enabled {
+			names[fmt.Sprintf("travo_%s_p%d", failoverSectionName(candidate.InterfaceName), candidate.Priority)] = nil
+		}
 	}
 	return names
 }

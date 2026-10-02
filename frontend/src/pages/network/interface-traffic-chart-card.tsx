@@ -25,10 +25,10 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
         <span className="text-sm font-medium text-gray-900 dark:text-white">
           {interfaceTrafficLabel(name)}
         </span>
-        <span className="text-xs font-mono text-gray-400">{name}</span>
+        <span className="text-xs font-mono text-gray-500 dark:text-gray-400">{name}</span>
       </div>
       {chartData.length < 2 ? (
-        <div className="flex h-[100px] items-center justify-center text-xs text-gray-400">
+        <div className="flex h-[100px] items-center justify-center text-xs text-gray-500 dark:text-gray-400">
           Collecting data…
         </div>
       ) : (
@@ -36,34 +36,34 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
           <AreaChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: -25 }}>
             <defs>
               <linearGradient id={rxGradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-rx)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--chart-rx)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id={txGradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--chart-tx)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--chart-tx)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
               dataKey="time"
-              tick={{ fontSize: 9 }}
-              stroke="#9ca3af"
+              tick={{ fontSize: 9, fill: 'var(--chart-axis)' }}
+              stroke="var(--chart-grid)"
               tickLine={false}
               axisLine={false}
             />
             <YAxis
-              tick={{ fontSize: 9 }}
-              stroke="#9ca3af"
+              tick={{ fontSize: 9, fill: 'var(--chart-axis)' }}
+              stroke="var(--chart-grid)"
               tickLine={false}
               axisLine={false}
               tickFormatter={(v: number) => formatRate(v)}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: 'rgba(0,0,0,0.8)',
-                border: 'none',
+                backgroundColor: 'var(--chart-tooltip-bg)',
+                border: '1px solid var(--chart-tooltip-border)',
                 borderRadius: '6px',
-                color: '#fff',
+                color: 'var(--chart-tooltip-text)',
                 fontSize: '11px',
               }}
               formatter={(value) => formatRate(Number(value ?? 0))}
@@ -71,7 +71,7 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
             <Area
               type="monotone"
               dataKey="rx"
-              stroke="#3b82f6"
+              stroke="var(--chart-rx)"
               fill={`url(#${rxGradId})`}
               strokeWidth={1.5}
               name="Download"
@@ -79,7 +79,7 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
             <Area
               type="monotone"
               dataKey="tx"
-              stroke="#f59e0b"
+              stroke="var(--chart-tx)"
               fill={`url(#${txGradId})`}
               strokeWidth={1.5}
               name="Upload"

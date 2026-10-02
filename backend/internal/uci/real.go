@@ -10,8 +10,22 @@ import (
 
 var validIdentifier = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 var validSectionType = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`) // OpenWrt uses wifi-iface, wifi-device, etc.
-// validSectionNameForList allows named sections (zone_wan) and anonymous (@zone[0]) for firewall etc.
-var validSectionNameForList = regexp.MustCompile(`^([a-zA-Z0-9_]+|@[a-zA-Z0-9_]+\[\d+\])$`)
+// validSectionName allows a named section (zone_wan) or an anonymous one
+// (@zone[0]). Anonymous sections are not optional here: on a factory-fresh
+// OpenWrt /etc/config/system declares the system section anonymously, so
+// `uci show system` hands back "@system[0]" and every read-then-write path —
+// SetTimezone, SetHostname — carries that string straight into the next call.
+// The uci CLI accepts it in the dotted form (`uci set system.@system[0].zonename=UTC`
+// works), but rejecting it here made both endpoints fail with
+// `uci: invalid section "@system[0]"` on every stock device.
+//
+// Safe to widen: the pattern admits no dots, quotes, spaces or shell
+// metacharacters, so the value is still a single literal argv entry.
+var validSectionName = regexp.MustCompile(`^([a-zA-Z0-9_]+|@[a-zA-Z0-9_]+\[\d+\])$`)
+
+// validSectionNameForList is the same rule, kept as its own name at the
+// original call sites that read as "this is the list form".
+var validSectionNameForList = validSectionName
 
 // validListValue allows identifiers + hyphens + dots + slashes + colons for IPs/CIDRs/interface names.
 var validListValue = regexp.MustCompile(`^[a-zA-Z0-9_.:/+-]+$`)
@@ -24,10 +38,20 @@ func NewRealUCI() *RealUCI {
 	return &RealUCI{}
 }
 
-// validateIdentifier ensures a UCI config/section/option name contains only safe characters.
+// validateIdentifier ensures a UCI config/option name contains only safe characters.
 func validateIdentifier(name, value string) error {
 	if !validIdentifier.MatchString(value) {
 		return fmt.Errorf("uci: invalid %s %q", name, value)
+	}
+	return nil
+}
+
+// validateSection ensures a UCI section reference is a named section
+// (zone_wan) or an anonymous one (@zone[0]) — see validSectionName for why the
+// anonymous form has to be accepted.
+func validateSection(section string) error {
+	if !validSectionName.MatchString(section) {
+		return fmt.Errorf("uci: invalid section %q", section)
 	}
 	return nil
 }
@@ -57,8 +81,11 @@ func parseShowOutput(output string) map[string]string {
 		option := parts[2]
 
 		// Strip surrounding single quotes
-		val = strings.TrimPrefix(val, "'")
-		val = strings.TrimSuffix(val, "'")
+		// A list option is printed on one line as option='a' 'b' 'c', a scalar
+		// as option='a' (or bare). Normalising through SplitUciValue turns a
+		// list into the comma-joined form callers already split on, instead of
+		// leaving the embedded quotes (a' 'b) in the value.
+		val = strings.Join(SplitUciValue(val), ",")
 
 		result[option] = val
 	}
@@ -69,7 +96,7 @@ func (r *RealUCI) Get(config, section, option string) (string, error) {
 	if err := validateIdentifier("config", config); err != nil {
 		return "", err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return "", err
 	}
 	if err := validateIdentifier("option", option); err != nil {
@@ -88,7 +115,7 @@ func (r *RealUCI) Set(config, section, option, value string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return err
 	}
 	if err := validateIdentifier("option", option); err != nil {
@@ -107,7 +134,7 @@ func (r *RealUCI) GetAll(config, section string) (map[string]string, error) {
 	if err := validateIdentifier("config", config); err != nil {
 		return nil, err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return nil, err
 	}
 
@@ -136,6 +163,9 @@ func (r *RealUCI) AddSection(config, section, stype string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
+	// Named only: this CREATES a section, and `uci set config.@type[0]=stype`
+	// is not a way to create one. Every caller passes a generated name
+	// (dns_pi_smoke, host_pi_smoke, ...).
 	if err := validateIdentifier("section", section); err != nil {
 		return err
 	}
@@ -179,7 +209,7 @@ func (r *RealUCI) DeleteOption(config, section, option string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return err
 	}
 	if err := validateIdentifier("option", option); err != nil {
@@ -194,7 +224,7 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 	if err := validateIdentifier("config", config); err != nil {
 		return err
 	}
-	if err := validateIdentifier("section", section); err != nil {
+	if err := validateSection(section); err != nil {
 		return err
 	}
 
@@ -206,7 +236,60 @@ func (r *RealUCI) DeleteSection(config, section string) error {
 	return nil
 }
 
-// parseShowConfigOutput parses `uci show <config>` output into a map of section → options.
+// SplitUciValue splits the value of a `uci show` line into its elements.
+//
+// uci prints a list option on a single line as option='a' 'b' and a scalar as
+// option='a'. An apostrophe inside a value is escaped the shell way, as
+// '\”, so the quotes around it are part of the value rather than element
+// boundaries — otherwise 'Bob'\”s WiFi' would parse as two elements.
+func SplitUciValue(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	if !strings.HasPrefix(value, "'") {
+		return []string{value}
+	}
+
+	var (
+		out     []string
+		cur     strings.Builder
+		inQuote bool
+	)
+	for i := 0; i < len(value); i++ {
+		if value[i] != '\'' {
+			if inQuote {
+				cur.WriteByte(value[i])
+			}
+			continue
+		}
+		// A closing quote followed by the escape sequence means the apostrophe
+		// belongs to the value: append it and stay inside the same element.
+		if inQuote && i+3 < len(value) && value[i+1] == '\\' && value[i+2] == '\'' && value[i+3] == '\'' {
+			cur.WriteByte('\'')
+			i += 3 // the escape's final quote re-opens the quoted run
+			continue
+		}
+		if inQuote {
+			out = append(out, cur.String())
+			cur.Reset()
+			inQuote = false
+		} else {
+			inQuote = true
+		}
+	}
+	if inQuote && cur.Len() > 0 {
+		// Unterminated quote: keep the value rather than dropping it.
+		out = append(out, cur.String())
+	}
+	if len(out) == 0 {
+		return []string{strings.Trim(value, "'")}
+	}
+	return out
+}
+
+// parseShowConfigOutput parses `uci show <config>` output into a map of
+// section → options.
 func parseShowConfigOutput(output string) map[string]map[string]string {
 	result := make(map[string]map[string]string)
 	for line := range strings.SplitSeq(output, "\n") {
@@ -219,10 +302,11 @@ func parseShowConfigOutput(output string) map[string]map[string]string {
 			continue
 		}
 		key := before
-		val := after
-
-		val = strings.TrimPrefix(val, "'")
-		val = strings.TrimSuffix(val, "'")
+		// A list option is printed on one line as option='a' 'b' 'c' and a scalar
+		// as option='a'. Normalising through SplitUciValue turns the list into
+		// the comma-joined form callers already split on, instead of leaving the
+		// embedded quotes (a' 'b) in the value.
+		val := strings.Join(SplitUciValue(after), ",")
 
 		parts := strings.SplitN(key, ".", 3)
 		if len(parts) == 2 {
@@ -245,14 +329,51 @@ func parseShowConfigOutput(output string) map[string]map[string]string {
 	return result
 }
 
+// uciShowConfig runs `uci show <config>`. It is a package-level seam so tests
+// can exercise GetSections error handling without the uci binary.
+var uciShowConfig = func(config string) ([]byte, error) {
+	return execx.CombinedOutput(execx.Quick, "uci", "show", config)
+}
+
+// isMissingUCIConfig reports whether a failed `uci show` means "this config
+// package is not installed" (uci exits non-zero with "Entry not found").
+// That is the one failure that legitimately means "no sections"; every other
+// failure (timeout, unreadable file, lock contention) must surface, otherwise
+// callers cannot tell a broken system from an empty config.
+func isMissingUCIConfig(out string) bool {
+	lower := strings.ToLower(out)
+	return strings.Contains(lower, "entry not found") ||
+		strings.Contains(lower, "no such file") ||
+		strings.Contains(lower, "not found")
+}
+
 func (r *RealUCI) GetSections(config string) (map[string]map[string]string, error) {
 	if err := validateIdentifier("config", config); err != nil {
 		return nil, err
 	}
 
-	out, err := execx.CombinedOutput(execx.Quick, "uci", "show", config)
+	out, err := uciShowConfig(config)
 	if err != nil {
-		return map[string]map[string]string{}, nil
+		if isMissingUCIConfig(string(out)) {
+			return map[string]map[string]string{}, nil
+		}
+		return nil, fmt.Errorf("uci show %s: %s", config, strings.TrimSpace(string(out)))
 	}
 	return parseShowConfigOutput(string(out)), nil
+}
+
+// Revert discards staged (uncommitted) changes for a config. The uci CLI keeps
+// its delta in /tmp/.uci/<config>/changes, which is process-global: a staged
+// write that is abandoned would be committed by a later, unrelated
+// `uci commit <config>`. Callers use this to roll back a failed write sequence.
+func (r *RealUCI) Revert(config string) error {
+	if err := validateIdentifier("config", config); err != nil {
+		return err
+	}
+
+	out, err := execx.CombinedOutput(execx.Quick, "uci", "revert", config)
+	if err != nil {
+		return fmt.Errorf("uci revert %s: %s", config, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

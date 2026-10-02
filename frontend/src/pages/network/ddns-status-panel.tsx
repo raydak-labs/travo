@@ -24,7 +24,9 @@ export function DdnsStatusPanel({ status }: DdnsStatusPanelProps) {
           <span className="ml-2 text-gray-500 dark:text-gray-400">IP: {status.public_ip}</span>
         ) : null}
         {status.last_update ? (
-          <span className="ml-2 text-xs text-gray-400">Updated: {status.last_update}</span>
+          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            Updated: {status.last_update}
+          </span>
         ) : null}
       </div>
     </div>

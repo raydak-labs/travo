@@ -4,11 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml calls this workflow so a tagged release can never ship from a
+  # red main. See .github/workflows/release.yml job `verify`.
+  workflow_call:
 
 permissions: {}
 
+# Prefixed so the group differs from any caller: release.yml calls this workflow
+# as a reusable workflow, and a called workflow resolves github.workflow to its
+# CALLER's name — sharing the group would make the verify job cancel the release
+# run that started it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,12 +34,40 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: Tidy modules
-        run: go mod tidy
+      - name: Verify modules are tidy
+        run: go mod tidy -diff
         working-directory: backend
 
       - name: Test
-        run: go test ./... -count=1
+        # -timeout is per package. internal/api builds an AuthService per test
+        # and each one runs bcrypt at DefaultCost, so the suite is CPU-bound on
+        # a 2-core runner and the 10m default leaves little headroom.
+        run: go test ./... -count=1 -timeout 20m
+        working-directory: backend
+
+  test-race:
+    name: Test Backend (race)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # Race detection is its own job: -race costs several times the wall clock
+      # of a plain run, so it must not gate or be blocked by test-backend.
+      - name: Test with race detector
+        # -timeout is per package. internal/api under -race takes ~2 min on a
+        # developer machine and several times that on a 2-core CI runner, so the
+        # 10m default is not a safe budget there.
+        run: go test ./... -count=1 -race -timeout 20m
         working-directory: backend
 
   test-frontend:
@@ -45,13 +80,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # Toolchain versions come from .mise.toml (single source of truth).
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 11
+          version: ${{ steps.toolchain.outputs.pnpm }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: ${{ steps.toolchain.outputs.node }}
           cache: pnpm
 
       - name: Install dependencies
@@ -80,13 +120,17 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 11
+          version: ${{ steps.toolchain.outputs.pnpm }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: ${{ steps.toolchain.outputs.node }}
           cache: pnpm
 
       - name: Install dependencies
@@ -94,16 +138,105 @@ jobs:
 
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: v2.13.2
+          version: v${{ steps.toolchain.outputs.golangci_lint }}
           working-directory: backend
 
       - name: ESLint
         run: pnpm lint
 
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
+      - name: Lint device-mutating shell scripts
+        run: |
+          set -euo pipefail
+          version="${SHELLCHECK_VERSION:?SHELLCHECK_VERSION not set}"
+          base="https://github.com/koalaman/shellcheck/releases/download/v${version}"
+          # Extract the binary into /usr/local/bin, not /usr/local: the tarball
+          # unpacks to shellcheck-v<version>/{shellcheck,LICENSE.txt,README.txt}
+          # and stripping one component would otherwise put the binary at
+          # /usr/local/shellcheck, which is not on the runner PATH. Selecting
+          # the member also keeps LICENSE.txt and README.txt out of /usr/local.
+          curl -fsSL "${base}/shellcheck-v${version}.linux.x86_64.tar.xz" \
+            | sudo tar -xJ -C /usr/local/bin --strip-components=1 "shellcheck-v${version}/shellcheck"
+          shellcheck --version
+          make shellcheck
+        env:
+          SHELLCHECK_VERSION: ${{ steps.toolchain.outputs.shellcheck }}
+
+  format-check:
+    name: Format Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Go is needed here too: without it this job falls back to whatever the
+      # runner image happens to ship, and the gate below is not the same one
+      # `make format-check` runs locally.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
+      # goimports is NOT part of a Go toolchain and is not on the runner image,
+      # so it must be installed explicitly or the goimports half of
+      # `make format-check` silently checks nothing. The version comes from
+      # .mise.toml, like every other tool version.
+      #
+      # This step must come AFTER "Read pinned toolchain versions", which is what
+      # populates steps.toolchain.outputs.goimports. Installed earlier, the
+      # version resolves to the empty string and `go install ...@v` fails.
+      #
+      # The version is passed through env, not expanded into the run block: zizmor
+      # flags template expansion inside `run:` as a code-injection vector.
+      - name: Install goimports
+        env:
+          GOBIN: ${{ runner.temp }}/gobin
+          GOIMPORTS_VERSION: ${{ steps.toolchain.outputs.goimports }}
+        run: |
+          go install "golang.org/x/tools/cmd/goimports@v$GOIMPORTS_VERSION"
+          echo "$GOBIN" >> "$GITHUB_PATH"
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: ${{ steps.toolchain.outputs.pnpm }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ steps.toolchain.outputs.node }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # One command for both halves of the gate (gofmt AND goimports) so CI
+      # cannot pass on a state `make format-check` rejects locally.
+      - name: Prettier + gofmt / goimports
+        run: make format-check
+
   build-check:
     name: Build Check
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    needs: [test-backend, test-frontend, lint, format-check]
     permissions:
       contents: read
     steps:
@@ -116,13 +249,17 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 11
+          version: ${{ steps.toolchain.outputs.pnpm }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: ${{ steps.toolchain.outputs.node }}
           cache: pnpm
 
       - name: Install dependencies
@@ -135,3 +272,80 @@ jobs:
       - name: Build backend
         run: CGO_ENABLED=0 go build ./cmd/server
         working-directory: backend
+
+  openwrt-package:
+    name: OpenWrt Cross-Compile + Tarball Layout
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Cross-compile backend for linux/arm64
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: arm64
+          VERSION: 0.0.0
+        run: |
+          go build \
+            -ldflags "-s -w -X main.Version=${VERSION}" \
+            -o ../dist/travo \
+            ./cmd/server
+        working-directory: backend
+
+      - name: Verify the arm64 binary really is arm64
+        run: |
+          file dist/travo | grep -q 'ARM aarch64' \
+            || { echo "::error::dist/travo is not an arm64 binary: $(file dist/travo)"; exit 1; }
+
+      # Minimal frontend/dist so package-tarball.sh can stage a tree; CI does not
+      # need a real Vite build to validate the tarball layout.
+      - name: Stage a minimal frontend/dist
+        run: |
+          mkdir -p frontend/dist
+          echo '<!doctype html><title>ci</title>' > frontend/dist/index.html
+
+      - name: Package install tarball
+        env:
+          VERSION: 0.0.0
+          ARCH: aarch64_cortex-a53
+        run: bash scripts/package-tarball.sh
+
+      - name: Verify tarball layout
+        run: |
+          set -euo pipefail
+          tarball="dist/travo_0.0.0_aarch64_cortex-a53.tar.gz"
+          test -f "$tarball" || { echo "::error::missing $tarball"; ls -l dist; exit 1; }
+          listing="$(tar -tzf "$tarball")"
+          for p in \
+            ./usr/bin/travo \
+            ./etc/init.d/travo \
+            ./etc/config/travo \
+            ./etc/uci-defaults/99-travel-gui-ports \
+            ./etc/sysupgrade.d/10-travo-backup.sh \
+            ./etc/sysupgrade.d/20-travo-restore.sh \
+            ./lib/upgrade/keep.d/travo \
+            ./etc/travo/adguardhome.yaml \
+            ./www/travo/index.html ; do
+            echo "$listing" | grep -qx "$p" \
+              || { echo "::error::tarball is missing $p"; echo "$listing"; exit 1; }
+          done
+          # install.sh resolves travo_<VERSION>_<arch>.tar.gz, where VERSION is a
+          # strict semver and <arch> is the OpenWrt-style label — which contains
+          # a hyphen, e.g. aarch64_cortex-a53. Both characters must be allowed or
+          # the check rejects the very names it is meant to protect.
+          echo "$tarball" | grep -Eq '^dist/travo_[0-9]+\.[0-9]+\.[0-9]+(_[A-Za-z0-9_-]+)?\.tar\.gz$' \
+            || { echo "::error::tarball name is not install.sh-resolvable: $tarball"; exit 1; }
+          # tarball is extracted as / on the device: no path may escape it.
+          if echo "$listing" | grep -qE '^\.\./'; then
+            echo "::error::tarball contains paths escaping /"; exit 1
+          fi
+          echo "openwrt-package: layout OK"

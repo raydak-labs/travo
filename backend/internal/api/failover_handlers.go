@@ -22,11 +22,11 @@ func GetFailoverConfigHandler(svc *services.FailoverService) fiber.Handler {
 func SetFailoverConfigHandler(svc *services.FailoverService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.FailoverConfig
-		if err := c.Bind().Body(&cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &cfg); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetConfig(cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		return RespondOK(c)
 	}

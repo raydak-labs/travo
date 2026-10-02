@@ -32,10 +32,10 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
             inputClassName="h-7 w-36 text-sm"
             placeholder="Device alias"
             displayNameClassName="font-medium text-gray-900 dark:text-white"
-            editButtonClassName="opacity-0 group-hover/alias:opacity-100"
+            editButtonClassName="opacity-0 focus-visible:opacity-100 group-hover/alias:opacity-100 group-focus-within:opacity-100"
           />
         </div>
-        <div className="mt-0.5 text-xs text-gray-400">{client.mac_address}</div>
+        <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{client.mac_address}</div>
       </td>
       <td className="py-3 pr-4 text-sm text-gray-700 dark:text-gray-300">
         <div className="flex items-center gap-1.5">

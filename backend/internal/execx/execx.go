@@ -6,9 +6,8 @@
 package execx
 
 import (
-	"bufio"
+	"bytes"
 	"context"
-	"io"
 	"os/exec"
 	"sync"
 	"time"
@@ -58,53 +57,76 @@ func Run(timeout time.Duration, name string, args ...string) error {
 
 // Stream runs the command and sends each merged stdout/stderr line to logFn,
 // killing the command after timeout.
+//
+// The streams are attached as io.Writers rather than read back through
+// StdoutPipe/StderrPipe. With pipes, cmd.Wait returns as soon as the process
+// exits and closes the read end, so whatever a reader had not yet drained is
+// discarded — Go documents that calling Wait before reads complete is incorrect.
+// That truncation is timing-dependent: it shows up as lost tail output on a busy
+// machine, which for a log-tail helper means silently returning fewer lines than
+// the command produced. With a Writer, os/exec owns the copying and Wait does
+// not return until it has finished, so the callback sees every line.
 func Stream(timeout time.Duration, logFn func(string), name string, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := command(ctx, name, args...)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
+
+	// One writer for both streams: logFn is shared, so a single mutex keeps a
+	// line from one stream from interleaving mid-line with the other.
+	shared := &lineWriter{logFn: logFn}
+	cmd.Stdout = shared
+	cmd.Stderr = shared
 
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-
-	// Read stdout/stderr separately. StdoutPipe()+Stderr=Stdout races on Linux
-	// under WaitDelay (CI saw empty line captures). Serialize logFn for callers.
-	var mu sync.Mutex
-	safeLog := func(line string) {
-		mu.Lock()
-		defer mu.Unlock()
-		logFn(line)
-	}
-	scan := func(r io.Reader) {
-		scanner := bufio.NewScanner(r)
-		for scanner.Scan() {
-			safeLog(scanner.Text())
-		}
-	}
-
-	// Read in goroutines: if an orphaned grandchild keeps a pipe open after the
-	// timeout kill, Wait's WaitDelay force-close unblocks the scanners — so Wait
-	// must not sit behind the read loops.
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() { defer wg.Done(); scan(stdout) }()
-		go func() { defer wg.Done(); scan(stderr) }()
-		wg.Wait()
-	}()
-
-	err = cmd.Wait()
-	<-done
+	// Wait also waits for os/exec's copying into cmd.Stdout/cmd.Stderr, so the
+	// buffers are complete once it returns. Emit any trailing partial line.
+	err := cmd.Wait()
+	shared.flush()
 	return err
+}
+
+// maxStreamLineBytes bounds a single unterminated line so a command that emits
+// bytes with no newline (binary output, a progress bar) cannot grow the buffer
+// without limit.
+const maxStreamLineBytes = 64 * 1024
+
+// lineWriter splits a byte stream into lines and hands each to logFn.
+type lineWriter struct {
+	mu    sync.Mutex
+	logFn func(string)
+	buf   []byte
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.buf = append(w.buf, p...)
+	for {
+		i := bytes.IndexByte(w.buf, '\n')
+		if i < 0 {
+			break
+		}
+		w.logFn(string(w.buf[:i]))
+		w.buf = w.buf[i+1:]
+	}
+	// A line with no newline yet: emit it once it is big enough to be a log line
+	// rather than a stream that never terminates.
+	if len(w.buf) > maxStreamLineBytes {
+		w.logFn(string(w.buf[:maxStreamLineBytes]))
+		w.buf = w.buf[maxStreamLineBytes:]
+	}
+	return len(p), nil
+}
+
+// flush emits a trailing line that ended without a newline.
+func (w *lineWriter) flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.buf) > 0 {
+		w.logFn(string(w.buf))
+		w.buf = nil
+	}
 }

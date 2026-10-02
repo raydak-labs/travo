@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -48,8 +49,8 @@ func DetectWanTypeHandler(svc *services.NetworkService) fiber.Handler {
 func SetWanConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WanConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
 		// Validate WAN type
@@ -98,11 +99,11 @@ func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
 		}
 		var req models.SetInterfaceStateRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetInterfaceState(name, req.Up); err != nil {
 			if err.Error() == fmt.Sprintf("unknown interface: %s", name) {
-				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+				return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 			}
 			return RespondWithServerError(c, err)
 		}
@@ -125,8 +126,8 @@ func GetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 func SetDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DNSConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if config.UseCustomDNS {
 			if len(config.Servers) == 0 {
@@ -171,8 +172,8 @@ func GetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 func SetDHCPConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DHCPConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
 		// Validate DHCP config
@@ -209,7 +210,7 @@ func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetAliasRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.MAC == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
@@ -240,7 +241,7 @@ func AddDNSEntryHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var entry models.DNSEntry
 		if err := c.Bind().Body(&entry); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if entry.Name == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "name is required")
@@ -291,7 +292,7 @@ func AddDHCPReservationHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var reservation models.DHCPReservation
 		if err := c.Bind().Body(&reservation); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if reservation.Name == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "name is required")
@@ -337,7 +338,7 @@ func KickClientHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.MAC == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
@@ -357,7 +358,7 @@ func BlockClientHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.MAC == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
@@ -377,7 +378,7 @@ func UnblockClientHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.MAC == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "MAC address is required")
@@ -410,7 +411,15 @@ func GetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 		if err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(config)
+		// Report availability alongside the config. Without ddns-scripts there is
+		// nothing that can act on this config, and ddns is not in the service
+		// catalog, so the UI cannot offer an install — it can only explain. It
+		// needs this flag to do that instead of offering a form whose only
+		// possible outcome is an error.
+		return c.JSON(fiber.Map{
+			"config":    config,
+			"available": svc.DDNSAvailable(),
+		})
 	}
 }
 
@@ -418,8 +427,10 @@ func GetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DDNSConfig
-		if err := c.Bind().Body(&config); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody)
+		// Strict: the handler persists the whole DDNS config, so an
+		// unrecognised field must not silently zero it.
+		if err := BindStrictBodyConfig(c, &config); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if config.Enabled {
 			if config.Domain == "" {
@@ -440,6 +451,12 @@ func SetDDNSConfigHandler(svc *services.NetworkService) fiber.Handler {
 			}
 		}
 		if err := svc.SetDDNSConfig(config); err != nil {
+			// A missing ddns-scripts package is a capability gap, not a bug in
+			// the request and not a server fault. 503 plus the reason lets the UI
+			// say "install ddns-scripts" instead of showing a bare 500.
+			if errors.Is(err, services.ErrDDNSNotAvailable) {
+				return RespondWithError(c, fiber.StatusServiceUnavailable, err.Error())
+			}
 			return RespondWithServerError(c, err)
 		}
 		return RespondOK(c)
@@ -491,7 +508,7 @@ func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var rule models.PortForwardRule
 		if err := c.Bind().Body(&rule); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.AddPortForward(rule); err != nil {
 			return RespondWithServerError(c, err)
@@ -516,7 +533,7 @@ func RunDiagnosticsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.DiagnosticsRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		result := svc.RunDiagnostics(req)
 		return c.JSON(result)
@@ -538,8 +555,10 @@ func GetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
 func SetDoHConfigHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.DoHConfig
-		if err := c.Bind().Body(&cfg); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+		// Strict: SetDoHConfig persists the whole config, so an unrecognised
+		// field must not silently zero it.
+		if err := BindStrictBodyConfig(c, &cfg); err != nil {
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetDoHConfig(cfg); err != nil {
 			return RespondWithServerError(c, err)
@@ -566,7 +585,7 @@ func SetIPv6EnabledHandler(svc *services.NetworkService) fiber.Handler {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetIPv6Enabled(req.Enabled); err != nil {
 			return RespondWithServerError(c, err)
@@ -580,7 +599,7 @@ func SendWoLHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.WoLRequest
 		if err := c.Bind().Body(&req); err != nil {
-			return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SendWoL(req.MAC, req.Interface); err != nil {
 			return RespondWithServerError(c, err)

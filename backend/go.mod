@@ -3,6 +3,7 @@ module github.com/openwrt-travel-gui/backend
 go 1.27.0
 
 require (
+	github.com/fasthttp/websocket v1.5.12
 	github.com/gofiber/contrib/v3/websocket v1.2.6
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -12,13 +13,10 @@ require (
 )
 
 require (
-	github.com/andybalholm/brotli v1.2.3 // indirect
-	github.com/fasthttp/websocket v1.5.12 // indirect
 	github.com/gofiber/schema v1.8.6 // indirect
 	github.com/gofiber/utils/v2 v2.5.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/molecule-man/go-brrr v1.0.1 // indirect

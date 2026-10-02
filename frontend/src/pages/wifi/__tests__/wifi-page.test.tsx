@@ -54,7 +54,9 @@ describe('WifiPage', () => {
       expect(screen.getByText('Current Connection')).toBeInTheDocument();
     });
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab', { name: /Wireless|Connect|Extras|Advanced/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: /Wireless|Connect|Extras|Advanced/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows Connect panel content on /wifi', async () => {

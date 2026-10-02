@@ -54,7 +54,11 @@ function WanInterplay({ interfaces }: { interfaces: readonly NetworkInterface[] 
                   {src.active ? src.iface.ip_address : 'down'}
                 </span>
               )}
-              {!src.iface && <span className="ml-2 text-xs text-gray-400">not configured</span>}
+              {!src.iface && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  not configured
+                </span>
+              )}
             </div>
             <Badge variant={src.active ? 'success' : 'secondary'}>
               {src.active ? 'Active' : 'Inactive'}

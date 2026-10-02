@@ -3,13 +3,15 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
-	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -19,19 +21,10 @@ import (
 // so this state leaves the actually-connected STA without a DHCP lease.
 var ErrMultipleActiveSTA = errors.New("wireless config invalid: multiple enabled STA interfaces on network=wwan")
 
-// WifiReloader applies wireless configuration changes (e.g. "wifi up").
+// WifiReloader applies wireless configuration changes. Production wiring always
+// has the rpcd applier configured; the reloader is the test seam only.
 type WifiReloader interface {
 	Reload() error
-}
-
-// ShellWifiReloader runs "wifi up" via exec to apply UCI wireless changes without
-// a full teardown. "wifi reload" tears everything down first and can trigger
-// ath11k/IPQ6018 driver crashes; "wifi up" is the recommended OpenWRT approach.
-type ShellWifiReloader struct{}
-
-// Reload executes "wifi up" to apply UCI wireless changes.
-func (r *ShellWifiReloader) Reload() error {
-	return execx.Run(execx.Slow, "wifi", "up")
 }
 
 // NoopWifiReloader does nothing (for tests).
@@ -40,11 +33,146 @@ type NoopWifiReloader struct{}
 // Reload is a no-op.
 func (r *NoopWifiReloader) Reload() error { return nil }
 
+// uciReverter is implemented by UCI backends that can drop staged (uncommitted)
+// changes for a config. RealUCI implements it with `uci revert <config>`; the
+// in-memory mock does not, which simply skips the rollback.
+type uciReverter interface {
+	Revert(config string) error
+}
+
+// uciConfigLocks maps a config name to its lock, so a writer of `firewall` and
+// a writer of `dhcp` never block each other.
+var uciConfigLocks sync.Map // config name -> *sync.Mutex
+
+// lockUCIConfigs locks each named config and returns a single unlock func.
+//
+// The names are sorted before locking, which makes the acquisition order GLOBAL
+// and identical on every path. That is what makes nesting safe: with a fixed
+// order, no two goroutines can hold overlapping sets in opposite orders, so the
+// wait-for graph is acyclic and deadlock is impossible. Without the sort, two
+// flows that each need {network, firewall} but list them in opposite order
+// would deadlock the moment they met — and on a router that means every other
+// endpoint that touches a config also stops responding, because they all queue
+// on the same per-config locks.
+//
+// The locks are still NOT reentrant: a flow that holds a config must not ask for
+// it again. Helpers called from inside a transaction therefore have a lock-free
+// core (…Locked) that the transaction calls, while the thin exported wrapper
+// takes the lock for callers that enter cold. See setupWireGuardFirewallLocked.
+func lockUCIConfigs(configs ...string) func() {
+	// Sorted + de-duplicated: acquiring the same mutex twice on one path would
+	// self-deadlock, and mutateUCI callers legitimately pass a set.
+	names := append([]string(nil), configs...)
+	slices.Sort(names)
+	locks := make([]*sync.Mutex, 0, len(names))
+	prev := ""
+	for i, c := range names {
+		if i > 0 && c == prev {
+			continue
+		}
+		prev = c
+		v, _ := uciConfigLocks.LoadOrStore(c, &sync.Mutex{})
+		m := v.(*sync.Mutex)
+		m.Lock()
+		locks = append(locks, m)
+	}
+	return func() {
+		for i := len(locks) - 1; i >= 0; i-- {
+			locks[i].Unlock()
+		}
+	}
+}
+
+// revertUCIConfig drops the staged UCI delta for each config that has one.
+//
+// The uci CLI keeps uncommitted changes in the process-global
+// /tmp/.uci/<config>/changes file, so a write sequence that fails half-way
+// must be reverted: otherwise a later, unrelated `uci commit <config>` (a WAN
+// save, a DHCP change, …) silently persists the abandoned delta.
+//
+// The caller must already hold the config lock for every name it passes, since
+// the revert discards whatever *anyone* has staged for that config.
+func revertUCIConfig(u uci.UCI, configs ...string) {
+	reverter, ok := u.(uciReverter)
+	if !ok {
+		return
+	}
+	for _, config := range configs {
+		if err := reverter.Revert(config); err != nil {
+			log.Printf("WARNING: uci revert %s: %v", config, err)
+		}
+	}
+}
+
+// mutateWireless runs a wireless write sequence with the wireless write lock
+// and the shared per-config locks held, reverting every named config if fn
+// fails.
+//
+// Passing the config list ONCE is the point. The uci CLI keeps uncommitted
+// changes in the process-global /tmp/.uci/<config>/changes file, so a config
+// left staged by a failed write is committed by the next unrelated writer of
+// that config — putting a change the API reported as failed into the running
+// config. Deriving the lock set and the revert set from the same list is what
+// keeps them in agreement.
+//
+// Lock order is always: uciWriteMu, then the config locks. Neither is
+// reentrant, so mutateWireless must not be nested and no fn passed to it may
+// take either lock itself. Callers that only read UCI should not use this.
+func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApplyResult, error)) (*WirelessApplyResult, error) {
+	defer w.lockUCIWrite()()
+
+	var res *WirelessApplyResult
+	err := mutateUCI(w.uci, configs, func() error {
+		var err error
+		res, err = fn()
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// withConfigLocks holds the named configs' locks for the duration of fn, in the
+// same globally ordered way, but does NOT revert on failure.
+//
+// For the writers that shell out to `uci` instead of going through the UCI
+// interface — AdGuardService and USBTetheringService do this — and therefore have
+// no uci.UCI to revert through. Taking the locks is still the point: without them
+// those writers interleave with the ones that DO revert, and the abandoned delta
+// gets committed by whoever commits next. The missing half is stated rather than
+// hidden: a failure in fn leaves its staged delta in place, and the next writer of
+// that config will commit it. Passing a uci.UCI and using mutateUCI where one is
+// available is preferred; this exists for the services that genuinely have none.
+func withConfigLocks(configs []string, fn func() error) error {
+	defer lockUCIConfigs(configs...)()
+	return fn()
+}
+
+// mutateUCI is mutateWireless for the other services: it holds the named
+// configs' locks for the duration of fn and reverts all of them if fn fails.
+// Same one-list rule, same reason — see mutateWireless.
+func mutateUCI(u uci.UCI, configs []string, fn func() error) error {
+	defer lockUCIConfigs(configs...)()
+
+	if err := fn(); err != nil {
+		revertUCIConfig(u, configs...)
+		return err
+	}
+	return nil
+}
+
 // WirelessApplyResult describes a staged rollback apply that still needs
 // browser-driven confirmation.
 type WirelessApplyResult struct {
 	Token                  string
 	RollbackTimeoutSeconds int
+
+	// GeneratedKey carries a WPA passphrase the service had to invent because
+	// the caller did not supply one (e.g. SetRadioRole creating a default AP).
+	// It is otherwise unrecoverable, so the caller must be able to show it to
+	// the operator. Empty when no key was generated.
+	GeneratedKey string
 }
 
 // WifiService provides WiFi scanning, connection, and configuration.
@@ -52,13 +180,26 @@ type WifiService struct {
 	uci                 uci.UCI
 	ubus                ubus.Ubus
 	reloader            WifiReloader
-	applier             UCIApplyConfirm // optional; when set, use apply+confirm instead of wifi up
+	applier             UCIApplyConfirm // optional; when set, use apply+confirm instead of any reload
 	cmd                 CommandRunner
 	priorityFile        string
 	autoReconnectFile   string
 	reconnectScript     string
 	modeFile            string
 	repeaterOptionsFile string
+	// crontabFile and scheduleFile override the WiFi on/off schedule's crontab
+	// and state-JSON paths (tests only), like the fields above.
+	crontabFile  string
+	scheduleFile string
+	// toggleScriptPath overrides where the generated toggle helper is written
+	// (tests only).
+	toggleScriptPath string
+	guardDir         string
+
+	// uciWriteMu serializes UCI write sequences (Set/AddSection/Commit/revert
+	// against the process-global uci delta). Read-only paths never take it, so
+	// status/scan requests stay concurrent.
+	uciWriteMu sync.Mutex
 }
 
 // uciApplyConfigs is the list of configs copied for staged apply+confirm.
@@ -72,13 +213,14 @@ const defaultWifiModeFile = "/etc/travo/wifi-mode"
 const defaultRepeaterOptionsFile = "/etc/travo/repeater-options.json"
 
 // NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
-// otherwise falls back to reloader (e.g. tests or when rpcd session is unavailable).
+// otherwise falls back to the (test-only) reloader.
 func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService {
 	return &WifiService{
-		uci: u, ubus: ub, reloader: &ShellWifiReloader{}, applier: NewRealUCIApplyConfirm(ub, pw),
+		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: NewRealUCIApplyConfirm(ub, pw),
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
+		guardDir: crashGuardDir,
 	}
 }
 
@@ -89,7 +231,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -99,7 +241,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -109,7 +251,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
 }
 
@@ -119,8 +261,17 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
 	}
+}
+
+// testGuardDir returns a private guard directory so tests never touch /etc/travo.
+func testGuardDir() string {
+	dir, err := os.MkdirTemp("", "travo-guard-*")
+	if err != nil {
+		return filepath.Join(os.TempDir(), "travo-guard")
+	}
+	return dir
 }
 
 // validateWirelessConsistency enforces invariants that, if violated, leave the router
@@ -242,7 +393,15 @@ func (w *WifiService) findSTASection() (string, error) {
 	return "", fmt.Errorf("no STA section found in UCI config")
 }
 
-// findSTASectionBySSID returns the UCI section name of a saved STA profile matching ssid, or error if not found.
+// ErrNoSTASection reports that no saved STA profile matches the requested SSID.
+// It is deliberately distinguishable from a real failure (e.g. an unreadable
+// UCI config): treating a read error as "not found" would silently create a
+// duplicate profile instead of surfacing the failure.
+var ErrNoSTASection = errors.New("no STA section found")
+
+// findSTASectionBySSID returns the UCI section name of a saved STA profile
+// matching ssid. It returns an error wrapping ErrNoSTASection when there is no
+// match, and a plain error when the wireless config could not be read.
 func (w *WifiService) findSTASectionBySSID(ssid string) (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
@@ -253,19 +412,22 @@ func (w *WifiService) findSTASectionBySSID(ssid string) (string, error) {
 			return name, nil
 		}
 	}
-	return "", fmt.Errorf("no STA section found for SSID %q", ssid)
+	return "", fmt.Errorf("%w for SSID %q", ErrNoSTASection, ssid)
 }
 
 // nextSTASectionName returns a unique UCI section name for a new STA profile (sta0, sta1, …).
-func (w *WifiService) nextSTASectionName() string {
+// It returns an error when the section list cannot be read: falling back to a
+// fixed name would let the caller `uci set` over an existing section, which
+// silently rewrites that section's type and destroys a saved network.
+func (w *WifiService) nextSTASectionName() (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
-		return "sta0"
+		return "", fmt.Errorf("failed to get wireless sections: %w", err)
 	}
 	for i := 0; ; i++ {
 		candidate := fmt.Sprintf("sta%d", i)
 		if _, exists := sections[candidate]; !exists {
-			return candidate
+			return candidate, nil
 		}
 	}
 }
@@ -428,11 +590,44 @@ func (w *WifiService) deriveWifiMode() string {
 	}
 }
 
+// ensureNamedSection makes sure config/section exists and carries the expected UCI
+// section type. A section that exists with the wrong type would make every later
+// Set write meaningless options, so the type is corrected explicitly.
 func (w *WifiService) ensureNamedSection(config, section, sectionType string) error {
-	if _, err := w.uci.GetAll(config, section); err == nil {
+	// GetSections reports both existence and the section type (".type"), and
+	// unlike GetAll it distinguishes "not there" from "could not read" — a read
+	// failure must not be turned into a blind section creation.
+	sections, err := w.uci.GetSections(config)
+	if err != nil {
+		return fmt.Errorf("reading %s sections: %w", config, err)
+	}
+	opts, exists := sections[section]
+	if !exists {
+		if err := w.uci.AddSection(config, section, sectionType); err != nil {
+			return fmt.Errorf("creating %s.%s as %s: %w", config, section, sectionType, err)
+		}
 		return nil
 	}
-	return w.uci.AddSection(config, section, sectionType)
+	// A missing .type means the backend does not report section types
+	// (e.g. an in-memory test double seeded with Set); leave it alone.
+	current := opts[".type"]
+	if current == "" || current == sectionType {
+		return nil
+	}
+	// `uci set <config>.<section>=<type>` rewrites the type in place and keeps
+	// the section's options.
+	if err := w.uci.AddSection(config, section, sectionType); err == nil {
+		return nil
+	}
+	// Backends that refuse to re-type an existing section: recreate it. The
+	// options of a wrong-typed section are meaningless by definition.
+	if err := w.uci.DeleteSection(config, section); err != nil {
+		return fmt.Errorf("fixing %s.%s section type (want %s, got %s): %w", config, section, sectionType, current, err)
+	}
+	if err := w.uci.AddSection(config, section, sectionType); err != nil {
+		return fmt.Errorf("recreating %s.%s as %s: %w", config, section, sectionType, err)
+	}
+	return nil
 }
 
 // ensureWwanNetwork creates the wwan network interface in UCI if missing (proto=dhcp).
@@ -488,12 +683,93 @@ func (w *WifiService) ensureWwanFirewall() error {
 }
 
 // applyWireless applies committed UCI using apply+confirm when applier is set (same as LuCI),
-// otherwise runs reloader (wifi up). Use after Commit("wireless") to avoid soft-brick risk.
+// otherwise it uses the reloader seam (tests only). Use after Commit("wireless").
 func (w *WifiService) applyWireless() error {
 	if w.applier != nil {
 		return w.applier.ApplyAndConfirm(uciApplyConfigs)
 	}
 	return w.reloader.Reload()
+}
+
+// lockUCIWrite serializes one UCI write sequence (Set/AddSection/Commit/revert)
+// against the process-global uci delta in /tmp/.uci/<config>/changes: two
+// concurrent mutations would otherwise interleave, commit each other's
+// half-written options, and revert each other's rollback. Read-only paths never
+// take this lock, so status and scan requests stay concurrent.
+//
+// The returned function releases the lock and must be deferred by the caller.
+func (w *WifiService) lockUCIWrite() func() {
+	w.uciWriteMu.Lock()
+	return w.uciWriteMu.Unlock
+}
+
+// guardPath returns the crash-guard path for a feature inside the guard dir.
+func (w *WifiService) guardPath(feature string) string {
+	dir := w.guardDir
+	if dir == "" {
+		dir = crashGuardDir
+	}
+	return filepath.Join(dir, feature+"-in-progress")
+}
+
+// resolveGuardDir returns the guard directory to use, falling back to a temp
+// directory when the configured one is not writable (dev host, unit tests, or a
+// broken installation). The guard is never skipped: a missing durable marker is
+// exactly the case the operator has to hear about, so it is logged as an error.
+func (w *WifiService) resolveGuardDir() string {
+	dir := w.guardDir
+	if dir == "" {
+		dir = crashGuardDir
+	}
+	mkErr := os.MkdirAll(dir, 0o750)
+	if mkErr == nil {
+		return dir
+	}
+	fallback := filepath.Join(os.TempDir(), "travo-guards")
+	log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side power loss is NOT protected by a durable marker.", dir, mkErr, fallback)
+	_ = os.MkdirAll(fallback, 0o750)
+	return fallback
+}
+
+// writeCrashGuard creates /etc/travo/<feature>-in-progress before a dangerous
+// live-state change (ADR 0003). The marker is removed by the caller only after
+// the change completed successfully.
+func (w *WifiService) writeCrashGuard(feature string) error {
+	path := filepath.Join(w.resolveGuardDir(), feature+"-in-progress")
+	if err := os.WriteFile(path, []byte("travo: "+feature+" in progress\n"), 0o600); err != nil {
+		return fmt.Errorf("writing crash guard %s: %w", path, err)
+	}
+	return nil
+}
+
+// clearCrashGuard removes a crash guard after the operation succeeded.
+func (w *WifiService) clearCrashGuard(feature string) {
+	// Clear every directory the guard could have been written to. writeCrashGuard
+	// uses resolveGuardDir(), which falls back to a temp directory when the
+	// configured one is not writable; removing only the configured path left that
+	// fallback guard behind forever, and a stale guard means "skip".
+	// The configured dir is also removed on its own because the resolution can
+	// differ between the write and the clear (e.g. the directory became writable).
+	for _, dir := range w.guardDirs() {
+		if err := os.Remove(filepath.Join(dir, feature+"-in-progress")); err != nil && !os.IsNotExist(err) {
+			log.Printf("WARNING: removing crash guard %s/%s: %v", dir, feature, err)
+		}
+	}
+}
+
+// guardDirs returns the directories a crash guard for this service may live in,
+// most likely first: the resolved directory (configured dir, or the temp
+// fallback when it is not writable) and the configured directory itself.
+func (w *WifiService) guardDirs() []string {
+	configured := w.guardDir
+	if configured == "" {
+		configured = crashGuardDir
+	}
+	resolved := w.resolveGuardDir()
+	if resolved == configured {
+		return []string{configured}
+	}
+	return []string{resolved, configured}
 }
 
 // ApplyWireless applies the current wireless (and related) UCI config via apply+confirm.

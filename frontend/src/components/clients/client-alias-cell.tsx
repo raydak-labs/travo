@@ -19,12 +19,19 @@ export interface ClientAliasCellProps {
   editButtonClassName?: string;
 }
 
+/**
+ * The edit button is revealed on hover, so it must also be revealed for
+ * keyboard users: it stays in the tab order, and hiding it with `opacity-0`
+ * alone would make it focusable but invisible (WCAG 2.4.7).
+ */
+const EDIT_BUTTON_REVEAL = 'opacity-0 focus-visible:opacity-100 group-focus-within:opacity-100';
+
 export function ClientAliasCell({
   client,
   inputClassName = 'h-7 w-32 text-sm',
   placeholder = 'Alias',
   displayNameClassName = 'text-gray-900 dark:text-white',
-  editButtonClassName = 'opacity-0 group-hover:opacity-100',
+  editButtonClassName = `${EDIT_BUTTON_REVEAL} group-hover:opacity-100`,
 }: ClientAliasCellProps) {
   const [editing, setEditing] = useState(false);
   const setAlias = useSetClientAlias();
@@ -96,6 +103,7 @@ export function ClientAliasCell({
           className="h-6 w-6 self-start"
           type="submit"
           disabled={setAlias.isPending}
+          aria-label="Save alias"
         >
           <Check className="h-3 w-3" />
         </Button>
@@ -105,6 +113,7 @@ export function ClientAliasCell({
           className="h-6 w-6 self-start"
           type="button"
           onClick={onCancel}
+          aria-label="Cancel alias edit"
         >
           <X className="h-3 w-3" />
         </Button>
@@ -117,7 +126,7 @@ export function ClientAliasCell({
       <div>
         <span className={displayNameClassName}>{displayName}</span>
         {client.alias && client.hostname && (
-          <span className="ml-1 text-xs text-gray-400">({client.hostname})</span>
+          <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">({client.hostname})</span>
         )}
       </div>
       <Button
@@ -126,6 +135,7 @@ export function ClientAliasCell({
         className={`h-6 w-6 ${editButtonClassName}`}
         type="button"
         title="Edit alias"
+        aria-label={`Edit alias for ${displayName}`}
         onClick={() => setEditing(true)}
       >
         <Pencil className="h-3 w-3" />

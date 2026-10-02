@@ -14,7 +14,9 @@ Provides an intuitive dashboard, WiFi management with hotel captive portal suppo
 
 - Contributor and agent doc map: [docs/README.md](docs/README.md)
 - Stable architecture decisions: [docs/architecture.md](docs/architecture.md)
+- Architecture decision records (normative detail by topic): [docs/adr/README.md](docs/adr/README.md)
 - Active backlog: [docs/requirements/tasks_open.md](docs/requirements/tasks_open.md)
+- Agent instructions and guardrails: [AGENTS.md](AGENTS.md)
 
 ## Quick Install
 
@@ -80,9 +82,12 @@ all options and manual install instructions.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 20
-- [pnpm](https://pnpm.io/) >= 9
-- [Go](https://go.dev/) >= 1.23
+- [mise](https://mise.jdx.dev/) — the pinned toolchain is the only supported way to
+  install and run; see [`.mise.toml`](.mise.toml)
+- [Node.js](https://nodejs.org/) >= 20, [pnpm](https://pnpm.io/) >= 9, [Go](https://go.dev/) >= 1.23
+
+`make install` resolves all of these through `mise` (`pnpm install` + `go mod download`),
+so install mise first and let it pick the versions.
 
 ### Setup
 
@@ -91,11 +96,8 @@ all options and manual install instructions.
 git clone https://github.com/raydak-labs/travo.git
 cd travo
 
-# Install Node dependencies (also generates MSW mock worker for dev mode)
-pnpm install
-
-# Install Go dependencies
-cd backend && go mod tidy && cd ..
+# Install Node + Go dependencies through the pinned mise toolchain
+make install
 
 # Run development servers
 make dev
@@ -106,20 +108,26 @@ make dev
 
 ### Commands
 
-| Command            | Description                               |
-| ------------------ | ----------------------------------------- |
-| `make dev`         | Run frontend + backend dev servers        |
-| `make build`       | Build frontend and backend                |
-| `make test`        | Run all tests (Go + shared + frontend)    |
-| `make lint`        | Run ESLint + go vet                       |
-| `make format`      | Run Prettier + gofmt                      |
-| `make clean`       | Remove build artifacts                    |
-| `make build-prod`  | Cross-compile for OpenWRT (aarch64)       |
-| `make build-all`   | Cross-compile for aarch64 and x86_64      |
-| `make package`     | Create release `.tar.gz` (install layout) |
-| `make package-all` | Tarballs for aarch64 and x86_64           |
-| `make deploy`      | Deploy to router (needs `ROUTER_IP`)      |
-| `make docker-dev`  | Start Docker dev environment              |
+| Command            | Description                                                        |
+| ------------------ | ------------------------------------------------------------------ |
+| `make install`     | Install Node and Go dependencies (run once after cloning)          |
+| `make dev`         | Run frontend + backend dev servers                                 |
+| `make build`       | Build frontend and backend                                         |
+| `make test`        | Run all tests (Go + shared + frontend), with `-count=1` on Go      |
+| `make test-race`   | Run the Go suite with the race detector                            |
+| `make lint`        | `pnpm lint` (ESLint) + `golangci-lint run` over the Go packages    |
+| `make format`      | `pnpm format` (Prettier) + `goimports -w` over the Go packages     |
+| `make format-check`| CI-style format gate: fails if any file is unformatted              |
+| `make shellcheck`  | Lint the device-mutating shell scripts                             |
+| `make coverage`    | Go coverage summary (informational; not a gate)                    |
+| `make clean`       | Remove build artifacts                                             |
+| `make build-prod`  | Cross-compile for OpenWRT (aarch64)                                |
+| `make build-all`   | Cross-compile for aarch64 and x86_64                               |
+| `make package`     | Create release `.tar.gz` (install layout)                          |
+| `make package-all` | Tarballs for aarch64 and x86_64                                    |
+| `make deploy`      | Deploy to router (needs `ROUTER_IP`)                               |
+| `make integration` | Run the on-device integration suites (mutates a real router)       |
+| `make docker-dev`  | Start Docker dev environment                                       |
 
 ## Docker Development
 

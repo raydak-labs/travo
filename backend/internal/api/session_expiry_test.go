@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoginResponseIncludesExpiresIn(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	body, _ := json.Marshal(map[string]string{"password": "admin"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -39,7 +39,7 @@ func TestLoginResponseIncludesExpiresIn(t *testing.T) {
 }
 
 func TestSessionEndpointReturnsExpiresIn(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)

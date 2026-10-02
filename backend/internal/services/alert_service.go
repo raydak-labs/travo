@@ -28,7 +28,7 @@ func defaultAlertThresholds() models.AlertThresholds {
 
 // GetAlertThresholds reads thresholds from the config file, returning defaults if absent.
 func (a *AlertService) GetAlertThresholds() models.AlertThresholds {
-	data, err := os.ReadFile(alertThresholdsFile)
+	data, err := os.ReadFile(a.thresholdsPath())
 	if err != nil {
 		return defaultAlertThresholds()
 	}
@@ -41,14 +41,15 @@ func (a *AlertService) GetAlertThresholds() models.AlertThresholds {
 
 // SetAlertThresholds persists thresholds to the config file.
 func (a *AlertService) SetAlertThresholds(t models.AlertThresholds) error {
-	if err := os.MkdirAll(filepath.Dir(alertThresholdsFile), 0750); err != nil {
+	path := a.thresholdsPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return err
 	}
 	data, err := json.Marshal(t)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(alertThresholdsFile, data, 0600)
+	return os.WriteFile(path, data, 0600)
 }
 
 // AlertChecker abstracts the system checks used by AlertService.
@@ -84,10 +85,29 @@ type AlertService struct {
 	alerts         []models.Alert
 	alertCh        chan models.Alert
 	stopCh         chan struct{}
+	startOnce      sync.Once
+	stopOnce       sync.Once
 	CheckInterval  time.Duration
 
 	// Track active conditions to avoid duplicate alerts
 	activeConditions map[string]bool
+
+	// thresholdsFile overrides the const path (tests only), following the same
+	// pattern as SystemService.sshKeysFile and NetworkService.portForwardsFile.
+	// Without it the handler cannot be exercised end to end off-device: the write
+	// goes to /etc/travo and fails.
+	thresholdsFile string
+}
+
+// SetThresholdsFile overrides the alert-thresholds store path (tests only).
+func (a *AlertService) SetThresholdsFile(path string) { a.thresholdsFile = path }
+
+// thresholdsPath returns the alert-thresholds store in use.
+func (a *AlertService) thresholdsPath() string {
+	if a.thresholdsFile != "" {
+		return a.thresholdsFile
+	}
+	return alertThresholdsFile
 }
 
 // SetCarrierChecker enables ethernet carrier monitoring in the alert service.
@@ -126,27 +146,34 @@ func (a *AlertService) GetAlerts() []models.Alert {
 	return result
 }
 
-// Start begins the periodic alert checking loop.
+// Start begins the periodic alert checking loop. Calling it more than once is
+// a no-op: a second call would otherwise spawn a duplicate ticker and double
+// every alert.
 func (a *AlertService) Start() {
-	go func() {
-		// Run an initial check immediately
-		a.checkConditions()
-		ticker := time.NewTicker(a.CheckInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				a.checkConditions()
-			case <-a.stopCh:
-				return
+	a.startOnce.Do(func() {
+		go func() {
+			// Run an initial check immediately
+			a.checkConditions()
+			ticker := time.NewTicker(a.CheckInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					a.checkConditions()
+				case <-a.stopCh:
+					return
+				}
 			}
-		}
-	}()
+		}()
+	})
 }
 
-// Stop stops the alert checking loop.
+// Stop stops the alert checking loop. Safe to call multiple times and before
+// Start.
 func (a *AlertService) Stop() {
-	close(a.stopCh)
+	a.stopOnce.Do(func() {
+		close(a.stopCh)
+	})
 }
 
 func (a *AlertService) checkConditions() {

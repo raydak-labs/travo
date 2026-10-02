@@ -104,9 +104,7 @@ export function DiagnosticsCard() {
               {runDiagnostics.data.output || '(no output)'}
             </pre>
           )}
-          {runDiagnostics.isError && (
-            <InlineError>{runDiagnostics.error.message}</InlineError>
-          )}
+          {runDiagnostics.isError && <InlineError>{runDiagnostics.error.message}</InlineError>}
         </form>
       </CardContent>
     </Card>

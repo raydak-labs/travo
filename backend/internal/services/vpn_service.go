@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +27,42 @@ const openwrtTailscaleBin = "/usr/sbin/tailscale"
 const openwrtTailscaleBinAlt = "/usr/bin/tailscale"
 
 var wireGuardVerifyTimeout = 12 * time.Second
+
+// tailscaleInitScript is the procd service for the tailscale package.
+const tailscaleInitScript = "/etc/init.d/tailscale"
+
+// ErrTailscaleNotInstalled is returned when the tailscale package is absent, so
+// none of its operations can run. Handlers map this to 503.
+//
+// Without it, every Tailscale mutation surfaced the raw exec error
+// ("exec: \"tailscale\": executable file not found in $PATH") as a 500, which
+// reads as a server fault and tells the operator nothing. Verified on the
+// device: PUT /api/v1/vpn/tailscale/ssh returned
+// 500 {"error":"exec: \"tailscale\": executable file not found in $PATH"}.
+var ErrTailscaleNotInstalled = errors.New("tailscale is not installed on this router")
+
+// TailscaleInstalled reports whether the tailscale package is present.
+//
+// Either artefact is enough: the binary is what the `tailscale` subcommands need,
+// and the init script is what the start/stop toggle needs. A router can have one
+// without the other mid-upgrade, so both are checked rather than assuming.
+func TailscaleInstalled() bool {
+	for _, p := range []string{openwrtTailscaleBin, openwrtTailscaleBinAlt, tailscaleInitScript} {
+		if _, err := os.Stat(p); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// requireTailscale returns ErrTailscaleNotInstalled when the package is absent, so
+// a Tailscale mutation fails with an actionable message instead of an exec error.
+func requireTailscale() error {
+	if !TailscaleInstalled() {
+		return fmt.Errorf("%w: install the tailscale package to use Tailscale", ErrTailscaleNotInstalled)
+	}
+	return nil
+}
 
 func tailscaleBin() string {
 	if _, err := os.Stat(openwrtTailscaleBin); err == nil {
@@ -80,13 +118,20 @@ type VpnService struct {
 	uci          uci.UCI
 	cmd          CommandRunner
 	profilesPath string // Path to wireguard_profiles.json
+	// guardFile is the crash guard path for VPN live-state changes. Empty
+	// disables the guard (only the production constructor sets it).
+	guardFile string
 }
 
-const vpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
+const vpnDnsSnapshotPath = "/etc/trafo/vpn-dns-snapshot.json"
+
+// legacyVpnDnsSnapshotPath is where releases before the guard-directory
+// unification wrote the snapshot. Read-only: a restore removes both.
+const legacyVpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
 
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
-	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/travo/wireguard_profiles.json"}
+	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/travo/wireguard_profiles.json", guardFile: vpnGuardPath}
 }
 
 // NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
@@ -559,8 +604,17 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	return config, nil
 }
 
-// SetWireguardConfig updates the WireGuard configuration.
+// SetWireguardConfig is the entry point from the API. It takes the UCI transaction for every
+// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
+// the middle of a VPN toggle and revert half of it.
 func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.SetWireguardConfigLocked(config)
+	})
+}
+
+// SetWireguardConfig updates the WireGuard configuration.
+func (v *VpnService) SetWireguardConfigLocked(config models.WireguardConfig) error {
 	if err := v.ensureWireGuardInterface(); err != nil {
 		return err
 	}
@@ -592,54 +646,148 @@ func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
 	return v.uci.Commit("network")
 }
 
-// ToggleWireguard enables or disables WireGuard. When enabling, it also ensures
-// the UCI structure is correct, creates firewall plumbing, commits, brings up wg0,
-// and verifies the tunnel is live. Returns an error if the tunnel fails to come up.
+// ToggleWireguard enables or disables WireGuard.
+//
+// Enable order matters: the tunnel is committed and verified FIRST, and only then
+// are the dependent changes (firewall zone/forwarding, LAN DNS forwarding) applied.
+// Those changes point LAN traffic at the tunnel, so committing them before the
+// tunnel is up would leave DNS resolving through resolvers that are unreachable.
+// If the tunnel does not come up, the dependent changes are never made and any
+// partially applied change is torn down again.
+// ToggleWireguard enables or disables the tunnel. It is the widest UCI writer in
+// the service — network, firewall and dhcp — so the whole toggle is one
+// transaction: a failure anywhere reverts all three together instead of leaving
+// a half-applied tunnel whose firewall zone and resolver list disagree with its
+// interface state.
 func (v *VpnService) ToggleWireguard(enable bool) error {
-	val := "1"
-	if enable {
-		val = "0"
-		_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
-		if err := v.ensureWireGuardInterface(); err != nil {
-			return fmt.Errorf("normalizing wg0 interface: %w", err)
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		if enable {
+			return v.enableWireguard()
 		}
-		if err := v.ensureWireGuardPeer("wg0_peer0"); err != nil {
-			return fmt.Errorf("normalizing wg0 peer: %w", err)
-		}
-		if err := v.validateWireGuardConfigForEnable(); err != nil {
-			return err
-		}
-		if err := v.setupWireGuardFirewall(); err != nil {
-			return fmt.Errorf("setting up WireGuard firewall: %w", err)
-		}
+		return v.disableWireguard()
+	})
+}
+
+// vpnGuardPath is the crash guard for VPN live-state changes (ADR 0003). It is
+// set by the production constructor; test constructors leave it empty, which
+// disables the guard for tests.
+const vpnGuardPath = crashGuardDir + "/vpn-in-progress"
+
+// writeVpnGuard creates the VPN crash guard before touching live state.
+func (v *VpnService) writeVpnGuard() error {
+	if v.guardFile == "" {
+		return nil
 	}
-	_ = v.uci.Set("network", "wg0", "disabled", val)
+	if err := os.MkdirAll(filepath.Dir(v.guardFile), 0750); err != nil {
+		return fmt.Errorf("create vpn guard dir: %w", err)
+	}
+	if err := os.WriteFile(v.guardFile, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
+		return fmt.Errorf("write vpn guard: %w", err)
+	}
+	return nil
+}
+
+// clearVpnGuard removes the crash guard after the operation completed.
+func (v *VpnService) clearVpnGuard() {
+	if v.guardFile == "" {
+		return
+	}
+	_ = os.Remove(v.guardFile)
+}
+
+func (v *VpnService) enableWireguard() error {
+	_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
+	if err := v.ensureWireGuardInterface(); err != nil {
+		return fmt.Errorf("normalizing wg0 interface: %w", err)
+	}
+	if err := v.ensureWireGuardPeer("wg0_peer0"); err != nil {
+		return fmt.Errorf("normalizing wg0 peer: %w", err)
+	}
+	if err := v.validateWireGuardConfigForEnable(); err != nil {
+		return err
+	}
+	prevDisabled, _ := v.uci.Get("network", "wg0", "disabled")
+	if err := v.writeVpnGuard(); err != nil {
+		return err
+	}
+	if err := v.uci.Set("network", "wg0", "disabled", "0"); err != nil {
+		v.clearVpnGuard()
+		return err
+	}
+	if err := v.uci.Commit("network"); err != nil {
+		v.clearVpnGuard()
+		return err
+	}
+
+	// Verify the tunnel before committing anything that depends on it.
+	if err := v.applyAndVerifyWireGuard(); err != nil {
+		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
+			// The device is in an unknown state: keep the crash guard so no
+			// other flow mutates it before a human looks.
+			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w (rollback incomplete, crash guard %s kept: %v)", err, v.guardFile, rbErr)
+		}
+		v.clearVpnGuard()
+		return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
+	}
+
+	if err := v.setupWireGuardFirewall(); err != nil {
+		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
+			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %v)", err, v.guardFile, rbErr)
+		}
+		v.clearVpnGuard()
+		return fmt.Errorf("setting up WireGuard firewall: %w", err)
+	}
+
+	v.enableVpnDNSForwarding()
+	v.clearVpnGuard()
+	return nil
+}
+
+// rollbackWireguardEnable restores the pre-enable state: dependent firewall/DNS
+// changes are reverted and wg0 is disabled again.
+func (v *VpnService) rollbackWireguardEnable(prevDisabled string) error {
+	var errs []error
+	if err := v.teardownWireGuardFirewall(); err != nil {
+		errs = append(errs, fmt.Errorf("tearing down WireGuard firewall: %w", err))
+	}
+	v.disableVpnDNSForwarding()
+	disabled := strings.TrimSpace(prevDisabled)
+	if disabled == "" {
+		disabled = "1"
+	}
+	if err := v.uci.Set("network", "wg0", "disabled", disabled); err != nil {
+		errs = append(errs, fmt.Errorf("restoring wg0 disabled=%s: %w", disabled, err))
+	}
+	if err := v.uci.Commit("network"); err != nil {
+		errs = append(errs, fmt.Errorf("committing network: %w", err))
+	}
+	_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+	return errors.Join(errs...)
+}
+
+func (v *VpnService) disableWireguard() error {
+	_ = v.uci.Set("network", "wg0", "disabled", "1")
 	if err := v.uci.Commit("network"); err != nil {
 		return err
 	}
-	if enable {
-		_ = v.enableVpnDNSForwarding()
-		if err := v.applyAndVerifyWireGuard(); err != nil {
-			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
-		}
-	} else {
-		// Bring down the interface and clean up firewall plumbing when disabling.
-		_ = v.SetKillSwitch(false)
-		_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
-		_ = v.disableVpnDNSForwarding()
-		// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
-		// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
-		// route even though the uplink interface still shows “up”. We recover by
-		// restoring the uplink default route (renew first, then down/up if needed).
-		_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
-		time.Sleep(150 * time.Millisecond)
-		v.restoreDefaultRouteAfterWireGuardDisable()
-		// Rock-solid semantics: do not report success if the device has no default route.
-		if !v.hasKernelDefaultRoute() {
-			return fmt.Errorf("WireGuard disabled but no default route was restored; internet may be down")
-		}
-		_ = v.teardownWireGuardFirewall()
+	// Bring down the interface and clean up firewall plumbing when disabling.
+	// Only a kill switch this service owns is removed: a kill switch the user
+	// set up as a standalone policy must survive a VPN toggle.
+	_ = v.removeVPNOwnedKillSwitch()
+	_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+	v.disableVpnDNSForwarding()
+	// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
+	// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
+	// route even though the uplink interface still shows “up”. We recover by
+	// restoring the uplink default route (renew first, then down/up if needed).
+	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
+	time.Sleep(150 * time.Millisecond)
+	v.restoreDefaultRouteAfterWireGuardDisable()
+	// Rock-solid semantics: do not report success if the device has no default route.
+	if !v.hasKernelDefaultRoute() {
+		return fmt.Errorf("WireGuard disabled but no default route was restored; internet may be down")
 	}
+	_ = v.teardownWireGuardFirewall()
 	return nil
 }
 
@@ -683,7 +831,15 @@ func (v *VpnService) writeVpnDnsSnapshot(snap vpnDnsSnapshot) error {
 func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
 	data, err := os.ReadFile(vpnDnsSnapshotPath)
 	if err != nil {
-		return nil, err
+		// Fall back to the pre-unification location. A device upgraded while the
+		// VPN was enabled has its snapshot under the old path; failing to read it
+		// would leave dnsmasq with noresolv=1 forwarding to VPN resolvers that
+		// are no longer reachable, i.e. LAN DNS stays broken after the tunnel
+		// goes down.
+		data, err = os.ReadFile(legacyVpnDnsSnapshotPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var snap vpnDnsSnapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
@@ -718,10 +874,14 @@ func (v *VpnService) wgConfiguredDNSServers() []string {
 	return splitWireGuardDNSOption(dns)
 }
 
-func (v *VpnService) enableVpnDNSForwarding() error {
+// enableVpnDNSForwarding points dnsmasq at the tunnel's resolvers. It is
+// best-effort by design and cannot report failure: the tunnel is already
+// verified up before it runs, so a failure here cannot strand LAN DNS on
+// unreachable resolvers and must never fail the toggle.
+func (v *VpnService) enableVpnDNSForwarding() {
 	vpnDNS := v.wgConfiguredDNSServers()
 	if len(vpnDNS) == 0 {
-		return nil
+		return
 	}
 
 	currentServers := v.readDnsmasqServers()
@@ -741,14 +901,15 @@ func (v *VpnService) enableVpnDNSForwarding() error {
 	_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=1")
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
-	return nil
 }
 
-func (v *VpnService) disableVpnDNSForwarding() error {
+// disableVpnDNSForwarding restores the dnsmasq snapshot taken when forwarding
+// was enabled. Like enable, it is best-effort and reports nothing.
+func (v *VpnService) disableVpnDNSForwarding() {
 	snap, err := v.loadVpnDnsSnapshot()
 	if err != nil {
 		// Nothing to restore.
-		return nil
+		return
 	}
 
 	// Restore previous servers/noresolv.
@@ -764,44 +925,75 @@ func (v *VpnService) disableVpnDNSForwarding() error {
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
 	_ = os.Remove(vpnDnsSnapshotPath)
-	return nil
+	_ = os.Remove(legacyVpnDnsSnapshotPath)
 }
+
+// Config sets for the VPN flows.
+//
+// vpnFirewallConfigs is the standalone firewall entry points (kill switch and the
+// firewall helpers called cold).
+//
+// vpnFlowConfigs is what a full VPN toggle actually touches, and it is more than
+// the `network` writes suggest:
+//   - network:  the wg0 interface, peer, addresses and split-tunnel allowed IPs
+//   - firewall: the wg0 zone/forwarding rule and the toggle-owned kill switch
+//   - dhcp:     enableVpnDNSForwarding / disableVpnDNSForwarding rewrite
+//     dnsmasq's server list and noresolv
+//
+// dhcp was the one nobody listed: those two helpers shell out to `uci` directly
+// rather than going through the UCI interface, so they were invisible to every
+// audit of "which configs does this write" and held no lock at all. A WiFi save
+// committing `dhcp` while a VPN toggle was rewriting the resolver list is exactly
+// the corruption these locks exist to prevent.
+var (
+	vpnFirewallConfigs = []string{"firewall"}
+	vpnFlowConfigs     = []string{"dhcp", "firewall", "network"}
+)
 
 // setupWireGuardFirewall ensures the wg0 firewall zone and lan→wg0 forwarding rule
 // exist in UCI and commits the firewall config. Called when activating a WireGuard profile.
+// setupWireGuardFirewall ensures the wg0 firewall zone and lan->wg0 forwarding
+// rule exist and commits. It does NOT take a config lock: every caller is inside
+// the VPN transaction, which already holds `firewall`, and the config locks are
+// not reentrant. TestVPNFlowsDoNotNestConfigLocks fails the build if that ever
+// stops being true.
 func (v *VpnService) setupWireGuardFirewall() error {
-	// Ensure the wg0 zone exists.
-	if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
-		if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
-			return fmt.Errorf("creating wg0 firewall zone: %w", addErr)
+	{
+		// Ensure the wg0 zone exists.
+		if _, err := v.uci.GetAll("firewall", "wg0_zone"); err != nil {
+			if addErr := v.uci.AddSection("firewall", "wg0_zone", "zone"); addErr != nil {
+				return fmt.Errorf("creating wg0 firewall zone: %w", addErr)
+			}
 		}
-	}
-	_ = v.uci.Set("firewall", "wg0_zone", "name", "wg0")
-	_ = v.uci.Set("firewall", "wg0_zone", "network", "wg0")
-	_ = v.uci.Set("firewall", "wg0_zone", "input", "DROP")
-	_ = v.uci.Set("firewall", "wg0_zone", "output", "ACCEPT")
-	_ = v.uci.Set("firewall", "wg0_zone", "forward", "DROP")
-	_ = v.uci.Set("firewall", "wg0_zone", "masq", "1")
-	_ = v.uci.Set("firewall", "wg0_zone", "mtu_fix", "1")
+		_ = v.uci.Set("firewall", "wg0_zone", "name", "wg0")
+		_ = v.uci.Set("firewall", "wg0_zone", "network", "wg0")
+		_ = v.uci.Set("firewall", "wg0_zone", "input", "DROP")
+		_ = v.uci.Set("firewall", "wg0_zone", "output", "ACCEPT")
+		_ = v.uci.Set("firewall", "wg0_zone", "forward", "DROP")
+		_ = v.uci.Set("firewall", "wg0_zone", "masq", "1")
+		_ = v.uci.Set("firewall", "wg0_zone", "mtu_fix", "1")
 
-	// Ensure lan→wg0 forwarding exists.
-	if _, err := v.uci.GetAll("firewall", "wg0_fwd"); err != nil {
-		if addErr := v.uci.AddSection("firewall", "wg0_fwd", "forwarding"); addErr != nil {
-			return fmt.Errorf("creating wg0 forwarding rule: %w", addErr)
+		// Ensure lan→wg0 forwarding exists.
+		if _, err := v.uci.GetAll("firewall", "wg0_fwd"); err != nil {
+			if addErr := v.uci.AddSection("firewall", "wg0_fwd", "forwarding"); addErr != nil {
+				return fmt.Errorf("creating wg0 forwarding rule: %w", addErr)
+			}
 		}
-	}
-	_ = v.uci.Set("firewall", "wg0_fwd", "src", "lan")
-	_ = v.uci.Set("firewall", "wg0_fwd", "dest", "wg0")
+		_ = v.uci.Set("firewall", "wg0_fwd", "src", "lan")
+		_ = v.uci.Set("firewall", "wg0_fwd", "dest", "wg0")
 
-	if err := v.uci.Commit("firewall"); err != nil {
-		return err
+		if err := v.uci.Commit("firewall"); err != nil {
+			return err
+		}
+		v.reloadFirewall()
+		return nil
 	}
-	v.reloadFirewall()
-	return nil
 }
 
 // teardownWireGuardFirewall removes the wg0 firewall zone and forwarding rule from UCI.
 // Called when deactivating WireGuard. Errors are non-fatal (section may not exist).
+// teardownWireGuardFirewall removes the wg0 zone and forwarding rule. It does
+// NOT take a config lock; see setupWireGuardFirewall.
 func (v *VpnService) teardownWireGuardFirewall() error {
 	_ = v.uci.DeleteSection("firewall", "wg0_zone")
 	_ = v.uci.DeleteSection("firewall", "wg0_fwd")
@@ -985,6 +1177,9 @@ func (v *VpnService) GetTailscaleStatus() (models.TailscaleStatus, error) {
 
 // StartTailscaleAuth runs `tailscale up` and returns the auth URL if login is required.
 func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
+	if err := requireTailscale(); err != nil {
+		return "", err
+	}
 	args := []string{"up", "--accept-routes"}
 	if authKey != "" {
 		args = append(args, "--auth-key="+authKey)
@@ -1007,6 +1202,9 @@ func (v *VpnService) StartTailscaleAuth(authKey string) (string, error) {
 // When a non-empty exit node is set, WireGuard is turned off first so only one
 // full-tunnel-style path is active (see requirements: single active VPN policy).
 func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
+	if err := requireTailscale(); err != nil {
+		return err
+	}
 	nodeIP = strings.TrimSpace(nodeIP)
 	if nodeIP != "" {
 		if opts, err := v.uci.GetAll("network", "wg0"); err == nil && opts["disabled"] != "1" {
@@ -1025,7 +1223,7 @@ func (v *VpnService) SetTailscaleExitNode(nodeIP string) error {
 
 // GetKillSwitch checks whether the VPN kill switch firewall rule exists.
 func (v *VpnService) GetKillSwitch() (models.KillSwitchStatus, error) {
-	opts, err := v.uci.GetAll("firewall", "vpn_killswitch")
+	opts, err := v.uci.GetAll("firewall", vpnKillSwitchSection)
 	if err != nil {
 		return models.KillSwitchStatus{Enabled: false}, nil
 	}
@@ -1034,29 +1232,97 @@ func (v *VpnService) GetKillSwitch() (models.KillSwitchStatus, error) {
 	}, nil
 }
 
+// vpnKillSwitchSection is the firewall rule implementing the VPN kill switch.
+const vpnKillSwitchSection = "vpn_killswitch"
+
+// vpnKillSwitchOwnerOption marks which flow created the kill switch rule.
+// "user" means the user configured it as a standalone policy, so a VPN toggle
+// must not delete it; "vpn_toggle" means the VPN toggle owns it.
+const (
+	vpnKillSwitchOwnerOption = "travo_owner"
+	vpnKillSwitchOwnerUser   = "user"
+	vpnKillSwitchOwnerToggle = "vpn_toggle"
+)
+
 // SetKillSwitch enables or disables the VPN kill switch firewall rule.
+// Every write error is propagated: a partial rule would be committed with the
+// default target (ACCEPT), i.e. a "kill switch" that allows all traffic.
 func (v *VpnService) SetKillSwitch(enabled bool) error {
-	if enabled {
-		// Create the firewall rule that blocks LAN→WAN when VPN is down.
-		_ = v.uci.AddSection("firewall", "vpn_killswitch", "rule")
-		_ = v.uci.Set("firewall", "vpn_killswitch", "name", "VPN Kill Switch")
-		_ = v.uci.Set("firewall", "vpn_killswitch", "src", "lan")
-		_ = v.uci.Set("firewall", "vpn_killswitch", "dest", "wan")
-		_ = v.uci.Set("firewall", "vpn_killswitch", "target", "REJECT")
-	} else {
-		// Remove the firewall rule; ignore error if it doesn't exist.
-		_ = v.uci.DeleteSection("firewall", "vpn_killswitch")
+	return mutateUCI(v.uci, vpnFirewallConfigs, func() error {
+		if enabled {
+			// Create the firewall rule that blocks LAN→WAN when VPN is down.
+			if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err != nil {
+				if addErr := v.uci.AddSection("firewall", vpnKillSwitchSection, "rule"); addErr != nil {
+					return fmt.Errorf("creating vpn kill switch rule: %w", addErr)
+				}
+			}
+			settings := [][2]string{
+				{"name", "VPN Kill Switch"},
+				{"src", "lan"},
+				{"dest", "wan"},
+				{"target", "REJECT"},
+				{vpnKillSwitchOwnerOption, vpnKillSwitchOwnerUser},
+			}
+			for _, kv := range settings {
+				if err := v.uci.Set("firewall", vpnKillSwitchSection, kv[0], kv[1]); err != nil {
+					return fmt.Errorf("set vpn kill switch %s: %w", kv[0], err)
+				}
+			}
+		} else {
+			// Remove the firewall rule; a missing section is not an error.
+			if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err == nil {
+				if delErr := v.uci.DeleteSection("firewall", vpnKillSwitchSection); delErr != nil {
+					return fmt.Errorf("removing vpn kill switch rule: %w", delErr)
+				}
+			}
+		}
+		if err := v.uci.Commit("firewall"); err != nil {
+			return err
+		}
+		v.reloadFirewall()
+		return nil
+	})
+}
+
+// removeVPNOwnedKillSwitch deletes the kill switch rule only when the VPN toggle
+// created it. A kill switch the user configured as a standalone policy is left
+// untouched.
+//
+// It does NOT take a config lock: every caller is already inside the VPN
+// transaction that holds `firewall`, and the config locks are not reentrant.
+func (v *VpnService) removeVPNOwnedKillSwitch() error {
+	{
+		opts, err := v.uci.GetAll("firewall", vpnKillSwitchSection)
+		if err != nil {
+			// Nothing to remove.
+			return nil
+		}
+		if opts[vpnKillSwitchOwnerOption] != vpnKillSwitchOwnerToggle {
+			return nil
+		}
+		if err := v.uci.DeleteSection("firewall", vpnKillSwitchSection); err != nil {
+			return fmt.Errorf("removing vpn kill switch rule: %w", err)
+		}
+		if err := v.uci.Commit("firewall"); err != nil {
+			return fmt.Errorf("committing firewall: %w", err)
+		}
+		v.reloadFirewall()
+		return nil
 	}
-	if err := v.uci.Commit("firewall"); err != nil {
-		return err
-	}
-	v.reloadFirewall()
-	return nil
+}
+
+// ImportWireguardConfig is the entry point from the API. It takes the UCI transaction for every
+// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
+// the middle of a VPN toggle and revert half of it.
+func (v *VpnService) ImportWireguardConfig(confContent string) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.ImportWireguardConfigLocked(confContent)
+	})
 }
 
 // ImportWireguardConfig parses a .conf file, normalizes the UCI structure,
 // applies the config, and verifies the tunnel comes up.
-func (v *VpnService) ImportWireguardConfig(confContent string) error {
+func (v *VpnService) ImportWireguardConfigLocked(confContent string) error {
 	parsed, err := ParseWireguardConfig(confContent)
 	if err != nil {
 		return err
@@ -1095,6 +1361,9 @@ func (v *VpnService) ImportWireguardConfig(confContent string) error {
 
 // ToggleTailscale starts or stops the Tailscale daemon via init.d.
 func (v *VpnService) ToggleTailscale(enable bool) error {
+	if err := requireTailscale(); err != nil {
+		return err
+	}
 	if enable {
 		_, err := v.cmd.Run("/etc/init.d/tailscale", "start")
 		return err
@@ -1176,6 +1445,13 @@ func (v *VpnService) AddProfile(name, config string) (*models.WireGuardProfile, 
 	return &profile, nil
 }
 
+// ActivateProfile is the entry point from the API; see ActivateProfileLocked.
+func (v *VpnService) ActivateProfile(id string) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.ActivateProfileLocked(id)
+	})
+}
+
 // DeleteProfile removes a profile by ID.
 func (v *VpnService) DeleteProfile(id string) error {
 	profiles, err := v.loadProfiles()
@@ -1199,8 +1475,11 @@ func (v *VpnService) DeleteProfile(id string) error {
 	return v.saveProfiles(filtered)
 }
 
-// ActivateProfile loads a profile's config into UCI and marks it as active.
-func (v *VpnService) ActivateProfile(id string) error {
+// ActivateProfileLocked loads a profile's config into UCI and marks it as
+// active. It writes network (via the import)
+// and firewall (the wg0 zone), so it runs inside the VPN transaction and calls
+// the lock-free cores.
+func (v *VpnService) ActivateProfileLocked(id string) error {
 	profiles, err := v.loadProfiles()
 	if err != nil {
 		return err
@@ -1218,7 +1497,7 @@ func (v *VpnService) ActivateProfile(id string) error {
 	}
 
 	// Apply the config via the existing import logic
-	if err := v.ImportWireguardConfig(target.Config); err != nil {
+	if err := v.ImportWireguardConfigLocked(target.Config); err != nil {
 		return fmt.Errorf("applying profile config: %w", err)
 	}
 
@@ -1444,45 +1723,134 @@ func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
 	return cfg, nil
 }
 
+// SetSplitTunnel is the entry point from the API. It takes the UCI transaction for every
+// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
+// the middle of a VPN toggle and revert half of it.
+func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
+	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+		return v.SetSplitTunnelLocked(cfg)
+	})
+}
+
 // SetSplitTunnel saves the split tunnel config and updates WireGuard allowed IPs in UCI.
 // mode "all" = route everything through VPN (0.0.0.0/0,::/0)
-// mode "custom" = only route specified CIDR ranges
-func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
-	data, err := json.Marshal(cfg)
+// mode "custom" = only route the specified CIDR ranges (at least one is required;
+//
+//	an empty custom list must never silently become a full tunnel)
+//
+// Staged UCI deltas are reverted when any write fails, so a failed save cannot
+// leave peers with a half-written allowed_ips list.
+func (v *VpnService) SetSplitTunnelLocked(cfg models.SplitTunnelConfig) error {
+	allowedParts, err := splitTunnelAllowedIPs(cfg)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("/etc/travo", 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(splitTunnelPath, data, 0o644); err != nil {
-		return err
-	}
 
-	allowedParts := []string{"0.0.0.0/0", "::/0"}
-	if cfg.Mode == "custom" && len(cfg.Routes) > 0 {
-		allowedParts = cfg.Routes
-	}
 	sections, err := v.uci.GetSections("network")
 	if err != nil {
 		return err
 	}
+	// Snapshot the current values so a partial write can be reverted.
+	var snapshots []splitTunnelPeerSnapshot
 	for name, opts := range sections {
-		if strings.HasPrefix(opts[".type"], "wireguard_") {
-			_ = v.uci.DeleteOption("network", name, "allowed_ips")
-			for _, cidr := range allowedParts {
-				cidr = strings.TrimSpace(cidr)
-				if cidr == "" {
-					continue
-				}
-				if err := v.uci.AddList("network", name, "allowed_ips", cidr); err != nil {
-					return err
-				}
+		if !strings.HasPrefix(opts[".type"], "wireguard_") {
+			continue
+		}
+		var allowed []string
+		for _, cidr := range strings.Split(opts["allowed_ips"], ",") {
+			if trimmed := strings.TrimSpace(cidr); trimmed != "" {
+				allowed = append(allowed, trimmed)
 			}
-			_ = v.uci.Set("network", name, "route_allowed_ips", "1")
+		}
+		snapshots = append(snapshots, splitTunnelPeerSnapshot{name: name, allowed: allowed})
+	}
+	slices.SortFunc(snapshots, func(a, b splitTunnelPeerSnapshot) int { return strings.Compare(a.name, b.name) })
+
+	for _, snap := range snapshots {
+		if err := v.setPeerAllowedIPs(snap.name, allowedParts); err != nil {
+			if rbErr := v.restorePeerAllowedIPs(snapshots); rbErr != nil {
+				return fmt.Errorf("updating split tunnel: %w (revert incomplete: %v)", err, rbErr)
+			}
+			return fmt.Errorf("updating split tunnel: %w", err)
 		}
 	}
-	return v.uci.Commit("network")
+	if err := v.uci.Commit("network"); err != nil {
+		if rbErr := v.restorePeerAllowedIPs(snapshots); rbErr != nil {
+			return fmt.Errorf("committing split tunnel: %w (revert incomplete: %v)", err, rbErr)
+		}
+		return fmt.Errorf("committing split tunnel: %w", err)
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(splitTunnelPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(splitTunnelPath, data, 0o644)
+}
+
+// splitTunnelAllowedIPs validates the split tunnel config and returns the
+// allowed_ips values to write to every WireGuard peer.
+func splitTunnelAllowedIPs(cfg models.SplitTunnelConfig) ([]string, error) {
+	switch cfg.Mode {
+	case "all", "":
+		return []string{"0.0.0.0/0", "::/0"}, nil
+	case "custom":
+		var routes []string
+		for _, route := range cfg.Routes {
+			if trimmed := strings.TrimSpace(route); trimmed != "" {
+				routes = append(routes, trimmed)
+			}
+		}
+		if len(routes) == 0 {
+			return nil, errors.New("custom split tunnel requires at least one route")
+		}
+		return routes, nil
+	default:
+		return nil, fmt.Errorf("unknown split tunnel mode %q (expected \"all\" or \"custom\")", cfg.Mode)
+	}
+}
+
+// setPeerAllowedIPs replaces a peer's allowed_ips with the given CIDR list.
+func (v *VpnService) setPeerAllowedIPs(peer string, cidrs []string) error {
+	_ = v.uci.DeleteOption("network", peer, "allowed_ips")
+	for _, cidr := range cidrs {
+		if err := v.uci.AddList("network", peer, "allowed_ips", cidr); err != nil {
+			return fmt.Errorf("set allowed_ips %s: %w", cidr, err)
+		}
+	}
+	return v.uci.Set("network", peer, "route_allowed_ips", "1")
+}
+
+// splitTunnelPeerSnapshot holds a peer's allowed_ips before a split tunnel change.
+type splitTunnelPeerSnapshot struct {
+	name    string
+	allowed []string
+}
+
+// restorePeerAllowedIPs reverts peers to their pre-change allowed_ips values.
+func (v *VpnService) restorePeerAllowedIPs(snapshots []splitTunnelPeerSnapshot) error {
+	var errs []error
+	for _, snap := range snapshots {
+		if len(snap.allowed) == 0 {
+			if err := v.uci.DeleteOption("network", snap.name, "allowed_ips"); err != nil {
+				errs = append(errs, fmt.Errorf("clearing allowed_ips on %s: %w", snap.name, err))
+			}
+			continue
+		}
+		if err := v.setPeerAllowedIPs(snap.name, snap.allowed); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	if err := v.uci.Commit("network"); err != nil {
+		return fmt.Errorf("committing reverted split tunnel: %w", err)
+	}
+	return nil
 }
 
 // GetTailscaleSSHEnabled returns whether Tailscale SSH is enabled.
@@ -1504,6 +1872,9 @@ func (v *VpnService) GetTailscaleSSHEnabled() (bool, error) {
 
 // SetTailscaleSSHEnabled enables or disables Tailscale SSH.
 func (v *VpnService) SetTailscaleSSHEnabled(enabled bool) error {
+	if err := requireTailscale(); err != nil {
+		return err
+	}
 	arg := "--ssh=false"
 	if enabled {
 		arg = "--ssh"

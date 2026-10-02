@@ -1,4 +1,4 @@
-.PHONY: dev build test lint format clean build-prod build-all package package-all deploy docker-dev install
+.PHONY: dev build test lint format format-check shellcheck integration clean build-prod build-all package package-all deploy docker-dev install coverage
 
 # Run a command through mise's resolved toolchain (go, node, pnpm, golangci-lint),
 # so recipes are correct regardless of the caller shell's PATH/GOROOT/etc.
@@ -18,26 +18,83 @@ install:
 dev:
 	@bash scripts/dev.sh
 
+# Emit the mise-pinned toolchain versions as KEY=VALUE lines so CI never keeps a
+# second hardcoded copy (.mise.toml stays the single source of truth).
+# Uses awk only, so it works in a bare CI runner with no mise/pnpm installed.
+toolchain-versions:
+	@awk 'BEGIN { FS = "=" } \
+		/^[[:space:]]*(node|pnpm|golangci-lint|shellcheck)[[:space:]]*=/ { \
+			key = $$1; val = $$2; \
+			gsub(/[[:space:]]/, "", key); \
+			gsub(/-/, "_", key); \
+			sub(/^[[:space:]]+/, "", val); \
+			sub(/[[:space:]].*$$/, "", val); \
+			gsub(/"/, "", val); \
+			print key "=" val; \
+		} \
+		/^[[:space:]]*"go:golang.org\/x\/tools\/cmd\/goimports"[[:space:]]*=/ { \
+			val = $$2; \
+			sub(/^[[:space:]]+/, "", val); \
+			sub(/[[:space:]].*$$/, "", val); \
+			gsub(/"/, "", val); \
+			gsub(/^v/, "", val); \
+			print "goimports=" val; \
+		}' .mise.toml
+
 # Build frontend and backend
 build:
 	cd frontend && $(RUN) pnpm build
 	cd backend && CGO_ENABLED=0 $(RUN) go build -ldflags="-s -w" -o bin/server ./cmd/server
 
-# Run all tests (Go + Vitest)
+# Run all tests (Go + Vitest). -count=1 disables the test result cache so a
+# local run never reports a stale green.
 test:
-	cd backend && $(RUN) go test ./...
+	cd backend && $(RUN) go test -count=1 ./...
 	cd shared && $(RUN) pnpm test
 	cd frontend && $(RUN) pnpm test
+
+# Run the Go test suite with the race detector (same as CI's race job)
+test-race:
+	cd backend && $(RUN) go test -count=1 -race ./...
+
+# Go coverage summary per package (informational; no gate)
+coverage:
+	cd backend && $(RUN) go test -count=1 -coverprofile=coverage.out ./...
+	cd backend && $(RUN) go tool cover -func=coverage.out | tail -20
 
 # Lint all code
 lint:
 	$(RUN) pnpm lint
 	cd backend && $(RUN) golangci-lint run ./...
 
-# Format all code
+# Format all code (repo-wide; prefer prettier --write on specific files)
 format:
 	$(RUN) pnpm format
 	cd backend && $(RUN) goimports -w .
+
+# Format check gate: fails (non-zero) when any file is unformatted.
+format-check:
+	@$(RUN) pnpm format:check
+	@cd backend && \
+	  for tool in gofmt goimports; do \
+	    $(RUN) sh -c "command -v $$tool" >/dev/null 2>&1 \
+	      || { echo "$$tool is not available via the pinned toolchain; the format gate would silently pass."; exit 1; }; \
+	  done; \
+	  out="$$($(RUN) sh -c 'gofmt -l .; goimports -l .')"; \
+	  if [ -n "$$out" ]; then \
+	    echo "Unformatted Go files:"; echo "$$out" | sort -u; \
+	    echo "Run 'make format' to fix."; exit 1; \
+	  fi
+	@echo "format-check: OK"
+
+# Shell lint gate for the device-mutating scripts
+# Gate at warning severity. The remaining info-level findings in these scripts are
+# intentional and must not be "fixed" blindly, because they are device-mutating
+# scripts: SC2059 (styled printf banners in install.sh), SC2086 ($SSH_OPTS is a
+# word-split option list on purpose) and SC2029 (remote shell expansion is the
+# point of ssh_cmd). Raising severity means a real error or warning fails the build.
+shellcheck:
+	@$(RUN) shellcheck --severity=warning --external-sources scripts/*.sh test/integration/*.sh
 
 # Cross-compile production binary for OpenWRT (aarch64)
 build-prod:
@@ -75,6 +132,27 @@ deploy-local:
 # Start Docker dev environment
 docker-dev:
 	docker compose up
+
+# Device integration suites. These mutate a REAL router, so they are never run
+# by CI. Override the target and credentials as needed:
+#
+#   make integration ROUTER_IP=192.168.1.1
+#   make integration SUITE=integration-device.sh
+#   make integration LOGIN_PASSWORD=...
+#
+# Host-key verification is enforced by default; set TRAVO_INSECURE_SSH=1 only for
+# a throwaway router whose key is not in your known_hosts.
+ROUTER_IP ?= 192.168.1.1
+SUITE ?= all
+LOGIN_PASSWORD ?= admin
+integration:
+	@if [ "$$SUITE" = "all" ]; then \
+	  set -e; for s in test/integration/*.sh; do \
+	    echo "=== $$s ==="; bash "$$s" --ip $(ROUTER_IP) --login-password '$(LOGIN_PASSWORD)' || exit $$?; \
+	  done; \
+	else \
+	  bash test/integration/$$SUITE --ip $(ROUTER_IP) --login-password '$(LOGIN_PASSWORD)'; \
+	fi
 
 # Report binary and bundle sizes
 size-audit:

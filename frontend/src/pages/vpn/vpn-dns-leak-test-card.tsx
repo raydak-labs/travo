@@ -75,7 +75,9 @@ export function VpnDnsLeakTestCard() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-gray-400">None found in /etc/resolv.conf</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  None found in /etc/resolv.conf
+                </p>
               )}
             </div>
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -21,7 +22,7 @@ import (
 const captiveProbeURL = "http://connectivitycheck.gstatic.com/generate_204"
 
 // captiveDNSGuardFile stores original DNS config while bypass is active.
-const captiveDNSGuardFile = "/etc/travo/captive-dns-in-progress"
+const captiveDNSGuardFile = crashGuardDir + "/captive-dns-in-progress"
 
 // captiveDNSRestoreTimeout auto-restores DNS if bypass has been active too long.
 const captiveDNSRestoreTimeout = 5 * time.Minute
@@ -93,6 +94,11 @@ type CaptiveService struct {
 	// test overrides (empty in production)
 	adguardAPIBaseOverride string
 	resolvConfAutoOverride string
+	// stopCh cancels the startup auto-restore goroutine so a shutdown does not
+	// race with a DNS restore (the goroutine used to be untracked).
+	stopCh   chan struct{}
+	stopOnce sync.Once
+	wg       sync.WaitGroup
 }
 
 // adguardAPIBase is the local AdGuardHome HTTP API endpoint.
@@ -119,15 +125,32 @@ type dnsBackup struct {
 
 // NewCaptiveService creates a new CaptiveService with the given HTTP prober.
 func NewCaptiveService(prober HTTPProber) *CaptiveService {
-	return &CaptiveService{prober: prober, guardFile: captiveDNSGuardFile}
+	return &CaptiveService{prober: prober, guardFile: captiveDNSGuardFile, stopCh: make(chan struct{})}
 }
 
 // NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
 func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *CaptiveService {
-	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: captiveDNSGuardFile}
-	// Auto-restore stale bypass on startup
-	go svc.autoRestoreStaleBypass()
+	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: captiveDNSGuardFile, stopCh: make(chan struct{})}
+	// Auto-restore stale bypass on startup. Tracked by the app lifecycle: Stop()
+	// must be able to keep this goroutine from restoring DNS after the process
+	// has begun shutting down.
+	svc.wg.Add(1)
+	go func() {
+		defer svc.wg.Done()
+		svc.autoRestoreStaleBypass()
+	}()
 	return svc
+}
+
+// Stop cancels the startup auto-restore goroutine and waits for it to finish.
+// Safe to call multiple times.
+func (c *CaptiveService) Stop() {
+	c.stopOnce.Do(func() {
+		if c.stopCh != nil {
+			close(c.stopCh)
+		}
+	})
+	c.wg.Wait()
 }
 
 // isUpstreamConnected returns true if the device has an active default route,
@@ -242,196 +265,295 @@ func (c *CaptiveService) IsDNSBypassed() bool {
 // local consumers) and AdGuardHome (which is the actual port-53 resolver for
 // LAN clients).  Original config is stored in the guard file for restoration.
 func (c *CaptiveService) BypassDNS() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	return mutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	if c.uci == nil {
-		return nil // no UCI = mock mode, noop
-	}
+		if c.uci == nil {
+			return nil // no UCI = mock mode, noop
+		}
 
-	// Already bypassed?
-	if _, err := os.Stat(c.guardFile); err == nil {
-		return nil
-	}
+		// Already bypassed?
+		if _, err := os.Stat(c.guardFile); err == nil {
+			return nil
+		}
 
-	// Read dnsmasq config
-	noresolv := c.getDnsmasqOption("noresolv")
-	servers := c.getDnsmasqServers()
-	rebindProtect := c.getDnsmasqOption("rebind_protection")
+		// Read dnsmasq config
+		noresolv := c.getDnsmasqOption("noresolv")
+		servers := c.getDnsmasqServers()
+		rebindProtect := c.getDnsmasqOption("rebind_protection")
 
-	// Read wan config for completeness
-	wanOpts, _ := c.uci.GetAll("network", "wan")
-	wanPeerdns := wanOpts["peerdns"]
-	wanDNS := wanOpts["dns"]
+		// Read wan config for completeness
+		wanOpts, _ := c.uci.GetAll("network", "wan")
+		wanPeerdns := wanOpts["peerdns"]
+		wanDNS := wanOpts["dns"]
 
-	// Determine whether anything actually blocks portal DNS resolution.
-	// Either dnsmasq noresolv, legacy wan peerdns=0, or AdGuardHome using
-	// encrypted DoH/DoT upstreams (which bypass hotel DNS hijacking).
-	agEncrypted := c.isAdGuardUsingEncryptedDNS()
-	needsBypass := noresolv == "1" || (wanPeerdns == "0" && strings.TrimSpace(wanDNS) != "") || agEncrypted
-	if !needsBypass {
-		return nil
-	}
+		// Determine whether anything actually blocks portal DNS resolution.
+		// Either dnsmasq noresolv, legacy wan peerdns=0, or AdGuardHome using
+		// encrypted DoH/DoT upstreams (which bypass hotel DNS hijacking).
+		agEncrypted := c.isAdGuardUsingEncryptedDNS()
+		needsBypass := noresolv == "1" || (wanPeerdns == "0" && strings.TrimSpace(wanDNS) != "") || agEncrypted
+		if !needsBypass {
+			return nil
+		}
 
-	// Get the DHCP-provided upstream DNS from the WAN interface.
-	// This is what the captive portal network expects us to use.
-	hotelDNS := c.readDHCPDNS()
-	if hotelDNS == "" {
-		log.Printf("captive: could not read DHCP DNS from resolv.conf.auto")
-	}
+		// Get the DHCP-provided upstream DNS from the WAN interface.
+		// This is what the captive portal network expects us to use.
+		//
+		// If it is unknown we must abort: proceeding would clear noresolv and drop
+		// the configured server list, leaving dnsmasq with no usable upstream at all
+		// (a strictly worse state than the one we are trying to escape). Bypass is
+		// recoverable, a resolver with zero upstreams is not.
+		hotelDNS := c.readDHCPDNS()
+		if hotelDNS == "" {
+			return fmt.Errorf("captive: no DHCP-provided DNS in %s; refusing to bypass (would leave dnsmasq with no upstream)", c.resolvConfPath())
+		}
 
-	// Read current AdGuardHome upstream config so we can restore it.
-	agUpstream, agBootstrap, agFallback := c.readAdGuardUpstream()
+		// Read current AdGuardHome upstream config so we can restore it.
+		agUpstream, agBootstrap, agFallback := c.readAdGuardUpstream()
 
-	// Save current state (including AdGuardHome config)
-	backup := dnsBackup{
-		PeerDNS:              wanPeerdns,
-		DNS:                  wanDNS,
-		DnsmasqNoResolv:      noresolv,
-		DnsmasqServers:       servers,
-		DnsmasqRebindProtect: rebindProtect,
-		AdGuardUpstream:      agUpstream,
-		AdGuardBootstrap:     agBootstrap,
-		AdGuardFallback:      agFallback,
-		Time:                 time.Now().Unix(),
-	}
-	data, err := json.Marshal(backup)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(c.guardFile), 0755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(c.guardFile, data, 0600); err != nil {
-		return err
-	}
-
-	// --- Patch dnsmasq (only needed when noresolv=1 or rebind protection) ---
-	needsDnsmasqCommit := false
-	if noresolv == "1" {
-		if err := c.setDnsmasqOption("noresolv", "0"); err != nil {
-			_ = os.Remove(c.guardFile)
+		// Save current state (including AdGuardHome config)
+		backup := dnsBackup{
+			PeerDNS:              wanPeerdns,
+			DNS:                  wanDNS,
+			DnsmasqNoResolv:      noresolv,
+			DnsmasqServers:       servers,
+			DnsmasqRebindProtect: rebindProtect,
+			AdGuardUpstream:      agUpstream,
+			AdGuardBootstrap:     agBootstrap,
+			AdGuardFallback:      agFallback,
+			Time:                 time.Now().Unix(),
+		}
+		data, err := json.Marshal(backup)
+		if err != nil {
 			return err
 		}
-		_ = c.deleteDnsmasqOption("server")
-		// Add hotel DNS as explicit dnsmasq upstream (belt-and-suspenders)
+		if err := c.writeGuardFile(data); err != nil {
+			return err
+		}
+
+		// --- Patch dnsmasq (only needed when noresolv=1 or rebind protection) ---
+		needsDnsmasqCommit := false
+		if noresolv == "1" {
+			if err := c.setDnsmasqOption("noresolv", "0"); err != nil {
+				_ = os.Remove(c.guardFile)
+				return err
+			}
+			if err := c.deleteDnsmasqOption("server"); err != nil {
+				_ = os.Remove(c.guardFile)
+				return err
+			}
+			// Add hotel DNS as explicit dnsmasq upstream (belt-and-suspenders)
+			if hotelDNS != "" {
+				if err := c.addDnsmasqListItem("server", hotelDNS); err != nil {
+					_ = os.Remove(c.guardFile)
+					return err
+				}
+			}
+			needsDnsmasqCommit = true
+		}
+		if rebindProtect == "1" {
+			if err := c.setDnsmasqOption("rebind_protection", "0"); err != nil {
+				_ = os.Remove(c.guardFile)
+				return err
+			}
+			needsDnsmasqCommit = true
+		}
+		if needsDnsmasqCommit {
+			if err := c.commitDhcp(); err != nil {
+				_ = os.Remove(c.guardFile)
+				return err
+			}
+			if c.cmd != nil {
+				_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
+			}
+		}
+		if wanPeerdns == "0" {
+			// The dnsmasq bypass is already committed and applied at this point, so
+			// the guard is the ONLY record of the pre-bypass configuration. Deleting
+			// it on a failure here would leave RestoreDNS with nothing to restore and
+			// strand LAN DNS on the hotel resolver. A stale guard only means the
+			// restore runs on the next check, so keeping it is the safe direction.
+			if err := c.uci.Set("network", "wan", "peerdns", "1"); err != nil {
+				return err
+			}
+			if err := c.uci.Set("network", "wan", "dns", ""); err != nil {
+				return err
+			}
+			if err := c.uci.Commit("network"); err != nil {
+				return err
+			}
+		}
+
+		// --- Patch AdGuardHome (this is the actual port-53 resolver) ---
+		// Switch its upstream from DoH/DoT to the plain hotel DNS so that
+		// captive portal hostnames (which resolve to private IPs) are resolved.
 		if hotelDNS != "" {
-			_ = c.addDnsmasqListItem("server", hotelDNS)
+			if err := c.setAdGuardUpstream([]string{hotelDNS}, nil, nil); err != nil {
+				log.Printf("captive: warning — could not update AdGuardHome upstream: %v", err)
+				// Non-fatal: dnsmasq changes are still in effect
+			} else {
+				log.Printf("captive: AdGuardHome upstream switched to %s", hotelDNS)
+			}
 		}
-		needsDnsmasqCommit = true
-	}
-	if rebindProtect == "1" {
-		_ = c.setDnsmasqOption("rebind_protection", "0")
-		needsDnsmasqCommit = true
-	}
-	if needsDnsmasqCommit {
-		if err := c.commitDhcp(); err != nil {
-			_ = os.Remove(c.guardFile)
-			return err
-		}
-		if c.cmd != nil {
-			_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
-		}
-	}
-	if wanPeerdns == "0" {
-		_ = c.uci.Set("network", "wan", "peerdns", "1")
-		_ = c.uci.Set("network", "wan", "dns", "")
-		_ = c.uci.Commit("network")
-	}
 
-	// --- Patch AdGuardHome (this is the actual port-53 resolver) ---
-	// Switch its upstream from DoH/DoT to the plain hotel DNS so that
-	// captive portal hostnames (which resolve to private IPs) are resolved.
-	if hotelDNS != "" {
-		if err := c.setAdGuardUpstream([]string{hotelDNS}, nil, nil); err != nil {
-			log.Printf("captive: warning — could not update AdGuardHome upstream: %v", err)
-			// Non-fatal: dnsmasq changes are still in effect
-		} else {
-			log.Printf("captive: AdGuardHome upstream switched to %s", hotelDNS)
-		}
-	}
-
-	log.Printf("captive: DNS bypassed (noresolv=%s, servers=%v, hotelDNS=%s)", noresolv, servers, hotelDNS)
-	return nil
+		log.Printf("captive: DNS bypassed (noresolv=%s, servers=%v, hotelDNS=%s)", noresolv, servers, hotelDNS)
+		return nil
+	})
 }
 
 // RestoreDNS restores the original DNS config from the guard file.
+// The guard file is removed ONLY when every step succeeded: it is the sole
+// record of the pre-bypass configuration, so deleting it after a partial
+// failure would make the original state unrecoverable.
 func (c *CaptiveService) RestoreDNS() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	return mutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	if c.uci == nil {
+		if c.uci == nil {
+			return nil
+		}
+
+		data, err := os.ReadFile(c.guardFile)
+		if err != nil {
+			return nil // no guard file = nothing to restore
+		}
+
+		var backup dnsBackup
+		if err := json.Unmarshal(data, &backup); err != nil {
+			// Keep the file: it is the only copy of the pre-bypass state.
+			return fmt.Errorf("captive: guard file %s is unreadable, DNS not restored (remove it manually once recovered): %w", c.guardFile, err)
+		}
+
+		var errs []error
+		fail := func(format string, args ...any) {
+			errs = append(errs, fmt.Errorf(format, args...))
+		}
+
+		// Restore dnsmasq settings — always restore noresolv regardless of servers
+		needsDhcpCommit := false
+		if backup.DnsmasqNoResolv != "" {
+			if err := c.setDnsmasqOption("noresolv", backup.DnsmasqNoResolv); err != nil {
+				fail("restoring dnsmasq noresolv: %w", err)
+			}
+			needsDhcpCommit = true
+		}
+		// Delete current servers first, then re-add original ones
+		if err := c.deleteDnsmasqOption("server"); err != nil {
+			fail("clearing dnsmasq server list: %w", err)
+		}
+		for _, srv := range backup.DnsmasqServers {
+			if err := c.addDnsmasqListItem("server", srv); err != nil {
+				fail("restoring dnsmasq server %s: %w", srv, err)
+			}
+			needsDhcpCommit = true
+		}
+		if backup.DnsmasqRebindProtect == "1" {
+			if err := c.setDnsmasqOption("rebind_protection", "1"); err != nil {
+				fail("restoring dnsmasq rebind_protection: %w", err)
+			}
+			needsDhcpCommit = true
+		}
+		if needsDhcpCommit {
+			if err := c.commitDhcp(); err != nil {
+				fail("committing dnsmasq config: %w", err)
+			}
+		}
+
+		// Restore wan settings
+		if backup.PeerDNS != "" {
+			if err := c.uci.Set("network", "wan", "peerdns", backup.PeerDNS); err != nil {
+				fail("restoring wan peerdns: %w", err)
+			}
+		}
+		if backup.DNS != "" {
+			if err := c.uci.Set("network", "wan", "dns", backup.DNS); err != nil {
+				fail("restoring wan dns: %w", err)
+			}
+		}
+		if backup.PeerDNS != "" || backup.DNS != "" {
+			if err := c.uci.Commit("network"); err != nil {
+				fail("committing network config: %w", err)
+			}
+		}
+
+		// Restore AdGuardHome upstream DNS
+		if len(backup.AdGuardUpstream) > 0 {
+			if err := c.setAdGuardUpstream(backup.AdGuardUpstream, backup.AdGuardBootstrap, backup.AdGuardFallback); err != nil {
+				// AdGuard is a best-effort extra; a failure here leaves the guard
+				// file in place so the next attempt (or the auto-restore) retries it.
+				fail("restoring AdGuardHome upstream: %w", err)
+			} else {
+				log.Printf("captive: AdGuardHome upstream restored to %v", backup.AdGuardUpstream)
+			}
+		}
+
+		if c.cmd != nil {
+			if _, err := c.cmd.Run("/etc/init.d/dnsmasq", "restart"); err != nil {
+				fail("restarting dnsmasq: %w", err)
+			}
+		}
+
+		if len(errs) > 0 {
+			return fmt.Errorf("captive: DNS restore incomplete (%d step(s) failed); %s kept for retry: %w",
+				len(errs), c.guardFile, errors.Join(errs...))
+		}
+
+		if err := os.Remove(c.guardFile); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("captive: DNS restored but could not remove %s: %w", c.guardFile, err)
+		}
+
+		log.Printf("captive: DNS restored")
 		return nil
-	}
+	})
+}
 
-	data, err := os.ReadFile(c.guardFile)
-	if err != nil {
-		return nil // no guard file = nothing to restore
-	}
-
-	var backup dnsBackup
-	if err := json.Unmarshal(data, &backup); err != nil {
-		_ = os.Remove(c.guardFile)
+// writeGuardFile writes the DNS backup atomically (temp file + rename).
+// BypassDNS/RestoreDNS and refreshBypassTimestamp all target the same file
+// under c.mu; a truncating O_TRUNC-style write would let a concurrent reader
+// observe a half-written JSON document, which fails to unmarshal and used to
+// delete the only record of the pre-bypass state.
+func (c *CaptiveService) writeGuardFile(data []byte) error {
+	dir := filepath.Dir(c.guardFile)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
+	tmp, err := os.CreateTemp(dir, filepath.Base(c.guardFile)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // no-op after a successful rename
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, c.guardFile)
+}
 
-	// Restore dnsmasq settings — always restore noresolv regardless of servers
-	needsDhcpCommit := false
-	if backup.DnsmasqNoResolv != "" {
-		_ = c.setDnsmasqOption("noresolv", backup.DnsmasqNoResolv)
-		needsDhcpCommit = true
+// resolvConfPath returns the path parsed for the DHCP-provided nameserver.
+func (c *CaptiveService) resolvConfPath() string {
+	if c.resolvConfAutoOverride != "" {
+		return c.resolvConfAutoOverride
 	}
-	// Delete current servers first, then re-add original ones
-	_ = c.deleteDnsmasqOption("server")
-	for _, srv := range backup.DnsmasqServers {
-		_ = c.addDnsmasqListItem("server", srv)
-		needsDhcpCommit = true
-	}
-	if backup.DnsmasqRebindProtect == "1" {
-		_ = c.setDnsmasqOption("rebind_protection", "1")
-		needsDhcpCommit = true
-	}
-	if needsDhcpCommit {
-		_ = c.commitDhcp()
-	}
-
-	// Restore wan settings
-	if backup.PeerDNS != "" {
-		_ = c.uci.Set("network", "wan", "peerdns", backup.PeerDNS)
-	}
-	if backup.DNS != "" {
-		_ = c.uci.Set("network", "wan", "dns", backup.DNS)
-	}
-	if backup.PeerDNS != "" || backup.DNS != "" {
-		_ = c.uci.Commit("network")
-	}
-
-	// Restore AdGuardHome upstream DNS
-	if len(backup.AdGuardUpstream) > 0 {
-		if err := c.setAdGuardUpstream(backup.AdGuardUpstream, backup.AdGuardBootstrap, backup.AdGuardFallback); err != nil {
-			log.Printf("captive: warning — could not restore AdGuardHome upstream: %v", err)
-		} else {
-			log.Printf("captive: AdGuardHome upstream restored to %v", backup.AdGuardUpstream)
-		}
-	}
-
-	_ = os.Remove(c.guardFile)
-
-	if c.cmd != nil {
-		_, _ = c.cmd.Run("/etc/init.d/dnsmasq", "restart")
-	}
-
-	log.Printf("captive: DNS restored")
-	return nil
+	return resolvConfAuto
 }
 
 // readDHCPDNS parses the first nameserver line from resolv.conf.auto —
 // this is the DNS server handed out by the upstream network via DHCP.
 func (c *CaptiveService) readDHCPDNS() string {
-	path := resolvConfAuto
-	if c.resolvConfAutoOverride != "" {
-		path = c.resolvConfAutoOverride
-	}
+	path := c.resolvConfPath()
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
@@ -568,12 +690,19 @@ func (c *CaptiveService) setDnsmasqOption(option, value string) error {
 }
 
 // deleteDnsmasqOption deletes a dnsmasq option via uci delete.
+// deleteDnsmasqOption removes a dnsmasq option. A missing option is not a
+// failure: the AdGuard-only bypass path never creates a `server` list, and
+// treating "Entry not found" as an error made RestoreDNS fail on every attempt,
+// which kept the guard forever and left IsDNSBypassed stuck true.
 func (c *CaptiveService) deleteDnsmasqOption(option string) error {
 	if c.cmd == nil {
 		return nil
 	}
-	_, _ = c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0]."+option)
-	return nil
+	out, err := c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0]."+option)
+	if err != nil && strings.Contains(string(out)+err.Error(), "Entry not found") {
+		return nil
+	}
+	return err
 }
 
 // addDnsmasqListItem appends a value to a dnsmasq list option.
@@ -596,14 +725,21 @@ func (c *CaptiveService) commitDhcp() error {
 
 // autoRestoreStaleBypass restores DNS if guard file is older than timeout.
 func (c *CaptiveService) autoRestoreStaleBypass() {
-	time.Sleep(10 * time.Second) // wait for startup
+	// wait for startup, but give up immediately on shutdown
+	select {
+	case <-time.After(10 * time.Second):
+	case <-c.stopCh:
+		return
+	}
 	data, err := os.ReadFile(c.guardFile)
 	if err != nil {
 		return
 	}
 	var backup dnsBackup
 	if err := json.Unmarshal(data, &backup); err != nil {
-		_ = os.Remove(c.guardFile)
+		// A corrupt guard file is the only record of the pre-bypass DNS config.
+		// Keep it (ADR 0003) instead of deleting it, and let an operator decide.
+		log.Printf("captive: guard file %s is unreadable (%v); leaving it in place for manual recovery", c.guardFile, err)
 		return
 	}
 	age := time.Since(time.Unix(backup.Time, 0))
@@ -623,13 +759,20 @@ func (c *CaptiveService) MaybeAutoRestoreDNS(canReachInternet bool) {
 }
 
 // refreshBypassTimestamp updates the guard file timestamp to prevent stale auto-restore.
+// It takes c.mu (the same lock BypassDNS/RestoreDNS hold) and rewrites the file
+// atomically, so it can never race a concurrent bypass/restore into producing a
+// truncated, unreadable guard file.
 func (c *CaptiveService) refreshBypassTimestamp() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	data, err := os.ReadFile(c.guardFile)
 	if err != nil {
 		return
 	}
 	var backup dnsBackup
 	if err := json.Unmarshal(data, &backup); err != nil {
+		log.Printf("captive: cannot refresh bypass timestamp: %s unreadable: %v", c.guardFile, err)
 		return
 	}
 	backup.Time = time.Now().Unix()
@@ -637,7 +780,9 @@ func (c *CaptiveService) refreshBypassTimestamp() {
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(c.guardFile, newData, 0600)
+	if err := c.writeGuardFile(newData); err != nil {
+		log.Printf("captive: cannot refresh bypass timestamp: %v", err)
+	}
 }
 
 // CheckDNSBypassNeeded returns true if custom DNS is configured that would

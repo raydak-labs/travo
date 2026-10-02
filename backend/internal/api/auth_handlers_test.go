@@ -17,7 +17,8 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-func setupTestApp() (*fiber.App, *Dependencies) {
+func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
+	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	authSvc := auth.NewAuthService("admin", "test-secret")
@@ -25,7 +26,12 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	authSvc.SetBlocklist(blocklist)
 	rateLimiter := auth.NewRateLimiter(5, time.Minute)
 
-	tmpDir, _ := os.MkdirTemp("", "vpn-test-*")
+	// t.TempDir() is removed when the test finishes and fails the test if it
+	// cannot be created. A bare os.MkdirTemp with a discarded error is worse than
+	// useless here: on failure tmpDir would be "" and every derived path below
+	// would silently become an absolute root path ("/wireguard_profiles.json"),
+	// and each of the ~100 call sites would leak its own directory.
+	tmpDir := t.TempDir()
 	profilesPath := tmpDir + "/wireguard_profiles.json"
 	priorityPath := tmpDir + "/wifi-priorities.json"
 	autoReconnectPath := tmpDir + "/autoreconnect.json"
@@ -35,6 +41,15 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 	authStore := auth.NewFileAuthStore(authConfigPath)
 
 	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
+
+	networkSvc := services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{})
+	// Pretend ddns-scripts is installed, so the DDNS endpoints exercise their
+	// normal path. TestSetDDNSConfig_MissingPackage_Returns503 covers the other
+	// case explicitly.
+	if err := os.WriteFile(tmpDir+"/init.d-ddns", []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write fake ddns init script: %v", err)
+	}
+	networkSvc.SetDDNSInitScript(tmpDir + "/init.d-ddns")
 	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
 
 	deps := &Dependencies{
@@ -43,7 +58,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
 		System:      systemSvc,
-		Network:     services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{}),
+		Network:     networkSvc,
 		Wifi:        wifiSvc,
 		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
@@ -68,7 +83,7 @@ func setupTestApp() (*fiber.App, *Dependencies) {
 }
 
 func TestLoginSuccess(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	body, _ := json.Marshal(map[string]string{"password": "admin"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -84,7 +99,7 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginWrongPassword(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	body, _ := json.Marshal(map[string]string{"password": "wrong"})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -99,7 +114,7 @@ func TestLoginWrongPassword(t *testing.T) {
 }
 
 func TestProtectedRouteWithoutToken(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
@@ -112,7 +127,7 @@ func TestProtectedRouteWithoutToken(t *testing.T) {
 }
 
 func TestProtectedRouteWithToken(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/v1/system/info", nil)
@@ -129,7 +144,7 @@ func TestProtectedRouteWithToken(t *testing.T) {
 }
 
 func TestLogoutBlocksToken(t *testing.T) {
-	app, deps := setupTestApp()
+	app, deps := setupTestApp(t)
 
 	// Login to get a token
 	token, _, _ := deps.Auth.Login("admin")
@@ -172,7 +187,7 @@ func TestLogoutBlocksToken(t *testing.T) {
 }
 
 func TestLoginRateLimited(t *testing.T) {
-	app, _ := setupTestApp()
+	app, _ := setupTestApp(t)
 
 	// Make 5 failed login attempts
 	for i := range 5 {
@@ -201,5 +216,101 @@ func TestLoginRateLimited(t *testing.T) {
 	if resp.StatusCode != http.StatusTooManyRequests {
 		b, _ := io.ReadAll(resp.Body)
 		t.Errorf("expected 429, got %d, body: %s", resp.StatusCode, b)
+	}
+}
+
+// A password change must invalidate every other session and hand the caller a
+// fresh token, so a stolen token cannot outlive the change.
+func TestChangePasswordRevokesSessionsAndReturnsToken(t *testing.T) {
+	app, deps := setupTestApp(t)
+	deps.Auth.SetSessionRegistry(auth.NewSessionRegistry(time.Hour))
+
+	stolen, _, err := deps.Auth.Login("admin")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	caller, _, err := deps.Auth.Login("admin")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"current_password": "admin",
+		"new_password":     "newpassword123",
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/auth/password", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+caller)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, respBody)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(respBody, &data); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	fresh, _ := data["token"].(string)
+	if fresh == "" {
+		t.Fatalf("expected a fresh token in the response, got %s", respBody)
+	}
+	if status, _ := data["status"].(string); status != "ok" {
+		t.Errorf("expected status ok for backwards compatibility, got %s", respBody)
+	}
+	if err := deps.Auth.ValidateToken(fresh); err != nil {
+		t.Errorf("expected the fresh token to be valid, got %v", err)
+	}
+
+	// The old caller token and the other session are both dead.
+	for name, token := range map[string]string{"caller": caller, "stolen": stolen} {
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		r, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("%s session check: %v", name, err)
+		}
+		r.Body.Close()
+		if r.StatusCode != http.StatusUnauthorized {
+			t.Errorf("%s token: expected 401 after the password change, got %d", name, r.StatusCode)
+		}
+	}
+
+	// The fresh token keeps the caller logged in.
+	req, _ = http.NewRequest(http.MethodGet, "/api/v1/auth/session", nil)
+	req.Header.Set("Authorization", "Bearer "+fresh)
+	r, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("fresh token session check: %v", err)
+	}
+	r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		t.Errorf("fresh token: expected 200, got %d", r.StatusCode)
+	}
+}
+
+func TestChangePasswordRejectsShortPassword(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+
+	body, _ := json.Marshal(map[string]string{
+		"current_password": "admin",
+		"new_password":     "short12",
+	})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/auth/password", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d, body: %s", resp.StatusCode, b)
 	}
 }

@@ -58,7 +58,13 @@ export function DataUsageSection() {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Data Usage</CardTitle>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => void refetch()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            aria-label="Refresh data usage"
+            onClick={() => void refetch()}
+          >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
           <BarChart2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />

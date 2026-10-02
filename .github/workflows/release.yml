@@ -3,12 +3,32 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # A release must never ship from a red main: re-run the CI checks against the
+  # exact tagged commit and fail the release when anything is red.
+  #
+  # A reusable workflow is called at the job level, never from steps — a job that
+  # calls one has no runs-on and no steps of its own. $/.github/workflows/<file> is
+  # the documented same-repository form (GitHub's recommended syntax; it resolves
+  # against this repository, not the caller's workspace) and, like ./, resolves
+  # to the caller's own commit. It must not carry an @ref.
+  verify:
+    name: Verify CI green on the tagged commit
+    uses: $/.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   build-and-release:
     name: Build (${{ matrix.arch }})
+    needs: [verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,13 +53,17 @@ jobs:
           go-version-file: backend/go.mod
           cache: false
 
+      - name: Read pinned toolchain versions
+        id: toolchain
+        run: make toolchain-versions >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 11
+          version: ${{ steps.toolchain.outputs.pnpm }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: ${{ steps.toolchain.outputs.node }}
           package-manager-cache: false
 
       - name: Install dependencies
@@ -53,6 +77,13 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # main.BuildTime doubles as the time-sync plausibility floor (see
+      # cmd/server/main.go); a release that omits it falls back to a hardcoded
+      # 2025-01-01 floor and weakens the unauthenticated time-sync gate.
+      - name: Stamp build time
+        id: buildmeta
+        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Cross-compile backend
         working-directory: backend
         env:
@@ -60,9 +91,10 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           VERSION: ${{ steps.version.outputs.VERSION }}
+          BUILD_TIME: ${{ steps.buildmeta.outputs.BUILD_TIME }}
         run: |
           go build \
-            -ldflags "-s -w -X main.Version=${VERSION}" \
+            -ldflags "-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
             -o "../dist/travo" \
             ./cmd/server
 
@@ -86,7 +118,7 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: build-and-release
+    needs: [verify, build-and-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write

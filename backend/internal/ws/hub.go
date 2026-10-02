@@ -31,6 +31,7 @@ type Hub struct {
 	alertSvc          *services.AlertService
 	networkStatusCh   <-chan models.NetworkStatus
 	stopCh            chan struct{}
+	stopOnce          sync.Once
 	BroadcastInterval time.Duration
 }
 
@@ -131,9 +132,26 @@ func (h *Hub) Start() {
 	}()
 }
 
-// Stop stops the broadcast loop.
+// Stop stops the broadcast loop and closes every registered client. It is
+// idempotent: shutdown paths (signal handler, tests, reload) may all call it.
 func (h *Hub) Stop() {
-	close(h.stopCh)
+	h.stopOnce.Do(func() {
+		close(h.stopCh)
+
+		// A stopped hub must not leave upgraded sockets streaming: nothing
+		// else closes them, and each one pins a goroutine and a client fd.
+		h.mu.Lock()
+		conns := make([]Conn, 0, len(h.clients))
+		for conn := range h.clients {
+			conns = append(conns, conn)
+		}
+		h.clients = make(map[Conn]bool)
+		h.mu.Unlock()
+
+		for _, conn := range conns {
+			_ = conn.Close()
+		}
+	})
 }
 
 func (h *Hub) broadcastStats() {

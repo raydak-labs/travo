@@ -2,19 +2,33 @@ package services
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
-func newTestServiceManager() (*ServiceManager, *MockPackageManager, *MockSystemProbe) {
+// newTestServiceManagerWithGuard builds a ServiceManager whose crash-guard
+// files land in a temp dir instead of /etc/travo.
+func newTestServiceManagerWithGuard(t *testing.T, pkg PackageManager, probe SystemProbe) *ServiceManager {
+	t.Helper()
+	sm := NewServiceManagerWith(pkg, probe)
+	sm.SetGuardDir(t.TempDir())
+	return sm
+}
+
+func newTestServiceManager(t *testing.T) (*ServiceManager, *MockPackageManager, *MockSystemProbe) {
 	pkg := NewMockPackageManager()
 	probe := NewMockSystemProbe()
-	sm := NewServiceManagerWith(pkg, probe)
+	sm := newTestServiceManagerWithGuard(t, pkg, probe)
 	return sm, pkg, probe
 }
 
 func TestListServices(t *testing.T) {
-	sm, _, _ := newTestServiceManager()
+	sm, _, _ := newTestServiceManager(t)
 	services, err := sm.ListServices()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -30,7 +44,7 @@ func TestListServices(t *testing.T) {
 }
 
 func TestInstallService(t *testing.T) {
-	sm, pkg, probe := newTestServiceManager()
+	sm, pkg, probe := newTestServiceManager(t)
 	// Install sets the package as installed and adds init.d script
 	err := sm.Install("adguardhome")
 	if err != nil {
@@ -48,7 +62,7 @@ func TestInstallService(t *testing.T) {
 }
 
 func TestStartService(t *testing.T) {
-	sm, _, probe := newTestServiceManager()
+	sm, _, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	err := sm.Start("adguardhome")
@@ -62,7 +76,7 @@ func TestStartService(t *testing.T) {
 }
 
 func TestStopService(t *testing.T) {
-	sm, _, probe := newTestServiceManager()
+	sm, _, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	_ = sm.Start("adguardhome")
@@ -77,7 +91,7 @@ func TestStopService(t *testing.T) {
 }
 
 func TestGetServiceStatus(t *testing.T) {
-	sm, _, _ := newTestServiceManager()
+	sm, _, _ := newTestServiceManager(t)
 	info, err := sm.GetServiceStatus("wireguard")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -91,7 +105,7 @@ func TestGetServiceStatus(t *testing.T) {
 }
 
 func TestGetServiceStatusNotFound(t *testing.T) {
-	sm, _, _ := newTestServiceManager()
+	sm, _, _ := newTestServiceManager(t)
 	_, err := sm.GetServiceStatus("nonexistent")
 	if err == nil {
 		t.Error("expected error for nonexistent service")
@@ -99,7 +113,7 @@ func TestGetServiceStatusNotFound(t *testing.T) {
 }
 
 func TestWireguardInstalledState(t *testing.T) {
-	sm, pkg, _ := newTestServiceManager()
+	sm, pkg, _ := newTestServiceManager(t)
 	pkg.installed["wireguard-tools"] = true
 	info, _ := sm.GetServiceStatus("wireguard")
 	// WireGuard has no init.d, so installed state is "installed"
@@ -109,7 +123,7 @@ func TestWireguardInstalledState(t *testing.T) {
 }
 
 func TestRemoveServiceStopsFirst(t *testing.T) {
-	sm, pkg, probe := newTestServiceManager()
+	sm, pkg, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	_ = sm.Start("adguardhome")
@@ -129,7 +143,7 @@ func TestRemoveServiceStopsFirst(t *testing.T) {
 }
 
 func TestInstallWithLog(t *testing.T) {
-	sm, pkg, _ := newTestServiceManager()
+	sm, pkg, _ := newTestServiceManager(t)
 	var lines []string
 	logFn := func(line string) { lines = append(lines, line) }
 
@@ -146,7 +160,7 @@ func TestInstallWithLog(t *testing.T) {
 }
 
 func TestInstallWithLogNotFound(t *testing.T) {
-	sm, _, _ := newTestServiceManager()
+	sm, _, _ := newTestServiceManager(t)
 	err := sm.InstallWithLog("nonexistent", func(string) {})
 	if err == nil {
 		t.Error("expected error for nonexistent service")
@@ -154,7 +168,7 @@ func TestInstallWithLogNotFound(t *testing.T) {
 }
 
 func TestRemoveWithLog(t *testing.T) {
-	sm, pkg, probe := newTestServiceManager()
+	sm, pkg, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	_ = sm.Start("adguardhome")
@@ -175,7 +189,7 @@ func TestRemoveWithLog(t *testing.T) {
 }
 
 func TestRemoveWithLogStopsRunning(t *testing.T) {
-	sm, _, probe := newTestServiceManager()
+	sm, _, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	_ = sm.Start("adguardhome")
@@ -195,7 +209,7 @@ func TestRemoveWithLogStopsRunning(t *testing.T) {
 }
 
 func TestCacheUpdatesOnInstall(t *testing.T) {
-	sm, _, probe := newTestServiceManager()
+	sm, _, probe := newTestServiceManager(t)
 	sm.RefreshCache()
 
 	// Before install, cache shows not_installed
@@ -215,7 +229,7 @@ func TestCacheUpdatesOnInstall(t *testing.T) {
 }
 
 func TestCacheUpdatesOnStartStop(t *testing.T) {
-	sm, _, probe := newTestServiceManager()
+	sm, _, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	sm.RefreshCache()
@@ -234,7 +248,7 @@ func TestCacheUpdatesOnStartStop(t *testing.T) {
 }
 
 func TestCacheUpdatesOnRemove(t *testing.T) {
-	sm, _, probe := newTestServiceManager()
+	sm, _, probe := newTestServiceManager(t)
 	_ = sm.Install("adguardhome")
 	probe.scripts["adguardhome"] = true
 	sm.RefreshCache()
@@ -247,7 +261,7 @@ func TestCacheUpdatesOnRemove(t *testing.T) {
 }
 
 func TestListServicesUsesCache(t *testing.T) {
-	sm, pkg, probe := newTestServiceManager()
+	sm, pkg, probe := newTestServiceManager(t)
 	pkg.installed["wireguard-tools"] = true
 	sm.RefreshCache()
 
@@ -281,7 +295,7 @@ func TestSetAutoStart(t *testing.T) {
 	pkg := NewMockPackageManager()
 	probe := NewMockSystemProbe()
 	probe.scripts["adguardhome"] = true
-	sm := NewServiceManagerWith(pkg, probe)
+	sm := newTestServiceManagerWithGuard(t, pkg, probe)
 
 	// Install adguardhome first
 	pkg.installed["adguardhome"] = true
@@ -313,7 +327,7 @@ func TestSetAutoStart(t *testing.T) {
 func TestSetAutoStart_NotInstalled(t *testing.T) {
 	pkg := NewMockPackageManager()
 	probe := NewMockSystemProbe()
-	sm := NewServiceManagerWith(pkg, probe)
+	sm := newTestServiceManagerWithGuard(t, pkg, probe)
 
 	err := sm.SetAutoStart("adguardhome", true)
 	if err == nil {
@@ -323,7 +337,7 @@ func TestSetAutoStart_NotInstalled(t *testing.T) {
 
 func TestInstall_RunsIndexUpdateFirst(t *testing.T) {
 	pkg := NewMockPackageManager()
-	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm := newTestServiceManagerWithGuard(t, pkg, NewMockSystemProbe())
 
 	if err := sm.Install("tailscale"); err != nil {
 		t.Fatalf("install failed: %v", err)
@@ -338,7 +352,7 @@ func TestInstall_RunsIndexUpdateFirst(t *testing.T) {
 
 func TestInstallWithLog_RunsIndexUpdateFirst(t *testing.T) {
 	pkg := NewMockPackageManager()
-	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm := newTestServiceManagerWithGuard(t, pkg, NewMockSystemProbe())
 
 	var lines []string
 	if err := sm.InstallWithLog("tailscale", func(s string) { lines = append(lines, s) }); err != nil {
@@ -355,12 +369,287 @@ func TestInstallWithLog_RunsIndexUpdateFirst(t *testing.T) {
 func TestInstall_ProceedsWhenIndexUpdateFails(t *testing.T) {
 	pkg := NewMockPackageManager()
 	pkg.UpdateErr = fmt.Errorf("no network")
-	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm := newTestServiceManagerWithGuard(t, pkg, NewMockSystemProbe())
 
 	if err := sm.Install("tailscale"); err != nil {
 		t.Fatalf("install must proceed on best-effort update failure, got: %v", err)
 	}
 	if !pkg.IsInstalled("tailscale") {
 		t.Error("expected tailscale installed despite failed index update")
+	}
+}
+
+// blockingPkgManager stalls every package operation until released, so a test
+// can observe what reads look like while an install is in flight.
+type blockingPkgManager struct {
+	*MockPackageManager
+	release chan struct{}
+	entered chan struct{}
+	once    sync.Once
+}
+
+func newBlockingPkgManager() *blockingPkgManager {
+	return &blockingPkgManager{
+		MockPackageManager: NewMockPackageManager(),
+		release:            make(chan struct{}),
+		entered:            make(chan struct{}, 1),
+	}
+}
+
+func (b *blockingPkgManager) Install(pkg string) (string, error) {
+	b.once.Do(func() { b.entered <- struct{}{} })
+	<-b.release
+	return b.MockPackageManager.Install(pkg)
+}
+
+// The install path must not hold the cache write lock: previously
+// ListServices/GetServiceStatus blocked for the whole (up to 30 min) install.
+func TestInstall_DoesNotBlockReads(t *testing.T) {
+	pkg := newBlockingPkgManager()
+	sm := newTestServiceManagerWithGuard(t, pkg, NewMockSystemProbe())
+
+	installDone := make(chan error, 1)
+	go func() { installDone <- sm.Install("wireguard") }()
+
+	select {
+	case <-pkg.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install never started")
+	}
+
+	readsDone := make(chan struct{})
+	go func() {
+		if _, err := sm.ListServices(); err != nil {
+			t.Errorf("ListServices: %v", err)
+		}
+		if _, err := sm.GetServiceStatus("tailscale"); err != nil {
+			t.Errorf("GetServiceStatus: %v", err)
+		}
+		close(readsDone)
+	}()
+
+	select {
+	case <-readsDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("reads blocked while an install was in flight")
+	}
+
+	close(pkg.release)
+	if err := <-installDone; err != nil {
+		t.Fatalf("install failed: %v", err)
+	}
+}
+
+// Package installs mutate live state, so a crash guard must exist while they
+// run and be removed only after full success (ADR 0003).
+func TestInstall_WritesAndClearsCrashGuard(t *testing.T) {
+	guardDir := t.TempDir()
+	pkg := NewMockPackageManager()
+	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	if err := sm.Install("tailscale"); err != nil {
+		t.Fatalf("install failed: %v", err)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("guard file must be removed after a successful install, stat err = %v", err)
+	}
+
+	// A failing install must leave the marker behind.
+	sm2 := NewServiceManagerWith(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	sm2.SetGuardDir(guardDir)
+	if err := sm2.Install("tailscale"); err == nil {
+		t.Fatal("expected install failure")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("guard file must remain after a failed install: %v", err)
+	}
+}
+
+type failingPkgManager struct{ *MockPackageManager }
+
+func (f *failingPkgManager) Install(string) (string, error) {
+	return "boom", fmt.Errorf("apk add failed")
+}
+
+// The post-install hook error must reach the caller: an installed but
+// unconfigured service used to be reported as a success.
+func TestInstall_PropagatesPostInstallHookError(t *testing.T) {
+	sm, _, _ := newTestServiceManager(t)
+	sm.SetPostInstallHook("adguardhome", func() error { return fmt.Errorf("adguard config failed") })
+
+	err := sm.Install("adguardhome")
+	if err == nil {
+		t.Fatal("expected the post-install hook failure to be reported")
+	}
+	if !strings.Contains(err.Error(), "post-install") {
+		t.Errorf("expected a post-install error, got %v", err)
+	}
+}
+
+func TestInstallWithLog_PropagatesPostInstallHookError(t *testing.T) {
+	sm, _, _ := newTestServiceManager(t)
+	sm.SetPostInstallHook("adguardhome", func() error { return fmt.Errorf("adguard config failed") })
+
+	var lines []string
+	err := sm.InstallWithLog("adguardhome", func(s string) { lines = append(lines, s) })
+	if err == nil {
+		t.Fatal("expected the post-install hook failure to be reported")
+	}
+	if !strings.Contains(err.Error(), "post-install") {
+		t.Errorf("expected a post-install error, got %v", err)
+	}
+}
+
+// safePkgManager is a concurrency-safe PackageManager that adds a small delay
+// to every install, so reader goroutines and the cache-publishing
+// refreshOne() genuinely overlap in time. (MockPackageManager's own map is not
+// synchronized and would itself trip the race detector.)
+type safePkgManager struct {
+	mu        sync.Mutex
+	installed map[string]bool
+	delay     time.Duration
+}
+
+func newSafePkgManager(delay time.Duration) *safePkgManager {
+	return &safePkgManager{installed: make(map[string]bool), delay: delay}
+}
+
+func (s *safePkgManager) Update() (string, error) { return "ok", nil }
+
+func (s *safePkgManager) Install(pkg string) (string, error) {
+	time.Sleep(s.delay)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.installed[pkg] = true
+	return "ok", nil
+}
+
+func (s *safePkgManager) Remove(pkg string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.installed, pkg)
+	return "ok", nil
+}
+
+func (s *safePkgManager) IsInstalled(pkg string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.installed[pkg]
+}
+
+func (s *safePkgManager) InstallStream(pkg string, logFn func(string)) error {
+	_, err := s.Install(pkg)
+	return err
+}
+
+func (s *safePkgManager) RemoveStream(pkg string, logFn func(string)) error {
+	_, err := s.Remove(pkg)
+	return err
+}
+
+// Publishing the refreshed cache entry must be a real write-locked update.
+// refreshOne used to write sm.cache with no lock at all, so a concurrent
+// ListServices/GetServiceStatus (which hold only the read lock) raced with it
+// — a Go map read/write race that can abort the process. Run with -race.
+func TestInstall_ConcurrentReadsDoNotRaceWithCachePublish(t *testing.T) {
+	sm := newTestServiceManagerWithGuard(t, newSafePkgManager(time.Millisecond), NewMockSystemProbe())
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				if _, err := sm.ListServices(); err != nil {
+					t.Errorf("ListServices: %v", err)
+					return
+				}
+				if _, err := sm.GetServiceStatus("wireguard"); err != nil {
+					t.Errorf("GetServiceStatus: %v", err)
+					return
+				}
+			}
+		}()
+	}
+
+	for i := 0; i < 20; i++ {
+		if err := sm.Install("wireguard"); err != nil {
+			t.Errorf("install %d: %v", i, err)
+			break
+		}
+	}
+	close(stop)
+	wg.Wait()
+}
+
+// failingRemovePkgManager fails only the remove path, so a test can reach the
+// Remove guard without also failing Install.
+type failingRemovePkgManager struct{ *MockPackageManager }
+
+func (f *failingRemovePkgManager) Remove(string) (string, error) {
+	return "boom", fmt.Errorf("opkg remove failed")
+}
+
+// Remove writes the crash guard before touching the package manager, and a
+// failed removal must leave it in place: the device is mid-change and a redeploy
+// is the recovery path (ADR 0003).
+func TestRemove_KeepsGuardOnFailure(t *testing.T) {
+	guardDir := t.TempDir()
+	sm := newTestServiceManagerWithGuard(t, &failingRemovePkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	if err := sm.Remove("tailscale"); err == nil {
+		t.Fatal("expected the removal to fail")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain after a failed removal: %v", err)
+	}
+}
+
+func TestRemove_ClearsGuardOnSuccess(t *testing.T) {
+	guardDir := t.TempDir()
+	sm, _, _ := newTestServiceManager(t)
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	if err := sm.Remove("tailscale"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("guard file must be removed after a successful removal, stat err = %v", err)
+	}
+}
+
+// failingStreamPkgManager fails the streaming install path, which is the one
+// InstallWithLog uses.
+type failingStreamPkgManager struct{ *MockPackageManager }
+
+func (f *failingStreamPkgManager) InstallStream(string, func(string)) error {
+	return fmt.Errorf("apk add failed")
+}
+
+// The streaming variant writes the same guard, so its failure path needs
+// coverage too: it is the path the browser actually uses.
+func TestInstallWithLog_KeepsGuardOnFailure(t *testing.T) {
+	guardDir := t.TempDir()
+	sm := newTestServiceManagerWithGuard(t, &failingStreamPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	sm.SetGuardDir(guardDir)
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	var lines []string
+	if err := sm.InstallWithLog("tailscale", func(s string) { lines = append(lines, s) }); err == nil {
+		t.Fatal("expected the install to fail")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Errorf("crash guard must remain after a failed install: %v", err)
 	}
 }

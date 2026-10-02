@@ -26,7 +26,7 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+            className="h-6 w-6 p-0 text-gray-500 hover:text-red-500 dark:text-gray-400"
             onClick={() => resetMutation.mutate(iface.name)}
             disabled={resetMutation.isPending}
             title="Reset counters"
@@ -40,21 +40,21 @@ export function DataUsageInterfaceCard({ iface, budget }: DataUsageInterfaceCard
         <div>
           <p className="mb-0.5 text-xs text-gray-500 dark:text-gray-400">Today</p>
           <p className="font-mono">{formatBytes(iface.today.rx_bytes + iface.today.tx_bytes)}</p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             ↓{formatBytes(iface.today.rx_bytes)} ↑{formatBytes(iface.today.tx_bytes)}
           </p>
         </div>
         <div>
           <p className="mb-0.5 text-xs text-gray-500 dark:text-gray-400">This Month</p>
           <p className="font-mono">{formatBytes(iface.month.rx_bytes + iface.month.tx_bytes)}</p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             ↓{formatBytes(iface.month.rx_bytes)} ↑{formatBytes(iface.month.tx_bytes)}
           </p>
         </div>
         <div>
           <p className="mb-0.5 text-xs text-gray-500 dark:text-gray-400">Total</p>
           <p className="font-mono">{formatBytes(iface.total.rx_bytes + iface.total.tx_bytes)}</p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             ↓{formatBytes(iface.total.rx_bytes)} ↑{formatBytes(iface.total.tx_bytes)}
           </p>
         </div>

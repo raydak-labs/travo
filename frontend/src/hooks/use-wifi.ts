@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
+import { routeWithParam, routeWithSegment } from '@/lib/api-url';
 import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { refreshRouterState } from '@/lib/router-state-refresh';
 import { API_ROUTES } from '@shared/index';
@@ -129,7 +130,7 @@ export function useWifiDelete() {
   return useMutation({
     mutationFn: (section: string) =>
       finalizeWifiMutation(
-        apiClient.del<WifiMutationResponse>(`${API_ROUTES.wifi.deleteSaved}/${section}`),
+        apiClient.del<WifiMutationResponse>(routeWithSegment(API_ROUTES.wifi.deleteSaved, section)),
       ),
     onSuccess: () => {
       toast.success('Network removed');
@@ -170,7 +171,7 @@ export function useSetAPConfig() {
   return useMutation({
     mutationFn: ({ section, config }: { section: string; config: APConfigUpdate }) =>
       finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(`${API_ROUTES.wifi.ap}/${section}`, config),
+        apiClient.put<WifiMutationResponse>(routeWithSegment(API_ROUTES.wifi.ap, section), config),
       ),
     onSuccess: () => {
       toast.success('AP configuration updated');
@@ -313,7 +314,7 @@ export function useSetRadioRole() {
   return useMutation({
     mutationFn: ({ name, role }: { name: string; role: string }) =>
       finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.radioRole.replace(':name', name), {
+        apiClient.put<WifiMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
           role,
         }),
       ),

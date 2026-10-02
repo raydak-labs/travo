@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
@@ -61,8 +63,8 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 //     pre-incident bad config) and cron would otherwise replay the failure
 //     forever. Counter is cleared on any successful reconnect or on redeploy.
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
-	"GUARD=\"/etc/travo/autoreconnect-crash-guard\"\n" +
-	"FAILCOUNT_FILE=\"/etc/travo/autoreconnect-failcount\"\n" +
+	"GUARD=\"" + crashGuardDir + "/autoreconnect-crash-guard\"\n" +
+	"FAILCOUNT_FILE=\"" + crashGuardDir + "/autoreconnect-failcount\"\n" +
 	"MAX_FAIL=5\n\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
 	"FAILCOUNT=0\n" +
@@ -88,7 +90,11 @@ func (w *WifiService) enableAutoReconnect() error {
 		return fmt.Errorf("writing reconnect script: %w", err)
 	}
 
-	// Add cron entry (every minute)
+	// Add cron entry (every minute). Under crontabMu: this is a read-modify-write
+	// of /etc/crontabs/root, the same file the WiFi/LED schedules rewrite, and
+	// an unlocked rewrite here drops their entries (and vice versa).
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
 	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s'; echo '* * * * * %s') | crontab -`,
 		w.reconnectScript, w.reconnectScript)
 	if _, err := w.cmd.Run("sh", "-c", cronCmd); err != nil {
@@ -108,7 +114,10 @@ func (w *WifiService) WriteReconnectScriptSafe() {
 }
 
 func (w *WifiService) disableAutoReconnect() error {
-	// Remove cron entry
+	// Remove cron entry, under the same lock enableAutoReconnect takes: both
+	// rewrite /etc/crontabs/root in place.
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
 	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s') | crontab -`, w.reconnectScript)
 	_, _ = w.cmd.Run("sh", "-c", cronCmd)
 
@@ -118,11 +127,46 @@ func (w *WifiService) disableAutoReconnect() error {
 }
 
 const wifiSchedulePath = "/etc/travo/wifi-schedule.json"
-const wifiScheduleCronPath = "/etc/cron.d/openwrt-gui-wifi-schedule"
+
+// OpenWrt has no /etc/cron.d. Its busybox crond is built with
+// `-c /etc/crontabs` and reads exactly one file per user, so a schedule has to
+// live in /etc/crontabs/root alongside the stock entries and be tagged so it
+// can be found and removed again. Same approach as the LED schedule
+// (SystemService.SetLEDSchedule, ledCronTag).
+//
+// The previous implementation wrote /etc/cron.d/openwrt-gui-wifi-schedule, which
+// is wrong twice over: the directory does not exist on OpenWrt, so the write
+// failed with ENOENT and the endpoint answered 500 — while wifi-schedule.json
+// had ALREADY been written, so the UI then reported a schedule that was enabled
+// and would never fire. Even had the directory existed, crond would never have
+// read it. Verified on the device: PUT /wifi/schedule returned 500
+// "open /etc/cron.d/openwrt-gui-wifi-schedule: no such file or directory" and
+// GET /wifi/schedule reported enabled=true with no cron entry anywhere.
+const (
+	wifiCrontabPath = "/etc/crontabs/root"
+	wifiCronTag     = "# openwrt-travel-gui-wifi-schedule"
+)
+
+// crontabPath returns the crontab in use, honouring the test override.
+func (w *WifiService) crontabPath() string {
+	if w.crontabFile != "" {
+		return w.crontabFile
+	}
+	return wifiCrontabPath
+}
+
+// wifiScheduleStatePath returns the persisted schedule JSON in use, honouring
+// the test override.
+func (w *WifiService) wifiScheduleStatePath() string {
+	if w.scheduleFile != "" {
+		return w.scheduleFile
+	}
+	return wifiSchedulePath
+}
 
 // GetWiFiSchedule returns the current cron-based WiFi on/off schedule.
 func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
-	data, err := os.ReadFile(wifiSchedulePath)
+	data, err := os.ReadFile(w.wifiScheduleStatePath())
 	if err != nil {
 		return models.WiFiSchedule{Enabled: false}, nil
 	}
@@ -133,32 +177,131 @@ func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
 	return s, nil
 }
 
-// SetWiFiSchedule saves the WiFi schedule and updates the cron file.
+// crontabMu serialises read-modify-write of /etc/crontabs/root.
+//
+// Every writer of that one file takes it: the WiFi schedule, the LED schedule,
+// AND the auto-reconnect cron entry. The auto-reconnect path rewrites the file
+// through `crontab -l | grep -v ... | crontab -`, which is the same
+// read-modify-write as the others — two concurrent rewrites each read the same
+// base and each wrote their own version, so one silently dropped the other's
+// entries. That is not hypothetical at boot: main.go reconciles auto-reconnect
+// at 5s and the schedules at 6s.
+//
+// Keyed on the FILE, not on a UCI config: this is a plain crontab, with no
+// uci delta involved.
+var crontabMu sync.Mutex
+
+// SetWiFiSchedule saves the WiFi schedule and updates the crontab.
 func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
+	// The times are formatted straight into a crontab line, so they must be
+	// strict HH:MM: a newline would inject an extra attacker-controlled cron
+	// entry that runs as root.
+	//
+	// Validate BEFORE persisting. Writing first left the rejected value in
+	// wifi-schedule.json (so GetWiFiSchedule reported it back to the UI and the
+	// startup reconcile goroutine re-read it) while the previously written cron
+	// file kept toggling WiFi — a request that returned 400 had in fact changed
+	// persisted state.
+	if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
+		if err := ValidateHHMM(schedule.OnTime); err != nil {
+			return fmt.Errorf("on_time: %w", err)
+		}
+		if err := ValidateHHMM(schedule.OffTime); err != nil {
+			return fmt.Errorf("off_time: %w", err)
+		}
+	}
+
+	// The crontab is the SOURCE OF TRUTH for "is the schedule actually
+	// scheduled", so write it FIRST and persist the JSON only once it is in
+	// place. The other order is how a 500 left the UI showing
+	// enabled=true with nothing scheduled: the JSON was written, then the
+	// /etc/cron.d write failed with ENOENT.
+	if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
+		if err := w.writeWiFiScheduleCronLines(schedule); err != nil {
+			return err
+		}
+	} else if err := w.removeWiFiScheduleCronLines(); err != nil {
+		return err
+	}
+
 	data, err := json.Marshal(schedule)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("/etc/travo", 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(w.wifiScheduleStatePath()), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(wifiSchedulePath, data, 0o644); err != nil {
+	return os.WriteFile(w.wifiScheduleStatePath(), data, 0o644)
+}
+
+// writeWiFiScheduleCronLines replaces our tagged crontab lines with entries for
+// the given schedule, preserving every line it does not own.
+func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) error {
+	// cron format: MM HH * * * command  (busybox crond, no user field)
+	onParts := strings.SplitN(schedule.OnTime, ":", 2)
+	offParts := strings.SplitN(schedule.OffTime, ":", 2)
+
+	// The cron entries must not run `wifi up` / `wifi down`; they call the
+	// generated toggle helper, which writes UCI and applies via rpcd.
+	if err := w.writeWirelessToggleScript(); err != nil {
 		return err
 	}
 
-	if !schedule.Enabled || schedule.OnTime == "" || schedule.OffTime == "" {
-		_ = os.Remove(wifiScheduleCronPath)
-		return nil
-	}
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
 
-	onParts := strings.Split(schedule.OnTime, ":")
-	offParts := strings.Split(schedule.OffTime, ":")
-	if len(onParts) != 2 || len(offParts) != 2 {
-		return fmt.Errorf("invalid time format, expected HH:MM")
+	existing, _ := os.ReadFile(w.crontabPath())
+	var lines []string
+	for line := range strings.SplitSeq(string(existing), "\n") {
+		if line == "" || strings.Contains(line, wifiCronTag) {
+			continue
+		}
+		lines = append(lines, line)
 	}
+	// Cron must name the path the helper was actually installed at, not the
+	// bare const, or the two could disagree.
+	helper := w.toggleScriptPathOrDefault()
+	lines = append(lines,
+		fmt.Sprintf("%s %s * * * %s up %s", onParts[1], onParts[0], helper, wifiCronTag),
+		fmt.Sprintf("%s %s * * * %s down %s", offParts[1], offParts[0], helper, wifiCronTag),
+		"")
+	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		return fmt.Errorf("writing crontab: %w", err)
+	}
+	// cron re-reads the crontab on mtime change, but an explicit restart makes
+	// the new entries live immediately instead of up to a minute later.
+	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")
+	return nil
+}
 
-	// cron format: MM HH * * * user command
-	cronContent := fmt.Sprintf("%s %s * * * root /sbin/wifi up\n%s %s * * * root /sbin/wifi down\n",
-		onParts[1], onParts[0], offParts[1], offParts[0])
-	return os.WriteFile(wifiScheduleCronPath, []byte(cronContent), 0o644)
+// removeWiFiScheduleCronLines strips our tagged lines from the crontab,
+// preserving everything else (the stock LED and auto-reconnect entries).
+func (w *WifiService) removeWiFiScheduleCronLines() error {
+	crontabMu.Lock()
+	defer crontabMu.Unlock()
+
+	existing, err := os.ReadFile(w.crontabPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var lines []string
+	for line := range strings.SplitSeq(string(existing), "\n") {
+		if line == "" || strings.Contains(line, wifiCronTag) {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	lines = append(lines, "")
+	// Atomic, like writeWiFiScheduleCronLines: busybox crond re-reads
+	// /etc/crontabs/root while it runs, and a truncating os.WriteFile can hand it
+	// a half-written file — which it then parses as the real crontab, dropping
+	// the auto-reconnect and LED entries it did not manage to read.
+	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		return fmt.Errorf("writing crontab: %w", err)
+	}
+	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")
+	return nil
 }
