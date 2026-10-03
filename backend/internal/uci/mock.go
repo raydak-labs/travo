@@ -172,14 +172,22 @@ func (m *MockUCI) AddSection(config, section, stype string) error {
 	return nil
 }
 
+// AddList appends value to a list option, as real `uci add_list` does, and
+// stores the list the way `uci get` reports it: one line, values separated by
+// a single space. That representation is what readDnsmasqServers and friends
+// parse, so Get/GetAll and the command-backed readers agree.
 func (m *MockUCI) AddList(config, section, option, value string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.data[config] == nil || m.data[config][section] == nil {
 		return fmt.Errorf("uci: section not found %s.%s", config, section)
 	}
-	// Mock: store as single value (real UCI list can have multiple; we don't track list multiplicity)
-	m.data[config][section][option] = value
+	opts := m.data[config][section]
+	if existing := opts[option]; existing != "" {
+		opts[option] = existing + " " + value
+		return nil
+	}
+	opts[option] = value
 	return nil
 }
 

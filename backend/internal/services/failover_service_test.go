@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -678,20 +679,107 @@ func TestVerifyApplyAcceptsAllEnabledCandidatesPresent(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
-	_ = mockUCI.AddSection("mwan3", "travo_failover", "policy")
-	_ = mockUCI.AddSection("mwan3", "travo_default_v4", "rule")
+	candidates := []models.FailoverCandidate{
+		{InterfaceName: "wan", Available: true, Enabled: true, Priority: 1},
+		{InterfaceName: "wwan", Available: true, Enabled: true, Priority: 2},
+	}
+	seedGeneratedManagedSections(t, mockUCI, candidates)
 
 	cfg := failoverConfigFile{
-		Enabled: true,
-		Candidates: []models.FailoverCandidate{
-			{InterfaceName: "wan", Available: true, Enabled: true, Priority: 1},
-			{InterfaceName: "wwan", Available: true, Enabled: true, Priority: 2},
-		},
-		Health: defaultFailoverHealth(),
+		Enabled:    true,
+		Candidates: candidates,
+		Health:     defaultFailoverHealth(),
 	}
 	if err := svc.verifyApply(cfg); err != nil {
 		t.Fatalf("verifyApply: %v", err)
 	}
+}
+
+// seedGeneratedManagedSections writes the mwan3 sections applyManagedConfig
+// generates for a candidate list, so verifyApply can be exercised on its own.
+func seedGeneratedManagedSections(t *testing.T, u uci.UCI, candidates []models.FailoverCandidate) {
+	t.Helper()
+	for _, section := range []struct{ name, stype string }{
+		{failoverPolicySection, "policy"},
+		{failoverRuleSection, "rule"},
+	} {
+		if err := u.AddSection("mwan3", section.name, section.stype); err != nil {
+			t.Fatalf("AddSection(%s): %v", section.name, err)
+		}
+	}
+	for _, candidate := range candidates {
+		iface := failoverInterfaceSection(candidate.InterfaceName)
+		if err := u.AddSection("mwan3", iface, "interface"); err != nil {
+			t.Fatalf("AddSection(%s): %v", iface, err)
+		}
+		if err := u.Set("mwan3", iface, "family", "ipv4"); err != nil {
+			t.Fatalf("Set(%s.family): %v", iface, err)
+		}
+		if !candidate.Enabled {
+			continue
+		}
+		member := fmt.Sprintf("travo_%s_p%d",
+			failoverSectionName(candidate.InterfaceName), candidate.Priority)
+		if err := u.AddSection("mwan3", member, "member"); err != nil {
+			t.Fatalf("AddSection(%s): %v", member, err)
+		}
+		if err := u.Set("mwan3", member, "interface", iface); err != nil {
+			t.Fatalf("Set(%s.interface): %v", member, err)
+		}
+	}
+}
+
+// mwan3 members reference the mwan3 INTERFACE SECTION, so a member left
+// pointing at a pre-namespacing name ("wan") binds the policy to a section this
+// service no longer writes. Presence-only verification passed that in
+// production; only the unit test noticed.
+func TestVerifyApplyRejectsStaleGeneratedSectionValues(t *testing.T) {
+	t.Parallel()
+
+	candidates := []models.FailoverCandidate{
+		{InterfaceName: "wan", Available: true, Enabled: true, Priority: 1},
+	}
+	cfg := failoverConfigFile{
+		Enabled:    true,
+		Candidates: candidates,
+		Health:     defaultFailoverHealth(),
+	}
+
+	t.Run("member references a non-namespaced section", func(t *testing.T) {
+		t.Parallel()
+		mockUCI := uci.NewMockUCI()
+		svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+		seedGeneratedManagedSections(t, mockUCI, candidates)
+		if err := mockUCI.Set("mwan3", "travo_wan_p1", "interface", "wan"); err != nil {
+			t.Fatalf("Set member interface: %v", err)
+		}
+
+		err := svc.verifyApply(cfg)
+		if err == nil {
+			t.Fatal("verifyApply accepted a member pointing at a stale section name")
+		}
+		if !strings.Contains(err.Error(), "travo_wan_p1") {
+			t.Errorf("the failure must name the offending member, got %v", err)
+		}
+	})
+
+	t.Run("generated interface section lost its family", func(t *testing.T) {
+		t.Parallel()
+		mockUCI := uci.NewMockUCI()
+		svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+		seedGeneratedManagedSections(t, mockUCI, candidates)
+		if err := mockUCI.DeleteOption("mwan3", failoverIfWan, "family"); err != nil {
+			t.Fatalf("DeleteOption: %v", err)
+		}
+
+		err := svc.verifyApply(cfg)
+		if err == nil {
+			t.Fatal("verifyApply accepted a generated interface section without family")
+		}
+		if !strings.Contains(err.Error(), "family") {
+			t.Errorf("the failure must name the offending option, got %v", err)
+		}
+	})
 }
 
 func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
@@ -789,6 +877,14 @@ func TestIsManagedSectionRecognisesOnlyTravoSections(t *testing.T) {
 	for _, option := range generatedInterfaceOptions {
 		generated[option] = "1"
 	}
+	// A hand-written section copied from the stock mwan3 example: it carries
+	// most, but not all, of the options this service writes.
+	handWrittenExample := map[string]string{
+		".type": "interface", "enabled": "1", "family": "ipv4", "count": "1",
+		"timeout": "2", "interval": "5", "failure_interval": "5",
+		"recovery_interval": "5", "down": "3", "up": "3", "track_ip": "1.1.1.1",
+	}
+	legacyNames := legacyGeneratedNames([]models.FailoverCandidate{{InterfaceName: "wwan"}})
 	cases := []struct {
 		name string
 		opts map[string]string
@@ -798,12 +894,116 @@ func TestIsManagedSectionRecognisesOnlyTravoSections(t *testing.T) {
 		{"travo_failover", map[string]string{".type": "policy"}, true},
 		{"hotel", map[string]string{".type": "interface", "ifname": "eth3"}, false},
 		{"my_custom_policy", map[string]string{".type": "policy"}, false},
-		{"wan", generated, true}, // legacy generated section, cleaned up once
+		{"wan", generated, true},  // legacy generated section, cleaned up once
+		{"wwan", generated, true}, // legacy section named after a candidate
+		// A candidate-named section this service never wrote must survive even
+		// though it looks like an mwan3 interface section.
+		{"wan", handWrittenExample, false},
+		{"wwan", handWrittenExample, false},
+		// The option signature alone is not enough any more either: the name has
+		// to be one a generated section could have had.
+		{"eth9", generated, false},
 	}
 	for _, tc := range cases {
-		if got := isManagedSection(tc.name, tc.opts); got != tc.want {
+		if got := isManagedSection(tc.name, tc.opts, legacyNames); got != tc.want {
 			t.Errorf("isManagedSection(%q) = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+// A hand-written mwan3 interface section must survive a save. Option shape alone
+// cannot tell it from a legacy generated one: the stock mwan3 example sets
+// exactly the options this service writes, so a user who copied it into a section
+// of their own ("office") was treated as generated and deleted — and the backup
+// that could restore it is only read on the failure path, so mwan3 silently
+// stopped tracking that uplink. Keying the legacy cleanup on the known generated
+// names, with the option signature as the secondary condition, fixes both
+// directions: a section outside those names survives whatever it contains, and a
+// candidate-named section survives unless it carries the signature.
+func TestSetConfigKeepsHandWrittenInterfaceSections(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	// wwan is a candidate in this save and also the name of a hand-written mwan3
+	// interface section: a stock example copied over and renamed after the
+	// uplink it tracks. It is missing one of the options this service writes.
+	exampleOptions := []string{"enabled", "family", "count", "timeout",
+		"interval", "failure_interval", "recovery_interval", "down", "up"}
+	if err := mockUCI.AddSection("mwan3", "wwan", "interface"); err != nil {
+		t.Fatalf("AddSection: %v", err)
+	}
+	for i, option := range exampleOptions {
+		if err := mockUCI.Set("mwan3", "wwan", option, fmt.Sprintf("%d", i+1)); err != nil {
+			t.Fatalf("Set: %v", err)
+		}
+	}
+	if err := mockUCI.Set("mwan3", "wwan", "track_ip", "1.1.1.1"); err != nil {
+		t.Fatalf("Set track_ip: %v", err)
+	}
+	// office carries the FULL option signature but is not a name this service
+	// ever generated, so no build of it could have written that section.
+	seedLegacyGeneratedInterface(t, mockUCI, "office")
+
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	cfg := failoverTestConfig(
+		wanCandidate(),
+		models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+			Available: true, Enabled: true, Priority: 2},
+	)
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	opts, ok := sections["wwan"]
+	if !ok {
+		t.Fatalf("hand-written mwan3 section named after a candidate was deleted by a save, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	if opts["track_ip"] != "1.1.1.1" {
+		t.Errorf("hand-written section was modified: %v", opts)
+	}
+	if _, ok := sections["office"]; !ok {
+		t.Errorf("a hand-written section outside the generated names was deleted by a save, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	if _, ok := sections[failoverInterfaceSection("wwan")]; !ok {
+		t.Errorf("the generated section must still be written next to it, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+}
+
+// The counterpart: a section carrying this service's full option signature under
+// a candidate's name was written by a pre-namespacing build, and the upgrade
+// path still has to clean it up.
+func TestSetConfigCleansLegacyGeneratedInterfaceOfACandidate(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	seedLegacyGeneratedInterface(t, mockUCI, "wwan")
+
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	cfg := failoverTestConfig(
+		wanCandidate(),
+		models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+			Available: true, Enabled: true, Priority: 2},
+	)
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	if _, ok := sections["wwan"]; ok {
+		t.Error("a legacy generated interface section named after a candidate must be cleaned up")
+	}
+	if _, ok := sections[failoverInterfaceSection("wwan")]; !ok {
+		t.Errorf("expected the namespaced replacement, got %v", slices.Sorted(maps.Keys(sections)))
 	}
 }
 
@@ -1147,6 +1347,37 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 
 		if guardExists(svc) {
 			t.Errorf("a successful rollback must clear %s: the running config is known-good again", svc.guardPath)
+		}
+	})
+
+	// The other keep-condition, pinned directly. The guard must not be dropped
+	// while rpcd still has a rollback armed for the apply that just failed: ~30s
+	// later rpcd would drop the post-restore config back in. The check has to
+	// read the pending state BEFORE the restore, because the restore's own apply
+	// clears it.
+	t.Run("kept while the failed apply's rollback window is armed", func(t *testing.T) {
+		t.Parallel()
+		svc, _ := newFailoverTestService(t, uci.NewMockUCI(), &recordingApplier{})
+		if err := svc.SetConfig(candidate); err != nil {
+			t.Fatalf("seed save: %v", err)
+		}
+		verifyErr := fmt.Errorf("config is not readable")
+		if err := svc.stagedApplyMwan3(func() error { return verifyErr }); err == nil {
+			t.Fatal("expected the failed verification to be reported")
+		}
+		armedSession := svc.pendingApplySession
+		if armedSession == "" {
+			t.Fatal("an unconfirmed apply must stay recorded while its rollback window is open")
+		}
+		if err := os.WriteFile(svc.guardPath, []byte("marker"), 0o600); err != nil {
+			t.Fatalf("seed guard: %v", err)
+		}
+
+		svc.rollbackOrKeepGuard()
+
+		if !guardExists(svc) {
+			t.Errorf("the guard must be kept while rpcd rollback %s is still armed: "+
+				"its timer would drop the restored config back in", armedSession)
 		}
 	})
 

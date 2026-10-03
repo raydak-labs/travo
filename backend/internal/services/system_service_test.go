@@ -1401,3 +1401,130 @@ func TestLoadButtonActions_HandlesReorderedAndEscapedJSON(t *testing.T) {
 		t.Errorf("unexpected second button: %+v", buttons[1])
 	}
 }
+
+// Board names are prefixes of each other: "gl-mt3000" is a prefix of
+// "gl-mt3000-nand". Matching the supported_devices list with a substring test
+// therefore accepts a NAND-only image for a NOR router, and that flash is the
+// brick this whole check exists to prevent. Entries must be compared whole.
+func TestSupportsDevice_RequiresAWholeEntry(t *testing.T) {
+	cases := []struct {
+		name        string
+		supported   []string
+		boardName   string
+		aliases     []string
+		wantSupport bool
+	}{
+		{
+			name:        "nand-only image on a nor board",
+			supported:   []string{"glinet,gl-mt3000-nand"},
+			boardName:   "glinet,gl-mt3000",
+			aliases:     []string{"gl-mt3000", "GL.iNet GL-MT3000", "GL-MT3000"},
+			wantSupport: false,
+		},
+		{
+			name:        "nor-only image on a nand board",
+			supported:   []string{"glinet,gl-mt3000"},
+			boardName:   "glinet,gl-mt3000-nand",
+			aliases:     []string{"gl-mt3000-nand"},
+			wantSupport: false,
+		},
+		{
+			name:        "own image listed beside a sibling variant",
+			supported:   []string{"glinet,gl-mt3000", "glinet,gl-mt3000-nand"},
+			boardName:   "glinet,gl-mt3000",
+			aliases:     []string{"gl-mt3000", "GL.iNet GL-MT3000"},
+			wantSupport: true,
+		},
+		{
+			name:        "full multi-board name with no aliases",
+			supported:   []string{"linksys,ea8300,linksys_e8300-ubi"},
+			boardName:   "linksys,ea8300",
+			aliases:     nil,
+			wantSupport: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			meta, err := ParseFirmwareMetadata(bytes.NewReader(
+				buildFirmwareImage("GL.iNet GL-MT3000", tc.supported)))
+			if err != nil {
+				t.Fatalf("parsing image: %v", err)
+			}
+			if got := meta.SupportsDevice(tc.boardName, tc.aliases); got != tc.wantSupport {
+				t.Errorf("SupportsDevice(%q, %v) with supported_devices %q = %v, want %v",
+					tc.boardName, tc.aliases, meta.SupportedDevicesRaw, got, tc.wantSupport)
+			}
+		})
+	}
+}
+
+// The end-to-end consequence of the prefix bug: an image that only supports the
+// NAND variant must never reach sysupgrade on this NOR board.
+func TestUpgradeFirmware_RejectsSiblingVariantImage(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	marker := installFakeSysupgrade(t)
+
+	image := buildFirmwareImage("GL.iNet GL-MT3000 (NAND)", []string{"glinet,gl-mt3000-nand"})
+	_, err := svc.UpgradeFirmware(bytes.NewReader(image), true)
+	if err == nil {
+		t.Fatal("an image for the sibling NAND variant was accepted for this NOR board")
+	}
+	if !errors.Is(err, ErrUnsupportedFirmware) {
+		t.Errorf("error = %v, want ErrUnsupportedFirmware", err)
+	}
+	assertNoSysupgradeCall(t, marker)
+	if _, err := os.Stat(filepath.Join(dir, firmwareUpgradeGuardName)); err == nil {
+		t.Error("a rejected image must not leave a crash guard: nothing was flashed")
+	}
+	assertNoStagedFirmware(t)
+}
+
+// A DIRECTORY entry under etc/config is not evidence of anything: the
+// message claims a UCI config member, so the witness has to be a real file. An
+// archive that carries only directories below etc/config (note that
+// cleanRestoreName drops the trailing slash, so it is the subdirectories that
+// match the prefix) would otherwise pass.
+func TestValidateRestoreArchive_RejectsConfigDirectoryWithoutAFile(t *testing.T) {
+	headers := []*tar.Header{
+		{Name: "etc", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/config", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/config/network", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/config/dhcp/", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/shadow", Typeflag: tar.TypeReg, Mode: 0o600, Size: 3},
+	}
+	archive := tarGzArchive(t, headers, map[string]string{"etc/shadow": "abc"})
+	path := filepath.Join(t.TempDir(), "empty-config.tar.gz")
+	if err := os.WriteFile(path, archive, 0o600); err != nil {
+		t.Fatalf("write archive: %v", err)
+	}
+	err := ValidateRestoreArchive(path)
+	if err == nil {
+		t.Fatal("an archive with only an etc/config directory was accepted as a backup")
+	}
+	if !errors.Is(err, ErrInvalidBackupArchive) {
+		t.Errorf("error = %v, want ErrInvalidBackupArchive", err)
+	}
+	if !strings.Contains(err.Error(), "not a configuration backup") {
+		t.Errorf("error = %q, want it to report the missing UCI config file", err)
+	}
+}
+
+// board_name is comma separated ("glinet,gl-mt3000"), but it names ONE board.
+// Handing its parts out as aliases hands out the vendor prefix "glinet", which
+// matches every GL.iNet entry in a supported_devices list and would let a
+// sibling board's image through.
+func TestBoardIdentityDoesNotSplitTheVendorPrefix(t *testing.T) {
+	svc, _ := newGuardedSystemService(t)
+	name, aliases, err := svc.boardIdentity()
+	if err != nil {
+		t.Fatalf("boardIdentity: %v", err)
+	}
+	if name != "glinet,gl-mt3000" {
+		t.Errorf("board name = %q, want the whole ubus value", name)
+	}
+	for _, a := range aliases {
+		if a == "glinet" {
+			t.Errorf("aliases %v must not contain the bare vendor prefix", aliases)
+		}
+	}
+}

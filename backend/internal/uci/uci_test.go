@@ -102,13 +102,20 @@ func TestMockUCIAddSectionAlreadyExists(t *testing.T) {
 
 func TestMockUCIAddList(t *testing.T) {
 	m := NewMockUCI()
-	// zone_wan already exists from populate() — just add wwan to its network list
+	// zone_wan already exists from populate() with network "wan wan6".
+	//
+	// This test used to expect AddList to REPLACE that list with "wwan". Real
+	// uci add_list APPENDS, so the mock was less strict than the layer it stands
+	// in for: a caller adding several members in a loop (mwan3 use_member,
+	// WireGuard allowed_ips, a zone network list) looked correct under test and
+	// kept only the last entry on the device. The expectation below is the real
+	// behaviour, and TestMockUCIAddListAppends covers the multi-add case.
 	if err := m.AddList("firewall", "zone_wan", "network", "wwan"); err != nil {
 		t.Fatalf("add_list: %v", err)
 	}
 	opts, _ := m.GetAll("firewall", "zone_wan")
-	if opts["network"] != "wwan" {
-		t.Errorf("expected network=wwan, got %q", opts["network"])
+	if want := "wan wan6 wwan"; opts["network"] != want {
+		t.Errorf("network = %q, want %q (add_list appends)", opts["network"], want)
 	}
 }
 

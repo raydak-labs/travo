@@ -62,13 +62,19 @@ var errApplyRollingBack = errors.New("an mwan3 apply from a previous save is sti
 // is what a human or a redeploy should clear, and deploy-local.sh and
 // install.sh both clear it.
 func (s *FailoverService) rollbackOrKeepGuard() {
+	// Capture the pending state BEFORE the restore runs. The restore issues its
+	// own rpcd apply and clears pendingApplySession on success, so evaluating it
+	// afterwards can never observe the window the failed apply left open — and
+	// the guard would be dropped on the one path it exists for.
+	rollbackPending := s.rollbackStillPending()
+	pendingSession := s.pendingApplySession
 	if err := s.restoreManagedSections(); err != nil {
 		log.Printf("failover: rollback failed, crash guard kept at %s: %v", s.guardPath, err)
 		return
 	}
-	if s.rollbackStillPending() {
-		log.Printf("failover: restored, but rpcd rollback %s is still armed; crash guard kept at %s",
-			s.pendingApplySession, s.guardPath)
+	if rollbackPending {
+		log.Printf("failover: restored, but rpcd rollback %s was still armed; crash guard kept at %s",
+			pendingSession, s.guardPath)
 		return
 	}
 	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -625,17 +631,47 @@ func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
 //     `config interface hotel` on the next save, and because the backup is only
 //     read on the failure path, nothing ever put it back — mwan3 stopped
 //     tracking that uplink for good.
-//  2. A legacy generated interface section: an interface section carrying the
-//     full set of options this service writes. Builds before the travo_ prefix
-//     named generated interface sections after the network interface (so
-//     `wan`, `wwan`, `usb0`); those are cleaned up once, on the next save. The
-//     option signature is what separates them from a hand-written section, so a
-//     user section never matches.
-func isManagedSection(name string, opts map[string]string) bool {
+//  2. A legacy generated interface section: an interface section NAMED after a
+//     candidate interface this save knows about, and carrying the full set of
+//     options this service writes. Builds before the travo_ prefix named
+//     generated interface sections after the network interface (so `wan`, `wwan`,
+//     `usb0`); those are cleaned up once, on the next save. The name is the
+//     primary key: matching on option shape alone would treat a hand-written
+//     section copied from the stock mwan3 example — which sets exactly this set
+//     of options on a section called `wan` — as generated and delete it, and
+//     because the backup is only read on the failure path nothing puts it back.
+//     The option signature stays as a secondary condition, so a candidate-named
+//     section that this service never wrote survives.
+func isManagedSection(name string, opts map[string]string, legacyNames map[string]bool) bool {
 	if strings.HasPrefix(name, failoverSectionPrefix) {
 		return true
 	}
+	if !legacyNames[name] {
+		return false
+	}
 	return isLegacyGeneratedInterfaceSection(opts)
+}
+
+// legacyGeneratedInterfaceNames are the section names a pre-namespacing build
+// could have used for a generated interface section without them appearing in
+// the config being saved: the default uplinks plus the USB devices candidate
+// discovery reports. Every other legacy name was a candidate at some point and
+// is supplied by legacyGeneratedNames.
+var legacyGeneratedInterfaceNames = []string{"wan", "wwan", "usb0", "usb1", "eth1", "eth2"}
+
+// legacyGeneratedNames is the set of non-namespaced section names the legacy
+// cleanup may touch: the built-in uplink names plus the candidates in hand.
+func legacyGeneratedNames(candidates []models.FailoverCandidate) map[string]bool {
+	names := make(map[string]bool, len(legacyGeneratedInterfaceNames)+len(candidates))
+	for _, name := range legacyGeneratedInterfaceNames {
+		names[name] = true
+	}
+	for _, candidate := range candidates {
+		if candidate.InterfaceName != "" {
+			names[candidate.InterfaceName] = true
+		}
+	}
+	return names
 }
 
 // failoverSectionPrefix namespaces every mwan3 section this service writes.
@@ -678,11 +714,12 @@ func (s *FailoverService) backupManagedSections(cfg models.FailoverConfig) error
 	if err != nil {
 		sections = map[string]map[string]string{}
 	}
+	legacyNames := legacyGeneratedNames(cfg.Candidates)
 	managed := map[string]map[string]string{}
 	for name, opts := range sections {
 		// Backup by section shape, not by the new candidate list: a section left
 		// over from a removed candidate must still be restorable.
-		if isManagedSection(name, opts) {
+		if isManagedSection(name, opts, legacyNames) {
 			managed[name] = opts
 		}
 	}
@@ -715,7 +752,14 @@ func (s *FailoverService) restoreManagedSections() error {
 	if err := json.Unmarshal(data, &sections); err != nil {
 		return err
 	}
-	if err := s.deleteManagedSections(); err != nil {
+	// Delete under the same rule the save used, with the candidate names from
+	// the stored config, so a legacy-named section of a candidate this save knows
+	// about is cleaned up here too.
+	var candidates []models.FailoverCandidate
+	if stored, err := s.loadConfigFile(); err == nil {
+		candidates = stored.Candidates
+	}
+	if err := s.deleteManagedSections(legacyGeneratedNames(candidates)); err != nil {
 		return err
 	}
 	for name, opts := range sections {
@@ -741,13 +785,13 @@ func (s *FailoverService) restoreManagedSections() error {
 	return s.restoreApplyMwan3(func() error { return s.verifyManagedSections(sections) })
 }
 
-func (s *FailoverService) deleteManagedSections() error {
+func (s *FailoverService) deleteManagedSections(legacyNames map[string]bool) error {
 	sections, err := s.uci.GetSections(mwan3ConfigName)
 	if err != nil {
 		return nil
 	}
 	for name, opts := range sections {
-		if isManagedSection(name, opts) {
+		if isManagedSection(name, opts, legacyNames) {
 			_ = s.uci.DeleteSection(mwan3ConfigName, name)
 		}
 	}
@@ -755,7 +799,7 @@ func (s *FailoverService) deleteManagedSections() error {
 }
 
 func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
-	if err := s.deleteManagedSections(); err != nil {
+	if err := s.deleteManagedSections(legacyGeneratedNames(cfg.Candidates)); err != nil {
 		return err
 	}
 	if !cfg.Enabled || !s.serviceInstalled() {
@@ -866,7 +910,9 @@ func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandida
 func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
 	var expect map[string]map[string]string
 	if cfg.Enabled {
-		expect = map[string]map[string]string{failoverPolicySection: nil, failoverRuleSection: nil}
+		// Every generated section, with the options that bind them together —
+		// not just the policy and the rule.
+		expect = managedSectionNames(cfg.Candidates)
 	}
 	if err := s.verifyManagedSections(expect); err != nil {
 		return err
@@ -893,19 +939,28 @@ func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
 }
 
 // verifyManagedSections checks that the mwan3 config the service wrote is
-// readable. When expect is non-nil, the given sections must be present.
+// readable. When expect is non-nil, the given sections must be present and
+// carry the option values in the map (an empty value is not checked).
 func (s *FailoverService) verifyManagedSections(expect map[string]map[string]string) error {
 	sections, err := s.uci.GetSections(mwan3ConfigName)
 	if err != nil {
 		return fmt.Errorf("verify mwan3 config: %w", err)
 	}
 	for name, opts := range expect {
-		if _, ok := sections[name]; !ok {
+		actual, ok := sections[name]
+		if !ok {
 			return fmt.Errorf("mwan3 section %s missing after apply", name)
 		}
-		if opts["family"] != "" {
-			if got, _ := s.uci.Get(mwan3ConfigName, name, "family"); got != opts["family"] {
-				return fmt.Errorf("mwan3 section %s: family = %q, want %q", name, got, opts["family"])
+		for option, want := range opts {
+			// Section metadata (".type") is not an option.
+			if want == "" || strings.HasPrefix(option, ".") {
+				continue
+			}
+			// Compare against the same read the expectation was built from:
+			// GetSections and Get normalise list values differently, so mixing
+			// them would fail the rollback restore of any section with a list.
+			if actual[option] != want {
+				return fmt.Errorf("mwan3 section %s: %s = %q, want %q", name, option, actual[option], want)
 			}
 		}
 	}
@@ -1145,16 +1200,26 @@ func failoverSectionName(value string) string {
 }
 
 // managedSectionNames lists the mwan3 sections the apply is expected to create
-// for a candidate list. Members are only written for enabled candidates.
+// for a candidate list, with the option values that must match what the apply
+// wrote. Members are only written for enabled candidates.
+//
+// The values matter as much as the names: mwan3 members reference the mwan3
+// interface SECTION, so a member left pointing at a pre-namespacing section name
+// ("wan" instead of "travo_if_wan") keeps the policy bound to a section the
+// service no longer writes or updates. Checking presence alone would let that
+// through in production.
 func managedSectionNames(candidates []models.FailoverCandidate) map[string]map[string]string {
 	names := map[string]map[string]string{
 		failoverPolicySection: nil,
 		failoverRuleSection:   nil,
 	}
 	for _, candidate := range candidates {
-		names[failoverInterfaceSection(candidate.InterfaceName)] = nil
+		iface := failoverInterfaceSection(candidate.InterfaceName)
+		names[iface] = map[string]string{"family": "ipv4"}
 		if candidate.Enabled {
-			names[fmt.Sprintf("travo_%s_p%d", failoverSectionName(candidate.InterfaceName), candidate.Priority)] = nil
+			memberName := fmt.Sprintf("travo_%s_p%d",
+				failoverSectionName(candidate.InterfaceName), candidate.Priority)
+			names[memberName] = map[string]string{"interface": iface}
 		}
 	}
 	return names

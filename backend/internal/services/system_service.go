@@ -717,8 +717,9 @@ const (
 // restoreArchiveNeedsUCIConfig is the one structural requirement that
 // distinguishes a configuration backup from an arbitrary tarball. A genuine
 // `sysupgrade -b` archive always carries the UCI packages under etc/config,
-// so requiring at least one member there rejects "here is a tar of whatever I
-// liked" without having to enumerate every path a real overlay contains.
+// so requiring at least one regular FILE there rejects "here is a tar of
+// whatever I liked" without having to enumerate every path a real overlay
+// contains.
 //
 // There is deliberately no directory allowlist beyond that. An earlier version
 // restricted members to etc/config and etc/ppp, on the reasoning that an
@@ -786,7 +787,11 @@ func ValidateRestoreArchive(path string) error {
 		if total > maxRestoreArchiveBytes {
 			return fmt.Errorf("%w: uncompressed size exceeds %d bytes", ErrInvalidBackupArchive, maxRestoreArchiveBytes)
 		}
-		if strings.HasPrefix(cleanRestoreName(hdr.Name), restoreArchiveNeedsUCIConfig) {
+		// A DIRECTORY entry under etc/config is not evidence of anything: the
+		// message claims a UCI config member, so the witness has to be a real
+		// file. An archive carrying only "etc/config/" would otherwise pass.
+		if hdr.Typeflag == tar.TypeReg &&
+			strings.HasPrefix(cleanRestoreName(hdr.Name), restoreArchiveNeedsUCIConfig) {
 			sawUCIConfig = true
 		}
 	}
@@ -1012,26 +1017,62 @@ func cutNUL(b []byte) (value string, rest []byte, ok bool) {
 // SupportsDevice reports whether the image declares boardName (or any alias in
 // aliases) as a supported device.
 //
-// OpenWrt board names contain a comma ("glinet,gl-mt3000") and the metadata
-// list is itself comma separated, so the list cannot be split into board names
-// without ambiguity. This matches the way OpenWrt's own platform_check_image
-// does it: the board name must appear in the raw list. Names are compared
-// case-insensitively with spaces/underscores folded to dashes, because
-// "GL.iNet GL-MT3000", "gl-mt3000" and "glinet,gl-mt3000" all name one board.
+// Names are compared case-insensitively with spaces/underscores folded to
+// dashes, because "GL.iNet GL-MT3000", "gl-mt3000" and "glinet,gl-mt3000" all
+// name one board.
+//
+// The comma is the load-bearing part. OpenWrt board names contain one
+// ("glinet,gl-mt3000") and the supported_devices list is itself comma
+// separated, so a list entry can only be told apart from a board name by
+// comparing WHOLE entries. Substring matching over the raw list is what
+// OpenWrt's own patsubstr() does, and it is unsafe here: board names are
+// prefixes of each other ("gl-mt3000" is a prefix of "gl-mt3000-nand"), so a
+// NAND-only image passes on a NOR router — a flash that leaves the device
+// unbootable with no serial console. Aliases are therefore matched for
+// equality, and the one deliberate exception is the device's own boardName
+// string, which OpenWrt may pack several models into ("glinet,gl-mt3000" for
+// an image that declares "glinet,gl-mt3000,gl-mt3000-nor"); it may match the
+// leading comma-delimited run of entries, still only on a comma boundary.
 func (m FirmwareMetadata) SupportsDevice(boardName string, aliases []string) bool {
 	list := normaliseBoardName(m.SupportedDevicesRaw)
 	if list == "" {
 		return false
 	}
-	if strings.Contains(list, normaliseBoardName(boardName)) {
+	if boardNameMatchesRun(list, normaliseBoardName(boardName)) {
 		return true
 	}
 	for _, a := range aliases {
-		if n := normaliseBoardName(a); n != "" && strings.Contains(list, n) {
+		if listHasDevice(list, normaliseBoardName(a)) {
 			return true
 		}
 	}
 	return false
+}
+
+// listHasDevice reports whether the normalised, comma-separated
+// supported_devices list contains name as a whole entry.
+func listHasDevice(list, name string) bool {
+	if list == "" || name == "" {
+		return false
+	}
+	for _, entry := range strings.Split(list, ",") {
+		if entry == name {
+			return true
+		}
+	}
+	return false
+}
+
+// boardNameMatchesRun reports whether the possibly multi-model board name heads
+// a whole run of comma-delimited entries in the list. It accepts an exact
+// whole-list match and a match followed by a comma; it never accepts a match
+// that runs into a longer entry, which is what keeps "gl-mt3000" from claiming
+// "gl-mt3000-nand".
+func boardNameMatchesRun(list, boardName string) bool {
+	if list == "" || boardName == "" {
+		return false
+	}
+	return list == boardName || strings.HasPrefix(list, boardName+",")
 }
 
 func normaliseBoardName(s string) string {
@@ -1042,7 +1083,15 @@ func normaliseBoardName(s string) string {
 
 // boardIdentity returns the strings this device may legitimately be named by in
 // an image's supported_devices list: the ubus board_name ("glinet,gl-mt3000"),
-// each of its comma-separated parts, and the model ("GL.iNet GL-MT3000").
+// and the model ("GL.iNet GL-MT3000") together with its trailing model token.
+//
+// The comma-separated PARTS of board_name are deliberately not returned as
+// separate aliases. "glinet,gl-mt3000" is one board whose name is comma
+// separated, and its first part is a vendor prefix that every GL.iNet entry
+// carries: splitting the name hands out "glinet", which then matches the
+// vendor part of "glinet,gl-mt3000-nand" and re-admits a sibling board's
+// image — the exact flash this check must refuse. The whole name is matched as
+// one unit by SupportsDevice instead.
 func (s *SystemService) boardIdentity() (string, []string, error) {
 	board, err := s.ubus.Call("system", "board", nil)
 	if err != nil {
@@ -1058,9 +1107,6 @@ func (s *SystemService) boardIdentity() (string, []string, error) {
 		primary = model
 	}
 	var aliases []string
-	if boardName != "" {
-		aliases = append(aliases, strings.Split(boardName, ",")...)
-	}
 	if model != "" {
 		aliases = append(aliases, model)
 		// "GL.iNet GL-MT3000" → also try the trailing model token.
