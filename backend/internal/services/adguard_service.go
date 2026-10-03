@@ -26,9 +26,11 @@ const (
 	adguardYAMLPathUCI     = "/etc/adguardhome/adguardhome.yaml"
 	adguardYAMLPathOpt     = "/opt/AdGuardHome/AdGuardHome.yaml"
 	adguardBundledTemplate = "/etc/travo/adguardhome.yaml"
-	// adguardDnsSnapshotPath holds dhcp.@dnsmasq[0].server/noresolv as it was
-	// before AdGuard forwarding was enabled. It is a state file, not a crash
-	// guard, so it keeps its own literal rather than deriving from crashGuardDir.
+	// adguardDnsSnapshotPath is where releases before the shared dnsmasq layer
+	// stack wrote AdGuard's snapshot of dhcp.@dnsmasq[0].server/noresolv. It is
+	// read once as a migration source for the stack's base state and then
+	// removed: two files restoring the same two options is how the AdGuard and
+	// VPN paths ended up restoring over each other.
 	adguardDnsSnapshotPath = "/etc/trafo/adguard-dns-snapshot.json"
 )
 
@@ -120,6 +122,10 @@ type AdGuardService struct {
 	httpAPIBase    string
 	yamlDNSPort    int
 	yamlSourcePath string
+	// dnsStackPath is the shared dnsmasq resolver layer record. It is a field
+	// rather than a bare constant so the stack lifecycle can be exercised
+	// without touching /etc/trafo.
+	dnsStackPath string
 }
 
 type adguardYAMLTop struct {
@@ -206,14 +212,14 @@ func (s *AdGuardService) apiBase() string {
 
 // NewAdGuardService creates a new AdGuardService with a real checker.
 func NewAdGuardService() *AdGuardService {
-	s := &AdGuardService{checker: NewRealAdGuardChecker()}
+	s := &AdGuardService{checker: NewRealAdGuardChecker(), dnsStackPath: dnsmasqLayerStackPath}
 	s.refreshEndpointsFromYAML()
 	return s
 }
 
 // NewAdGuardServiceWithChecker creates a new AdGuardService with a custom checker (for tests).
 func NewAdGuardServiceWithChecker(c AdGuardChecker) *AdGuardService {
-	s := &AdGuardService{checker: c}
+	s := &AdGuardService{checker: c, dnsStackPath: dnsmasqLayerStackPath}
 	s.refreshEndpointsFromYAML()
 	return s
 }
@@ -391,13 +397,12 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 // When enabling, it first verifies that AdGuard is running and its DNS listener
 // is reachable. If the pre-flight check fails, no dnsmasq changes are made and
 // the error is returned (safe: DNS resolution is never left in a broken state).
-// SetDNS points dnsmasq at AdGuard's resolver.
+// SetDNS stacks or unstacks AdGuard on the shared dnsmasq resolver layer stack
+// (see dnsmasqLayerStackFile in vpn_service.go).
 //
-// Enable snapshots dhcp.@dnsmasq[0].server and .noresolv to
-// adguardDnsSnapshotPath first, and disable restores from it. It used to
-// `uci delete` the whole server list on both paths, which destroyed split-DNS
-// entries the operator added by hand in LuCI (server=/lan.example.com/...) with
-// nothing to put them back. This mirrors VpnService's snapshot discipline
+// It used to `uci delete` the whole server list on both paths, which destroyed
+// split-DNS entries the operator added by hand in LuCI (server=/lan.example.com/...)
+// with nothing to put them back. The stack holds the pre-any-layer state instead
 // (ADR 0001 §3).
 //
 // Takes the `dhcp` lock. This writes dhcp.@dnsmasq[0].server and .noresolv — the
@@ -405,7 +410,8 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 // disableVpnDNSForwarding and CaptiveService's dnsmasq helpers mutate. Holding the
 // lock on the VPN side while this side does not achieves nothing: whichever
 // sequence commits last wins, and the loser's commit persists whatever the other
-// had staged.
+// had staged. The stack is also what stops one feature's restore from landing
+// on top of the other's: both consult the same record.
 //
 // withConfigLocks rather than mutateUCI: this shells out to `uci` and has no
 // uci.UCI handle to revert through, so a failure here leaves its staged delta for
@@ -414,50 +420,79 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 	return withConfigLocks([]string{"dhcp"}, func() error { return s.setDNSLocked(enabled) })
 }
 
-// dnsmasqResolverSnapshot is the pre-change dnsmasq resolver state. It has the
-// same shape as VpnService's vpnDnsSnapshot, kept separate because the two
-// features snapshot different moments and must not overwrite each other.
-type dnsmasqResolverSnapshot struct {
-	NoResolv string   `json:"noresolv"`
-	Servers  []string `json:"servers"`
-}
+// checkerDNS drives the shared dnsmasq stack through AdGuardService's
+// AdGuardChecker, so the two features share one record and one set of rules
+// while keeping their own file and process abstractions.
+type checkerDNS struct{ checker AdGuardChecker }
 
-func (s *AdGuardService) readDnsmasqServers() []string {
-	out, err := s.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].server")
+func (k checkerDNS) getServers() ([]string, error) {
+	out, err := k.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].server")
 	if err != nil {
-		return nil
-	}
-	return strings.Fields(strings.TrimSpace(out))
-}
-
-func (s *AdGuardService) readDnsmasqNoResolv() string {
-	out, err := s.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].noresolv")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(out)
-}
-
-// loadDnsmasqSnapshot reads the pre-change dnsmasq state. Returns (nil, nil)
-// when there is no snapshot, which is not an error: a disable on a device that
-// never had one simply has nothing to restore.
-func (s *AdGuardService) loadDnsmasqSnapshot() (*dnsmasqResolverSnapshot, error) {
-	data, err := s.checker.ReadFile(adguardDnsSnapshotPath)
-	if err != nil {
-		return nil, nil
-	}
-	var snap dnsmasqResolverSnapshot
-	if err := json.Unmarshal(data, &snap); err != nil {
 		return nil, err
 	}
-	return &snap, nil
+	return strings.Fields(strings.TrimSpace(out)), nil
+}
+
+func (k checkerDNS) getNoResolv() (string, error) {
+	out, err := k.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].noresolv")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func (k checkerDNS) setServers(servers []string) error {
+	// Best-effort clear: `uci delete` exits 1 with "Entry not found" when the
+	// list is already empty, which is the normal state on a router that has
+	// never had forwarding configured.
+	_, _ = k.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, srv := range servers {
+		if _, err := k.checker.RunCommand("uci", "add_list", "dhcp.@dnsmasq[0].server="+srv); err != nil {
+			return fmt.Errorf("failed to add dnsmasq server %q: %w", srv, err)
+		}
+	}
+	return nil
+}
+
+func (k checkerDNS) setNoResolv(value string) error {
+	if _, err := k.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv="+value); err != nil {
+		return fmt.Errorf("failed to set noresolv=%s: %w", value, err)
+	}
+	return nil
+}
+
+func (k checkerDNS) commitAndRestart() error {
+	if _, err := k.checker.RunCommand("uci", "commit", "dhcp"); err != nil {
+		return fmt.Errorf("failed to commit dhcp: %w", err)
+	}
+	if _, err := k.checker.RunCommand("/etc/init.d/dnsmasq", "restart"); err != nil {
+		return fmt.Errorf("failed to restart dnsmasq: %w", err)
+	}
+	return nil
+}
+
+func (k checkerDNS) readFile(path string) ([]byte, error) { return k.checker.ReadFile(path) }
+
+func (k checkerDNS) writeFile(path string, data []byte, perm os.FileMode) error {
+	return k.checker.WriteFile(path, data, perm)
+}
+
+func (k checkerDNS) removeFile(path string) error { return k.checker.RemoveFile(path) }
+
+// dnsmasqLayers returns this service's view of the shared stack.
+func (s *AdGuardService) dnsmasqLayers() *dnsmasqLayerStackFile {
+	return &dnsmasqLayerStackFile{
+		dns:        checkerDNS{checker: s.checker},
+		path:       s.dnsStackPath,
+		legacyPath: adguardDnsSnapshotPath,
+	}
 }
 
 func (s *AdGuardService) setDNSLocked(enabled bool) error {
-	port := s.getDNSPort()
-	entry := dnsmasqServerEntry(port)
-
 	if enabled {
+		port := s.getDNSPort()
+		entry := dnsmasqServerEntry(port)
+
 		// Pre-flight: AdGuard must be running.
 		if !s.IsRunning() {
 			return fmt.Errorf("AdGuard Home is not running — start it before enabling DNS forwarding")
@@ -466,91 +501,28 @@ func (s *AdGuardService) setDNSLocked(enabled bool) error {
 		if !s.probeAdGuardDNSListener(port) {
 			return fmt.Errorf("AdGuard Home DNS listener is not ready on 127.0.0.1:%d — verify AdGuard config", port)
 		}
-
-		// Snapshot first. An existing readable snapshot is authoritative and is
-		// never overwritten, so a second enable cannot record AdGuard's own
-		// entry as the "pre-existing" list.
-		snap, err := s.loadDnsmasqSnapshot()
-		if err != nil {
-			return fmt.Errorf("reading existing dnsmasq snapshot: %w", err)
-		}
-		if snap == nil {
-			data, mErr := json.Marshal(dnsmasqResolverSnapshot{
-				NoResolv: s.readDnsmasqNoResolv(),
-				Servers:  s.readDnsmasqServers(),
-			})
-			if mErr != nil {
-				return fmt.Errorf("encoding dnsmasq snapshot: %w", mErr)
-			}
-			if wErr := s.checker.WriteFile(adguardDnsSnapshotPath, data, 0o600); wErr != nil {
-				// Without a snapshot there is nothing to restore, so continuing
-				// would delete the operator's resolver entries with no way back.
-				return fmt.Errorf("snapshotting dnsmasq before enabling AdGuard forwarding: %w", wErr)
-			}
-		}
-
-		// Apply dnsmasq changes.
-		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
-		if _, err := s.checker.RunCommand("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", entry)); err != nil {
-			return fmt.Errorf("failed to set dnsmasq server: %w", err)
-		}
-		if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=1"); err != nil {
-			// Rollback: delete the server entry we just added.
-			_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
-			return fmt.Errorf("failed to set noresolv: %w", err)
-		}
-	} else {
-		snap, err := s.loadDnsmasqSnapshot()
-		if err != nil {
-			return fmt.Errorf("reading dnsmasq snapshot: %w", err)
-		}
-		if snap == nil {
-			// No snapshot: this disable was never preceded by an enable through
-			// this service (or it predates the snapshot). The current server
-			// list is left untouched — it may be entirely the operator's own
-			// split-DNS entries, and deleting it is exactly the data loss this
-			// snapshot exists to prevent. noresolv is still cleared so dnsmasq
-			// falls back to resolv.conf.
-			if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=0"); err != nil {
-				return fmt.Errorf("failed to unset noresolv: %w", err)
-			}
-			if _, err := s.checker.RunCommand("uci", "commit", "dhcp"); err != nil {
-				return fmt.Errorf("failed to commit dhcp: %w", err)
-			}
-			if _, err := s.checker.RunCommand("/etc/init.d/dnsmasq", "restart"); err != nil {
-				return fmt.Errorf("failed to restart dnsmasq: %w", err)
-			}
-			return nil
-		}
-		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
-		for _, srv := range snap.Servers {
-			key := fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", srv)
-			if _, err := s.checker.RunCommand("uci", "add_list", key); err != nil {
-				return fmt.Errorf("failed to restore dnsmasq server %q: %w", srv, err)
-			}
-		}
-		noresolv := snap.NoResolv
-		if noresolv == "" {
-			noresolv = "0"
-		}
-		setKey := "dhcp.@dnsmasq[0].noresolv=" + noresolv
-		if _, err := s.checker.RunCommand("uci", "set", setKey); err != nil {
-			return fmt.Errorf("failed to restore noresolv: %w", err)
-		}
+		// The stack records the pre-any-layer state before dnsmasq is touched.
+		// Without it there would be nothing to restore, so a failure here aborts
+		// the enable instead of deleting the operator's resolver entries.
+		return s.dnsmasqLayers().EnableLayer(dnsLayerAdGuard, []string{entry})
 	}
 
-	if _, err := s.checker.RunCommand("uci", "commit", "dhcp"); err != nil {
-		return fmt.Errorf("failed to commit dhcp: %w", err)
+	// Disable: pop the AdGuard layer. When another layer is still stacked the
+	// stack leaves dnsmasq pointing at it untouched; only the last layer to go
+	// restores the pre-any-layer state and drops the record.
+	applied, err := s.dnsmasqLayers().RemoveLayer(dnsLayerAdGuard, false)
+	if err != nil {
+		return err
 	}
-	if _, err := s.checker.RunCommand("/etc/init.d/dnsmasq", "restart"); err != nil {
-		return fmt.Errorf("failed to restart dnsmasq: %w", err)
+	if applied {
+		return nil
 	}
-	if !enabled {
-		// The restore is committed and dnsmasq restarted; the snapshot has done
-		// its job.
-		_ = s.checker.RemoveFile(adguardDnsSnapshotPath)
-	}
-	return nil
+	// No record: this disable was never preceded by an enable through this
+	// service (or it predates the stack). The current server list is left
+	// untouched — it may be entirely the operator's own split-DNS entries, and
+	// deleting it is exactly the data loss the record exists to prevent.
+	// noresolv is still cleared so dnsmasq falls back to resolv.conf.
+	return s.dnsmasqLayers().ClearNoResolv()
 }
 
 // defaultAdGuardConfig is written on first install to give AdGuard sensible defaults:
@@ -590,8 +562,9 @@ verbose: false
 // it runs after a successful package install.
 //
 // It deliberately does NOT touch dnsmasq: forwarding is an operator decision made
-// through SetDNS, which snapshots the existing resolver list. An earlier comment
-// here claimed it enabled forwarding; it never did.
+// through SetDNS, which records the pre-any-layer resolver list in the shared
+// dnsmasq layer record. An earlier comment here claimed it enabled forwarding;
+// it never did.
 func (s *AdGuardService) AutoConfigure() error {
 	if !s.checker.FileExists(adguardYAMLPathUCI) && !s.checker.FileExists(adguardYAMLPathOpt) {
 		_, _ = s.checker.RunCommand("mkdir", "-p", "/opt/AdGuardHome")

@@ -1,14 +1,18 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // mockAdGuardChecker is a test double for AdGuardChecker.
@@ -685,22 +689,152 @@ func mockAdGuardDNSChecker(initialServers []string) *mockAdGuardChecker {
 	return m
 }
 
+// newStackScopedAdGuard returns a service whose shared dnsmasq layer record
+// lives in the mock's own file map, so the stack lifecycle can be asserted.
+func newStackScopedAdGuard(t *testing.T, mock *mockAdGuardChecker) *AdGuardService {
+	t.Helper()
+	svc := NewAdGuardServiceWithChecker(mock)
+	svc.dnsStackPath = "dnsmasq-layers.json"
+	return svc
+}
+
+// readAdGuardLayerStack reads back the shared record through the mock's files.
+func readAdGuardLayerStack(t *testing.T, svc *AdGuardService) *dnsmasqLayerStack {
+	t.Helper()
+	st, err := svc.dnsmasqLayers().load()
+	if err != nil {
+		t.Fatalf("reading the layer stack: %v", err)
+	}
+	if st == nil {
+		t.Fatal("expected a dnsmasq layer stack on disk, got none")
+	}
+	return st
+}
+
+// sharedDnsmasqChecker is an AdGuardChecker whose `uci` calls drive the same
+// dhcp.@dnsmasq[0] model and temp-dir files a VpnService sees, so the two
+// features can be stacked on one record in a cross-feature test. Everything
+// that is not a dnsmasq call goes to the embedded mock.
+type sharedDnsmasqChecker struct {
+	*mockAdGuardChecker
+	state *dnsmasqState
+	dir   string
+}
+
+func (c *sharedDnsmasqChecker) RunCommand(name string, args ...string) (string, error) {
+	if name == "uci" {
+		out, err := c.state.runUci(args...)
+		return string(out), err
+	}
+	return c.mockAdGuardChecker.RunCommand(name, args...)
+}
+
+func (c *sharedDnsmasqChecker) resolve(path string) string {
+	return filepath.Join(c.dir, path)
+}
+
+func (c *sharedDnsmasqChecker) ReadFile(path string) ([]byte, error) {
+	return os.ReadFile(c.resolve(path))
+}
+
+func (c *sharedDnsmasqChecker) WriteFile(path string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(c.resolve(path), data, perm)
+}
+
+func (c *sharedDnsmasqChecker) RemoveFile(path string) error {
+	if err := os.Remove(c.resolve(path)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// sharedDNSHarness pairs an AdGuardService and a VpnService over one dnsmasq
+// model and one shared layer record, which is the situation the record exists
+// for: both features write the same two options of the same section.
+type sharedDNSHarness struct {
+	t         *testing.T
+	adguard   *AdGuardService
+	vpn       *VpnService
+	state     *dnsmasqState
+	stackPath string
+}
+
+// newSharedDNSHarness starts from a router whose LAN DNS points at 1.1.1.1 and
+// whose tunnel is configured with 10.8.0.1 as its resolver.
+func newSharedDNSHarness(t *testing.T) *sharedDNSHarness {
+	t.Helper()
+	cmd, state := newDnsmasqRunner([]string{"1.1.1.1"}, true)
+	dir := t.TempDir()
+	stackPath := filepath.Join(dir, "dnsmasq-layers.json")
+
+	checker := &sharedDnsmasqChecker{
+		mockAdGuardChecker: mockAdGuardDNSChecker(nil),
+		state:              state,
+		dir:                dir,
+	}
+	adguard := NewAdGuardServiceWithChecker(checker)
+	// Relative: the checker resolves it under dir, which is the same file the
+	// VpnService is pointed at with an absolute path.
+	adguard.dnsStackPath = "dnsmasq-layers.json"
+
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "dns", "10.8.0.1")
+	_ = u.Set("network", "wg0", "disabled", "0")
+	vpn := NewVpnServiceWithRunner(u, cmd)
+	vpn.dnsStackPath = stackPath
+	vpn.legacyDnsSnapshotPath = filepath.Join(dir, "vpn-dns-snapshot.json")
+
+	return &sharedDNSHarness{
+		t:         t,
+		adguard:   adguard,
+		vpn:       vpn,
+		state:     state,
+		stackPath: stackPath,
+	}
+}
+
+// adguardEnabled turns AdGuard forwarding on through the public entry point.
+func (h *sharedDNSHarness) adguardEnabled() {
+	h.t.Helper()
+	if err := h.adguard.SetDNS(true); err != nil {
+		h.t.Fatalf("enable AdGuard DNS: %v", err)
+	}
+}
+
+// readStack reads the shared record straight off disk, so the assertion does
+// not depend on either service's own view of it.
+func (h *sharedDNSHarness) readStack(t *testing.T) *dnsmasqLayerStack {
+	t.Helper()
+	data, err := os.ReadFile(h.stackPath)
+	if err != nil {
+		t.Fatalf("reading the shared dnsmasq record: %v", err)
+	}
+	var st dnsmasqLayerStack
+	if err := json.Unmarshal(data, &st); err != nil {
+		t.Fatalf("parsing the shared dnsmasq record: %v", err)
+	}
+	return &st
+}
+
 // A split-DNS entry the operator added in LuCI must survive an AdGuard
-// enable/disable round trip. Before the snapshot existed, SetDNS(false)
+// enable/disable round trip. Before the record existed, SetDNS(false)
 // `uci delete`d the whole server list and the entry was gone for good.
 func TestSetDNS_RoundTripPreservesSplitDNSEntry(t *testing.T) {
 	const splitEntry = "server=/lan.example.com/192.168.9.5"
 	mock := mockAdGuardDNSChecker([]string{splitEntry})
 	var added []string
 	mock.addListRecorder = func(entry string) { added = append(added, entry) }
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := newStackScopedAdGuard(t, mock)
 
 	if err := svc.SetDNS(true); err != nil {
 		t.Fatalf("SetDNS(true): %v", err)
 	}
-	snapRaw := mock.fileContents[adguardDnsSnapshotPath]
-	if !strings.Contains(snapRaw, "lan.example.com") {
-		t.Fatalf("enable must snapshot the pre-existing split-DNS entry, got %q", snapRaw)
+	st := readAdGuardLayerStack(t, svc)
+	if len(st.Servers) != 1 || st.Servers[0] != splitEntry {
+		t.Fatalf("enable must record the pre-existing split-DNS entry, got %v", st.Servers)
+	}
+	if len(st.Layers) != 1 || st.Layers[0].Name != dnsLayerAdGuard {
+		t.Fatalf("enable must stack the adguard layer, got %+v", st.Layers)
 	}
 
 	added = nil
@@ -709,26 +843,26 @@ func TestSetDNS_RoundTripPreservesSplitDNSEntry(t *testing.T) {
 	}
 
 	if len(added) != 1 || added[0] != splitEntry {
-		t.Fatalf("disable must restore exactly the snapshotted server list, got %v", added)
+		t.Fatalf("disable must restore exactly the recorded server list, got %v", added)
 	}
-	if _, ok := mock.fileContents[adguardDnsSnapshotPath]; ok {
-		t.Error("the snapshot must be removed once it has been restored")
+	if _, ok := mock.fileContents["dnsmasq-layers.json"]; ok {
+		t.Error("the record must be removed once the last layer is restored")
 	}
 }
 
-// A second enable while forwarding is already on must not re-snapshot AdGuard's
-// own entry as the "pre-existing" list.
+// A second enable while forwarding is already on must not re-record AdGuard's
+// own entry as the pre-any-layer list.
 func TestSetDNS_SecondEnableKeepsFirstSnapshot(t *testing.T) {
 	mock := mockAdGuardDNSChecker([]string{"1.1.1.1"})
 	mock.addListRecorder = func(string) {}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := newStackScopedAdGuard(t, mock)
 
 	if err := svc.SetDNS(true); err != nil {
 		t.Fatalf("first SetDNS(true): %v", err)
 	}
-	first := mock.fileContents[adguardDnsSnapshotPath]
-	if !strings.Contains(first, "1.1.1.1") {
-		t.Fatalf("first snapshot must hold the pre-VPN server list, got %q", first)
+	first := readAdGuardLayerStack(t, svc)
+	if len(first.Servers) != 1 || first.Servers[0] != "1.1.1.1" {
+		t.Fatalf("the record must hold the pre-layer server list, got %v", first.Servers)
 	}
 
 	// Second enable: dnsmasq now reports AdGuard's own entry.
@@ -741,45 +875,161 @@ func TestSetDNS_SecondEnableKeepsFirstSnapshot(t *testing.T) {
 	if err := svc.SetDNS(true); err != nil {
 		t.Fatalf("second SetDNS(true): %v", err)
 	}
-	if got := mock.fileContents[adguardDnsSnapshotPath]; got != first {
-		t.Fatalf("the second enable must not overwrite the snapshot:\nfirst: %q\nsecond: %q", first, got)
+	if got := readAdGuardLayerStack(t, svc); !slices.Equal(got.Servers, first.Servers) {
+		t.Fatalf("the second enable must not overwrite the base:\nfirst: %v\nsecond: %v",
+			first.Servers, got.Servers)
 	}
 }
 
-// A failed snapshot write must abort the enable before dnsmasq is touched:
-// there would be nothing to restore afterwards.
+// A record that cannot be written must abort the enable before dnsmasq is
+// touched: there would be nothing to restore afterwards.
 func TestSetDNS_EnableFailsWhenSnapshotWriteFails(t *testing.T) {
 	mock := mockAdGuardDNSChecker([]string{"1.1.1.1"})
-	mock.writeErr[adguardDnsSnapshotPath] = errors.New("read-only file system")
-	svc := NewAdGuardServiceWithChecker(mock)
+	mock.writeErr["dnsmasq-layers.json"] = errors.New("read-only file system")
+	svc := newStackScopedAdGuard(t, mock)
 
 	if err := svc.SetDNS(true); err == nil {
-		t.Fatal("expected SetDNS(true) to fail when the snapshot cannot be written")
+		t.Fatal("expected SetDNS(true) to fail when the record cannot be written")
 	}
 	for _, call := range mock.recordedCalls() {
 		if call == "uci commit dhcp" || call == "/etc/init.d/dnsmasq restart" {
-			t.Errorf("dnsmasq must not be touched when the snapshot failed, but %q was called", call)
+			t.Errorf("dnsmasq must not be touched when the record failed, but %q was called", call)
 		}
 	}
 }
 
-// With no snapshot, disable clears noresolv but leaves the server list alone: it
+// With no record, disable clears noresolv but leaves the server list alone: it
 // may be entirely the operator's own split-DNS entries.
 func TestSetDNS_DisableWithoutSnapshotKeepsServerList(t *testing.T) {
 	mock := mockAdGuardDNSChecker([]string{"1.1.1.1"})
 	mock.addListRecorder = func(string) {}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := newStackScopedAdGuard(t, mock)
 
 	if err := svc.SetDNS(false); err != nil {
 		t.Fatalf("SetDNS(false): %v", err)
 	}
 	for _, call := range mock.recordedCalls() {
 		if call == "uci delete dhcp.@dnsmasq[0].server" {
-			t.Error("disable without a snapshot must not delete the dnsmasq server list")
+			t.Error("disable without a record must not delete the dnsmasq server list")
 		}
 	}
 	if !slices.Contains(mock.recordedCalls(), "uci set dhcp.@dnsmasq[0].noresolv=0") {
-		t.Error("disable without a snapshot must still clear noresolv")
+		t.Error("disable without a record must still clear noresolv")
+	}
+}
+
+// A device upgraded while AdGuard forwarding was on has only the pre-stack
+// snapshot. The enable must adopt it as the base and then drop it, so there is
+// one restore target for dnsmasq's resolver options instead of two.
+func TestSetDNS_EnableAdoptsAndRemovesTheLegacySnapshot(t *testing.T) {
+	const splitEntry = "server=/lan.example.com/192.168.9.5"
+	mock := mockAdGuardDNSChecker([]string{"127.0.0.1#5353"})
+	mock.addListRecorder = func(string) {}
+	mock.fileContents[adguardDnsSnapshotPath] = `{"noresolv":"0","servers":["` + splitEntry + `"]}`
+	mock.files[adguardDnsSnapshotPath] = true
+	svc := newStackScopedAdGuard(t, mock)
+
+	if err := svc.SetDNS(true); err != nil {
+		t.Fatalf("SetDNS(true): %v", err)
+	}
+	if _, ok := mock.fileContents[adguardDnsSnapshotPath]; ok {
+		t.Error("the legacy snapshot must be dropped once the stack owns the base")
+	}
+	st := readAdGuardLayerStack(t, svc)
+	if len(st.Servers) != 1 || st.Servers[0] != splitEntry {
+		t.Fatalf("the legacy snapshot must become the stack base, got %v", st.Servers)
+	}
+}
+
+// The cross-feature damage the shared stack exists to prevent: AdGuard and VPN
+// forward to the same two options of the same dnsmasq section, so with separate
+// records the last restore landed on top of the other's state and the operator
+// was left with dnsmasq pointing at the router itself.
+//
+// AdGuard is enabled first, then the VPN on top of it. Turning AdGuard off
+// leaves the VPN running and dnsmasq untouched; turning the VPN off restores
+// the pre-any-layer list and drops the record.
+func TestDNSLayerStack_AdGuardUnderVPNRestoresInOrder(t *testing.T) {
+	h := newSharedDNSHarness(t)
+	h.adguardEnabled()
+
+	if err := h.vpn.enableVpnDNSForwarding(); err != nil {
+		t.Fatalf("enable VPN DNS: %v", err)
+	}
+	if !slices.Equal(h.state.servers, []string{"10.8.0.1"}) || h.state.noresolv != "1" {
+		t.Fatalf("the VPN must own dnsmasq while it is on top, got %v noresolv=%q",
+			h.state.servers, h.state.noresolv)
+	}
+	st := h.readStack(t)
+	if len(st.Layers) != 2 || st.Layers[0].Name != dnsLayerAdGuard ||
+		st.Layers[1].Name != dnsLayerVPN {
+		t.Fatalf("expected [adguard, vpn] on the stack, got %+v", st.Layers)
+	}
+	if len(st.Servers) != 1 || st.Servers[0] != "1.1.1.1" {
+		t.Fatalf("the base must be the pre-any-layer list, got %v", st.Servers)
+	}
+
+	// AdGuard off: the VPN is still stacked on top, so dnsmasq is left alone.
+	if err := h.adguard.SetDNS(false); err != nil {
+		t.Fatalf("disable AdGuard DNS: %v", err)
+	}
+	if !slices.Equal(h.state.servers, []string{"10.8.0.1"}) || h.state.noresolv != "1" {
+		t.Fatalf("the VPN layer must keep owning dnsmasq, got %v noresolv=%q",
+			h.state.servers, h.state.noresolv)
+	}
+	if st := h.readStack(t); len(st.Layers) != 1 || st.Layers[0].Name != dnsLayerVPN {
+		t.Fatalf("only the adguard entry must be removed, got %+v", st.Layers)
+	}
+
+	// VPN off last: the pre-any-layer state comes back and the record is dropped.
+	h.vpn.disableVpnDNSForwarding()
+	if !slices.Equal(h.state.servers, []string{"1.1.1.1"}) || h.state.noresolv != "0" {
+		t.Fatalf("the last layer to disable must restore the base, got %v noresolv=%q",
+			h.state.servers, h.state.noresolv)
+	}
+	if _, err := os.Stat(h.stackPath); !os.IsNotExist(err) {
+		t.Errorf("the last layer to disable must drop the record, stat err = %v", err)
+	}
+}
+
+// The same scenario with the order reversed: the VPN is on the bottom and
+// AdGuard is stacked over it. Turning AdGuard off must restore the VPN's
+// resolvers, not the pre-any-layer list.
+func TestDNSLayerStack_VPNUnderAdGuardRestoresInOrder(t *testing.T) {
+	h := newSharedDNSHarness(t)
+	if err := h.vpn.enableVpnDNSForwarding(); err != nil {
+		t.Fatalf("enable VPN DNS: %v", err)
+	}
+	h.adguardEnabled()
+
+	if !slices.Equal(h.state.servers, []string{"127.0.0.1#5353"}) {
+		t.Fatalf("AdGuard must own dnsmasq while it is on top, got %v", h.state.servers)
+	}
+	st := h.readStack(t)
+	if len(st.Layers) != 2 || st.Layers[0].Name != dnsLayerVPN ||
+		st.Layers[1].Name != dnsLayerAdGuard {
+		t.Fatalf("expected [vpn, adguard] on the stack, got %+v", st.Layers)
+	}
+
+	// AdGuard off: the VPN's resolvers come back, not the pre-any-layer list.
+	if err := h.adguard.SetDNS(false); err != nil {
+		t.Fatalf("disable AdGuard DNS: %v", err)
+	}
+	if !slices.Equal(h.state.servers, []string{"10.8.0.1"}) || h.state.noresolv != "1" {
+		t.Fatalf("the VPN layer below must be restored, got %v noresolv=%q",
+			h.state.servers, h.state.noresolv)
+	}
+	if st := h.readStack(t); len(st.Layers) != 1 || st.Layers[0].Name != dnsLayerVPN {
+		t.Fatalf("only the adguard entry must be removed, got %+v", st.Layers)
+	}
+
+	h.vpn.disableVpnDNSForwarding()
+	if !slices.Equal(h.state.servers, []string{"1.1.1.1"}) || h.state.noresolv != "0" {
+		t.Fatalf("the last layer to disable must restore the base, got %v noresolv=%q",
+			h.state.servers, h.state.noresolv)
+	}
+	if _, err := os.Stat(h.stackPath); !os.IsNotExist(err) {
+		t.Errorf("the last layer to disable must drop the record, stat err = %v", err)
 	}
 }
 
