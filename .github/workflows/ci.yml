@@ -141,8 +141,11 @@ jobs:
           version: v${{ steps.toolchain.outputs.golangci_lint }}
           working-directory: backend
 
-      - name: ESLint
-        run: pnpm lint
+      # `--format=github` is pinned so annotations are deterministic: oxlint's default output
+      # format depends on CI-detection env vars (CLAUDECODE / CURSOR_AGENT / CODEX_* ...),
+      # which outrank GITHUB_ACTIONS.
+      - name: Oxlint
+        run: pnpm lint:ci
 
   shellcheck:
     name: Shellcheck

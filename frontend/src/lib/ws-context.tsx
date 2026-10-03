@@ -170,7 +170,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
   return <WsContext.Provider value={{ connected, subscribe }}>{children}</WsContext.Provider>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+// eslint-disable-next-line react/only-export-components
 export function useWsSubscribe() {
   return useContext(WsContext);
 }

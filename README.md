@@ -115,7 +115,7 @@ make dev
 | `make build`       | Build frontend and backend                                         |
 | `make test`        | Run all tests (Go + shared + frontend), with `-count=1` on Go      |
 | `make test-race`   | Run the Go suite with the race detector                            |
-| `make lint`        | `pnpm lint` (ESLint) + `golangci-lint run` over the Go packages    |
+| `make lint`        | `pnpm lint` (oxlint) + `golangci-lint run` over the Go packages    |
 | `make format`      | `pnpm format` (Prettier) + `goimports -w` over the Go packages     |
 | `make format-check`| CI-style format gate: fails if any file is unformatted              |
 | `make shellcheck`  | Lint the device-mutating shell scripts                             |

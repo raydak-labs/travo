@@ -20,14 +20,14 @@
 - **`app-shell.tsx`** — Uses `useSidebarCollapsed()` so collapse state survives reloads; mobile Sheet + hamburger flow unchanged.
 - **`theme-context.ts`** — `ThemeContext` plus `Theme` / `ThemeContextValue` types.
 - **`use-theme.ts`** — `useTheme()` hook (import from here or `@/components/layout/use-theme` in `App` / `Header`).
-- **`theme-provider.tsx`** — `ThemeProvider` only; satisfies `react-refresh/only-export-components` when paired with the files above.
+- **`theme-provider.tsx`** — `ThemeProvider` only; satisfies `react/only-export-components` when paired with the files above.
 - **`components/ui/collapsible.tsx`** — Radix Collapsible primitives aligned with other shadcn-style wrappers.
 - **`index.ts`** — Barrel exports for the layout feature.
 - **`router.tsx`** — Route tree + `createRouter` only; **`LazyPageBoundary`** (`lazy-page-boundary.tsx`) wraps lazy pages in ErrorBoundary + Suspense + **Skeleton** fallback; **`router/lazy-loaded-pages.tsx`** holds `lazy()` imports; **`router/route-guards.ts`** exports `requireAuth` / `requireSetupComplete`; `shellPage()` DRYs `AppShell` + boundary + page for each protected route.
 
 ### UI primitives (`components/ui/`)
 
-- **`badge.tsx`**, **`button.tsx`** — Export the component and `export type` for props only; CVA variant helpers are not re-exported (unused externally; keeps react-refresh clean).
+- **`badge.tsx`**, **`button.tsx`** — Export the component and `export type` for props only; CVA variant helpers are not re-exported (unused externally; keeps react/only-export-components clean).
 
 ### System page (`pages/system/`)
 

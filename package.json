@@ -9,20 +9,16 @@
     "dev": "make dev",
     "build": "make build",
     "test": "make test",
-    "lint": "eslint 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts'",
+    "lint": "oxlint frontend/src shared/src",
+    "lint:ci": "oxlint --format=github frontend/src shared/src",
     "format": "prettier --write 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts' '**/*.{yml,yaml}'",
     "format:check": "prettier --check 'frontend/src/**/*.{ts,tsx}' 'shared/src/**/*.ts' '**/*.{yml,yaml}'",
     "clean": "make clean"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
-    "eslint": "10.11.0",
-    "eslint-plugin-react-hooks": "7.1.1",
-    "eslint-plugin-react-refresh": "0.5.7",
-    "globals": "17.12.0",
+    "oxlint": "1.86.0",
     "prettier": "3.9.9",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.70.1"
+    "typescript": "7.0.2"
   },
   "msw": {
     "workerDirectory": [

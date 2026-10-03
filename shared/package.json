@@ -9,10 +9,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc",
-    "lint": "eslint 'src/**/*.ts'"
+    "lint": "oxlint src"
   },
   "devDependencies": {
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vitest": "5.0.1"
   }
 }
