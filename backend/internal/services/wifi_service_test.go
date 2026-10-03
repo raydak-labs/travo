@@ -2,8 +2,10 @@ package services
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -768,8 +770,19 @@ func TestSetAPConfig_APModeSkipsRepeaterReconcile(t *testing.T) {
 	}
 }
 
-func TestSetMACAddress(t *testing.T) {
+// newMACUnitTestService is newTestWifiService with the live-link commands
+// stubbed. applyMACImmediate now REPORTS a failed `ip link` instead of logging
+// it, and the shared helper keeps the real command runner: on a dev machine
+// "ip link set phy0-sta0 down" fails because the interface does not exist,
+// which says nothing about the code under test.
+func newMACUnitTestService() (*WifiService, *uci.MockUCI) {
 	svc, u := newTestWifiService()
+	svc.cmd = &MockCommandRunner{}
+	return svc, u
+}
+
+func TestSetMACAddress(t *testing.T) {
+	svc, u := newMACUnitTestService()
 
 	// Input is canonicalized to lowercase colon notation.
 	_, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
@@ -788,7 +801,7 @@ func TestSetMACAddress(t *testing.T) {
 }
 
 func TestSetMACAddress_Reset(t *testing.T) {
-	svc, u := newTestWifiService()
+	svc, u := newMACUnitTestService()
 
 	// Set then reset
 	_, _ = svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
@@ -822,7 +835,7 @@ func TestGetMACAddresses(t *testing.T) {
 }
 
 func TestRandomizeMAC(t *testing.T) {
-	svc, u := newTestWifiService()
+	svc, u := newMACUnitTestService()
 
 	mac, _, err := svc.RandomizeMAC()
 	if err != nil {
@@ -857,7 +870,7 @@ func TestRandomizeMAC(t *testing.T) {
 }
 
 func TestRandomizeMAC_UniquePerCall(t *testing.T) {
-	svc, _ := newTestWifiService()
+	svc, _ := newMACUnitTestService()
 
 	mac1, _, err := svc.RandomizeMAC()
 	if err != nil {
@@ -1305,6 +1318,9 @@ func TestGetConnection_DerivesRepeaterMode(t *testing.T) {
 
 func TestConfirmApply_DelegatesToApplier(t *testing.T) {
 	svc, _ := newTestWifiService()
+	// Both mock AP sections are enabled, so confirm only reaches the applier once
+	// netifd reports them up (see ConfirmApply).
+	registerAPStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": true})
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1313,6 +1329,110 @@ func TestConfirmApply_DelegatesToApplier(t *testing.T) {
 	}
 	if len(fake.confirmed) != 1 || fake.confirmed[0] != "session-456" {
 		t.Fatalf("expected confirm to be called for session-456, got %#v", fake.confirmed)
+	}
+}
+
+func TestConfirmApply_RequiresToken(t *testing.T) {
+	svc, _ := newTestWifiService()
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("   "); err == nil {
+		t.Fatal("expected an error for a blank apply token")
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("a rejected token must not reach the applier, got %#v", fake.confirmed)
+	}
+}
+
+// registerAPStatus publishes a `network.wireless status` payload where each named
+// AP section is reported by netifd with the given up flag.
+func registerAPStatus(t *testing.T, svc *WifiService, up map[string]bool) {
+	t.Helper()
+	sections, err := svc.uci.GetSections("wireless")
+	if err != nil {
+		t.Fatalf("reading wireless sections: %v", err)
+	}
+	byRadio := map[string][]any{}
+	names := slices.Sorted(maps.Keys(up))
+	for _, name := range names {
+		radio := sections[name]["device"]
+		byRadio[radio] = append(byRadio[radio], map[string]any{
+			"section": name,
+			"ifname":  "phy0-ap0",
+			"up":      up[name],
+			"config":  map[string]any{"mode": "ap", "ssid": sections[name]["ssid"]},
+		})
+	}
+	resp := map[string]any{}
+	for radio, ifaces := range byRadio {
+		resp[radio] = map[string]any{"interfaces": ifaces}
+	}
+	ub, ok := svc.ubus.(*ubus.MockUbus)
+	if !ok {
+		t.Fatal("expected a MockUbus")
+	}
+	ub.RegisterResponse("network.wireless.status", resp)
+}
+
+// A radio that stays down must NOT have its rollback cancelled: that is the
+// "proof of reachability" docs/architecture.md §3 and ADR 0002 §5 require, and
+// it is what a client-confirms-instantly bug silently skipped.
+func TestConfirmApply_KeepsRollbackArmedWhenAPIsDown(t *testing.T) {
+	svc, _ := newTestWifiService()
+	registerAPStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": false})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	err := svc.ConfirmApply("session-down")
+	if !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("expected ErrWirelessNotUp, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("the apply session must stay open when the AP is down, got confirm %#v", fake.confirmed)
+	}
+}
+
+func TestConfirmApply_FailsClosedWhenWirelessStatusIsUnreadable(t *testing.T) {
+	svc, _ := newTestWifiService()
+	ub := svc.ubus.(*ubus.MockUbus)
+	ub.RegisterResponse("network.wireless.status", nil)
+	// A nil registered response makes the mock answer with no interfaces, i.e. no
+	// AP is observable at all.
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-unknown"); !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("expected ErrWirelessNotUp when the interfaces cannot be observed, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("unknown state must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// "Turn WiFi off" and client mode leave no access point running, so there is
+// nothing to prove and the operator's change must be allowed to stick.
+func TestConfirmApply_SkipsProbeWhenNoAPIsEnabled(t *testing.T) {
+	svc, u := newTestWifiService()
+	for _, section := range []string{"default_radio0", "default_radio1"} {
+		if err := u.Set("wireless", section, "disabled", "1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// An AP section on a disabled radio is deliberately down as well.
+	if err := u.Set("wireless", "radio0", "disabled", "1"); err != nil {
+		t.Fatal(err)
+	}
+	_ = u.Set("wireless", "radio1", "disabled", "1")
+	registerAPStatus(t, svc, map[string]bool{"default_radio0": false, "default_radio1": false})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-off"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
 	}
 }
 
@@ -2350,6 +2470,142 @@ func TestSetRadioRole_NewAPGetsRandomKey(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Finding 1: role "both" must not commit AP+STA on one radio.
+// ---------------------------------------------------------------------------
+
+// repeaterModeService returns a service whose mock config is in repeater mode
+// (enabled STA plus enabled APs on both radios) with the given
+// allow_ap_on_sta_radio setting persisted.
+func repeaterModeService(t *testing.T, allowAPOnSTA bool) (*WifiService, *revertingUCI) {
+	t.Helper()
+	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
+	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc.guardDir = testGuardDir()
+	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
+	opts, err := json.Marshal(models.RepeaterOptions{AllowAPOnSTARadio: allowAPOnSTA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(svc.repeaterOptionsFile, opts, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return svc, u
+}
+
+// assertNoSameRadioAPSTA fails when radioName has both an enabled AP and an
+// enabled STA: the state ADR 0002 §2 says is enough to crash ath11k/IPQ6018.
+func assertNoSameRadioAPSTA(t *testing.T, u uci.UCI, radioName string) {
+	t.Helper()
+	sections, err := u.GetSections("wireless")
+	if err != nil {
+		t.Fatalf("reading wireless sections: %v", err)
+	}
+	ap, sta := false, false
+	for name, opts := range sections {
+		if opts["device"] != radioName || opts["disabled"] == "1" {
+			continue
+		}
+		switch opts["mode"] {
+		case "ap":
+			ap = true
+			t.Logf("enabled AP on %s: %s", radioName, name)
+		case "sta":
+			sta = true
+			t.Logf("enabled STA on %s: %s", radioName, name)
+		}
+	}
+	if ap && sta {
+		t.Errorf("%s has both an enabled AP and an enabled STA", radioName)
+	}
+}
+
+func TestSetRadioRole_BothIsRefusedWithoutAllowAPOnSTARadio(t *testing.T) {
+	svc, u := repeaterModeService(t, false)
+	applier := &fakeWirelessApplier{startToken: "must-not-be-used"}
+	svc.applier = applier
+	// Start from a split layout: the STA owns radio0, the only access point is on
+	// radio1. Asking for "both" on radio0 is what would put both on one PHY.
+	if err := u.DeleteSection("wireless", "default_radio0"); err != nil {
+		t.Fatal(err)
+	}
+	assertNoSameRadioAPSTA(t, u, "radio0")
+
+	if _, err := svc.SetRadioRole("radio0", "both"); !errors.Is(err, ErrAPAndSTASameRadio) {
+		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
+	}
+	// Nothing may reach the running config: the write is refused before Commit,
+	// the staged delta is dropped, and no rpcd apply is started (an rpcd rollback
+	// could not undo it — the rollback would restore the same broken state).
+	for _, c := range u.commitCalls() {
+		if c == "wireless" {
+			t.Error("wireless was committed after the role was refused")
+		}
+	}
+	for _, c := range []string{"wireless", "network", "firewall"} {
+		if !slices.Contains(u.revertCalls(), c) {
+			t.Errorf("expected the staged %s delta to be reverted, got %v", c, u.revertCalls())
+		}
+	}
+	if len(applier.started) != 0 {
+		t.Errorf("no apply may be started for a refused role, got %v", applier.started)
+	}
+}
+
+// allow_ap_on_sta_radio is the documented escape hatch: with it set, the same
+// request is honoured as asked.
+func TestSetRadioRole_BothIsAllowedWhenAllowAPOnSTARadioIsSet(t *testing.T) {
+	svc, u := repeaterModeService(t, true)
+
+	if _, err := svc.SetRadioRole("radio0", "both"); err != nil {
+		t.Fatalf("SetRadioRole: %v", err)
+	}
+	apDis, _ := u.Get("wireless", "default_radio0", "disabled")
+	staDis, _ := u.Get("wireless", "sta0", "disabled")
+	if apDis == "1" || staDis == "1" {
+		t.Errorf("expected AP and STA enabled on radio0, got ap=%q sta=%q", apDis, staDis)
+	}
+}
+
+// Single-radio hardware has no split to make, so coexistence stays allowed — the
+// same trade-off SetMode("repeater") already accepts.
+func TestSetRadioRole_BothIsAllowedOnSingleRadio(t *testing.T) {
+	svc, u := repeaterModeService(t, false)
+	if err := u.DeleteSection("wireless", "radio1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.DeleteSection("wireless", "default_radio1"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.SetRadioRole("radio0", "both"); err != nil {
+		t.Fatalf("SetRadioRole on single-radio hardware: %v", err)
+	}
+	apDis, _ := u.Get("wireless", "default_radio0", "disabled")
+	staDis, _ := u.Get("wireless", "sta0", "disabled")
+	if apDis == "1" || staDis == "1" {
+		t.Errorf("expected AP and STA enabled on the only radio, got ap=%q sta=%q", apDis, staDis)
+	}
+}
+
+// The refused write must be recoverable: a per-radio role that does not put both
+// modes on one radio still goes through on the same device.
+func TestSetRadioRole_SplitRolesStillWorkOnMultiRadio(t *testing.T) {
+	svc, u := repeaterModeService(t, false)
+
+	if _, err := svc.SetRadioRole("radio0", "sta"); err != nil {
+		t.Fatalf("STA-only role should be accepted: %v", err)
+	}
+	apDis, _ := u.Get("wireless", "default_radio0", "disabled")
+	staDis, _ := u.Get("wireless", "sta0", "disabled")
+	if apDis != "1" {
+		t.Errorf("expected the AP on radio0 to be disabled for an STA-only role, got %q", apDis)
+	}
+	if staDis == "1" {
+		t.Errorf("expected the STA on radio0 to stay enabled, got disabled=%q", staDis)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Finding 9: disabling guest WiFi must tear the whole guest network down.
 // ---------------------------------------------------------------------------
 
@@ -2473,7 +2729,7 @@ func TestSetMACAddress_RejectsInvalidMAC(t *testing.T) {
 }
 
 func TestSetMACAddress_AcceptsValidVariants(t *testing.T) {
-	svc, u := newTestWifiService()
+	svc, u := newMACUnitTestService()
 	// Accepted spellings are canonicalized to lowercase colon notation, which
 	// is what netifd and mac80211.sh expect.
 	for mac, want := range map[string]string{
@@ -2551,6 +2807,90 @@ func TestSetMACAddress_GuardRemovedAndLinkTouchedAfterApply(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(cmds, " "), "address aa:bb:cc:dd:ee:ff") {
 		t.Errorf("expected the new MAC to be set on the link, commands: %v", cmds)
+	}
+}
+
+// The `ip link set <if> address` step is the only one that can leave the router
+// worse off: the interface was just taken DOWN, and if the address is rejected
+// the function returned without bringing it back up and the caller swallowed the
+// error — so the STA silently disappeared behind a 200 response, taking the
+// operator's upstream link with it.
+func TestSetMACAddress_LinkFailureIsReturnedAndLinkBroughtBackUp(t *testing.T) {
+	guardDir := t.TempDir()
+	var cmds []string
+	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
+	svc.cmd = &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		cmds = append(cmds, strings.Join(append([]string{name}, args...), " "))
+		// The address change is what a busy driver rejects.
+		if slices.Contains(args, "address") {
+			return nil, errors.New("RTNETLINK answers: Operation not supported")
+		}
+		return nil, nil
+	}}
+
+	apply, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF")
+	if err == nil {
+		t.Fatal("a failed `ip link set address` must surface as an error, not a success")
+	}
+	if apply != nil {
+		t.Errorf("no apply result may be reported when the live link failed: %+v", apply)
+	}
+	joined := strings.Join(cmds, " | ")
+	if !strings.Contains(joined, "ip link set phy0-sta0 down") {
+		t.Fatalf("the link was never taken down, so this test proves nothing: %v", cmds)
+	}
+	// After the failed address change the link must be brought back up.
+	if strings.Count(joined, "ip link set phy0-sta0 up") != 1 {
+		t.Errorf("the interface was left down after a failed address change: %v", cmds)
+	}
+}
+
+// The guard is the only durable record that the MAC sequence did not finish
+// (ADR 0003 §1.3: remove it only after the operation completes end to end). It
+// was cleared unconditionally as soon as the apply was staged, before the live
+// link had been touched at all.
+func TestSetMACAddress_GuardSurvivesAFailedLinkChange(t *testing.T) {
+	guardDir := t.TempDir()
+	var cmds []string
+	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
+	svc.cmd = &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if slices.Contains(args, "address") {
+			return nil, errors.New("RTNETLINK answers: Operation not supported")
+		}
+		return nil, nil
+	}}
+
+	if _, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected the link failure to surface")
+	}
+	if _, err := os.Stat(filepath.Join(guardDir, "mac-in-progress")); err != nil {
+		t.Errorf("the crash guard must survive an incomplete MAC change: %v", err)
+	}
+}
+
+// A `ip link down` that fails means nothing was changed, but the sequence still
+// did not complete; the guard must stay so the operator can see the device is in
+// an unresolved state.
+func TestSetMACAddress_GuardSurvivesAFailedLinkDown(t *testing.T) {
+	guardDir := t.TempDir()
+	var cmds []string
+	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
+	svc.cmd = &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		cmds = append(cmds, strings.Join(append([]string{name}, args...), " "))
+		if slices.Contains(args, "down") {
+			return nil, errors.New("ip: cannot find device phy0-sta0")
+		}
+		return nil, nil
+	}}
+
+	if _, err := svc.SetMACAddress("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected the link failure to surface")
+	}
+	if _, err := os.Stat(filepath.Join(guardDir, "mac-in-progress")); err != nil {
+		t.Errorf("the crash guard must survive an incomplete MAC change: %v", err)
+	}
+	if slices.ContainsFunc(cmds, func(c string) bool { return strings.Contains(c, "address") }) {
+		t.Errorf("the address must not be set after the interface could not be taken down: %v", cmds)
 	}
 }
 
@@ -2987,4 +3327,79 @@ func keys(m map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// ---------------------------------------------------------------------------
+// Band switching: a persisted config must never be able to take the backend
+// down with it.
+// ---------------------------------------------------------------------------
+
+// writeBandSwitchConfigFile persists raw JSON as the band switcher's config.
+func writeBandSwitchConfigFile(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "band-switch.json")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write band switch config: %v", err)
+	}
+	return path
+}
+
+// check_interval_sec 0 reached time.NewTicker(0), which PANICS. Start runs in the
+// backend process, so that panic took the API, the WebSocket and every other
+// service down with it. loadConfig must reject the file instead.
+func TestBandSwitchingStartDoesNotPanicOnZeroCheckInterval(t *testing.T) {
+	path := writeBandSwitchConfigFile(t, `{"enabled":true,"check_interval_sec":0,"preferred_band":"5g"}`)
+
+	svc := NewBandSwitchingService(nil, path)
+	if got := svc.GetConfig().CheckIntervalSec; got != defaultBandSwitchCheckInterval {
+		t.Errorf("an invalid config file must fall back to the default interval, got %d", got)
+	}
+	if got := svc.checkInterval(); got != time.Duration(defaultBandSwitchCheckInterval)*time.Second {
+		t.Errorf("ticker interval = %s, want %ds", got, defaultBandSwitchCheckInterval)
+	}
+
+	// Start must return normally; a panic here fails the whole test binary.
+	svc.Start()
+	defer svc.Stop()
+}
+
+// The clamp in checkInterval is what stands between a bad value and the panic,
+// so it is asserted directly too: a non-positive interval never reaches
+// time.NewTicker.
+func TestBandSwitchingCheckIntervalClampsNonPositiveValues(t *testing.T) {
+	for _, sec := range []int{0, -5, -3600} {
+		svc := NewBandSwitchingService(nil, filepath.Join(t.TempDir(), "missing.json"))
+		svc.config.CheckIntervalSec = sec
+		if got := svc.checkInterval(); got <= 0 {
+			t.Errorf("check_interval_sec %d produced a non-positive ticker interval %s", sec, got)
+		}
+	}
+}
+
+// A config file that is not even JSON must not replace the defaults either.
+func TestBandSwitchingLoadConfigKeepsDefaultsOnGarbage(t *testing.T) {
+	path := writeBandSwitchConfigFile(t, `{"enabled":true,`)
+
+	svc := NewBandSwitchingService(nil, path)
+	if got := svc.GetConfig(); got.CheckIntervalSec != defaultBandSwitchCheckInterval || got.Enabled {
+		t.Errorf("a truncated config file must be ignored, got %+v", got)
+	}
+}
+
+// A VALID file must still be honoured — loadConfig is not allowed to silently
+// drop every config and always run on defaults.
+func TestBandSwitchingLoadConfigAppliesValidFile(t *testing.T) {
+	path := writeBandSwitchConfigFile(t,
+		`{"enabled":true,"preferred_band":"2g","check_interval_sec":42,"down_switch_threshold_dbm":-70,`+
+			`"up_switch_threshold_dbm":-60,"down_switch_delay_sec":30,"up_switch_delay_sec":15,`+
+			`"min_viable_signal_dbm":-80}`)
+
+	svc := NewBandSwitchingService(nil, path)
+	got := svc.GetConfig()
+	if got.CheckIntervalSec != 42 || !got.Enabled || got.PreferredBand != "2g" {
+		t.Errorf("a valid config file was not applied: %+v", got)
+	}
+	if got.UpSwitchDelaySec != 15 {
+		t.Errorf("up_switch_delay_sec = %d, want 15", got.UpSwitchDelaySec)
+	}
 }

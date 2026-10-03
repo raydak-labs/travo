@@ -107,14 +107,33 @@ func (b *BandSwitchingService) SetConfig(cfg BandSwitchConfig) error {
 	return b.saveConfig()
 }
 
+// loadConfig reads the persisted config and applies it ONLY if it validates.
+//
+// The API handler validates before SetConfig, but the file on disk is not
+// covered by that: a config written by an older build, hand-edited, or
+// truncated to check_interval_sec 0 reached time.NewTicker(0) in Start, which
+// PANICS — and Start runs in the backend process, so the API, the WebSocket and
+// every other service went down with it. An invalid file now falls back to the
+// defaults and says so in the log, which is the same outcome as a device that
+// has never saved a config.
 func (b *BandSwitchingService) loadConfig() error {
 	data, err := os.ReadFile(b.configFile)
 	if err != nil {
 		return err
 	}
+	var cfg BandSwitchConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		log.Printf("band-switching: %s is not valid JSON (%v); keeping defaults", b.configFile, err)
+		return nil
+	}
+	if err := ValidateBandSwitchConfig(cfg); err != nil {
+		log.Printf("band-switching: %s is invalid (%v); keeping the default config", b.configFile, err)
+		return nil
+	}
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	return json.Unmarshal(data, &b.config)
+	b.config = cfg
+	b.mu.Unlock()
+	return nil
 }
 
 func (b *BandSwitchingService) saveConfig() error {
@@ -130,6 +149,19 @@ func (b *BandSwitchingService) saveConfig() error {
 	return os.WriteFile(b.configFile, data, 0600)
 }
 
+// checkInterval is the ticker period, clamped so a bad config can never reach
+// time.NewTicker with a zero or negative duration (which panics). Start uses it
+// instead of reading the raw field, so the clamp holds for every config source.
+func (b *BandSwitchingService) checkInterval() time.Duration {
+	b.mu.RLock()
+	sec := b.config.CheckIntervalSec
+	b.mu.RUnlock()
+	if sec <= 0 {
+		sec = defaultBandSwitchCheckInterval
+	}
+	return time.Duration(sec) * time.Second
+}
+
 // Start begins the band switching monitor goroutine.
 // Must be called once after service creation.
 func (b *BandSwitchingService) Start() {
@@ -139,17 +171,16 @@ func (b *BandSwitchingService) Start() {
 	}
 
 	go func() {
-		b.mu.RLock()
-		interval := time.Duration(b.config.CheckIntervalSec) * time.Second
-		b.mu.RUnlock()
-
-		ticker := time.NewTicker(interval)
+		ticker := time.NewTicker(b.checkInterval())
 		defer ticker.Stop()
 
 		var (
-			weakSignalSecs  int
-			cooldownSec     int
-			onPreferredBand bool
+			weakSignalSecs int
+			// upSignalSecs accumulates how long the preferred band has been strong
+			// enough to return to. up_switch_delay_sec used to be parsed,
+			// validated and persisted, and then never read by any logic.
+			upSignalSecs int
+			cooldownSec  int
 		)
 
 		for {
@@ -164,9 +195,10 @@ func (b *BandSwitchingService) Start() {
 					b.status = BandSwitchStatus{State: "inactive"}
 					b.mu.Unlock()
 					weakSignalSecs = 0
+					upSignalSecs = 0
 					cooldownSec = 0
 					// Reset ticker if interval changed
-					ticker.Reset(time.Duration(cfg.CheckIntervalSec) * time.Second)
+					ticker.Reset(b.checkInterval())
 					continue
 				}
 
@@ -184,6 +216,7 @@ func (b *BandSwitchingService) Start() {
 					b.status = BandSwitchStatus{State: "inactive"}
 					b.mu.Unlock()
 					weakSignalSecs = 0
+					upSignalSecs = 0
 					cooldownSec = 0
 					continue
 				}
@@ -192,7 +225,10 @@ func (b *BandSwitchingService) Start() {
 				radios := b.getRadios()
 				preferredRadio := b.findRadioByBand(radios, cfg.PreferredBand)
 				alternateRadio := b.findAlternateRadio(radios, preferredRadio)
-				onPreferredBand = currentRadio == preferredRadio
+				onPreferredBand := currentRadio == preferredRadio
+				if onPreferredBand {
+					upSignalSecs = 0
+				}
 
 				// Update cooldown.
 				if cooldownSec > 0 {
@@ -229,6 +265,7 @@ func (b *BandSwitchingService) Start() {
 							b.bandForRadio(radios, alternateRadio), altSignal)
 						if err := b.doSwitch(alternateRadio, reason); err == nil {
 							weakSignalSecs = 0
+							upSignalSecs = 0
 							cooldownSec = bandSwitchCooldownSec
 						}
 					}
@@ -237,15 +274,26 @@ func (b *BandSwitchingService) Start() {
 				}
 
 				// Up-switch logic: if on non-preferred band, check if preferred recovered.
+				// up_switch_delay_sec holds the switch back until the preferred band has
+				// been strong for that many seconds, so one good scan does not bounce
+				// the client straight back onto the band that just failed. 0 means "as
+				// soon as the threshold is met", i.e. the behaviour from when this
+				// setting was parsed but never used.
 				if !onPreferredBand && preferredRadio != "" {
 					prefSignal, found, _ := b.wifi.ScanRadioForSSID(preferredRadio, ssid)
 					if found && prefSignal >= cfg.UpSwitchThresholdDBm {
-						reason := fmt.Sprintf("preferred %s recovered (%d dBm), switching back",
-							cfg.PreferredBand, prefSignal)
-						if err := b.doSwitch(preferredRadio, reason); err == nil {
-							weakSignalSecs = 0
-							cooldownSec = bandSwitchCooldownSec
+						upSignalSecs += cfg.CheckIntervalSec
+						if upSignalSecs >= cfg.UpSwitchDelaySec {
+							reason := fmt.Sprintf("preferred %s recovered (%d dBm), switching back",
+								cfg.PreferredBand, prefSignal)
+							if err := b.doSwitch(preferredRadio, reason); err == nil {
+								weakSignalSecs = 0
+								upSignalSecs = 0
+								cooldownSec = bandSwitchCooldownSec
+							}
 						}
+					} else {
+						upSignalSecs = 0
 					}
 				}
 
@@ -264,7 +312,7 @@ func (b *BandSwitchingService) Start() {
 				}
 				b.mu.Unlock()
 
-				ticker.Reset(time.Duration(cfg.CheckIntervalSec) * time.Second)
+				ticker.Reset(b.checkInterval())
 
 			case <-b.stopCh:
 				return

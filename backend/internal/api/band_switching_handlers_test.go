@@ -8,6 +8,10 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 func TestGetBandSwitchingHandler(t *testing.T) {
@@ -146,5 +150,82 @@ func TestSetRadioRoleHandler_InvalidRole(t *testing.T) {
 	}
 	if _, ok := result["error"]; !ok {
 		t.Error("expected 'error' field in response")
+	}
+}
+
+// stubApplier stands in for the rpcd apply/confirm applier, which only exists in
+// production wiring (the shared test app configures no applier).
+type stubApplier struct {
+	token string
+}
+
+func (s *stubApplier) StartApply(configs []string) (string, error) { return s.token, nil }
+
+func (s *stubApplier) Confirm(sessionID string) error { return nil }
+
+func (s *stubApplier) ApplyAndConfirm(configs []string) error { return nil }
+
+// The radio-role mutator must answer with the same envelope as every other
+// wireless mutator: the client reads response.apply and, when it is pending,
+// calls confirmWifiApply. A raw WirelessApplyResult ({"Token": ...}) leaves the
+// client with no apply state, so it never confirms and rpcd's 30 s rollback
+// reverts every role change. The invented WPA passphrase also has to travel with
+// it, or the operator never learns the key of the access point Travo just
+// created for them.
+func TestSetRadioRoleHandler_ReturnsApplyEnvelopeAndGeneratedKey(t *testing.T) {
+	u := uci.NewMockUCI()
+	// No AP section on radio0, so the service has to create one and invent a key.
+	if err := u.DeleteSection("wireless", "default_radio0"); err != nil {
+		t.Fatal(err)
+	}
+	svc := services.NewWifiServiceWithApplier(u, ubus.NewMockUbus(),
+		&stubApplier{token: "role-session-1"})
+
+	app := fiber.New()
+	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
+
+	body, _ := json.Marshal(map[string]string{"role": "ap"})
+	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/radios/radio0/role", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Status    string `json:"status"`
+		Generated string `json:"generated_key"`
+		Apply     *struct {
+			Pending                bool   `json:"pending"`
+			Token                  string `json:"token"`
+			RollbackTimeoutSeconds int    `json:"rollback_timeout_seconds"`
+		} `json:"apply"`
+	}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("invalid JSON %s: %v", b, err)
+	}
+	if result.Status != "ok" {
+		t.Errorf("expected status=ok, got %q", result.Status)
+	}
+	if result.Apply == nil {
+		t.Fatalf("expected the shared apply envelope in the response, got %s", b)
+	}
+	if !result.Apply.Pending || result.Apply.Token != "role-session-1" {
+		t.Errorf("expected a pending apply for role-session-1, got %+v", result.Apply)
+	}
+	if result.Apply.RollbackTimeoutSeconds != 30 {
+		t.Errorf("expected rollback_timeout_seconds=30, got %d", result.Apply.RollbackTimeoutSeconds)
+	}
+	key, _ := u.Get("wireless", "ap_radio0", "key")
+	if result.Generated != key {
+		t.Errorf("expected generated_key %q (the created AP's passphrase), got %q", key, result.Generated)
+	}
+	if len(result.Generated) < 8 {
+		t.Errorf("generated_key must be a usable WPA passphrase, got %q", result.Generated)
 	}
 }

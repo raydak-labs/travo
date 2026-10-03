@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -8,6 +9,15 @@ import (
 )
 
 // Radios, AP configuration, and guest WiFi.
+
+// ErrAPAndSTASameRadio reports a radio role that would run an access point and
+// the uplink STA on the same PHY while the repeater split policy forbids it.
+// ADR 0002 §2: committing that state — even transiently — is enough to crash
+// ath11k/IPQ6018, and allow_ap_on_sta_radio is the explicit, documented escape
+// hatch for it. SetRadioRole refuses the request instead of applying it.
+var ErrAPAndSTASameRadio = errors.New("refusing to run an access point and the WiFi uplink " +
+	"on the same radio: give the uplink STA its own radio and put the downlink access " +
+	"point on the other one, or enable allow_ap_on_sta_radio in repeater options first")
 
 func (w *WifiService) preferredGuestRadio() (string, error) {
 	radios, err := w.getWifiRadioNames()
@@ -130,6 +140,10 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 
 // SetRadioRole assigns a role (ap/sta/both/none) to a specific radio.
 // It enables/disables existing iface sections and creates them if needed.
+//
+// Role "both" is refused with ErrAPAndSTASameRadio when it would put an access
+// point and the uplink STA on one radio and the repeater split policy forbids
+// it (see rejectSameRadioAPSTA).
 func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
 		// abort drops the staged wireless delta before surfacing a failure: the uci
@@ -262,6 +276,16 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 		if err := w.validateWirelessConsistency(); err != nil {
 			return nil, err
 		}
+		// Role "both" is the only role that puts an access point and the uplink STA
+		// on one PHY, so it is the only one the repeater split policy has to police
+		// here. validateWirelessConsistency is radio-blind (it counts only active
+		// mode=sta/network=wwan sections), so without this the request would commit
+		// and apply AP+STA on a single radio and bypass allow_ap_on_sta_radio
+		// entirely. See rejectSameRadioAPSTA for why this refuses instead of
+		// silently moving the downlink AP to the other radio.
+		if err := w.rejectSameRadioAPSTA(radioName, enableAP, enableSTA); err != nil {
+			return nil, err
+		}
 		if err := w.uci.Commit("wireless"); err != nil {
 			return nil, err
 		}
@@ -274,6 +298,47 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 		}
 		return apply, nil
 	})
+}
+
+// rejectSameRadioAPSTA refuses a radio role that would leave an enabled access
+// point and the uplink STA on the same PHY when the repeater split policy
+// forbids it. It runs BEFORE uci.Commit("wireless"), so the refused write never
+// reaches the running config — an rpcd rollback could not undo it, because the
+// rollback would restore the very same broken state.
+//
+// Why a refusal and not the repeater reconcile (reconcileRepeaterAPRadioLayout,
+// which ADR 0002 §2 mandates for functions that activate a STA):
+//
+//   - The reconcile is a whole-config operation. applyRepeaterDownlinkAPPolicy
+//     runs with enableAP=true, so it re-enables access points on the OTHER radios.
+//     SetRadioRole is a per-radio request, and the operator may just have set that
+//     other radio to "none" or "ap". Reconciling here would silently undo it.
+//   - Reconciling would not give the operator what they asked for anyway: the
+//     radio they marked "both" would come back as STA-only (or AP-only), with no
+//     error, and the split AP would appear on a radio they did not name.
+//   - The layout they actually want is reachable without ambiguity: give the STA
+//     its own radio and the downlink AP the other one (SetMode("repeater") plus
+//     per-radio roles), or flip the documented escape hatch.
+//
+// Single-radio hardware keeps coexistence: with one PHY there is no split to
+// make, which is the same trade-off SetMode("repeater") already accepts.
+func (w *WifiService) rejectSameRadioAPSTA(radioName string, enableAP, enableSTA bool) error {
+	if !enableAP || !enableSTA {
+		return nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return err
+	}
+	if len(radios) < 2 {
+		return nil
+	}
+	// allow_ap_on_sta_radio is the operator's explicit "I accept AP+STA on one
+	// radio" switch; when it is set, the request is honoured as asked.
+	if w.repeaterAllowAPOnSTARadio(true) {
+		return nil
+	}
+	return fmt.Errorf("%w: role 'both' requested on %s", ErrAPAndSTASameRadio, radioName)
 }
 
 // GetAPConfigs returns the AP configuration for all radios.

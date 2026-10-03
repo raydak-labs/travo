@@ -10,6 +10,8 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/ubus"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 func TestValidateHHMM(t *testing.T) {
@@ -132,13 +134,17 @@ func TestWirelessToggleScriptSelectsNamedAndAnonymousRadios(t *testing.T) {
 	}, "\n")
 
 	// Lift the sed expression the script itself uses, so the test cannot drift
-	// from the generated helper.
-	start := strings.Index(wirelessToggleScript, "sed -n 's/")
+	// from the generated helper. It is anchored on the `uci show wireless` line
+	// rather than on the first "sed -n" in the file: the helper has more than
+	// one (the rpcd session id is extracted with one too), and this is the
+	// expression that selects radios.
+	const showAnchor = "uci -q show wireless 2>/dev/null | sed -n '"
+	start := strings.Index(wirelessToggleScript, showAnchor)
 	end := strings.Index(wirelessToggleScript[start:], "/p'")
 	if start < 0 || end < 0 {
 		t.Fatal("could not find the sed expression in the toggle script")
 	}
-	expr := wirelessToggleScript[start+len("sed -n '") : start+end]
+	expr := wirelessToggleScript[start+len(showAnchor) : start+end]
 
 	cmd := exec.Command("sh", "-c", "sed -n '"+expr+"/p'")
 	cmd.Stdin = strings.NewReader(uciShow)
@@ -251,7 +257,8 @@ exit 0
 `, "up", false)
 
 	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-in-progress")); err != nil {
-		t.Error("the guard must survive a post-apply failure: it is the only marker that the rollback is unresolved")
+		t.Error("the guard must survive a post-apply failure: it is the only marker that the\n" +
+			"rollback is unresolved")
 	}
 	// The session dir is what rpcd restores from, so it must not be deleted.
 	if _, err := os.Stat(filepath.Join(binDir, "run", "uci-sid-1")); err != nil {
@@ -448,4 +455,241 @@ func runToggleScript(t *testing.T, ubusStub, state string, wantSuccess bool) (bi
 		t.Fatal("expected the helper to exit non-zero")
 	}
 	return binDir, calls, guardDir
+}
+
+// A rollback that cannot undo the commit is worse than no rollback: the helper
+// committed wireless.*.disabled=1, the apply failed, `uci revert` did nothing
+// (it only drops the uncommitted /tmp/.uci delta), and the next unrelated apply
+// silently committed it with the radios still up.
+//
+// rpcd restores an aborted apply from the copy in the session dir, so that copy
+// must be the PRE-change file. It was taken after "uci commit wireless", which
+// staged exactly the change the rollback exists to undo.
+func TestWirelessToggleScriptStagesPreChangeFileBeforeCommit(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	// A uci stub that behaves like the real CLI for the operations the helper
+	// uses: set stages a delta, commit makes it visible in the config file. The
+	// no-op uci stub the shared fixture installs cannot tell a pre-change
+	// snapshot from a post-change one.
+	const uciStub = `#!/bin/sh
+printf '%s\n' "uci $*" >> "$CALLS"
+while [ "$1" = "-q" ]; do shift; done
+case "$1" in
+	show) echo "wireless.radio0=wifi-device"; exit 0 ;;
+	set) echo "$2" > "$STAGED"; exit 0 ;;
+	commit) [ -f "$STAGED" ] && cat "$STAGED" >> "$WIRELESS_FILE"; exit 0 ;;
+esac
+exit 0
+`
+	const ubusStub = `#!/bin/sh
+printf '%s\n' "ubus $*" >> "$CALLS"
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  confirm) echo "confirm refused" >&2; exit 1 ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`
+
+	binDir, calls, guardDir, scriptPath := writeToggleScriptFixture(t, ubusStub)
+	if err := os.WriteFile(filepath.Join(binDir, "uci"), []byte(uciStub), 0o755); err != nil {
+		t.Fatalf("write uci stub: %v", err)
+	}
+	wireless := filepath.Join(binDir, "config", "wireless")
+
+	cmd := exec.Command("sh", scriptPath, "down")
+	cmd.Env = append(os.Environ(),
+		"PATH="+binDir+":"+os.Getenv("PATH"), "CALLS="+calls,
+		"STAGED="+filepath.Join(binDir, "staged"), "WIRELESS_FILE="+wireless)
+	// The confirm failure is what keeps the session dir around, which is where
+	// rpcd reads the rollback snapshot from.
+	if out, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("expected the failed confirm to make the helper exit non-zero:\n%s", out)
+	}
+
+	log, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	if !strings.Contains(string(log), "uci -q commit wireless") {
+		t.Fatalf("the fixture never committed, so it proves nothing:\n%s", log)
+	}
+	// What rpcd restores from when the apply is not confirmed: it must be the
+	// PRE-change file, or the rollback re-applies the change it should undo.
+	stagedCopy, err := os.ReadFile(filepath.Join(binDir, "run", "uci-sid-1", "wireless"))
+	if err != nil {
+		t.Fatalf("read the session snapshot: %v", err)
+	}
+	if strings.Contains(string(stagedCopy), "disabled=1") {
+		t.Errorf("the session snapshot holds the POST-change file, so an aborted apply rolls "+
+			"the change back IN instead of undoing it: %q", stagedCopy)
+	}
+	// The second pre-change copy, kept beside the guard, is what fail() restores.
+	backup, err := os.ReadFile(filepath.Join(guardDir, "wifi-toggle-wireless.bak"))
+	if err != nil {
+		t.Fatalf("read the pre-change backup: %v", err)
+	}
+	if strings.Contains(string(backup), "disabled=1") {
+		t.Errorf("the backup beside the guard is a post-change copy: %q", backup)
+	}
+	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-in-progress")); err != nil {
+		t.Error("the guard must survive a post-apply failure: it is the only marker that the rollback is unresolved")
+	}
+	if restored, err := os.ReadFile(wireless); err != nil {
+		t.Fatalf("read config: %v", err)
+	} else if strings.Contains(string(restored), "disabled=1") {
+		t.Errorf("fail() must put the pre-change file back, config is %q", restored)
+	}
+}
+
+// A failed apply must put the pre-change file BACK, not just leave a copy lying
+// around: `uci revert` is a no-op once the config is committed.
+func TestWirelessToggleScriptRestoresPreChangeFileOnApplyFailure(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	const uciStub = `#!/bin/sh
+printf '%s\n' "uci $*" >> "$CALLS"
+while [ "$1" = "-q" ]; do shift; done
+case "$1" in
+	show) echo "wireless.radio0=wifi-device"; exit 0 ;;
+	set) echo "$2" > "$STAGED"; exit 0 ;;
+	commit) [ -f "$STAGED" ] && cat "$STAGED" >> "$WIRELESS_FILE"; exit 0 ;;
+esac
+exit 0
+`
+	const ubusStub = `#!/bin/sh
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  apply) echo "apply refused" >&2; exit 1 ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`
+
+	binDir, calls, guardDir, scriptPath := writeToggleScriptFixture(t, ubusStub)
+	if err := os.WriteFile(filepath.Join(binDir, "uci"), []byte(uciStub), 0o755); err != nil {
+		t.Fatalf("write uci stub: %v", err)
+	}
+	wireless := filepath.Join(binDir, "config", "wireless")
+
+	cmd := exec.Command("sh", scriptPath, "down")
+	cmd.Env = append(os.Environ(),
+		"PATH="+binDir+":"+os.Getenv("PATH"), "CALLS="+calls,
+		"STAGED="+filepath.Join(binDir, "staged"), "WIRELESS_FILE="+wireless)
+	if out, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("expected the failed apply to make the helper exit non-zero:\n%s", out)
+	}
+
+	restored, err := os.ReadFile(wireless)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if strings.Contains(string(restored), "disabled=1") {
+		t.Errorf("after a failed apply the committed change must be rolled back, config is %q", restored)
+	}
+	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-in-progress")); !os.IsNotExist(err) {
+		t.Error("a failed apply must clear its guard, or every later run is blocked")
+	}
+}
+
+// A successful toggle must leave no pre-change copy behind: a stale BACKUP next
+// to the guard is a config file from an older toggle that a later failure could
+// restore over a newer one.
+func TestWirelessToggleScriptRemovesBackupAfterSuccess(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	binDir, calls, guardDir, scriptPath := writeToggleScriptFixture(t, `#!/bin/sh
+if [ "$1" = "-S" ]; then shift; fi
+case "$3" in
+  login) echo '{"ubus_rpc_session":"sid-1"}' ;;
+  *) echo '{}' ;;
+esac
+exit 0
+`)
+	cmd := exec.Command("sh", scriptPath, "up")
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "CALLS="+calls)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("toggle helper failed: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(guardDir, "wifi-toggle-wireless.bak")); !os.IsNotExist(err) {
+		t.Error("a successful toggle must remove the pre-change backup")
+	}
+}
+
+// Both generated helpers are root-executed by cron. os.WriteFile truncates in
+// place (a power loss leaves a half-written script that cron runs on the next
+// tick) and does not change the mode of an EXISTING file, so a helper left at
+// 0644 by an older build silently stops being executable while every
+// content-only check still passes.
+func TestWriteGeneratedScriptReplacesFileWithCorrectModeAndFullContent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "travo-wireless-toggle.sh")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n# stale\n"), 0o644); err != nil {
+		t.Fatalf("seed helper: %v", err)
+	}
+
+	if err := writeWirelessToggleScriptTo(path); err != nil {
+		t.Fatalf("writeWirelessToggleScriptTo: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat helper: %v", err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Errorf("helper mode = %v, want 0755; a non-executable helper makes every scheduled "+
+			"and button-driven toggle a no-op", info.Mode().Perm())
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read helper: %v", err)
+	}
+	if string(got) != wirelessToggleScript {
+		t.Error("the installed helper is not the generated script in full; a truncated write " +
+			"looks like this")
+	}
+	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
+		t.Error("the atomic write left its temp file behind")
+	}
+}
+
+// The auto-reconnect helper is root-executed by cron as well, so it is
+// installed the same way.
+func TestSetAutoReconnect_ReplacesScriptWithCorrectMode(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "wifi-reconnect.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n# stale\n"), 0o644); err != nil {
+		t.Fatalf("seed script: %v", err)
+	}
+
+	w := NewWifiServiceForTesting(uci.NewMockUCI(), ubus.NewMockUbus(), &NoopWifiReloader{},
+		&MockCommandRunner{}, filepath.Join(dir, "priorities.json"),
+		filepath.Join(dir, "autoreconnect.json"), script)
+	if err := w.SetAutoReconnect(true); err != nil {
+		t.Fatalf("SetAutoReconnect: %v", err)
+	}
+
+	info, err := os.Stat(script)
+	if err != nil {
+		t.Fatalf("stat script: %v", err)
+	}
+	if info.Mode().Perm() != 0o750 {
+		t.Errorf("reconnect script mode = %v, want 0750", info.Mode().Perm())
+	}
+	got, err := os.ReadFile(script)
+	if err != nil {
+		t.Fatalf("read script: %v", err)
+	}
+	if string(got) != reconnectScriptContent {
+		t.Error("the installed reconnect script is not the generated script in full")
+	}
 }

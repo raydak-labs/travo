@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -224,6 +225,21 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 	}
 }
 
+// NewWifiServiceWithApplier wires an explicit apply/confirm step into a
+// WifiService. Production uses NewWifiService (the real rpcd applier); this
+// constructor is the seam other packages' tests use to drive the wireless
+// mutation envelope (token, rollback timeout, generated key) that only exists
+// when an applier is configured.
+func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm) *WifiService {
+	return &WifiService{
+		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: applier,
+		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
+		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
+		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
+		guardDir: crashGuardDir,
+	}
+}
+
 // NewWifiServiceWithReloader creates a WifiService with a custom reloader (for tests).
 // Applier is left nil so Reload() is used.
 func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiService {
@@ -323,8 +339,16 @@ func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 	return nil, nil
 }
 
-// ConfirmApply finalizes a staged wireless apply once the browser has proven
-// the router is still reachable after the config change.
+// ConfirmApply finalizes a staged wireless apply once the router has proven it
+// is still reachable on the new settings.
+//
+// The proof is made HERE, on the device, not in the caller: docs/architecture.md
+// §3 and ADR 0002 §5 require confirm only after reachability is proven, and a
+// client that POSTs confirm a millisecond after the apply (the normal case for an
+// operator on Ethernet, where WiFi is exactly what is being reconfigured) would
+// otherwise cancel the rollback of a config that never came up. A failed proof
+// returns BEFORE applier.Confirm, so the apply session stays open and rpcd rolls
+// the wireless config back when the window expires.
 func (w *WifiService) ConfirmApply(token string) error {
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("apply token is required")
@@ -332,11 +356,146 @@ func (w *WifiService) ConfirmApply(token string) error {
 	if w.applier == nil {
 		return nil
 	}
+	if err := w.verifyAppliedWirelessUp(); err != nil {
+		return err
+	}
 	if err := w.applier.Confirm(token); err != nil {
 		return err
 	}
 	// After successful confirm, no reload is needed as apply+confirm already applied changes
 	return nil
+}
+
+// ErrWirelessNotUp reports that the access points the just-applied wireless
+// config enables are not running. ConfirmApply surfaces it instead of
+// cancelling rpcd's rollback window, so a change that cannot bring WiFi up
+// reverts to the previous config.
+var ErrWirelessNotUp = errors.New(
+	"wireless apply not verified: enabled access point(s) did not come up")
+
+const (
+	// wirelessConfirmAttempts / wirelessConfirmDelay bound the wait for the
+	// access points to come up. netifd needs a moment to re-associate after
+	// `uci apply`, and the whole wait (3 probes, 2 s apart = 4 s) stays far
+	// inside rpcd's 30 s rollback window, so a confirm that fails here still
+	// leaves the window time to do its job.
+	wirelessConfirmAttempts = 3
+	wirelessConfirmDelay    = 2 * time.Second
+)
+
+// verifyAppliedWirelessUp proves that every access point the applied config says
+// should be running is actually up. It is the confirmation-time counterpart of
+// GetHealth: UCI says which AP sections are enabled, netifd says whether they
+// exist and are up.
+//
+// A config that leaves no access point enabled has nothing to prove — client mode
+// and "WiFi off" are changes the operator is allowed to make and reachability is
+// exactly what the confirm request itself demonstrates.
+func (w *WifiService) verifyAppliedWirelessUp() error {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return fmt.Errorf("reading wireless sections: %w", err)
+	}
+	want := enabledAPSections(sections)
+	if len(want) == 0 {
+		return nil
+	}
+	var lastErr error
+	for attempt := 0; attempt < wirelessConfirmAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(wirelessConfirmDelay)
+		}
+		lastErr = w.apInterfacesUp(sections, want)
+		if lastErr == nil {
+			return nil
+		}
+	}
+	return lastErr
+}
+
+// enabledAPSections returns the wifi-iface sections the given wireless config
+// says should be running: mode=ap, not disabled, on a radio that is not
+// disabled. An AP on a radio the config switches off is deliberately down.
+func enabledAPSections(sections map[string]map[string]string) []string {
+	var names []string
+	for name, opts := range sections {
+		if opts["mode"] != "ap" || opts["disabled"] == "1" {
+			continue
+		}
+		device := opts["device"]
+		if device == "" {
+			continue
+		}
+		if radio, ok := sections[device]; ok && radio["disabled"] == "1" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// apInterfacesUp cross-checks netifd's view of the wireless interfaces against
+// the AP sections the config enables: each expected section must appear in
+// `ubus call network.wireless status` with up=true. This is the access-point
+// counterpart of GetHealth's iwinfo-vs-netifd cross-check — and it fails closed:
+// an interface that cannot be observed is treated as down, because the whole
+// point is to keep the rollback armed when the answer is unknown.
+func (w *WifiService) apInterfacesUp(sections map[string]map[string]string, want []string) error {
+	resp, err := w.ubus.Call("network.wireless", "status", nil)
+	if err != nil {
+		return fmt.Errorf("%w: cannot read network.wireless status: %v", ErrWirelessNotUp, err)
+	}
+	down := make(map[string]bool, len(want))
+	for _, name := range want {
+		down[name] = true
+	}
+	for _, radioData := range resp {
+		radioMap, ok := radioData.(map[string]any)
+		if !ok {
+			continue
+		}
+		ifaces, ok := radioMap["interfaces"].([]any)
+		if !ok {
+			continue
+		}
+		for _, iface := range ifaces {
+			ifaceMap, ok := iface.(map[string]any)
+			if !ok {
+				continue
+			}
+			name, _ := ifaceMap["section"].(string)
+			if _, wanted := down[name]; !wanted {
+				// netifd did not report the section: fall back to mode+ssid so a
+				// build without "section" does not read as every AP being down.
+				cfg, _ := ifaceMap["config"].(map[string]any)
+				mode, _ := cfg["mode"].(string)
+				ssid, _ := cfg["ssid"].(string)
+				for _, candidate := range want {
+					opts := sections[candidate]
+					if ssid != "" && opts["ssid"] == ssid && opts["mode"] == mode {
+						name = candidate
+						break
+					}
+				}
+			}
+			if _, wanted := down[name]; !wanted {
+				continue
+			}
+			if up, _ := ifaceMap["up"].(bool); up {
+				delete(down, name)
+			}
+		}
+	}
+	if len(down) == 0 {
+		return nil
+	}
+	missing := make([]string, 0, len(down))
+	for name := range down {
+		missing = append(missing, name)
+	}
+	sort.Strings(missing)
+	return fmt.Errorf("%w: sections %s", ErrWirelessNotUp, strings.Join(missing, ","))
 }
 
 // findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.

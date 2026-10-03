@@ -1,7 +1,9 @@
 package services
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -152,6 +154,221 @@ func TestAutoReconnectWaitsForTheCrontabLock(t *testing.T) {
 	if !ran {
 		t.Error("expected the crontab command to run once the lock was free")
 	}
+}
+
+// writeReconnectScriptFixture stages the REAL generated auto-reconnect script in
+// a temp bin dir with a stub `wifi` that records every invocation, and points the
+// guard directory at guardDir. The stub is what makes the assertion possible:
+// the script is otherwise a root cron job that talks to ubus.
+//
+// The paths inside the script are rewritten so the fixture never touches the test
+// machine's /etc/trafo (paths.replace would corrupt them).
+func writeReconnectScriptFixture(t *testing.T, guardDir string) (dir, script, marker string) {
+	t.Helper()
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("no /bin/sh available")
+	}
+
+	binDir := t.TempDir()
+	marker = filepath.Join(binDir, "wifi-invoked")
+	scriptPath := filepath.Join(binDir, "wifi-reconnect.sh")
+
+	// The stub records the call and succeeds, so the script takes its "reconnect
+	// worked" branch.
+	stub := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"" + marker + "\"\nexit 0\n"
+	if err := os.WriteFile(filepath.Join(binDir, "wifi"), []byte(stub), 0o755); err != nil {
+		t.Fatalf("write wifi stub: %v", err)
+	}
+	// No wwan address on the test machine: the stub reports an interface with no
+	// ipv4-address, which is the "connection dropped" branch the guard exists for.
+	for _, name := range []string{"ubus", "jsonfilter"} {
+		body := "#!/bin/sh\nexit 0\n"
+		if name == "ubus" {
+			body = "#!/bin/sh\necho '{\"up\":false}'\n"
+		}
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte(body), 0o755); err != nil {
+			t.Fatalf("write %s stub: %v", name, err)
+		}
+	}
+
+	script = strings.ReplaceAll(reconnectScriptContent, crashGuardDir, guardDir)
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write reconnect script: %v", err)
+	}
+	dir = binDir
+	return dir, scriptPath, marker
+}
+
+// The crash guard and the MAX_FAIL counter are the only things standing between
+// cron and an endless `wifi up` on a broken saved network. Both live in /etc/trafo,
+// which nothing in packaging/, install.sh or backend startup guarantees exists,
+// and cron can fire this script before the backend has ever run.
+//
+// Without `mkdir -p` the guard write fails silently (there is no `set -e`), the
+// leftover-guard check cannot see a stale guard, and the script runs `wifi up`
+// UNGUARDED with a counter that never increments — the one sanctioned `wifi up` in
+// the tree, every minute, forever. The script must refuse to run instead.
+func TestAutoReconnectScriptRefusesToRunWhenTheGuardDirIsMissing(t *testing.T) {
+	// A regular file where the guard directory has to be: mkdir -p fails with
+	// ENOTDIR, and so does the guard write — the exact state on a device that
+	// never got /etc/trafo created.
+	blocker := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	guardDir := filepath.Join(blocker, "trafo")
+
+	binDir, scriptPath, wifiMarker := writeReconnectScriptFixture(t, guardDir)
+
+	cmd := exec.Command("sh", scriptPath)
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("the script exited 0 although it could not create its guard directory:\n%s", out)
+	}
+	if _, statErr := os.Stat(wifiMarker); statErr == nil {
+		t.Error("`wifi up` ran without a crash guard and without a fail counter")
+	}
+}
+
+// Control for the test above: with a writable guard directory the same script
+// does reach `wifi up`, so the refusal above is caused by the missing directory
+// and not by the fixture.
+func TestAutoReconnectScriptRunsWifiWhenTheGuardDirIsWritable(t *testing.T) {
+	guardDir := filepath.Join(t.TempDir(), "trafo")
+
+	binDir, scriptPath, wifiMarker := writeReconnectScriptFixture(t, guardDir)
+
+	cmd := exec.Command("sh", scriptPath)
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("the script failed with a writable guard dir: %v\n%s", err, out)
+	}
+	calls, err := os.ReadFile(wifiMarker)
+	if err != nil {
+		t.Fatalf("`wifi` was never invoked, so the fixture proves nothing: %v", err)
+	}
+	if !strings.Contains(string(calls), "up") {
+		t.Errorf("expected `wifi up`, stub recorded: %q", calls)
+	}
+	// A successful reconnect clears both the guard and the counter.
+	if _, err := os.Stat(filepath.Join(guardDir, "autoreconnect-crash-guard")); !os.IsNotExist(err) {
+		t.Error("a successful reconnect must clear the crash guard")
+	}
+}
+
+// scheduleWindowIsOff backs the startup AP repair: it must be able to tell that
+// the operator's schedule currently says "WiFi off", including across midnight.
+func TestScheduleWindowIsOff(t *testing.T) {
+	day := func(h, m int) time.Time {
+		return time.Date(2026, 10, 4, h, m, 0, 0, time.Local)
+	}
+	for _, tc := range []struct {
+		name    string
+		now     time.Time
+		on, off string
+		wantOff bool
+	}{
+		{"same day window, inside", day(13, 0), "22:00", "12:00", true},
+		{"same day window, before off", day(8, 0), "22:00", "12:00", false},
+		{"same day window, after on", day(23, 0), "22:00", "12:00", false},
+		{"wrapping window, late evening", day(23, 30), "07:00", "22:00", true},
+		{"wrapping window, after midnight", day(3, 0), "07:00", "22:00", true},
+		{"wrapping window, daytime", day(13, 0), "07:00", "22:00", false},
+		{"degenerate equal times", day(13, 0), "07:00", "07:00", false},
+		{"malformed times", day(13, 0), "7:00", "23:00", false},
+	} {
+		if got := scheduleWindowIsOff(tc.now, tc.on, tc.off); got != tc.wantOff {
+			t.Errorf("%s: scheduleWindowIsOff(%s, on=%q, off=%q) = %v, want %v",
+				tc.name, tc.now.Format("15:04"), tc.on, tc.off, got, tc.wantOff)
+		}
+	}
+}
+
+// A backend restart inside the schedule's off window must NOT re-enable the
+// radios. The startup repair runs ~30s after boot and used to commit
+// wireless.<radio>.disabled=0 whenever an AP iface was enabled — which is
+// exactly the shape the generated toggle helper leaves behind when it turns WiFi
+// off (radios disabled, AP ifaces still enabled). The result was a WiFi schedule
+// that silently stopped applying.
+func TestEnsureAPRunning_KeepsRadiosOffDuringScheduleOffWindow(t *testing.T) {
+	dir := t.TempDir()
+	// One hour either side of now, so "now" is a full hour away from both
+	// boundaries and the assertion cannot depend on the minute it runs in.
+	now := time.Now()
+	writeSchedule := func(on, off string) *WifiService {
+		path := filepath.Join(dir, "wifi-schedule.json")
+		data, err := json.Marshal(models.WiFiSchedule{Enabled: true, OnTime: on, OffTime: off})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return &WifiService{scheduleFile: path}
+	}
+	hhmm := func(offset time.Duration) string {
+		return now.Add(offset).Format("15:04")
+	}
+
+	t.Run("off window leaves the radios disabled", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		// radio1 has no STA, so only the schedule can keep it off.
+		if err := u.Set("wireless", "radio1", "disabled", "1"); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		svc := newAPHealthTestService(u)
+		// Off an hour ago, on an hour from now: now is inside the off window.
+		svc.scheduleFile = writeSchedule(hhmm(time.Hour), hhmm(-time.Hour)).scheduleFile
+
+		if _, _, err := svc.EnsureAPRunning(); err != nil {
+			t.Fatalf("EnsureAPRunning: %v", err)
+		}
+		sections, _ := u.GetSections("wireless")
+		if sections["radio1"]["disabled"] != "1" {
+			t.Error("startup AP repair re-enabled a radio the WiFi schedule had turned off")
+		}
+	})
+
+	t.Run("on window still enables the radios", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		if err := u.Set("wireless", "radio1", "disabled", "1"); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		svc := newAPHealthTestService(u)
+		// On an hour ago, off an hour from now: the off window runs from now+1h
+		// round to now-1h, so it does not contain now.
+		svc.scheduleFile = writeSchedule(hhmm(-time.Hour), hhmm(time.Hour)).scheduleFile
+
+		if _, _, err := svc.EnsureAPRunning(); err != nil {
+			t.Fatalf("EnsureAPRunning: %v", err)
+		}
+		sections, _ := u.GetSections("wireless")
+		if sections["radio1"]["disabled"] != "0" {
+			t.Error("a radio with an enabled AP must still be re-enabled outside the off window")
+		}
+	})
+
+	t.Run("disabled schedule does not block the repair", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		if err := u.Set("wireless", "radio1", "disabled", "1"); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		svc := newAPHealthTestService(u)
+		path := filepath.Join(dir, "wifi-schedule.json")
+		if err := os.WriteFile(path, []byte(`{"enabled":false}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		svc.scheduleFile = path
+
+		if _, _, err := svc.EnsureAPRunning(); err != nil {
+			t.Fatalf("EnsureAPRunning: %v", err)
+		}
+		sections, _ := u.GetSections("wireless")
+		if sections["radio1"]["disabled"] != "0" {
+			t.Error("with no active schedule the repair must still enable the radios")
+		}
+	})
 }
 
 // busybox crond re-reads /etc/crontabs/root while it runs, so removing the

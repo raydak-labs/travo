@@ -10,6 +10,10 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
+// wifiMutationResponse is the single response envelope every wireless mutator
+// returns, so the client can find the pending apply in one place
+// (response.apply) and, when the service had to invent a WPA passphrase, show it
+// next to it (response.generated_key) instead of losing it with the rollback.
 func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
 	resp := fiber.Map{"status": "ok"}
 	if apply != nil {
@@ -17,6 +21,9 @@ func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
 			"pending":                  true,
 			"token":                    apply.Token,
 			"rollback_timeout_seconds": apply.RollbackTimeoutSeconds,
+		}
+		if apply.GeneratedKey != "" {
+			resp["generated_key"] = apply.GeneratedKey
 		}
 	}
 	return resp
@@ -336,7 +343,11 @@ func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
 		if err != nil {
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(result)
+		// Not c.JSON(result): every other wireless mutator returns the shared
+		// envelope, and a client that reads response.apply finds nothing in the raw
+		// WirelessApplyResult — it then never calls confirmWifiApply and rpcd's
+		// 30 s rollback silently reverts the change.
+		return c.JSON(wifiMutationResponse(result))
 	}
 }
 
