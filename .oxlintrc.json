@@ -162,5 +162,35 @@
     // `react/only-export-components` is `restriction` (off by default); the baseline severity
     // was `warn` with `allowConstantExport: true`, which oxlint supports 1:1.
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  // -------------------------------------------------------------------------------------
+  // Test files: Vitest's `vi.mocked(obj.method)` idiom is an intentional unbound
+  // method reference, so `typescript/unbound-method` is off here ONLY.
+  //
+  // WHY: `vi.mocked(apiClient.get)` is Vitest's documented way to obtain a typed
+  // handle to a mocked module export. The handle is never invoked by the test — it
+  // is only configured (`mockResolvedValue`) and asserted (`toHaveBeenCalledWith`)
+  // — so no `this` can be lost. The code under test always calls the method on its
+  // object (`apiClient.get(path)` in `use-network.ts` / `use-system.ts`), which is
+  // where `this` is bound. Additionally the module under test is replaced wholesale
+  // by `vi.mock` factories, so the "method" is a bare `vi.fn()` with no receiver at
+  // all; only its static TYPE is a method.
+  //
+  // SCOPE: as narrow as the finding justifies — the two test-file globs and this one
+  // rule. Production code keeps the rule at `error` (it is a `correctness` rule, on
+  // via `categories`), and test files keep every other type-aware rule, so genuine
+  // type errors in tests are still reported. Accepted trade-off: a real `this`
+  // mistake authored directly inside a test file would go unreported; tests never
+  // depend on `this`-sensitive production methods because `vi.fn()` replaces them.
+  // Only `*.test.*` globs are listed because the repo has no `*.spec.*` files; add
+  // them here if that ever changes.
+  // -------------------------------------------------------------------------------------
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "typescript/unbound-method": "off"
+      }
+    }
+  ]
 }

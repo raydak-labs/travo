@@ -11,7 +11,13 @@ async function enableMocking() {
   }
 }
 
-enableMocking()
+// Fire-and-forget on purpose: this bootstrap must NOT block module evaluation, so the
+// resulting promise is intentionally left un-awaited. Rejections are still dealt with
+// downstream — `.catch` handles MSW startup failures (warn and continue without mocks),
+// and the trailing `.then` renders the app once mocking has settled. The leading `void`
+// states the fire-and-forget intent explicitly, which is what
+// `typescript/no-floating-promises` requires for a deliberately un-awaited promise.
+void enableMocking()
   .catch((err) => {
     console.warn('MSW failed to start, continuing without mocks:', err);
   })

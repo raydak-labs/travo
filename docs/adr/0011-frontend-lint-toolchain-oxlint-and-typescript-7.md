@@ -100,6 +100,12 @@ missing.
 `oxlint-tsgolint` was evaluated and deliberately **not enabled**. It sits outside
 oxlint's semver guarantee, and no enabled rule needs it.
 
+It was run once against the whole tree to find out what it would cost: it surfaced
+6 findings, all since fixed (2 genuine in app code, 4 in Vitest test files). The
+tree is therefore clean under `oxlint --type-aware frontend/src shared/src` today,
+so enabling it later is a config-only change — but it stays off until that
+semver gap is worth closing deliberately.
+
 It is nonetheless present in the dependency graph: oxlint declares it an
 *optional* peer and pnpm auto-installs peers, so the lockfile resolves
 `oxlint: 1.86.0(oxlint-tsgolint@7.0.2003)` and the platform binaries are fetched

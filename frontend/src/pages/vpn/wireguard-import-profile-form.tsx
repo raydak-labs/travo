@@ -63,7 +63,7 @@ export function WireguardImportProfileForm({
           type="file"
           accept=".conf,text/plain"
           className="hidden"
-          onChange={(e) => void onFileSelected(e.target.files?.[0] ?? null)}
+          onChange={(e) => onFileSelected(e.target.files?.[0] ?? null)}
         />
         <span className="text-xs text-gray-500 dark:text-gray-400">or paste below</span>
       </div>
