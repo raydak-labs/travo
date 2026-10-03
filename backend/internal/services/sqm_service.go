@@ -157,6 +157,11 @@ func validateSQMConfig(cfg models.SQMConfig) error {
 }
 
 // SetConfig writes SQM config into UCI but does not restart services.
+//
+// Wrapped in mutateUCI like every other writer: `sqm` shares the process-global
+// /tmp/.uci delta, so an unlocked writer here can have its staged changes
+// discarded by a failing flow of another config, or commit somebody else's
+// staged delta (ADR 0010).
 func (s *SQMService) SetConfig(cfg models.SQMConfig) error {
 	cfg = normalizeSQMStrings(cfg)
 	if cfg.Qdisc == "" {
@@ -174,39 +179,47 @@ func (s *SQMService) SetConfig(cfg models.SQMConfig) error {
 		return err
 	}
 
-	section, err := s.ensureQueueSection()
-	if err != nil {
-		return err
-	}
-	enabled := "0"
-	if cfg.Enabled {
-		enabled = "1"
-	}
-	if err := s.uci.Set(sqmConfigName, section, "enabled", enabled); err != nil {
-		return err
-	}
-	if err := s.uci.Set(sqmConfigName, section, "interface", cfg.Interface); err != nil {
-		return err
-	}
-	if err := s.uci.Set(sqmConfigName, section, "download", strconv.Itoa(cfg.DownloadKbit)); err != nil {
-		return err
-	}
-	if err := s.uci.Set(sqmConfigName, section, "upload", strconv.Itoa(cfg.UploadKbit)); err != nil {
-		return err
-	}
-	if err := s.uci.Set(sqmConfigName, section, "qdisc", cfg.Qdisc); err != nil {
-		return err
-	}
-	if err := s.uci.Set(sqmConfigName, section, "script", cfg.Script); err != nil {
-		return err
-	}
-	if err := s.uci.Commit(sqmConfigName); err != nil {
-		return err
-	}
-	return nil
+	return mutateUCI(s.uci, []string{sqmConfigName}, func() error {
+		section, err := s.ensureQueueSection()
+		if err != nil {
+			return err
+		}
+		enabled := "0"
+		if cfg.Enabled {
+			enabled = "1"
+		}
+		if err := s.uci.Set(sqmConfigName, section, "enabled", enabled); err != nil {
+			return err
+		}
+		if err := s.uci.Set(sqmConfigName, section, "interface", cfg.Interface); err != nil {
+			return err
+		}
+		if err := s.uci.Set(sqmConfigName, section, "download",
+			strconv.Itoa(cfg.DownloadKbit)); err != nil {
+			return err
+		}
+		if err := s.uci.Set(sqmConfigName, section, "upload", strconv.Itoa(cfg.UploadKbit)); err != nil {
+			return err
+		}
+		if err := s.uci.Set(sqmConfigName, section, "qdisc", cfg.Qdisc); err != nil {
+			return err
+		}
+		if err := s.uci.Set(sqmConfigName, section, "script", cfg.Script); err != nil {
+			return err
+		}
+		return s.uci.Commit(sqmConfigName)
+	})
 }
 
 // Apply commits UCI (already committed by SetConfig) and restarts sqm.
+//
+// No crash guard: `/etc/init.d/sqm restart` is idempotent and retryable. procd
+// either runs the restart or does not, the shaping config is already committed
+// before the restart is issued, and repeating it converges on the same state —
+// the contract ADR 0003 §1 guards exists for (an operation that must NOT be
+// blindly repeated, with no way to recover) does not apply. A stale shaping
+// config survives a crash here as a traffic-shaping difference, not as a lost
+// uplink.
 func (s *SQMService) Apply() (string, error) {
 	// Quick sanity: fail clearly when init script is missing.
 	if _, err := s.cmd.Run(sqmInitScript, "enabled"); err != nil {

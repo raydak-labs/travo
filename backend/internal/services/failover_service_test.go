@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -514,6 +515,14 @@ func failoverTestHealth() models.FailoverHealthConfig {
 	}
 }
 
+// wanCandidate is the enabled priority-1 ethernet candidate the save tests use.
+func wanCandidate() models.FailoverCandidate {
+	return models.FailoverCandidate{
+		InterfaceName: "wan", Kind: models.FailoverCandidateKindEthernet,
+		Available: true, Enabled: true, Priority: 1,
+	}
+}
+
 func failoverTestConfig(candidates ...models.FailoverCandidate) models.FailoverConfig {
 	return models.FailoverConfig{
 		Enabled:    true,
@@ -607,7 +616,9 @@ func TestFailoverRestoreManagedSectionsReloadsThroughStagedApply(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	_ = mockUCI.AddSection("mwan3", "wan", "interface")
+	// A legacy generated section: the restore must delete it as Travo-owned and
+	// put the backup back in its place.
+	seedLegacyGeneratedInterface(t, mockUCI, "wan")
 	_ = mockUCI.Set("mwan3", "wan", "proto", "dhcp")
 	applier := &recordingApplier{}
 	svc, _ := newFailoverTestService(t, mockUCI, applier)
@@ -687,18 +698,19 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	// Pre-existing mwan3 state: two candidates plus a hand-written policy.
-	_ = mockUCI.AddSection("mwan3", "wan", "interface")
-	_ = mockUCI.Set("mwan3", "wan", "proto", "dhcp")
-	_ = mockUCI.AddSection("mwan3", "usb0", "interface")
-	_ = mockUCI.Set("mwan3", "usb0", "proto", "dhcp")
+	// Pre-existing mwan3 state: two generated candidates written by an older
+	// build (sections named after the network interface), a hand-written
+	// interface section and a hand-written policy.
+	seedLegacyGeneratedInterface(t, mockUCI, "wan")
+	seedLegacyGeneratedInterface(t, mockUCI, "usb0")
+	_ = mockUCI.AddSection("mwan3", "hotel", "interface")
+	_ = mockUCI.Set("mwan3", "hotel", "ifname", "eth3")
+	_ = mockUCI.Set("mwan3", "hotel", "metric", "10")
 	_ = mockUCI.AddSection("mwan3", "my_custom_policy", "policy")
 	_ = mockUCI.Set("mwan3", "my_custom_policy", "use_member", "travo_wan_p1")
 
 	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
-	cfg := failoverTestConfig(
-		models.FailoverCandidate{InterfaceName: "wan", Kind: models.FailoverCandidateKindEthernet, Available: true, Enabled: true, Priority: 1},
-	)
+	cfg := failoverTestConfig(wanCandidate())
 	if err := svc.SetConfig(cfg); err != nil {
 		t.Fatalf("SetConfig: %v", err)
 	}
@@ -709,6 +721,17 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	}
 	if _, ok := sections["usb0"]; ok {
 		t.Error("mwan3 interface section of a dropped candidate must be removed")
+	}
+	if _, ok := sections["wan"]; ok {
+		t.Error("a legacy generated interface section must be cleaned up by the next save")
+	}
+	if _, ok := sections[failoverIfWan]; !ok {
+		t.Errorf("expected the namespaced section %s, got %v",
+			failoverIfWan, slices.Sorted(maps.Keys(sections)))
+	}
+	member, _ := mockUCI.Get("mwan3", "travo_wan_p1", "interface")
+	if member != failoverIfWan {
+		t.Errorf("member must reference the mwan3 interface section, got %q", member)
 	}
 	if _, ok := sections["my_custom_policy"]; !ok {
 		t.Error("unmanaged mwan3 sections must not be touched")
@@ -724,6 +747,152 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	}
 	if _, ok := backup["usb0"]; !ok {
 		t.Error("dropped candidate must be restorable from the backup")
+	}
+}
+
+// A hand-written mwan3 interface section must survive a save. It used to be
+// deleted on every save, with no error and no log line, and the backup that
+// could have restored it is only read on the failure path — so mwan3 silently
+// stopped tracking that uplink.
+func TestSetConfigKeepsForeignInterfaceSections(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	_ = mockUCI.AddSection("mwan3", "hotel", "interface")
+	_ = mockUCI.Set("mwan3", "hotel", "ifname", "eth3")
+	_ = mockUCI.Set("mwan3", "hotel", "metric", "10")
+	_ = mockUCI.Set("mwan3", "hotel", "track_ip", "1.1.1.1")
+
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	cfg := failoverTestConfig(wanCandidate())
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	opts, ok := sections["hotel"]
+	if !ok {
+		t.Fatalf("hand-written mwan3 interface section was deleted by a failover save")
+	}
+	if opts["ifname"] != "eth3" {
+		t.Errorf("hand-written section was modified: %v", opts)
+	}
+}
+
+func TestIsManagedSectionRecognisesOnlyTravoSections(t *testing.T) {
+	t.Parallel()
+
+	generated := map[string]string{".type": "interface"}
+	for _, option := range generatedInterfaceOptions {
+		generated[option] = "1"
+	}
+	cases := []struct {
+		name string
+		opts map[string]string
+		want bool
+	}{
+		{"travo_if_wan", map[string]string{".type": "interface"}, true},
+		{"travo_failover", map[string]string{".type": "policy"}, true},
+		{"hotel", map[string]string{".type": "interface", "ifname": "eth3"}, false},
+		{"my_custom_policy", map[string]string{".type": "policy"}, false},
+		{"wan", generated, true}, // legacy generated section, cleaned up once
+	}
+	for _, tc := range cases {
+		if got := isManagedSection(tc.name, tc.opts); got != tc.want {
+			t.Errorf("isManagedSection(%q) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A config-write failure happens before anything is mutated. It must not apply
+// anything and must not leave a crash guard behind: the old code ran a full
+// delete + restore + rpcd apply here, unguarded, for a change that never
+// started (an ENOSPC on /etc/travo).
+func TestSetConfigConfigWriteFailureAppliesNothingAndLeavesNoGuard(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	applier := &recordingApplier{}
+	tmpDir := t.TempDir()
+	mockUbus := ubus.NewMockUbus()
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	// A directory where the config file belongs: every write of it fails, for
+	// any user, including root.
+	blocker := filepath.Join(tmpDir, "failover.json")
+	if err := os.Mkdir(blocker, 0o750); err != nil {
+		t.Fatalf("create blocking directory: %v", err)
+	}
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
+		&MockCommandRunner{}, applier, blocker)
+	svc.initScript = filepath.Join(tmpDir, "mwan3")
+	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write init script: %v", err)
+	}
+
+	cfg := failoverTestConfig(wanCandidate())
+	if err := svc.SetConfig(cfg); err == nil {
+		t.Fatal("expected SetConfig to fail when the config cannot be written")
+	}
+	if starts, confirms := applier.calls(); len(starts) != 0 || len(confirms) != 0 {
+		t.Errorf("no rpcd apply may happen for a change that never started: %v / %v", starts, confirms)
+	}
+	if _, err := os.Stat(svc.guardPath); err == nil {
+		t.Errorf("no crash guard may be written before the first mutation: %s", svc.guardPath)
+	}
+	if sections, _ := mockUCI.GetSections("mwan3"); len(sections) != 0 {
+		t.Errorf("mwan3 must be untouched when the save never started, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+}
+
+func TestReadTrackerStatesMapsNamespacedSections(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	cmd := &MockCommandRunner{RunFunc: func(name string, _ ...string) ([]byte, error) {
+		if name == "mwan3" {
+			return []byte("interface travo_if_wan is online\ninterface hotel is offline\n"), nil
+		}
+		return nil, nil
+	}}
+	tmpDir := t.TempDir()
+	mockUbus := ubus.NewMockUbus()
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	configPath := filepath.Join(tmpDir, "failover.json")
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, cmd,
+		&NoopUCIApplyConfirm{}, configPath)
+	svc.initScript = filepath.Join(tmpDir, "mwan3")
+	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write init script: %v", err)
+	}
+
+	states := svc.readTrackerStates()
+	if states["wan"] != models.FailoverTrackingStateOnline {
+		t.Errorf("expected the namespaced section to report as network interface wan, got %v", states)
+	}
+	if states["hotel"] != models.FailoverTrackingStateOffline {
+		t.Errorf("a hand-written mwan3 section must be reported under its own name, got %v", states)
+	}
+}
+
+// failoverIfWan is the mwan3 interface section name for the wan candidate.
+const failoverIfWan = failoverInterfaceSectionPrefix + "wan"
+
+// seedLegacyGeneratedInterface writes an mwan3 interface section the way a
+// pre-namespacing build did: named after the network interface, carrying every
+// option FailoverService writes.
+func seedLegacyGeneratedInterface(t *testing.T, u uci.UCI, name string) {
+	t.Helper()
+	if err := u.AddSection("mwan3", name, "interface"); err != nil {
+		t.Fatalf("AddSection(%s): %v", name, err)
+	}
+	for _, option := range generatedInterfaceOptions {
+		if err := u.Set("mwan3", name, option, "1"); err != nil {
+			t.Fatalf("Set(%s.%s): %v", name, option, err)
+		}
 	}
 }
 
@@ -807,8 +976,9 @@ func TestSetConfigWithDisabledCandidateStillVerifies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSections: %v", err)
 	}
-	if _, ok := sections["wwan"]; !ok {
-		t.Error("a disabled candidate still gets an mwan3 interface section (enabled=0)")
+	if _, ok := sections[failoverInterfaceSection("wwan")]; !ok {
+		t.Errorf("a disabled candidate still gets an interface section (enabled=0), got %v",
+			slices.Sorted(maps.Keys(sections)))
 	}
 	if _, ok := sections["travo_wwan_p2"]; ok {
 		t.Error("a disabled candidate must not get a policy member")
@@ -997,4 +1167,35 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 			t.Errorf("a failed rollback must keep %s: the running config is unknown", svc.guardPath)
 		}
 	})
+}
+
+// ADR 0010: mwan3UCIConfigs includes `network`, and the rpcd apply snapshots
+// and reloads it, so the whole save must hold the network + mwan3 config locks
+// across that blocking work instead of racing every other writer of `network`.
+func TestSetConfigHoldsTheNetworkAndMwan3ConfigLocks(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newFailoverTestService(t, uci.NewMockUCI(), &NoopUCIApplyConfirm{})
+	cfg := failoverTestConfig(wanCandidate())
+
+	unlock := lockUCIConfigs("network")
+	done := make(chan error, 1)
+	go func() { done <- svc.SetConfig(cfg) }()
+
+	select {
+	case err := <-done:
+		unlock()
+		t.Fatalf("SetConfig must wait for the network config lock, returned early: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	unlock()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("SetConfig after the locks were released: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SetConfig did not resume after the locks were released")
+	}
 }

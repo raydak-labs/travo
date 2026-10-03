@@ -115,3 +115,23 @@ func isValidWifiEncryption(enc string) bool {
 	}
 	return false
 }
+
+// isValidDiagnosticsTarget returns true if target is something the network
+// diagnostics endpoint may hand to ping / traceroute / nslookup: a hostname or
+// an IPv4 address, and nothing that a diagnostic tool would read as an option.
+//
+// The target is passed as one argv element (no shell), so this is not about
+// command injection: it is that ping and friends treat a leading "-" as a flag
+// (ping -f floods, ping -w changes semantics), and that a value containing
+// whitespace or a path separator is never a host. A leading dash is rejected
+// explicitly rather than relying on the hostname rules, because that is the
+// property being defended.
+func isValidDiagnosticsTarget(target string) bool {
+	if target == "" || strings.HasPrefix(target, "-") {
+		return false
+	}
+	if isValidIPv4(target) {
+		return true
+	}
+	return isValidHostname(target)
+}

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -131,6 +132,30 @@ func (s *USBTetheringService) clearGuard() {
 	_ = os.Remove(s.guardFile)
 }
 
+// abort is the single exit for every failed Configure/Unconfigure.
+//
+// It does NOT clear the crash guard. ADR 0003 §1.3 removes the guard only after
+// the change completed successfully end-to-end, and it is the only marker that
+// the device was left mid-flight: a Configure that committed `network` and then
+// failed on `uci commit firewall` leaves a live network.usbtether DHCP interface
+// in no firewall zone. Clearing the guard there turned a recoverable, visible
+// state into a silent one.
+//
+// It also reverts the staged UCI delta, which withConfigLocks cannot do: this
+// service shells `uci` out and has no uci.UCI handle, and the uci CLI keeps
+// uncommitted changes in the process-global /tmp/.uci/<config>/changes, so an
+// abandoned delta is committed by the next unrelated writer of that config
+// (ADR 0010). Reverting a config that was already committed is a no-op, so this
+// is safe on every failure path.
+func (s *USBTetheringService) abort(err error) error {
+	for _, cfg := range usbTetherConfigs {
+		if _, revertErr := s.runner.RunCommand("uci", "revert", cfg); revertErr != nil {
+			log.Printf("usbtether: uci revert %s after failed change: %v", cfg, revertErr)
+		}
+	}
+	return err
+}
+
 // parseUciShow parses `uci show <prefix>` output into section -> option -> values.
 // List options appear once per value, anonymous sections are keyed as "@zone[0]".
 func parseUciShow(prefix, output string) map[string]map[string][]string {
@@ -253,8 +278,9 @@ func (s *USBTetheringService) isConfigured() bool {
 // because it never goes through uci.Set — it shells out. Unlocked, its
 // `uci commit firewall` can commit a VPN toggle's half-torn-down wg0 zone.
 //
-// withConfigLocks, not mutateUCI: no uci.UCI handle here to revert through, so a
-// failure leaves this flow's staged delta for the next writer of those configs.
+// withConfigLocks, not mutateUCI: no uci.UCI handle here to revert through, so
+// the revert is done by shelling out (`uci revert`) on the failure path — see
+// abort. A failure keeps the crash guard.
 func (s *USBTetheringService) Configure(ifaceName string) error {
 	return withConfigLocks(usbTetherConfigs, func() error { return s.configureLocked(ifaceName) })
 }
@@ -274,31 +300,26 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 	}
 	for _, args := range cmds {
 		if _, err := s.runner.RunCommand(args[0], args[1:]...); err != nil {
-			s.clearGuard()
-			return fmt.Errorf("uci set failed (%v): %w", args, err)
+			return s.abort(fmt.Errorf("uci set failed (%v): %w", args, err))
 		}
 	}
 
 	// Add usbtether to the WAN zone (add_list is idempotent).
 	wanZone, zoneNetworks, err := s.wanZoneSection()
 	if err != nil {
-		s.clearGuard()
-		return err
+		return s.abort(err)
 	}
 	if !slices.Contains(zoneNetworks, usbTetherUCIName) {
 		if _, err := s.runner.RunCommand("uci", "add_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, usbTetherUCIName)); err != nil {
-			s.clearGuard()
-			return fmt.Errorf("uci add_list firewall wan zone: %w", err)
+			return s.abort(fmt.Errorf("uci add_list firewall wan zone: %w", err))
 		}
 	}
 
 	if _, err := s.runner.RunCommand("uci", "commit", "network"); err != nil {
-		s.clearGuard()
-		return fmt.Errorf("uci commit network: %w", err)
+		return s.abort(fmt.Errorf("uci commit network: %w", err))
 	}
 	if _, err := s.runner.RunCommand("uci", "commit", "firewall"); err != nil {
-		s.clearGuard()
-		return fmt.Errorf("uci commit firewall: %w", err)
+		return s.abort(fmt.Errorf("uci commit firewall: %w", err))
 	}
 
 	// Bring up the interface. Best effort: the UCI config is committed and
@@ -326,27 +347,22 @@ func (s *USBTetheringService) unconfigureLocked() error {
 	// network in the WAN zone after the interface is gone.
 	wanZone, zoneNetworks, err := s.wanZoneSection()
 	if err != nil {
-		s.clearGuard()
-		return err
+		return s.abort(err)
 	}
 	if slices.Contains(zoneNetworks, usbTetherUCIName) {
 		if _, err := s.runner.RunCommand("uci", "del_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, usbTetherUCIName)); err != nil {
-			s.clearGuard()
-			return fmt.Errorf("uci del_list firewall wan zone: %w", err)
+			return s.abort(fmt.Errorf("uci del_list firewall wan zone: %w", err))
 		}
 		if _, err := s.runner.RunCommand("uci", "commit", "firewall"); err != nil {
-			s.clearGuard()
-			return fmt.Errorf("uci commit firewall: %w", err)
+			return s.abort(fmt.Errorf("uci commit firewall: %w", err))
 		}
 	}
 
 	if _, err := s.runner.RunCommand("uci", "delete", fmt.Sprintf("network.%s", usbTetherUCIName)); err != nil {
-		s.clearGuard()
-		return fmt.Errorf("uci delete: %w", err)
+		return s.abort(fmt.Errorf("uci delete: %w", err))
 	}
 	if _, err := s.runner.RunCommand("uci", "commit", "network"); err != nil {
-		s.clearGuard()
-		return fmt.Errorf("uci commit network: %w", err)
+		return s.abort(fmt.Errorf("uci commit network: %w", err))
 	}
 	s.clearGuard()
 	return nil

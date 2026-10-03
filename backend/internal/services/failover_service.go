@@ -225,6 +225,12 @@ func (s *FailoverService) GetEvents() []models.FailoverEvent {
 // SetConfig validates, backs up and applies a new failover configuration. The
 // whole live-state sequence is serialized: two concurrent saves would otherwise
 // interleave their guard file, backup and mwan3 apply steps.
+//
+// The whole sequence runs inside mutateUCI over mwan3UCIConfigs, so the
+// `network` and `mwan3` config locks are held across the blocking work —
+// including the rpcd apply, whose snapshot/reload races every other writer of
+// `network` — and the staged /tmp/.uci delta is dropped if anything fails
+// (ADR 0010). Reads inside (verifyApply) take no lock of their own.
 func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 	if err := s.validateConfig(cfg); err != nil {
 		return err
@@ -232,6 +238,14 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 	s.applyMu.Lock()
 	defer s.applyMu.Unlock()
 
+	return mutateUCI(s.uci, mwan3UCIConfigs, func() error {
+		return s.setConfigLocked(cfg)
+	})
+}
+
+// setConfigLocked is SetConfig's body; the caller holds applyMu and the
+// `network` + `mwan3` config locks.
+func (s *FailoverService) setConfigLocked(cfg models.FailoverConfig) error {
 	if err := os.MkdirAll(filepath.Dir(s.configPath), 0750); err != nil {
 		return fmt.Errorf("create failover config dir: %w", err)
 	}
@@ -246,7 +260,10 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 	}
 	copy(cfgFile.Candidates, cfg.Candidates)
 	if err := s.saveConfigFile(cfgFile); err != nil {
-		_ = s.restoreManagedSections()
+		// Nothing has been mutated yet — no backup restore is owed, and running
+		// one here meant an ENOSPC on /etc/trafo produced a full mwan3 delete +
+		// restore + rpcd apply with no crash guard at all, for a change that
+		// never started.
 		return err
 	}
 	if err := os.WriteFile(s.guardPath, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
@@ -591,24 +608,69 @@ func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
 	if err != nil {
 		return fmt.Errorf("marshal failover config: %w", err)
 	}
-	return os.WriteFile(s.configPath, data, 0600)
+	// Atomic: the 10s monitor reads this file, and os.WriteFile truncates before
+	// writing, so a save that overlapped a read gave the monitor a 500 and a
+	// power cut left a truncated file that fails to parse forever after.
+	return writeFileAtomic(s.configPath, data, 0600)
 }
 
 // isManagedSection reports whether an mwan3 section belongs to the failover
-// service. Besides our own travo_* sections this covers every mwan3 interface
-// section, so a candidate that was removed or renamed is backed up and deleted
-// instead of being health-pinged forever.
+// service, i.e. whether this service may back it up and delete it.
+//
+// Two cases only:
+//
+//  1. Every travo_-prefixed section. Generated sections are namespaced
+//     (ADR 0005 §1) precisely so this check does not have to guess from the
+//     section type: matching on `.type == "interface"` deleted a hand-written
+//     `config interface hotel` on the next save, and because the backup is only
+//     read on the failure path, nothing ever put it back — mwan3 stopped
+//     tracking that uplink for good.
+//  2. A legacy generated interface section: an interface section carrying the
+//     full set of options this service writes. Builds before the travo_ prefix
+//     named generated interface sections after the network interface (so
+//     `wan`, `wwan`, `usb0`); those are cleaned up once, on the next save. The
+//     option signature is what separates them from a hand-written section, so a
+//     user section never matches.
 func isManagedSection(name string, opts map[string]string) bool {
-	if strings.HasPrefix(name, "travo_") {
+	if strings.HasPrefix(name, failoverSectionPrefix) {
 		return true
 	}
-	if name == failoverPolicySection || name == failoverRuleSection {
-		return true
+	return isLegacyGeneratedInterfaceSection(opts)
+}
+
+// failoverSectionPrefix namespaces every mwan3 section this service writes.
+const failoverSectionPrefix = "travo_"
+
+// failoverInterfaceSectionPrefix prefixes a generated mwan3 interface section.
+// mwan3 tracks by the mwan3 section name, so members reference THIS name, not
+// the network interface name.
+const failoverInterfaceSectionPrefix = failoverSectionPrefix + "if_"
+
+// generatedInterfaceOptions are the options FailoverService writes into every
+// generated mwan3 interface section. A section carrying all of them was written
+// by this service, whichever build wrote it.
+var generatedInterfaceOptions = []string{
+	"enabled", "family", "reliability", "count", "timeout",
+	"interval", "failure_interval", "recovery_interval", "down", "up",
+}
+
+// isLegacyGeneratedInterfaceSection identifies an interface section written by a
+// pre-namespacing build, which named sections after the network interface.
+func isLegacyGeneratedInterfaceSection(opts map[string]string) bool {
+	if opts[".type"] != "interface" {
+		return false
 	}
-	if name == "wan" || name == "wwan" || name == usbTetherUCIName {
-		return true
+	for _, option := range generatedInterfaceOptions {
+		if _, ok := opts[option]; !ok {
+			return false
+		}
 	}
-	return opts[".type"] == "interface"
+	return true
+}
+
+// failoverInterfaceSection is the mwan3 interface section name for a candidate.
+func failoverInterfaceSection(interfaceName string) string {
+	return failoverInterfaceSectionPrefix + failoverSectionName(interfaceName)
 }
 
 func (s *FailoverService) backupManagedSections(cfg models.FailoverConfig) error {
@@ -628,7 +690,10 @@ func (s *FailoverService) backupManagedSections(cfg models.FailoverConfig) error
 	if err != nil {
 		return fmt.Errorf("marshal failover backup: %w", err)
 	}
-	return os.WriteFile(s.backupPath, data, 0600)
+	// Atomic write: restoreManagedSections reads this on the rollback path, and
+	// a truncated backup makes the restore fail after the failure it was
+	// supposed to repair.
+	return writeFileAtomic(s.backupPath, data, 0600)
 }
 
 // restoreManagedSections puts the backed-up mwan3/network sections back and
@@ -706,7 +771,10 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 			if err := s.uci.AddSection(mwan3ConfigName, memberName, "member"); err != nil {
 				return err
 			}
-			if err := s.uci.Set(mwan3ConfigName, memberName, "interface", candidate.InterfaceName); err != nil {
+			// mwan3 members reference the mwan3 INTERFACE SECTION name, which
+			// is the namespaced one, not the network interface.
+			iface := failoverInterfaceSection(candidate.InterfaceName)
+			if err := s.uci.Set(mwan3ConfigName, memberName, "interface", iface); err != nil {
 				return err
 			}
 			if err := s.uci.Set(mwan3ConfigName, memberName, "metric", fmt.Sprintf("%d", candidate.Priority)); err != nil {
@@ -748,7 +816,10 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 }
 
 func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandidate, health models.FailoverHealthConfig) error {
-	sectionName := candidate.InterfaceName
+	// Namespaced (ADR 0005 §1): a generated section that shares its name with a
+	// hand-written one is indistinguishable from it on the next save, and the
+	// next save deletes it.
+	sectionName := failoverInterfaceSection(candidate.InterfaceName)
 	if err := s.uci.AddSection(mwan3ConfigName, sectionName, "interface"); err != nil {
 		return err
 	}
@@ -985,6 +1056,7 @@ func normalizeStoredHealth(health models.FailoverHealthConfig, present healthKey
 
 func (s *FailoverService) readTrackerStates() map[string]models.FailoverTrackingState {
 	states := map[string]models.FailoverTrackingState{}
+	generated := map[string]bool{}
 	if !s.serviceInstalled() {
 		return states
 	}
@@ -1002,14 +1074,33 @@ func (s *FailoverService) readTrackerStates() map[string]models.FailoverTracking
 			continue
 		}
 		name := fields[1]
+		// mwan3 reports state per mwan3 INTERFACE SECTION name; candidates are
+		// keyed by network interface name (ADR 0005 §1 namespacing). A
+		// hand-written section that shares a name with a network interface must
+		// not overwrite the generated one's state.
+		key := name
+		isGenerated := strings.HasPrefix(name, failoverInterfaceSectionPrefix)
+		if isGenerated {
+			key = strings.TrimPrefix(name, failoverInterfaceSectionPrefix)
+		} else if generated[key] {
+			continue
+		}
+		state := models.FailoverTrackingState("")
 		switch {
 		case strings.Contains(line, "is online"):
-			states[name] = models.FailoverTrackingStateOnline
+			state = models.FailoverTrackingStateOnline
 		case strings.Contains(line, "is offline"):
-			states[name] = models.FailoverTrackingStateOffline
+			state = models.FailoverTrackingStateOffline
 		case strings.Contains(line, "is disabled"):
-			states[name] = models.FailoverTrackingStateDisabled
+			state = models.FailoverTrackingStateDisabled
 		}
+		if state == "" {
+			continue
+		}
+		if isGenerated {
+			generated[key] = true
+		}
+		states[key] = state
 	}
 	return states
 }
@@ -1061,7 +1152,7 @@ func managedSectionNames(candidates []models.FailoverCandidate) map[string]map[s
 		failoverRuleSection:   nil,
 	}
 	for _, candidate := range candidates {
-		names[candidate.InterfaceName] = nil
+		names[failoverInterfaceSection(candidate.InterfaceName)] = nil
 		if candidate.Enabled {
 			names[fmt.Sprintf("travo_%s_p%d", failoverSectionName(candidate.InterfaceName), candidate.Priority)] = nil
 		}

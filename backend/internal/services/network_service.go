@@ -763,12 +763,59 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 	}, nil
 }
 
+// wanStaticOptions are the options that only mean something for a static WAN.
+// They are deleted when the WAN is switched to another mode: leaving them behind
+// is how a static→dhcp switch produced a WAN that kept a stale ipaddr/netmask/
+// gateway, and — combined with a leftover peerdns=0 + dns from SetDNSConfig —
+// kept resolving through a DNS server the DHCP lease never handed out.
+var wanStaticOptions = []string{"ip4addr", "netmask", "gateway"}
+
+// errPPPoEUnsupported is returned for a save that would create a PPPoE WAN
+// without credentials. Writing proto=pppoe alone produces a WAN that can never
+// authenticate: the handler validates "type", not a username/password pair the
+// model does not have.
+var errPPPoEUnsupported = errors.New(
+	"PPPoE needs a username and password that this API cannot store: " +
+		"configure PPPoE in LuCI (Network -> Interfaces -> WAN), then save other WAN fields here")
+
 // SetWanConfig updates the WAN configuration.
+//
+// Everything the request declares is written. MTU and the DNS servers used to be
+// validated by the handler, published in the OpenAPI body and then dropped on
+// the floor, so the documented "GET, change a field, PUT it back" client pattern
+// answered 200 having changed nothing at all.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	return mutateUCI(n.uci, []string{"network"}, func() error {
+		if config.MTU != 0 && (config.MTU < 68 || config.MTU > 9000) {
+			return fmt.Errorf("MTU must be between 68 and 9000, got %d", config.MTU)
+		}
+		current := map[string]string{}
+		if opts, err := n.uci.GetAll("network", "wan"); err == nil {
+			current = opts
+		}
+		if config.Type == "pppoe" {
+			// Editing other fields of an already-configured PPPoE WAN is fine;
+			// switching INTO one is not.
+			if current["proto"] != "pppoe" || current["username"] == "" || current["password"] == "" {
+				return errPPPoEUnsupported
+			}
+		}
 		if config.Type != "" {
 			if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
 				return err
+			}
+			if config.Type != current["proto"] && config.Type != "static" {
+				for _, option := range wanStaticOptions {
+					// Only options that are actually set: `uci delete` on a
+					// missing entry is itself an error, and that must not fail
+					// the whole save.
+					if _, present := current[option]; !present {
+						continue
+					}
+					if err := n.uci.DeleteOption("network", "wan", option); err != nil {
+						return fmt.Errorf("clear %s after switching WAN to %s: %w", option, config.Type, err)
+					}
+				}
 			}
 		}
 		if config.IPAddress != "" {
@@ -783,6 +830,25 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 		}
 		if config.Gateway != "" {
 			if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+				return err
+			}
+		}
+		if config.MTU > 0 {
+			if err := n.uciSet("network", "wan", "mtu", strconv.Itoa(config.MTU)); err != nil {
+				return err
+			}
+		}
+		// A nil dns_servers means "not part of this save"; an explicit empty
+		// list means "go back to the DHCP-provided resolvers".
+		if config.DNSServers != nil {
+			peerdns := "1"
+			if len(config.DNSServers) > 0 {
+				peerdns = "0"
+			}
+			if err := n.uciSet("network", "wan", "peerdns", peerdns); err != nil {
+				return err
+			}
+			if err := n.uciSet("network", "wan", "dns", strings.Join(config.DNSServers, " ")); err != nil {
 				return err
 			}
 		}
@@ -992,11 +1058,43 @@ func (n *NetworkService) DeleteDNSEntry(section string) error {
 	// Same lock as AddDNSEntry, and for the same reason: a delete that reverts
 	// or commits `dhcp` concurrently with an add silently discards the add.
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.requireNamedDHCPSection(section, "domain"); err != nil {
+			return err
+		}
 		if err := n.uci.DeleteSection("dhcp", section); err != nil {
 			return fmt.Errorf("deleting DNS entry: %w", err)
 		}
 		return n.uci.Commit("dhcp")
 	})
+}
+
+// requireNamedDHCPSection rejects anything that is not a named section of the
+// expected type before it is deleted.
+//
+// uci.validSectionName deliberately admits anonymous references (@dnsmasq[0]),
+// because stock /etc/config files use them, so
+// DELETE /api/v1/network/dns/entries/@dnsmasq[0] passed validation and
+// `uci delete dhcp.@dnsmasq[0]` removed the whole dnsmasq section and committed
+// it: DHCP pool, lease time, DNS servers, DHCPv6 and RA all gone, with nothing
+// but a 200 to show for it. Both add paths only ever create named sections, so
+// no legitimate caller can produce an anonymous reference.
+func (n *NetworkService) requireNamedDHCPSection(section, wantType string) error {
+	if strings.HasPrefix(section, "@") {
+		return fmt.Errorf("refusing to delete anonymous dhcp section %s: "+
+			"it is part of the file, not one entry", section)
+	}
+	sections, err := n.uci.GetSections("dhcp")
+	if err != nil {
+		return fmt.Errorf("reading dhcp sections: %w", err)
+	}
+	opts, ok := sections[section]
+	if !ok {
+		return fmt.Errorf("dhcp section not found: %s", section)
+	}
+	if opts[".type"] != wantType {
+		return fmt.Errorf("dhcp section %s is a %q section, not %q", section, opts[".type"], wantType)
+	}
+	return nil
 }
 
 // sanitizeSectionName converts a hostname to a valid UCI section name.
@@ -1059,6 +1157,9 @@ func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) 
 // DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
 func (n *NetworkService) DeleteDHCPReservation(section string) error {
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.requireNamedDHCPSection(section, "host"); err != nil {
+			return err
+		}
 		if err := n.uci.DeleteSection("dhcp", section); err != nil {
 			return fmt.Errorf("deleting DHCP reservation: %w", err)
 		}
@@ -1132,6 +1233,17 @@ func (n *NetworkService) KickClient(mac string) error {
 // delta: the uci CLI keeps uncommitted changes in /tmp/.uci/firewall/changes,
 // so an abandoned half-written rule would be committed by a later, unrelated
 // `uci commit firewall`.
+//
+// This is a direct `uci commit firewall` + firewall reload rather than the rpcd
+// apply/confirm flow, because a block has to be enforced on the running firewall
+// immediately — a rollback window that silently expires on a policy change would
+// unblock a client the operator believes is filtered. ADR 0004 §5 requires such
+// a path to be listed there with a named crash guard AND a rollback; the
+// rollback is the undoFirewallSection call below. The guard row is still
+// missing (it needs ADR 0004 §5, ADR 0003 §2, scripts/deploy-local.sh and
+// scripts/install.sh), and writing a guard here without those would be worse
+// than no guard: nothing would clear it, and blocking would stay dead until a
+// redeploy.
 func (n *NetworkService) BlockClient(mac string) error {
 	return mutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
@@ -1156,6 +1268,11 @@ func (n *NetworkService) BlockClient(mac string) error {
 			return err
 		}
 		if err := n.restartService("firewall"); err != nil {
+			// The rule is committed but the running firewall never loaded it.
+			// Take it back out so the file and the running firewall agree.
+			if undoErr := n.undoFirewallSection(section, nil); undoErr != nil {
+				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %v)", err, section, undoErr)
+			}
 			return fmt.Errorf("restart firewall: %w", err)
 		}
 		return nil
@@ -1167,6 +1284,7 @@ func (n *NetworkService) UnblockClient(mac string) error {
 	return mutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 
+		previous, _ := n.uci.GetAll("firewall", section)
 		if err := n.uci.DeleteSection("firewall", section); err != nil {
 			return fmt.Errorf("delete firewall block rule: %w", err)
 		}
@@ -1175,10 +1293,42 @@ func (n *NetworkService) UnblockClient(mac string) error {
 			return err
 		}
 		if err := n.restartService("firewall"); err != nil {
+			// Same contract as BlockClient: the committed config must not be
+			// left saying "unblocked" while the running firewall still drops it.
+			if undoErr := n.undoFirewallSection(section, previous); undoErr != nil {
+				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %v)", err, section, undoErr)
+			}
 			return fmt.Errorf("restart firewall: %w", err)
 		}
 		return nil
 	})
+}
+
+// undoFirewallSection restores a firewall section to a previous option set —
+// nil means the section must be gone — and commits the result.
+func (n *NetworkService) undoFirewallSection(section string, previous map[string]string) error {
+	// An unblock has usually already deleted the section by this point, and a
+	// missing section IS the target state, so a failed delete is only an error
+	// when the section is in fact still there.
+	if _, err := n.uci.GetAll("firewall", section); err == nil {
+		if err := n.uci.DeleteSection("firewall", section); err != nil {
+			return err
+		}
+	}
+	if previous != nil {
+		if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
+			return err
+		}
+		for option, value := range previous {
+			if strings.HasPrefix(option, ".") {
+				continue
+			}
+			if err := n.uci.Set("firewall", section, option, value); err != nil {
+				return err
+			}
+		}
+	}
+	return n.uciCommit("firewall")
 }
 
 // GetBlockedClients returns a list of blocked MAC addresses.
@@ -1499,8 +1649,17 @@ func (n *NetworkService) savePortForwards(rules []models.PortForwardRule) error 
 }
 
 // RunDiagnostics runs ping, traceroute, or DNS lookup and returns the output.
+//
+// The target becomes the final argv entry of a root-run command, so it is
+// validated as a hostname or IP literal first: an unvalidated target of "-f"
+// turned `ping` into a root flood of the whole internet, and "-w1"/"-s" style
+// values rewrite its behaviour.
 func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.DiagnosticsResult {
 	result := models.DiagnosticsResult{Type: req.Type, Target: req.Target}
+	if err := validateDiagnosticTarget(req.Target); err != nil {
+		result.Error = err.Error()
+		return result
+	}
 	var out []byte
 	var err error
 	switch req.Type {
@@ -1519,6 +1678,33 @@ func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.Di
 	}
 	result.Output = string(out)
 	return result
+}
+
+// validateDiagnosticTarget accepts a hostname or an IP literal and nothing else.
+func validateDiagnosticTarget(target string) error {
+	trimmed := strings.TrimSpace(target)
+	if trimmed == "" {
+		return errors.New("target is required")
+	}
+	if trimmed != target || strings.HasPrefix(target, "-") {
+		return fmt.Errorf("invalid diagnostic target %q: must be a hostname or IP address", target)
+	}
+	if _, err := netip.ParseAddr(target); err == nil {
+		return nil
+	}
+	for _, label := range strings.Split(target, ".") {
+		if label == "" {
+			return fmt.Errorf("invalid diagnostic target %q: must be a hostname or IP address", target)
+		}
+		for _, r := range label {
+			isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+			isDigit := r >= '0' && r <= '9'
+			if !isLetter && !isDigit && r != '-' && r != '_' {
+				return fmt.Errorf("invalid diagnostic target %q: must be a hostname or IP address", target)
+			}
+		}
+	}
+	return nil
 }
 
 const dohConfigFile = "/etc/travo/doh-config.json"
@@ -1545,7 +1731,9 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(dohConfigFile, data, 0600); err != nil {
+	// Atomic: os.WriteFile truncates first, so a power cut or a concurrent read
+	// left a half-written file that silently falls back to the default provider.
+	if err := writeFileAtomic(dohConfigFile, data, 0600); err != nil {
 		return err
 	}
 	// Apply: configure dnsmasq to use a local DoH proxy if enabled.

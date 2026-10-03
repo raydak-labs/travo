@@ -794,3 +794,62 @@ func TestGetDDNSConfig_ReportsAvailability(t *testing.T) {
 		t.Errorf("without ddns-scripts, available should be false, got %v", get()["available"])
 	}
 }
+
+// The diagnostics endpoint passes the target to ping / traceroute / nslookup.
+// A target that a tool would read as an option, or that is not a host at all,
+// must be a 400 at the boundary — the service answered 200 with the tool's
+// complaint in an "error" field.
+func TestRunDiagnostics_ValidatesTypeAndTarget(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+
+	post := func(body string) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, "/api/v1/network/diagnostics", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("request: %v", err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"unknown type", `{"type":"curl","target":"8.8.8.8"}`},
+		{"empty type", `{"type":"","target":"8.8.8.8"}`},
+		{"target starting with a dash", `{"type":"ping","target":"-f"}`},
+		{"target with a shell metacharacter", `{"type":"ping","target":"8.8.8.8; reboot"}`},
+		{"empty target", `{"type":"ping","target":""}`},
+		{"target is a path", `{"type":"dns","target":"/etc/passwd"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if code, body := post(tc.body); code != http.StatusBadRequest {
+				t.Errorf("%s returned %d, want 400: %s", tc.body, code, body)
+			}
+		})
+	}
+
+	// A well-formed request still reaches the service.
+	if code, body := post(`{"type":"ping","target":"8.8.8.8"}`); code != http.StatusOK {
+		t.Errorf("a valid ping returned %d, want 200: %s", code, body)
+	}
+}
+
+// PUT /network/clients/alias persists the alias per MAC. A body that does not
+// match the documented shape used to be accepted and stored under an empty key.
+func TestSetClientAlias_RejectsUnknownField(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+
+	code, body := putJSON(t, app, token, "/api/v1/network/clients/alias",
+		`{"mac":"aa:bb:cc:dd:ee:ff","nickname":"nope"}`)
+	if code != http.StatusBadRequest {
+		t.Errorf("expected 400 for an unknown field, got %d: %s", code, body)
+	}
+}

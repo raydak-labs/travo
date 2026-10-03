@@ -209,7 +209,10 @@ func GetDHCPLeasesHandler(svc *services.NetworkService) fiber.Handler {
 func SetClientAliasHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetAliasRequest
-		if err := c.Bind().Body(&req); err != nil {
+		// Strict: the alias is persisted per MAC, so a body that does not match
+		// the documented shape must not be accepted and silently stored under an
+		// empty key.
+		if err := BindStrictBodyConfig(c, &req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.MAC == "" {
@@ -529,11 +532,25 @@ func DeletePortForwardHandler(svc *services.NetworkService) fiber.Handler {
 }
 
 // RunDiagnosticsHandler handles POST /api/v1/network/diagnostics.
+//
+// The type and the target are validated here rather than in the service: a
+// target that a diagnostic tool would read as an option (a leading dash) or
+// that is not a host at all must be a 400, not a 200 carrying the tool's
+// complaint in an "error" field.
 func RunDiagnosticsHandler(svc *services.NetworkService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.DiagnosticsRequest
 		if err := c.Bind().Body(&req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
+		}
+		switch req.Type {
+		case "ping", "traceroute", "dns":
+		default:
+			return RespondWithError(c, fiber.StatusBadRequest, "type must be one of: ping, traceroute, dns")
+		}
+		if !isValidDiagnosticsTarget(req.Target) {
+			return RespondWithError(c, fiber.StatusBadRequest,
+				"target must be a hostname or IPv4 address, and must not start with '-'")
 		}
 		result := svc.RunDiagnostics(req)
 		return c.JSON(result)

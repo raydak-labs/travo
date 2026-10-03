@@ -387,3 +387,18 @@ func TestAlertService_StartIsIdempotent(t *testing.T) {
 		t.Errorf("expected at most 1 alert (no duplicate ticker), got %d", len(alerts))
 	}
 }
+
+// SetCarrierChecker writes a field the 10s check loop reads. main.go sets it
+// before Start(), so this has never raced in practice; the pair below runs under
+// -race and fails the build if the setter goes back to an unsynchronised write.
+func TestSetCarrierCheckerIsSafeWhileChecksRun(t *testing.T) {
+	svc := NewAlertService(&mockAlertChecker{})
+	svc.CheckInterval = time.Millisecond
+	svc.Start()
+	defer svc.Stop()
+
+	checkers := []CarrierChecker{&RealCarrierChecker{}, nil, &RealCarrierChecker{}}
+	for i := range 200 {
+		svc.SetCarrierChecker(checkers[i%len(checkers)])
+	}
+}
