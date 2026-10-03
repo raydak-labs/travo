@@ -28,6 +28,8 @@ updated: 2026-09-28
 - [[adr/0007-authentication-and-access-control]]
 - [[adr/0008-ssh-key-management]]
 - [[adr/0009-persistent-store-bbolt]]
+- [[adr/0010-uci-write-serialisation-and-request-contracts]]
+- [[adr/0011-frontend-lint-toolchain-oxlint-and-typescript-7]]
 
 ## Backlog and shipped work
 

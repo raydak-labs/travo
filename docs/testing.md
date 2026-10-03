@@ -330,7 +330,7 @@ ssh root@192.168.1.1 'reboot'
 
 ```sh
 ssh root@192.168.1.1 '
-  ls -la /etc/travo 2>/dev/null || true
+  ls -la /etc/trafo /etc/travo 2>/dev/null || true
   uci show network
   uci show wireless
   uci show firewall

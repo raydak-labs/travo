@@ -69,7 +69,7 @@ We need:
   - dnsmasq **`noresolv=1`** (custom forwarders only),
   - legacy **`network.wan`** static DNS with `peerdns=0`, or
   - **AdGuard using encrypted upstreams** (DoH/DoT), which cannot resolve hijacked “hotel” names the way the upstream expects.
-- **Mechanism**: before changing anything, Travo writes a **JSON backup** to **`/etc/travo/captive-dns-in-progress`** (also acts as the “bypass active” marker) containing dnsmasq options, relevant `wan` DNS fields, and AdGuard upstream/bootstrap/fallback slices. It then:
+- **Mechanism**: before changing anything, Travo writes a **JSON backup** to **`/etc/trafo/captive-dns-in-progress`** (also acts as the “bypass active” marker) containing dnsmasq options, relevant `wan` DNS fields, and AdGuard upstream/bootstrap/fallback slices. It then:
   - relaxes dnsmasq toward **DHCP-provided DNS** (reads **`/tmp/resolv.conf.d/resolv.conf.auto`**),
   - may clear static WAN DNS overrides,
   - points **AdGuard upstream** at plain **hotel DNS** when available so the resolver that actually handles queries can see portal names.

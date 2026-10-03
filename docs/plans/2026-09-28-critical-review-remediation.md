@@ -27,10 +27,16 @@ data-loss-relevant are pulled into the relevant lane.
 
 ## Wave 0 — build unblock (parent)
 
-- [x] P0.0: `.mise.toml` pins `go = "1.27.0"` (matches `backend/go.mod` `go 1.27.0`
-      and CI's `go-version-file`); the 1.27.1 `klauspost/compress` zstd breakage is no
-      longer reachable. An explicit `toolchain` directive is *not* added: `go mod tidy`
-      strips it while the toolchain is newer than the `go` directive.
+- [~] **P0.0 as originally written is superseded.** It claimed the `klauspost/compress` zstd
+      breakage under Go 1.27.1 and that pinning `.mise.toml` to `go = "1.27.0"` fixed it. Neither
+      half survived verification on 2026-10-04:
+      - The breakage does not reproduce. `go build ./...`, `go test ./...` (11/11) and
+        `go test ./... -race` are all green on Go 1.27.1, `go mod tidy -diff` is clean, and
+        `klauspost/compress` has since moved to `v1.20.1` (`backend/go.mod`). The actual fix was a
+        dependency bump that no document recorded.
+      - The pin was never applied: `.mise.toml` still said `1.27.1`. It now says `1.27.0`, matching
+        `backend/go.mod` and therefore matching what CI installs. That alignment is enforced by
+        `TestGoVersionPinsAgree` in `backend/internal/services/docs_index_test.go`.
 
 ## Wave 1 — P0 injection + clock control (parent, done)
 
@@ -116,7 +122,7 @@ Documentation-as-code pass over the same diff. What changed in the docs:
 - **Two new ADRs.** [ADR 0008](../adr/0008-ssh-key-management.md) — SSH key management
   as a root-credential surface (what the endpoint may write, the single-line +
   key-format validation boundary, why it is default-deny behind JWT auth). [ADR 0009](../adr/0009-persistent-store-bbolt.md) —
-  the bbolt store at `/etc/trafo/travo.db` (NAND/overlayfs write discipline, persisted vs
+  the bbolt store at `/etc/travo/travo.db` (NAND/overlayfs write discipline, persisted vs
   in-memory, memory-only degradation, per-bucket retention). Both indexed in
   [`docs/adr/README.md`](../adr/README.md) and linked from `docs/architecture.md`.
 - **ADR 0003 rewritten around an authoritative guard table** (path → owning file → what it

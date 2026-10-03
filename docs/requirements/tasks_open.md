@@ -48,7 +48,7 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 ### 6.2 Real-Time Monitoring
 
 - [ ] Historical data beyond the current window. The 6 h ring buffer (30 s interval,
-      720 points, persisted in `/etc/trafo/travo.db`) shipped; longer retention is a
+      720 points, persisted in `/etc/travo/travo.db`) shipped; longer retention is a
       product decision about flash wear — see [ADR 0009](../adr/0009-persistent-store-bbolt.md)
       for the write-batching rule any extension must follow.
 
@@ -86,7 +86,7 @@ documented rather than fixed. They are code changes, not doc changes.
       currently writes nothing to the log ([ADR 0008](../adr/0008-ssh-key-management.md)).
 - [ ] **`DeleteSSHKey` is positional.** The index space is positional, so a delete after
       an add shifts later keys. A fingerprint-addressed delete is a breaking API change.
-- [ ] **Store degradation is invisible.** If `/etc/trafo/travo.db` cannot be opened the
+- [ ] **Store degradation is invisible.** If `/etc/travo/travo.db` cannot be opened the
       backend only logs a warning; the UI cannot tell that history and cross-restart
       revocations are not persisting ([ADR 0009](../adr/0009-persistent-store-bbolt.md)).
 
@@ -115,7 +115,7 @@ oxlint — see [`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
 
 - [x] ~~Investigate whether a lightweight database such as SQLite makes sense for Travo
       passwords and collected data such as CPU or traffic usage.~~ **Decided and
-      implemented as bbolt** (`/etc/trafo/travo.db`, ADR 0009). Measured: bbolt adds
+      implemented as bbolt** (`/etc/travo/travo.db`, ADR 0009). Measured: bbolt adds
       **247 KB** to the stripped binary (12.57 → 12.83 MB) where `modernc.org/sqlite`
       would add ~10 MB. The current consumers are the token-revocation set and the
       stats-history ring buffer.

@@ -57,7 +57,7 @@ On device, the administrative password is the **root** password shared with **Lu
 ### 5. Storage paths
 
 - **`/etc/trafo/auth.json`** — sealed auth metadata / JWT secret storage (see `config.Config` `AuthConfigPath`).
-- **`/etc/trafo/travo.db`** — the bbolt key/value store opened beside `auth.json`, holding the persisted token-revocation set and the stats-history ring buffer. Opened with a 5 s timeout; failure degrades to **memory-only** with a warning rather than blocking startup. Retention, flash-write batching and the full bucket table are in [ADR 0009](./0009-persistent-store-bbolt.md).
+- **`/etc/travo/travo.db`** — the bbolt key/value store opened beside `auth.json`, holding the persisted token-revocation set and the stats-history ring buffer. Opened with a 5 s timeout; failure degrades to **memory-only** with a warning rather than blocking startup. Retention, flash-write batching and the full bucket table are in [ADR 0009](./0009-persistent-store-bbolt.md).
 - **TLS** material may live under `/etc/trafo/tls.crt` / `tls.key` when HTTPS is enabled for the Travo listener.
 
 ## Consequences

@@ -106,7 +106,7 @@ timer- or button-driven `wifi down` has no rollback. Those paths therefore call 
 
 | Caller | Where it is generated | What it runs |
 | ------ | --------------------- | ------------ |
-| WiFi on/off **schedule** | `WifiService.SetWiFiSchedule` writes `/etc/cron.d/openwrt-gui-wifi-schedule` | `/usr/libexec/travo-wireless-toggle.sh up` / `… down` |
+| WiFi on/off **schedule** | `WifiService.SetWiFiSchedule` writes `/etc/crontabs/root` | `/usr/libexec/travo-wireless-toggle.sh up` / `… down` |
 | **Hardware button** WiFi toggle | `SystemService.buildButtonHotplugScript` writes `/etc/hotplug.d/button/50-gui-button-actions` (`0755`, run as root by procd) | `iwinfo` presence check, then `/usr/libexec/travo-wireless-toggle.sh down` / `… up` |
 
 The button's VPN toggle still uses `ifstatus`/`ifdown`/`ifup` on `wg0` — that is

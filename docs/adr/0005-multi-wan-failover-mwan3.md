@@ -30,7 +30,7 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 
 ### 3. Safety guards and backup
 
-- Applying failover writes **`/etc/travo/failover-in-progress`** before live policy mutation and removes it only after successful verification (ADR 0003).
+- Applying failover writes **`/etc/trafo/failover-in-progress`** before live policy mutation and removes it only after successful verification (ADR 0003).
 - A backup artifact **`/etc/travo/failover-mwan3-backup.json`** supports restore semantics implemented in `FailoverService` (paired with UCI operations).
 
 ### 4. Apply path

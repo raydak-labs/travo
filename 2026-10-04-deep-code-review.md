@@ -3,11 +3,63 @@ title: Deep code review — 2026-10-04
 date: 2026-10-04
 scope: whole repo — backend services, platform/trust boundary, frontend, tests/CI/build, docs↔code, architecture
 method: 11 read-only subagent lanes (2 waves) + parent verification of every P0/P1
-status: findings only — no code changed
+status: findings reported; remediation in progress on this branch
 baseline: f3125f22 (clean tree)
 ---
 
 # Deep code review — 2026-10-04
+
+> ## Remediation status
+>
+> Fixes are landing on `fix/deep-review-2026-10-04`. Landed so far:
+>
+> | Area | Commits | State |
+> | ---- | ------- | ----- |
+> | P0 auth bypass | `70193d6`, `93e6e2b` | Fixed. `CaseSensitive` routing plus an `auth.PublicPaths` allowlist, with a route-table test. `93e6e2b` repairs a regression `70193d6` introduced — see below. |
+> | P0 shipped credentials | `29faf2e` | Fixed. Installer refuses a default root password and verifies the service starts; AdGuard ships no account; uninstall reports surviving live state. |
+> | Wireless guarded paths | `286b808`, `087f168` | Fixed. Includes two defects found by reviewing the first attempt. |
+> | Network / guards / failover | `f5d331a`, `3633cdd` | Fixed. |
+> | VPN / DNS layering / API contract | `f81e4bd`, `db681c4` | Fixed. `db681c4` addresses two P1s found by reviewing `f81e4bd`. |
+> | Restore + firmware validation | `f81e4bd`, `3633cdd` | Fixed, with a documented reversal — see "Decision reversal" below. |
+> | Frontend truthfulness and safety | `c7a469d`, `4cfc254` | Fixed. |
+> | Doc drift | this commit | Fixed where mechanical; a gate now prevents recurrence. |
+>
+> **Process note.** Every wave was followed by an adversarial review lane whose job was to break
+> the work just landed. It did, four times, and those four rounds are commits `93e6e2b`,
+> `db681c4`, `087f168` and `3633cdd`. The most serious was in my own first fix: I moved the auth
+> middleware onto the `/api/v1` route group believing group middleware is scoped by router. In
+> Fiber v3 it is scoped by **path prefix**, so it also intercepted the WebSocket upgrade and the
+> public time-sync endpoint — the WebSocket answered 401 and live updates were dead, while every
+> "route is protected" test still passed. Both the wiring and the gate that missed it are fixed.
+>
+> ### Decision reversal you should review
+>
+> The restore allowlist. The review named `etc/crontabs/root` in an uploaded archive as the exploit
+> path, and the first implementation restricted members to `etc/config` and `etc/ppp`. That was
+> defence at the wrong layer: it was written to compensate for the auth bypass, which is now fixed,
+> and restore is an authenticated-admin-only endpoint whose admin already holds root via
+> `POST /system/ssh-keys`, firmware flash and factory reset. Worse, **this application itself
+> writes** `/etc/crontabs/root`, `/etc/dropbear/authorized_keys` and `/etc/shadow`, all of which
+> `sysupgrade -b` captures — so the allowlist refused every genuine backup taken on this device. It
+> is replaced by an authenticity check (the archive must carry a UCI config member) plus the
+> structural checks that matter regardless of who uploads: absolute paths, `..` traversal,
+> symlinks/hardlinks/device nodes, member count and size caps. See `ValidateRestoreArchive`.
+>
+> ### Still open, needs a decision
+>
+> 1. **The repeater wizard is dead code.** Nothing imports it; the remediation plan advertises its
+>    rollback as delivered. Mount it or delete it — I did not choose, because it is a product call.
+> 2. **`SetRadioRole("both")` is now refused outright** rather than reconciled. Smaller and safer,
+>    but it changes what an operator can do. Reverting to a reconciling implementation is a
+>    deliberate choice, not an oversight.
+> 3. **Kill-switch ownership, split-tunnel interaction, and whether `dest=wan` is the right scope**
+>    are open product questions, untouched.
+> 4. **Not yet done:** `.mise.toml`/Docker `node` version divergence, `oxlint --type-aware` never
+>    being invoked, coverage thresholds, `deploy-local.sh` not pruning `/www/travo`, and
+>    `setup-local.sh` still disabling SSH host-key verification.
+> 5. **Unverifiable without the device:** whether ath11k reports an access point as up with zero
+>    associated stations. `ConfirmApply` now depends on that answer for every AP config. This is the
+>    single largest unknown in the branch and must be checked on hardware before release.
 
 Follow-up to [`2026-09-26-critical-code-review.md`](./2026-09-26-critical-code-review.md).
 **No files were modified.** The device `192.168.1.1` was unreachable throughout, so this is

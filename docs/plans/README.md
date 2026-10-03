@@ -1,7 +1,7 @@
 ---
 title: Plans index
 description: Searchable catalog of all planning and historical design docs in this directory.
-updated: 2026-07-24
+updated: 2026-10-04
 tags: [plans, traceability, index]
 ---
 
@@ -46,3 +46,22 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 | [`wireguard-adguard-oob-fix-plan.md`](wireguard-adguard-oob-fix-plan.md) | WG + AdGuard out-of-box correctness | `wireguard`, `adguard` |
 | [`wireguard-full-networking.md`](wireguard-full-networking.md) | WG zones, routes, split tunnel | `wireguard`, `firewall` |
 | [`wireguard_client_openwrt_25.12.md`](wireguard_client_openwrt_25.12.md) | OpenWrt 25.12 WG client notes | `wireguard`, `openwrt` |
+| [`2026-09-28-critical-review-remediation.md`](2026-09-28-critical-review-remediation.md) | Remediation of the 2026-09-26 critical review. **Its completion marks were found unreliable — see [`2026-10-04-deep-code-review.md`](../../2026-10-04-deep-code-review.md).** | `review`, `remediation` |
+| [`failover-gaps.md`](failover-gaps.md) | Known gaps in multi-WAN failover | `failover`, `mwan3` |
+
+### Agent scratch reports
+
+Per-task working notes from the primitive-usage audit. No product truth and no owner: they
+are listed only so this directory is self-describing.
+
+| File | Summary |
+| ---- | ------- |
+| [`_approach-a-report.md`](_approach-a-report.md) | Per-task primitive-usage report |
+| [`_task-4-report.md`](_task-4-report.md) | Per-task primitive-usage report |
+| [`_task-5-report.md`](_task-5-report.md) | Per-task primitive-usage report |
+| [`_task-6-report.md`](_task-6-report.md) | Per-task primitive-usage report |
+| [`_task-7-report.md`](_task-7-report.md) | Per-task primitive-usage report |
+| [`_task-8-report.md`](_task-8-report.md) | Per-task primitive-usage report |
+| [`_task-9-report.md`](_task-9-report.md) | Per-task primitive-usage report |
+| [`_task-10-mop-report.md`](_task-10-mop-report.md) | Per-task primitive-usage report |
+| [`_verify-mop-report.md`](_verify-mop-report.md) | Per-task primitive-usage report |
