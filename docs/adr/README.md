@@ -21,6 +21,7 @@ ADRs capture **durable, topic-specific** decisions that are too long for `docs/a
 | [0008](./0008-ssh-key-management.md) | SSH key management (root `authorized_keys`) | Accepted |
 | [0009](./0009-persistent-store-bbolt.md) | Persistent key/value store (bbolt at `/etc/travo/travo.db`) | Accepted |
 | [0010](./0010-uci-write-serialisation-and-request-contracts.md) | UCI write serialisation, ordered config locks, and strict request-body contracts | Accepted |
+| [0011](./0011-frontend-lint-toolchain-oxlint-and-typescript-7.md) | Frontend lint toolchain (oxlint and TypeScript 7) | Accepted |
 
 **How to use:** pick the ADR that matches the subsystem you are changing; if the behavior is not documented yet, add or amend an ADR in the same numbering series.
 

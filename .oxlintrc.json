@@ -1,0 +1,166 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // oxlint reads ESLint **v8 / eslintrc** style config, not ESLint flat config.
+  // The previous `eslint.config.js` (flat) was deleted in the oxlint migration.
+  //
+  // `plugins` OVERWRITES the default plugin set (default: eslint, typescript, unicorn, oxc).
+  // The repo only ever linted with the ESLint core + typescript-eslint + react rulesets, so we
+  // deliberately re-declare the plugins instead of inheriting the defaults:
+  //   - "unicorn"/"oxc" are NOT added: they were never part of the ESLint baseline and would
+  //     introduce hundreds of findings the project has never seen.
+  //   - "react" is NOT enabled by default in oxlint, but the baseline used
+  //     eslint-plugin-react-hooks + eslint-plugin-react-refresh. oxlint's `react` plugin bundles
+  //     react-hooks, react-refresh and the React Compiler rules natively (no JS plugin shims).
+  // Do not "helpfully" add unicorn/oxc here without re-running the parity check.
+  "plugins": ["eslint", "typescript", "react"],
+  // Only `correctness` is on by default in oxlint. Enabling pedantic/restriction/style/perf
+  // wholesale would import hundreds of rules the ESLint baseline never ran, so they stay off.
+  // NOTE: `correctness: "error"` on its own enables every correctness rule of the enabled
+  // plugins, so the old baseline is a SUBSET of it. The `rules` map below does not create
+  // that coverage — it pins severities and re-adds the baseline rules oxlint classifies
+  // outside `correctness` (e.g. `react/rules-of-hooks` is `pedantic`).
+  "categories": {
+    "correctness": "error",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  // Matches the ESLint baseline (`globals.browser`).
+  "env": {
+    "browser": true
+  },
+  // `settings.react.version` selects the React runtime assumption used by the react plugin.
+  "settings": {
+    "react": {
+      "version": "19.0"
+    }
+  },
+  "ignorePatterns": [
+    "dist",
+    "build",
+    "node_modules",
+    "backend"
+  ],
+  "rules": {
+    // ---------------------------------------------------------------------------------------
+    // eslint:recommended parity (all were `error` in the ESLint baseline)
+    // ---------------------------------------------------------------------------------------
+    "eslint/for-direction": "error",
+    "eslint/no-async-promise-executor": "error",
+    "eslint/no-case-declarations": "error",
+    "eslint/no-compare-neg-zero": "error",
+    "eslint/no-cond-assign": "error",
+    "eslint/no-constant-binary-expression": "error",
+    "eslint/no-constant-condition": "error",
+    "eslint/no-control-regex": "error",
+    "eslint/no-debugger": "error",
+    "eslint/no-delete-var": "error",
+    "eslint/no-dupe-else-if": "error",
+    "eslint/no-duplicate-case": "error",
+    "eslint/no-empty": "error",
+    "eslint/no-empty-character-class": "error",
+    "eslint/no-empty-pattern": "error",
+    "eslint/no-empty-static-block": "error",
+    "eslint/no-ex-assign": "error",
+    "eslint/no-extra-boolean-cast": "error",
+    "eslint/no-fallthrough": "error",
+    "eslint/no-global-assign": "error",
+    "eslint/no-invalid-regexp": "error",
+    "eslint/no-irregular-whitespace": "error",
+    "eslint/no-loss-of-precision": "error",
+    "eslint/no-misleading-character-class": "error",
+    "eslint/no-nonoctal-decimal-escape": "error",
+    // eslint/no-octal has no oxlint equivalent (accepted parity loss; the codebase is strict
+    // TypeScript and contains no legacy octal literals).
+    "eslint/no-prototype-builtins": "error",
+    "eslint/no-regex-spaces": "error",
+    "eslint/no-self-assign": "error",
+    "eslint/no-shadow-restricted-names": "error",
+    "eslint/no-sparse-arrays": "error",
+    "eslint/no-unassigned-vars": "error",
+    "eslint/no-unexpected-multiline": "error",
+    "eslint/no-unsafe-finally": "error",
+    "eslint/no-unsafe-optional-chaining": "error",
+    "eslint/no-unused-labels": "error",
+    "eslint/no-unused-private-class-members": "error",
+    "eslint/no-useless-assignment": "error",
+    "eslint/no-useless-backreference": "error",
+    "eslint/no-useless-catch": "error",
+    "eslint/no-useless-escape": "error",
+    // oxlint classifies `no-undef` as `nursery` (off by default). NOTE: typescript-eslint's
+    // `recommended` set turns eslint/no-undef OFF, so this was NOT part of the previous ESLint
+    // baseline either. It is enabled here deliberately as defence in depth for the browser
+    // globals declared in `env`.
+    "eslint/no-undef": "error",
+    "eslint/no-var": "error",
+    "eslint/prefer-const": "error",
+    "eslint/prefer-rest-params": "error",
+    "eslint/prefer-spread": "error",
+    "eslint/preserve-caught-error": "error",
+    "eslint/require-yield": "error",
+    "eslint/use-isnan": "error",
+    "eslint/valid-typeof": "error",
+
+    // ---------------------------------------------------------------------------------------
+    // typescript-eslint `recommended` parity (all were `error` in the ESLint baseline)
+    // ---------------------------------------------------------------------------------------
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-array-constructor": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-unused-expressions": "error",
+    // oxlint implements the TS-aware unused-variable check as `eslint/no-unused-vars`, aliased
+    // here. DEVIATION: oxlint ignores `_`-prefixed bindings unconditionally, where
+    // typescript-eslint only does so via varsIgnorePattern; no such binding exists today, so
+    // this is inert for now and a future `_name` must be a conscious decision.
+    "typescript/no-unused-vars": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/triple-slash-reference": "error",
+
+    // ---------------------------------------------------------------------------------------
+    // React parity (eslint-plugin-react-hooks 7.1.1 `recommended` + react-refresh)
+    // ---------------------------------------------------------------------------------------
+    // oxlint classifies `react/rules-of-hooks` as `pedantic`, which is off in the `categories`
+    // block above. Without this explicit entry the single most important rule for this repo
+    // would be silently disabled.
+    "react/rules-of-hooks": "error",
+    // `react/exhaustive-deps` is `correctness` (on by default) but the baseline severity was
+    // `warn`; pinned here so the severity does not drift.
+    "react/exhaustive-deps": "warn",
+    "react/static-components": "error",
+    "react/use-memo": "error",
+    "react/preserve-manual-memoization": "error",
+    // React Hook Form `watch()` is intentionally used in this codebase; oxlint's
+    // `react/incompatible-library` flags it. It is `correctness` (on by default), so it must be
+    // turned off explicitly to keep the previous `react-hooks/incompatible-library: off` behaviour.
+    "react/incompatible-library": "off",
+    "react/immutability": "error",
+    "react/globals": "error",
+    "react/refs": "error",
+    "react/set-state-in-effect": "error",
+    "react/error-boundaries": "error",
+    "react/purity": "error",
+    "react/set-state-in-render": "error",
+    "react/unsupported-syntax": "warn",
+    // react/config and react/gating (the old react-hooks/config and react-hooks/gating) are NOT
+    // implemented by oxlint 1.86 — accepted parity loss, see ADR 0011.
+    // `react/only-export-components` is `restriction` (off by default); the baseline severity
+    // was `warn` with `allowConstantExport: true`, which oxlint supports 1:1.
+    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  }
+}

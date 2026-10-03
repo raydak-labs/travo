@@ -42,7 +42,7 @@ Agent-facing instructions (workflow, guardrails, finish criteria) live in
 
 ## Code Style
 
-- **TypeScript/React**: follow the ESLint + Prettier configuration in the repo
+- **TypeScript/React**: follow the oxlint (`.oxlintrc.json`) + Prettier configuration in the repo
 - **Go**: follow standard `gofmt` formatting; `make lint` runs `golangci-lint` over the
   backend, which is stricter than `go vet`
 - Use meaningful commit messages following [Conventional Commits](https://www.conventionalcommits.org/)

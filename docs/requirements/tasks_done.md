@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-09-28
+updated: 2026-10-02
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-09-28 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-02 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## Milestone checklist (compact)
 
@@ -47,6 +47,23 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - System: reboot, shutdown, firmware upgrade, factory reset, hostname, backup/restore, LED, timezone, NTP, password, hardware buttons.
 - Logs: system/kernel filters, search, export.
 - UI: responsive layout, sidebar + mobile drawer, dark mode, skeletons, onboarding, grouped IA.
+
+## Frontend Toolchain
+
+- **ESLint replaced by oxlint, TypeScript 7 adopted.** The `TypeScript 7 — blocked by
+  typescript-eslint` hold in [`tasks_open.md`](./tasks_open.md) §16 (and the matching
+  Renovate `allowedVersions` rule) is resolved by the escape hatch it named: ESLint and
+  `typescript-eslint` are gone, `.oxlintrc.json` replaces `eslint.config.js`, and
+  `typescript` is pinned to `7.0.2` in the root, `frontend/`, and `shared/` packages.
+  82 of the 85 previously-enabled ESLint rules are ported 1:1 at identical severity, plus
+  `eslint/no-undef` added on top (the typescript-eslint baseline had it off) for 83 enabled; the
+  three that oxlint does not implement (`eslint/no-octal`, `react-hooks/config`,
+  `react-hooks/gating`) are documented as accepted losses in `.oxlintrc.json` and in
+  [ADR 0011](../adr/0011-frontend-lint-toolchain-oxlint-and-typescript-7.md). Prettier is
+  unchanged and remains the formatter (oxlint does not format). Type-aware linting via
+  `oxlint-tsgolint` was evaluated and deliberately NOT enabled — it remains in the dependency
+  graph only as an auto-installed optional peer of oxlint, so no type-aware rule runs, behaviour
+  is unaffected, and CI does not depend on it. See [`docs/development.md`](../development.md).
 
 ## Reliability And Operational Fixes
 
