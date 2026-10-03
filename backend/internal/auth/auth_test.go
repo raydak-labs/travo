@@ -102,79 +102,41 @@ func TestMiddlewareAllowsWithValidToken(t *testing.T) {
 	}
 }
 
-func TestMiddlewareAllowsHealthWithoutToken(t *testing.T) {
+// TestMiddlewareAppliesToEveryPath pins the contract that replaced the old
+// in-middleware path allowlist. Middleware no longer exempts any path: the
+// public endpoints are the ones simply not mounted on the authenticated group
+// (see api.PublicRoutes), so a prefix check can no longer drift out of sync with
+// routing. These are exactly the paths that used to bypass auth.
+func TestMiddlewareAppliesToEveryPath(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
 	app := fiber.New()
 	app.Use(svc.Middleware())
-	app.Get("/api/health", func(c fiber.Ctx) error {
-		return c.SendString("ok")
-	})
-	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
-	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected 200, got %d", resp.StatusCode)
-	}
-}
+	app.Get("/api/health", func(c fiber.Ctx) error { return c.SendString("ok") })
+	app.Get("/api/openapi.json", func(c fiber.Ctx) error { return c.SendString("ok") })
+	app.Post("/api/v1/auth/login", func(c fiber.Ctx) error { return c.SendString("ok") })
+	app.Post("/api/v1/system/time-sync", func(c fiber.Ctx) error { return c.SendString("ok") })
+	app.Get("/*", func(c fiber.Ctx) error { return c.SendString("ok") })
 
-func TestMiddlewareAllowsStaticFilesWithoutToken(t *testing.T) {
-	svc := NewAuthService("admin", "test-secret")
-	app := fiber.New()
-	app.Use(svc.Middleware())
-	app.Get("/*", func(c fiber.Ctx) error {
-		return c.SendString("ok")
-	})
-
-	paths := []string{"/", "/index.html", "/assets/style.css", "/assets/main.js"}
+	paths := []string{
+		"/api/health",
+		"/api/openapi.json",
+		"/api/v1/auth/login",
+		"/api/v1/system/time-sync",
+		"/",
+		"/index.html",
+		"/assets/style.css",
+	}
 	for _, p := range paths {
 		req, _ := http.NewRequest(http.MethodGet, p, nil)
 		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 		if err != nil {
 			t.Fatalf("request to %s failed: %v", p, err)
 		}
+		status := resp.StatusCode
 		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected 200 for %s, got %d", p, resp.StatusCode)
+		if status != http.StatusUnauthorized {
+			t.Errorf("path %s: expected 401 from the middleware, got %d", p, status)
 		}
-	}
-}
-
-func TestMiddlewareAllowsLoginWithoutToken(t *testing.T) {
-	svc := NewAuthService("admin", "test-secret")
-	app := fiber.New()
-	app.Use(svc.Middleware())
-	app.Post("/api/v1/auth/login", func(c fiber.Ctx) error {
-		return c.SendString("ok")
-	})
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
-	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected 200, got %d", resp.StatusCode)
-	}
-}
-
-func TestMiddlewareAllowsOpenAPIWithoutToken(t *testing.T) {
-	svc := NewAuthService("admin", "test-secret")
-	app := fiber.New()
-	app.Use(svc.Middleware())
-	app.Get("/api/openapi.json", func(c fiber.Ctx) error {
-		return c.SendString("ok")
-	})
-	req, _ := http.NewRequest(http.MethodGet, "/api/openapi.json", nil)
-	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected 200 for openapi.json, got %d", resp.StatusCode)
 	}
 }
 

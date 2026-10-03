@@ -43,15 +43,37 @@ type Dependencies struct {
 	TimeSyncGate *TimeSyncGate
 }
 
-// SetupRoutes registers all API routes under /api/v1/.
+// PublicRoutes are the only API paths reachable without a Bearer token.
+// Everything else is mounted on the authenticated group below, so this list is
+// the whole public surface and cannot silently grow. TestAuthCoversEveryRoute
+// walks the live route table and fails if any other /api path answers an
+// unauthenticated request.
+//
+// /api/v1/ws is not registered here (main.go owns the upgrade); it authenticates
+// itself in ws.UpgradeMiddleware, so it is listed as public only so the coverage
+// test does not have to special-case it.
+var PublicRoutes = []string{
+	"/api/health",
+	"/api/openapi.json",
+	"/api/v1/auth/login",
+	"/api/v1/system/time-sync",
+	"/api/v1/ws",
+}
+
+// SetupRoutes registers all API routes. Public endpoints go on the app itself;
+// every other route goes on a group carrying the auth middleware, so
+// "protected" is a property of the wiring rather than a string comparison.
 func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// OpenAPI spec — served without auth for agent/automation use.
 	app.Get("/api/openapi.json", OpenAPIHandler())
 
-	v1 := app.Group("/api/v1")
+	// Public endpoints, registered before the authenticated group so the
+	// group middleware never runs for them.
+	app.Post("/api/v1/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
+	app.Post("/api/v1/system/time-sync", SyncTimeHandler(deps))
 
-	// Auth routes (login does not require auth)
-	v1.Post("/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
+	v1 := app.Group("/api/v1", deps.Auth.Middleware())
+
 	v1.Post("/auth/logout", LogoutHandler(deps.Auth, deps.Blocklist))
 	v1.Get("/auth/session", SessionHandler(deps.Auth))
 	v1.Put("/auth/password", ChangePasswordHandler(deps.Auth))
@@ -80,7 +102,6 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/ntp/sync", NTPSyncHandler(deps.System))
 	v1.Get("/system/setup-complete", GetSetupCompleteHandler(deps.System))
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
-	v1.Post("/system/time-sync", SyncTimeHandler(deps))
 	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
 	v1.Get("/system/alert-thresholds", GetAlertThresholdsHandler(deps.Alerts))
 	v1.Put("/system/alert-thresholds", SetAlertThresholdsHandler(deps.Alerts))

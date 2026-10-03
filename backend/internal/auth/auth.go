@@ -433,14 +433,16 @@ func (a *AuthService) rotateSessions() (ChangePasswordResult, error) {
 }
 
 // Middleware returns a Fiber middleware that checks for a valid Bearer token.
+//
+// It applies to every request that reaches it and makes no exception for
+// particular paths. The set of public endpoints is expressed structurally, by
+// mounting this middleware on the authenticated route group in
+// api.SetupRoutes rather than by string-matching a request path here: a prefix
+// check silently stops matching whenever routing normalises a path differently
+// from the raw request (Fiber's case-insensitive routing is one instance of
+// this, and it made the whole /api/v1 surface reachable without a token).
 func (a *AuthService) Middleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
-		path := c.Path()
-
-		if !strings.HasPrefix(path, "/api/") || path == "/api/health" || path == "/api/openapi.json" || path == "/api/v1/auth/login" || path == "/api/v1/ws" || path == "/api/v1/system/time-sync" {
-			return c.Next()
-		}
-
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{

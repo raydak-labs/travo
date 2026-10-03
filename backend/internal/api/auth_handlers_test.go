@@ -70,10 +70,13 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
 	}
 
-	app := fiber.New()
-	app.Use(authSvc.Middleware())
+	// CaseSensitive mirrors production (cmd/server/main.go). Without it the
+	// test app would not reproduce the routing behaviour the auth coverage
+	// test in auth_coverage_test.go exists to guard.
+	app := fiber.New(fiber.Config{CaseSensitive: true})
 
-	// Health endpoint (excluded from auth)
+	// Health endpoint is public; it is registered on the app rather than the
+	// authenticated /api/v1 group, exactly as in main.go.
 	app.Get("/api/health", func(c fiber.Ctx) error {
 		return RespondOK(c)
 	})
