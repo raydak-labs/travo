@@ -23,15 +23,22 @@ Provides an intuitive dashboard, WiFi management with hotel captive portal suppo
 SSH into your OpenWRT router and run:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
+wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
+  sh -s -- --password 'your-strong-password'
 ```
+
+The installer has **no default password** — it is the LuCI, SSH and Travo login
+for the whole device, so pass `--password` (min 8 characters) or run the script
+from a terminal to be prompted.
 
 This installs Travo on port 80, AdGuard Home on port 3000 (DNS on 5353 via dnsmasq forwarding),
 and moves LuCI to port 8080. See [docs/deployment.md](docs/deployment.md) for
 all options and manual install instructions.
 
-> **Default AdGuard credentials:** `admin` / `password` — change immediately via
-> **Settings → AdGuard Password** in the Travo UI.
+> **AdGuard credentials:** no default account is installed. The first time you
+> open AdGuard you create the admin user; you can also do it from
+> **System → AdGuard Password** in the Travo UI, which keeps the password out of
+> your terminal's scrollback.
 
 ## General
 

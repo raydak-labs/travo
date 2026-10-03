@@ -197,7 +197,9 @@ enable_and_start() {
     log "Starting adguardhome service ..."
     "$INIT_SCRIPT" start
     log "AdGuard Home is running — web UI at http://<router-ip>:3000"
-    log "Default credentials: admin / password  (change immediately via Settings → AdGuard Password)"
+    log "No default AdGuard account is installed."
+    log "Create the admin account once via Travo: System -> AdGuard Password."
+    log "(Doing it there keeps the password out of this terminal's scrollback.)"
 }
 
 # ---------- configure router DNS ----------
