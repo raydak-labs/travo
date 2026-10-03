@@ -90,7 +90,34 @@ documented rather than fixed. They are code changes, not doc changes.
       backend only logs a warning; the UI cannot tell that history and cross-restart
       revocations are not persisting ([ADR 0009](../adr/0009-persistent-store-bbolt.md)).
 
-## 16. Research And Open Questions
+## 16. Held Dependency Upgrades
+
+Consolidating the Renovate branches on 2026-10-02 surfaced three upgrades that cannot land
+yet. Each is pinned by an `allowedVersions` rule in `.github/renovate.json5` so Renovate
+stops proposing it; drop the matching rule once the blocker clears.
+
+- [ ] **TypeScript 7 — blocked by `typescript-eslint`.** Every release, stable `8.71.0`
+      and canary `8.71.1-alpha.7`, peer-requires `typescript >=4.8.4 <6.1.0`, so TS 7
+      breaks `pnpm lint` with `typescript-eslint does not support TS 7.0.`
+      Watch: a `typescript-eslint` release widening its peer range to 7.x.
+      Escape hatch: moving off ESLint would unblock this — Oxlint's type-aware backend is
+      built on `typescript-go` (TS 7) and does not read the `typescript` npm peer range at
+      all, and Biome likewise has no `typescript` peer. Both are real migrations (rule
+      parity, config regeneration, loss of `tsc`-grade type information), not a version bump.
+- [ ] **MSW 3 — blocked by Vitest 5.** Every `@vitest/mocker` 5.x release through `5.0.3`
+      peer-requires `msw ^2.4.9`, so Vitest 5 and MSW 3 are mutually exclusive. We chose
+      Vitest 5, so MSW stays on 2.x. Unblocking MSW 3 also needs the `onUnhandledRequest` →
+      `onUnhandledFrame` rename in `frontend/src/main.tsx` and `frontend/src/test/setup.ts`.
+      Watch: `peerDependencies.msw` on https://registry.npmjs.org/@vitest/mocker.
+- [ ] **jsdom 30.1 — blocked by Vitest 5.** Vitest 5's jsdom compat shim resolves jsdom's
+      implementation symbol with `getOwnPropertySymbols(new Blob())[0]`, assuming the first
+      own symbol is the impl symbol. jsdom 30.1.0 switched wrapper registration to
+      `registerWrapper(wrapper, impl, interfaceDescriptor)`, so the lookup now resolves the
+      descriptor instead and any request whose body contains a `File` throws
+      `Cannot read properties of undefined (reading '_buffer')` before MSW sees it.
+      Watch: a Vitest release that resolves the impl symbol explicitly.
+
+## 17. Research And Open Questions
 
 - [x] ~~Investigate whether a lightweight database such as SQLite makes sense for Travo
       passwords and collected data such as CPU or traffic usage.~~ **Decided and
