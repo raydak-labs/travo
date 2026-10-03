@@ -309,12 +309,22 @@ export function useRadios() {
   });
 }
 
+/**
+ * Response of the radio-role endpoint: the shared envelope plus, when the
+ * service had to invent a WPA passphrase for a default AP it created,
+ * generated_key. The passphrase is returned exactly once and is unrecoverable
+ * afterwards, so callers must surface it.
+ */
+type RadioRoleMutationResponse = WifiMutationResponse & {
+  readonly generated_key?: string;
+};
+
 export function useSetRadioRole() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ name, role }: { name: string; role: string }) =>
       finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
+        apiClient.put<RadioRoleMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
           role,
         }),
       ),
@@ -339,6 +349,8 @@ export function useSetRadioRole() {
       ]);
     },
     onError: (error) => {
+      // Keep the backend's own wording: a refused role names both remedies, and
+      // the radio card repeats the same message inline next to the selector.
       toast.error('Failed to update radio role', { description: error.message });
     },
   });
