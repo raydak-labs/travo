@@ -11,7 +11,7 @@ import (
 // publicRouteSet indexes PublicRoutes for the coverage test below.
 func publicRouteSet() map[string]bool {
 	set := make(map[string]bool, len(PublicRoutes))
-	for _, p := range PublicRoutes {
+	for p := range PublicRoutes {
 		set[p] = true
 	}
 	return set
@@ -153,12 +153,47 @@ func TestPublicRoutesAreReachable(t *testing.T) {
 
 	// /api/v1/ws is registered by main.go, not SetupRoutes, so it is absent
 	// from the test app by design.
-	for _, p := range PublicRoutes {
+	for p := range PublicRoutes {
 		if p == "/api/v1/ws" {
 			continue
 		}
 		if !registered[p] {
 			t.Errorf("PublicRoutes lists %q but no route with that path is registered", p)
 		}
+	}
+}
+
+// TestPublicEndpointsAreReachable is the regression guard for a bug this
+// coverage test's own structure would not have caught: the auth middleware was
+// briefly mounted on the /api/v1 route group, and because Fiber v3 scopes group
+// middleware by PATH PREFIX rather than by which router a route was registered
+// on, it also intercepted /api/v1/ws and /api/v1/system/time-sync -- breaking
+// the WebSocket and the pre-login clock recovery while every "route is
+// protected" assertion still passed.
+func TestPublicEndpointsAreReachable(t *testing.T) {
+	app, _ := setupTestApp(t)
+
+	// A token would be required if these were treated as protected.
+	req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/time-sync", nil)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("time-sync request failed: %v", err)
+	}
+	status := resp.StatusCode
+	resp.Body.Close()
+	if status == http.StatusUnauthorized {
+		t.Error("POST /api/v1/system/time-sync answered 401: the pre-login clock " +
+			"recovery path is unauthenticated by design and must stay reachable")
+	}
+
+	req, _ = http.NewRequest(http.MethodGet, "/api/health", nil)
+	resp, err = app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("health request failed: %v", err)
+	}
+	status = resp.StatusCode
+	resp.Body.Close()
+	if status != http.StatusOK {
+		t.Errorf("GET /api/health answered %d, want 200", status)
 	}
 }

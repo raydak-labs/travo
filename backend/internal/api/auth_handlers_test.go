@@ -75,8 +75,12 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	// test in auth_coverage_test.go exists to guard.
 	app := fiber.New(fiber.Config{CaseSensitive: true})
 
-	// Health endpoint is public; it is registered on the app rather than the
-	// authenticated /api/v1 group, exactly as in main.go.
+	// Auth middleware is mounted by the caller in production (main.go) and must
+	// be mounted here too, or the coverage test in auth_coverage_test.go would
+	// pass vacuously.
+	app.Use(authSvc.Middleware())
+
+	// Health endpoint is public: auth.PublicPaths exempts it.
 	app.Get("/api/health", func(c fiber.Ctx) error {
 		return RespondOK(c)
 	})

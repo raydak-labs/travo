@@ -102,40 +102,88 @@ func TestMiddlewareAllowsWithValidToken(t *testing.T) {
 	}
 }
 
-// TestMiddlewareAppliesToEveryPath pins the contract that replaced the old
-// in-middleware path allowlist. Middleware no longer exempts any path: the
-// public endpoints are the ones simply not mounted on the authenticated group
-// (see api.PublicRoutes), so a prefix check can no longer drift out of sync with
-// routing. These are exactly the paths that used to bypass auth.
-func TestMiddlewareAppliesToEveryPath(t *testing.T) {
+// TestMiddlewareExemptsOnlyPublicPaths pins the auth middleware's allowlist.
+//
+// This replaced an earlier test asserting the middleware had NO path logic at
+// all. That turned out to be unworkable: Fiber v3 scopes route-group middleware
+// by PATH PREFIX rather than by which router a route was registered on, so
+// moving the middleware onto the /api/v1 group also intercepted routes
+// registered directly on the app -- the WebSocket upgrade and the public
+// time-sync endpoint -- breaking both. The allowlist is back, and what makes it
+// safe is that routing is case-sensitive (fiber.Config.CaseSensitive), so a
+// case-varied request matches no route and cannot reach a handler.
+//
+// internal/api's TestAuthCoversEveryRoute is the companion gate: it walks the
+// live route table and asserts this allowlist covers the public surface exactly.
+func TestMiddlewareExemptsOnlyPublicPaths(t *testing.T) {
 	svc := NewAuthService("admin", "test-secret")
-	app := fiber.New()
+	app := fiber.New(fiber.Config{CaseSensitive: true})
 	app.Use(svc.Middleware())
-	app.Get("/api/health", func(c fiber.Ctx) error { return c.SendString("ok") })
-	app.Get("/api/openapi.json", func(c fiber.Ctx) error { return c.SendString("ok") })
-	app.Post("/api/v1/auth/login", func(c fiber.Ctx) error { return c.SendString("ok") })
-	app.Post("/api/v1/system/time-sync", func(c fiber.Ctx) error { return c.SendString("ok") })
-	app.Get("/*", func(c fiber.Ctx) error { return c.SendString("ok") })
-
-	paths := []string{
-		"/api/health",
-		"/api/openapi.json",
-		"/api/v1/auth/login",
-		"/api/v1/system/time-sync",
-		"/",
-		"/index.html",
-		"/assets/style.css",
+	handler := func(name string) fiber.Handler {
+		return func(c fiber.Ctx) error { return c.SendString("handled:" + name) }
 	}
-	for _, p := range paths {
-		req, _ := http.NewRequest(http.MethodGet, p, nil)
+	app.Get("/api/health", handler("health"))
+	app.Get("/api/openapi.json", handler("openapi"))
+	app.Post("/api/v1/auth/login", handler("login"))
+	app.Post("/api/v1/system/time-sync", handler("time-sync"))
+	app.Get("/api/v1/ws", handler("ws"))
+	app.Get("/api/v1/system/info", handler("system-info"))
+	app.Get("/index.html", handler("index"))
+
+	status := func(method, p string) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequest(method, p, nil)
 		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 		if err != nil {
-			t.Fatalf("request to %s failed: %v", p, err)
+			t.Fatalf("request %s %s failed: %v", method, p, err)
 		}
-		status := resp.StatusCode
-		resp.Body.Close()
-		if status != http.StatusUnauthorized {
-			t.Errorf("path %s: expected 401 from the middleware, got %d", p, status)
+		defer func() { _ = resp.Body.Close() }()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+
+	// Public API paths and static files must not require a token.
+	for _, tc := range []struct{ method, path, want string }{
+		{http.MethodGet, "/api/health", "handled:health"},
+		{http.MethodGet, "/api/openapi.json", "handled:openapi"},
+		{http.MethodPost, "/api/v1/auth/login", "handled:login"},
+		{http.MethodPost, "/api/v1/system/time-sync", "handled:time-sync"},
+		{http.MethodGet, "/api/v1/ws", "handled:ws"},
+		{http.MethodGet, "/index.html", "handled:index"},
+	} {
+		got, body := status(tc.method, tc.path)
+		if got == http.StatusUnauthorized {
+			t.Errorf("%s %s: expected no 401, got one", tc.method, tc.path)
+		}
+		if body != tc.want {
+			t.Errorf("%s %s: handler did not run (body %q)", tc.method, tc.path, body)
+		}
+	}
+
+	// Every other API path is gated, and the handler must not run.
+	for _, p := range []string{"/api/v1/system/info", "/api/v1/wifi/scan", "/api/v1/auth/logout"} {
+		got, body := status(http.MethodGet, p)
+		if got != http.StatusUnauthorized {
+			t.Errorf("%s: expected 401, got %d", p, got)
+		}
+		if body == "handled:system-info" {
+			t.Errorf("%s: the handler ran without a token", p)
+		}
+	}
+
+	// A case-varied spelling matches no route at all, so the allowlist cannot
+	// be reached through it. This is the property the original bypass rested on
+	// and the reason CaseSensitive must stay true.
+	for _, p := range []string{
+		"/API/V1/SYSTEM/INFO",
+		"/Api/V1/System/Info",
+		"/API/v1/auth/login",
+		"/API/v1/system/time-sync",
+		"/API/v1/ws",
+	} {
+		got, body := status(http.MethodGet, p)
+		if got != http.StatusNotFound {
+			t.Errorf("%s: expected 404 (no route matches a case variant), got %d (body %q)", p, got, body)
 		}
 	}
 }

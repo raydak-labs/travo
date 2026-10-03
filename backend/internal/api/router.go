@@ -43,36 +43,26 @@ type Dependencies struct {
 	TimeSyncGate *TimeSyncGate
 }
 
-// PublicRoutes are the only API paths reachable without a Bearer token.
-// Everything else is mounted on the authenticated group below, so this list is
-// the whole public surface and cannot silently grow. TestAuthCoversEveryRoute
-// walks the live route table and fails if any other /api path answers an
-// unauthenticated request.
+// PublicRoutes re-exports the auth package's public path set, which is the
+// single source of truth for "reachable without a token".
 //
-// /api/v1/ws is not registered here (main.go owns the upgrade); it authenticates
-// itself in ws.UpgradeMiddleware, so it is listed as public only so the coverage
-// test does not have to special-case it.
-var PublicRoutes = []string{
-	"/api/health",
-	"/api/openapi.json",
-	"/api/v1/auth/login",
-	"/api/v1/system/time-sync",
-	"/api/v1/ws",
-}
+// It is deliberately NOT enforced by mounting the auth middleware on the /api/v1
+// group: Fiber v3 group middleware is scoped by path prefix rather than by which
+// router a route was registered on, so that also intercepted routes registered
+// directly on the app -- the WebSocket upgrade and the pre-login time-sync
+// endpoint. See auth.Middleware.
+var PublicRoutes = auth.PublicPaths
 
-// SetupRoutes registers all API routes. Public endpoints go on the app itself;
-// every other route goes on a group carrying the auth middleware, so
-// "protected" is a property of the wiring rather than a string comparison.
+// SetupRoutes registers all API routes. Authentication is enforced by
+// auth.Middleware, mounted by the caller, against the auth.PublicPaths allowlist.
 func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// OpenAPI spec — served without auth for agent/automation use.
 	app.Get("/api/openapi.json", OpenAPIHandler())
 
-	// Public endpoints, registered before the authenticated group so the
-	// group middleware never runs for them.
 	app.Post("/api/v1/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
 	app.Post("/api/v1/system/time-sync", SyncTimeHandler(deps))
 
-	v1 := app.Group("/api/v1", deps.Auth.Middleware())
+	v1 := app.Group("/api/v1")
 
 	v1.Post("/auth/logout", LogoutHandler(deps.Auth, deps.Blocklist))
 	v1.Get("/auth/session", SessionHandler(deps.Auth))
