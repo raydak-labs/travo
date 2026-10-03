@@ -10,7 +10,43 @@
   "separateMajorMinor": true,
   "separateMultipleMajor": true,
 
+  // Without gomodTidy the gomod manager only appends the new hashes for the
+  // versions it bumps, so go.sum keeps the superseded ones and CI's
+  // `go mod tidy -diff` gate (test-backend) goes red on the next patch PR.
+  "postUpdateOptions": ["gomodTidy"],
+
   "packageRules": [
+    {
+      // TRACK: every typescript-eslint release so far (stable 8.71.0 and
+      // canary 8.71.1-alpha.7) peer-requires ">=4.8.4 <6.1.0", so TypeScript
+      // 7 breaks `pnpm lint` with "typescript-eslint does not support TS 7.0.".
+      // Drop this rule once typescript-eslint widens its peer range to 7.x.
+      "description": "Hold TypeScript on 6.x until typescript-eslint supports 7",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7",
+    },
+    {
+      // TRACK: every @vitest/mocker 5.x release through 5.0.3 peer-requires
+      // "msw ^2.4.9", so Vitest 5 and MSW 3 cannot coexist. We are on Vitest 5,
+      // so MSW stays on 2.x. Drop this rule once a Vitest release peers msw ^3
+      // (check https://registry.npmjs.org/@vitest/mocker for peerDependencies.msw).
+      "description": "Hold MSW on 2.x until Vitest supports MSW 3",
+      "matchPackageNames": ["msw"],
+      "allowedVersions": "<3",
+    },
+    {
+      // TRACK: Vitest 5's jsdom compat shim resolves jsdom's implementation
+      // symbol with `getOwnPropertySymbols(new Blob())[0]` — it assumes the
+      // FIRST own symbol is the impl symbol. jsdom 30.1.0 switched wrapper
+      // registration to `registerWrapper(wrapper, impl, interfaceDescriptor)`,
+      // which adds a different symbol first, so the lookup resolves the
+      // descriptor instead and any request whose body contains a File throws
+      // "Cannot read properties of undefined (reading '_buffer')". That breaks
+      // the upload/backup tests. Drop this rule once Vitest fixes the lookup.
+      "description": "Hold jsdom on 30.0.x until Vitest 5 fixes its impl-symbol lookup",
+      "matchPackageNames": ["jsdom"],
+      "allowedVersions": "<30.1.0",
+    },
     {
       "description": "Group all patch/pin/digest updates together",
       "matchUpdateTypes": ["!major", "!minor"],
