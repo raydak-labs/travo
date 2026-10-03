@@ -562,9 +562,14 @@ func jsonFieldNames(t reflect.Type) []string {
 func TestOpenAPIWifiMutationResponsesMatchEnvelope(t *testing.T) {
 	spec := openAPISpec
 
+	// Every key the envelope carries is asserted explicitly below. Building the
+	// expected envelope with zero values would let a field be added to the
+	// handler and left out of the spec without this test noticing, which is the
+	// drift it exists to catch.
 	envelope := wifiMutationResponse(&services.WirelessApplyResult{
 		Token:                  "apply-token",
 		RollbackTimeoutSeconds: 90,
+		ProbeBudgetSeconds:     4,
 	})
 	envelopeKeys := make([]string, 0, len(envelope))
 	for k := range envelope {
@@ -579,6 +584,12 @@ func TestOpenAPIWifiMutationResponsesMatchEnvelope(t *testing.T) {
 	applyKeys := make([]string, 0, len(apply))
 	for k := range apply {
 		applyKeys = append(applyKeys, k)
+	}
+	if got, ok := apply["probe_budget_seconds"]; !ok {
+		t.Error("the apply envelope must always carry probe_budget_seconds: a key that " +
+			"appears only when non-zero cannot be relied on by a generated client")
+	} else if got != 4 {
+		t.Errorf("probe_budget_seconds = %v, want 4 (echoed from the service)", got)
 	}
 	sort.Strings(applyKeys)
 

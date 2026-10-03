@@ -22,11 +22,32 @@ func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
 			"token":                    apply.Token,
 			"rollback_timeout_seconds": apply.RollbackTimeoutSeconds,
 		}
+		// How long one confirm call can block on the device while it waits for the
+		// new interfaces to come up. A client that re-POSTs confirm until the
+		// rollback deadline has to leave this much room, or a probe it starts near
+		// the deadline is answered after rpcd has already rolled back.
+		//
+		// Emitted unconditionally: a key that appears only when non-zero is a
+		// worse contract than one that is always present, because a generated
+		// client cannot rely on finding it.
+		resp["apply"].(fiber.Map)["probe_budget_seconds"] = apply.ProbeBudgetSeconds
 		if apply.GeneratedKey != "" {
 			resp["generated_key"] = apply.GeneratedKey
 		}
 	}
 	return resp
+}
+
+// respondWifiMutationError maps a wireless mutator's error to a status code.
+// ErrAPAndSTASameRadio is a 409: this radio layout is not possible on this
+// hardware, which is a conflict with the device's current state, not a server
+// failure. Answering 500 would tell the operator (and the frontend's retry
+// policy) that Travo itself broke.
+func respondWifiMutationError(c fiber.Ctx, err error) error {
+	if errors.Is(err, services.ErrAPAndSTASameRadio) {
+		return RespondWithError(c, fiber.StatusConflict, err.Error())
+	}
+	return RespondWithServerError(c, err)
 }
 
 // WifiScanHandler handles GET /api/v1/wifi/scan.
@@ -213,7 +234,7 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 		}
 		apply, err := svc.SetAPConfig(section, update)
 		if err != nil {
-			return RespondWithServerError(c, err)
+			return respondWifiMutationError(c, err)
 		}
 		return c.JSON(wifiMutationResponse(apply))
 	}
@@ -341,7 +362,7 @@ func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
 		}
 		result, err := svc.SetRadioRole(radioName, req.Role)
 		if err != nil {
-			return RespondWithServerError(c, err)
+			return respondWifiMutationError(c, err)
 		}
 		// Not c.JSON(result): every other wireless mutator returns the shared
 		// envelope, and a client that reads response.apply finds nothing in the raw
@@ -382,7 +403,7 @@ func SetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 		}
 		apply, err := svc.SetGuestWifi(cfg)
 		if err != nil {
-			return RespondWithServerError(c, err)
+			return respondWifiMutationError(c, err)
 		}
 		return c.JSON(wifiMutationResponse(apply))
 	}

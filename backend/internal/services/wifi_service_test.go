@@ -1320,7 +1320,7 @@ func TestConfirmApply_DelegatesToApplier(t *testing.T) {
 	svc, _ := newTestWifiService()
 	// Both mock AP sections are enabled, so confirm only reaches the applier once
 	// netifd reports them up (see ConfirmApply).
-	registerAPStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": true})
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": true})
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1345,9 +1345,11 @@ func TestConfirmApply_RequiresToken(t *testing.T) {
 	}
 }
 
-// registerAPStatus publishes a `network.wireless status` payload where each named
-// AP section is reported by netifd with the given up flag.
-func registerAPStatus(t *testing.T, svc *WifiService, up map[string]bool) {
+// registerInterfaceStatus publishes a `network.wireless status` payload where
+// each named section is reported by netifd with the given up flag. Mode, SSID and
+// ifname come from the UCI section, so it serves access points and uplink STA
+// sections alike — netifd reports "up" for both kinds.
+func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool) {
 	t.Helper()
 	sections, err := svc.uci.GetSections("wireless")
 	if err != nil {
@@ -1356,12 +1358,17 @@ func registerAPStatus(t *testing.T, svc *WifiService, up map[string]bool) {
 	byRadio := map[string][]any{}
 	names := slices.Sorted(maps.Keys(up))
 	for _, name := range names {
-		radio := sections[name]["device"]
+		opts := sections[name]
+		radio := opts["device"]
+		ifname := "phy0-ap0"
+		if opts["mode"] == "sta" {
+			ifname = "phy0-sta0"
+		}
 		byRadio[radio] = append(byRadio[radio], map[string]any{
 			"section": name,
-			"ifname":  "phy0-ap0",
+			"ifname":  ifname,
 			"up":      up[name],
-			"config":  map[string]any{"mode": "ap", "ssid": sections[name]["ssid"]},
+			"config":  map[string]any{"mode": opts["mode"], "ssid": opts["ssid"]},
 		})
 	}
 	resp := map[string]any{}
@@ -1380,7 +1387,7 @@ func registerAPStatus(t *testing.T, svc *WifiService, up map[string]bool) {
 // it is what a client-confirms-instantly bug silently skipped.
 func TestConfirmApply_KeepsRollbackArmedWhenAPIsDown(t *testing.T) {
 	svc, _ := newTestWifiService()
-	registerAPStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": false})
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": false})
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1410,9 +1417,9 @@ func TestConfirmApply_FailsClosedWhenWirelessStatusIsUnreadable(t *testing.T) {
 	}
 }
 
-// "Turn WiFi off" and client mode leave no access point running, so there is
+// "Turn WiFi off" leaves neither an access point nor an uplink STA, so there is
 // nothing to prove and the operator's change must be allowed to stick.
-func TestConfirmApply_SkipsProbeWhenNoAPIsEnabled(t *testing.T) {
+func TestConfirmApply_SkipsProbeWhenWiFiTurnedOff(t *testing.T) {
 	svc, u := newTestWifiService()
 	for _, section := range []string{"default_radio0", "default_radio1"} {
 		if err := u.Set("wireless", section, "disabled", "1"); err != nil {
@@ -1424,12 +1431,184 @@ func TestConfirmApply_SkipsProbeWhenNoAPIsEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = u.Set("wireless", "radio1", "disabled", "1")
-	registerAPStatus(t, svc, map[string]bool{"default_radio0": false, "default_radio1": false})
+	// The saved STA profile is the only section left that could be "wanted", and
+	// a disabled one is not. Bound to wwan and enabled it would be: that is the
+	// client-mode probe, not the WiFi-off case.
+	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "sta0", "disabled", "1"); err != nil {
+		t.Fatal(err)
+	}
+	registerInterfaceStatus(t, svc, map[string]bool{
+		"default_radio0": false, "default_radio1": false, "sta0": false,
+	})
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
 	if err := svc.ConfirmApply("session-off"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Confirm-time verification: the uplink STA is proven, not just the access
+// points; an AP section netifd cannot report is unprovable rather than absent;
+// and the probe cost is reported so the client can keep its deadline honest.
+// ---------------------------------------------------------------------------
+
+// putInClientMode turns the mock config into what SetMode("client") leaves
+// behind: no enabled access point, one enabled uplink STA bound to network=wwan.
+func putInClientMode(t *testing.T, u *uci.MockUCI) {
+	t.Helper()
+	for _, section := range []string{"default_radio0", "default_radio1"} {
+		if err := u.Set("wireless", section, "disabled", "1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "sta0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A client-mode change has no access point to prove, so while the proof covered
+// only APs `want` was empty and ConfirmApply cancelled rpcd's rollback no matter
+// what: an STA on the wrong band or with the wrong key left the operator with no
+// uplink and no way back over WiFi.
+func TestConfirmApply_ClientModeWithDownSTADoesNotConfirm(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInClientMode(t, u)
+	registerInterfaceStatus(t, svc, map[string]bool{"sta0": false})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	err := svc.ConfirmApply("session-client-down")
+	if !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("expected ErrWirelessNotUp for a client-mode apply with no uplink, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("the apply session must stay open while the uplink is down, got confirm %#v",
+			fake.confirmed)
+	}
+}
+
+func TestConfirmApply_ClientModeWithUpSTAConfirms(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInClientMode(t, u)
+	registerInterfaceStatus(t, svc, map[string]bool{"sta0": true})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-client-up"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.confirmed) != 1 || fake.confirmed[0] != "session-client-up" {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
+// Repeater mode is no escape hatch: the downlink AP can come up while the uplink
+// never associates, and that is the same unrecoverable state.
+func TestConfirmApply_RepeaterModeAlsoProbesTheSTA(t *testing.T) {
+	svc, u := newTestWifiService()
+	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "sta0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	registerInterfaceStatus(t, svc, map[string]bool{
+		"default_radio0": true, "default_radio1": true, "sta0": false,
+	})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-repeater-down"); !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("expected ErrWirelessNotUp when the uplink STA is down, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("a down uplink STA must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// A section netifd cannot be asked about proves nothing. Skipping it (as this
+// used to) could empty the want-list and turn "the AP never came up" into
+// "nothing to prove".
+func TestEnabledAPSections_APWithoutDeviceIsUnprovable(t *testing.T) {
+	sections := map[string]map[string]string{
+		"radio0":  {"type": "mac80211", "disabled": "0"},
+		"orphan":  {"mode": "ap", "disabled": "0"},
+		"radio1":  {"type": "mac80211", "disabled": "0"},
+		"default": {"mode": "ap", "device": "radio1", "disabled": "0"},
+	}
+	if _, err := enabledAPSections(sections); !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("an enabled AP section with no device must be unprovable, got %v", err)
+	}
+	delete(sections, "orphan")
+	names, err := enabledAPSections(sections)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(names) != 1 || names[0] != "default" {
+		t.Fatalf("expected only the provable AP, got %v", names)
+	}
+}
+
+func TestConfirmApply_KeepsRollbackArmedWhenAPSectionHasNoDevice(t *testing.T) {
+	svc, u := newTestWifiService()
+	if err := u.Set("wireless", "default_radio0", "device", ""); err != nil {
+		t.Fatal(err)
+	}
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": true})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-orphan"); !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("expected ErrWirelessNotUp for an unprovable AP section, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("an unprovable AP must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// The confirm probe must not spend its retry budget in the common case, and the
+// caller has to be able to subtract that budget from its own rollback deadline:
+// a probe started near the deadline is answered after rpcd already rolled back,
+// which reverts a config that was merely slow.
+func TestConfirmApply_ProbesImmediatelyAndReportsProbeBudget(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInClientMode(t, u)
+	registerInterfaceStatus(t, svc, map[string]bool{"sta0": true})
+	svc.applier = &fakeWirelessApplier{startToken: "budget-token"}
+
+	apply, err := svc.stageWirelessApply()
+	if err != nil {
+		t.Fatalf("stageWirelessApply: %v", err)
+	}
+	if apply.ProbeBudgetSeconds != wirelessProbeBudgetSeconds() {
+		t.Fatalf("expected the apply result to report a probe budget of %ds, got %d",
+			wirelessProbeBudgetSeconds(), apply.ProbeBudgetSeconds)
+	}
+	if apply.ProbeBudgetSeconds <= 0 || apply.ProbeBudgetSeconds >= apply.RollbackTimeoutSeconds {
+		t.Fatalf("the probe budget (%ds) must be positive and fit inside the rollback window (%ds)",
+			apply.ProbeBudgetSeconds, apply.RollbackTimeoutSeconds)
+	}
+
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+	start := time.Now()
+	if err := svc.ConfirmApply("session-fast"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed >= wirelessConfirmDelay {
+		t.Fatalf("an already-up config answered only after %s; the first probe must be immediate",
+			elapsed)
 	}
 	if len(fake.confirmed) != 1 {
 		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
@@ -2602,6 +2781,149 @@ func TestSetRadioRole_SplitRolesStillWorkOnMultiRadio(t *testing.T) {
 	}
 	if staDis == "1" {
 		t.Errorf("expected the STA on radio0 to stay enabled, got disabled=%q", staDis)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The same-radio refusal has to cover every writer of an AP section, not just
+// SetRadioRole: SetGuestWifi and SetAPConfig create/enable APs too, and
+// reconcileRepeaterAPRadioLayout protects neither outside repeater mode.
+// ---------------------------------------------------------------------------
+
+// clientModeService returns a service on the mock config switched to client
+// mode: the uplink STA sta0 is enabled and bound to network=wwan on radio0 — the
+// 2.4 GHz radio preferredGuestRadio picks, and the one a repeater or client STA
+// is normally on — with no access point enabled.
+func clientModeService(t *testing.T, allowAPOnSTA bool) (*WifiService, *revertingUCI) {
+	t.Helper()
+	svc, u := repeaterModeService(t, allowAPOnSTA)
+	for _, section := range []string{"default_radio0", "default_radio1"} {
+		if err := u.Set("wireless", section, "disabled", "1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "sta0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	return svc, u
+}
+
+func guestEnable() models.GuestWifiConfig {
+	return models.GuestWifiConfig{
+		Enabled: true, SSID: "Guest-Travel", Encryption: "psk2", Key: "guestpass123",
+	}
+}
+
+func TestSetGuestWifi_RefusesUplinkRadio(t *testing.T) {
+	svc, u := clientModeService(t, false)
+
+	if _, err := svc.SetGuestWifi(guestEnable()); !errors.Is(err, ErrAPAndSTASameRadio) {
+		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
+	}
+	if _, err := u.GetAll("wireless", "guest"); err == nil {
+		t.Error("the refused request created the guest access point anyway")
+	}
+	if commits := u.commitCalls(); len(commits) != 0 {
+		t.Errorf("a refused request must commit nothing, got %v", commits)
+	}
+}
+
+func TestSetGuestWifi_AllowedOnTheRadioWithoutTheUplink(t *testing.T) {
+	svc, u := clientModeService(t, false)
+	// Move the uplink to the 5 GHz radio; the guest AP then lands on radio0,
+	// which is what the split layout asks for.
+	if err := u.Set("wireless", "sta0", "device", "radio1"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+		t.Fatalf("SetGuestWifi: %v", err)
+	}
+	device, _ := u.Get("wireless", "guest", "device")
+	if device != "radio0" {
+		t.Errorf("expected the guest AP on radio0, got %q", device)
+	}
+}
+
+func TestSetGuestWifi_AllowedWithAllowAPOnSTARadio(t *testing.T) {
+	svc, u := clientModeService(t, true)
+
+	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+		t.Fatalf("allow_ap_on_sta_radio must keep the guest AP on the uplink radio: %v", err)
+	}
+	device, _ := u.Get("wireless", "guest", "device")
+	if device != "radio0" {
+		t.Errorf("expected the guest AP on radio0, got %q", device)
+	}
+}
+
+func TestSetAPConfig_EnableRefusesUplinkRadio(t *testing.T) {
+	svc, u := clientModeService(t, false)
+
+	enabled := true
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID: "OpenWrt-Travel", Encryption: "psk2", Key: "travelrouter", Enabled: &enabled,
+	})
+	if !errors.Is(err, ErrAPAndSTASameRadio) {
+		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis != "1" {
+		t.Errorf("the refused request enabled the access point anyway, got disabled=%q", dis)
+	}
+	if commits := u.commitCalls(); len(commits) != 0 {
+		t.Errorf("a refused request must commit nothing, got %v", commits)
+	}
+}
+
+func TestSetAPConfig_EnableAllowedOnTheRadioWithoutTheUplink(t *testing.T) {
+	svc, u := clientModeService(t, false)
+	if err := u.Set("wireless", "sta0", "device", "radio1"); err != nil {
+		t.Fatal(err)
+	}
+
+	enabled := true
+	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID: "OpenWrt-Travel", Encryption: "psk2", Key: "travelrouter", Enabled: &enabled,
+	}); err != nil {
+		t.Fatalf("SetAPConfig: %v", err)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis != "0" {
+		t.Errorf("expected the access point to be enabled, got disabled=%q", dis)
+	}
+}
+
+// A refused role must not leave network.wwan and a wan-zone firewall entry
+// behind: ensureWwanNetwork COMMITS both, and a commit cannot be undone by the
+// staged-delta revert, so the answer "refused" would be a lie.
+func TestSetRadioRole_RefusalDoesNotCommitWwanOrFirewall(t *testing.T) {
+	svc, u := repeaterModeService(t, false)
+	// No STA section on radio0 left, so the request would have to create one —
+	// and creating one is what reaches ensureWwanNetwork.
+	if err := u.DeleteSection("wireless", "sta0"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.GetAll("network", "wwan"); err == nil {
+		t.Fatal("expected the mock to start without network.wwan")
+	}
+
+	if _, err := svc.SetRadioRole("radio0", "both"); !errors.Is(err, ErrAPAndSTASameRadio) {
+		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
+	}
+	if _, err := u.GetAll("network", "wwan"); err == nil {
+		t.Error("the refused role created and committed network.wwan")
+	}
+	if net, _ := u.Get("firewall", "zone_wan", "network"); strings.Contains(net, "wwan") {
+		t.Errorf("the refused role added wwan to the wan firewall zone, got %q", net)
+	}
+	for _, c := range []string{"network", "firewall"} {
+		if slices.Contains(u.commitCalls(), c) {
+			t.Errorf("%s was committed for a refused role", c)
+		}
 	}
 }
 

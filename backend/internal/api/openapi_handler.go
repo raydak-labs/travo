@@ -787,8 +787,11 @@ func resp200(contentType string, example map[string]any) map[string]any {
 // wifiApplyEnvelope is the 200 body every wireless mutator answers, built by
 // wifiMutationResponse in wifi_handlers.go: {"status":"ok","apply":{…}} where
 // apply carries the pending token the browser must confirm and the rollback
-// timeout. extra adds the one endpoint-specific key a handler appends
-// (allow_ap_on_sta_radio, mac).
+// timeout. probe_budget_seconds is how long ONE confirm call can block on the
+// device while it waits for the new interfaces to come up; a client that re-POSTs
+// confirm until the rollback deadline has to leave that much room, or a probe it
+// starts near the deadline is answered after rpcd has already rolled back. extra
+// adds the one endpoint-specific key a handler appends (allow_ap_on_sta_radio, mac).
 func wifiApplyEnvelope(extra map[string]any) map[string]any {
 	body := map[string]any{
 		"status": "ok",
@@ -796,6 +799,7 @@ func wifiApplyEnvelope(extra map[string]any) map[string]any {
 			"pending":                  true,
 			"token":                    "",
 			"rollback_timeout_seconds": 90,
+			"probe_budget_seconds":     4,
 		},
 	}
 	for k, v := range extra {

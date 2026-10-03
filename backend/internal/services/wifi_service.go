@@ -174,6 +174,14 @@ type WirelessApplyResult struct {
 	// It is otherwise unrecoverable, so the caller must be able to show it to
 	// the operator. Empty when no key was generated.
 	GeneratedKey string
+
+	// ProbeBudgetSeconds is the wall-clock time a single ConfirmApply can block
+	// in the worst case (see wirelessProbeBudgetSeconds). A client that keeps
+	// re-POSTing confirm until the rollback deadline has no other way to know
+	// that one of its attempts is still in flight, so a probe started late
+	// lands after rpcd has already rolled back — and a good-but-slow config gets
+	// reverted. Subtract this from the client's own deadline.
+	ProbeBudgetSeconds int
 }
 
 // WifiService provides WiFi scanning, connection, and configuration.
@@ -331,6 +339,7 @@ func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 		return &WirelessApplyResult{
 			Token:                  token,
 			RollbackTimeoutSeconds: uciApplyRollbackTimeout,
+			ProbeBudgetSeconds:     wirelessProbeBudgetSeconds(),
 		}, nil
 	}
 	if err := w.reloader.Reload(); err != nil {
@@ -375,37 +384,57 @@ var ErrWirelessNotUp = errors.New(
 
 const (
 	// wirelessConfirmAttempts / wirelessConfirmDelay bound the wait for the
-	// access points to come up. netifd needs a moment to re-associate after
-	// `uci apply`, and the whole wait (3 probes, 2 s apart = 4 s) stays far
-	// inside rpcd's 30 s rollback window, so a confirm that fails here still
-	// leaves the window time to do its job.
+	// interfaces the applied config enables to come up. netifd needs a moment to
+	// re-associate after `uci apply`, and the whole wait stays far inside rpcd's
+	// 30 s rollback window, so a confirm that fails here still leaves the window
+	// time to do its job.
 	wirelessConfirmAttempts = 3
 	wirelessConfirmDelay    = 2 * time.Second
 )
 
-// verifyAppliedWirelessUp proves that every access point the applied config says
+// wirelessProbeBudgetSeconds is the longest a single ConfirmApply can block: the
+// first probe is immediate, and only the sleeps between the retries cost time.
+func wirelessProbeBudgetSeconds() int {
+	return int((wirelessConfirmAttempts - 1) * wirelessConfirmDelay / time.Second)
+}
+
+// verifyAppliedWirelessUp proves that every interface the applied config says
 // should be running is actually up. It is the confirmation-time counterpart of
-// GetHealth: UCI says which AP sections are enabled, netifd says whether they
-// exist and are up.
+// GetHealth: UCI says which AP and uplink-STA sections are enabled, netifd says
+// whether they exist and are up.
 //
-// A config that leaves no access point enabled has nothing to prove — client mode
-// and "WiFi off" are changes the operator is allowed to make and reachability is
-// exactly what the confirm request itself demonstrates.
+// The uplink STA is proven too, not just the access points. Client mode disables
+// every AP, so a client-mode apply used to have an empty proof and confirm
+// unconditionally — a STA on the wrong band or with the wrong key then left the
+// operator with no uplink and no way back over WiFi, with rpcd's rollback
+// cancelled. Probing the STA also closes the same hole in repeater mode, where
+// the downlink AP can come up while the uplink never associates.
+//
+// A config that leaves neither an AP nor an uplink STA enabled has nothing to
+// prove — "WiFi off" is a change the operator is allowed to make and
+// reachability is exactly what the confirm request itself demonstrates.
 func (w *WifiService) verifyAppliedWirelessUp() error {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return fmt.Errorf("reading wireless sections: %w", err)
 	}
-	want := enabledAPSections(sections)
-	if len(want) == 0 {
+	wantAPs, err := enabledAPSections(sections)
+	if err != nil {
+		return err
+	}
+	wantSTAs := enabledWwanSTAs(sections)
+	if len(wantAPs) == 0 && len(wantSTAs) == 0 {
 		return nil
 	}
 	var lastErr error
 	for attempt := 0; attempt < wirelessConfirmAttempts; attempt++ {
+		// The first probe is immediate and costs a single ubus round-trip, so
+		// the common "already up" case answers in well under a second and only
+		// the slow case spends the retry budget.
 		if attempt > 0 {
 			time.Sleep(wirelessConfirmDelay)
 		}
-		lastErr = w.apInterfacesUp(sections, want)
+		lastErr = w.appliedWirelessUp(sections, wantAPs, wantSTAs)
 		if lastErr == nil {
 			return nil
 		}
@@ -414,9 +443,16 @@ func (w *WifiService) verifyAppliedWirelessUp() error {
 }
 
 // enabledAPSections returns the wifi-iface sections the given wireless config
-// says should be running: mode=ap, not disabled, on a radio that is not
-// disabled. An AP on a radio the config switches off is deliberately down.
-func enabledAPSections(sections map[string]map[string]string) []string {
+// says should be running as access points: mode=ap, not disabled, on a radio
+// that is not disabled. An AP on a radio the config switches off is
+// deliberately down.
+//
+// An enabled AP section with no device is an ERROR, not an absence: netifd has
+// no interface to report for it, so the section is unprovable. Skipping it (as
+// this used to) could empty the list and turn "the AP never came up" into
+// "nothing to prove", which cancels the rollback of a config that was never
+// working.
+func enabledAPSections(sections map[string]map[string]string) ([]string, error) {
 	var names []string
 	for name, opts := range sections {
 		if opts["mode"] != "ap" || opts["disabled"] == "1" {
@@ -424,8 +460,35 @@ func enabledAPSections(sections map[string]map[string]string) []string {
 		}
 		device := opts["device"]
 		if device == "" {
+			return nil, fmt.Errorf("%w: access point section %s has no device, "+
+				"so netifd cannot report it", ErrWirelessNotUp, name)
+		}
+		if radio, ok := sections[device]; ok && radio["disabled"] == "1" {
 			continue
 		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// enabledWwanSTAs returns the wifi-iface sections the given wireless config says
+// should be connected as the WiFi uplink: mode=sta, not disabled, bound to
+// network=wwan, on a radio that is not disabled.
+//
+// network=wwan is what makes a STA the uplink: every path in this service that
+// creates one binds it there (wifi_connect.go, wifi_scan.go), so this is the
+// section whose association carries the router's internet access.
+func enabledWwanSTAs(sections map[string]map[string]string) []string {
+	var names []string
+	for name, opts := range sections {
+		if opts["mode"] != "sta" || opts["disabled"] == "1" {
+			continue
+		}
+		if opts["network"] != "wwan" {
+			continue
+		}
+		device := opts["device"]
 		if radio, ok := sections[device]; ok && radio["disabled"] == "1" {
 			continue
 		}
@@ -435,21 +498,62 @@ func enabledAPSections(sections map[string]map[string]string) []string {
 	return names
 }
 
-// apInterfacesUp cross-checks netifd's view of the wireless interfaces against
-// the AP sections the config enables: each expected section must appear in
-// `ubus call network.wireless status` with up=true. This is the access-point
-// counterpart of GetHealth's iwinfo-vs-netifd cross-check — and it fails closed:
-// an interface that cannot be observed is treated as down, because the whole
-// point is to keep the rollback armed when the answer is unknown.
-func (w *WifiService) apInterfacesUp(sections map[string]map[string]string, want []string) error {
+// appliedWirelessUp cross-checks netifd's view of the wireless interfaces
+// against what the applied config enables: every expected section must appear
+// in `ubus call network.wireless status` with up=true. It is the confirmation-
+// time counterpart of GetHealth's iwinfo-vs-netifd cross-check — and it fails
+// closed: an interface that cannot be observed is treated as down, because the
+// whole point is to keep the rollback armed when the answer is unknown.
+//
+// One status read answers every expectation, so the cost of a probe does not
+// grow with the number of interfaces to prove.
+func (w *WifiService) appliedWirelessUp(
+	sections map[string]map[string]string, wantAPs, wantSTAs []string,
+) error {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
 		return fmt.Errorf("%w: cannot read network.wireless status: %v", ErrWirelessNotUp, err)
 	}
-	down := make(map[string]bool, len(want))
-	for _, name := range want {
-		down[name] = true
+	// section name -> what the config expects it to be, so one pass over the
+	// status answers both kinds.
+	pending := make(map[string]string, len(wantAPs)+len(wantSTAs))
+	for _, name := range wantAPs {
+		pending[name] = "access point"
 	}
+	for _, name := range wantSTAs {
+		pending[name] = "uplink STA"
+	}
+	want := make([]string, 0, len(pending))
+	for name := range pending {
+		want = append(want, name)
+	}
+	sort.Strings(want)
+	for _, iface := range wirelessStatusInterfaces(resp) {
+		name := wirelessStatusSection(iface, sections, want)
+		if _, expected := pending[name]; !expected {
+			continue
+		}
+		if up, _ := iface["up"].(bool); up {
+			delete(pending, name)
+		}
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	missing := make([]string, 0, len(pending))
+	for _, name := range want {
+		if kind, still := pending[name]; still {
+			missing = append(missing, fmt.Sprintf("%s (%s)", name, kind))
+		}
+	}
+	return fmt.Errorf("%w: sections %s did not come up",
+		ErrWirelessNotUp, strings.Join(missing, ", "))
+}
+
+// wirelessStatusInterfaces flattens a `network.wireless status` payload into the
+// per-interface entries it carries, one per radio under "interfaces".
+func wirelessStatusInterfaces(resp map[string]any) []map[string]any {
+	var out []map[string]any
 	for _, radioData := range resp {
 		radioMap, ok := radioData.(map[string]any)
 		if !ok {
@@ -464,38 +568,34 @@ func (w *WifiService) apInterfacesUp(sections map[string]map[string]string, want
 			if !ok {
 				continue
 			}
-			name, _ := ifaceMap["section"].(string)
-			if _, wanted := down[name]; !wanted {
-				// netifd did not report the section: fall back to mode+ssid so a
-				// build without "section" does not read as every AP being down.
-				cfg, _ := ifaceMap["config"].(map[string]any)
-				mode, _ := cfg["mode"].(string)
-				ssid, _ := cfg["ssid"].(string)
-				for _, candidate := range want {
-					opts := sections[candidate]
-					if ssid != "" && opts["ssid"] == ssid && opts["mode"] == mode {
-						name = candidate
-						break
-					}
-				}
-			}
-			if _, wanted := down[name]; !wanted {
-				continue
-			}
-			if up, _ := ifaceMap["up"].(bool); up {
-				delete(down, name)
-			}
+			out = append(out, ifaceMap)
 		}
 	}
-	if len(down) == 0 {
-		return nil
+	return out
+}
+
+// wirelessStatusSection names the wanted config section a netifd interface
+// entry belongs to, or "" when it is not one of them. It falls back to mode+ssid
+// so a build without "section" does not read as every interface being down.
+func wirelessStatusSection(
+	iface map[string]any, sections map[string]map[string]string, want []string,
+) string {
+	name, _ := iface["section"].(string)
+	for _, candidate := range want {
+		if candidate == name {
+			return name
+		}
 	}
-	missing := make([]string, 0, len(down))
-	for name := range down {
-		missing = append(missing, name)
+	cfg, _ := iface["config"].(map[string]any)
+	mode, _ := cfg["mode"].(string)
+	ssid, _ := cfg["ssid"].(string)
+	for _, candidate := range want {
+		opts := sections[candidate]
+		if ssid != "" && opts["ssid"] == ssid && opts["mode"] == mode {
+			return candidate
+		}
 	}
-	sort.Strings(missing)
-	return fmt.Errorf("%w: sections %s", ErrWirelessNotUp, strings.Join(missing, ","))
+	return ""
 }
 
 // findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.

@@ -156,6 +156,22 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 		}
 		enableAP := role == "ap" || role == "both"
 		enableSTA := role == "sta" || role == "both"
+		// Role "both" is the only role that puts an access point and the uplink
+		// STA on one PHY, so it is the only one the repeater split policy has to
+		// police here. validateWirelessConsistency (below) is radio-blind — it
+		// counts only active mode=sta/network=wwan sections — so without this the
+		// request would commit and apply AP+STA on a single radio and bypass
+		// allow_ap_on_sta_radio entirely. See rejectSameRadioAPSTA for why this
+		// refuses instead of silently moving the downlink AP to the other radio.
+		//
+		// The refusal runs FIRST, before any write: it runs before
+		// ensureWwanNetwork, which COMMITS network.wwan and adds wwan to the wan
+		// firewall zone. A commit cannot be undone by revertUCIConfig, so a
+		// request answered as refused would otherwise still have created an
+		// interface and a firewall change nobody asked for.
+		if err := w.rejectSameRadioAPSTA(radioName, enableAP, enableSTA); err != nil {
+			return nil, err
+		}
 		// Set when this call had to invent a WPA key for a default AP.
 		var generatedKey string
 		sections, err := w.uci.GetSections("wireless")
@@ -276,16 +292,6 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 		if err := w.validateWirelessConsistency(); err != nil {
 			return nil, err
 		}
-		// Role "both" is the only role that puts an access point and the uplink STA
-		// on one PHY, so it is the only one the repeater split policy has to police
-		// here. validateWirelessConsistency is radio-blind (it counts only active
-		// mode=sta/network=wwan sections), so without this the request would commit
-		// and apply AP+STA on a single radio and bypass allow_ap_on_sta_radio
-		// entirely. See rejectSameRadioAPSTA for why this refuses instead of
-		// silently moving the downlink AP to the other radio.
-		if err := w.rejectSameRadioAPSTA(radioName, enableAP, enableSTA); err != nil {
-			return nil, err
-		}
 		if err := w.uci.Commit("wireless"); err != nil {
 			return nil, err
 		}
@@ -341,6 +347,63 @@ func (w *WifiService) rejectSameRadioAPSTA(radioName string, enableAP, enableSTA
 	return fmt.Errorf("%w: role 'both' requested on %s", ErrAPAndSTASameRadio, radioName)
 }
 
+// rejectAPOnUplinkRadio refuses enabling an access point on the radio that
+// carries the enabled WiFi uplink STA. It is the same physical constraint
+// rejectSameRadioAPSTA polices for SetRadioRole, expressed the other way round:
+// here the uplink already exists and the caller is adding the AP, so the
+// decision is "is this radio the uplink's radio" rather than "does this role ask
+// for both".
+//
+// Every writer that creates or enables an AP section has to go through it. The
+// uplink STA on radio0 with an AP enabled on radio0 is the AP+STA-on-one-PHY
+// state ADR 0002 §2 says is enough to crash ath11k/IPQ6018, and reconcileRepeater-
+// APRadioLayout is no defence outside repeater mode: there it does nothing at
+// all, so SetGuestWifi and SetAPConfig reached the crash state without ever
+// passing the refusal SetRadioRole applies.
+//
+// reason names the request in the error (e.g. "guest access point enabled"), so
+// the operator can see which of their two radios is the problem.
+func (w *WifiService) rejectAPOnUplinkRadio(radioName, reason string) error {
+	uplinkRadio, err := w.enabledUwanSTARadio()
+	if err != nil {
+		return err
+	}
+	if uplinkRadio == "" || uplinkRadio != radioName {
+		return nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return err
+	}
+	// Single-radio hardware has no split to make; the same trade-off
+	// SetMode("repeater") already accepts.
+	if len(radios) < 2 {
+		return nil
+	}
+	if w.repeaterAllowAPOnSTARadio(true) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s on %s, which carries the WiFi uplink",
+		ErrAPAndSTASameRadio, reason, radioName)
+}
+
+// enabledUwanSTARadio returns the radio of the enabled STA bound to network=wwan
+// — the WiFi uplink — or "" when no uplink is enabled. It reads the same
+// sections the confirmation probe proves (enabledWwanSTAs), so the state the
+// guard inspects is the state the rollback protects.
+func (w *WifiService) enabledUwanSTARadio() (string, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "", err
+	}
+	for _, name := range enabledWwanSTAs(sections) {
+		if device := sections[name]["device"]; device != "" {
+			return device, nil
+		}
+	}
+	return "", nil
+}
+
 // GetAPConfigs returns the AP configuration for all radios.
 func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
 	sections, err := w.uci.GetSections("wireless")
@@ -389,6 +452,17 @@ func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate) 
 		}
 		if opts["mode"] != "ap" {
 			return nil, fmt.Errorf("section %s is not an AP interface", section)
+		}
+		// Enabling an AP is a single-radio decision, so it is policed the same way
+		// SetRadioRole is: refuse it when this radio carries the WiFi uplink.
+		// reconcileRepeaterAPRadioLayout is not a substitute — it does nothing at
+		// all outside repeater mode, which is exactly the mode an operator is in
+		// when they enable an AP by hand. Checked before any write so the refusal
+		// leaves no staged delta behind.
+		if update.Enabled != nil && *update.Enabled {
+			if err := w.rejectAPOnUplinkRadio(opts["device"], "access point enabled"); err != nil {
+				return nil, err
+			}
 		}
 		if update.SSID != "" {
 			if err := w.uci.Set("wireless", section, "ssid", update.SSID); err != nil {
@@ -446,6 +520,17 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyRe
 		if !cfg.Enabled {
 			return w.teardownGuestWifi()
 		}
+		// Pick the radio and police it before writing anything. The refusal has to
+		// come first: the network and dhcp commits below cannot be undone by
+		// revertUCIConfig, so a request answered as "refused" must not already
+		// have created network.guest, dhcp.guest and the guest firewall zone.
+		guestRadio, err := w.preferredGuestRadio()
+		if err != nil {
+			return nil, err
+		}
+		if err := w.rejectAPOnUplinkRadio(guestRadio, "guest access point enabled"); err != nil {
+			return nil, err
+		}
 		// Network interface for guest subnet
 		if err := w.ensureNamedSection("network", "guest", "interface"); err != nil {
 			return nil, err
@@ -482,10 +567,6 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyRe
 			return nil, err
 		}
 		// Wireless interface for guest AP
-		guestRadio, err := w.preferredGuestRadio()
-		if err != nil {
-			return nil, err
-		}
 		if err := w.ensureNamedSection("wireless", "guest", "wifi-iface"); err != nil {
 			return nil, err
 		}
