@@ -85,7 +85,9 @@ jobs:
         id: toolchain
         run: make toolchain-versions >> "$GITHUB_OUTPUT"
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+||||||| c22fa1f
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: ${{ steps.toolchain.outputs.pnpm }}
 
@@ -124,7 +126,9 @@ jobs:
         id: toolchain
         run: make toolchain-versions >> "$GITHUB_OUTPUT"
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+||||||| c22fa1f
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: ${{ steps.toolchain.outputs.pnpm }}
 
@@ -139,6 +143,8 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v${{ steps.toolchain.outputs.golangci_lint }}
+||||||| c22fa1f
+          version: v2.13.2
           working-directory: backend
 
       - name: ESLint
@@ -216,7 +222,7 @@ jobs:
           go install "golang.org/x/tools/cmd/goimports@v$GOIMPORTS_VERSION"
           echo "$GOBIN" >> "$GITHUB_PATH"
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: ${{ steps.toolchain.outputs.pnpm }}
 
@@ -253,7 +259,9 @@ jobs:
         id: toolchain
         run: make toolchain-versions >> "$GITHUB_OUTPUT"
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+||||||| c22fa1f
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: ${{ steps.toolchain.outputs.pnpm }}
 
