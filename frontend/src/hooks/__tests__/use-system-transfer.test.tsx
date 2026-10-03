@@ -23,8 +23,16 @@ beforeEach(() => {
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:backup');
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   // jsdom cannot navigate; the shared 401 handler's redirect is what we assert.
+  // `Location.assign` is non-configurable in jsdom, so `vi.spyOn` cannot stub it
+  // and `window.location` has to be replaced wholesale. The spread is load-bearing:
+  // MSW resolves the hooks' relative request paths against `window.location.href`,
+  // so dropping the copied members turns every fetch into an "Invalid URL" error.
   Object.defineProperty(window, 'location', {
     configurable: true,
+    // The rule assumes `Location` members live on its prototype, but jsdom defines
+    // them as own enumerable data properties, so this copy keeps the stub's
+    // `href`/`origin`/`host`/... values intact and nothing reads prototype methods.
+    // oxlint-disable-next-line typescript/no-misused-spread
     value: { ...window.location, assign: assignMock },
   });
 });
