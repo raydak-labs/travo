@@ -2,8 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"slices"
 	"sort"
@@ -13,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
 // The served /api/openapi.json is the contract automation and tests depend on,
@@ -439,6 +444,12 @@ func TestOpenAPIRequestBodiesAreAccepted(t *testing.T) {
 func TestOpenAPIRequestFieldNamesMatchModels(t *testing.T) {
 	spec := openAPISpec
 
+	// SyncTimeHandler binds this shape inline; it is reproduced here so renaming
+	// the field on either side fails.
+	type timeSyncRequest struct {
+		ClientTimeMs int64 `json:"client_time_ms"`
+	}
+
 	tests := []struct {
 		method string
 		path   string
@@ -456,6 +467,14 @@ func TestOpenAPIRequestFieldNamesMatchModels(t *testing.T) {
 		{"PUT", "/api/v1/system/timezone", &models.TimezoneConfig{}},
 		{"PUT", "/api/v1/system/ntp", &models.NTPConfig{}},
 		{"PUT", "/api/v1/system/alert-thresholds", &models.AlertThresholds{}},
+		// The pre-login clock-recovery path documented "timestamp" while the
+		// handler binds client_time_ms and answers 400 without it, so a client
+		// generated from the spec could not use the endpoint at all.
+		{"POST", "/api/v1/system/time-sync", &timeSyncRequest{}},
+		// PUT /system/leds documented "enabled" while the handler binds
+		// models.SetLEDRequest.StealthMode: the documented request was accepted,
+		// ignored, and answered 200 after doing the OPPOSITE of what was asked.
+		{"PUT", "/api/v1/system/leds", &models.SetLEDRequest{}},
 		{"PUT", "/api/v1/sqm/config", &models.SQMConfig{}},
 		{"PUT", "/api/v1/vpn/split-tunnel", &models.SplitTunnelConfig{}},
 		{"PUT", "/api/v1/vpn/wireguard", &models.WireguardConfig{}},
@@ -523,4 +542,417 @@ func jsonFieldNames(t reflect.Type) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Every wireless mutator answers ONE envelope, built by wifiMutationResponse
+// (wifi_handlers.go): {"status":"ok","apply":{pending, token,
+// rollback_timeout_seconds}}, sometimes with one endpoint-specific key added.
+//
+// The spec documented two shapes that no handler produces —
+// {"token","confirm_within_seconds"} for POST /wifi/connect and PUT
+// /wifi/ap/{section}, and {"ok":…} for the rest — so a client generated from
+// /api/openapi.json read fields that are never sent and missed the fields that
+// are. This compares the declared 200 keys against the envelope the handler
+// actually builds, so renaming a key in either place fails here.
+//
+// Handlers that answer the bare apply result instead of the envelope
+// (PUT /wifi/radios/{name}/role returns *services.WirelessApplyResult) are
+// deliberately not listed: the spec documents the envelope they are supposed to
+// answer.
+func TestOpenAPIWifiMutationResponsesMatchEnvelope(t *testing.T) {
+	spec := openAPISpec
+
+	envelope := wifiMutationResponse(&services.WirelessApplyResult{
+		Token:                  "apply-token",
+		RollbackTimeoutSeconds: 90,
+	})
+	envelopeKeys := make([]string, 0, len(envelope))
+	for k := range envelope {
+		envelopeKeys = append(envelopeKeys, k)
+	}
+	sort.Strings(envelopeKeys)
+
+	apply, ok := envelope["apply"].(fiber.Map)
+	if !ok {
+		t.Fatalf("the apply envelope is not a fiber.Map: %T", envelope["apply"])
+	}
+	applyKeys := make([]string, 0, len(apply))
+	for k := range apply {
+		applyKeys = append(applyKeys, k)
+	}
+	sort.Strings(applyKeys)
+
+	tests := []struct {
+		method    string
+		path      string
+		extraKeys []string // keys the handler adds on top of the envelope
+	}{
+		{"POST", "/api/v1/wifi/connect", nil},
+		{"POST", "/api/v1/wifi/disconnect", nil},
+		{"PUT", "/api/v1/wifi/mode", nil},
+		{"PUT", "/api/v1/wifi/radio", nil},
+		{"PUT", "/api/v1/wifi/ap/{section}", nil},
+		{"PUT", "/api/v1/wifi/repeater-options", []string{"allow_ap_on_sta_radio"}},
+		{"POST", "/api/v1/wifi/repeater/reconcile", nil},
+		{"PUT", "/api/v1/wifi/mac", nil},
+		{"POST", "/api/v1/wifi/mac/randomize", []string{"mac"}},
+		{"PUT", "/api/v1/wifi/saved/priority", nil},
+		{"PUT", "/api/v1/wifi/guest", nil},
+	}
+
+	if len(applyKeys) == 0 {
+		t.Fatal("the apply envelope carries no keys, so this test would be vacuous")
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			declared := specResponseKeys(t, spec, tc.path, tc.method)
+			if len(declared) == 0 {
+				t.Fatalf("the spec declares no 200 example for %s %s, so this test would be vacuous",
+					tc.method, tc.path)
+			}
+			want := append(append([]string{}, envelopeKeys...), tc.extraKeys...)
+			sort.Strings(want)
+
+			if !slices.Equal(declared, want) {
+				t.Errorf("OpenAPI %s %s declares %v, but the handler answers %v",
+					tc.method, tc.path, declared, want)
+			}
+			// The apply sub-object must be documented too: it carries the token
+			// the browser has to confirm with.
+			declaredApply, _ := specApplyKeys(t, spec, tc.path, tc.method)
+			if !slices.Equal(declaredApply, applyKeys) {
+				t.Errorf("OpenAPI %s %s documents apply as %v, the handler sends %v",
+					tc.method, tc.path, declaredApply, applyKeys)
+			}
+		})
+	}
+}
+
+// specApplyKeys returns the property names declared inside the 200 response's
+// "apply" object.
+func specApplyKeys(t *testing.T, spec map[string]any, path, method string) ([]string, bool) {
+	t.Helper()
+	paths, _ := spec["paths"].(map[string]any)
+	ops, _ := paths[strings.TrimPrefix(path, "/api/v1")].(map[string]any)
+	op, _ := ops[strings.ToLower(method)].(map[string]any)
+	responses, _ := op["responses"].(map[string]any)
+	ok200, _ := responses["200"].(map[string]any)
+	content, _ := ok200["content"].(map[string]any)
+	for _, v := range content {
+		schema, _ := v.(map[string]any)["schema"].(map[string]any)
+		example, _ := schema["example"].(map[string]any)
+		apply, ok := example["apply"].(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		keys := make([]string, 0, len(apply))
+		for k := range apply {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys, true
+	}
+	return nil, false
+}
+
+// ---------------------------------------------------------------------------
+// Strict-body gate
+// ---------------------------------------------------------------------------
+
+// BindStrictBodyConfig rejects an unknown field, which turns "the body did not
+// match the shape I expected" into a 400 that names the field. The permissive
+// c.Bind().Body() drops it silently, and a handler that then persists the bound
+// struct overwrites the user's settings with zeros while answering 200. ADR
+// 0002 §2 documents one field that is deliberately NOT persisted
+// (allow_ap_on_sta_radio) — exactly the kind of field the permissive binder
+// swallows without a word.
+//
+// The ratchet below is derived from the SPEC, not from a remembered list of
+// endpoints: every registered PUT whose documented requestBody is a JSON object
+// with more than one property replaces a whole configuration object, so its
+// handler must bind strictly. A single-property body cannot zero a
+// multi-setting configuration, so it is out of scope — as are POSTs, which
+// create a resource instead of replacing one.
+//
+// The handlers are classified by parsing this package's own source, so the gate
+// needs no running app, never touches live state, and cannot be satisfied by a
+// route that silently stopped binding at all.
+
+// knownPermissiveWholeConfigHandlers are whole-config PUTs outside this lane
+// that still bind with the permissive binder. They are listed rather than
+// hidden so the gap stays visible; each one fixed elsewhere lets its entry be
+// deleted here.
+var knownPermissiveWholeConfigHandlers = map[string]string{
+	// auth_handlers.go: ChangePasswordHandler
+	"PUT /auth/password": "auth_handlers.go (password change, not a config write)",
+	// adguard_handlers.go: SetAdGuardPasswordHandler
+	"PUT /adguard/password": "adguard_handlers.go (AdGuard UI password, not a config write)",
+	// wifi_handlers.go: SetAPConfigHandler
+	"PUT /wifi/ap/{section}": "wifi_handlers.go — AP section update binds permissively",
+}
+
+func TestWholeConfigPutHandlersBindStrictly(t *testing.T) {
+	app := setupSpecApp(t)
+	registered := registeredOperations(t, app)
+	spec := openAPISpec
+
+	funcs, routeHandlers := parseAPIPackage(t)
+
+	classified := 0
+	for op := range registered {
+		if op.method != http.MethodPut {
+			continue
+		}
+		keys, ok := specJSONBodyKeys(spec, op)
+		if !ok || len(keys) < 2 {
+			continue // not a documented multi-field JSON object: not a whole-config write
+		}
+		classified++
+
+		where := op.String()
+		handler, ok := routeHandlers[op]
+		if !ok {
+			t.Errorf("%s is a whole-config write but its handler could not be resolved in the source; "+
+				"update parseAPIPackage so this gate keeps covering every route", where)
+			continue
+		}
+		fn, ok := funcs[handler]
+		if !ok {
+			t.Errorf("%s: handler %s was not found in this package", where, handler)
+			continue
+		}
+		switch handlerBinder(fn) {
+		case binderStrict:
+			// good
+		case binderPermissive:
+			if reason, known := knownPermissiveWholeConfigHandlers[where]; known {
+				t.Logf("known gap: %s binds permissively (%s)", where, reason)
+				continue
+			}
+			t.Errorf("%s replaces a whole configuration object (%v) but %s binds with c.Bind().Body(), "+
+				"so a body naming the wrong field is accepted, ignored and answered 200; "+
+				"use BindStrictBodyConfig",
+				where, keys, handler)
+		default:
+			t.Errorf("%s: %s neither calls BindStrictBodyConfig nor binds a body; "+
+				"this gate can no longer tell whether it is strict", where, handler)
+		}
+	}
+
+	if classified == 0 {
+		t.Fatal("no whole-config PUT was classified — the gate would be vacuous")
+	}
+	if len(knownPermissiveWholeConfigHandlers) > 0 {
+		for op := range registered {
+			if _, ok := knownPermissiveWholeConfigHandlers[op.String()]; ok {
+				if binder := handlerBinder(funcs[routeHandlers[op]]); binder != binderPermissive {
+					t.Logf("stale ratchet entry: %s is no longer permissive, "+
+						"delete it from knownPermissiveWholeConfigHandlers", op)
+				}
+			}
+		}
+	}
+}
+
+type bodyBinder int
+
+const (
+	binderUnknown bodyBinder = iota
+	binderStrict
+	binderPermissive
+)
+
+// handlerBinder reports which binder a handler function uses. decodeStrictJSON
+// counts as strict: SetBandSwitchingHandler calls it directly for both the
+// wrapped and the bare shape.
+func handlerBinder(fn *ast.FuncDecl) bodyBinder {
+	if fn == nil || fn.Body == nil {
+		return binderUnknown
+	}
+	found := binderUnknown
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch fun := call.Fun.(type) {
+		case *ast.Ident:
+			if fun.Name == "BindStrictBodyConfig" || fun.Name == "decodeStrictJSON" {
+				found = binderStrict
+			}
+		case *ast.SelectorExpr:
+			// c.Bind().Body(&req) is a SelectorExpr on a CallExpr.
+			if fun.Sel.Name != "Body" {
+				return true
+			}
+			if inner, ok := fun.X.(*ast.CallExpr); ok {
+				if sel, ok := inner.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Bind" {
+					found = binderPermissive
+				}
+			}
+		}
+		return true
+	})
+	return found
+}
+
+// parseAPIPackage parses this package's non-test sources and returns the
+// handler functions plus the route → handler-constructor mapping taken from the
+// route registrations.
+func parseAPIPackage(t *testing.T) (map[string]*ast.FuncDecl, map[openAPIOperation]string) {
+	t.Helper()
+	fset := token.NewFileSet()
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("read api package dir: %v", err)
+	}
+	funcs := make(map[string]*ast.FuncDecl)
+	routeHandlers := make(map[openAPIOperation]string)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		{
+			file, err := parser.ParseFile(fset, name, nil, 0)
+			if err != nil {
+				t.Fatalf("parse %s: %v", name, err)
+			}
+			for _, decl := range file.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Recv != nil {
+					continue
+				}
+				funcs[fn.Name.Name] = fn
+				ast.Inspect(fn.Body, func(n ast.Node) bool {
+					call, ok := n.(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+					sel, ok := call.Fun.(*ast.SelectorExpr)
+					if !ok {
+						return true
+					}
+					switch strings.ToUpper(sel.Sel.Name) {
+					case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete:
+					default:
+						return true
+					}
+					recv, ok := sel.X.(*ast.Ident)
+					if !ok || (recv.Name != "app" && recv.Name != "v1") {
+						return true
+					}
+					if len(call.Args) < 2 {
+						return true
+					}
+					lit, ok := call.Args[0].(*ast.BasicLit)
+					if !ok || lit.Kind != token.STRING {
+						return true
+					}
+					ctor, ok := call.Args[1].(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+					ident, ok := ctor.Fun.(*ast.Ident)
+					if !ok {
+						return true // an inline func literal: not a named handler
+					}
+					path := openAPIPath(strings.TrimPrefix(strings.Trim(lit.Value, `"`), "/api/v1"))
+					routeHandlers[openAPIOperation{
+						method: strings.ToUpper(sel.Sel.Name),
+						path:   path,
+					}] = ident.Name
+					return true
+				})
+			}
+		}
+	}
+	if len(routeHandlers) == 0 {
+		t.Fatal("no routes were parsed from the source; the strict-binding gate would be vacuous")
+	}
+	return funcs, routeHandlers
+}
+
+// specJSONBodyKeys returns the property names the spec documents in an
+// operation's application/json requestBody example.
+func specJSONBodyKeys(spec map[string]any, op openAPIOperation) ([]string, bool) {
+	paths, _ := spec["paths"].(map[string]any)
+	ops, _ := paths[op.path].(map[string]any)
+	entry, _ := ops[strings.ToLower(op.method)].(map[string]any)
+	body, _ := entry["requestBody"].(map[string]any)
+	content, _ := body["content"].(map[string]any)
+	media, ok := content["application/json"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	schema, _ := media["schema"].(map[string]any)
+	example, _ := schema["example"].(map[string]any)
+	if len(example) == 0 {
+		return nil, false
+	}
+	keys := make([]string, 0, len(example))
+	for k := range example {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys, true
+}
+
+// The strict-binding gate above is only worth anything if the classifier can
+// tell the two binders apart, so pin it on known sources.
+func TestHandlerBinderClassifiesBinders(t *testing.T) {
+	const src = `package api
+
+import (
+	"strconv"
+
+	"github.com/gofiber/fiber/v3"
+)
+
+func strictHandler(c fiber.Ctx) error {
+	var cfg struct{ Enabled bool ` + "`json:\"enabled\"`" + ` }
+	if err := BindStrictBodyConfig(c, &cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func strictDecodeHandler(c fiber.Ctx) error {
+	var cfg struct{ Enabled bool }
+	return decodeStrictJSON(c.Body(), &cfg, "")
+}
+
+func permissiveHandler(c fiber.Ctx) error {
+	var cfg struct{ Enabled bool }
+	if err := c.Bind().Body(&cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func unrelatedHandler(n int) string { return strconv.Itoa(n) }
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "gate_probe.go", src, 0)
+	if err != nil {
+		t.Fatalf("parse probe source: %v", err)
+	}
+	funcs := map[string]*ast.FuncDecl{}
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok {
+			funcs[fn.Name.Name] = fn
+		}
+	}
+	want := map[string]bodyBinder{
+		"strictHandler":       binderStrict,
+		"strictDecodeHandler": binderStrict,
+		"permissiveHandler":   binderPermissive,
+		"unrelatedHandler":    binderUnknown,
+	}
+	for name, expect := range want {
+		if got := handlerBinder(funcs[name]); got != expect {
+			t.Errorf("handlerBinder(%s) = %v, want %v", name, got, expect)
+		}
+	}
 }

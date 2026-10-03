@@ -1453,3 +1453,380 @@ func TestSetSplitTunnel_RevertsStagedDeltasOnWriteError(t *testing.T) {
 		t.Errorf("expected wg0_peer1 allowed_ips reverted to 192.168.0.0/16, got %q", peer1)
 	}
 }
+
+// wgDumpWithHandshake is a `wg show wg0 dump` with one peer that has completed
+// a handshake, so wgRuntimeState reports "connected".
+const wgDumpWithHandshake = "PRIV\tPUB\t51820\toff\n" +
+	"PEER\t\t10.0.0.1:51820\t0.0.0.0/0\t1700000000\t1\t2\toff\n"
+
+// newSnapshotScopedVpnService returns a service whose crash guard and DNS
+// snapshot both live in a temp dir, so the snapshot lifecycle can be asserted
+// without touching /etc/trafo.
+func newSnapshotScopedVpnService(t *testing.T, u uci.UCI, cmd CommandRunner) (*VpnService, string) {
+	t.Helper()
+	svc, guard := newGuardedVpnService(t, u, cmd)
+	dir := t.TempDir()
+	svc.dnsSnapshotPath = filepath.Join(dir, "vpn-dns-snapshot.json")
+	svc.legacyDnsSnapshotPath = filepath.Join(dir, "legacy-vpn-dns-snapshot.json")
+	return svc, guard
+}
+
+// seedVpnDnsSnapshot writes the snapshot an earlier successful enable would have
+// left behind, holding the pre-VPN dnsmasq list.
+func seedVpnDnsSnapshot(t *testing.T, svc *VpnService) {
+	t.Helper()
+	err := svc.writeVpnDnsSnapshot(vpnDnsSnapshot{Servers: []string{"127.0.0.1#5353"}})
+	if err != nil {
+		t.Fatalf("seeding snapshot: %v", err)
+	}
+}
+
+// dnsmasqState is a tiny model of dhcp.@dnsmasq[0] driven through the same
+// `uci` shell-outs the service makes.
+type dnsmasqState struct {
+	servers  []string
+	noresolv string
+}
+
+func newDnsmasqRunner(servers []string, wgUp bool) (*MockCommandRunner, *dnsmasqState) {
+	state := &dnsmasqState{servers: servers}
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch {
+		case name == "uci" && len(args) == 2 && args[0] == "get" &&
+			args[1] == "dhcp.@dnsmasq[0].server":
+			return []byte(strings.Join(state.servers, " ")), nil
+		case name == "uci" && len(args) == 2 && args[0] == "get" &&
+			args[1] == "dhcp.@dnsmasq[0].noresolv":
+			return []byte(state.noresolv), nil
+		case name == "uci" && len(args) == 2 && args[0] == "delete" &&
+			args[1] == "dhcp.@dnsmasq[0].server":
+			state.servers = nil
+			return nil, nil
+		case name == "uci" && len(args) == 2 && args[0] == "add_list":
+			_, value, _ := strings.Cut(args[1], "=")
+			state.servers = append(state.servers, value)
+			return nil, nil
+		case name == "uci" && len(args) == 2 && args[0] == "set":
+			_, value, _ := strings.Cut(args[1], "=")
+			if strings.HasSuffix(args[1], ".noresolv=") || strings.Contains(args[1], ".noresolv=") {
+				state.noresolv = value
+			}
+			return nil, nil
+		case name == "uci" && len(args) == 2 && args[0] == "commit":
+			return nil, nil
+		case name == "/etc/init.d/dnsmasq":
+			return nil, nil
+		case name == "tailscale":
+			return nil, nil
+		case name == "/etc/init.d/firewall":
+			return nil, nil
+		case name == "/usr/bin/wg":
+			if !wgUp {
+				return nil, fmt.Errorf("Unable to access interface: No such device")
+			}
+			return []byte(wgDumpWithHandshake), nil
+		case name == "/sbin/ip":
+			if len(args) >= 3 && args[0] == "link" && args[1] == "show" {
+				if !wgUp {
+					return []byte("3: wg0: state DOWN"), nil
+				}
+				return []byte("3: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> state UNKNOWN"), nil
+			}
+			return nil, nil
+		}
+		return nil, nil
+	}}
+	return cmd, state
+}
+
+// Enabling twice must not overwrite the snapshot with the VPN's own resolvers.
+// The dashboard toggle and the VPN page are independent entry points with no
+// idempotency guard, so a second enable used to destroy the pre-VPN state and
+// the later disable restored noresolv=1 pointing at 10.8.0.1.
+func TestEnableVpnDNSForwarding_SecondEnableKeepsFirstSnapshot(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "dns", "10.8.0.1")
+	cmd, state := newDnsmasqRunner([]string{"127.0.0.1#5353"}, true)
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+
+	if err := svc.enableVpnDNSForwarding(); err != nil {
+		t.Fatalf("first enable: %v", err)
+	}
+	if !slices.Equal(state.servers, []string{"10.8.0.1"}) || state.noresolv != "1" {
+		t.Fatalf("first enable must point dnsmasq at the tunnel,"+
+			" got %v noresolv=%q", state.servers, state.noresolv)
+	}
+	first, err := os.ReadFile(svc.dnsSnapshotPath)
+	if err != nil {
+		t.Fatalf("reading snapshot: %v", err)
+	}
+	if !strings.Contains(string(first), "127.0.0.1#5353") {
+		t.Fatalf("the snapshot must hold the pre-VPN list, got %q", first)
+	}
+
+	// Second enable, now that dnsmasq already points at the tunnel.
+	if err := svc.enableVpnDNSForwarding(); err != nil {
+		t.Fatalf("second enable: %v", err)
+	}
+	second, err := os.ReadFile(svc.dnsSnapshotPath)
+	if err != nil {
+		t.Fatalf("reading snapshot: %v", err)
+	}
+	if string(second) != string(first) {
+		t.Fatalf("a second enable must not overwrite the snapshot:\nfirst: %q\nsecond: %q", first, second)
+	}
+
+	// The disable still restores the pre-VPN list, not the tunnel's.
+	svc.disableVpnDNSForwarding()
+	if !slices.Equal(state.servers, []string{"127.0.0.1#5353"}) {
+		t.Fatalf("disable must restore the pre-VPN list, got %v", state.servers)
+	}
+	if state.noresolv != "0" {
+		t.Fatalf("disable must restore the pre-VPN noresolv, got %q", state.noresolv)
+	}
+}
+
+// A snapshot that cannot be written means there is nothing to restore, so the
+// forwarding must be aborted before dnsmasq is touched at all.
+func TestEnableVpnDNSForwarding_SnapshotWriteFailureLeavesDnsmasqAlone(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "dns", "10.8.0.1")
+	cmd, state := newDnsmasqRunner([]string{"127.0.0.1#5353"}, true)
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+	// A regular file cannot be a parent directory, so the snapshot write fails.
+	blocker := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0600); err != nil {
+		t.Fatalf("write blocker: %v", err)
+	}
+	svc.dnsSnapshotPath = filepath.Join(blocker, "vpn-dns-snapshot.json")
+
+	if err := svc.enableVpnDNSForwarding(); err == nil {
+		t.Fatal("expected the forwarding to abort when the snapshot cannot be written")
+	}
+	if !slices.Equal(state.servers, []string{"127.0.0.1#5353"}) {
+		t.Errorf("dnsmasq must be untouched when the snapshot failed, got %v", state.servers)
+	}
+	if state.noresolv != "" {
+		t.Errorf("noresolv must not be set when the snapshot failed, got %q", state.noresolv)
+	}
+}
+
+// A downed tunnel with a snapshot on disk leaves dnsmasq at noresolv=1 pointing
+// at resolvers reachable only through that tunnel. Polling GET /vpn/status must
+// restore the pre-VPN state instead of waiting for an operator toggle.
+func TestGetVpnStatus_SelfHealsDNSSnapshotWhenTunnelIsDown(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	cmd, state := newDnsmasqRunner([]string{"127.0.0.1#5353"}, false)
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+
+	// A snapshot left behind by an earlier enable, and dnsmasq pointed at the
+	// tunnel's resolvers because the tunnel never came back.
+	seedVpnDnsSnapshot(t, svc)
+	state.servers = []string{"10.8.0.1"}
+	state.noresolv = "1"
+
+	if _, err := svc.GetVpnStatus(); err != nil {
+		t.Fatalf("GetVpnStatus: %v", err)
+	}
+	if !slices.Equal(state.servers, []string{"127.0.0.1#5353"}) {
+		t.Fatalf("expected dnsmasq restored to the pre-VPN list, got %v", state.servers)
+	}
+	if state.noresolv != "0" {
+		t.Fatalf("expected noresolv cleared to 0, got %q", state.noresolv)
+	}
+	if _, err := os.Stat(svc.dnsSnapshotPath); !os.IsNotExist(err) {
+		t.Errorf("the snapshot must be removed once restored, stat err = %v", err)
+	}
+}
+
+// A healthy tunnel must not be healed: the VPN resolvers are the point.
+func TestGetVpnStatus_KeepsVPNResolversWhenTunnelIsConnected(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	cmd, state := newDnsmasqRunner([]string{"10.8.0.1"}, true)
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+	seedVpnDnsSnapshot(t, svc)
+	state.noresolv = "1"
+
+	statuses, err := svc.GetVpnStatus()
+	if err != nil {
+		t.Fatalf("GetVpnStatus: %v", err)
+	}
+	if !slices.Equal(state.servers, []string{"10.8.0.1"}) || state.noresolv != "1" {
+		t.Fatalf("a connected tunnel must keep the VPN resolvers,"+
+			" got %v noresolv=%q", state.servers, state.noresolv)
+	}
+	if statuses[0].StatusDetail != "connected" {
+		t.Errorf("StatusDetail must stay at its documented value, got %q", statuses[0].StatusDetail)
+	}
+	if !statuses[0].Connected {
+		t.Error("expected Connected=true")
+	}
+}
+
+// With no snapshot there is nothing to heal, so the self-heal must not touch
+// dnsmasq at all.
+func TestGetVpnStatus_NoSnapshotLeavesDnsmasqAlone(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wg0", "disabled", "0")
+	cmd, state := newDnsmasqRunner([]string{"10.8.0.1"}, false)
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+	state.noresolv = "1"
+
+	if _, err := svc.GetVpnStatus(); err != nil {
+		t.Fatalf("GetVpnStatus: %v", err)
+	}
+	if !slices.Equal(state.servers, []string{"10.8.0.1"}) || state.noresolv != "1" {
+		t.Fatalf("dnsmasq must be untouched without a snapshot,"+
+			" got %v noresolv=%q", state.servers, state.noresolv)
+	}
+}
+
+// The wg0 firewall sections must be gone on every exit path, including the
+// missing-default-route one. Leaving them committed meant the next enable
+// silently reused stale sections after any number of reboots.
+func TestToggleWireguard_DisableTearsDownFirewallWithoutDefaultRoute(t *testing.T) {
+	u := uci.NewMockUCI()
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" &&
+			args[1] == "show" && args[2] == "default" {
+			return []byte(""), nil
+		}
+		return nil, nil
+	}}
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+	// Pretend a previous enable left the sections in place.
+	if err := svc.setupWireGuardFirewall(); err != nil {
+		t.Fatalf("setupWireGuardFirewall: %v", err)
+	}
+
+	if err := svc.ToggleWireguard(false); err == nil {
+		t.Fatal("expected an error when no default route can be restored")
+	}
+	if _, err := u.GetAll("firewall", "wg0_zone"); err == nil {
+		t.Error("wg0 firewall zone must be torn down even when the route restore failed")
+	}
+	if _, err := u.GetAll("firewall", "wg0_fwd"); err == nil {
+		t.Error("wg0 forwarding must be torn down even when the route restore failed")
+	}
+}
+
+// The disable path bounces uplinks, so it needs the crash guard too. It must be
+// kept when the default route is not confirmed and removed when it is.
+func TestToggleWireguard_DisableWritesAndClearsCrashGuard(t *testing.T) {
+	prev := wireGuardVerifyTimeout
+	wireGuardVerifyTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { wireGuardVerifyTimeout = prev })
+
+	u := uci.NewMockUCI()
+	kernelDefault := false
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" &&
+			args[1] == "show" && args[2] == "default" {
+			if kernelDefault {
+				return []byte("default via 10.0.1.1 dev phy1-sta0"), nil
+			}
+			return []byte(""), nil
+		}
+		if name == "/sbin/ubus" && len(args) >= 3 && args[0] == "call" && args[2] == "renew" {
+			kernelDefault = true
+			return []byte("{}"), nil
+		}
+		return nil, nil
+	}}
+	svc, guard := newSnapshotScopedVpnService(t, u, cmd)
+
+	if err := svc.ToggleWireguard(false); err != nil {
+		t.Fatalf("ToggleWireguard(false): %v", err)
+	}
+	if _, err := os.Stat(guard); !os.IsNotExist(err) {
+		t.Errorf("crash guard must be cleared once a default route is confirmed, stat err = %v", err)
+	}
+
+	// Now the route cannot be restored: the marker must survive.
+	u2 := uci.NewMockUCI()
+	svc2, guard2 := newSnapshotScopedVpnService(t, u2, &MockCommandRunner{
+		RunFunc: func(name string, args ...string) ([]byte, error) {
+			if name == "/sbin/ip" && len(args) >= 3 && args[0] == "route" &&
+				args[1] == "show" && args[2] == "default" {
+				return []byte(""), nil
+			}
+			return nil, nil
+		},
+	})
+	if err := svc2.ToggleWireguard(false); err == nil {
+		t.Fatal("expected an error when no default route can be restored")
+	}
+	if _, err := os.Stat(guard2); err != nil {
+		t.Errorf("crash guard must be kept when the default route is not confirmed: %v", err)
+	}
+}
+
+// The Tailscale exit node must not be cleared before the tunnel is verified:
+// a failed enable used to silently move the router's egress with nothing to put
+// it back.
+func TestEnableWireguard_ClearsTailscaleExitNodeOnlyAfterTunnelVerified(t *testing.T) {
+	prev := wireGuardVerifyTimeout
+	wireGuardVerifyTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { wireGuardVerifyTimeout = prev })
+
+	u := uci.NewMockUCI()
+	var exitNodeCleared bool
+	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "tailscale":
+			if slices.Contains(args, "--exit-node=") {
+				exitNodeCleared = true
+			}
+			return nil, nil
+		case "/etc/init.d/firewall", "/sbin/ubus", "/sbin/ifup", "/sbin/ifdown":
+			return nil, nil
+		case "/usr/bin/wg":
+			return nil, fmt.Errorf("no such device")
+		case "/sbin/ip":
+			return []byte("3: wg0: state DOWN"), nil
+		}
+		return nil, nil
+	}}
+	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
+
+	if err := svc.ToggleWireguard(true); err == nil {
+		t.Fatal("expected the enable to fail when wg0 never comes up")
+	}
+	if exitNodeCleared {
+		t.Error("the Tailscale exit node must not be cleared when the tunnel failed to start")
+	}
+
+	// And it IS cleared once the tunnel is verified.
+	u2 := uci.NewMockUCI()
+	var clearedAfterVerify bool
+	var verified bool
+	cmd2 := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+		switch name {
+		case "tailscale":
+			if slices.Contains(args, "--exit-node=") && verified {
+				clearedAfterVerify = true
+			}
+			return nil, nil
+		case "/etc/init.d/firewall", "/sbin/ubus", "/sbin/ifup", "/sbin/ifdown":
+			return nil, nil
+		case "/usr/bin/wg":
+			verified = true
+			return []byte("PRIV\tPUB\t51820\toff\n"), nil
+		case "/sbin/ip":
+			if len(args) >= 3 && args[0] == "link" && args[1] == "show" {
+				return []byte("3: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> state UNKNOWN"), nil
+			}
+			return nil, nil
+		}
+		return nil, nil
+	}}
+	svc2, _ := newSnapshotScopedVpnService(t, u2, cmd2)
+	if err := svc2.ToggleWireguard(true); err != nil {
+		t.Fatalf("ToggleWireguard(true): %v", err)
+	}
+	if !clearedAfterVerify {
+		t.Error("the Tailscale exit node must be cleared once the tunnel is verified")
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -121,8 +122,16 @@ type VpnService struct {
 	// guardFile is the crash guard path for VPN live-state changes. Empty
 	// disables the guard (only the production constructor sets it).
 	guardFile string
+	// dnsSnapshotPath and legacyDnsSnapshotPath are fields rather than bare
+	// constants so the snapshot lifecycle can be exercised against a temp dir.
+	dnsSnapshotPath string
+	// legacyDnsSnapshotPath is the pre-unification location, read-only.
+	legacyDnsSnapshotPath string
 }
 
+// vpnDnsSnapshotPath holds the pre-VPN dnsmasq server/noresolv state. It is a
+// state file, not a crash guard, so it keeps its own literal rather than being
+// derived from crashGuardDir.
 const vpnDnsSnapshotPath = "/etc/trafo/vpn-dns-snapshot.json"
 
 // legacyVpnDnsSnapshotPath is where releases before the guard-directory
@@ -131,17 +140,36 @@ const legacyVpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
 
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
-	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/travo/wireguard_profiles.json", guardFile: vpnGuardPath}
+	return &VpnService{
+		uci:                   u,
+		cmd:                   &RealCommandRunner{},
+		profilesPath:          "/etc/travo/wireguard_profiles.json",
+		guardFile:             vpnGuardPath,
+		dnsSnapshotPath:       vpnDnsSnapshotPath,
+		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+	}
 }
 
 // NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
 func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
-	return &VpnService{uci: u, cmd: cmd, profilesPath: "/etc/travo/wireguard_profiles.json"}
+	return &VpnService{
+		uci:                   u,
+		cmd:                   cmd,
+		profilesPath:          "/etc/travo/wireguard_profiles.json",
+		dnsSnapshotPath:       vpnDnsSnapshotPath,
+		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+	}
 }
 
 // NewVpnServiceWithProfilesPath creates a VpnService with a custom profiles path (for tests).
 func NewVpnServiceWithProfilesPath(u uci.UCI, cmd CommandRunner, profilesPath string) *VpnService {
-	return &VpnService{uci: u, cmd: cmd, profilesPath: profilesPath}
+	return &VpnService{
+		uci:                   u,
+		cmd:                   cmd,
+		profilesPath:          profilesPath,
+		dnsSnapshotPath:       vpnDnsSnapshotPath,
+		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+	}
 }
 
 func wireGuardIfaceLooksUp(linkShowOutput string) bool {
@@ -483,6 +511,14 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 }
 
 // GetVpnStatus returns all VPN connection statuses.
+//
+// It also runs the DNS self-heal reconcile (ADR 0001 §3): if a VPN DNS
+// forwarding snapshot is on disk but the tunnel that justified it is not
+// connected, the pre-VPN dnsmasq state is restored here rather than waiting for
+// an operator to toggle the VPN off. This is a status read that heals rather
+// than just reporting, which is deliberate: GET /vpn/status is polled by the
+// dashboard and the VPN page, so it is the only health signal that is guaranteed
+// to be hit after a reboot.
 func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	var statuses []models.VpnStatus
 
@@ -494,6 +530,13 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 		wgStatus := models.VpnStatus{Type: "wireguard",
 			Enabled: disabled != "1"}
 		wgStatus.StatusDetail = v.wgRuntimeState(wgStatus.Enabled)
+		if v.maybeSelfHealVpnDNS(wgStatus.StatusDetail) {
+			// StatusDetail is left at its documented value: the frontend matches
+			// it by exact equality, so a suffixed value would render no status
+			// text at all. The restore is logged instead.
+			log.Printf("vpn: LAN DNS restored from snapshot; tunnel state %q",
+				wgStatus.StatusDetail)
+		}
 		wgStatus.Connected = wgStatus.StatusDetail == "connected"
 		if wgStatus.Enabled {
 			wgStatus.Endpoint = v.combinePeerEndpointFromUCI("wg0_peer0")
@@ -696,7 +739,6 @@ func (v *VpnService) clearVpnGuard() {
 }
 
 func (v *VpnService) enableWireguard() error {
-	_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 	if err := v.ensureWireGuardInterface(); err != nil {
 		return fmt.Errorf("normalizing wg0 interface: %w", err)
 	}
@@ -730,6 +772,12 @@ func (v *VpnService) enableWireguard() error {
 		return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 	}
 
+	// The tunnel is verified up, so clearing the Tailscale exit node can no
+	// longer strand a failed enable. It used to run first, which meant a failed
+	// enable silently changed where the router's own traffic egresses with
+	// nothing to put it back (rollbackWireguardEnable never restored it).
+	_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
+
 	if err := v.setupWireGuardFirewall(); err != nil {
 		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
 			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %v)", err, v.guardFile, rbErr)
@@ -738,7 +786,13 @@ func (v *VpnService) enableWireguard() error {
 		return fmt.Errorf("setting up WireGuard firewall: %w", err)
 	}
 
-	v.enableVpnDNSForwarding()
+	if err := v.enableVpnDNSForwarding(); err != nil {
+		// DNS forwarding was aborted on purpose (no snapshot could be taken),
+		// so dnsmasq still has the pre-VPN resolvers. The tunnel is up and
+		// verified; failing the toggle here would tear down a working VPN over
+		// a DNS bookkeeping problem. Record it instead.
+		log.Printf("vpn: tunnel up but LAN DNS left unchanged: %v", err)
+	}
 	v.clearVpnGuard()
 	return nil
 }
@@ -766,6 +820,32 @@ func (v *VpnService) rollbackWireguardEnable(prevDisabled string) error {
 }
 
 func (v *VpnService) disableWireguard() error {
+	// The disable path bounces uplinks (ubus down/up, then ifdown/ifup as a last
+	// resort). That is live state, so it needs the crash guard exactly like the
+	// enable path (ADR 0003). It used to be written only by enableWireguard, so
+	// an interrupted bounce left the uplink down with no marker at all.
+	if err := v.writeVpnGuard(); err != nil {
+		return err
+	}
+	// Every exit path tears the wg0 firewall plumbing down. Returning early on
+	// the missing-default-route branch used to leave firewall.wg0_zone and
+	// firewall.wg0_fwd committed across reboots, and the next enable reused
+	// those stale sections.
+	//
+	// The guard is cleared inside this defer, after the teardown, so a device
+	// that dies mid-teardown still has the marker. routeConfirmed is false on
+	// every error return, which keeps the guard when the uplink bounce may not
+	// have taken.
+	routeConfirmed := false
+	defer func() {
+		if err := v.teardownWireGuardFirewall(); err != nil {
+			log.Printf("vpn: tearing down WireGuard firewall: %v", err)
+		}
+		if routeConfirmed {
+			v.clearVpnGuard()
+		}
+	}()
+
 	_ = v.uci.Set("network", "wg0", "disabled", "1")
 	if err := v.uci.Commit("network"); err != nil {
 		return err
@@ -785,9 +865,11 @@ func (v *VpnService) disableWireguard() error {
 	v.restoreDefaultRouteAfterWireGuardDisable()
 	// Rock-solid semantics: do not report success if the device has no default route.
 	if !v.hasKernelDefaultRoute() {
+		// Guard stays (routeConfirmed is false): the uplink bounce may not
+		// have taken, and the operator needs the marker (ADR 0003).
 		return fmt.Errorf("WireGuard disabled but no default route was restored; internet may be down")
 	}
-	_ = v.teardownWireGuardFirewall()
+	routeConfirmed = true
 	return nil
 }
 
@@ -818,25 +900,25 @@ func (v *VpnService) readDnsmasqNoResolv() string {
 }
 
 func (v *VpnService) writeVpnDnsSnapshot(snap vpnDnsSnapshot) error {
-	if err := os.MkdirAll(filepath.Dir(vpnDnsSnapshotPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(v.dnsSnapshotPath), 0o755); err != nil {
 		return err
 	}
 	data, err := json.Marshal(snap)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(vpnDnsSnapshotPath, data, 0o600)
+	return os.WriteFile(v.dnsSnapshotPath, data, 0o600)
 }
 
 func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
-	data, err := os.ReadFile(vpnDnsSnapshotPath)
+	data, err := os.ReadFile(v.dnsSnapshotPath)
 	if err != nil {
 		// Fall back to the pre-unification location. A device upgraded while the
 		// VPN was enabled has its snapshot under the old path; failing to read it
 		// would leave dnsmasq with noresolv=1 forwarding to VPN resolvers that
 		// are no longer reachable, i.e. LAN DNS stays broken after the tunnel
 		// goes down.
-		data, err = os.ReadFile(legacyVpnDnsSnapshotPath)
+		data, err = os.ReadFile(v.legacyDnsSnapshotPath)
 		if err != nil {
 			return nil, err
 		}
@@ -846,6 +928,14 @@ func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
 		return nil, err
 	}
 	return &snap, nil
+}
+
+// removeVpnDnsSnapshot drops both snapshot locations. It is best-effort: the
+// restore has already been written to dnsmasq at this point, and a leftover
+// snapshot only costs one redundant restore on the next health reconcile.
+func (v *VpnService) removeVpnDnsSnapshot() {
+	_ = os.Remove(v.dnsSnapshotPath)
+	_ = os.Remove(v.legacyDnsSnapshotPath)
 }
 
 // splitWireGuardDNSOption splits UCI network.wg0.dns. OpenWrt normally uses
@@ -874,24 +964,40 @@ func (v *VpnService) wgConfiguredDNSServers() []string {
 	return splitWireGuardDNSOption(dns)
 }
 
-// enableVpnDNSForwarding points dnsmasq at the tunnel's resolvers. It is
-// best-effort by design and cannot report failure: the tunnel is already
-// verified up before it runs, so a failure here cannot strand LAN DNS on
-// unreachable resolvers and must never fail the toggle.
-func (v *VpnService) enableVpnDNSForwarding() {
+// enableVpnDNSForwarding points dnsmasq at the tunnel's resolvers. It reports
+// failure but must never fail the toggle: the tunnel is already verified up
+// before it runs, so aborting the whole enable over DNS bookkeeping would tear
+// down a working VPN. Returning an error lets the caller record why LAN DNS was
+// left alone.
+//
+// An existing readable snapshot is authoritative and is NEVER overwritten. The
+// dashboard toggle and the VPN page are independent entry points with no
+// idempotency guard, so a second enable while the tunnel is already up would
+// otherwise snapshot the VPN's own resolvers, and the later disable would
+// restore noresolv=1 pointing at 10.8.0.1 with the tunnel down.
+func (v *VpnService) enableVpnDNSForwarding() error {
 	vpnDNS := v.wgConfiguredDNSServers()
 	if len(vpnDNS) == 0 {
-		return
+		return nil
 	}
 
-	currentServers := v.readDnsmasqServers()
-	// Snapshot current dnsmasq (including AdGuard 127.0.0.1#5353) so we can restore
-	// on WireGuard disable. LAN DNS must forward to VPN DNS while the tunnel is up,
-	// otherwise queries would still go to AdGuard only.
-	_ = v.writeVpnDnsSnapshot(vpnDnsSnapshot{
-		NoResolv: v.readDnsmasqNoResolv(),
-		Servers:  currentServers,
-	})
+	if _, err := v.loadVpnDnsSnapshot(); err != nil {
+		// No usable snapshot: take one from the CURRENT dnsmasq state,
+		// including AdGuard's 127.0.0.1#5353, so the disable path can put it
+		// back. LAN DNS must forward to VPN DNS while the tunnel is up,
+		// otherwise queries would still go to AdGuard only.
+		snap := vpnDnsSnapshot{
+			NoResolv: v.readDnsmasqNoResolv(),
+			Servers:  v.readDnsmasqServers(),
+		}
+		if err := v.writeVpnDnsSnapshot(snap); err != nil {
+			// Without a snapshot there is nothing to restore, so continuing
+			// would set noresolv=1 against resolvers reachable only through
+			// the tunnel: LAN DNS SERVFAILs once the tunnel goes down, and the
+			// pre-VPN state is unrecoverable without hand-editing dhcp.
+			return fmt.Errorf("snapshotting dnsmasq before VPN DNS forwarding: %w", err)
+		}
+	}
 
 	// Apply: forward to VPN DNS only.
 	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
@@ -901,6 +1007,7 @@ func (v *VpnService) enableVpnDNSForwarding() {
 	_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=1")
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	return nil
 }
 
 // disableVpnDNSForwarding restores the dnsmasq snapshot taken when forwarding
@@ -924,8 +1031,40 @@ func (v *VpnService) disableVpnDNSForwarding() {
 	}
 	_, _ = v.cmd.Run("uci", "commit", "dhcp")
 	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
-	_ = os.Remove(vpnDnsSnapshotPath)
-	_ = os.Remove(legacyVpnDnsSnapshotPath)
+	v.removeVpnDnsSnapshot()
+}
+
+// maybeSelfHealVpnDNS restores the pre-VPN dnsmasq state when a forwarding
+// snapshot exists but the tunnel that justified it can no longer carry DNS:
+// wg0 is absent, up without a handshake, or the tunnel is disabled in UCI.
+//
+// This is the second entrypoint into disableVpnDNSForwarding. Without it, a
+// dropped uplink or a reboot into an unreachable peer leaves dnsmasq at
+// noresolv=1 pointing at resolvers only reachable through a down tunnel, and
+// every LAN client SERVFAILs until the operator manually toggles the VPN off.
+//
+// tunnelDetail is the already-computed wgRuntimeState detail, so this costs no
+// extra shell-out. Returns true when a restore happened.
+func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
+	if tunnelDetail == "connected" {
+		return false
+	}
+	if _, err := v.loadVpnDnsSnapshot(); err != nil {
+		// No snapshot: dnsmasq was never pointed at the tunnel.
+		return false
+	}
+	log.Printf("vpn: tunnel state %q with a DNS snapshot present; restoring dnsmasq",
+		tunnelDetail)
+	// disableVpnDNSForwarding shells out to `uci` for dhcp, so it needs the same
+	// lock every other dhcp writer holds (ADR 0010).
+	if err := withConfigLocks([]string{"dhcp"}, func() error {
+		v.disableVpnDNSForwarding()
+		return nil
+	}); err != nil {
+		log.Printf("vpn: restoring pre-VPN dnsmasq: %v", err)
+		return false
+	}
+	return true
 }
 
 // Config sets for the VPN flows.
