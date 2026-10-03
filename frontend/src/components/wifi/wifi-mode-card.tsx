@@ -5,25 +5,49 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useWifiConnection, useWifiMode } from '@/hooks/use-wifi';
 import { cn } from '@/lib/cn';
 import type { WifiMode } from '@shared/index';
-import { isRecommendedWifiMode, WIFI_MODE_OPTIONS } from '@/components/wifi/wifi-mode-options';
+import {
+  isRecommendedWifiMode,
+  WIFI_MODE_OPTIONS,
+  getWifiModeLabel,
+} from '@/components/wifi/wifi-mode-options';
 import { WifiModeSwitchDialog } from '@/components/wifi/wifi-mode-switch-dialog';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 
 export function WifiModeCard() {
   const { data: connection, isLoading } = useWifiConnection();
   const setMode = useWifiMode();
   const [pendingMode, setPendingMode] = useState<WifiMode | null>(null);
+  const [switchingLabel, setSwitchingLabel] = useState<string | null>(null);
 
   const currentMode: WifiMode = connection?.mode ?? 'client';
 
   function handleConfirm() {
-    if (pendingMode) {
-      setMode.mutate(pendingMode);
-      setPendingMode(null);
-    }
+    if (!pendingMode) return;
+    setSwitchingLabel(getWifiModeLabel(pendingMode));
+    setMode.mutate(pendingMode, {
+      onSettled: () => {
+        setPendingMode(null);
+        setSwitchingLabel(null);
+      },
+    });
+    setPendingMode(null);
   }
 
   return (
     <>
+      {/* finalizeWifiMutation blocks for up to 30s while it confirms the apply
+          token. Without this the click produced three greyed-out tiles and no
+          output at all, on the one page whose connectivity is about to drop. */}
+      <OperationProgressDialog
+        open={setMode.isPending}
+        title={`Switching to ${switchingLabel ?? 'new'} mode…`}
+        description="The router restarts its wireless subsystem and waits for the new settings to come up."
+        details={[
+          'This can take up to 30 seconds.',
+          'Keep this page open — your browser confirms the change while the old configuration is still active.',
+          'If the new mode does not come up, the router rolls back to the previous mode on its own.',
+        ]}
+      />
       <Card>
         <CardHeader>
           <CardTitle>WiFi Mode</CardTitle>

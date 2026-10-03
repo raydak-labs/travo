@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/layout/theme-provider';
 import { APStep } from '@/pages/setup/ap-step';
 import { server } from '@/mocks/server';
 import { API_ROUTES } from '@shared/index';
+import { toast } from 'sonner';
 
 function renderAPStep(onNext = () => {}, onBack = () => {}) {
   const queryClient = new QueryClient({
@@ -62,5 +63,56 @@ describe('APStep', () => {
     });
 
     expect(putPaths.sort()).toEqual(['default_radio0', 'default_radio1']);
+  });
+
+  // Setup writes both bands in sequence; without a rollback the router is left
+  // with the new SSID on one band and the old one on the other.
+  it('restores the first band when the second one fails', async () => {
+    const user = userEvent.setup();
+    const putBodies: Array<{ section: string; ssid: string }> = [];
+    const errorSpy = vi.spyOn(toast, 'error').mockImplementation(() => '');
+
+    server.use(
+      http.put(`${API_ROUTES.wifi.ap}/:section`, async ({ request, params }) => {
+        const body = (await request.json()) as { ssid: string };
+        putBodies.push({ section: params.section as string, ssid: body.ssid });
+        if (body.ssid === 'TravelSSID' && params.section === 'default_radio1') {
+          return HttpResponse.json({ error: 'uci commit failed' }, { status: 400 });
+        }
+        return HttpResponse.json({ status: 'ok' });
+      }),
+    );
+
+    const onNext = vi.fn();
+    renderAPStep(onNext);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/network name \(ssid\)/i)).toBeInTheDocument();
+    });
+
+    await user.clear(screen.getByLabelText(/network name \(ssid\)/i));
+    await user.type(screen.getByLabelText(/network name \(ssid\)/i), 'TravelSSID');
+    await user.clear(screen.getByLabelText(/^password$/i));
+    await user.type(screen.getByLabelText(/^password$/i), 'travel12345');
+
+    await user.click(screen.getByRole('button', { name: /save ap config/i }));
+
+    await waitFor(() => {
+      expect(putBodies.length).toBe(3);
+    });
+    expect(putBodies).toEqual([
+      { section: 'default_radio0', ssid: 'TravelSSID' },
+      { section: 'default_radio1', ssid: 'TravelSSID' },
+      { section: 'default_radio0', ssid: 'OpenWrt-Travel' },
+    ]);
+    expect(onNext).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Failed to update AP config',
+      expect.objectContaining({
+        description: expect.stringContaining('default_radio0'),
+      }),
+    );
+
+    errorSpy.mockRestore();
   });
 });

@@ -1,10 +1,10 @@
 import { Network } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { useNetworkStatus } from '@/hooks/use-network';
 
 export function LanConfigCard() {
-  const { data: network, isLoading } = useNetworkStatus();
+  const { data: network, isLoading, isError, error, refetch } = useNetworkStatus();
 
   return (
     <Card>
@@ -13,23 +13,25 @@ export function LanConfigCard() {
         <Network className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        ) : network ? (
-          <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-            <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500 dark:text-gray-400">IP Address</span>
-              <span className="text-gray-900 dark:text-white">{network.lan.ip_address}</span>
-              <span className="text-gray-500 dark:text-gray-400">Subnet</span>
-              <span className="text-gray-900 dark:text-white">{network.lan.netmask}</span>
-              <span className="text-gray-500 dark:text-gray-400">MAC</span>
-              <span className="text-gray-900 dark:text-white">{network.lan.mac_address}</span>
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+        >
+          {network ? (
+            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+              <div className="grid grid-cols-2 gap-2">
+                <span className="text-gray-500 dark:text-gray-400">IP Address</span>
+                <span className="text-gray-900 dark:text-white">{network.lan.ip_address}</span>
+                <span className="text-gray-500 dark:text-gray-400">Subnet</span>
+                <span className="text-gray-900 dark:text-white">{network.lan.netmask}</span>
+                <span className="text-gray-500 dark:text-gray-400">MAC</span>
+                <span className="text-gray-900 dark:text-white">{network.lan.mac_address}</span>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </QueryCard>
       </CardContent>
     </Card>
   );

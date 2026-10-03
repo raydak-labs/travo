@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useDDNSConfig, useDDNSStatus, useSetDDNSConfig } from '@/hooks/use-network';
@@ -12,7 +13,13 @@ import { DdnsStatusPanel } from './ddns-status-panel';
 import { DdnsEnabledFields } from './ddns-enabled-fields';
 
 export function DdnsCard() {
-  const { data: ddnsConfig, isLoading: ddnsConfigLoading } = useDDNSConfig();
+  const {
+    data: ddnsConfig,
+    isLoading: ddnsConfigLoading,
+    isError: ddnsFailed,
+    error: ddnsError,
+    refetch: refetchDdns,
+  } = useDDNSConfig();
   const { data: ddnsStatus } = useDDNSStatus();
   const setDDNS = useSetDDNSConfig();
 
@@ -38,8 +45,9 @@ export function DdnsCard() {
     mode: 'onChange',
   });
 
-  // undefined while loading; the form is not rendered in that state.
-  const available = ddnsConfig?.available ?? false;
+  // Undefined while loading or after a failed GET; only a query that actually
+  // answered may claim ddns-scripts is missing.
+  const available = ddnsConfig?.available === true;
   const enabled = watch('enabled');
   const service = watch('service');
 
@@ -76,45 +84,53 @@ export function DdnsCard() {
         <RefreshCw className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {ddnsConfigLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-            <DdnsStatusPanel status={ddnsStatus} />
-            {available ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Switch {...register('enabled')} />
-                  <span className="text-sm">Enable Dynamic DNS</span>
-                </div>
-                {enabled && (
-                  <DdnsEnabledFields
-                    control={control}
-                    register={register}
-                    errors={errors}
-                    service={service}
-                    setValue={setValue}
-                  />
-                )}
-                <Button type="submit" size="sm" disabled={setDDNS.isPending}>
-                  {setDDNS.isPending ? 'Saving…' : 'Save DDNS Settings'}
-                </Button>
-              </>
-            ) : (
-              // ddns-scripts is not installed, so nothing can service a `ddns`
-              // config and the backend answers 503 to every write. Say so here
-              // rather than offering a form that cannot succeed.
-              <p className="text-sm text-muted-foreground">
-                Dynamic DNS is unavailable: the <code>ddns-scripts</code> package is not installed
-                on this router. Install it with <code>opkg install ddns-scripts</code> to enable
-                these settings.
-              </p>
-            )}
-          </form>
-        )}
+        <QueryCard
+          isLoading={ddnsConfigLoading}
+          isError={ddnsFailed}
+          error={ddnsError}
+          onRetry={() => void refetchDdns()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          }
+        >
+          {ddnsConfig ? (
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+              <DdnsStatusPanel status={ddnsStatus} />
+              {available ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Switch {...register('enabled')} />
+                    <span className="text-sm">Enable Dynamic DNS</span>
+                  </div>
+                  {enabled && (
+                    <DdnsEnabledFields
+                      control={control}
+                      register={register}
+                      errors={errors}
+                      service={service}
+                      setValue={setValue}
+                    />
+                  )}
+                  <Button type="submit" size="sm" disabled={setDDNS.isPending}>
+                    {setDDNS.isPending ? 'Saving…' : 'Save DDNS Settings'}
+                  </Button>
+                </>
+              ) : (
+                // ddns-scripts is not installed, so nothing can service a `ddns`
+                // config and the backend answers 503 to every write. Say so here
+                // rather than offering a form that cannot succeed.
+                <p className="text-sm">
+                  Dynamic DNS is unavailable: the <code>ddns-scripts</code> package is not installed
+                  on this router. Install it with <code>opkg install ddns-scripts</code> to enable
+                  these settings.
+                </p>
+              )}
+            </form>
+          ) : null}
+        </QueryCard>
       </CardContent>
     </Card>
   );

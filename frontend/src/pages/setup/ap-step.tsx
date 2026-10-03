@@ -12,6 +12,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAPConfigs } from '@/hooks/use-wifi';
 import { apiClient } from '@/lib/api-client';
 import { routeWithSegment } from '@/lib/api-url';
+import {
+  ApApplyRollbackError,
+  describeApApplyRollback,
+  rollbackApSections,
+  snapshotApSections,
+  type ApSectionSnapshot,
+} from '@/lib/ap-section-apply';
 import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { APStepCredentialsFields } from '@/pages/setup/ap-step-credentials-fields';
 import { APStepIntro } from '@/pages/setup/ap-step-intro';
@@ -30,19 +37,36 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
       if (!apConfigs?.length) {
         throw new Error('No access point configuration available');
       }
-      for (const ap of apConfigs) {
+      const snapshots = snapshotApSections(apConfigs);
+      const written: ApSectionSnapshot[] = [];
+      for (const snapshot of snapshots) {
         const config: APConfigUpdate = {
           ssid: data.ssid,
           key: data.key,
-          encryption: ap.encryption,
-          enabled: ap.enabled,
+          encryption: snapshot.config.encryption,
+          enabled: snapshot.config.enabled,
         };
-        await finalizeWifiMutation(
-          apiClient.put<WifiMutationResponse>(
-            routeWithSegment(API_ROUTES.wifi.ap, ap.section),
-            config,
-          ),
-        );
+        try {
+          await finalizeWifiMutation(
+            apiClient.put<WifiMutationResponse>(
+              routeWithSegment(API_ROUTES.wifi.ap, snapshot.section),
+              config,
+            ),
+          );
+          written.push(snapshot);
+        } catch (error) {
+          // The bands already written are committed on the device; undo them so
+          // first-run setup cannot leave the router with two different SSIDs.
+          const rollback = await rollbackApSections(written, (previous) =>
+            finalizeWifiMutation(
+              apiClient.put<WifiMutationResponse>(
+                routeWithSegment(API_ROUTES.wifi.ap, previous.section),
+                previous.config,
+              ),
+            ),
+          );
+          throw new ApApplyRollbackError(snapshot, error, rollback);
+        }
       }
     },
     onSuccess: () => {
@@ -51,7 +75,9 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
       onNext();
     },
     onError: (error: Error) => {
-      toast.error('Failed to update AP config', { description: error.message });
+      toast.error('Failed to update AP config', {
+        description: describeApApplyRollback(error),
+      });
     },
   });
 
@@ -91,26 +117,28 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
         </div>
       ) : (
         <form onSubmit={handleSubmit(onSave)} className="space-y-4" noValidate>
-          <APStepCredentialsFields
-            register={register}
-            errors={errors}
-            showPassword={showPassword}
-            onTogglePassword={() => setShowPassword((v) => !v)}
-          />
+          <fieldset disabled={saveAllAPs.isPending} className="space-y-4 disabled:opacity-60">
+            <APStepCredentialsFields
+              register={register}
+              errors={errors}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword((v) => !v)}
+            />
 
-          <div className="flex gap-3">
-            <Button type="button" variant="outline" onClick={onBack} className="flex-1">
-              Back
-            </Button>
-            <Button
-              type="submit"
-              disabled={saveAllAPs.isPending || isLoading || !firstAP}
-              className="flex-1"
-            >
-              {saveAllAPs.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save AP Config
-            </Button>
-          </div>
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={onBack} className="flex-1">
+                Back
+              </Button>
+              <Button
+                type="submit"
+                disabled={saveAllAPs.isPending || isLoading || !firstAP}
+                className="flex-1"
+              >
+                {saveAllAPs.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save AP Config
+              </Button>
+            </div>
+          </fieldset>
         </form>
       )}
       <button

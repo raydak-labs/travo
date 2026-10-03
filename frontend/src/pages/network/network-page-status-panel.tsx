@@ -3,7 +3,9 @@ import { Link } from '@tanstack/react-router';
 import { Network } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNetworkStatus } from '@/hooks/use-network';
 import { ClientsTable } from '@/pages/network/clients-table';
 import { InterfaceTrafficCharts } from '@/pages/network/interface-traffic-charts';
 import { UptimeLogCard } from '@/pages/network/uptime-log-card';
@@ -22,6 +24,10 @@ export function NetworkPageStatusPanel({
   isLoading,
   blockedClients,
 }: NetworkPageStatusPanelProps) {
+  // NetworkPage owns the network-status query and forwards only the loading
+  // flag. Observing the same query key here (deduped by react-query) is what
+  // lets a failed GET render an error instead of an empty client list.
+  const { isError, error, refetch } = useNetworkStatus();
   const hasClients = Boolean(network?.clients && network.clients.length > 0);
 
   return (
@@ -39,21 +45,29 @@ export function NetworkPageStatusPanel({
           <Network className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : hasClients && network?.clients ? (
-            <ClientsTable
-              clients={network.clients}
-              blockedMacs={blockedClients}
-              limit={CLIENTS_PREVIEW_LIMIT}
-            />
-          ) : (
-            <EmptyState message="No clients connected" />
-          )}
+          <QueryCard
+            isLoading={isLoading}
+            isError={isError}
+            error={error}
+            onRetry={() => void refetch()}
+            loading={
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            }
+          >
+            {hasClients && network?.clients ? (
+              <ClientsTable
+                clients={network.clients}
+                blockedMacs={blockedClients}
+                limit={CLIENTS_PREVIEW_LIMIT}
+              />
+            ) : (
+              <EmptyState message="No clients connected" />
+            )}
+          </QueryCard>
         </CardContent>
         {hasClients ? (
           <CardFooter className="justify-end">

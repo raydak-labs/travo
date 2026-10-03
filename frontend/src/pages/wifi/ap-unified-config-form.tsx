@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { QrCode, Radio } from 'lucide-react';
+import { toast } from 'sonner';
 import type { APConfig, APConfigUpdate } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { CardInset } from '@/components/ui/card-inset';
@@ -23,6 +24,13 @@ import {
 } from '@/lib/schemas/wifi-forms';
 import { useSetAPConfig } from '@/hooks/use-wifi';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
+import {
+  ApApplyRollbackError,
+  describeApApplyRollback,
+  rollbackApSections,
+  snapshotApSections,
+  type ApSectionSnapshot,
+} from '@/lib/ap-section-apply';
 import { normalizeApEncryption } from './ap-config-normalize';
 import { ApRadioDisableDialog } from './ap-radio-disable-dialog';
 
@@ -71,6 +79,8 @@ export function APUnifiedConfigForm({
   const [qrPayload, setQrPayload] = useState<APConfig | null>(null);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [pendingApply, setPendingApply] = useState<(() => void) | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   const primary = useMemo(() => pickPrimaryAp(apConfigs), [apConfigs]);
   const mismatch = useMemo(() => !credentialsMatchAcross(apConfigs), [apConfigs]);
@@ -115,20 +125,50 @@ export function APUnifiedConfigForm({
 
   const applyAll = async (data: UnifiedApCredentialsValues) => {
     const shared = buildSharedUpdate(data);
-    for (const ap of apConfigs) {
-      const enabled = enabledBySection[ap.section] ?? ap.enabled;
-      await setAP.mutateAsync({
-        section: ap.section,
-        config: { ...shared, enabled },
-      });
+    const snapshots = snapshotApSections(apConfigs);
+    const written: ApSectionSnapshot[] = [];
+    setApplying(true);
+    setApplyError(null);
+    try {
+      for (const snapshot of snapshots) {
+        const enabled = enabledBySection[snapshot.section] ?? snapshot.config.enabled;
+        try {
+          await setAP.mutateAsync({
+            section: snapshot.section,
+            config: { ...shared, enabled },
+          });
+          written.push(snapshot);
+        } catch (error) {
+          // Earlier sections are already committed and confirmed on the device,
+          // so put them back before reporting; otherwise the bands end up with
+          // different names/keys and nothing in the UI explains how to undo it.
+          const rollback = await rollbackApSections(written, (previous) =>
+            setAP.mutateAsync({ section: previous.section, config: previous.config }),
+          );
+          throw new ApApplyRollbackError(snapshot, error, rollback);
+        }
+      }
+    } finally {
+      setApplying(false);
     }
   };
 
-  const onSubmit = (data: UnifiedApCredentialsValues) => {
+  const runApply = async (data: UnifiedApCredentialsValues) => {
+    try {
+      await applyAll(data);
+      setApplyError(null);
+    } catch (error) {
+      const description = describeApApplyRollback(error);
+      setApplyError(description);
+      toast.error('Failed to save WiFi settings', { description });
+    }
+  };
+
+  const onSubmit = async (data: UnifiedApCredentialsValues) => {
     if (activeEnabledCount < 1) {
       if (!apConfigs.some((ap) => ap.enabled)) return;
-      setPendingApply(() => () => {
-        void applyAll(data).finally(() => {
+      setPendingApply(() => {
+        void runApply(data).finally(() => {
           setPendingApply(null);
           setDisableDialogOpen(false);
         });
@@ -137,7 +177,7 @@ export function APUnifiedConfigForm({
       return;
     }
 
-    void applyAll(data);
+    await runApply(data);
   };
 
   const confirmDisable = () => {
@@ -169,107 +209,115 @@ export function APUnifiedConfigForm({
           </p>
         ) : null}
 
-        <CardInset className="space-y-3 p-4">
-          {apConfigs.map((ap) => (
-            <div
-              key={ap.section}
-              className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
-            >
-              <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {ap.radio}
-                </span>
-                <Badge variant="outline">{bandLabel(ap.band)}</Badge>
-                <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
-              </div>
-              <Switch
-                id={`ap-unified-enabled-${ap.section}`}
-                label="Enabled"
-                checked={enabledBySection[ap.section] ?? ap.enabled}
-                onChange={(e) => onEnabledChange(ap.section, e.target.checked)}
-              />
-            </div>
-          ))}
-        </CardInset>
+        {applyError ? (
+          <p className="text-xs text-red-700 dark:text-red-300" role="alert">
+            {applyError}
+          </p>
+        ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="ap-unified-ssid" className="flex items-center gap-1">
-            Network name (all bands)
-            <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
-          </Label>
-          <Input
-            id="ap-unified-ssid"
-            placeholder="SSID for all radios"
-            aria-invalid={errors.ssid ? 'true' : undefined}
-            {...register('ssid')}
-          />
-          {errors.ssid ? (
-            <p className="text-xs text-red-500" role="alert">
-              {errors.ssid.message}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="ap-unified-enc">Encryption</Label>
-          <Controller
-            name="encryption"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(val) => {
-                  field.onChange(val);
-                  if (val === 'none') {
-                    setValue('key', '', { shouldValidate: true });
-                  }
-                }}
+        <fieldset disabled={applying} className="space-y-4 disabled:opacity-60">
+          <CardInset className="space-y-3 p-4">
+            {apConfigs.map((ap) => (
+              <div
+                key={ap.section}
+                className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
               >
-                <SelectTrigger id="ap-unified-enc">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (Open)</SelectItem>
-                  <SelectItem value="psk2">WPA2-PSK</SelectItem>
-                  <SelectItem value="sae">WPA3-SAE</SelectItem>
-                  <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
+                <div className="flex items-center gap-2">
+                  <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {ap.radio}
+                  </span>
+                  <Badge variant="outline">{bandLabel(ap.band)}</Badge>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
+                </div>
+                <Switch
+                  id={`ap-unified-enabled-${ap.section}`}
+                  label="Enabled"
+                  checked={enabledBySection[ap.section] ?? ap.enabled}
+                  onChange={(e) => onEnabledChange(ap.section, e.target.checked)}
+                />
+              </div>
+            ))}
+          </CardInset>
 
-        {encryption !== 'none' && (
           <div className="space-y-2">
-            <Label htmlFor="ap-unified-key" className="flex items-center gap-1">
-              Password
-              <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
+            <Label htmlFor="ap-unified-ssid" className="flex items-center gap-1">
+              Network name (all bands)
+              <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
             </Label>
             <Input
-              id="ap-unified-key"
-              type="password"
-              placeholder="Minimum 8 characters"
-              aria-invalid={errors.key ? 'true' : undefined}
-              {...register('key')}
+              id="ap-unified-ssid"
+              placeholder="SSID for all radios"
+              aria-invalid={errors.ssid ? 'true' : undefined}
+              {...register('ssid')}
             />
-            {errors.key ? (
+            {errors.ssid ? (
               <p className="text-xs text-red-500" role="alert">
-                {errors.key.message}
+                {errors.ssid.message}
               </p>
             ) : null}
           </div>
-        )}
 
-        <div className="flex gap-2">
-          <Button type="submit" size="sm" disabled={setAP.isPending}>
-            {setAP.isPending ? 'Saving...' : 'Save'}
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={openQrFromForm}>
-            <QrCode className="mr-1 h-4 w-4" />
-            QR Code
-          </Button>
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="ap-unified-enc">Encryption</Label>
+            <Controller
+              name="encryption"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    if (val === 'none') {
+                      setValue('key', '', { shouldValidate: true });
+                    }
+                  }}
+                >
+                  <SelectTrigger id="ap-unified-enc">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (Open)</SelectItem>
+                    <SelectItem value="psk2">WPA2-PSK</SelectItem>
+                    <SelectItem value="sae">WPA3-SAE</SelectItem>
+                    <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          {encryption !== 'none' && (
+            <div className="space-y-2">
+              <Label htmlFor="ap-unified-key" className="flex items-center gap-1">
+                Password
+                <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
+              </Label>
+              <Input
+                id="ap-unified-key"
+                type="password"
+                placeholder="Minimum 8 characters"
+                aria-invalid={errors.key ? 'true' : undefined}
+                {...register('key')}
+              />
+              {errors.key ? (
+                <p className="text-xs text-red-500" role="alert">
+                  {errors.key.message}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={applying || setAP.isPending}>
+              {applying ? 'Saving...' : 'Save'}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={openQrFromForm}>
+              <QrCode className="mr-1 h-4 w-4" />
+              QR Code
+            </Button>
+          </div>
+        </fieldset>
       </form>
 
       <WifiQRDialog
@@ -291,7 +339,7 @@ export function APUnifiedConfigForm({
         }}
         isLastActive
         onConfirm={confirmDisable}
-        confirmPending={setAP.isPending}
+        confirmPending={applying}
       />
     </>
   );

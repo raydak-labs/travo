@@ -24,7 +24,8 @@ export function WiFiScheduleFormFields({
         <div className="space-y-0.5">
           <p className="text-sm">Enable schedule</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Automatically turn WiFi on and off at set times (cron-based)
+            Turns this router&apos;s WiFi on and off every day at the times below. Anything
+            connected over WiFi loses its connection while WiFi is off.
           </p>
         </div>
         <Switch

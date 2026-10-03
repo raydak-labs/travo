@@ -1,6 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { apiClient, ApiError } from '../api-client';
-import { confirmWifiApply, finalizeWifiMutation, isTerminalApplyStatus } from '../wifi-apply';
+import {
+  confirmWifiApply,
+  finalizeWifiMutation,
+  isTerminalApplyStatus,
+  isWirelessNotVerifiedError,
+  WifiApplyRolledBackError,
+} from '../wifi-apply';
 
 describe('wifi-apply', () => {
   beforeEach(() => {
@@ -84,5 +90,44 @@ describe('wifi-apply', () => {
     expect(isTerminalApplyStatus(429)).toBe(false);
     expect(isTerminalApplyStatus(500)).toBe(false);
     expect(isTerminalApplyStatus(200)).toBe(false);
+  });
+
+  // services.ErrWirelessNotUp arrives as a 500, so the retry loop used to keep
+  // polling for the full 30s and then report a generic rollback timeout instead
+  // of telling the operator the router already reverted the change.
+  it('stops retrying when the router reports the wireless apply was not verified', async () => {
+    const spy = vi
+      .spyOn(apiClient, 'post')
+      .mockRejectedValue(
+        new ApiError(
+          500,
+          'wireless apply not verified: enabled access point(s) did not come up: default_radio1',
+        ),
+      );
+
+    await expect(confirmWifiApply('token-6', 30, 1)).rejects.toBeInstanceOf(
+      WifiApplyRolledBackError,
+    );
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('recognises the not-verified error by message, whatever the status', () => {
+    expect(
+      isWirelessNotVerifiedError(new ApiError(500, 'wireless apply not verified: sections x')),
+    ).toBe(true);
+    expect(isWirelessNotVerifiedError(new Error('token is required'))).toBe(false);
+    expect(isWirelessNotVerifiedError(undefined)).toBe(false);
+  });
+
+  it('still reports a plain rollback timeout when the router never answers', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('network down'));
+
+    const assertion = expect(confirmWifiApply('token-7', 1, 10)).rejects.toThrow(
+      /rollback timeout/,
+    );
+    await vi.runAllTimersAsync();
+
+    await assertion;
   });
 });

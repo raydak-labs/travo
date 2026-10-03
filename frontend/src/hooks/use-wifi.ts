@@ -318,8 +318,18 @@ export function useSetRadioRole() {
           role,
         }),
       ),
-    onSuccess: () => {
-      toast.success('Radio role updated');
+    onSuccess: (data, { name }) => {
+      // A radio switched to AP with no key gets a passphrase invented by the
+      // service. It is returned exactly once, in this response, and the new AP
+      // on the air uses it — so it has to reach the operator here or the network
+      // ends up with a password nobody knows.
+      if (data.generated_key) {
+        toast.success(`Radio ${name} updated`, {
+          description: `Generated WiFi password for ${name}: ${data.generated_key}`,
+        });
+      } else {
+        toast.success('Radio role updated');
+      }
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
       void refreshRouterState(queryClient, [
         ['wifi', 'connection'],

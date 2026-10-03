@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -41,7 +42,13 @@ function summarizeTrackIPs(trackIPs: readonly string[]) {
 }
 
 export function FailoverCard() {
-  const { data, isLoading } = useFailoverConfig();
+  const {
+    data,
+    isLoading,
+    isError: failoverFailed,
+    error: failoverError,
+    refetch: refetchFailover,
+  } = useFailoverConfig();
   const { data: events = [] } = useFailoverEvents();
   const setConfig = useSetFailoverConfig();
   const [isEditing, setIsEditing] = useState(false);
@@ -53,32 +60,32 @@ export function FailoverCard() {
     [current],
   );
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Connection Failover</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-10 w-28" />
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (!current) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Connection Failover</CardTitle>
+          <ArrowLeftRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent>
-          <EmptyState
-            message="Failover configuration is not available."
-            icon={<ArrowLeftRight className="h-5 w-5" />}
-          />
+          <QueryCard
+            isLoading={isLoading}
+            isError={failoverFailed}
+            error={failoverError}
+            onRetry={() => void refetchFailover()}
+            loading={
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-10 w-28" />
+              </div>
+            }
+          >
+            <EmptyState
+              message="Failover configuration is not available."
+              icon={<ArrowLeftRight className="h-5 w-5" />}
+            />
+          </QueryCard>
         </CardContent>
       </Card>
     );

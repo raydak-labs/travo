@@ -144,11 +144,12 @@ export function WifiModeSwitchDialog({
         message: 'You are connected via WiFi client. You may lose access.',
         details: [
           'AP mode disables WiFi client functionality.',
-          'Ensure you have Ethernet access or can connect to the AP WiFi.',
-          'Enable Emergency AP in advanced settings for guaranteed access.',
+          'Connect an Ethernet cable to a LAN port before switching, so you keep a route back in.',
+          'If the change does not complete, the router rolls back to the previous mode within 30 seconds.',
+          'A router reboot restores the mode that was active before this change.',
         ],
         extraWarning:
-          'Strongly recommended: Enable Emergency AP or connect via Ethernet before proceeding.',
+          'Strongly recommended: connect via Ethernet before proceeding. Without it, a switch that does not complete leaves you with no way to reach this page.',
       };
     }
 
@@ -262,10 +263,12 @@ export function WifiModeSwitchDialog({
 
           <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              <span className="font-medium">Keep this page open:</span> Your browser will confirm
-              the router is still reachable. If successful, the mode updates automatically. If the
-              rollback triggers, you will see a connection error — refresh the page and your old
-              mode will be restored.
+              <span className="font-medium">Keep this page open:</span> a progress dialog shows the
+              apply being confirmed for up to 30 seconds while the previous mode is still active. If
+              the new mode does not come up, the router rolls back on its own and reload this page
+              to see the previous mode. If you are locked out entirely, connect via Ethernet to a
+              LAN port, or reboot the router to return to the mode that was active before this
+              change.
             </p>
           </div>
         </div>

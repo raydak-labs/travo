@@ -2,14 +2,20 @@ import { Search, Wifi } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useNetworkStatus, useDetectWanType, useWanConfig } from '@/hooks/use-network';
 import { networkMedium } from '@shared/index';
 import { formatBytes } from '@/lib/utils';
 
 export function WanConfigCard() {
-  const { data: network, isLoading } = useNetworkStatus();
+  const {
+    data: network,
+    isLoading,
+    isError: networkFailed,
+    error: networkError,
+    refetch: refetchNetwork,
+  } = useNetworkStatus();
   const { data: wanConfig } = useWanConfig();
   const detectWanType = useDetectWanType();
 
@@ -20,37 +26,40 @@ export function WanConfigCard() {
         <Wifi className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        ) : network?.wan ? (
-          <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-            <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Medium</span>
-              <span className="text-gray-900 dark:text-white">{networkMedium(network.wan)}</span>
-              <span className="text-gray-500 dark:text-gray-400">Protocol</span>
-              <span className="text-gray-900 dark:text-white">{wanConfig?.type ?? '—'}</span>
-              <span className="text-gray-500 dark:text-gray-400">IP Address</span>
-              <span className="text-gray-900 dark:text-white">{network.wan.ip_address}</span>
-              <span className="text-gray-500 dark:text-gray-400">Gateway</span>
-              <span className="text-gray-900 dark:text-white">{network.wan.gateway}</span>
-              <span className="text-gray-500 dark:text-gray-400">DNS</span>
-              <span className="text-gray-900 dark:text-white">
-                {(network.wan.dns_servers ?? []).join(', ') || '—'}
-              </span>
-              <span className="text-gray-500 dark:text-gray-400">MAC</span>
-              <span className="text-gray-900 dark:text-white">{network.wan.mac_address}</span>
-              <span className="text-gray-500 dark:text-gray-400">Traffic</span>
-              <span className="text-gray-900 dark:text-white">
-                ↓ {formatBytes(network.wan.rx_bytes)} / ↑ {formatBytes(network.wan.tx_bytes)}
-              </span>
+        {/* "WAN not configured" is only true when the status query answered. */}
+        <QueryCard
+          isLoading={isLoading}
+          isError={networkFailed}
+          error={networkError}
+          onRetry={() => void refetchNetwork()}
+        >
+          {network?.wan ? (
+            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+              <div className="grid grid-cols-2 gap-2">
+                <span className="text-gray-500 dark:text-gray-400">Medium</span>
+                <span className="text-gray-900 dark:text-white">{networkMedium(network.wan)}</span>
+                <span className="text-gray-500 dark:text-gray-400">Protocol</span>
+                <span className="text-gray-900 dark:text-white">{wanConfig?.type ?? '—'}</span>
+                <span className="text-gray-500 dark:text-gray-400">IP Address</span>
+                <span className="text-gray-900 dark:text-white">{network.wan.ip_address}</span>
+                <span className="text-gray-500 dark:text-gray-400">Gateway</span>
+                <span className="text-gray-900 dark:text-white">{network.wan.gateway}</span>
+                <span className="text-gray-500 dark:text-gray-400">DNS</span>
+                <span className="text-gray-900 dark:text-white">
+                  {(network.wan.dns_servers ?? []).join(', ') || '—'}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">MAC</span>
+                <span className="text-gray-900 dark:text-white">{network.wan.mac_address}</span>
+                <span className="text-gray-500 dark:text-gray-400">Traffic</span>
+                <span className="text-gray-900 dark:text-white">
+                  ↓ {formatBytes(network.wan.rx_bytes)} / ↑ {formatBytes(network.wan.tx_bytes)}
+                </span>
+              </div>
             </div>
-          </div>
-        ) : (
-          <EmptyState message="WAN not configured" />
-        )}
+          ) : (
+            <EmptyState message="WAN not configured" />
+          )}
+        </QueryCard>
         <div className="mt-3 flex items-center gap-3">
           <Button
             variant="outline"

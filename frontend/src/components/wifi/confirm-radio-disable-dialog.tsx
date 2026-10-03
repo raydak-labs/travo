@@ -94,7 +94,7 @@ export function ConfirmRadioDisableDialog({
                   </p>
                   <ul className="mt-1 space-y-1 text-sm text-red-700 dark:text-red-300">
                     <li>• Connect via Ethernet cable to LAN port</li>
-                    <li>• Reboot and use Emergency AP (if enabled)</li>
+                    <li>• Reboot the router and connect to the AP network it comes up with</li>
                     <li>• Access via serial console (advanced)</li>
                   </ul>
                 </div>

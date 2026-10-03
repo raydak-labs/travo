@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Shield } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 import { useServices } from '@/hooks/use-services';
 import {
@@ -26,9 +27,9 @@ import { applyWireguardImportFile } from '@/pages/vpn/wireguard-import-profile-f
 import { WireguardInstallPrompt } from '@/pages/vpn/wireguard-install-prompt';
 
 export function WireguardSection() {
-  const { data: vpnStatuses = [] } = useVpnStatus();
-  const { data: services = [] } = useServices();
-  const { data: config, isLoading } = useWireguardConfig();
+  const vpnStatusQuery = useVpnStatus();
+  const servicesQuery = useServices();
+  const configQuery = useWireguardConfig();
   const { data: wgLiveStatus } = useWireguardStatus();
   const { data: profiles = [] } = useWireguardProfiles();
   const toggleMutation = useToggleWireguard();
@@ -44,9 +45,21 @@ export function WireguardSection() {
     mode: 'onChange',
   });
 
-  const wgStatus = vpnStatuses.find((v) => v.type === 'wireguard');
-  const wgService = services.find((s) => s.id === 'wireguard');
+  const wgStatus = vpnStatusQuery.data?.find((v) => v.type === 'wireguard');
+  const wgService = servicesQuery.data?.find((s) => s.id === 'wireguard');
+  // "Not installed" may only be concluded from a service list or VPN status that
+  // actually arrived; a failed GET must not read as an absent feature.
   const isInstalled = wgService ? wgService.state !== 'not_installed' : !!wgStatus;
+  // Both the service list and the VPN status feed the install state. It can only
+  // be concluded once both have settled; if either request failed, "not
+  // installed" would be a guess, and the install link would point at an action
+  // that cannot work.
+  const installStatePending =
+    !(servicesQuery.isSuccess || servicesQuery.isError) ||
+    !(vpnStatusQuery.isSuccess || vpnStatusQuery.isError);
+  const installStateFailed = servicesQuery.isError || vpnStatusQuery.isError;
+  const installStateError = servicesQuery.error ?? vpnStatusQuery.error;
+  const configFailed = isInstalled && configQuery.isError;
   const isToggling = toggleMutation.isPending;
   const desiredEnabled = isToggling ? toggleMutation.variables : undefined;
 
@@ -65,6 +78,12 @@ export function WireguardSection() {
 
   const handleFileUpload = (file: File | null) => {
     void applyWireguardImportFile(file, importForm);
+  };
+
+  const retryInstallState = () => {
+    void servicesQuery.refetch();
+    void vpnStatusQuery.refetch();
+    void configQuery.refetch();
   };
 
   return (
@@ -87,34 +106,42 @@ export function WireguardSection() {
           <Shield className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent className="space-y-4">
-          {!isInstalled ? (
-            <WireguardInstallPrompt />
-          ) : isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          ) : (
-            <WireguardCardBody
-              wgStatus={wgStatus}
-              wgLiveStatus={wgLiveStatus}
-              config={config}
-              profiles={profiles}
-              killSwitch={killSwitch}
-              isToggling={isToggling}
-              desiredEnabled={desiredEnabled}
-              statusDetail={statusDetail}
-              toggleMutationPending={toggleMutation.isPending}
-              onToggleWireguard={() => toggleMutation.mutate(!(wgStatus?.enabled ?? false))}
-              activateProfileMutation={activateProfileMutation}
-              deleteProfileMutation={deleteProfileMutation}
-              killSwitchMutation={killSwitchMutation}
-              importForm={importForm}
-              onImportSubmit={onImportSubmit}
-              onFileSelected={handleFileUpload}
-              addProfilePending={addProfileMutation.isPending}
-            />
-          )}
+          <QueryCard
+            isLoading={installStatePending || (isInstalled && configQuery.isLoading)}
+            isError={installStateFailed || configFailed}
+            error={installStateError ?? configQuery.error}
+            onRetry={retryInstallState}
+            loading={
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            }
+          >
+            {!isInstalled ? (
+              <WireguardInstallPrompt />
+            ) : (
+              <WireguardCardBody
+                wgStatus={wgStatus}
+                wgLiveStatus={wgLiveStatus}
+                config={configQuery.data}
+                profiles={profiles}
+                killSwitch={killSwitch}
+                isToggling={isToggling}
+                desiredEnabled={desiredEnabled}
+                statusDetail={statusDetail}
+                toggleMutationPending={toggleMutation.isPending}
+                onToggleWireguard={() => toggleMutation.mutate(!(wgStatus?.enabled ?? false))}
+                activateProfileMutation={activateProfileMutation}
+                deleteProfileMutation={deleteProfileMutation}
+                killSwitchMutation={killSwitchMutation}
+                importForm={importForm}
+                onImportSubmit={onImportSubmit}
+                onFileSelected={handleFileUpload}
+                addProfilePending={addProfileMutation.isPending}
+              />
+            )}
+          </QueryCard>
         </CardContent>
       </Card>
     </>

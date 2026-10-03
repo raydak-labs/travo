@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Globe } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { Switch } from '@/components/ui/switch';
 import { useDNSConfig, useSetDNSConfig } from '@/hooks/use-network';
 import { dnsConfigFormSchema, type DnsConfigFormValues } from '@/lib/schemas/network-forms';
@@ -12,7 +12,13 @@ import { LanDnsPresetButtons } from './lan-dns-preset-buttons';
 import { LanDnsServerFields } from './lan-dns-server-fields';
 
 export function LanDnsSettingsCard() {
-  const { data: dnsConfig, isLoading: dnsLoading } = useDNSConfig();
+  const {
+    data: dnsConfig,
+    isLoading: dnsLoading,
+    isError: dnsFailed,
+    error: dnsError,
+    refetch: refetchDns,
+  } = useDNSConfig();
   const setDNS = useSetDNSConfig();
 
   const {
@@ -56,30 +62,38 @@ export function LanDnsSettingsCard() {
         <Globe className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {dnsLoading ? (
-          <Skeleton className="h-4 w-1/2" />
-        ) : (
-          <form onSubmit={handleSubmit(onSaveDns)} className="space-y-4" noValidate>
-            <div className="flex items-center gap-2">
-              <Switch {...register('use_custom_dns')} />
-              <span className="text-sm">Use custom DNS servers</span>
-            </div>
-            {useCustom && (
-              <>
-                <LanDnsPresetButtons
-                  onPick={(primary, secondary) => {
-                    setValue('server1', primary, { shouldValidate: true });
-                    setValue('server2', secondary, { shouldValidate: true });
-                  }}
-                />
-                <LanDnsServerFields register={register} errors={dnsErrors} />
-              </>
-            )}
-            <Button type="submit" size="sm" disabled={setDNS.isPending}>
-              {setDNS.isPending ? 'Saving…' : 'Save DNS Settings'}
-            </Button>
-          </form>
-        )}
+        {/* Rendering the form before the config is known would show
+            "Use custom DNS servers" off with empty fields, and a Save would then
+            discard the resolvers the router is actually using. */}
+        <QueryCard
+          isLoading={dnsLoading}
+          isError={dnsFailed}
+          error={dnsError}
+          onRetry={() => void refetchDns()}
+        >
+          {dnsConfig ? (
+            <form onSubmit={handleSubmit(onSaveDns)} className="space-y-4" noValidate>
+              <div className="flex items-center gap-2">
+                <Switch {...register('use_custom_dns')} />
+                <span className="text-sm">Use custom DNS servers</span>
+              </div>
+              {useCustom && (
+                <>
+                  <LanDnsPresetButtons
+                    onPick={(primary, secondary) => {
+                      setValue('server1', primary, { shouldValidate: true });
+                      setValue('server2', secondary, { shouldValidate: true });
+                    }}
+                  />
+                  <LanDnsServerFields register={register} errors={dnsErrors} />
+                </>
+              )}
+              <Button type="submit" size="sm" disabled={setDNS.isPending}>
+                {setDNS.isPending ? 'Saving…' : 'Save DNS Settings'}
+              </Button>
+            </form>
+          ) : null}
+        </QueryCard>
       </CardContent>
     </Card>
   );

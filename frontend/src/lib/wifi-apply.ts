@@ -20,6 +20,33 @@ export function isTerminalApplyStatus(status: number): boolean {
   return status !== 408 && status !== 429;
 }
 
+/**
+ * Substring the backend sends when ConfirmApply found that the access points the
+ * new config enables never came up (services.ErrWirelessNotUp). The change was
+ * NOT applied — rpcd's rollback window was left to expire, so the router is
+ * already back on the previous configuration.
+ */
+const WIRELESS_NOT_VERIFIED = 'wireless apply not verified';
+
+export function isWirelessNotVerifiedError(error: unknown): boolean {
+  return error instanceof Error && error.message.toLowerCase().includes(WIRELESS_NOT_VERIFIED);
+}
+
+/**
+ * The wireless change was rejected by the device's own verification and the
+ * router rolled back to the previous configuration. Distinct from a plain
+ * failure so the UI can say "rolled back" instead of "something went wrong".
+ */
+export class WifiApplyRolledBackError extends Error {
+  constructor() {
+    super(
+      'The router could not bring the new wireless settings up, so it rolled back ' +
+        'to the previous settings.',
+    );
+    this.name = 'WifiApplyRolledBackError';
+  }
+}
+
 export async function confirmWifiApply(
   token: string,
   rollbackTimeoutSeconds = 30,
@@ -34,6 +61,12 @@ export async function confirmWifiApply(
       return;
     } catch (error) {
       lastError = error;
+      // A final answer even though it arrives as a 5xx: the device already
+      // decided the change is not applied, so retrying only burns the 30 s and
+      // hides the fact that the router is back on the old settings.
+      if (isWirelessNotVerifiedError(error)) {
+        throw new WifiApplyRolledBackError();
+      }
       if (error instanceof ApiError && isTerminalApplyStatus(error.status)) {
         // Surface the device's answer immediately instead of waiting for the
         // rollback window to expire.
