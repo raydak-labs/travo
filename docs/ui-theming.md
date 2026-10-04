@@ -1,7 +1,7 @@
 ---
 title: Frontend UI and theming
 description: ThemeProvider, dark class, Tailwind tokens, chart variables, contrast rules.
-updated: 2026-07-24
+updated: 2026-10-04
 tags: [docs, frontend, theming, tailwind]
 ---
 
@@ -45,9 +45,43 @@ That way elements that only set size/weight (e.g. `className="text-sm"`) inherit
 | Secondary / hint text               | `text-gray-500 dark:text-gray-400` or `text-gray-600 dark:text-gray-300`  |
 | Primary emphasis on colored surface | Ensure both light and dark classes (e.g. `text-gray-900 dark:text-white`) |
 
-## Charts and third-party SVG
+## Motion
 
-Recharts ticks and tooltips cannot use Tailwind classes directly. Use CSS variables from `index.css` (`--chart-grid`, `--chart-axis`, `--chart-tooltip-*`) and pass them via `stroke` / `fill` / `contentStyle`.
+`index.css` imports `tw-animate-css`. Every `animate-in` / `fade-in-*` /
+`zoom-in-*` / `slide-in-from-*` utility on a Dialog, Sheet or Select depends on
+it — adding one without the import produces a class that silently does nothing
+(no lint or type error). A `prefers-reduced-motion` block in `@layer`-adjacent
+CSS neutralises all of it; keep it last in `index.css`.
+
+## Native controls and `color-scheme`
+
+`index.css` declares `color-scheme: light` on `:root` and `dark` on `.dark`.
+Without it the UA keeps its own light rendering for `type="time"`,
+`type="range"`, `type="file"` inputs and scrollbars on dark surfaces.
+
+## Field chrome
+
+`Input`, `Textarea` and `SelectTrigger` share one surface string
+(`fieldClassName` in `components/ui/input.tsx`) and one invalid-state string
+(`invalidFieldClassName`). Do not hand-roll a fourth copy, and do not restyle
+`SelectTrigger` independently: a form mixing an `Input` and a Select must show
+one surface and one focus-ring width.
+
+Field validation errors use **`FieldError`** (`text-xs text-red-600
+dark:text-red-400`, `role="alert"`). Do not write `text-red-500` directly:
+that is 3.76:1 on white and fails AA at the sizes used here.
+
+## Buttons
+
+`buttonVariants` base owns `gap-2` for the icon-to-label distance. Do not add
+`mr-*` between a button's icon and its label — 41 call sites had drifted across
+`mr-2`, `mr-1.5` and `mr-1`.
+
+## Status dots
+
+Use `statusDotClass(up)` / `statusDotIdleClass` from `@/lib/status-dot` rather
+than an inline `shadow-[0_0_6px_rgba(...)]`. State must never be colour-only:
+pair the dot with a visually hidden text node and `role="status"`.
 
 ## Nested regions
 
@@ -60,7 +94,9 @@ Inside a `Card`, use **`CardInset`** (`frontend/src/components/ui/card-inset.tsx
 | **Form rows** | Default control height (`Input` / `SelectTrigger` / submit `Button` = **`h-10`**) | Labeled fields, add/save rows next to `Input` |
 | **Dense chrome** | `Button size="sm"` (and icon rows) | Logs filters, page header actions, service action icon rows, quick actions — **not** form rows with labeled Inputs |
 
-`SelectTrigger` default is **`h-10`** with light `border-gray-300` and dark `border-white/10` (card-plane consistency). Do not leave form submits at `size="sm"` beside default Inputs.
+`SelectTrigger` default is **`h-10`** with the same `fieldClassName` surface as
+`Input` (card-plane consistency). Do not leave form submits at `size="sm"` beside
+default Inputs.
 
 ## Badge exceptions
 

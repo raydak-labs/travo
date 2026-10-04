@@ -154,6 +154,32 @@ Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive
 
 The captive auto-accept flow's conditional `wwan` DHCP bounce lives in that ADR (§4.1), not here: it is a captive-portal behavior, and putting the "only when `wwan` is the active uplink" condition next to the DNS bypass rules keeps the whole captive surface in one place.
 
+### 6.4 Uplink identity and what the UI may call it
+
+The dashboard, the Network Status page and the VPN/throughput readouts all
+describe the same three uplinks (`wan`, `wwan`, `usbtether`). One vocabulary
+defines them: `frontend/src/lib/uplink.ts`.
+
+Normative rules:
+
+- **`status.Interfaces` must include every candidate uplink.** USB tethering
+  creates its own logical interface (`network.usbtether`) in the wan zone, so
+  `NetworkService` surfaces it alongside WAN/LAN/wwan and promotes it to the
+  effective WAN when it is up. Omitting it makes a phone-tethered router report
+  "No Internet" while the internet is up.
+- **`internet_reachable` is a WAN-carrier check, not a reachability probe.** It
+  is `status.WAN != nil && status.WAN.IsUp`. The only word that must not sit
+  next to it is "Internet"; the UI says "Uplink". A real probe is
+  `uptime_tracker.go`, and it is a different signal on purpose.
+- **Throughput charts plot a named uplink, never `network[0]`.**
+  `system_service.go` emits stats in a fixed order whose first entry is
+  `br-lan`, so index 0 is LAN traffic. `uplinkInterfaceName` selects by name and
+  returns nothing rather than falling back to the LAN bridge.
+- **Tunnel state has three values, not two.** `VpnStatus.status_detail` exists to
+  distinguish disabled / configured / enabled-not-up / no-handshake / connected;
+  collapsing `enabled` and `connected` produced "Off" directly above a
+  "Disable VPN" button.
+
 ## 7. Authentication And API Access
 
 - Administrative login uses the **root** password validated via **rpcd** on device; Travo issues **JWT** bearer tokens for API access.
