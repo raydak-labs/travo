@@ -657,7 +657,7 @@ export const handlers = [
       apply: { pending: true, token: 'apply-repeater-reconcile', rollback_timeout_seconds: 30 },
     });
   }),
-  http.put(/\/api\/v1\/wifi\/ap\/.*/, () => {
+  http.put(`${API_ROUTES.wifi.ap}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 

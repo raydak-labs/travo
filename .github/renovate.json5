@@ -15,6 +15,13 @@
   // `go mod tidy -diff` gate (test-backend) goes red on the next patch PR.
   "postUpdateOptions": ["gomodTidy"],
 
+  // docker-compose.yml pins node:26-alpine by digest (restored in 5baa9c7 after a
+  // tooling commit dropped it while claiming to keep the pin). Renovate updates
+  // a digest that is present but does not put one back if it disappears, and
+  // nothing in CI fails when the pin is gone, so pinDigests is what makes the
+  // supply-chain pin self-healing instead of a one-time courtesy.
+  "pinDigests": true,
+
   "packageRules": [
     {
       // TRACK: every @vitest/mocker 5.x release through 5.0.3 peer-requires

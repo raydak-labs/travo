@@ -136,6 +136,11 @@ func TestDocsNameThePersistentStoreInEtcTravo(t *testing.T) {
 // set. ADR 0010 and ADR 0011 were missing from the hub while being Accepted,
 // which hid exactly the two documents that govern the classes of bug this repo
 // keeps producing.
+//
+// The entry has to be a LINK, not a mention: a bare substring is satisfied by
+// the sentence "0012 is not an ADR yet", so a new ADR could be filed and left
+// unreachable. An unnumbered file in docs/adr is an error for the same reason —
+// the numbered series is what makes "read the ADR for this area" possible.
 func TestOwningAdrIsReferenced(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(docsDir, "adr"))
 	if err != nil {
@@ -150,19 +155,96 @@ func TestOwningAdrIsReferenced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read obsidian hub: %v", err)
 	}
+	indexLink := regexp.MustCompile(`\]\(\./([^)"]+\.md)\)`)
+	hubLink := regexp.MustCompile(`\[\[adr/([^\]|]+?)(?:\|[^\]]*)?\]\]`)
 
+	linked := map[string]bool{}
+	for _, m := range indexLink.FindAllStringSubmatch(string(index), -1) {
+		linked["index:"+m[1]] = true
+	}
+	for _, m := range hubLink.FindAllStringSubmatch(string(hub), -1) {
+		linked["hub:"+m[1]] = true
+	}
+
+	numbered := regexp.MustCompile(`^[0-9]{4}-[a-z0-9-]+\.md$`)
+	adrs := 0
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || !strings.HasPrefix(name, "0") || !strings.HasSuffix(name, ".md") {
+		if e.IsDir() || name == "README.md" || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		adrs++
+		if !numbered.MatchString(name) {
+			t.Errorf("docs/adr/%s is not in the numbered ADR series, so nobody knows "+
+				"which subsystem owns it; rename it to NNNN-topic.md", name)
 			continue
 		}
 		stem := strings.TrimSuffix(name, ".md")
-		if !strings.Contains(string(index), stem) {
-			t.Errorf("ADR %s is not listed in docs/adr/README.md", stem)
+		if !linked["index:"+name] {
+			t.Errorf("ADR %s has no link in docs/adr/README.md", stem)
 		}
-		if !strings.Contains(string(hub), stem) {
-			t.Errorf("ADR %s is not listed in docs/+ Start here.md, which AGENTS.md "+
+		if !linked["hub:"+stem] {
+			t.Errorf("ADR %s has no wikilink in docs/+ Start here.md, which AGENTS.md "+
 				"names as the default retrieval path", stem)
 		}
+	}
+	if adrs == 0 {
+		t.Fatal("no ADRs found — the directory walk is broken, so this gate proved nothing")
+	}
+}
+
+// TestVerificationPlaybooksAreLinked closes the same hole one level down: a
+// playbook in docs/tests/ that nothing links to is a document that exists only
+// to satisfy the review that asked for it. Any document in the vault may be the
+// entry point, so the gate follows links from all of docs/ rather than from one
+// nominated file that is easy to forget to update.
+func TestVerificationPlaybooksAreLinked(t *testing.T) {
+	playbookDir := filepath.Join(docsDir, "tests")
+	entries, err := os.ReadDir(playbookDir)
+	if err != nil {
+		t.Skipf("no playbook directory: %v", err)
+	}
+
+	// Basenames are enough: docs/ has one file per basename by convention, and a
+	// false link is caught by the resolution check below.
+	linked := map[string]bool{}
+	filepath.Walk(docsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		if !strings.HasSuffix(path, ".md") ||
+			info.Name() == ".obsidian" || strings.Contains(path, "_archive") {
+			return nil
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, re := range []*regexp.Regexp{
+			regexp.MustCompile(`\[\[[^\]|]*?([a-z0-9-]+\.md|[a-z0-9-]+)(?:\|[^\]]*)?\]\]`),
+			regexp.MustCompile(`\]\([^)]*?([a-z0-9-]+(?:\.md)?)\)`),
+		} {
+			for _, found := range re.FindAllStringSubmatch(string(body), -1) {
+				linked[filepath.Base(found[1])] = true
+			}
+		}
+		return nil
+	})
+
+	playbooks := 0
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		playbooks++
+		if !linked[e.Name()] && !linked[strings.TrimSuffix(e.Name(), ".md")] {
+			t.Errorf("docs/tests/%s is not linked from any document in docs/: a "+
+				"playbook nobody can reach is a document that only exists to satisfy "+
+				"the review that asked for it", e.Name())
+		}
+	}
+	if playbooks == 0 {
+		t.Fatal("no playbooks found in docs/tests — the walk is broken, so this gate " +
+			"proved nothing")
 	}
 }
