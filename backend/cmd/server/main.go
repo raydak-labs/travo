@@ -468,8 +468,23 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	timeSyncLimiter := auth.NewRateLimiter(3, time.Minute)
 	timeSyncLimiter.StartCleanup(5 * time.Minute)
 
-	// Health check endpoint. Registered on the app rather than the
-	// authenticated /api/v1 group, so it stays reachable without a token.
+	// Auth middleware, mounted BEFORE any /api route is registered.
+	//
+	// It is deliberately app.Use, not a route-group middleware: Fiber v3 scopes
+	// group middleware by PATH PREFIX rather than by which router the route was
+	// registered on, so mounting it on the /api/v1 group also intercepted routes
+	// registered directly on the app -- the WebSocket upgrade and the public
+	// time-sync endpoint -- and broke both. The public exceptions are the exact
+	// paths in auth.PublicPaths, not a prefix test.
+	//
+	// TestProductionAppRequiresAuthOnAPIRoutes drives the app this function
+	// builds, because the composition of this file is otherwise untested: an
+	// earlier commit moved the middleware onto a group and, when that was
+	// reverted, this line was never restored -- leaving production with no auth
+	// at all while every other test stayed green.
+	app.Use(authSvc.Middleware())
+
+	// Health check endpoint. Public, per auth.PublicPaths.
 	app.Get("/api/health", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status": "ok",
