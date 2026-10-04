@@ -3907,3 +3907,119 @@ func TestBandSwitchingLoadConfigAppliesValidFile(t *testing.T) {
 		t.Errorf("up_switch_delay_sec = %d, want 15", got.UpSwitchDelaySec)
 	}
 }
+
+// TestRadioForNewSTAIsDeterministic pins a bug this branch's own new check
+// exposed rather than caused.
+//
+// Connect used to pick the radio for a new uplink STA by taking the first entry
+// found while ranging over the wireless-section map, so Go's randomised
+// iteration order decided it. Downstream that was not cosmetic: the chosen radio
+// decides whether the uplink shares a PHY with an access point, and the new
+// splitAPOffUplinkRadio check refuses when it would. The result was an
+// intermittent "refusing to run an access point and the WiFi uplink on the same
+// radio" that depended on map order — a ~40% failure rate in
+// TestWifiConnect_MultipleProfilesPersist.
+func TestRadioForNewSTAIsDeterministic(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Both radios carry an enabled access point, the stock layout, so nothing
+	// is preferable and the sorted first radio must win every time.
+	for _, section := range []string{"default_radio0", "default_radio1"} {
+		if err := u.Set("wireless", section, "mode", "ap"); err != nil {
+			t.Fatal(err)
+		}
+		if err := u.Set("wireless", section, "device", section); err != nil {
+			t.Fatal(err)
+		}
+		if err := u.Set("wireless", section, "disabled", "0"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	sections, err := u.GetSections("wireless")
+	if err != nil {
+		t.Fatalf("read sections: %v", err)
+	}
+
+	first, err := svc.radioForNewSTA(sections)
+	if err != nil {
+		t.Fatalf("radioForNewSTA: %v", err)
+	}
+	if first != "radio0" {
+		t.Errorf("radioForNewSTA = %q, want radio0 (sorted, not map order)", first)
+	}
+
+	// Repeat: the choice must not move between calls on identical input.
+	for i := 0; i < 50; i++ {
+		again, err := svc.radioForNewSTA(sections)
+		if err != nil {
+			t.Fatalf("radioForNewSTA call %d: %v", i, err)
+		}
+		if again != first {
+			t.Fatalf("radioForNewSTA is not deterministic: call %d returned %q, first returned %q",
+				i, again, first)
+		}
+	}
+}
+
+// TestRadioForNewSTAPrefersRadioWithoutAccessPoint pins the second property:
+// when one radio is free of access points the uplink should go there, so a
+// second Connect does not land on the radio holding the only remaining access
+// point and get refused for it.
+func TestRadioForNewSTAPrefersRadioWithoutAccessPoint(t *testing.T) {
+	svc, u := newTestWifiService()
+
+	// Simulate the state a first Connect leaves behind: radio0's AP disabled by
+	// splitAPOffUplinkRadio, radio1 still carrying the only enabled AP.
+	if err := u.Set("wireless", "default_radio0", "mode", "ap"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "default_radio0", "device", "radio0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "default_radio0", "disabled", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "default_radio1", "mode", "ap"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "default_radio1", "device", "radio1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "default_radio1", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+
+	sections, err := u.GetSections("wireless")
+	if err != nil {
+		t.Fatalf("read sections: %v", err)
+	}
+	got, err := svc.radioForNewSTA(sections)
+	if err != nil {
+		t.Fatalf("radioForNewSTA: %v", err)
+	}
+	if got != "radio0" {
+		t.Errorf("radioForNewSTA = %q, want radio0: it has no enabled access point, so "+
+			"choosing it avoids disabling a second one and avoids being refused for "+
+			"sharing a PHY with the only remaining AP", got)
+	}
+}
+
+// TestConnectTwiceSucceeds is the regression the two properties exist for: two
+// consecutive connects with no band pinned must both succeed. Before, the second
+// one could be refused because the new STA landed on the radio that still held
+// the only enabled access point.
+func TestConnectTwiceSucceeds(t *testing.T) {
+	svc, _ := newTestWifiService()
+
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Coffee-Shop", Password: "coffee123", Encryption: "psk2",
+	}); err != nil {
+		t.Fatalf("first connect: %v", err)
+	}
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Airport-WiFi", Password: "air456", Encryption: "psk2",
+	}); err != nil {
+		t.Fatalf("second connect was refused: %v", err)
+	}
+}
