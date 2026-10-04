@@ -17,7 +17,30 @@ import {
   dismissedOverwriteAlerts,
   rememberDismissedOverwriteAlert,
 } from './operator-edit-overwrite';
-import type { FailoverCandidate, FailoverConfig } from '@shared/index';
+import type {
+  FailoverCandidate,
+  FailoverConfig,
+  FailoverTrackingState,
+} from '@shared/index';
+
+/**
+ * The tracking state as something a user can act on. `not_available` vs
+ * `not_installed` is a distinction only the mwan3 author cares about, and
+ * neither tells a user what to do.
+ */
+const TRACKING_LABEL: Record<FailoverTrackingState, string> = {
+  online: 'Online',
+  offline: 'Offline',
+  disabled: 'Skipped',
+  not_installed: 'Service missing',
+  not_available: 'No device',
+  unknown: 'Unknown',
+};
+
+function trackingLabel(candidate: FailoverCandidate): string {
+  if (!candidate.enabled) return 'Skipped';
+  return TRACKING_LABEL[candidate.tracking_state] ?? candidate.tracking_state;
+}
 
 function cloneConfig(config: FailoverConfig): FailoverConfig {
   return {
@@ -45,8 +68,16 @@ function moveCandidate(candidates: readonly FailoverCandidate[], index: number, 
 }
 
 function summarizeTrackIPs(trackIPs: readonly string[]) {
-  return trackIPs.length > 0 ? trackIPs.join(', ') : '—';
+  if (trackIPs.length === 0) return '—';
+  if (trackIPs.length === 1) return trackIPs[0];
+  return `${trackIPs.length} addresses`;
 }
+
+const HEALTH_FIELDS = [
+  { field: 'interval', label: 'Interval (s)', min: 1 },
+  { field: 'down', label: 'Failures before down', min: 1 },
+  { field: 'up', label: 'Successes before recovery', min: 1 },
+] as const;
 
 export function FailoverCard() {
   const {
@@ -89,6 +120,11 @@ export function FailoverCard() {
       onDismiss={(id) => setDismissedAlerts(rememberDismissedOverwriteAlert(id))}
     />
   ) : null;
+
+  // Held as raw text while editing: parsing on every keystroke turned a
+  // cleared field into 0, which the backend rejects, so clearing a field and
+  // saving produced a raw server error toast.
+  const [healthDraft, setHealthDraft] = useState<Record<string, string>>({});
 
   const current = isEditing ? (draft ?? data) : data;
   const enabledCount = useMemo(
@@ -145,6 +181,14 @@ export function FailoverCard() {
     setIsEditing(false);
   };
 
+  const commitHealthField = (field: 'interval' | 'down' | 'up', raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return;
+    setDraft((prev) =>
+      prev ? { ...prev, health: { ...prev.health, [field]: parsed } } : prev,
+    );
+  };
+
   const handleEdit = () => {
     if (data) {
       setDraft(cloneConfig(data));
@@ -189,14 +233,19 @@ export function FailoverCard() {
                         {candidate.priority}. {candidate.label}
                       </span>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {candidate.enabled ? candidate.tracking_state : 'excluded'}
+                        <span title={candidate.tracking_state}>{trackingLabel(candidate)}</span>
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Health targets</span>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span
+                  className="text-gray-500 dark:text-gray-400"
+                  title="Addresses checked to decide whether the internet is really reachable"
+                >
+                  Addresses checked for internet
+                </span>
                 <span className="truncate pl-4 text-right">
                   {summarizeTrackIPs(current.health.track_ips)}
                 </span>
@@ -209,7 +258,8 @@ export function FailoverCard() {
 
             {!current.service_installed ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Install the `mwan3` service from the Services page before enabling ordered failover.
+                Install the <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">mwan3</code>{' '}
+                service from the Services page before enabling ordered failover.
               </p>
             ) : null}
 
@@ -237,7 +287,11 @@ export function FailoverCard() {
                     <div className="space-y-1">
                       <div className="font-medium">{candidate.label}</div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        Interface `{candidate.interface_name}` · {candidate.tracking_state}
+                        Interface{' '}
+                        <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">
+                          {candidate.interface_name}
+                        </code>{' '}
+                        · {trackingLabel(candidate)}
                       </div>
                     </div>
                     <Switch
@@ -329,37 +383,34 @@ export function FailoverCard() {
                 />
               </div>
 
-              {[
-                ['interval', 'Interval (s)'],
-                ['down', 'Failures before down'],
-                ['up', 'Successes before recovery'],
-              ].map(([field, label]) => (
-                <div key={field} className="space-y-2">
-                  <Label htmlFor={field} className="text-sm font-medium">
-                    {label}
-                  </Label>
-                  <Input
-                    id={field}
-                    inputMode="numeric"
-                    value={String(current.health[field as keyof typeof current.health] ?? '')}
-                    disabled={setConfig.isPending}
-                    onChange={(e) => {
-                      const next = Number.parseInt(e.target.value, 10) || 0;
-                      setDraft((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              health: {
-                                ...prev.health,
-                                [field]: next,
-                              },
-                            }
-                          : prev,
-                      );
-                    }}
-                  />
-                </div>
-              ))}
+              {HEALTH_FIELDS.map(({ field, label, min }) => {
+                const raw = healthDraft[field] ?? String(current.health[field] ?? '');
+                const parsed = Number.parseInt(raw, 10);
+                const invalid = raw !== '' && (!Number.isFinite(parsed) || parsed < min);
+                const inputId = `failover-${field}`;
+                return (
+                  <div key={field} className="space-y-2">
+                    <Label htmlFor={inputId} className="text-sm font-medium">
+                      {label}
+                    </Label>
+                    <Input
+                      id={inputId}
+                      inputMode="numeric"
+                      value={raw}
+                      disabled={setConfig.isPending}
+                      aria-invalid={invalid}
+                      aria-describedby={invalid ? `${inputId}-error` : undefined}
+                      onChange={(e) => setHealthDraft({ ...healthDraft, [field]: e.target.value })}
+                      onBlur={() => commitHealthField(field, raw)}
+                    />
+                    {invalid && (
+                      <p id={`${inputId}-error`} role="alert" className="text-xs text-red-600 dark:text-red-400">
+                        Enter a number of at least {min}.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {draft?.enabled && enabledCount === 0 ? (

@@ -19,17 +19,29 @@ export function InterfaceTrafficCharts() {
         <CardTitle>Interface Traffic</CardTitle>
         <div className="flex items-center gap-2">
           <span
-            className={`h-2 w-2 rounded-full ${
-              connected ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-600'
-            }`}
-          />
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2"
+          >
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 rounded-full ${
+                connected ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-600'
+              }`}
+            />
+            <span className="sr-only">
+              Live updates {connected ? 'connected' : 'disconnected'}
+            </span>
+          </span>
           <Activity className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </div>
       </CardHeader>
       <CardContent>
         {sortedNames.length === 0 ? (
           <div className="flex h-[100px] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-            Waiting for interface data…
+            {connected
+              ? 'Waiting for interface data…'
+              : 'Live updates disconnected. Reconnect to resume charts.'}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -44,11 +56,19 @@ export function InterfaceTrafficCharts() {
         )}
         <div className="mt-3 flex justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
           <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: 'var(--chart-legend-rx)' }}
+            />
             Download (RX)
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: 'var(--chart-legend-tx)' }}
+            />
             Upload (TX)
           </span>
         </div>

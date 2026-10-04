@@ -403,7 +403,7 @@ export function DashboardPage() {
     wifiConn,
     usbTether,
     sysInfo,
-    vpnActive,
+    vpn: vpnStatus,
     internetUp,
     allClients,
   } = useTopologyData();
@@ -519,7 +519,11 @@ export function DashboardPage() {
             <>
               <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Internet</span>
+                  {/* `internet_reachable` is a WAN-carrier check, not a
+                      reachability probe: a DHCP lease on a dead or
+                      captive-portaled uplink still reads true. Labelling it
+                      "Internet" is the one word a non-expert trusts most. */}
+                  <span className="text-gray-500 dark:text-gray-400">Uplink</span>
                   <p
                     className={`mt-0.5 font-medium ${
                       internetUp
@@ -527,25 +531,36 @@ export function DashboardPage() {
                         : 'text-red-600 dark:text-red-400'
                     }`}
                   >
-                    {internetUp ? 'Reachable' : 'Unreachable'}
+                    {internetUp ? 'Connected' : 'Disconnected'}
                   </p>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">VPN</span>
+                  {/* Distinguishes configured-but-not-connected from off, so this
+                      no longer reads "Off" directly above a "Disable VPN"
+                      button. */}
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    {vpnActive ? (
-                      <>
-                        <Shield className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                          On
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                        <span className="font-medium text-gray-500 dark:text-gray-400">Off</span>
-                      </>
-                    )}
+                    <Shield
+                      aria-hidden="true"
+                      className={
+                        vpnStatus.healthy
+                          ? 'h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400'
+                          : vpnStatus.active
+                            ? 'h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400'
+                            : 'h-3.5 w-3.5 text-gray-500 dark:text-gray-400'
+                      }
+                    />
+                    <span
+                      className={
+                        vpnStatus.healthy
+                          ? 'font-medium text-emerald-600 dark:text-emerald-400'
+                          : vpnStatus.active
+                            ? 'font-medium text-yellow-600 dark:text-yellow-400'
+                            : 'font-medium text-gray-500 dark:text-gray-400'
+                      }
+                    >
+                      {vpnStatus.label}
+                    </span>
                   </div>
                 </div>
                 <div>

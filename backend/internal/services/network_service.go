@@ -248,6 +248,11 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	// Also check wwan (WiFi uplink) — common on travel routers
 	wwanData, wwanErr := n.ubus.Call("network.interface.wwan", "status", nil)
 
+	// USB tethering (typically a phone) creates its own logical interface in
+	// the wan zone. It has to appear in Interfaces, or a phone-tethered router
+	// reports the uplink as down while it is up.
+	usbData, usbErr := n.ubus.Call("network.interface."+usbTetherUCIName, "status", nil)
+
 	status.Interfaces = []models.NetworkInterface{}
 	if status.WAN != nil {
 		status.Interfaces = append(status.Interfaces, *status.WAN)
@@ -261,6 +266,14 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 		// If wwan is up and wan is not, use wwan as the effective WAN
 		if wwanIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
 			status.WAN = &wwanIface
+		}
+	}
+
+	if usbErr == nil {
+		usbIface := parseInterface(usbTetherUCIName, usbTetherUCIName, usbData, n.ubus)
+		status.Interfaces = append(status.Interfaces, usbIface)
+		if usbIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
+			status.WAN = &usbIface
 		}
 	}
 

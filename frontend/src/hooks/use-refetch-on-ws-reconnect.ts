@@ -14,9 +14,12 @@ export function useRefetchOnWsReconnect(queryKeys: ReadonlyArray<readonly unknow
   const queryClient = useQueryClient();
   const { connected } = useWsSubscribe();
   const wasDisconnectedRef = useRef(false);
-  // Held in a ref so a caller passing an inline array does not re-run the effect.
+  // Held in a ref so a caller passing an inline array does not re-run the
+  // effect. Written in an effect, never during render.
   const keysRef = useRef(queryKeys);
-  keysRef.current = queryKeys;
+  useEffect(() => {
+    keysRef.current = queryKeys;
+  }, [queryKeys]);
 
   useEffect(() => {
     if (!connected) {

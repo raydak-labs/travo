@@ -7,7 +7,8 @@ function alert(id: string, message = `alert ${id}`): Alert {
     id,
     message,
     severity: 'info',
-    created_at: '2026-10-04T00:00:00Z',
+    type: 'system',
+    timestamp: 1_800_000_000_000,
   } as Alert;
 }
 
