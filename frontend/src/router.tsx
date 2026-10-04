@@ -25,6 +25,8 @@ import {
   WifiPage,
 } from '@/router/lazy-loaded-pages';
 import { requireAuth, requireSetupComplete } from '@/router/route-guards';
+import { NotFoundPage } from '@/pages/not-found/not-found-page';
+import { TopProgressBar } from '@/components/layout/top-progress-bar';
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -33,12 +35,16 @@ const rootRoute = createRootRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
+    typeof search.redirect === 'string' ? { redirect: search.redirect } : {},
   component: LoginPage,
 });
 
 const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/setup',
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
+    typeof search.redirect === 'string' ? { redirect: search.redirect } : {},
   beforeLoad: () => {
     requireAuth();
   },
@@ -179,12 +185,16 @@ const logsRoute = createRoute({
   component: shellPage('/logs', LogsPage),
 });
 
+/**
+ * Unknown URLs render a real 404 instead of silently redirecting to the
+ * dashboard, so a mistyped or stale link is distinguishable from a working
+ * page. It sits under `protectedRoute` so an unauthenticated bad URL still
+ * goes through login first and comes back here afterwards.
+ */
 const notFoundRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => protectedRoute,
   path: '*',
-  beforeLoad: () => {
-    throw redirect({ to: '/dashboard' });
-  },
+  component: shellPage('/not-found', () => <NotFoundPage />),
 });
 
 const routeTree = rootRoute.addChildren([
@@ -209,11 +219,17 @@ const routeTree = rootRoute.addChildren([
     speedtestRoute,
     systemRoute,
     logsRoute,
+    notFoundRoute,
   ]),
-  notFoundRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  // `requireSetupComplete` awaits the setup status on every navigation. With
+  // its 30s cache, that guard can leave the UI unresponsive with no feedback.
+  defaultPendingMs: 200,
+  defaultPendingComponent: TopProgressBar,
+});
 
 declare module '@tanstack/react-router' {
   interface Register {

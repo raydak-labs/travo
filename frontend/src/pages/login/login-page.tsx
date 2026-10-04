@@ -1,7 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useAuthStore } from '@/stores/auth-store';
+import { safeRedirectTarget } from '@/lib/auth-redirect';
 import { Card, CardContent } from '@/components/ui/card';
 import { loginFormSchema, type LoginFormValues } from '@/pages/login/login-schema';
 import { LoginFormFields } from '@/pages/login/login-form-fields';
@@ -10,6 +11,8 @@ import { LoginPageCardHeader } from '@/pages/login/login-page-card-header';
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  // Where the router guard (or a 401) was sending us before login.
+  const { redirect: redirectTo } = useSearch({ from: '/login' });
 
   const {
     register,
@@ -26,7 +29,7 @@ export function LoginPage() {
     clearErrors('root');
     try {
       await login(data.password, data.rememberMe);
-      await navigate({ to: '/dashboard' });
+      await navigate({ to: safeRedirectTarget(redirectTo) });
     } catch (err) {
       setError('root', {
         message: err instanceof Error ? err.message : 'Login failed',

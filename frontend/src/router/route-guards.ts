@@ -1,10 +1,19 @@
 import { redirect } from '@tanstack/react-router';
 import { getToken } from '@/lib/api-client';
+import { currentRelativeLocation } from '@/lib/auth-redirect';
 import { getSetupComplete } from '@/lib/setup-status';
+
+/**
+ * Sends the user to `/login` remembering where they were headed, so a deep
+ * link survives an expired session instead of silently becoming the dashboard.
+ */
+function redirectToLogin(): never {
+  throw redirect({ to: '/login', search: { redirect: currentRelativeLocation() } });
+}
 
 export function requireAuth() {
   if (!getToken()) {
-    throw redirect({ to: '/login' });
+    redirectToLogin();
   }
 }
 
@@ -25,6 +34,6 @@ export async function requireSetupComplete() {
   const complete = await getSetupComplete();
 
   if (!complete) {
-    throw redirect({ to: '/setup' });
+    throw redirect({ to: '/setup', search: { redirect: currentRelativeLocation() } });
   }
 }
