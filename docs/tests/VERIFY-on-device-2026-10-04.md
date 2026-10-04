@@ -12,9 +12,25 @@ rather than by running it on real hardware. Nothing here is documentation of Tra
 list for one person with the device.
 
 **When every item is done, delete `docs/tests/VERIFY-on-device-2026-10-04.md` and remove the commit
-that introduced it** (`git log --oneline -- docs/tests/VERIFY-on-device-2026-10-04.md`, then
-`git rebase -d <sha>` or `git revert --no-commit <sha>` on the release branch). Do not merge it to
-`main`. If some items are still open when the device is next available, keep the file and re-date it
+that introduced it.** That commit is:
+
+```
+88b66d5 docs(temporary): on-device verification checklist for this remediation
+```
+
+Before merging, drop it from the branch:
+
+```sh
+# find it again if the SHA has moved
+git log --format=%H -1 -- docs/tests/VERIFY-on-device-2026-10-04.md
+
+# then, on the branch, either
+git rebase -d <sha>          # remove it from history
+# or, if the branch is already merged / you prefer not to rewrite it
+git rm docs/tests/VERIFY-on-device-2026-10-04.md && git commit -m "docs: remove temporary device verification checklist"
+```
+
+Do not merge it to `main`. If some items are still open when the device is next available, keep the file and re-date it
 rather than deleting it with work outstanding — a checklist that silently disappears is worse than one
 that is out of date.
 
