@@ -21,6 +21,13 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
+	// The shared app's requests come from fiber's in-memory connection, whose
+	// peer address is 0.0.0.0 and therefore cannot be placed by the router.
+	// Registering a wired L3 device makes the lockout guard classify every
+	// request in this app as a proven ethernet caller, so the many tests here
+	// that are about something else are not refused by it. Tests that are ABOUT
+	// the guard register their own dump instead (wifi_lockout_handlers_test.go).
+	ub.RegisterResponse("network.interface.dump", interfaceDump("eth0"))
 	authSvc := auth.NewAuthService("admin", "test-secret")
 	blocklist := auth.NewTokenBlocklist()
 	authSvc.SetBlocklist(blocklist)

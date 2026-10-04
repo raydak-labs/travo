@@ -15,19 +15,20 @@ import (
 // prefixes of the interface dump registered below, because that dump — not a
 // separate notion of "who is the caller" — is what the router really knows.
 const (
-	wifiClientIP = "10.0.0.50"    // matches wwan0 -> wifi-client
-	wifiAPIP     = "192.168.8.50" // matches br-lan -> wifi-ap
-	ethernetIP   = "172.16.0.10"  // matches eth0  -> ethernet
+	wifiClientIP = "10.0.0.50"    // matches wwan0    -> wifi-client
+	wifiAPIP     = "192.168.8.50" // matches br-lan, MAC associated -> wifi-ap
+	ethernetIP   = "172.16.0.10"  // matches eth0                -> ethernet
 )
 
-// lockoutDump is the shape `ubus call network.interface dump` really returns:
-// an "interface" array of per-L3-device objects carrying up/interface flags and
-// ipv4-prefix CIDR strings. The lockout guard classifies the caller through
-// NetworkService.GetConnectionMethod, so it reads exactly this.
+// The real netifd shape is `ipv4-address` as a bare address plus a separate
+// integer mask. The `ipv4-prefix` CIDR form below is kept deliberately: some
+// netifd builds emit it and the classifier must keep tolerating it. The
+// end-to-end cases against the CAPTURED payload live in
+// wifi_lockout_device_test.go.
 func lockoutDump() map[string]any {
 	entry := func(l3 string, prefix string) map[string]any {
 		return map[string]any{
-			"interface":   true,
+			"interface":   l3,
 			"up":          true,
 			"device":      l3,
 			"l3_device":   l3,
@@ -43,6 +44,27 @@ func lockoutDump() map[string]any {
 	}
 }
 
+// lockoutArp is the neighbour table these tests classify through. A br-lan
+// caller needs a MAC before it can be called wired or wireless at all, so
+// without this the `wifiAPIP` case was really testing the `unknown` path while
+// claiming to test `wifi-ap`.
+const lockoutArp = `IP address       HW type     Flags       HW address            Mask     Device
+192.168.8.50    0x1         0x2         AA:BB:CC:DD:EE:01     *        br-lan
+`
+
+// lockoutIw answers `iw`: one access point holding exactly the client MAC above.
+const lockoutIwDev = `phy#1
+	Interface phy1-ap0
+		ifindex 24
+		type AP
+`
+
+const lockoutStationDump = `Station AA:BB:CC:DD:EE:01 (on phy1-ap0)
+	associated:	yes
+	rx bytes:	1000
+	tx bytes:	2000
+`
+
 // newLockoutService wires a wifi service whose caller classification is
 // deterministic and whose apply sessions are recorded, so a refusal can be
 // asserted to have staged nothing at all.
@@ -54,6 +76,13 @@ func newLockoutService(t *testing.T) (*WifiService, *uci.MockUCI, *fakeWirelessA
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
 	svc := NewWifiServiceWithApplier(u, ub, applier)
 	svc.guardDir = testGuardDir()
+	svc.arpFile = writeTempFile(t, "arp", lockoutArp)
+	svc.cmd = &MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {
+		if len(args) == 1 && args[0] == "dev" {
+			return []byte(lockoutIwDev), nil
+		}
+		return []byte(lockoutStationDump), nil
+	}}
 	return svc, u, applier
 }
 

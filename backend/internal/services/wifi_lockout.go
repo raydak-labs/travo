@@ -3,8 +3,6 @@ package services
 import (
 	"errors"
 	"fmt"
-
-	"github.com/openwrt-travel-gui/backend/internal/ubus"
 )
 
 // ErrLockoutRefused refuses a wireless change that would leave the operator who
@@ -15,9 +13,12 @@ import (
 // same request with the acknowledgement set is fine. That is deliberate — a
 // router that cannot be reached after a change it applied correctly cannot
 // explain itself, and the operator has no way back short of physical access.
+//
+// It also fires when the router cannot PROVE the caller is wired. See
+// guardLockout.
 var ErrLockoutRefused = errors.New("refusing to remove the access point you are connected " +
-	"through: connect over Ethernet first, or resend with acknowledge_lockout to accept " +
-	"losing WiFi access")
+	"through, or cannot prove you are not: connect over Ethernet first, or resend " +
+	"with acknowledge_lockout to accept losing WiFi access")
 
 // LockoutErrorCode is the stable machine-readable code the HTTP layer puts next
 // to the lockout message. The frontend keys off this, never off the message
@@ -38,16 +39,23 @@ type LockoutRequest struct {
 	AcknowledgeLockout bool
 }
 
-// wifiCallerIP reports whether clientIP is on a WiFi interface, reusing
+// wifiCallerIP reports whether clientIP may be connected over WiFi, reusing
 // NetworkService.GetConnectionMethod rather than a second notion of "who is the
 // caller": two classifiers would drift, and the one on the connection-method
 // endpoint is what the operator's own UI already shows them.
-func wifiCallerIP(ub ubus.Ubus, clientIP string) bool {
-	switch classifyClientConnection(ub, clientIP).Method {
-	case "wifi-client", "wifi-ap":
-		return true
-	default:
+//
+// It is deliberately INCLUSIVE of `unknown`. The classifier cannot prove a
+// caller is wired, and this guard's whole purpose is not to strand anyone, so
+// "cannot tell" is treated as "might be on WiFi". See guardLockout.
+func wifiCallerIP(deps classifyDeps, clientIP string) bool {
+	switch classifyClientConnection(deps, clientIP).Method {
+	case "ethernet":
 		return false
+	default:
+		// wifi-client, wifi-ap and unknown all refuse. Only a PROVEN wired caller
+		// passes; every other answer, including the ones the classifier could not
+		// reach, is the direction that strands.
+		return true
 	}
 }
 
@@ -89,6 +97,15 @@ func (w *WifiService) guardLockoutExcluding(
 //     AP stays enabled, which is the everyday case ("turn 5G off while I am on
 //     2.4G"), so a narrower rule would add a second thing to keep in agreement
 //     for no additional safety.
+//
+// IT FAILS CLOSED ON AN UNCLASSIFIED CALLER. wifiCallerIP refuses for every
+// method except a proven `ethernet`, so a caller the classifier cannot place
+// (an IP outside every interface prefix, a MAC with no neighbour entry, a bridge
+// whose station dumps could not be read) is refused rather than allowed. That is
+// the deliberate direction: a refusal costs the operator one acknowledgement
+// they can read and undo, while allowing it strands them on a router that can no
+// longer be reached to explain itself. The acknowledged path is unchanged, so
+// the false positive is never more than a dialog. See ADR 0002 §5.2.
 func (w *WifiService) guardLockout(req LockoutRequest, enabledAPRemains bool) error {
 	if req.AcknowledgeLockout || req.ClientIP == "" {
 		return nil
@@ -96,10 +113,17 @@ func (w *WifiService) guardLockout(req LockoutRequest, enabledAPRemains bool) er
 	if enabledAPRemains {
 		return nil
 	}
-	if !wifiCallerIP(w.ubus, req.ClientIP) {
+	if !wifiCallerIP(w.classifyDeps(), req.ClientIP) {
 		return nil
 	}
 	return ErrLockoutRefused
+}
+
+// classifyDeps builds the dependency set the shared classifier reads from, so
+// the guard classifies its caller through exactly the code the
+// GET /network/connection-method endpoint runs.
+func (w *WifiService) classifyDeps() classifyDeps {
+	return classifyDeps{ubus: w.ubus, cmd: w.cmd, arpFile: w.arpFile}
 }
 
 // enabledAPRemains reports whether at least one enabled mode=ap wifi-iface

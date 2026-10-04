@@ -1,0 +1,36 @@
+Station 60:22:32:2f:05:2b (on phy0-sta0)
+	authorized:	yes
+	authenticated:	yes
+	associated:	yes
+	preamble:	long
+	WMM/WME:	yes
+	MFP:		no
+	TDLS peer:	no
+	inactive time:	6290 ms
+	rx bytes:	67851017
+	rx packets:	203237
+	tx bytes:	2278782
+	tx packets:	10684
+	tx retries:	0
+	tx failed:	0
+	beacon loss:	0
+		beacon rx:	69540
+	rx drop misc:	7
+	signal:  	-25 dBm
+	signal avg:	-26 dBm
+	beacon signal avg:	-24 dBm
+	tx bitrate:	1200.9 MBit/s 80MHz HE-MCS 11 HE-NSS 2 HE-GI 0 HE-DCM 0
+	tx duration:	900851 us
+	rx bitrate:	1200.9 MBit/s 80MHz HE-MCS 11 HE-NSS 2 HE-GI 0 HE-DCM 0
+	rx duration:	50458006 us
+	last ack signal:-32 dBm
+	avg ack signal:	-32 dBm
+	expected throughput:	978.710Mbps
+	DTIM period:	3
+	beacon interval:100
+	short slot time:yes
+	connected time:	7175 seconds
+	associated at [boottime]:	30024.450s
+	associated at:	1791146916854 ms
+	current time:	1791154091714 ms
+

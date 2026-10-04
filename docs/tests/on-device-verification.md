@@ -171,7 +171,7 @@ router with Wi-Fi off entirely.
 | - | ------ | -------- |
 | B.1 | Over Wi-Fi, change an AP SSID. | Applied and **confirmed**; no "rolled back" toast. |
 | B.2 | Same, with a deliberately broken config (11-character key, impossible channel). | Rolled back to the previous working config after ~30 s; the UI says so specifically. |
-| B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Refused, 409 with `code: "wifi_lockout_risk"`, and nothing changes** until the operator ticks the lockout box. This is the lockout case the model exists for; the guard is implemented server-side (ADR 0002 §5.2) but the **on-device re-run has not happened yet** — run it before trusting the claim. |
+| B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Requires the §5.1 precondition** — `GET /api/v1/network/connection-method` must return `wifi-ap` from the phone and `ethernet` from the wired console first. Then: **refused, 409 with `code: "wifi_lockout_risk"`, and nothing changes** until the operator ticks the lockout box. This is the lockout case the model exists for; the guard is implemented server-side (ADR 0002 §5.2) but the **on-device re-run has not happened yet** — run it before trusting the claim. |
 | B.4 | Switch to Client mode over **Ethernet**. | Applies and confirms. |
 | B.5 | Connect to an upstream twice, no band pinned. | Both succeed. |
 | B.9 | Connect to an upstream that **does not exist**, or with a wrong password. | Must be **refused**: the uplink STA has no carrier, so it is not up. This is the only reliable way to make the uplink genuinely fail — an invalid channel is silently ignored and the access point stays up. |
@@ -181,6 +181,39 @@ router with Wi-Fi off entirely.
 | B.8 | Press Scan, or switch to Client mode, with no saved upstream on a stock layout where both radios run an AP. | The AP is moved off the uplink radio before the STA is enabled; `uci show wireless` must never show an enabled AP and an enabled STA on one `device`. See B7. |
 
 ### 5.1 How the lockout guard is checked on the device (B.3)
+
+**PRECONDITION — do this first, or B.3 is meaningless.** You cannot test the
+lockout guard until the router can classify its caller. The guard decides "is
+this caller on WiFi?" with `GET /api/v1/network/connection-method`, and an
+earlier version of that classifier answered `unknown` for *every* real client,
+so the guard could not fire and B.3 passed for the wrong reason. Check the
+classifier first, from the device you are about to use:
+
+```sh
+# from the operator's device, while joined to the router AP
+curl -s http://192.168.8.1/api/v1/network/connection-method \
+  -H "Authorization: Bearer $TOKEN"
+#   -> {"method":"wifi-ap","interface":"br-lan","ip_address":"192.168.8.x"}
+#      the method MUST be a real one. "unknown" means the classifier cannot place
+#      this caller, and B.3 will be refused for the wrong reason.
+
+# then the same call over Ethernet, from the wired console
+#   -> {"method":"ethernet",...}
+#      THIS is the load-bearing half: if the wired console does not answer
+#      "ethernet", the guard would refuse the one caller it must never refuse.
+
+# what the router itself sees, if the answers above are surprising
+ssh root@192.168.8.1 'ubus call network.interface dump'   # note: ipv4-address
+                                                          # is {address, mask},
+                                                          # NOT an ipv4-prefix CIDR
+ssh root@192.168.8.1 'ip neigh show dev br-lan'          # the IP -> MAC table
+ssh root@192.168.8.1 'iw dev'                             # which ifnames are APs
+ssh root@192.168.8.1 'iw dev phy1-ap0 station dump'       # who is associated
+```
+
+If the wired console answers `unknown`, stop: fix the classifier, not the test.
+The captured payloads above are checked in as fixtures in
+`backend/internal/services/testdata/`; re-capture rather than hand-editing them.
 
 This is the check that found the defect the guard was written for: on a
 GL-AXT1800 the operator switched to Client from an iPhone, the AP was removed,

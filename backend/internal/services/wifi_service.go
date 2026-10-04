@@ -246,6 +246,10 @@ type WifiService struct {
 	toggleScriptPath string
 	guardDir         string
 
+	// arpFile is the neighbour table the caller classifier reads a client IP to
+	// a MAC through. Overridable for tests, like the other file fields here.
+	arpFile string
+
 	// uciWriteMu serializes UCI write sequences (Set/AddSection/Commit/revert
 	// against the process-global uci delta). Read-only paths never take it, so
 	// status/scan requests stay concurrent.
@@ -270,7 +274,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: crashGuardDir,
+		guardDir: crashGuardDir, arpFile: procNetARP,
 	}
 }
 
@@ -285,7 +289,7 @@ func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm)
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: crashGuardDir,
+		guardDir: crashGuardDir, arpFile: procNetARP,
 	}
 }
 
@@ -296,7 +300,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
 	}
 }
 
@@ -306,7 +310,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
 	}
 }
 
@@ -316,7 +320,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
 	}
 }
 
@@ -326,7 +330,7 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
 	}
 }
 

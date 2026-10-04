@@ -600,7 +600,11 @@ func uplinkSTAService(t *testing.T) (*services.WifiService, *uci.MockUCI) {
 	if err := u.Set("wireless", "sta0", "disabled", "0"); err != nil {
 		t.Fatal(err)
 	}
-	return services.NewWifiServiceWithApplier(u, ubus.NewMockUbus(), &stubApplier{token: "s"}), u
+	// A wired caller, so the lockout guard classifies these requests as ethernet
+	// and leaves the radio-layout rule as the thing under test.
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("network.interface.dump", interfaceDump("eth0"))
+	return services.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "s"}), u
 }
 
 func putJSONRequest(

@@ -259,6 +259,65 @@ per endpoint:
 > `GET /network/connection-method` endpoint uses) **and** the resulting config
 > would have no enabled `mode=ap` wifi-iface left on any radio.
 
+**How the caller's connection method is decided.** The classifier
+(`classifyClientConnection`, `backend/internal/services/network_service.go`) maps
+the caller's IP onto the interface it is reachable through using
+`ubus call network.interface dump`, and then onto a connection method. Two
+things about that are load-bearing and both were wrong for a long time.
+
+*The dump shape.* netifd reports each IPv4 address as a **bare address plus a
+separate integer netmask length** — `{"address": "192.168.1.1", "mask": 24}`.
+The classifier instead matched an `ipv4-prefix` key carrying a CIDR string, a
+key the device does not emit anywhere. Every interface therefore contributed no
+prefixes, nothing matched, and **every real client — wired and wireless alike —
+classified as `unknown`**. The unit tests were green throughout, because their
+fixture fed the classifier the invented key: a test asserting a fiction the
+device never produces. This is the same defect class as the original P0 on this
+branch (a fixture inventing a field the system does not emit), now in a third
+place. The parser now accepts the real `{address, mask}` form *and* a CIDR
+string in either `ipv4-address` or `ipv4-prefix`, because netifd builds differ;
+a malformed entry is skipped rather than emptying the whole list, since an empty
+list is exactly what makes everything `unknown` again. The fixture is now the
+verbatim captured payload in
+`backend/internal/services/testdata/network_interface_dump.json`, with its
+provenance in the file — not a hand-written map.
+
+*The medium.* Fixing the prefix alone is **not sufficient**, and it would have
+been a new bug. On this hardware `br-lan` carries wired and wireless clients in
+the same /24, so a subnet match resolves every LAN client to `br-lan` — and the
+pre-existing rule answered `wifi-ap` for `br-lan`. That would classify the
+operator's wired console as WiFi and refuse them, the one false positive the
+guard's own tests forbid. A client on the LAN bridge is therefore resolved to a
+MAC through the **neighbour table** (`/proc/net/arp`, the same reader the client
+list uses, so the two cannot disagree) and that MAC is checked against the
+**access points' station lists** (`iw dev` → each AP interface → `station
+dump`), which is the mechanism the health path already uses. Associated →
+`wifi-ap`. Not associated → `ethernet`. The uplink STA still answers
+`wifi-client` from the interface name alone, because there the router itself is
+the WiFi client. Real identities from the test device: `192.168.1.2` /
+`9c:eb:e8:d3:f8:d1` (wired) and `192.168.1.151` / `22:4e:76:6c:2d:62` (the
+iPhone, associated with `phy1-ap0`) — same bridge, same subnet.
+
+**It fails closed on `unknown`.** The guard refuses for every method except a
+proven `ethernet`. A caller the classifier cannot place — an IP outside every
+interface prefix, a MAC with no neighbour entry, a bridge whose station dumps
+could not be read — is **refused unless acknowledged**, not waved through. This
+is a deliberate choice of direction, and it is the safety-relevant decision in
+this section:
+
+- A refusal costs the operator one acknowledgement they can read and undo. The
+  dialog names the remedy and, as before, the acknowledged request proceeds.
+- Allowing it is unrecoverable: a router with no reachable access point cannot
+  explain itself, and the operator has no way back short of physical access.
+  That is precisely the failure this guard was written for.
+
+The cost is a false positive on the case that used to be free — a wired
+operator whose neighbour entry has not aged in gets a dialog instead of a silent
+apply. That is the right trade, and it is the direction the owner ruled out in
+the opposite direction. `unknown` is still an honest answer from the
+`GET /network/connection-method` endpoint; it is the *guard* that reads it as
+unsafe. Nothing was weakened to make a test pass.
+
 Why "no enabled AP left anywhere" and not "the caller's own AP goes away": it
 is conservative in the safe direction, it cannot strand anyone it does not
 refuse, and it does not fire when the operator is on the other radio and that

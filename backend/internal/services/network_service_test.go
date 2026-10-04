@@ -27,9 +27,15 @@ func (f *failingSetUCI) Set(_, _, _, _ string) error {
 
 func TestGetConnectionMethod(t *testing.T) {
 	tests := []struct {
-		name           string
-		clientIP       string
-		ubusResponse   map[string]any
+		name         string
+		clientIP     string
+		ubusResponse map[string]any
+		// arp is the neighbour table the case runs against. A br-lan client
+		// cannot be classified from the dump alone — it needs a MAC, and then
+		// that MAC's association state. See client_classifier_test.go for the
+		// same cases run against the payload captured from the device.
+		arp            string
+		assoc          string
 		expectedMethod string
 		expectError    bool
 	}{
@@ -87,10 +93,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "wwan0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.20.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.20.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -107,10 +111,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"device":    "phy0-sta",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.30.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.30.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -119,7 +121,11 @@ func TestGetConnectionMethod(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:     "br-lan interface matches WiFi AP",
+			// The REAL netifd shape: a bare address plus a separate integer mask.
+			// The old fixture used an `ipv4-prefix` CIDR key that the device does
+			// not emit, so this case passed without ever exercising the code the
+			// router runs.
+			name:     "ipv4-address with an integer mask matches a WiFi AP client",
 			clientIP: "192.168.1.200",
 			ubusResponse: map[string]any{
 				"interface": []any{
@@ -127,19 +133,40 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.1.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.1", "mask": float64(24)},
 						},
 					},
 				},
 			},
+			arp:            "192.168.1.200  0x1  0x2  AA:BB:CC:11:22:33  *  br-lan",
+			assoc:          "AA:BB:CC:11:22:33",
 			expectedMethod: "wifi-ap",
 			expectError:    false,
 		},
 		{
-			name:     "lan interface matches WiFi AP",
+			name:     "a br-lan client with no association is Ethernet",
+			clientIP: "192.168.1.201",
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
+						"interface": true,
+						"up":        true,
+						"l3_device": "br-lan",
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.1", "mask": float64(24)},
+						},
+					},
+				},
+			},
+			arp:            "192.168.1.201  0x1  0x2  9C:EB:E8:D3:F8:D1  *  br-lan",
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+		{
+			// CIDR tolerance in `ipv4-prefix`, kept because some netifd builds
+			// emit it and the classifier must not regress on those.
+			name:     "lan interface with a CIDR ipv4-prefix",
 			clientIP: "192.168.2.50",
 			ubusResponse: map[string]any{
 				"interface": []any{
@@ -148,14 +175,13 @@ func TestGetConnectionMethod(t *testing.T) {
 						"up":        true,
 						"l3_device": "lan",
 						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.2.0/24",
-							},
+							map[string]any{"address": "192.168.2.0/24"},
 						},
 					},
 				},
 			},
-			expectedMethod: "wifi-ap",
+			arp:            "192.168.2.50  0x1  0x2  9C:EB:E8:D3:F8:D1  *  lan",
+			expectedMethod: "ethernet",
 			expectError:    false,
 		},
 		{
@@ -167,10 +193,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "10.0.0.0/8",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "10.0.0.0", "mask": float64(8)},
 						},
 					},
 				},
@@ -187,10 +211,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth1",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "172.16.0.0/12",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "172.16.0.0", "mask": float64(12)},
 						},
 					},
 				},
@@ -207,10 +229,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "some-unknown",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.100.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.100.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -227,10 +247,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": false,
 						"up":        false,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.1.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -247,10 +265,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.1.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -267,10 +283,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.0.0/23",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.0.0", "mask": float64(23)},
 						},
 					},
 				},
@@ -287,10 +301,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "10.0.0.0/16",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "10.0.0.0", "mask": float64(16)},
 						},
 					},
 				},
@@ -307,10 +319,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "172.16.0.0/19",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "172.16.0.0", "mask": float64(19)},
 						},
 					},
 				},
@@ -328,7 +338,18 @@ func TestGetConnectionMethod(t *testing.T) {
 			}
 
 			u := uci.NewMockUCI()
-			svc := NewNetworkService(u, ub)
+			cmd := &MockCommandRunner{Err: fmt.Errorf("iw: not available")}
+			if tt.assoc != "" {
+				cmd = &MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {
+					if len(args) == 1 && args[0] == "dev" {
+						return []byte("phy#1\n\tInterface phy1-ap0\n\t\ttype AP\n"), nil
+					}
+					return []byte("Station " + tt.assoc + " (on phy1-ap0)\n"), nil
+				}}
+			}
+			svc := NewNetworkServiceWithRunner(u, ub, cmd)
+			svc.arpFile = writeTempFile(t, "arp",
+				"IP address  HW type  Flags  HW address  Mask  Device\n"+tt.arp)
 
 			result, err := svc.GetConnectionMethod(tt.clientIP)
 

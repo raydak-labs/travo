@@ -25,17 +25,26 @@ import (
 // on top of that classification is pinned on real addresses in
 // internal/services/wifi_lockout_test.go.
 // interfaceDump answers `ubus call network.interface dump` with one up L3 device
-// carrying prefix 0.0.0.0/0, which is exactly the shape
-// classifyClientConnection reads. The device name is what decides the method:
-// br-lan -> wifi-ap, eth0 -> ethernet.
+// carrying the REAL netifd shape — `ipv4-address` as a bare address plus a
+// separate integer mask, which is what `ubus call network.interface dump`
+// returns on the device. The previous fixture used an `ipv4-prefix` CIDR key the
+// device never emits, so it described a payload no router produces.
+//
+// The device name is what decides the method: eth0 -> ethernet, br-lan -> a
+// client on the LAN bridge. A br-lan caller is NOT resolved to `wifi-ap` here:
+// that needs the caller's MAC and its association state, which these tests
+// cannot supply, so it lands on `unknown` — which the guard also refuses. Every
+// br-lan case below asserts a refusal, so the status and code are unaffected;
+// the wired-vs-wireless discrimination itself is pinned in
+// internal/services/client_classifier_test.go against the captured payload.
 func interfaceDump(l3Device string) map[string]any {
 	return map[string]any{
 		"interface": []any{map[string]any{
-			"interface":   true,
-			"up":          true,
-			"device":      l3Device,
-			"l3_device":   l3Device,
-			"ipv4-prefix": []any{map[string]any{"address": "0.0.0.0/0"}},
+			"interface":    l3Device,
+			"up":           true,
+			"device":       l3Device,
+			"l3_device":    l3Device,
+			"ipv4-address": []any{map[string]any{"address": "0.0.0.0", "mask": float64(0)}},
 		}},
 	}
 }
