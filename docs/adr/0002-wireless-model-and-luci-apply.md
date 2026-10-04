@@ -47,6 +47,133 @@ Travel-router behavior depends on predictable **STA/WWAN**, **repeater** radio l
 - **`WifiService.stageWirelessApply`**: validates consistency → **`StartApply(uciApplyConfigs)`** → returns a **token** (session id) and rollback timeout for the client.
 - **`WifiService.ConfirmApply(token)`** calls **`Confirm`** after the browser proves reachability. The backend **must not** self-confirm immediately after `StartApply` without that proof (see `docs/architecture.md` §3).
 
+#### 5.1 What the confirm probe reads
+
+`ConfirmApply` proves the apply on the **device**, before `applier.Confirm`, so a
+change that cannot bring WiFi up reverts to the previous config. The proof
+(`appliedWirelessUp`) answers, for every AP and uplink-STA section the applied
+config enables:
+
+1. netifd **lists** the section (it is present under a radio's `interfaces`), and
+2. the owning radio is **up and settled** (`up` && !`pending` && !`retry_setup_failed`)
+   **and it carries no other expected interface**, **or** the interface itself
+   answers `ubus call network.device status {"name":"<ifname>"}` with
+   `present` && `up` && `carrier`.
+
+Both conditions are required: listing alone proves netifd created the section,
+not that it works; the device call is the only per-interface liveness netifd
+exposes and is the same object `NetworkService` already reads, so it adds no
+dependency. A section that is not listed, or whose signals are false, is **down**:
+the probe fails closed and the rollback stays armed.
+
+**A radio flag is proof only when it is the only expected interface on that
+radio.** netifd reports liveness per RADIO, so on a radio hosting two wanted
+interfaces the first one to come up settles the radio — and reading it that way
+proved the second one too. That is reachable in the product, not a theory:
+`SetGuestWifi` excludes only the uplink radio, so on the captured layout (uplink
+STA on radio0, main AP on radio1) the guest AP lands on radio1 **beside** the
+enabled main AP. With the guest up and the main AP down, the probe confirmed,
+cancelled rpcd's rollback and left the operator with no main SSID. So when a
+radio carries more than one expected interface, each of them has to answer
+`network.device status` for itself; the per-device answer is the authority. The
+single-interface case is unchanged and still costs no extra ubus round-trip.
+
+**netifd reports liveness per RADIO on this firmware, not per interface.**
+OpenWrt 25.12.3 / netifd 2026.02.26-r1 emits `up`, `pending`,
+`retry_setup_failed` and `autostart` on the radio entry, and a per-interface
+entry carries exactly `{section, config, ifname, vlans, stations}` — there is no
+per-interface `up` and no `config_path`. A test fixture that adds such a field
+makes a probe that can never pass on hardware look green; the golden fixture in
+`wifi_service_test.go` is the verbatim device payload for that reason.
+
+A payload that lacks the keys the probe reads is **not** silently down, and it is
+**not** allowed to abort the whole proof: an entry this build cannot read is
+skipped and reported (`ErrWirelessUnverifiable`), while the radios that do read
+are proven normally. One malformed radio the apply has nothing to do with used
+to convert a transient netifd hiccup into a failure that was never retried. The
+two outcomes are still distinguished — if a section that is still unproven
+belongs to a radio this build could not read, the answer is
+`ErrWirelessUnverifiable` ("I cannot read this"), otherwise `ErrWirelessNotUp`
+("your access point did not come up"). Both keep the rollback armed; only one
+sends the operator looking at their own config, and the other means "this build
+cannot read netifd's answer", which is a different thing to go and look at.
+
+A transport failure is folded into the same condition: when
+`ubus call network.wireless status` itself fails (ubus socket gone, netifd
+restarting the object, call timeout) Travo knows nothing about the change, so it
+is `ErrWirelessUnverifiable` too — never `ErrWirelessNotUp`, which claimed a
+rollback that had not happened yet. That subset is marked with
+`errWirelessStatusUnread` and is retried inside the budget (netifd restarting is
+the normal case and is readable a moment later), while a payload in an unknown
+shape is reported on the first probe, because waiting cannot make it readable.
+
+**The two conditions must stay distinguishable end to end, on the wire.**
+`ErrWirelessUnverifiable` is the one case where the frontend must NOT claim a
+rollback: rpcd's rollback window is still open and nothing has been reverted yet,
+so the operator is told that Travo could not verify the change and that the
+router will revert it by itself if the settings do not come up. In Go that means
+`ErrWirelessUnverifiable`'s message must not start with `ErrWirelessNotUp`'s —
+`wireless apply could not be verified:` versus `wireless apply not verified:` —
+because the client matches on that substring (`isWirelessNotVerifiedError` /
+`isWirelessStatusUnreadableError` in `frontend/src/lib/wifi-apply.ts`). A shared
+prefix once made an unreadable payload throw `WifiApplyRolledBackError`, which
+told the operator the router had already rolled back. The client re-checks both
+substrings whenever either constant changes.
+
+**Attempt and budget constants** (`wirelessConfirmAttempts` = 3,
+`wirelessConfirmDelay` = 5 s, budget = 12 s): sized from what the device actually
+takes. After `uci apply`, netifd restarts the radios and hostapd must finish ACS
+before `phy1-ap0` links up, which the device log puts at **~10 s**; the first
+probe is immediate, so the common "already up" case still answers in well under a
+second.
+
+**The published budget is the worst-case blocking time, not the sleep total.**
+A probe blocks on its sleeps *and* on its ubus round-trips: one
+`network.wireless status` per attempt plus one `network.device status` per
+expected interface on an unsettled (or multi-interface) radio. Budgeting only the
+sleeps — 8 probes x 2 s = "14 s" while the probe really blocked for ~30 s — is
+what moved the client's last probe to 0.5 s before rpcd's rollback, turning a
+clean revert into a confusing failure. The accounting is now explicit:
+
+| term | value | why |
+| --- | --- | --- |
+| waits between retries | 2 x 5 s = 10 s | covers the measured ~10 s link-up |
+| ubus calls per attempt | 1 status + up to 4 device = 5 | one fallback per expected interface; more than any layout this service produces |
+| budget per ubus round-trip | 100 ms | measured on the device: wireless status ~4 ms, device status ~5 ms including the ubus client; 100 ms is a ~20x allowance for a busy netifd |
+| **published budget** | **10 s + 3 x 0.5 s = 12 s** | `wirelessProbeBudgetSeconds()` |
+
+Fewer, longer waits cover the same device latency as 8 x 2 s at a sixth of the
+round-trip cost, which is the whole reason the attempt count dropped. The budget
+is published as `apply.probe_budget_seconds`; the client subtracts it plus
+**`PROBE_SAFETY_MARGIN_MS` (2 s, the same number the Go gate
+`wirelessProbeSafetyMarginSeconds` uses)** from the 30 s rollback window and caps
+that reservation at half the window: 12 + 2 = 14 s against the 15 s cap, so the
+cap does **not** bind, and the last probe is answered ~2 s before rpcd rolls
+back. If the cap ever binds, the reserved time is truncated below the blocking
+time and the final probe would be answered after the rollback — the Go gate
+(`TestConfirmApply_ProbesImmediatelyAndReportsProbeBudget`) fails on that, and the
+same check on the client side asserts the headroom. A device with more than four
+expected interfaces spends more than the published budget; it still fails closed,
+and the client stops probing early rather than late.
+
+**Ranked alternative liveness signals, and why they are not used:**
+
+1. `stations[]` in the wireless status — rejected: verified empty for a healthy
+   zero-client AP (`phy1-ap0`, up and beaconing), and structurally always empty
+   for a `mode=sta` interface (`phy0-sta0` had a live peer and still reported
+   `stations: []`).
+2. `iwinfo assoclist` — rejected for the same reason: a correct AP with no clients
+   is not a failed AP.
+3. Hostapd control socket / `ubus call hostapd.<phy> get_status` — capable but adds
+   a dependency per radio; the radio+device signals cover the same ground.
+4. Ping/L3 reachability of the AP address — confuses "AP up" with "client can talk
+   to it", and cannot speak for a client-mode apply with no AP at all.
+
+Device-side verification steps and captured payloads — including the ubus
+round-trip timings the budget is built from — live in
+[`docs/tests/on-device-verification.md`](../tests/on-device-verification.md); this
+section records the decision, not the procedure.
+
 ### 6. Scripts, packaging, and `wifi` commands
 
 - **User-facing** wireless mutations go through the apply/confirm path above when `applier` is configured; they **must not** run **`wifi`**, **`wifi up`**, or **`wifi reload`** as part of apply (matches `docs/architecture.md` §3).
@@ -130,7 +257,7 @@ enforced at the HTTP handler **and** re-checked inside `SetWiFiSchedule`.
 
 ## References
 
-- `backend/internal/services/wifi_service.go` — invariants, `stageWirelessApply`, `ConfirmApply`, `uciApplyConfigs`
+- `backend/internal/services/wifi_service.go` — invariants, `stageWirelessApply`, `ConfirmApply`, confirm probe (§5.1), `uciApplyConfigs`
 - `backend/internal/services/uci_apply.go` — rpcd apply/confirm
 - `backend/internal/services/wifi_toggle_script.go` — the generated toggle helper
 - `backend/internal/services/wifi_reconnect.go` — schedule cron file, bounded `wifi up` exception
@@ -138,3 +265,36 @@ enforced at the HTTP handler **and** re-checked inside `SetWiFiSchedule`.
 - `backend/internal/services/validate.go` — `ValidateHHMM`, `ValidateButtonName`
 - `docs/architecture.md` §2–3
 - [ADR 0003](./0003-crash-guards-and-live-state.md) — guard contract
+
+## Addendum: radio choice determinism and one definition of "the uplink radio"
+
+**Which radio an operation picks must be deterministic.** `radioForNewSTA`
+(`wifi_connect.go`) sorts the radios by name and prefers one with no enabled access
+point; `ensureSTASectionForScan` (`wifi_scan.go`) uses the same chooser instead of
+taking the first radio a map range turned up. `GetRadios` and `GetAPConfigs`
+(`wifi_ap.go`) return their slices ordered by section/radio name, and the band
+switcher (`band_switching_service.go`) sorts before it picks "the radio for this
+band" or "the other radio". A randomised choice here is not cosmetic: it decides
+whether the uplink shares a PHY with an access point, and on a device where two
+radios report the same band it makes the band switcher oscillate.
+
+**"The uplink radio" means one thing: the radio of any enabled `mode=sta`
+wifi-iface.** A `network=wwan` STA wins when several radios qualify, but a
+hand-written STA without `network=wwan` still occupies its PHY, so it counts for
+every guard. The strict direction is deliberate — the constraint is physical, and
+a loose definition let the health API report a radio as "both" while the same-radio
+guards saw no uplink on it. `activeIfaces` is the single predicate the guards and
+the role detection read.
+
+**Every writer that enables a STA on a radio runs the same refusal.**
+`rejectSTAOnAPRadio` refuses a radio that carries an enabled access point with
+`ErrAPAndSTASameRadio` (409 via `respondWifiMutationError`); `SwitchSTAToRadio` uses
+it before any write, because it applies immediately and
+`reconcileRepeaterAPRadioLayout` does nothing outside repeater mode. Single-radio
+hardware and `allow_ap_on_sta_radio` remain the documented exemptions. A refusal is
+not a crash, so the band switcher removes its crash guard for one — otherwise one
+refused tick would disable automatic band switching until somebody removed the file.
+
+**Guest WiFi refuses a subnet it cannot own.** `192.168.2.0/24` is fixed, so
+`SetGuestWifi` checks it against every configured `network` interface and returns
+`ErrGuestSubnetOverlap` instead of creating a second interface on one network.

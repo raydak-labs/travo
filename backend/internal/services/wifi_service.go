@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -384,18 +386,63 @@ var ErrWirelessNotUp = errors.New(
 
 const (
 	// wirelessConfirmAttempts / wirelessConfirmDelay bound the wait for the
-	// interfaces the applied config enables to come up. netifd needs a moment to
-	// re-associate after `uci apply`, and the whole wait stays far inside rpcd's
-	// 30 s rollback window, so a confirm that fails here still leaves the window
-	// time to do its job.
+	// interfaces the applied config enables to come up. They are sized from what
+	// the device actually takes, not from a guess: after `uci apply` netifd
+	// restarts the radios and hostapd has to finish ACS before phy1-ap0 links
+	// up, which logread puts at ~10 s.
+	//
+	// 3 probes x 5 s waits 10 s — the measured link-up time — and the number of
+	// attempts is deliberately small: every attempt spends ubus round-trips
+	// (see wirelessProbeMaxUbusCalls), and the budget the client subtracts from
+	// its own deadline has to cover those too. 8 probes x 2 s covered the same
+	// window with 8 x 4 = 32 extra round-trips that the published budget did not
+	// count, which put the client's last probe half a second from rpcd's
+	// rollback. Fewer, longer waits cover the same device latency for a fraction
+	// of the round-trip cost.
 	wirelessConfirmAttempts = 3
-	wirelessConfirmDelay    = 2 * time.Second
+	wirelessConfirmDelay    = 5 * time.Second
+
+	// wirelessProbeRoundTrip is what ONE ubus round-trip is budgeted at inside
+	// the published probe budget. Measured on the device
+	// (192.168.1.1, OpenWrt 25.12.3): `network.wireless status` answers in
+	// ~4 ms and `network.device status` in ~5 ms, including spawning the ubus
+	// client. 100 ms is a ~20x allowance for netifd answering from a busy event
+	// loop while it is restarting the radios.
+	wirelessProbeRoundTrip = 100 * time.Millisecond
+
+	// wirelessProbeMaxUbusCalls is how many ubus calls one attempt is budgeted
+	// at: the wireless status read, plus one `network.device status` per
+	// expected interface (the per-interface fallback). Four expected interfaces
+	// is more than any layout this service produces (main AP + guest AP + uplink
+	// STA). A config with more can still be proven, it just spends more time
+	// than the published budget says — and it fails closed, never open.
+	wirelessProbeMaxUbusCalls = 5
 )
 
+// wirelessProbeSafetyMarginSeconds is the room the CLIENT reserves on top of the
+// probe budget: PROBE_SAFETY_MARGIN_MS / 1000 in
+// frontend/src/lib/wifi-apply.ts, which is the only place that reserves it. It
+// used to exist here as well (as 1) while the client used 500 and the comment
+// said "half a second"; the Go gate in wifi_service_test.go now states it once,
+// next to the assertion that uses it, and
+// TestClientProbeSafetyMarginMatchesTheGoGate fails when the two sides drift.
+const wirelessProbeSafetyMarginSeconds = 2
+
+// wirelessRetrySleep is the wait between two confirm probes. It is a var only so
+// tests that deliberately exhaust the retry budget do not have to spend it.
+var wirelessRetrySleep = time.Sleep
+
 // wirelessProbeBudgetSeconds is the longest a single ConfirmApply can block: the
-// first probe is immediate, and only the sleeps between the retries cost time.
+// first probe is immediate, so only the sleeps between the retries cost time —
+// plus the ubus round-trips every attempt makes, which the old version of this
+// function did not count at all (it published the sleep total as if a probe cost
+// nothing but sleeping, and the last probe then landed 0.5 s before rpcd rolled
+// back).
 func wirelessProbeBudgetSeconds() int {
-	return int((wirelessConfirmAttempts - 1) * wirelessConfirmDelay / time.Second)
+	sleeps := (wirelessConfirmAttempts - 1) * wirelessConfirmDelay
+	calls := time.Duration(wirelessProbeMaxUbusCalls) *
+		wirelessProbeRoundTrip * wirelessConfirmAttempts
+	return int(math.Ceil((sleeps + calls).Seconds()))
 }
 
 // verifyAppliedWirelessUp proves that every interface the applied config says
@@ -432,11 +479,20 @@ func (w *WifiService) verifyAppliedWirelessUp() error {
 		// the common "already up" case answers in well under a second and only
 		// the slow case spends the retry budget.
 		if attempt > 0 {
-			time.Sleep(wirelessConfirmDelay)
+			wirelessRetrySleep(wirelessConfirmDelay)
 		}
 		lastErr = w.appliedWirelessUp(sections, wantAPs, wantSTAs)
 		if lastErr == nil {
 			return nil
+		}
+		// A payload this probe cannot read will not become readable by waiting:
+		// report it straight away so a netifd schema change is diagnosable as
+		// one instead of burning the budget and then reading like a dead AP.
+		// A status read that FAILED is the opposite case — the socket was gone,
+		// netifd was restarting the object, the call timed out — and is very
+		// often readable a moment later, so it keeps the retry budget.
+		if isUnreadablePayload(lastErr) {
+			return lastErr
 		}
 	}
 	return lastErr
@@ -498,22 +554,90 @@ func enabledWwanSTAs(sections map[string]map[string]string) []string {
 	return names
 }
 
-// appliedWirelessUp cross-checks netifd's view of the wireless interfaces
-// against what the applied config enables: every expected section must appear
-// in `ubus call network.wireless status` with up=true. It is the confirmation-
-// time counterpart of GetHealth's iwinfo-vs-netifd cross-check — and it fails
-// closed: an interface that cannot be observed is treated as down, because the
-// whole point is to keep the rollback armed when the answer is unknown.
+// ErrWirelessUnverifiable reports that this probe could not READ the answer:
+// `ubus call network.wireless status` (or the `network.device status` fallback)
+// either failed at the transport level or answered in a shape this build cannot
+// read — a radio without an "up" flag, an interface without an "ifname", an
+// entry that is not an object at all. It covers both, because to the operator
+// they are one condition: Travo does not know whether the new settings came up.
 //
-// One status read answers every expectation, so the cost of a probe does not
-// grow with the number of interfaces to prove.
+// The transport failure used to be reported as ErrWirelessNotUp, which put
+// "wireless apply not verified: ..." in front of the operator while rpcd's
+// rollback window was still open and the new config was still live — and the
+// frontend, which substring-matches that prefix, turned it into "so it rolled
+// back to the previous settings". rpcd has rolled back nothing at that point.
+//
+// It is deliberately NOT ErrWirelessNotUp, and its message must not start with
+// the same words either: the frontend tells the two apart by substring, so a
+// shared prefix made "I cannot read the answer" say on screen that the router
+// had already rolled back — while rpcd's rollback window was still open.
+// "I cannot read the answer" and "the access point did not come up" call for
+// different responses from an operator and from whoever is on call, and
+// collapsing the first into the second is what let a probe that could never pass
+// on real hardware look like operator error. Both still keep the rollback armed:
+// the apply is not confirmed either way.
+var ErrWirelessUnverifiable = errors.New(
+	"wireless apply could not be verified: network.wireless status could not be read")
+
+// errWirelessStatusUnread marks the subset of ErrWirelessUnverifiable where the
+// question was never answered — the ubus call itself failed. Only this subset is
+// worth retrying: a payload in an unknown shape will not become readable.
+var errWirelessStatusUnread = errors.New("the ubus call did not complete")
+
+// isUnreadablePayload reports whether err is an unreadable-ANSWER failure, as
+// opposed to an unreadable-QUESTION one.
+func isUnreadablePayload(err error) bool {
+	return errors.Is(err, ErrWirelessUnverifiable) && !errors.Is(err, errWirelessStatusUnread)
+}
+
+// appliedWirelessUp cross-checks netifd's view of the wireless interfaces
+// against what the applied config enables. A section counts as up only when BOTH
+// hold:
+//
+//  1. netifd LISTS it (the section is present under a radio's "interfaces", so
+//     netifd created it), and
+//  2. either the owning radio is up and settled (not pending, not
+//     retry_setup_failed) AND it carries no other expected interface, or the
+//     interface itself answers
+//     `ubus call network.device status {"name":"<ifname>"}` with
+//     present && up && carrier.
+//
+// Why the radio is not proof for a shared radio: netifd reports liveness per
+// RADIO, so on a radio hosting two wanted interfaces (guest AP beside the main
+// AP — SetGuestWifi only excludes the uplink radio) the first one to come up
+// settles the radio and used to prove the second one too. The probe then
+// confirmed and cancelled the rollback with a dead access point, which is the
+// one direction that silently takes the operator's SSID away. The per-device
+// answer is therefore the authority whenever a radio carries more than one
+// expected interface.
+//
+// Why per-radio: on OpenWrt 25.12.3 / netifd 2026.02.26-r1 liveness is reported
+// per RADIO ("up", "pending", "retry_setup_failed", "autostart"). A per-interface
+// entry carries exactly {section, config, ifname, vlans, stations} — there is no
+// per-interface "up" and no "config_path". Reading iface["up"] therefore answers
+// false for every interface on every device, which is what made ConfirmApply
+// refuse to confirm anything. Why the device fallback: a radio can read up while
+// the interface on it is still being set up, and carrier is the only per-device
+// liveness netifd exposes.
+//
+// Deliberately not used as liveness signals: stations[] (empty for a healthy
+// zero-client AP, and structurally always empty for mode=sta) and iwinfo
+// assoclist. See ADR 0002 §5.
+//
+// It fails closed: an interface that cannot be observed counts as down, because
+// the whole point is to keep the rollback armed when the answer is unknown. One
+// wireless status read answers every expectation, so a settled single-interface
+// radio costs no extra ubus round-trip; the fallback is consulted for an
+// unsettled radio or one carrying several expected interfaces, and its cost is
+// budgeted (see wirelessProbeMaxUbusCalls).
 func (w *WifiService) appliedWirelessUp(
 	sections map[string]map[string]string, wantAPs, wantSTAs []string,
 ) error {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
-		return fmt.Errorf("%w: cannot read network.wireless status: %v", ErrWirelessNotUp, err)
+		return fmt.Errorf("%w: %w: %v", ErrWirelessUnverifiable, errWirelessStatusUnread, err)
 	}
+	radios, unreadable, shapeErr := wirelessStatusRadios(resp)
 	// section name -> what the config expects it to be, so one pass over the
 	// status answers both kinds.
 	pending := make(map[string]string, len(wantAPs)+len(wantSTAs))
@@ -528,17 +652,58 @@ func (w *WifiService) appliedWirelessUp(
 		want = append(want, name)
 	}
 	sort.Strings(want)
-	for _, iface := range wirelessStatusInterfaces(resp) {
-		name := wirelessStatusSection(iface, sections, want)
-		if _, expected := pending[name]; !expected {
-			continue
+	for _, radioName := range slices.Sorted(maps.Keys(radios)) {
+		radio := radios[radioName]
+		// Collect first, prove second: whether the radio flag counts as proof
+		// depends on how many EXPECTED interfaces it carries, and that is only
+		// known once the whole radio has been read.
+		var onRadio []struct {
+			name  string
+			iface map[string]any
 		}
-		if up, _ := iface["up"].(bool); up {
-			delete(pending, name)
+		for _, iface := range radio.interfaces {
+			name := wirelessStatusSection(iface, sections, want)
+			if _, expected := pending[name]; !expected {
+				continue
+			}
+			onRadio = append(onRadio, struct {
+				name  string
+				iface map[string]any
+			}{name, iface})
+		}
+		// One expected interface on the radio: the radio flag is proof, and no
+		// ubus round-trip is spent. More than one: the flag says the RADIO is
+		// up, not which of its interfaces are, so each one has to answer for
+		// itself.
+		radioIsProof := radio.settled && len(onRadio) < 2
+		for _, entry := range onRadio {
+			up := radioIsProof
+			if !up {
+				var err error
+				if up, err = w.wirelessDeviceUp(entry.iface); err != nil {
+					return err
+				}
+			}
+			if up {
+				delete(pending, entry.name)
+			}
 		}
 	}
 	if len(pending) == 0 {
 		return nil
+	}
+	// The interfaces that read fine were proven; anything still missing may be
+	// sitting behind a radio this build cannot read. When one of the radios the
+	// still-missing sections belong to is the unreadable one, the honest answer
+	// is "I cannot read this", not "your access point did not come up". Either
+	// way the proof is not made and the rollback stays armed.
+	for _, name := range want {
+		if _, still := pending[name]; !still {
+			continue
+		}
+		if _, hidden := unreadable[sections[name]["device"]]; hidden && shapeErr != nil {
+			return shapeErr
+		}
 	}
 	missing := make([]string, 0, len(pending))
 	for _, name := range want {
@@ -550,28 +715,109 @@ func (w *WifiService) appliedWirelessUp(
 		ErrWirelessNotUp, strings.Join(missing, ", "))
 }
 
-// wirelessStatusInterfaces flattens a `network.wireless status` payload into the
-// per-interface entries it carries, one per radio under "interfaces".
-func wirelessStatusInterfaces(resp map[string]any) []map[string]any {
-	var out []map[string]any
-	for _, radioData := range resp {
-		radioMap, ok := radioData.(map[string]any)
-		if !ok {
-			continue
-		}
-		ifaces, ok := radioMap["interfaces"].([]any)
-		if !ok {
-			continue
-		}
-		for _, iface := range ifaces {
-			ifaceMap, ok := iface.(map[string]any)
-			if !ok {
-				continue
-			}
-			out = append(out, ifaceMap)
+// wirelessRadio is one entry of a `network.wireless status` payload: the radio's
+// liveness and the interfaces netifd created on it.
+type wirelessRadio struct {
+	settled    bool
+	interfaces []map[string]any
+}
+
+// wirelessStatusRadios splits a `network.wireless status` payload per radio and
+// records whether each radio is settled. An entry the probe cannot read is
+// skipped and REPORTED, never a silent skip: its interfaces are not listed, so
+// anything the config expects on it stays unproven and the proof fails closed.
+//
+// Reading it aborts the whole payload (as this used to), so one malformed radio
+// the apply has nothing to do with turned a transient netifd hiccup into a
+// failure that was never retried, even when every interface the change is about
+// read fine. The returned set names the radios that were skipped, so the caller
+// can still tell "I cannot read this radio" from "the access point is down".
+func wirelessStatusRadios(resp map[string]any) (map[string]wirelessRadio, map[string]bool, error) {
+	out := make(map[string]wirelessRadio, len(resp))
+	unreadable := map[string]bool{}
+	var firstErr error
+	note := func(radio string, err error) {
+		unreadable[radio] = true
+		if firstErr == nil {
+			firstErr = err
 		}
 	}
-	return out
+	for name, data := range resp {
+		radio, ok := data.(map[string]any)
+		if !ok {
+			note(name, fmt.Errorf("%w: radio %s is %T, not an object",
+				ErrWirelessUnverifiable, name, data))
+			continue
+		}
+		up, hasUp := radio["up"].(bool)
+		if !hasUp {
+			note(name, fmt.Errorf("%w: radio %s reports no \"up\" flag", ErrWirelessUnverifiable, name))
+			continue
+		}
+		pending, _ := radio["pending"].(bool)
+		retry, _ := radio["retry_setup_failed"].(bool)
+		raw, ok := radio["interfaces"].([]any)
+		if !ok {
+			note(name, fmt.Errorf("%w: radio %s reports no \"interfaces\" list",
+				ErrWirelessUnverifiable, name))
+			continue
+		}
+		ifaces := make([]map[string]any, 0, len(raw))
+		readable := true
+		for _, entry := range raw {
+			iface, ok := entry.(map[string]any)
+			if !ok {
+				note(name, fmt.Errorf("%w: radio %s has a non-object interface entry",
+					ErrWirelessUnverifiable, name))
+				readable = false
+				break
+			}
+			if _, ok := iface["ifname"].(string); !ok {
+				note(name, fmt.Errorf("%w: an interface on radio %s reports no \"ifname\"",
+					ErrWirelessUnverifiable, name))
+				readable = false
+				break
+			}
+			ifaces = append(ifaces, iface)
+		}
+		if !readable {
+			continue
+		}
+		out[name] = wirelessRadio{settled: up && !pending && !retry, interfaces: ifaces}
+	}
+	return out, unreadable, firstErr
+}
+
+// wirelessDeviceUp asks netifd whether one wireless interface is live. It is the
+// second liveness signal, and the same `network.device` object the rest of the
+// backend already reads (see NetworkService), so it adds no dependency.
+//
+// An unknown device makes the call fail and an unassociated device answers
+// present+up without carrier; both count as down. A non-empty answer missing one
+// of the three flags is a shape problem, not a down interface, and is reported
+// as one.
+func (w *WifiService) wirelessDeviceUp(iface map[string]any) (bool, error) {
+	ifname, _ := iface["ifname"].(string)
+	if ifname == "" {
+		return false, nil
+	}
+	resp, err := w.ubus.Call("network.device", "status", map[string]any{"name": ifname})
+	if err != nil {
+		return false, nil
+	}
+	if len(resp) == 0 {
+		return false, nil
+	}
+	for _, key := range []string{"present", "up", "carrier"} {
+		if _, ok := resp[key].(bool); !ok {
+			return false, fmt.Errorf("%w: network.device status for %s reports no %q flag",
+				ErrWirelessUnverifiable, ifname, key)
+		}
+	}
+	present, _ := resp["present"].(bool)
+	up, _ := resp["up"].(bool)
+	carrier, _ := resp["carrier"].(bool)
+	return present && up && carrier, nil
 }
 
 // wirelessStatusSection names the wanted config section a netifd interface

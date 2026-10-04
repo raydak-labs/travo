@@ -7,7 +7,10 @@ import {
   finalizeWifiMutation,
   isTerminalApplyStatus,
   isWirelessNotVerifiedError,
+  isWirelessStatusUnreadableError,
+  PROBE_SAFETY_MARGIN_MS,
   WifiApplyRolledBackError,
+  WifiApplyUnverifiedError,
 } from '../wifi-apply';
 
 describe('wifi-apply', () => {
@@ -121,6 +124,39 @@ describe('wifi-apply', () => {
     expect(isWirelessNotVerifiedError(undefined)).toBe(false);
   });
 
+  // "I cannot read netifd's answer" is not "your access point did not come up",
+  // and the rollback window is still OPEN when it happens. Telling the operator
+  // the router rolled back asserts something that has not happened yet. Both
+  // messages below are what the backend actually sends today
+  // (services.ErrWirelessUnverifiable).
+  it.each([
+    'wireless apply could not be verified: network.wireless status could not be read: ' +
+      'the ubus call did not complete: ubus connection reset by peer',
+    'wireless apply could not be verified: network.wireless status could not be read: ' +
+      'radio radio0 reports no "up" flag',
+  ])('separates an unreadable device answer (%s) from a confirmed rollback', async (message) => {
+    vi.spyOn(apiClient, 'post').mockRejectedValue(new ApiError(500, message));
+
+    const assertion = expect(confirmWifiApply('token-shape', 30, 1)).rejects.toBeInstanceOf(
+      WifiApplyUnverifiedError,
+    );
+    await assertion;
+  });
+
+  it('does not read an unreadable status as a rollback, and does not claim one', () => {
+    const shape = new ApiError(
+      500,
+      'wireless apply could not be verified: network.wireless status could not be read',
+    );
+    expect(isWirelessNotVerifiedError(shape)).toBe(false);
+    expect(isWirelessStatusUnreadableError(shape)).toBe(true);
+    expect(isWirelessStatusUnreadableError(new Error('token is required'))).toBe(false);
+
+    const unverified = new WifiApplyUnverifiedError();
+    expect(unverified.message.toLowerCase()).not.toContain('rolled back');
+    expect(unverified.message.toLowerCase()).toContain('could not verify');
+  });
+
   it('still reports a plain rollback timeout when the router never answers', async () => {
     vi.useFakeTimers();
     vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('network down'));
@@ -135,7 +171,9 @@ describe('wifi-apply', () => {
 });
 
 // apply.probe_budget_seconds is how long ONE confirm call can block on the
-// device while netifd brings the new interfaces up (~4 s today). The client
+// device while netifd brings the new interfaces up (12 s today: ~10 s of sleeps
+// covering the measured ACS + link-up, plus the ubus round-trips the
+// per-interface fallback makes). The client
 // used to probe until the full rollback timeout, so a probe started near the
 // deadline was answered only after rpcd had already rolled back and the
 // operator saw a session failure instead of a clean rollback.
@@ -145,7 +183,7 @@ describe('confirm probe budget', () => {
   });
 
   it('subtracts the probe budget and a margin from the rollback window', () => {
-    expect(confirmDeadlineMs(30, 4, 1_000)).toBe(1_000 + 30_000 - 4_000 - 500);
+    expect(confirmDeadlineMs(30, 4, 1_000)).toBe(1_000 + 30_000 - 4_000 - PROBE_SAFETY_MARGIN_MS);
   });
 
   it('shortens the deadline as the declared probe budget grows', () => {
@@ -160,12 +198,37 @@ describe('confirm probe budget', () => {
     (budget) => {
       const deadline = confirmDeadlineMs(30, budget, 1_000);
       expect(Number.isFinite(deadline)).toBe(true);
-      expect(deadline).toBe(1_000 + 30_000 - DEFAULT_PROBE_BUDGET_SECONDS * 1000 - 500);
+      expect(deadline).toBe(
+        1_000 + 30_000 - DEFAULT_PROBE_BUDGET_SECONDS * 1000 - PROBE_SAFETY_MARGIN_MS,
+      );
     },
   );
 
   it('never lets the budget consume more than half the rollback window', () => {
+    // A 1 s window: the reservation is capped at 500 ms, so the deadline is
+    // half the window away and the caller still gets an instant to probe at.
     expect(confirmDeadlineMs(1, 4, 0)).toBe(500);
+  });
+
+  // The deadline must leave the final probe's own blocking time AND real
+  // headroom before rpcd fires. A 500 ms margin left the last probe answered
+  // 0.5 s before the rollback, so any device that took a second longer turned a
+  // clean rollback into a confusing failure.
+  it('leaves at least a second of headroom before the rollback with the default budget', () => {
+    const rollbackMs = 30_000;
+    const lastProbeEndsAt =
+      confirmDeadlineMs(30, DEFAULT_PROBE_BUDGET_SECONDS, 0) + DEFAULT_PROBE_BUDGET_SECONDS * 1000;
+    expect(rollbackMs - lastProbeEndsAt).toBeGreaterThanOrEqual(1_000);
+  });
+
+  // The fallback budget is used when the backend does not publish one, so it
+  // has to satisfy the same cap the published value does: a device budget too
+  // big for half the 30 s window would be truncated silently and the probe
+  // would be issued too late.
+  it('keeps the fallback budget inside half the rollback window', () => {
+    const rollbackWindowMs = 30_000;
+    const reserved = DEFAULT_PROBE_BUDGET_SECONDS * 1000 + PROBE_SAFETY_MARGIN_MS;
+    expect(reserved).toBeLessThan(rollbackWindowMs / 2);
   });
 
   it('never issues a probe that could still be in flight when rpcd rolls back', async () => {

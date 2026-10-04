@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -706,7 +707,9 @@ func TestSetAPConfig_ReturnsApplyError(t *testing.T) {
 	svc, _ := newTestWifiService()
 	svc.applier = &fakeWirelessApplier{startErr: errors.New("apply failed")}
 
-	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+	// radio1 carries no uplink STA, so enabling its AP is a legal request and
+	// the apply failure is what this test is about.
+	_, err := svc.SetAPConfig("default_radio1", models.APConfigUpdate{
 		SSID:       "MyTravelRouter",
 		Encryption: "psk2",
 		Key:        "newpassword123",
@@ -717,7 +720,11 @@ func TestSetAPConfig_ReturnsApplyError(t *testing.T) {
 	}
 }
 
-func TestSetAPConfig_RepeaterDisablesSTARadioAPAfterEnableAttempt(t *testing.T) {
+// Enabling the access point on the radio that carries the uplink STA is refused
+// outright now: any enabled mode=sta on that radio is the uplink, whether or not
+// it carries network=wwan, so there is nothing left for the repeater reconcile
+// to undo afterwards. The AP on the uplink PHY therefore stays off.
+func TestSetAPConfig_RepeaterRefusesEnableOnTheSTARadio(t *testing.T) {
 	svc, u := newTestWifiService()
 	_ = u.Set("wireless", "default_radio0", "device", "radio0")
 	_ = u.Set("wireless", "default_radio1", "device", "radio1")
@@ -730,21 +737,17 @@ func TestSetAPConfig_RepeaterDisablesSTARadioAPAfterEnableAttempt(t *testing.T) 
 		t.Fatalf("precondition: expected AP on STA radio disabled, got %q", ap0)
 	}
 
-	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID:       "Unified",
 		Encryption: "psk2",
 		Key:        "password12",
 		Enabled:    models.BoolPtr(true),
-	}); err != nil {
-		t.Fatalf("SetAPConfig: %v", err)
+	})
+	if !errors.Is(err, ErrAPAndSTASameRadio) {
+		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
 	}
-	ap0, _ = u.Get("wireless", "default_radio0", "disabled")
-	if ap0 != "1" {
-		t.Errorf("expected AP on STA radio to stay disabled after reconcile, got disabled=%q", ap0)
-	}
-	ssid, _ := u.Get("wireless", "default_radio0", "ssid")
-	if ssid != "Unified" {
-		t.Errorf("expected SSID updated on STA-radio section for when user turns allow_ap on later, got %q", ssid)
+	if ap0, _ = u.Get("wireless", "default_radio0", "disabled"); ap0 != "1" {
+		t.Errorf("expected AP on STA radio to stay disabled, got disabled=%q", ap0)
 	}
 }
 
@@ -929,13 +932,21 @@ func TestSetGuestWifi_Enable(t *testing.T) {
 		t.Errorf("expected network 'guest', got %q", opts["network"])
 	}
 
-	// Verify network.guest interface
+	// Verify network.guest interface. The address is not pinned to a literal:
+	// what matters is that the guest subnet does not collide with network.lan,
+	// which is why SetGuestWifi refuses an overlap (see
+	// TestSetGuestWifi_RefusesASubnetThatOverlapsLAN).
 	netOpts, err := u.GetAll("network", "guest")
 	if err != nil {
 		t.Fatalf("expected network.guest to exist: %v", err)
 	}
-	if netOpts["ipaddr"] != "192.168.2.1" {
-		t.Errorf("expected ipaddr '192.168.2.1', got %q", netOpts["ipaddr"])
+	lanOpts, err := u.GetAll("network", "lan")
+	if err != nil {
+		t.Fatalf("expected network.lan to exist: %v", err)
+	}
+	if sameSubnet(t, netOpts["ipaddr"], netOpts["netmask"], lanOpts["ipaddr"], lanOpts["netmask"]) {
+		t.Errorf("guest subnet %s/%s overlaps network.lan %s/%s",
+			netOpts["ipaddr"], netOpts["netmask"], lanOpts["ipaddr"], lanOpts["netmask"])
 	}
 
 	// Verify dhcp.guest
@@ -1167,7 +1178,11 @@ func TestWifiSetMode_ClientDisablesAPsAndEnablesSTA(t *testing.T) {
 func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
 	svc, u := newTestWifiService()
 	_ = u.Set("wireless", "default_radio0", "disabled", "1")
-	_ = u.Set("wireless", "default_radio1", "disabled", "1")
+	// The downlink AP on the free radio must be ENABLED for repeater mode to have
+	// somewhere to put the AP. A config whose only other-radio AP is disabled is
+	// refused rather than silently enabling an AP onto the uplink radio — see
+	// TestSetMode_RepeaterRefusesWhenNoOtherRadioAPIsEnabled.
+	_ = u.Set("wireless", "default_radio1", "disabled", "0")
 	_ = u.Set("wireless", "sta0", "disabled", "1")
 	// sta0 lives on radio0 per the mock UCI. Ensure default_radio0 AP is on radio0 too.
 	_ = u.Set("wireless", "default_radio0", "device", "radio0")
@@ -1345,10 +1360,15 @@ func TestConfirmApply_RequiresToken(t *testing.T) {
 	}
 }
 
-// registerInterfaceStatus publishes a `network.wireless status` payload where
-// each named section is reported by netifd with the given up flag. Mode, SSID and
-// ifname come from the UCI section, so it serves access points and uplink STA
-// sections alike — netifd reports "up" for both kinds.
+// registerInterfaceStatus publishes a `network.wireless status` payload for the
+// named sections, each reported up or down. Liveness goes where netifd puts it
+// on this firmware: on the RADIO (up/pending/retry_setup_failed), not on the
+// interface entry, which carries exactly section, config, ifname, vlans and
+// stations. A radio is up when any of the sections it owns is up.
+//
+// `network.device status` is registered DOWN for these fixtures: they vary the
+// radio-level signal, and the per-interface fallback has its own tests. (The
+// mock cannot answer per ifname, so a mixed answer is not expressible here.)
 func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool) {
 	t.Helper()
 	sections, err := svc.uci.GetSections("wireless")
@@ -1356,6 +1376,7 @@ func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool)
 		t.Fatalf("reading wireless sections: %v", err)
 	}
 	byRadio := map[string][]any{}
+	radioUp := map[string]bool{}
 	names := slices.Sorted(maps.Keys(up))
 	for _, name := range names {
 		opts := sections[name]
@@ -1365,21 +1386,85 @@ func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool)
 			ifname = "phy0-sta0"
 		}
 		byRadio[radio] = append(byRadio[radio], map[string]any{
-			"section": name,
-			"ifname":  ifname,
-			"up":      up[name],
-			"config":  map[string]any{"mode": opts["mode"], "ssid": opts["ssid"]},
+			"section":  name,
+			"ifname":   ifname,
+			"config":   map[string]any{"mode": opts["mode"], "ssid": opts["ssid"]},
+			"vlans":    []any{},
+			"stations": []any{},
 		})
+		if up[name] {
+			radioUp[radio] = true
+		}
 	}
 	resp := map[string]any{}
 	for radio, ifaces := range byRadio {
-		resp[radio] = map[string]any{"interfaces": ifaces}
+		resp[radio] = map[string]any{
+			"up":                 radioUp[radio],
+			"pending":            false,
+			"autostart":          true,
+			"disabled":           false,
+			"retry_setup_failed": false,
+			"interfaces":         ifaces,
+		}
 	}
+	registerPayload(t, svc, resp)
+	registerDeviceStatus(t, svc, map[string]bool{"fixture radios settle nothing": false})
+}
+
+// registerPayload installs a whole `network.wireless status` response.
+func registerPayload(t *testing.T, svc *WifiService, resp map[string]any) {
+	t.Helper()
 	ub, ok := svc.ubus.(*ubus.MockUbus)
 	if !ok {
 		t.Fatal("expected a MockUbus")
 	}
 	ub.RegisterResponse("network.wireless.status", resp)
+}
+
+// registerDeviceStatus installs a `network.device status` answer. The mock keys
+// responses by path and method and ignores the requested device name, so the
+// answer applies to every ifname the probe asks about; the map exists so a test
+// says what it means.
+func registerDeviceStatus(t *testing.T, svc *WifiService, up map[string]bool) {
+	t.Helper()
+	anyUp := false
+	for _, isUp := range up {
+		anyUp = anyUp || isUp
+	}
+	ub, ok := svc.ubus.(*ubus.MockUbus)
+	if !ok {
+		t.Fatal("expected a MockUbus")
+	}
+	ub.RegisterResponse("network.device.status", map[string]any{
+		"external": true,
+		"present":  true,
+		"up":       anyUp,
+		"carrier":  anyUp,
+	})
+}
+
+// setRadioPending flips a radio-level liveness flag on the payload a preceding
+// registerInterfaceStatus installed.
+func setRadioPending(t *testing.T, svc *WifiService, radio string, pending bool) {
+	t.Helper()
+	resp, err := svc.ubus.Call("network.wireless", "status", nil)
+	if err != nil {
+		t.Fatalf("reading back the registered payload: %v", err)
+	}
+	entry, ok := resp[radio].(map[string]any)
+	if !ok {
+		t.Fatalf("the registered payload has no radio %s", radio)
+	}
+	entry["pending"] = pending
+}
+
+// quietConfirmRetries drops the wait between confirm probes so a test that
+// deliberately exhausts the retry budget does not have to spend it.
+func quietConfirmRetries(t *testing.T) {
+	t.Helper()
+	prev := wirelessRetrySleep
+	wirelessRetrySleep = func(time.Duration) {}
+	t.Cleanup(func() { wirelessRetrySleep = prev })
 }
 
 // A radio that stays down must NOT have its rollback cancelled: that is the
@@ -1388,6 +1473,7 @@ func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool)
 func TestConfirmApply_KeepsRollbackArmedWhenAPIsDown(t *testing.T) {
 	svc, _ := newTestWifiService()
 	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": false})
+	quietConfirmRetries(t)
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1400,12 +1486,65 @@ func TestConfirmApply_KeepsRollbackArmedWhenAPIsDown(t *testing.T) {
 	}
 }
 
+// A radio is a per-RADIO signal, so on a radio hosting TWO wanted interfaces one
+// of them coming up used to prove the other. This layout is real: SetGuestWifi
+// only excludes the uplink radio, so on the captured layout the guest AP lands
+// beside the main AP on radio1. Confirming there with a dead main AP silently
+// removes the operator's main SSID and cancels the rollback that would have
+// restored it.
+func TestConfirmApply_SettledRadioDoesNotProveASecondInterfaceOnIt(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Guest AP beside the main AP on radio1, both wanted.
+	if err := u.Set("wireless", "default_radio0", "device", "radio1"); err != nil {
+		t.Fatal(err)
+	}
+	// The radio reads up because ONE of its interfaces came up...
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": false})
+	// ...and both per-device answers say the interfaces are not live.
+	registerDeviceStatus(t, svc, map[string]bool{"phy0-ap0": false})
+	quietConfirmRetries(t)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-two-ap"); !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("a settled radio must not prove a second interface on it, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("the rollback must stay armed when one of two interfaces on a radio is down, "+
+			"got confirm %#v", fake.confirmed)
+	}
+}
+
+// The single-interface case keeps working: a settled radio with nothing else on
+// it is still proof, without paying a device round-trip.
+func TestConfirmApply_SettledRadioStillProvesItsOnlyInterface(t *testing.T) {
+	svc, u := newTestWifiService()
+	// Only one wanted interface in total, so the radio has nothing else on it.
+	if err := u.Set("wireless", "default_radio1", "disabled", "1"); err != nil {
+		t.Fatal(err)
+	}
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true})
+	// The per-device fallback answers down; a settled single-interface radio must
+	// not need it.
+	registerDeviceStatus(t, svc, map[string]bool{"phy0-ap0": false})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-single-ap"); err != nil {
+		t.Fatalf("a settled radio carrying one wanted interface must prove it, got %v", err)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
 func TestConfirmApply_FailsClosedWhenWirelessStatusIsUnreadable(t *testing.T) {
 	svc, _ := newTestWifiService()
 	ub := svc.ubus.(*ubus.MockUbus)
 	ub.RegisterResponse("network.wireless.status", nil)
 	// A nil registered response makes the mock answer with no interfaces, i.e. no
 	// AP is observable at all.
+	quietConfirmRetries(t)
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1414,6 +1553,58 @@ func TestConfirmApply_FailsClosedWhenWirelessStatusIsUnreadable(t *testing.T) {
 	}
 	if len(fake.confirmed) != 0 {
 		t.Fatalf("unknown state must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// A malformed radio the apply has nothing to do with must not turn a transient
+// netifd hiccup into a proof that is never retried: the interfaces that read
+// fine are still proven, and the radio that owns the wanted sections is the one
+// that decides.
+func TestConfirmApply_UnrelatedUnreadableRadioDoesNotAbortTheProof(t *testing.T) {
+	svc, _ := newTestWifiService()
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": true})
+	resp, err := svc.ubus.Call("network.wireless", "status", nil)
+	if err != nil {
+		t.Fatalf("reading back the registered payload: %v", err)
+	}
+	// A third radio netifd answers in a shape this build cannot read. It owns no
+	// wanted section.
+	resp["radio2"] = "up"
+	registerPayload(t, svc, resp)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-foreign-shape"); err != nil {
+		t.Fatalf("an unreadable unrelated radio must not abort the proof, got %v", err)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
+// ...but it still fails closed for the interfaces it might own.
+func TestConfirmApply_UnreadableRadioStillFailsClosedForItsInterfaces(t *testing.T) {
+	svc, u := newTestWifiService()
+	if err := u.Set("wireless", "default_radio0", "device", "radio2"); err != nil {
+		t.Fatal(err)
+	}
+	registerInterfaceStatus(t, svc, map[string]bool{"default_radio0": true, "default_radio1": true})
+	resp, err := svc.ubus.Call("network.wireless", "status", nil)
+	if err != nil {
+		t.Fatalf("reading back the registered payload: %v", err)
+	}
+	resp["radio2"] = "up"
+	registerPayload(t, svc, resp)
+	quietConfirmRetries(t)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	err = svc.ConfirmApply("session-own-shape")
+	if !errors.Is(err, ErrWirelessUnverifiable) {
+		t.Fatalf("an unreadable radio that owns a wanted section must not confirm, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("an unreadable payload must not cancel the rollback, got confirm %#v", fake.confirmed)
 	}
 }
 
@@ -1485,6 +1676,7 @@ func TestConfirmApply_ClientModeWithDownSTADoesNotConfirm(t *testing.T) {
 	svc, u := newTestWifiService()
 	putInClientMode(t, u)
 	registerInterfaceStatus(t, svc, map[string]bool{"sta0": false})
+	quietConfirmRetries(t)
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1515,6 +1707,11 @@ func TestConfirmApply_ClientModeWithUpSTAConfirms(t *testing.T) {
 
 // Repeater mode is no escape hatch: the downlink AP can come up while the uplink
 // never associates, and that is the same unrecoverable state.
+//
+// netifd cannot express "AP up, uplink not associated" through the radio-level
+// signal — a radio is up or it is not — so what a still-assocsiating uplink
+// actually looks like is a radio that has not settled yet. That is the fixture:
+// the radio the uplink lives on is pending.
 func TestConfirmApply_RepeaterModeAlsoProbesTheSTA(t *testing.T) {
 	svc, u := newTestWifiService()
 	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
@@ -1526,6 +1723,8 @@ func TestConfirmApply_RepeaterModeAlsoProbesTheSTA(t *testing.T) {
 	registerInterfaceStatus(t, svc, map[string]bool{
 		"default_radio0": true, "default_radio1": true, "sta0": false,
 	})
+	setRadioPending(t, svc, "radio0", true)
+	quietConfirmRetries(t)
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1598,6 +1797,42 @@ func TestConfirmApply_ProbesImmediatelyAndReportsProbeBudget(t *testing.T) {
 	if apply.ProbeBudgetSeconds <= 0 || apply.ProbeBudgetSeconds >= apply.RollbackTimeoutSeconds {
 		t.Fatalf("the probe budget (%ds) must be positive and fit inside the rollback window (%ds)",
 			apply.ProbeBudgetSeconds, apply.RollbackTimeoutSeconds)
+	}
+	// The budget is what the client subtracts from its own deadline, so it has to
+	// cover the whole time ONE probe can block: the sleeps between retries AND
+	// the ubus round-trips the per-interface fallback makes. Counting only the
+	// sleeps (as this used to) understated the blocking time by 2.5 s per
+	// attempt and pushed the last probe to within half a second of rpcd's
+	// rollback.
+	sleepOnly := int((wirelessConfirmAttempts - 1) * wirelessConfirmDelay / time.Second)
+	if apply.ProbeBudgetSeconds <= sleepOnly {
+		t.Fatalf("the published budget (%ds) does not account for the ubus round-trips "+
+			"of the per-interface fallback on top of the %ds of sleeps",
+			apply.ProbeBudgetSeconds, sleepOnly)
+	}
+	// ...without giving up the patience the device needs: after `uci apply`
+	// netifd restarts the radios and hostapd finishes ACS before the AP links
+	// up, which the device log puts at ~10 s.
+	const deviceLinkSeconds = 10
+	if sleepOnly < deviceLinkSeconds {
+		t.Fatalf("the probe waits %ds, less than the ~%ds the device needs to link an AP up",
+			sleepOnly, deviceLinkSeconds)
+	}
+	// The client reserves the budget plus its own margin and caps that
+	// reservation at half the rollback window. A budget that outgrows the cap
+	// would be silently truncated there, and the probe would then be issued too
+	// late — so the cap is asserted here rather than discovered on a device.
+	//
+	// The margin is the one number wifi-apply.ts reserves
+	// (PROBE_SAFETY_MARGIN_MS), stated here in seconds because the gate speaks
+	// in the units of the published budget. Keeping them apart is what let the
+	// Go comment say "half a second" while the gate reserved a full one;
+	// TestClientProbeSafetyMarginMatchesTheGoGate is what keeps them one number.
+	const probeMarginSeconds = wirelessProbeSafetyMarginSeconds
+	reserved := apply.ProbeBudgetSeconds + probeMarginSeconds
+	if reserved*2 > apply.RollbackTimeoutSeconds {
+		t.Fatalf("budget %ds plus %ds of client margin outgrows half the %ds rollback window",
+			apply.ProbeBudgetSeconds, probeMarginSeconds, apply.RollbackTimeoutSeconds)
 	}
 
 	fake := &fakeWirelessApplier{}
@@ -2487,31 +2722,12 @@ func TestConnectThenSetModeRepeater_PreservesSingleActiveSTA(t *testing.T) {
 	}
 }
 
-// Regression: SwitchSTAToRadio must reconcile AP layout so the target radio's AP is
-// disabled before commit (ath11k/IPQ6018 crashes if AP and STA share the same PHY).
-func TestSwitchSTAToRadio_ReconcilesSameRadioAP(t *testing.T) {
-	svc, u := newTestWifiService()
-
-	// Default mock: sta0 on radio0, default_radio0 (AP) on radio0, default_radio1 (AP) on radio1.
-	// Switch STA to radio1 — default_radio1 must be disabled, default_radio0 must be enabled.
-	if err := svc.SwitchSTAToRadio("radio1"); err != nil {
-		t.Fatalf("SwitchSTAToRadio: %v", err)
-	}
-
-	staDevice, _ := u.Get("wireless", "sta0", "device")
-	if staDevice != "radio1" {
-		t.Errorf("expected sta0 device=radio1, got %q", staDevice)
-	}
-
-	ap0Disabled, _ := u.Get("wireless", "default_radio0", "disabled")
-	ap1Disabled, _ := u.Get("wireless", "default_radio1", "disabled")
-	if ap0Disabled == "1" {
-		t.Errorf("default_radio0 (AP on radio0, STA moved away) should be enabled, got disabled=1")
-	}
-	if ap1Disabled != "1" {
-		t.Errorf("default_radio1 (AP on radio1, STA now on radio1) should be disabled=1, got %q", ap1Disabled)
-	}
-}
+// Regression: a background radio switch must never put the uplink on a PHY that
+// runs an access point (ath11k/IPQ6018 crashes if AP and STA share one PHY).
+// The switch splits the AP off the target radio when it can, and refuses with
+// ErrAPAndSTASameRadio when it cannot. Both branches are pinned in
+// wifi_radio_choice_test.go, which supersedes the earlier "always refuse"
+// contract this test used to assert.
 
 // ---------------------------------------------------------------------------
 // L1: UCI write-sequence safety helpers used by the tests below.
@@ -4021,5 +4237,391 @@ func TestConnectTwiceSucceeds(t *testing.T) {
 		SSID: "Airport-WiFi", Password: "air456", Encryption: "psk2",
 	}); err != nil {
 		t.Fatalf("second connect was refused: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The probe reads netifd's real payload shape.
+//
+// goldenWirelessStatus is the trimmed, verbatim `ubus call network.wireless
+// status` output captured on the test device (OpenWrt 25.12.3, netifd
+// 2026.02.26-r1) with every radio up and both the 2 GHz AP and the 5 GHz uplink
+// STA live. Only the WPA keys are redacted; they are not read by the probe and
+// they are a real credential.
+//
+// It is embedded verbatim rather than synthesised because the previous fixture
+// invented a per-interface "up" field: netifd reports liveness per RADIO
+// (up/pending/retry_setup_failed) and a per-interface entry carries exactly
+// {section, config, ifname, vlans, stations}. A fixture that adds a field the
+// device does not emit makes a probe that can never pass on hardware look green.
+// See docs/tests/on-device-verification.md.
+const goldenWirelessStatus = `	{
+	 "radio0": {
+	  "up": true,
+	  "pending": false,
+	  "autostart": true,
+	  "disabled": false,
+	  "retry_setup_failed": false,
+	  "config": {
+	   "disabled": false,
+	   "type": "mac80211",
+	   "band": "5g",
+	   "cell_density": 0,
+	   "channel": "36",
+	   "country": "US",
+	   "htmode": "VHT80",
+	   "path": "platform/soc@0/c000000.wifi"
+	  },
+	  "interfaces": [
+	   {
+	    "section": "sta0",
+	    "config": {
+	     "network": [
+	      "wwan"
+	     ],
+	     "device": [
+	      "radio0"
+	     ],
+	     "mode": "sta",
+	     "disabled": false,
+	     "encryption": "psk2",
+	     "hidden": false,
+	     "key": "<redacted>",
+	     "macaddr": "9e:6c:d4:9d:05:d0",
+	     "ssid": "Cappuxinno",
+	     "radios": []
+	    },
+	    "ifname": "phy0-sta0",
+	    "vlans": [],
+	    "stations": []
+	   }
+	  ]
+	 },
+	 "radio1": {
+	  "up": true,
+	  "pending": false,
+	  "autostart": true,
+	  "disabled": false,
+	  "retry_setup_failed": false,
+	  "config": {
+	   "disabled": false,
+	   "type": "mac80211",
+	   "band": "2g",
+	   "cell_density": 0,
+	   "channel": "auto",
+	   "country": "US",
+	   "htmode": "HT20",
+	   "path": "platform/soc@0/c000000.wifi+1"
+	  },
+	  "interfaces": [
+	   {
+	    "section": "default_radio1",
+	    "config": {
+	     "network": [
+	      "lan"
+	     ],
+	     "device": [
+	      "radio1"
+	     ],
+	     "mode": "ap",
+	     "disabled": false,
+	     "encryption": "psk2",
+	     "key": "<redacted>",
+	     "ssid": "Cappuxinno-Travel",
+	     "radios": []
+	    },
+	    "ifname": "phy1-ap0",
+	    "vlans": [],
+	    "stations": []
+	   }
+	  ]
+	 }
+	}`
+
+// decodeWirelessStatus parses a captured `ubus call ... status` payload the way
+// the ubus client does, so a fixture cannot drift from the real wire shape by
+// being hand-built as Go maps.
+func decodeWirelessStatus(t *testing.T, payload string) map[string]any {
+	t.Helper()
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(payload), &resp); err != nil {
+		t.Fatalf("decoding the captured status payload: %v", err)
+	}
+	return resp
+}
+
+// putInRepeaterLikeDeviceConfig makes the mock config match the captured
+// payload: the 5 GHz uplink STA plus the 2 GHz AP, and no other enabled AP.
+func putInRepeaterLikeDeviceConfig(t *testing.T, u *uci.MockUCI) {
+	t.Helper()
+	if err := u.Set("wireless", "default_radio0", "disabled", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Set("wireless", "sta0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The regression this whole section exists for: with the real payload, an AP
+// and an uplink that netifd reports as up MUST confirm, or every wireless
+// change on this firmware rolls back after 30 s forever.
+func TestConfirmApply_RealDevicePayloadConfirmsUpradioAndSTA(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInRepeaterLikeDeviceConfig(t, u)
+	registerPayload(t, svc, decodeWirelessStatus(t, goldenWirelessStatus))
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-real"); err != nil {
+		t.Fatalf("an AP and STA netifd reports as up must confirm, got %v", err)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
+// Fail-closed, the direction a naive fix breaks: a section netifd does not
+// LIST proves nothing, even when every radio says it is up.
+func TestConfirmApply_UnlistedSectionIsNotUp(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInRepeaterLikeDeviceConfig(t, u)
+	// Drop the 2 GHz AP from the payload; the radio it belongs to stays up.
+	resp := decodeWirelessStatus(t, goldenWirelessStatus)
+	radio1 := resp["radio1"].(map[string]any)
+	radio1["interfaces"] = []any{}
+	registerPayload(t, svc, resp)
+	quietConfirmRetries(t)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	err := svc.ConfirmApply("session-unlisted")
+	if !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("a section netifd does not list must stay unproven, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("an unlisted section must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// A radio that is up but still pending (or that netifd gave up on) is not up:
+// reporting "up" while the interface is still being set up is exactly the state
+// the rollback window exists for.
+func TestConfirmApply_PendingOrRetryFailedRadioIsNotUp(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  string
+	}{
+		{"pending", "pending"},
+		{"retry_setup_failed", "retry_setup_failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, u := newTestWifiService()
+			putInRepeaterLikeDeviceConfig(t, u)
+			resp := decodeWirelessStatus(t, goldenWirelessStatus)
+			resp["radio1"].(map[string]any)[tc.key] = true
+			registerPayload(t, svc, resp)
+			quietConfirmRetries(t)
+			// The device status says the interface carries traffic, so only the
+			// radio-level signal can keep it from counting as up.
+			fake := &fakeWirelessApplier{}
+			svc.applier = fake
+
+			err := svc.ConfirmApply("session-" + tc.name)
+			if !errors.Is(err, ErrWirelessNotUp) {
+				t.Fatalf("a radio with %s must not count as up, got %v", tc.key, err)
+			}
+			if len(fake.confirmed) != 0 {
+				t.Fatalf("an unsettled radio must not cancel the rollback, got confirm %#v",
+					fake.confirmed)
+			}
+		})
+	}
+}
+
+// The radio-level signal is only one of two. When the radio is not settled,
+// `network.device status {"name":"<ifname>"}` is asked whether the interface
+// itself exists, is up and has carrier.
+func TestConfirmApply_DeviceStatusProvesAnInterfaceOnAnUnsettledRadio(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInRepeaterLikeDeviceConfig(t, u)
+	resp := decodeWirelessStatus(t, goldenWirelessStatus)
+	resp["radio1"].(map[string]any)["up"] = false
+	registerPayload(t, svc, resp)
+	registerDeviceStatus(t, svc, map[string]bool{"phy1-ap0": true})
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-device"); err != nil {
+		t.Fatalf("an interface the device reports present, up and with carrier must confirm, got %v", err)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
+// Without the device answer, the same unsettled radio must fail closed.
+func TestConfirmApply_DeviceStatusDownDoesNotProveAnInterface(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInRepeaterLikeDeviceConfig(t, u)
+	resp := decodeWirelessStatus(t, goldenWirelessStatus)
+	resp["radio1"].(map[string]any)["up"] = false
+	registerPayload(t, svc, resp)
+	registerDeviceStatus(t, svc, map[string]bool{"phy1-ap0": false})
+	quietConfirmRetries(t)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-device-down"); !errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("a device-reported-down interface must not count as up, got %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("a down interface must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// Schema drift must not masquerade as operator error. When netifd stops
+
+// reporting the keys the probe reads, the answer is "I cannot read this",
+// which is diagnosable, and not "the access point did not come up", which
+// sends the operator looking at their own config.
+func TestConfirmApply_UnknownPayloadShapeIsDistinguishableFromAPNotUp(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		payload string
+	}{
+		{"radio without liveness", `{"radio0":{"interfaces":[]}}`},
+		{"interface without ifname", `{"radio0":{"up":true,"pending":false,
+			"retry_setup_failed":false,"interfaces":[{"section":"default_radio0"}]}}`},
+		{"radio is not an object", `{"radio0":"up"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, _ := newTestWifiService()
+			registerPayload(t, svc, decodeWirelessStatus(t, tc.payload))
+			fake := &fakeWirelessApplier{}
+			svc.applier = fake
+
+			err := svc.ConfirmApply("session-shape")
+			if !errors.Is(err, ErrWirelessUnverifiable) {
+				t.Fatalf("expected ErrWirelessUnverifiable for %s, got %v", tc.name, err)
+			}
+			if errors.Is(err, ErrWirelessNotUp) {
+				t.Fatalf("schema drift must not read as ErrWirelessNotUp, got %v", err)
+			}
+			if len(fake.confirmed) != 0 {
+				t.Fatalf("an unreadable payload must not cancel the rollback, got confirm %#v",
+					fake.confirmed)
+			}
+		})
+	}
+}
+
+// flakyWirelessStatusUbus answers `network.wireless status` with a TRANSPORT
+// error for its first `failures` calls and with a payload afterwards. It exists
+// because MockUbus cannot return an error from Call, and "the bus never
+// answered" is a condition the service must tell apart from "the bus answered
+// with bad news": the socket is gone, netifd is restarting the object, or the
+// call timed out. Unrelated to this file and deleted with it.
+type flakyWirelessStatusUbus struct {
+	payload  map[string]any
+	failures int
+	calls    int
+}
+
+func (f *flakyWirelessStatusUbus) Call(
+	path, method string, _ map[string]any,
+) (map[string]any, error) {
+	if path != "network.wireless" || method != "status" {
+		return nil, fmt.Errorf("unexpected ubus call %s %s", path, method)
+	}
+	f.calls++
+	if f.calls <= f.failures {
+		return nil, errors.New("ubus connection reset by peer")
+	}
+	return f.payload, nil
+}
+
+// A transport failure is the SAME condition as an unreadable payload: Travo
+// cannot read the answer, so it knows nothing about the change. Reporting it as
+// ErrWirelessNotUp claims the router rolled back while rpcd's rollback window is
+// still open and the config is still live — and the frontend turns that message
+// into "so it rolled back to the previous settings".
+func TestConfirmApply_TransportFailureIsNotReportedAsARollback(t *testing.T) {
+	svc, _ := newTestWifiService()
+	ub := &flakyWirelessStatusUbus{failures: wirelessConfirmAttempts}
+	svc.ubus = ub
+	quietConfirmRetries(t)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	err := svc.ConfirmApply("session-transport")
+	if !errors.Is(err, ErrWirelessUnverifiable) {
+		t.Fatalf("a transport failure must be ErrWirelessUnverifiable, got %v", err)
+	}
+	if errors.Is(err, ErrWirelessNotUp) {
+		t.Fatalf("a transport failure must not read as a rollback, got %v", err)
+	}
+	if strings.Contains(err.Error(), "wireless apply not verified") {
+		t.Fatalf("the operator-facing message claims a rollback that has not happened: %v", err)
+	}
+	if len(fake.confirmed) != 0 {
+		t.Fatalf("an unreadable answer must not cancel the rollback, got confirm %#v", fake.confirmed)
+	}
+}
+
+// A transport failure is transient by nature — netifd restarting the object is
+// the normal case — so it is retried inside the budget instead of ending the
+// confirmation on the first unreadable poll.
+func TestConfirmApply_TransportFailureIsRetriedAndCanStillConfirm(t *testing.T) {
+	svc, u := newTestWifiService()
+	putInRepeaterLikeDeviceConfig(t, u)
+	ub := &flakyWirelessStatusUbus{
+		payload:  decodeWirelessStatus(t, goldenWirelessStatus),
+		failures: 1,
+	}
+	svc.ubus = ub
+	quietConfirmRetries(t)
+	fake := &fakeWirelessApplier{}
+	svc.applier = fake
+
+	if err := svc.ConfirmApply("session-transient"); err != nil {
+		t.Fatalf("a status read that recovers on retry must confirm, got %v", err)
+	}
+	if ub.calls < 2 {
+		t.Fatalf("expected the transport failure to be retried, got %d status reads", ub.calls)
+	}
+	if len(fake.confirmed) != 1 {
+		t.Fatalf("expected the applier to be confirmed, got %#v", fake.confirmed)
+	}
+}
+
+// The probe safety margin is one number with two homes: the Go gate reserves it
+// in seconds, the client reserves it in milliseconds, and the documentation
+// asserts they are the same. Nothing derived one from the other, so they
+// drifted (1 s here, 500 ms there, "half a second" in the comment) without a
+// single test failing. This one reads the client's exported constant and fails
+// when the two sides disagree.
+func TestClientProbeSafetyMarginMatchesTheGoGate(t *testing.T) {
+	clientPath := filepath.Join(
+		"..", "..", "..", "frontend", "src", "lib", "wifi-apply.ts")
+	body, err := os.ReadFile(clientPath)
+	if err != nil {
+		t.Fatalf("reading %s: %v", clientPath, err)
+	}
+	match := regexp.MustCompile(`PROBE_SAFETY_MARGIN_MS\s*=\s*(\d+)`).
+		FindSubmatch(body)
+	if match == nil {
+		t.Fatalf("no PROBE_SAFETY_MARGIN_MS constant found in %s", clientPath)
+	}
+	clientMillis, err := strconv.Atoi(string(match[1]))
+	if err != nil {
+		t.Fatalf("parsing the client margin %q: %v", match[1], err)
+	}
+	if clientMillis != wirelessProbeSafetyMarginSeconds*1000 {
+		t.Fatalf("the client reserves %d ms of margin while the Go gate reserves %ds; "+
+			"docs/adr/0002 says they are the same number", clientMillis,
+			wirelessProbeSafetyMarginSeconds)
 	}
 }
