@@ -2,10 +2,18 @@ import { BookmarkPlus, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryCard } from '@/components/ui/query-card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDHCPReservations, useDeleteDHCPReservation } from '@/hooks/use-network';
 
 export function ClientsDhcpReservationsCard() {
-  const { data: reservations } = useDHCPReservations();
+  const {
+    data: reservations,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useDHCPReservations();
   const deleteReservation = useDeleteDHCPReservation();
 
   return (
@@ -15,17 +23,35 @@ export function ClientsDhcpReservationsCard() {
         <BookmarkPlus className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {!reservations || reservations.length === 0 ? (
-          <EmptyState message="No static reservations. Use the bookmark icon next to a connected client to reserve its IP." />
-        ) : (
+        {/* A failed fetch must not read as "no reservations configured". */}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={<Skeleton className="h-10 w-full" />}
+        >
+          {!reservations || reservations.length === 0 ? (
+            <EmptyState message="No static reservations. Use the bookmark icon next to a connected client to reserve its IP." />
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              <caption className="sr-only">Static DHCP reservations</caption>
               <thead>
                 <tr className="border-b border-gray-200 text-left dark:border-gray-700">
-                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">Hostname</th>
-                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">MAC</th>
-                  <th className="pb-2 font-medium text-gray-500 dark:text-gray-400">IP</th>
-                  <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">
+                  <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
+                    Hostname
+                  </th>
+                  <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
+                    MAC
+                  </th>
+                  <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
+                    IP
+                  </th>
+                  <th
+                    scope="col"
+                    className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400"
+                  >
                     Actions
                   </th>
                 </tr>
@@ -58,7 +84,8 @@ export function ClientsDhcpReservationsCard() {
               </tbody>
             </table>
           </div>
-        )}
+          )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

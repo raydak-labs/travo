@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { routeWithParam, routeWithSegment } from '@/lib/api-url';
@@ -50,6 +51,22 @@ export function useWifiHealth() {
   });
 }
 
+/**
+ * A WiFi change perturbs every `wifi` query plus a few router-wide ones.
+ *
+ * The broad invalidate covers all `wifi` keys (including ones that need no
+ * follow-up, like the radio scan); `refreshRouterState` then only repeats the
+ * delayed passes on `refreshKeys`. Calling both in full fetched the listed keys
+ * four times per mutation.
+ */
+function wifiMutationSettled(queryClient: QueryClient, refreshKeys: Array<readonly unknown[]>) {
+  void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+  for (const queryKey of refreshKeys) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+  void refreshRouterState(queryClient, refreshKeys, { skipImmediate: true });
+}
+
 export function useWifiConnect() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -64,8 +81,7 @@ export function useWifiConnect() {
       finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.connect, params)),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'saved'],
         ['network', 'status'],
@@ -84,8 +100,7 @@ export function useWifiDisconnect() {
       finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.disconnect)),
     onSuccess: () => {
       toast.success('Disconnected from WiFi');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'saved'],
         ['network', 'status'],
@@ -118,8 +133,7 @@ export function useWifiMode() {
       ),
     onSuccess: (_data, { mode }) => {
       toast.success(`WiFi mode changed to ${mode}`);
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'saved'],
         ['wifi', 'ap'],
@@ -242,8 +256,7 @@ export function useRepeaterRadioReconcile() {
       ),
     onSuccess: () => {
       toast.success('Repeater radio layout updated');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'health'],
         ['wifi', 'ap'],
         ['wifi', 'connection'],
@@ -370,8 +383,7 @@ export function useSetRadioRole() {
       } else {
         toast.success('Radio role updated');
       }
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'radios'],
         ['wifi', 'ap'],
@@ -393,8 +405,7 @@ export function useSetRadioEnabled() {
       finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.radio, { enabled })),
     onSuccess: () => {
       toast.success('WiFi radio updated');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'radios'],
         ['network', 'status'],

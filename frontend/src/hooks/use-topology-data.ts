@@ -7,6 +7,7 @@ import { useWifiConnection } from './use-wifi';
 import { useVpnStatus } from './use-vpn';
 import { useSystemInfo } from './use-system';
 import { useUSBTetherStatus } from './use-usb-tether';
+import { useRefetchOnWsReconnect } from './use-refetch-on-ws-reconnect';
 import { useWsSubscribe } from '@/lib/ws-context';
 
 export interface SourceDef {
@@ -56,6 +57,9 @@ export function topologyRefetchInterval(wsConnected: boolean): number | false {
 
 export function useTopologyData(): TopologyData {
   const { connected } = useWsSubscribe();
+  // Anything pushed while the socket was down is gone for good; without this
+  // the dashboard holds pre-outage WAN/client state indefinitely.
+  useRefetchOnWsReconnect([['network', 'status']]);
   // A finite staleTime (instead of `Infinity`) plus focus/reconnect refetching
   // is what makes the dashboard heal when the WebSocket never delivered a
   // push: `staleTime: Infinity` also disabled refetchOnWindowFocus and

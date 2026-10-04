@@ -2,13 +2,26 @@ import { Server, Cpu, HardDrive } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { HostnameInlineForm } from './hostname-inline-form';
 import { useSystemInfo, useSystemStats } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 export function SystemAtAGlanceSection() {
-  const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
-  const { data: stats, isLoading: statsLoading } = useSystemStats();
+  const {
+    data: info,
+    isLoading: infoLoading,
+    isError: infoError,
+    error: infoErrorDetail,
+    refetch: refetchInfo,
+  } = useSystemInfo();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    error: statsErrorDetail,
+    refetch: refetchStats,
+  } = useSystemStats();
 
   return (
     <div>
@@ -22,12 +35,21 @@ export function SystemAtAGlanceSection() {
             <Server className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent>
-            {infoLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ) : info ? (
+            {/* Without this the card body rendered nothing at all on failure,
+                which reads as an empty section rather than a broken request. */}
+            <QueryCard
+              isLoading={infoLoading}
+              isError={infoError}
+              error={infoErrorDetail}
+              onRetry={() => void refetchInfo()}
+              loading={
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              }
+            >
+              {info ? (
               <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
                 <div className="grid grid-cols-2 gap-2">
                   <span className="text-gray-500 dark:text-gray-400">Hostname</span>
@@ -46,7 +68,8 @@ export function SystemAtAGlanceSection() {
                   </span>
                 </div>
               </div>
-            ) : null}
+              ) : null}
+            </QueryCard>
           </CardContent>
         </Card>
 
@@ -56,13 +79,20 @@ export function SystemAtAGlanceSection() {
             <Cpu className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent className="space-y-4">
-            {statsLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : stats ? (
+            <QueryCard
+              isLoading={statsLoading}
+              isError={statsError}
+              error={statsErrorDetail}
+              onRetry={() => void refetchStats()}
+              loading={
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              }
+            >
+              {stats ? (
               <>
                 <div>
                   <div className="mb-1 flex items-center justify-between text-sm">
@@ -112,7 +142,8 @@ export function SystemAtAGlanceSection() {
                   <Progress value={stats.storage.usage_percent} />
                 </div>
               </>
-            ) : null}
+              ) : null}
+            </QueryCard>
           </CardContent>
         </Card>
       </div>
