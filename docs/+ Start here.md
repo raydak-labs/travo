@@ -55,3 +55,5 @@ updated: 2026-09-28
 ## On-device verification
 
 - [[tests/failover-verification]]
+- [[tests/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
+  guard or install change touches a device

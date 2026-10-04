@@ -11,6 +11,18 @@ baseline: f3125f22 (clean tree)
 
 > ## Remediation status
 >
+> ### Update: device validation found a P0 this review could not
+>
+> Once the device was reachable, the wireless confirm probe introduced during this remediation was
+> shown to **never** pass on the target hardware: it read a per-interface `up` field that netifd emits
+> per radio only. Every wireless change rolled back, and the suite stayed green because the test
+> fixture invented the missing field. That is fixed, along with a second fail-open in the
+> replacement (one radio hosting two access points) and an unrecoverable DNS-resolver deletion in
+> captive restore. Three further adversarial rounds over the remediation found and fixed more of the
+> same class — checks that asserted the *shape* of the thing they checked rather than the property
+> they cared about. See
+> [`docs/tests/on-device-verification.md`](./docs/tests/on-device-verification.md).
+>
 > Fixes are landing on `fix/deep-review-2026-10-04` — 24 commits, all pushed. Everything in
 > this report that needed no product decision is done: `make test`, `make lint` (0 issues),
 > `make build`, `pnpm format:check`, shellcheck and `go mod tidy -diff` are all green, and
@@ -151,10 +163,22 @@ baseline: f3125f22 (clean tree)
 Follow-up to [`2026-09-26-critical-code-review.md`](./2026-09-26-critical-code-review.md).
 The findings below are as first reported. The fixes are **not** — see
 [Remediation status](#remediation-status) above; remediation is landing on
-`fix/deep-review-2026-10-04`. The device `192.168.1.1` was unreachable throughout, so this is
-static analysis plus local test/lint runs — no on-device validation. A punch list for that is in
-[`docs/tests/VERIFY-on-device-2026-10-04.md`](./docs/tests/VERIFY-on-device-2026-10-04.md)
-(a temporary file, to be deleted once the checks have run).
+`fix/deep-review-2026-10-04`. At the time of writing, the device `192.168.1.1` was unreachable, so
+this section is static analysis plus local test/lint runs — no on-device validation.
+
+**Device validation has since happened and changed this report's status.** `192.168.1.1` is
+reachable, and a read-only pass over it on 2026-10-04 overturned two things this document assumes:
+
+1. **The confirm-apply probe is a P0 on real hardware.** `appliedWirelessUp` decides an interface is
+   up from `iface["up"]`, but netifd reports liveness **per radio**; a per-interface entry carries
+   only `{section, config, ifname, vlans, stations}`. The probe therefore fails closed on every
+   wireless change. The test fixture invented the missing field, which is why the suite stayed green.
+2. **The deployed build is still exposed.** The binary on the device predates this branch and answers
+   `GET /API/v1/system/info` with 200 — the path-case bypass from finding 1, live.
+
+The device playbook and the hardware facts behind both are in
+[`docs/tests/on-device-verification.md`](./docs/tests/on-device-verification.md), which replaces the
+temporary punch list.
 
 ## Method
 
