@@ -642,17 +642,42 @@ func TestSetRadioRole_SameRadioRefusalIs409(t *testing.T) {
 	}
 }
 
-func TestGuestWifiSet_SameRadioRefusalIs409(t *testing.T) {
+// TestGuestWifiSet_FallsBackToTheOtherRadio pins the corrected behaviour.
+//
+// This used to assert 409: enabling a guest AP on the radio carrying the uplink
+// STA was refused outright. But preferredGuestRadio picked the 2.4 GHz radio
+// unconditionally, and on the archetypal travel router -- a client or repeater
+// whose uplink STA sits on the 2.4 GHz band -- that made guest WiFi impossible
+// to enable at all, with no way out except allow_ap_on_sta_radio, i.e.
+// deliberately re-enabling the AP+STA-on-one-PHY state the guard exists to
+// prevent.
+//
+// It now falls back to the other radio, exactly as the downlink AP does, so the
+// refusal only applies when there is genuinely nowhere else to put the AP.
+func TestGuestWifiSet_FallsBackToTheOtherRadio(t *testing.T) {
 	app := fiber.New()
-	svc, _ := uplinkSTAService(t)
+	svc, u := uplinkSTAService(t)
 	app.Put("/api/v1/wifi/guest", SetGuestWifiHandler(svc))
 
 	resp, body := putJSONRequest(t, app, http.MethodPut, "/api/v1/wifi/guest", map[string]any{
 		"enabled": true, "ssid": "Guest-Travel", "encryption": "psk2", "key": "guestpass123",
 	})
-	if resp.StatusCode != http.StatusConflict {
-		t.Fatalf("expected 409 when the guest AP would share the uplink radio, got %d: %s",
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected the guest AP to fall back to the non-uplink radio, got %d: %s",
 			resp.StatusCode, body)
+	}
+
+	opts, err := u.GetAll("wireless", "guest")
+	if err != nil {
+		t.Fatalf("guest section was not created: %v", err)
+	}
+	// radio1 is the only radio that does not carry the enabled uplink STA.
+	if got := opts["device"]; got != "radio1" {
+		t.Errorf("guest AP device = %q, want radio1 (the radio without the uplink STA); "+
+			"falling back to the 2.4 GHz uplink radio is what made guest WiFi unusable", got)
+	}
+	if got := opts["disabled"]; got != "0" {
+		t.Errorf("guest AP disabled = %q, want 0", got)
 	}
 }
 

@@ -103,6 +103,16 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 				return nil, fmt.Errorf("setting STA radio: %w", err)
 			}
 		}
+		// The radio the uplink STA will land on, resolved now: it is either the
+		// band-matched radio above or whatever the existing/new section already
+		// names. splitAPOffUplinkRadio keeps that radio from also running an
+		// access point (see its comment for why this cannot be left to
+		// reconcileRepeaterAPRadioLayout).
+		staOpts, err := w.uci.GetAll("wireless", section)
+		if err != nil {
+			return nil, fmt.Errorf("reading STA section %s: %w", section, err)
+		}
+		staRadio := staOpts["device"]
 		if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
 			return nil, fmt.Errorf("setting STA ssid: %w", err)
 		}
@@ -136,6 +146,16 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 		}
 		// Disable all other saved STA profiles so only this one connects at runtime.
 		if err := w.disableOtherSTASections(section); err != nil {
+			return nil, err
+		}
+		// Keep the radio the uplink is about to take free of access points before
+		// the STA is enabled. Outside repeater mode nothing else did this: every
+		// stock config has an access point on each radio, so Connect could commit
+		// AP+STA on one PHY — the state ADR 0002 §2 says is enough to crash
+		// ath11k/IPQ6018 — with no check at all. Runs after
+		// disableOtherSTASections so the only enabled uplink is the one being
+		// connected, and before Commit so a refusal reaches no running config.
+		if err := w.splitAPOffUplinkRadio(staRadio); err != nil {
 			return nil, err
 		}
 		// Reconcile AP radio layout atomically with the STA activation: in repeater mode

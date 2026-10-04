@@ -19,6 +19,21 @@ var ErrAPAndSTASameRadio = errors.New("refusing to run an access point and the W
 	"on the same radio: give the uplink STA its own radio and put the downlink access " +
 	"point on the other one, or enable allow_ap_on_sta_radio in repeater options first")
 
+// preferredGuestRadio picks the radio the guest access point goes on: the
+// 2.4 GHz one when it is free, otherwise the best radio that does NOT carry the
+// enabled WiFi uplink.
+//
+// Skipping the uplink radio is what keeps guest WiFi reachable at all on the
+// common travel-router layout — uplink STA on 2.4 GHz — instead of answering a
+// refusal whose only escape is allow_ap_on_sta_radio, i.e. deliberately
+// re-enabling the crash state the guard exists to prevent. It is the same split
+// applyRepeaterDownlinkAPPolicy makes for the downlink AP: the guest AP and the
+// uplink get separate PHYs. A guest network on 5 GHz is slower but usable; a
+// refusal is not.
+//
+// When no alternative exists (single-radio hardware) the uplink radio is
+// returned anyway and rejectAPOnUplinkRadio decides whether coexistence stands —
+// the same trade-off SetMode("repeater") and SetRadioRole already accept.
 func (w *WifiService) preferredGuestRadio() (string, error) {
 	radios, err := w.getWifiRadioNames()
 	if err != nil {
@@ -27,11 +42,25 @@ func (w *WifiService) preferredGuestRadio() (string, error) {
 	if len(radios) == 0 {
 		return "", fmt.Errorf("no radio found for guest wifi")
 	}
+	uplinkRadio, err := w.enabledUwanSTARadio()
+	if err != nil {
+		return "", err
+	}
+	firstFree := ""
 	for _, radio := range radios {
+		if radio == uplinkRadio {
+			continue
+		}
 		opts, _ := w.uci.GetAll("wireless", radio)
+		if firstFree == "" {
+			firstFree = radio
+		}
 		if opts["band"] == "2g" {
 			return radio, nil
 		}
+	}
+	if firstFree != "" {
+		return firstFree, nil
 	}
 	return radios[0], nil
 }
@@ -154,6 +183,15 @@ func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult
 		default:
 			return nil, fmt.Errorf("invalid role %q: must be ap, sta, both, or none", role)
 		}
+		// Role "ap" is deliberately not policed by rejectSameRadioAPSTA, and does
+		// not need to be: asking for an access point on the uplink radio also
+		// disables that radio's STA sections below, so the end state is AP-only
+		// and never the AP+STA-on-one-PHY state ADR 0002 §2 warns about. Refusing
+		// instead would break the ordinary "make this radio an AP" action the
+		// operator asked for — losing the uplink is the consequence of their
+		// choice, not something to second-guess here. Pinned by
+		// TestSetRadioRole_APRoleOnUplinkRadioLeavesAPOnly and
+		// TestSetRadioRole_APRoleOnUplinkRadioCreatesAPOnly.
 		enableAP := role == "ap" || role == "both"
 		enableSTA := role == "sta" || role == "both"
 		// Role "both" is the only role that puts an access point and the uplink
@@ -385,6 +423,66 @@ func (w *WifiService) rejectAPOnUplinkRadio(radioName, reason string) error {
 	}
 	return fmt.Errorf("%w: %s on %s, which carries the WiFi uplink",
 		ErrAPAndSTASameRadio, reason, radioName)
+}
+
+// splitAPOffUplinkRadio keeps the radio an uplink STA is about to be enabled on
+// from also running an access point.
+//
+// It is the same split reconcileRepeaterAPRadioLayout performs, applied for
+// every mode. Connect used to rely on that reconcile alone, and it returns
+// immediately outside repeater mode — so on a device in client or ap mode
+// nothing stood between the uplink and an enabled AP on the same radio, which
+// is the state ADR 0002 §2 says is enough to crash ath11k/IPQ6018.
+//
+// Two outcomes, both deliberate:
+//
+//   - Another radio hosts an access point: the APs on the uplink radio are
+//     disabled and the downlink moves to the other band, exactly what
+//     SetMode("repeater") already does. The uplink is what the operator asked
+//     for; the downlink follows.
+//   - No other radio hosts one: the request is refused. Disabling the only
+//     access point to free a radio would silently take the router's WiFi away,
+//     which is not what a "connect" request means. allow_ap_on_sta_radio is the
+//     documented escape.
+//
+// Single-radio hardware keeps coexistence: there is no split to make, which is
+// the trade-off SetMode("repeater") already accepts.
+func (w *WifiService) splitAPOffUplinkRadio(radioName string) error {
+	if radioName == "" {
+		return nil
+	}
+	radios, err := w.getWifiRadioNames()
+	if err != nil {
+		return err
+	}
+	if len(radios) < 2 {
+		return nil
+	}
+	apSections, err := w.getWifiSectionsByMode("ap")
+	if err != nil {
+		return err
+	}
+	apOnTarget, apOnOtherRadio := false, false
+	for _, section := range apSections {
+		opts, err := w.uci.GetAll("wireless", section)
+		if err != nil || opts["disabled"] == "1" || opts["device"] == "" {
+			continue
+		}
+		if opts["device"] == radioName {
+			apOnTarget = true
+		} else {
+			apOnOtherRadio = true
+		}
+	}
+	if !apOnTarget {
+		return nil
+	}
+	allowSTAAP := w.repeaterAllowAPOnSTARadio(true)
+	if !allowSTAAP && !apOnOtherRadio {
+		return fmt.Errorf("%w: WiFi uplink connected on %s, which is the only radio "+
+			"running an access point", ErrAPAndSTASameRadio, radioName)
+	}
+	return w.applyRepeaterDownlinkAPPolicy(apSections, radioName, apOnOtherRadio, allowSTAAP, true)
 }
 
 // enabledUwanSTARadio returns the radio of the enabled STA bound to network=wwan

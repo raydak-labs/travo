@@ -2817,17 +2817,52 @@ func guestEnable() models.GuestWifiConfig {
 	}
 }
 
-func TestSetGuestWifi_RefusesUplinkRadio(t *testing.T) {
+// The 2.4 GHz preference must not be a hard veto. On the archetypal travel
+// router the uplink STA is on the 2.4 GHz radio, so preferring it made the
+// guest access point a 409 with no way forward but allow_ap_on_sta_radio — i.e.
+// deliberately re-enabling the crash state the guard exists to prevent. The
+// guest AP belongs on the radio that does NOT carry the uplink, exactly like
+// the downlink AP does.
+func TestSetGuestWifi_FallsBackToTheRadioWithoutTheUplink(t *testing.T) {
 	svc, u := clientModeService(t, false)
 
-	if _, err := svc.SetGuestWifi(guestEnable()); !errors.Is(err, ErrAPAndSTASameRadio) {
-		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
+	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+		t.Fatalf("SetGuestWifi on the 2.4 GHz uplink radio must fall back, got %v", err)
 	}
-	if _, err := u.GetAll("wireless", "guest"); err == nil {
-		t.Error("the refused request created the guest access point anyway")
+	device, _ := u.Get("wireless", "guest", "device")
+	if device != "radio1" {
+		t.Errorf("expected the guest AP on radio1, the radio without the uplink, got %q", device)
 	}
-	if commits := u.commitCalls(); len(commits) != 0 {
-		t.Errorf("a refused request must commit nothing, got %v", commits)
+	if dis, _ := u.Get("wireless", "guest", "disabled"); dis != "0" {
+		t.Errorf("expected the guest AP to be enabled, got disabled=%q", dis)
+	}
+	for _, radio := range []string{"radio0", "radio1"} {
+		assertNoSameRadioAPSTA(t, u, radio)
+	}
+}
+
+// Single-radio hardware has no split to make, and rejectAPOnUplinkRadio accepts
+// the coexistence there — the same trade-off SetMode("repeater") and
+// SetRadioRole already accept, and the only case left where preferredGuestRadio
+// cannot fall back. Pinned so guest WiFi cannot silently become impossible on
+// single-radio travel routers.
+func TestSetGuestWifi_SingleRadioKeepsCoexistence(t *testing.T) {
+	svc, u := repeaterModeService(t, false)
+	for _, section := range []string{"radio1", "default_radio1"} {
+		if err := u.DeleteSection("wireless", section); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := u.Set("wireless", "sta0", "network", "wwan"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+		t.Fatalf("guest WiFi must stay available on single-radio hardware: %v", err)
+	}
+	device, _ := u.Get("wireless", "guest", "device")
+	if device != "radio0" {
+		t.Errorf("expected the guest AP on the only radio, got %q", device)
 	}
 }
 
@@ -2848,16 +2883,163 @@ func TestSetGuestWifi_AllowedOnTheRadioWithoutTheUplink(t *testing.T) {
 	}
 }
 
+// The guest AP no longer needs the escape hatch to sit on the 2.4 GHz uplink
+// radio: preferredGuestRadio falls back to the other one. The hatch is still
+// what lets an access point STAY on the uplink radio, which is what the
+// SetAPConfig sibling test covers.
 func TestSetGuestWifi_AllowedWithAllowAPOnSTARadio(t *testing.T) {
 	svc, u := clientModeService(t, true)
 
 	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
-		t.Fatalf("allow_ap_on_sta_radio must keep the guest AP on the uplink radio: %v", err)
+		t.Fatalf("guest WiFi must be available with allow_ap_on_sta_radio: %v", err)
 	}
-	device, _ := u.Get("wireless", "guest", "device")
-	if device != "radio0" {
-		t.Errorf("expected the guest AP on radio0, got %q", device)
+	if dis, _ := u.Get("wireless", "guest", "disabled"); dis != "0" {
+		t.Errorf("expected the guest AP to be enabled, got disabled=%q", dis)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Connect activates the uplink STA, so it needs the same explicit
+// AP-on-the-target-radio check the other writers have: reconcileRepeaterAP-
+// RadioLayout returns immediately outside repeater mode, so outside it nothing
+// stood between Connect and an enabled STA sharing a PHY with an enabled AP.
+// ---------------------------------------------------------------------------
+
+// clientModeWithAPService returns a service forced into client mode by its mode
+// file — so reconcileRepeaterAPRadioLayout is a no-op, exactly as it is on a
+// device whose operator never selected repeater mode — with the uplink STA on
+// radio0 and no access point enabled. Tests enable the access points they need.
+func clientModeWithAPService(t *testing.T) (*WifiService, *revertingUCI) {
+	t.Helper()
+	svc, u := clientModeService(t, false)
+	modeFile := filepath.Join(t.TempDir(), "wifi-mode")
+	if err := os.WriteFile(modeFile, []byte("client"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc.modeFile = modeFile
+	if got := svc.deriveWifiMode(); got != "client" {
+		t.Fatalf("fixture is not in client mode, got %q", got)
+	}
+	return svc, u
+}
+
+// A second enabled access point on ANOTHER radio is the layout ADR 0002 §2 asks
+// for, so Connect is not refused; with no split available the uplink would put
+// an AP and a STA on the only PHY that runs an access point, which is refused
+// rather than silently taking the router's WiFi away.
+func TestConnect_RefusesWhenTheTargetRadioHasAnEnabledAP(t *testing.T) {
+	svc, u := clientModeWithAPService(t)
+	// An access point on radio0 and none anywhere else: freeing radio0 would
+	// mean disabling the router's only WiFi.
+	if err := u.Set("wireless", "default_radio0", "disabled", "0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.DeleteSection("wireless", "default_radio1"); err != nil {
+		t.Fatal(err)
+	}
+	applier := &fakeWirelessApplier{startToken: "must-not-be-used"}
+	svc.applier = applier
+
+	_, err := svc.Connect(models.WifiConfig{
+		SSID: "Cafe-WiFi", Band: "2g", Encryption: "psk2", Password: "cafepass1",
+	})
+	if !errors.Is(err, ErrAPAndSTASameRadio) {
+		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
+	}
+	if dis, _ := u.Get("wireless", "default_radio0", "disabled"); dis == "1" {
+		t.Error("the refused connect disabled the access point anyway")
+	}
+	for _, c := range u.commitCalls() {
+		if c == "wireless" {
+			t.Error("wireless was committed after the connect was refused")
+		}
+	}
+	if len(applier.started) != 0 {
+		t.Errorf("no apply may be started for a refused connect, got %v", applier.started)
+	}
+}
+
+// The split layout is not a refusal: with an enabled access point on the other
+// radio the uplink is welcome, and the AP sharing the target radio is disabled
+// so the PHY is not asked to do both — the same move SetMode("repeater") makes,
+// applied here in client mode too.
+func TestConnect_MovesTheEnabledAPOffTheUplinkRadio(t *testing.T) {
+	svc, u := clientModeWithAPService(t)
+	for _, section := range []string{"default_radio0", "default_radio1"} {
+		if err := u.Set("wireless", section, "disabled", "0"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Cafe-WiFi", Band: "2g", Encryption: "psk2", Password: "cafepass1",
+	}); err != nil {
+		t.Fatalf("Connect must be allowed when the downlink AP has the other radio: %v", err)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis != "1" {
+		t.Errorf("expected the access point on the uplink radio to be disabled, got %q", dis)
+	}
+	if dis, _ := u.Get("wireless", "default_radio1", "disabled"); dis != "0" {
+		t.Errorf("expected the access point on the other radio to stay enabled, got %q", dis)
+	}
+	assertNoSameRadioAPSTA(t, u, "radio0")
+}
+
+// allow_ap_on_sta_radio is the operator's explicit override for the case
+// SetAPConfig cannot resolve itself: the AP sits on the radio the operator named
+// and there is no split to move it to.
+func TestSetAPConfig_EnableAllowedWithAllowAPOnSTARadio(t *testing.T) {
+	svc, u := clientModeService(t, true)
+
+	enabled := true
+	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
+		SSID: "OpenWrt-Travel", Encryption: "psk2", Key: "travelrouter", Enabled: &enabled,
+	}); err != nil {
+		t.Fatalf("allow_ap_on_sta_radio must enable an access point on the uplink radio: %v", err)
+	}
+	if dis, _ := u.Get("wireless", "default_radio0", "disabled"); dis != "0" {
+		t.Errorf("expected the access point to be enabled, got disabled=%q", dis)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Finding 3: role "ap" on the uplink radio is deliberately AP-only, not a
+// silent AP+STA commit and not a refusal of the ordinary "make this radio an
+// AP" action.
+// ---------------------------------------------------------------------------
+
+func TestSetRadioRole_APRoleOnUplinkRadioLeavesAPOnly(t *testing.T) {
+	svc, u := clientModeService(t, false)
+
+	if _, err := svc.SetRadioRole("radio0", "ap"); err != nil {
+		t.Fatalf("role 'ap' on the uplink radio is a legitimate request: %v", err)
+	}
+	assertNoSameRadioAPSTA(t, u, "radio0")
+	if dis, _ := u.Get("wireless", "sta0", "disabled"); dis != "1" {
+		t.Errorf("expected the uplink STA on the AP radio to be disabled, got %q", dis)
+	}
+	dis, _ := u.Get("wireless", "default_radio0", "disabled")
+	if dis == "1" {
+		t.Errorf("expected the access point to be enabled, got disabled=%q", dis)
+	}
+}
+
+// Same guarantee for a radio that has no AP section yet: the created default AP
+// must still leave the radio AP-only.
+func TestSetRadioRole_APRoleOnUplinkRadioCreatesAPOnly(t *testing.T) {
+	svc, u := clientModeService(t, false)
+	if err := u.DeleteSection("wireless", "default_radio0"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.SetRadioRole("radio0", "ap"); err != nil {
+		t.Fatalf("role 'ap' on the uplink radio is a legitimate request: %v", err)
+	}
+	if _, err := u.GetAll("wireless", "ap_radio0"); err != nil {
+		t.Fatalf("expected a default AP to be created on radio0: %v", err)
+	}
+	assertNoSameRadioAPSTA(t, u, "radio0")
 }
 
 func TestSetAPConfig_EnableRefusesUplinkRadio(t *testing.T) {
