@@ -270,6 +270,33 @@ guard can mean "missing ACL" rather than "interrupted operation". `deploy-local.
 Note the router may not be able to download `luci-app-mwan3` over its own uplink; fetch it on a LAN
 host and `scp -O` it across, then `apk add --allow-untrusted`.
 
+### 9.2 Installing mwan3 can blackhole all internet traffic
+
+Observed on `192.168.1.1`: with no working `wan` interface, installing `mwan3` produced a config
+whose catch-all rule routed `0.0.0.0/0` into a policy with no healthy member. Every policy then
+read `unreachable` and **every outbound connection failed with "Network unreachable"** — the
+router looked healthy (uplink up, lease held, WiFi up) while carrying no traffic.
+
+```sh
+mwan3 status | head -20     # every policy reading "unreachable" is this failure
+ping -c2 1.1.1.1            # "Network unreachable" is the symptom
+```
+
+Recovery is to remove the stock catch-all rules so normal routing applies again:
+
+```sh
+uci -q delete mwan3.default_rule_v4
+uci -q delete mwan3.default_rule_v6
+uci commit mwan3
+```
+
+Then check Travo: disabling failover makes it remove its own rule (`travo_default_v4`) but leaves
+its generated interfaces, members and policy behind, which are inert without a rule. Removing the
+package (`apk del mwan3`) is the clean way to get back to a device with no mwan3 at all.
+
+So before any mwan3 work on a device whose WAN is a WiFi uplink, check that a policy can actually
+become healthy — and verify with a real outbound request, not with the uplink's own status.
+
 - **Multi-WAN failover** with two real uplinks — see
   [`failover-verification.md`](./failover-verification.md).
 - **The captive-portal composition** (C.8): the captive bypass and the DNS layer stack are two
