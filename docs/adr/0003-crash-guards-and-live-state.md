@@ -2,7 +2,7 @@
 title: "ADR 0003: Crash guards and automated live-state changes"
 status: Accepted
 date: 2026-05-14
-updated: 2026-09-28
+updated: 2026-10-04
 tags: [adr, safety, travo, guards, operations]
 ---
 
@@ -90,6 +90,29 @@ logic consults them as **“abort if present”** signals.
 - **Startup AP repair** (`main.go` → `WifiService.EnsureAPRunning`) commits `wireless` fixes with **no guard**, deliberately: there is no browser in the loop to confirm an rpcd rollback, so the repair is committed and the operator applies via LuCI “Save & Apply” or a reboot. The reasoning lives in the code comment at the call site, not here.
 - **Direct `uci commit` + reload** paths that bypass rpcd `apply`/`confirm` still need a guard: the WireGuard `wg0` zone and the USB-tether `wan` zone membership are committed and reloaded directly (see ADR 0004 §5).
 
+### 3.1 Bounded recovery: `network reload` after a refused apply
+
+The rule everywhere else is that **applying a user's wireless changes must not run `wifi`,
+`wifi up` or `wifi reload`** — they are the classic ath11k/IPQ6018 driver-crash trigger and
+an automated one has no rollback. **Recovery is the single, explicitly bounded exception, and
+it is stated in one place so it cannot be generalised:**
+
+- **What it is.** When `WifiService.ConfirmApply`'s probe refuses the apply (ADR 0002 §5),
+  `UCIApplyConfirm.Rollback` restores the file-level snapshot taken before the mutation
+  committed, cancels rpcd's rollback window, and then issues **`ubus call uci reload_config`**
+  (rpcd re-reads `/etc/config`) followed by **`ubus call network reload`** (netifd re-reads
+  `/etc/config/network` **and** `/etc/config/wireless`).
+- **What it is not.** `network reload` is a netifd configuration reload, **not** a driver
+  reload: it never calls `wifi`, `wifi up` or `wifi reload`. Those three remain forbidden on
+  this path, and on every other one.
+- **Why here and only here.** There is no browser left to confirm and no operator watching:
+  the config on disk is one that Travo itself has just proved cannot work. Leaving the device
+  running it would strand the operator off their router, which is the exact outcome a crash
+  guard exists to prevent — so this is recovery, and recovery is guarded by making the
+  previous config real again rather than by doing nothing.
+- Both ubus objects and their zero-argument signatures were verified on the device with
+  `ubus -v list uci` (`reload_config`) and `ubus -v list network` (`reload`).
+
 ## Consequences
 
 - New **goroutines**, **cron hooks**, or **init**-triggered Travo paths that mutate connectivity must either use this guard pattern or be proven safe to retry idempotently without user intervention.
@@ -102,6 +125,8 @@ logic consults them as **“abort if present”** signals.
 - `backend/internal/services/wifi_toggle_script.go` — the generated toggle helper and its guard
 - `backend/internal/services/wifi_reconnect.go` — auto-reconnect guard + fail count
 - `backend/internal/services/wifi_service.go`, `service_manager.go` — guard paths (now `/etc/trafo/`)
+- `backend/internal/services/uci_apply.go` — `Snapshot`/`Rollback`, the bounded-recovery `network reload` (§3.1)
+- [ADR 0002](./0002-wireless-model-and-luci-apply.md) — apply/confirm and the file-level rollback (§5, §5.0)
 - `backend/internal/services/failover_service.go`, `band_switching_service.go`,
   `captive_service.go`, `captive_autoaccept.go`, `vpn_service.go`,
   `usb_tethering_service.go` — guard paths

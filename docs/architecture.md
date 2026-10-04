@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-09-28
+updated: 2026-10-04
 ---
 
 # Architecture Decisions
@@ -65,6 +65,7 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 Wireless mutation safety is intentionally modeled after LuCI. **Implementation reference:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](./adr/0002-wireless-model-and-luci-apply.md).
 
 - Backend wireless changes use rpcd session login, copy config into session state, `uci apply` with rollback timeout, then explicit `uci confirm`.
+- **The rollback that actually restores is ours, not rpcd's window.** The change is committed before the apply, so rpcd snapshots the already-changed config and `uci revert` is a no-op. Travo copies `/etc/config/<name>` into its own snapshot **before** the mutation commits and restores it explicitly (`uci reload_config` + `network reload`) when the probe refuses or the mutation fails. See ADR 0002 §5.0.
 - Confirmation must happen only after the caller proves the router is still reachable.
 - Backend must **not** self-confirm immediately after starting rollback apply.
 - Scripts and SSH setup flows must **not** run `wifi`, `wifi up`, or `wifi reload` as part of applying user wireless changes.

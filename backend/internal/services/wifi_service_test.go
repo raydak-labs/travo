@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -36,8 +37,12 @@ type fakeWirelessApplier struct {
 	startErr     error
 	confirmErr   error
 	applyErr     error
+	snapErr      error
+	rollbackErr  error
 	started      [][]string
 	confirmed    []string
+	snapshotted  [][]string
+	rolledBack   []string
 	appliedCalls int
 }
 
@@ -55,6 +60,17 @@ func (f *fakeWirelessApplier) StartApply(configs []string) (string, error) {
 func (f *fakeWirelessApplier) Confirm(token string) error {
 	f.confirmed = append(f.confirmed, token)
 	return f.confirmErr
+}
+
+// Snapshot and Rollback are recorded only; this fake owns no files.
+func (f *fakeWirelessApplier) Snapshot(configs []string) error {
+	f.snapshotted = append(f.snapshotted, append([]string(nil), configs...))
+	return f.snapErr
+}
+
+func (f *fakeWirelessApplier) Rollback(sessionID string) error {
+	f.rolledBack = append(f.rolledBack, sessionID)
+	return f.rollbackErr
 }
 
 func (f *fakeWirelessApplier) ApplyAndConfirm(configs []string) error {
@@ -3669,6 +3685,11 @@ func (g *guardCheckingApplier) StartApply(configs []string) (string, error) {
 	return "token-guard", nil
 }
 
+// Snapshot and Rollback own no files here; the guard test is about ordering.
+func (g *guardCheckingApplier) Snapshot([]string) error { return nil }
+
+func (g *guardCheckingApplier) Rollback(string) error { return nil }
+
 // Finding 1: a failed `uci show` must never look like an empty config in the
 // wireless read paths either.
 func TestGetRadios_SurfacesGetSectionsError(t *testing.T) {
@@ -4635,5 +4656,150 @@ func TestClientProbeSafetyMarginMatchesTheGoGate(t *testing.T) {
 		t.Fatalf("the client reserves %d ms of margin while the Go gate reserves %ds; "+
 			"docs/adr/0002 says they are the same number", clientMillis,
 			wirelessProbeSafetyMarginSeconds)
+	}
+}
+
+// newRollbackTestService builds a WifiService whose applier is the REAL
+// rpcd applier wired to temp config dirs, so the file-level snapshot/restore is
+// exercised end to end. Its wireless config enables one access point, which the
+// unreachable netifd makes unverifiable — that is the refused-confirm case.
+func newRollbackTestService(t *testing.T) (*WifiService, *RealUCIApplyConfirm, string) {
+	t.Helper()
+	prev := wirelessRetrySleep
+	wirelessRetrySleep = func(time.Duration) {}
+	t.Cleanup(func() { wirelessRetrySleep = prev })
+
+	etcDir := t.TempDir()
+	cfg := filepath.Join(etcDir, "wireless")
+	if err := os.WriteFile(cfg, []byte("config wifi-iface 'ap0'\n\tmode 'ap'\n"), 0600); err != nil {
+		t.Fatalf("write wireless config: %v", err)
+	}
+	u := uci.NewMockUCI()
+	if err := u.AddSection("wireless", "radio0", "wifi-device"); err != nil {
+		t.Fatalf("seed radio: %v", err)
+	}
+	if err := u.AddSection("wireless", "ap0", "wifi-iface"); err != nil {
+		t.Fatalf("seed AP: %v", err)
+	}
+	for k, v := range map[string]string{"device": "radio0", "mode": "ap"} {
+		if err := u.Set("wireless", "ap0", k, v); err != nil {
+			t.Fatalf("seed AP %s: %v", k, err)
+		}
+	}
+	fu := &fakeUbusApply{loginSID: "sess-refused"}
+	applier := NewRealUCIApplyConfirm(fu, auth.NewRootPassword())
+	applier.etcConfigDir = etcDir
+	applier.rpcdRunDir = filepath.Join(t.TempDir(), "rpcd")
+	svc := NewWifiServiceWithApplier(u, fu, applier)
+	svc.guardDir = testGuardDir()
+	return svc, applier, cfg
+}
+
+// A refused confirm must be followed by the action it implies. rpcd's window
+// snapshotted the already-committed config, so leaving the restore to it left
+// the operator with the broken profile (confirmed on a GL-AXT1800, OpenWrt
+// 25.12.3).
+func TestConfirmApply_RefusedProbeRestoresThePreviousConfig(t *testing.T) {
+	svc, applier, cfg := newRollbackTestService(t)
+	before, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+
+	res, err := svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		// The mutation commits: that is what put the previous config out of
+		// reach of `uci revert` and of rpcd's rollback window.
+		broken := "config wifi-iface 'broken'\n\tmode 'sta'\n"
+		if err := os.WriteFile(cfg, []byte(broken), 0600); err != nil {
+			return nil, err
+		}
+		sid, err := applier.StartApply([]string{"wireless"})
+		if err != nil {
+			return nil, err
+		}
+		return &WirelessApplyResult{Token: sid}, nil
+	})
+	if err != nil {
+		t.Fatalf("mutateWireless: %v", err)
+	}
+
+	if err := svc.ConfirmApply(res.Token); err == nil {
+		t.Fatal("expected the probe to refuse: netifd reports no wireless interfaces")
+	}
+	after, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config after refused confirm: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("wireless config after a refused confirm =\n%q\nwant the pre-mutation config\n%q",
+			after, before)
+	}
+}
+
+// Gap 2: a mutation that commits and then fails has no session to roll back, so
+// the pending snapshot is the only thing standing between the operator and a
+// config the API already reported as failed.
+func TestMutateWireless_FailedMutationRestoresTheCommittedConfig(t *testing.T) {
+	svc, _, cfg := newRollbackTestService(t)
+	before, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+
+	_, err = svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		if writeErr := os.WriteFile(cfg, []byte("half written\n"), 0600); writeErr != nil {
+			return nil, writeErr
+		}
+		return nil, errors.New("mutation failed after committing")
+	})
+	if err == nil {
+		t.Fatal("expected the mutation's error")
+	}
+	after, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config after failed mutation: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("wireless config after a failed mutation = %q, want the pre-mutation %q",
+			after, before)
+	}
+}
+
+// A failed mutation must not hide behind a failed restore: the caller gets one
+// error that says the config may still be the one it rejected.
+func TestMutateWireless_FailedMutationReportsAFailedRestore(t *testing.T) {
+	cause := errors.New("mutation failed after committing")
+	applier := &fakeWirelessApplier{rollbackErr: errors.New("snapshot unreadable")}
+	svc := NewWifiServiceWithApplier(uci.NewMockUCI(), ubus.NewMockUbus(), applier)
+
+	_, err := svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		return nil, cause
+	})
+	if !errors.Is(err, cause) {
+		t.Fatalf("error = %v, want the mutation's error to stay unwrappable", err)
+	}
+	if !strings.Contains(err.Error(), "restoring the previous config also failed") {
+		t.Errorf("error = %q, want it to say the restore failed too", err)
+	}
+	if len(applier.rolledBack) != 1 || applier.rolledBack[0] != "" {
+		t.Errorf("expected a rollback of the pending snapshot, got %v", applier.rolledBack)
+	}
+}
+
+// The applier inside the mutation may already have consumed the pending snapshot
+// (ApplyAndConfirm does exactly that). That is not a failed restore.
+func TestMutateWireless_FailedMutationToleratesAnAlreadyRestoredSnapshot(t *testing.T) {
+	cause := errors.New("mutation failed after committing")
+	applier := &fakeWirelessApplier{rollbackErr: ErrNoSnapshot}
+	svc := NewWifiServiceWithApplier(uci.NewMockUCI(), ubus.NewMockUbus(), applier)
+
+	_, err := svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		return nil, cause
+	})
+	if !errors.Is(err, cause) {
+		t.Errorf("error = %v, want the mutation's error unchanged", err)
+	}
+	if err != cause { //nolint:errorlint // identity is the assertion
+		t.Errorf("error = %v, want the mutation's error verbatim", err)
 	}
 }

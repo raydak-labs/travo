@@ -523,6 +523,12 @@ func (r *recordingApplier) ApplyAndConfirm(configs []string) error {
 	return r.Confirm("sess-1")
 }
 
+// Snapshot and Rollback own no files in this fake; they only have to exist so
+// the applier keeps satisfying the apply/confirm contract.
+func (r *recordingApplier) Snapshot([]string) error { return nil }
+
+func (r *recordingApplier) Rollback(string) error { return nil }
+
 func (r *recordingApplier) calls() (starts [][]string, confirms []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -1192,6 +1198,10 @@ func (a *failOnceApplier) StartApply([]string) (string, error) {
 }
 
 func (a *failOnceApplier) Confirm(string) error { return nil }
+
+func (a *failOnceApplier) Snapshot([]string) error { return nil }
+
+func (a *failOnceApplier) Rollback(string) error { return nil }
 
 func (a *failOnceApplier) ApplyAndConfirm(configs []string) error {
 	sid, err := a.StartApply(configs)

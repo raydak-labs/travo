@@ -165,6 +165,10 @@ func (s *stubApplier) Confirm(sessionID string) error { return nil }
 
 func (s *stubApplier) ApplyAndConfirm(configs []string) error { return nil }
 
+func (s *stubApplier) Snapshot(configs []string) error { return nil }
+
+func (s *stubApplier) Rollback(sessionID string) error { return nil }
+
 // The radio-role mutator must answer with the same envelope as every other
 // wireless mutator: the client reads response.apply and, when it is pending,
 // calls confirmWifiApply. A raw WirelessApplyResult ({"Token": ...}) leaves the

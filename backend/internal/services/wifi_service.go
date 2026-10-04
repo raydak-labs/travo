@@ -111,6 +111,15 @@ func revertUCIConfig(u uci.UCI, configs ...string) {
 // and the shared per-config locks held, reverting every named config if fn
 // fails.
 //
+// It also SNAPSHOTS the named configs first, and restores that snapshot if fn
+// fails. Both halves are needed, and they are not the same mechanism: the
+// revert only drops the uncommitted delta, so a writer that already committed
+// (every wireless mutator does, before stageWirelessApply) is not touched by
+// it. The snapshot is the only thing that can put a committed config back.
+//
+// The snapshot is taken INSIDE the locks, before fn runs, so nothing can
+// commit between the copy and the mutation.
+//
 // Passing the config list ONCE is the point. The uci CLI keeps uncommitted
 // changes in the process-global /tmp/.uci/<config>/changes file, so a config
 // left staged by a failed write is committed by the next unrelated writer of
@@ -124,6 +133,12 @@ func revertUCIConfig(u uci.UCI, configs ...string) {
 func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApplyResult, error)) (*WirelessApplyResult, error) {
 	defer w.lockUCIWrite()()
 
+	if w.applier != nil {
+		if err := w.applier.Snapshot(configs); err != nil {
+			return nil, err
+		}
+	}
+
 	var res *WirelessApplyResult
 	err := mutateUCI(w.uci, configs, func() error {
 		var err error
@@ -131,9 +146,33 @@ func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApply
 		return err
 	})
 	if err != nil {
-		return nil, err
+		// fn failed with its changes committed and no apply session to time
+		// out (a failed stageWirelessApply has none at all), so the previous
+		// config goes back now.
+		return nil, w.restoreAfterFailedMutation(err)
 	}
 	return res, nil
+}
+
+// restoreAfterFailedMutation puts the pre-mutation configs back after fn failed
+// and keeps fn's error as the one the caller sees. A rollback that itself failed
+// is stated in that error rather than logged and dropped: it is the case where
+// the previous config is NOT on disk, and the operator has to hear about it.
+//
+// A missing pending snapshot is NOT that case, and is the one exception: it means
+// the applier inside fn already owned and consumed the snapshot —
+// `ApplyAndConfirm` (SwitchSTAToRadio) snapshots, restores on its own failure and
+// discards on success — so there is nothing left to put back and turning that into
+// an error would report a failure that did not happen.
+func (w *WifiService) restoreAfterFailedMutation(cause error) error {
+	if w.applier == nil {
+		return cause
+	}
+	err := w.applier.Rollback("")
+	if err == nil || errors.Is(err, ErrNoSnapshot) {
+		return cause
+	}
+	return fmt.Errorf("%w (restoring the previous config also failed: %v)", cause, err)
 }
 
 // withConfigLocks holds the named configs' locks for the duration of fn, in the
@@ -329,6 +368,11 @@ func (w *WifiService) validateWirelessConsistency() error {
 	return nil
 }
 
+// stageWirelessApply commits the change (its caller does) and opens the apply
+// window. If StartApply fails here the mutation has ALREADY committed and there
+// is no session, so the only way back is the snapshot mutateWireless took before
+// the mutation: mutateWireless restores it for every fn failure, including this
+// one. Nothing extra to do here.
 func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 	if err := w.validateWirelessConsistency(); err != nil {
 		return nil, err
@@ -358,8 +402,9 @@ func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 // client that POSTs confirm a millisecond after the apply (the normal case for an
 // operator on Ethernet, where WiFi is exactly what is being reconfigured) would
 // otherwise cancel the rollback of a config that never came up. A failed proof
-// returns BEFORE applier.Confirm, so the apply session stays open and rpcd rolls
-// the wireless config back when the window expires.
+// returns BEFORE applier.Confirm — and now rolls the previous config back by
+// hand, because leaving it to rpcd's window restored the ALREADY-COMMITTED
+// config instead (ADR 0002 §5).
 func (w *WifiService) ConfirmApply(token string) error {
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("apply token is required")
@@ -368,13 +413,28 @@ func (w *WifiService) ConfirmApply(token string) error {
 		return nil
 	}
 	if err := w.verifyAppliedWirelessUp(); err != nil {
-		return err
+		return w.refuseAndRollback(token, err)
 	}
 	if err := w.applier.Confirm(token); err != nil {
 		return err
 	}
 	// After successful confirm, no reload is needed as apply+confirm already applied changes
 	return nil
+}
+
+// refuseAndRollback follows a refused proof with the action it implies: the
+// pre-mutation config goes back on disk NOW, before the operator is told. The
+// probe error stays the one the caller unwraps — its message prefix is what the
+// frontend matches on — and a failed restore is appended rather than dropped,
+// because that is the case where the previous config is not on disk.
+//
+// The apply session is deliberately NOT confirmed here: Rollback cancels rpcd's
+// window itself, so the window cannot fire later and overwrite the restore.
+func (w *WifiService) refuseAndRollback(token string, probeErr error) error {
+	if err := w.applier.Rollback(token); err != nil {
+		return fmt.Errorf("%w (rolling back to the previous config also failed: %v)", probeErr, err)
+	}
+	return probeErr
 }
 
 // ErrWirelessNotUp reports that the access points the just-applied wireless

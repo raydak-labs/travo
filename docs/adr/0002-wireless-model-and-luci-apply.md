@@ -2,7 +2,7 @@
 title: "ADR 0002: Wireless model, health, and LuCI-style UCI apply"
 status: Accepted
 date: 2026-05-14
-updated: 2026-09-28
+updated: 2026-10-04
 tags: [adr, wireless, wwan, repeater, uci, rpcd, openwrt]
 ---
 
@@ -46,6 +46,59 @@ Travel-router behavior depends on predictable **STA/WWAN**, **repeater** radio l
 - **`RealUCIApplyConfirm`** (`backend/internal/services/uci_apply.go`) implements rpcd session login, copies **`/etc/config/{wireless,network,system,firewall,dhcp}`** into the session tree, calls **`uci apply`** with **`rollback: true`** and **30s** timeout, then **`uci confirm`** only when invoked after success.
 - **`WifiService.stageWirelessApply`**: validates consistency → **`StartApply(uciApplyConfigs)`** → returns a **token** (session id) and rollback timeout for the client.
 - **`WifiService.ConfirmApply(token)`** calls **`Confirm`** after the browser proves reachability. The backend **must not** self-confirm immediately after `StartApply` without that proof (see `docs/architecture.md` §3).
+
+#### 5.0 The rollback is our own file-level snapshot, not rpcd's window
+
+**Hardware finding (GL.iNet GL-AXT1800, OpenWrt 25.12.3).** Both rollback mechanisms
+travo relied on restored **nothing**, because travo **commits the UCI change before either
+of them runs**:
+
+1. **rpcd's rollback window.** `StartApply` copies `/etc/config/<name>` into the session dir
+   and *then* calls `uci apply` with `rollback:true`. rpcd snapshots at **apply** time, so its
+   rollback target is the **already-changed** config: when the 30 s window expired without a
+   confirm, rpcd faithfully restored the change it existed to undo. Observed on the device:
+   after a refused confirm and the full window, the working uplink section was still disabled
+   and the broken profile still enabled.
+2. **`uci revert <config>`** (in `mutateUCI`) only discards **uncommitted** staged changes, so
+   for any writer that already committed it is a no-op — which every wireless mutator does,
+   before `stageWirelessApply`.
+
+So the probe was right to refuse; there was simply nothing behind the refusal.
+
+**The decision.** Travo owns the snapshot:
+
+- **`UCIApplyConfirm.Snapshot(configs)`** copies the named `/etc/config/<file>`s into a
+  **pending** directory under `/var/run/rpcd` **before the mutation commits**, together with a
+  manifest recording each name as `present` or `absent` (an `absent` name is deleted on
+  restore, so a config the mutation created does not survive it). **One pending snapshot is
+  enough**: `mutateWireless` holds the wireless write lock across snapshot → mutate → apply, so
+  no second snapshot can be taken in between. A queue would be dead code.
+- **`StartApply`** keeps the rpcd session + `uci apply` flow — harmless, and still rpcd's
+  **crash-time** rollback — and then keys the pending snapshot to the session id it returned.
+- **`Confirm(sessionID)`** discards that session's snapshot. This is the success path, and a
+  discarded snapshot must never be able to undo a *later*, unrelated change.
+- **`Rollback(sessionID)`** copies the snapshot back over `/etc/config/<name>`, cancels rpcd's
+  window (`uci confirm`, so the window cannot fire later and **overwrite the restore with the
+  already-committed config**), then asks the device to act: **`ubus call uci reload_config`**
+  (rpcd re-reads the config files) and **`ubus call network reload`** (netifd re-reads
+  `/etc/config/network` **and** `wireless`). An empty `sessionID` means the pending snapshot.
+  **A missing snapshot is an error, never a reported success** — a rollback that cannot find
+  what to restore must say so.
+- **`WifiService.mutateWireless`** snapshots inside the locks it already holds, and restores
+  when `fn` fails. That closes the second gap: a mutation that **committed and then failed**
+  (including a `stageWirelessApply` whose `StartApply` failed, leaving no session at all) was
+  previously not rolled back in any way.
+- **`WifiService.ConfirmApply`** calls **`Rollback(token)`** when `verifyAppliedWirelessUp`
+  refuses. **The probe's verdict must be followed by the action it implies**; returning the
+  error and leaving the restore to a window that restores the wrong config is what stranded
+  the operator.
+- **`ApplyAndConfirm`** (guarded internal flows) snapshots, applies, and on any failure rolls
+  back by hand — there is no session left to time out, and `uci revert` cannot undo a commit.
+
+**Recovery is the only place that reloads, and it is bounded.** `network reload` is the
+explicit **bounded-recovery exception** to the "never run `wifi` / `wifi up`" rule — see
+[ADR 0003](./0003-crash-guards-and-live-state.md) §3.1. `wifi`, `wifi up` and `wifi reload`
+are **never** run by the rollback, on any path.
 
 #### 5.1 What the confirm probe reads
 
@@ -258,7 +311,7 @@ enforced at the HTTP handler **and** re-checked inside `SetWiFiSchedule`.
 ## References
 
 - `backend/internal/services/wifi_service.go` — invariants, `stageWirelessApply`, `ConfirmApply`, confirm probe (§5.1), `uciApplyConfigs`
-- `backend/internal/services/uci_apply.go` — rpcd apply/confirm
+- `backend/internal/services/uci_apply.go` — rpcd apply/confirm, the file-level `Snapshot`/`Rollback` recovery path (§5.0)
 - `backend/internal/services/wifi_toggle_script.go` — the generated toggle helper
 - `backend/internal/services/wifi_reconnect.go` — schedule cron file, bounded `wifi up` exception
 - `backend/internal/services/system_service.go` — button hotplug script
