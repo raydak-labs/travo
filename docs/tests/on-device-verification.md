@@ -217,7 +217,8 @@ ls -la /etc/trafo/    # the RIGHT directory. Not /etc/travo.
 
 | # | Action | Expected |
 | - | ------ | -------- |
-| D.1 | Hand-write an mwan3 interface Travo did not create, then save any failover setting. | The member **survives**. (Needs mwan3 installed — absent on `192.168.1.1`.) |
+| D.1 | Hand-write an mwan3 interface Travo did not create, then save any failover setting. | The member **survives**. Needs mwan3 **and** its rpcd ACL — see §7.1. |
+| D.1a | Save a failover config (this is what D.1 sets up). | Must answer 200, not `Permission denied`. |
 | D.2 | Block a client twice, or make a commit fail. | The guard file **remains** after the failure. |
 | D.3 | Make `uci commit firewall` fail (read-only overlay), then configure USB tethering. | Guard file still present; interface not half-created. |
 | D.4 | Stuck guard present, then a scheduled toggle fires. | Behaviour is documented per ADR 0003 §1.4; a stuck guard disables the schedule until `deploy-local.sh` clears it. Confirm you can actually reach that retry path. |
@@ -240,6 +241,34 @@ it still matches, then set the password from Travo -> System -> AdGuard Password
 ---
 
 ## 9. What one device cannot settle
+
+### 9.1 mwan3 needs its rpcd ACL, not just the package
+
+Verified on `192.168.1.1` (OpenWrt 25.12.3): installing the `mwan3` package is **not** enough to
+make failover saving work. Travo stages the change through rpcd (`uci apply`), and rpcd grants
+`uci` access **per config package**. A root session can read `wireless` and `system` but gets
+`Permission denied` on `mwan3` until `luci-app-mwan3` is installed — its ACL file is what grants
+it.
+
+```sh
+# Reproduce, and check the grant rather than assuming it:
+apk add mwan3
+PW=$(jsonfilter -i /etc/travo/rpcd-login.json -e '@.password')
+LOGIN="{\"username\":\"root\",\"password\":\"$PW\"}"
+SID=$(ubus call session login "$LOGIN" | jsonfilter -e '@.ubus_rpc_session')
+ubus call uci get "{\"ubus_rpc_session\":\"$SID\",\"config\":\"mwan3\"}" >/dev/null \
+  && echo "mwan3 ACL present" || echo "MISSING the mwan3 uci ACL"
+
+apk add luci-app-mwan3    # this is what supplies it
+```
+
+A failure surfaces as `uci apply mwan3: ... (Permission denied)` and leaves
+`/etc/trafo/failover-in-progress` in place, because the failover rollback uses the same mechanism.
+Keeping the guard there is correct fail-safe behaviour (ADR 0003), but it means a stuck failover
+guard can mean "missing ACL" rather than "interrupted operation". `deploy-local.sh` clears it.
+
+Note the router may not be able to download `luci-app-mwan3` over its own uplink; fetch it on a LAN
+host and `scp -O` it across, then `apk add --allow-untrusted`.
 
 - **Multi-WAN failover** with two real uplinks — see
   [`failover-verification.md`](./failover-verification.md).
