@@ -6,7 +6,7 @@ http:
     enabled: false
   address: 192.168.1.1:3001
   session_ttl: 720h
-users: []  # no default account is shipped; set it via Travo
+users: [] # no default account is shipped; set it via Travo
 auth_attempts: 5
 block_auth_min: 15
 http_proxy: ''
