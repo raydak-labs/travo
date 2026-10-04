@@ -630,6 +630,14 @@ func isUnreadablePayload(err error) bool {
 // radio costs no extra ubus round-trip; the fallback is consulted for an
 // unsettled radio or one carrying several expected interfaces, and its cost is
 // budgeted (see wirelessProbeMaxUbusCalls).
+// The kinds an expected interface can be, held as values rather than inline
+// strings because the uplink kind also decides HOW an interface may be proven:
+// see appliedWirelessUp.
+const (
+	expectedAPKind  = "access point"
+	expectedSTAKind = "uplink STA"
+)
+
 func (w *WifiService) appliedWirelessUp(
 	sections map[string]map[string]string, wantAPs, wantSTAs []string,
 ) error {
@@ -642,10 +650,10 @@ func (w *WifiService) appliedWirelessUp(
 	// status answers both kinds.
 	pending := make(map[string]string, len(wantAPs)+len(wantSTAs))
 	for _, name := range wantAPs {
-		pending[name] = "access point"
+		pending[name] = expectedAPKind
 	}
 	for _, name := range wantSTAs {
-		pending[name] = "uplink STA"
+		pending[name] = expectedSTAKind
 	}
 	want := make([]string, 0, len(pending))
 	for name := range pending {
@@ -659,17 +667,20 @@ func (w *WifiService) appliedWirelessUp(
 		// known once the whole radio has been read.
 		var onRadio []struct {
 			name  string
+			kind  string
 			iface map[string]any
 		}
 		for _, iface := range radio.interfaces {
 			name := wirelessStatusSection(iface, sections, want)
-			if _, expected := pending[name]; !expected {
+			kind, expected := pending[name]
+			if !expected {
 				continue
 			}
 			onRadio = append(onRadio, struct {
 				name  string
+				kind  string
 				iface map[string]any
-			}{name, iface})
+			}{name, kind, iface})
 		}
 		// One expected interface on the radio: the radio flag is proof, and no
 		// ubus round-trip is spent. More than one: the flag says the RADIO is
@@ -677,7 +688,20 @@ func (w *WifiService) appliedWirelessUp(
 		// itself.
 		radioIsProof := radio.settled && len(onRadio) < 2
 		for _, entry := range onRadio {
-			up := radioIsProof
+			// An uplink STA is never proven by the radio flag. The flag says the
+			// radio is up, which a station that has configured itself and never
+			// associated also satisfies: on the device a non-associated STA reads
+			// up:true, carrier:false while its radio is settled. Taking the flag
+			// there confirmed a client-mode apply whose uplink cannot work and
+			// cancelled the rollback that would have restored the working one —
+			// the operator was left with no internet and no way back.
+			//
+			// carrier is the only signal that says the station associated, so the
+			// per-device answer is the authority for an uplink STA. An access
+			// point keeps the radio shortcut: a settled radio has already created
+			// its interface, and skipping the round-trip keeps the probe inside
+			// wirelessProbeMaxUbusCalls for the common single-AP layout.
+			up := radioIsProof && entry.kind != expectedSTAKind
 			if !up {
 				var err error
 				if up, err = w.wirelessDeviceUp(entry.iface); err != nil {

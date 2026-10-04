@@ -52,6 +52,15 @@ same area deserves the same scepticism.
 | B6 | The probe then **failed open** when one radio hosted two APs — reachable by enabling guest WiFi beside the main AP — disarming the rollback with a dead AP. | The fixture baked in coarse per-radio semantics. | B.6 |
 | B7 | `Scan()` committed an uplink STA onto a radio that runs an AP. | Determinism had been fixed; the guard had not. | B.5 |
 | B8 | `deploy-local.sh` cleared crash guards *before* restarting, so a failed deploy erased the only record that the device was mid-recovery. | Every claim about the shell scripts was a string grep. | D.2 |
+| B9 | The probe accepted an uplink STA that **never associated**: a settled radio was taken as proof, and a configured-but-unassociated station reads `up:true, carrier:false`. The apply confirmed and cancelled the rollback that would have restored the working uplink. | `MockUbus` ignores the requested device name, so no test could give one interface `carrier:false` and another `carrier:true`. | B.9 |
+| B10 | **The rpcd rollback window does not revert a wireless change.** `StartApply` copies the already-committed config into the rpcd session dir *before* calling `uci apply`, so the rollback target is the changed config. When the probe refuses to confirm, the config stays applied. | Nothing tested the window *expiring*; only the confirm path was covered. | **KNOWN BROKEN — B.10** |
+
+B9 is fixed: an uplink STA is now proven only by `network.device status` answering
+`present && up && carrier`, because carrier is the only signal that says the station associated.
+
+B10 is **not** fixed and is the most serious item here. It is pre-existing rather than introduced by
+this branch, and it means "the change is rolled back" describes intent, not observed behaviour, on
+the wireless path.
 
 ---
 
@@ -165,6 +174,8 @@ router with Wi-Fi off entirely.
 | B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Rollback.** The AP returns. This is the lockout case the model exists for. |
 | B.4 | Switch to Client mode over **Ethernet**. | Applies and confirms. |
 | B.5 | Connect to an upstream twice, no band pinned. | Both succeed. |
+| B.9 | Connect to an upstream that **does not exist**, or with a wrong password. | Must be **refused**: the uplink STA has no carrier, so it is not up. This is the only reliable way to make the uplink genuinely fail — an invalid channel is silently ignored and the access point stays up. |
+| B.10 | After a refused confirm, wait out the 30 s window. | **KNOWN BROKEN:** the config is *not* reverted. Verify it yourself rather than trusting the rollback, and restore the working uplink by hand. |
 | B.6 | Client mode with the uplink on 2.4 GHz, then enable guest Wi-Fi. | Guest AP lands on the radio that does **not** carry the STA: `uci show wireless` — guest's `device` vs the `wwan` STA's. Both APs may end up on one radio; the confirm must still prove **each** interface, not the radio. |
 | B.7 | With every enabled AP on the uplink radio, switch to Travel/repeater mode. | Must be **refused**, matching `Connect`'s behaviour. See B4. |
 | B.8 | Press Scan, or switch to Client mode, with no saved upstream on a stock layout where both radios run an AP. | The AP is moved off the uplink radio before the STA is enabled; `uci show wireless` must never show an enabled AP and an enabled STA on one `device`. See B7. |

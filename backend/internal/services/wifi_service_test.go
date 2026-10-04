@@ -1694,6 +1694,10 @@ func TestConfirmApply_ClientModeWithUpSTAConfirms(t *testing.T) {
 	svc, u := newTestWifiService()
 	putInClientMode(t, u)
 	registerInterfaceStatus(t, svc, map[string]bool{"sta0": true})
+	// The uplink STA is proven by carrier, not by its radio: a configured station
+	// that never associated also leaves the radio up. See
+	// TestConfirmApply_UplinkSTANeverAssociatedIsNotUp.
+	registerDeviceStatus(t, svc, map[string]bool{"sta0": true})
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -1784,6 +1788,7 @@ func TestConfirmApply_ProbesImmediatelyAndReportsProbeBudget(t *testing.T) {
 	svc, u := newTestWifiService()
 	putInClientMode(t, u)
 	registerInterfaceStatus(t, svc, map[string]bool{"sta0": true})
+	registerDeviceStatus(t, svc, map[string]bool{"sta0": true})
 	svc.applier = &fakeWirelessApplier{startToken: "budget-token"}
 
 	apply, err := svc.stageWirelessApply()
@@ -4372,6 +4377,7 @@ func TestConfirmApply_RealDevicePayloadConfirmsUpradioAndSTA(t *testing.T) {
 	svc, u := newTestWifiService()
 	putInRepeaterLikeDeviceConfig(t, u)
 	registerPayload(t, svc, decodeWirelessStatus(t, goldenWirelessStatus))
+	registerDeviceStatus(t, svc, map[string]bool{"phy0-sta0": true, "phy1-ap0": true})
 	fake := &fakeWirelessApplier{}
 	svc.applier = fake
 
@@ -4533,6 +4539,12 @@ type flakyWirelessStatusUbus struct {
 func (f *flakyWirelessStatusUbus) Call(
 	path, method string, _ map[string]any,
 ) (map[string]any, error) {
+	if path == "network.device" && method == "status" {
+		// The uplink STA is proven by carrier; see
+		// TestConfirmApply_UplinkSTANeverAssociatedIsNotUp for the case this
+		// deliberately does NOT model.
+		return map[string]any{"present": true, "up": true, "carrier": true}, nil
+	}
 	if path != "network.wireless" || method != "status" {
 		return nil, fmt.Errorf("unexpected ubus call %s %s", path, method)
 	}
