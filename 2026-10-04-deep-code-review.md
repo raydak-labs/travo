@@ -11,55 +11,61 @@ baseline: f3125f22 (clean tree)
 
 > ## Remediation status
 >
-> Fixes are landing on `fix/deep-review-2026-10-04`. Landed so far:
+> Fixes are landing on `fix/deep-review-2026-10-04` — 22 commits, all pushed. Everything in
+> this report that needed no product decision is done: `make test`, `make lint` (0 issues),
+> `make build`, `pnpm format:check`, shellcheck and `go mod tidy -diff` are all green, and
+> `go test ./... -race` passes.
 >
-> | Area | Commits | State |
-> | ---- | ------- | ----- |
-> | P0 auth bypass | `70193d6`, `93e6e2b` | Fixed. `CaseSensitive` routing plus an `auth.PublicPaths` allowlist, with a route-table test. `93e6e2b` repairs a regression `70193d6` introduced — see below. |
-> | P0 shipped credentials | `29faf2e` | Fixed. Installer refuses a default root password and verifies the service starts; AdGuard ships no account; uninstall reports surviving live state. |
-> | Wireless guarded paths | `286b808`, `087f168` | Fixed. Includes two defects found by reviewing the first attempt. |
-> | Network / guards / failover | `f5d331a`, `3633cdd` | Fixed. |
-> | VPN / DNS layering / API contract | `f81e4bd`, `db681c4` | Fixed. `db681c4` addresses two P1s found by reviewing `f81e4bd`. |
-> | Restore + firmware validation | `f81e4bd`, `3633cdd` | Fixed, with a documented reversal — see "Decision reversal" below. |
-> | Frontend truthfulness and safety | `c7a469d`, `4cfc254` | Fixed. |
-> | Doc drift | this commit | Fixed where mechanical; a gate now prevents recurrence. |
+> **Fixed:** all five P0s, and P1s across wireless, network, VPN/DNS, API contract, frontend
+> truthfulness and safety, test fidelity, tooling and documentation drift.
 >
-> **Process note.** Every wave was followed by an adversarial review lane whose job was to break
-> the work just landed. It did, four times, and those four rounds are commits `93e6e2b`,
-> `db681c4`, `087f168` and `3633cdd`. The most serious was in my own first fix: I moved the auth
-> middleware onto the `/api/v1` route group believing group middleware is scoped by router. In
-> Fiber v3 it is scoped by **path prefix**, so it also intercepted the WebSocket upgrade and the
-> public time-sync endpoint — the WebSocket answered 401 and live updates were dead, while every
-> "route is protected" test still passed. Both the wiring and the gate that missed it are fixed.
+> ### The review loop found more than the review did
+>
+> Every wave was followed by an adversarial lane told to break the work just landed. It did,
+> repeatedly, and the findings were not cosmetic:
+>
+> | Round | Found |
+> | ----- | ----- |
+> | 1 | My own first auth fix broke the WebSocket and the public time-sync endpoint. Fiber v3 scopes group middleware by **path prefix**, not by router. Every "route is protected" test still passed. |
+> | 2 | That GET-triggered DNS self-heal fired on a *transient* `wg` failure and deleted the snapshot; and the VPN and AdGuard snapshots restore over each other. |
+> | 3 | A client-mode wireless change still confirmed with zero verification; two more endpoints could still reach the crash state; the UCI mock was less strict than the layer it mocks. |
+> | 4 | **The production app had no auth middleware at all.** Commit `93e6e2b` removed the `app.Use` line when it moved middleware to a group and, when that was reverted, never put it back — so the entire `/api/v1` surface was unauthenticated in the shipped binary, with a fully green suite. |
+> | 5 | **Every install ended in `die`.** The new health probe polled port 3000; Travo defaults to 80 and 3000 belongs to AdGuard. The published release-notes one-liner also still omitted `--password`. |
+> | 6 | The same-radio guard made guest WiFi impossible on the most common uplink layout; the contract field `probe_budget_seconds` was published but never read; ADR 0001 contradicted the code it owns. |
+>
+> The root cause of rounds 1, 4 and 5 is the same and it is worth naming: **every one of them
+> lived in how things are composed, and nothing tested the composition.** Tests build their own
+> app with their own middleware; scripts are asserted by reading them. The gates added in
+> response drive the *production* wiring (`TestProductionAppRequiresAuthOnAPIRoutes`), check
+> published artefacts rather than source (`TestPublishedInstallInstructionsAreRunnable`), and
+> derive expectations from code rather than memory (`TestEtcTrafoStatePathsAreNamedInAnAdr`).
 >
 > ### Decision reversal you should review
 >
-> The restore allowlist. The review named `etc/crontabs/root` in an uploaded archive as the exploit
-> path, and the first implementation restricted members to `etc/config` and `etc/ppp`. That was
-> defence at the wrong layer: it was written to compensate for the auth bypass, which is now fixed,
-> and restore is an authenticated-admin-only endpoint whose admin already holds root via
+> The restore allowlist. This report named `etc/crontabs/root` in an uploaded archive as the
+> exploit path, and the first implementation restricted members to `etc/config` and `etc/ppp`.
+> That was defence at the wrong layer: it was written to compensate for the auth bypass, and
+> restore is an authenticated-admin-only endpoint whose admin already holds root via
 > `POST /system/ssh-keys`, firmware flash and factory reset. Worse, **this application itself
 > writes** `/etc/crontabs/root`, `/etc/dropbear/authorized_keys` and `/etc/shadow`, all of which
-> `sysupgrade -b` captures — so the allowlist refused every genuine backup taken on this device. It
-> is replaced by an authenticity check (the archive must carry a UCI config member) plus the
+> `sysupgrade -b` captures — so the allowlist refused every genuine backup taken on this device.
+> It is replaced by an authenticity check (the archive must carry a UCI config member) plus the
 > structural checks that matter regardless of who uploads: absolute paths, `..` traversal,
 > symlinks/hardlinks/device nodes, member count and size caps. See `ValidateRestoreArchive`.
 >
-> ### Still open, needs a decision
+> ### Blocked on a decision
 >
-> 1. **The repeater wizard is dead code.** Nothing imports it; the remediation plan advertises its
->    rollback as delivered. Mount it or delete it — I did not choose, because it is a product call.
-> 2. **`SetRadioRole("both")` is now refused outright** rather than reconciled. Smaller and safer,
->    but it changes what an operator can do. Reverting to a reconciling implementation is a
->    deliberate choice, not an oversight.
-> 3. **Kill-switch ownership, split-tunnel interaction, and whether `dest=wan` is the right scope**
->    are open product questions, untouched.
-> 4. **Not yet done:** `.mise.toml`/Docker `node` version divergence, `oxlint --type-aware` never
->    being invoked, coverage thresholds, `deploy-local.sh` not pruning `/www/travo`, and
->    `setup-local.sh` still disabling SSH host-key verification.
-> 5. **Unverifiable without the device:** whether ath11k reports an access point as up with zero
->    associated stations. `ConfirmApply` now depends on that answer for every AP config. This is the
->    single largest unknown in the branch and must be checked on hardware before release.
+> 1. **AdGuard first-run wizard** — `users: []` means any LAN client can claim the DNS filter.
+> 2. **Repeater wizard** — shipped, documented, mounted by nothing.
+> 3. **Kill-switch ownership**, and its interaction with split tunnelling.
+> 4. **Single-radio guest/AP coexistence** — now pinned as deliberate; worth confirming.
+> 5. **Coverage thresholds** — measured at ~72%, ungated; gating needs a new dependency.
+>
+> ### Unverifiable without the device
+>
+> Whether ath11k reports an access point as `up` with **zero associated stations**.
+> `ConfirmApply` now depends on that answer for every AP config. It is the single largest
+> unknown in the branch and must be checked on hardware before release.
 
 Follow-up to [`2026-09-26-critical-code-review.md`](./2026-09-26-critical-code-review.md).
 **No files were modified.** The device `192.168.1.1` was unreachable throughout, so this is
