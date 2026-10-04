@@ -246,16 +246,17 @@ of a configuration written by a newer build. AdGuard then crash-looped on every 
     [error] parsing configuration file: unknown current schema version 33
 
 Consequence, and the reason this deserves its own section: **dnsmasq keeps
-`server='127.0.0.1#5353'` with `noresolv=1`**, so once AdGuard is down every LAN client loses DNS —
-while the uplink still holds its lease, the AP is up, and Travo reports health `ok`. A cached answer
-resolves for a few minutes and hides it, so check with a name you have not looked up before.
+`server='127.0.0.1#5353'` with `noresolv=1`**, so once AdGuard is down every LAN client
+loses DNS — while the uplink still holds its lease, the AP is up, and Travo reports health
+`ok`. A cached answer resolves for a few minutes and hides it, so check with a name you have
+not looked up before.
 
 The config the init script actually reads is `/opt/AdGuardHome/AdGuardHome.yaml`, **not**
-`/etc/adguardhome/adguardhome.yaml` (which the UCI `config_file` option names) — editing the latter
-appears to do nothing.
+`/etc/adguardhome/adguardhome.yaml` (which the UCI `config_file` option names) — editing the
+latter appears to do nothing.
 
-Recovery, when the saved config carries nothing worth keeping (`users: []` means the wizard was never
-completed, which is usually the case):
+Recovery, when the saved config carries nothing worth keeping (`users: []` means the wizard was
+never completed, which is usually the case):
 
 ```sh
 cp /opt/AdGuardHome/AdGuardHome.yaml /tmp/AdGuardHome.yaml.bak
