@@ -1,7 +1,7 @@
 ---
 title: Open tasks
 description: Active product and engineering backlog; link target for plans and architecture.
-updated: 2026-09-28
+updated: 2026-10-04
 tags: [backlog, requirements, tasks]
 ---
 
@@ -11,7 +11,7 @@ Working backlog only — no duplicate “priority queue”; each item appears on
 
 Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
-> **Last updated:** 2026-09-28 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-04 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## 1. WiFi Management
 
@@ -90,7 +90,30 @@ documented rather than fixed. They are code changes, not doc changes.
       backend only logs a warning; the UI cannot tell that history and cross-restart
       revocations are not persisting ([ADR 0009](../adr/0009-persistent-store-bbolt.md)).
 
-## 16. Held Dependency Upgrades
+## 16. Follow-Ups From The 2026-10-04 Deep Review Remediation
+
+Raised by the device verification pass and the five remediation lanes. Each is a deliberate
+decision, not an oversight; the reasoning is in the linked ADR or lane report.
+
+- [ ] **Captive restore-on-reconnect is no longer on the read path.** `GET /api/v1/captive/status`
+      no longer mutates state, so a bypass that outlives the captive state (internet back, portal
+      gone) now waits for the operator to press restore or for the 5-minute startup restore. If
+      that gap matters, the right home is a bounded scheduler with its own crash guard — not a
+      mutation inside a GET ([ADR 0001](../adr/0001-dns-vpn-captive-portal-architecture.md) §4).
+- [ ] **Preserved mwan3 leftovers are not surfaced.** Under the recorded-ownership rule a legacy
+      section for a dropped candidate survives. `GET /api/v1/failover` does not report it, so the
+      operator sees trailing config with no explanation
+      ([ADR 0005](../adr/0005-multi-wan-failover-mwan3.md) §1).
+- [ ] **Recovery from an already-corrupt dnsmasq layer record.** Writes are now atomic, but a
+      record corrupt before that change still fails loudly rather than being quarantined.
+- [ ] **Route table gap: `POST /api/v1/vpn/wireguard/profiles/:id/activate`.** `handlers.ts`
+      hardcodes it; `shared/src/api/routes.ts` does not describe it. Listed explicitly in the
+      parity test's `ROUTE_TABLE_GAPS` until the route table gains it.
+- [ ] **No gate pins action SHAs or image digests.** `renovate.json5` sets `pinDigests`, which
+      re-pins a dropped digest but does not fail a build when one is missing. All current `uses:`
+      are SHA-pinned; nothing enforces it.
+
+## 17. Held Dependency Upgrades
 
 Consolidating the Renovate branches on 2026-10-02 surfaced three upgrades that could not land
 at the time. Each remaining one is pinned by an `allowedVersions` rule in
@@ -111,7 +134,7 @@ oxlint — see [`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
       `Cannot read properties of undefined (reading '_buffer')` before MSW sees it.
       Watch: a Vitest release that resolves the impl symbol explicitly.
 
-## 17. Research And Open Questions
+## 18. Research And Open Questions
 
 - [x] ~~Investigate whether a lightweight database such as SQLite makes sense for Travo
       passwords and collected data such as CPU or traffic usage.~~ **Decided and

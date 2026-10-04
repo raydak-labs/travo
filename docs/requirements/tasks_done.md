@@ -51,7 +51,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 ## Frontend Toolchain
 
 - **ESLint replaced by oxlint, TypeScript 7 adopted.** The `TypeScript 7 — blocked by
-  typescript-eslint` hold in [`tasks_open.md`](./tasks_open.md) §16 (and the matching
+  typescript-eslint` hold in [`tasks_open.md`](./tasks_open.md) §17 (and the matching
   Renovate `allowedVersions` rule) is resolved by the escape hatch it named: ESLint and
   `typescript-eslint` are gone, `.oxlintrc.json` replaces `eslint.config.js`, and
   `typescript` is pinned to `7.0.2` in the root, `frontend/`, and `shared/` packages.
