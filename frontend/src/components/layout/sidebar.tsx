@@ -76,7 +76,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
         )}
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2" role="navigation" aria-label="Main">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label="Main navigation">
         {collapsedRail ? (
           <>
             {flat.map(({ to, label, icon: Icon }) => {
@@ -86,6 +86,11 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
                   key={to}
                   to={to}
                   title={label}
+                  // The collapsed rail shows an icon only. `title` alone is a
+                  // weak, inconsistently announced name and is invisible to a
+                  // sighted keyboard user on focus; the expanded links get real
+                  // text, so the two modes had unequal accessibility.
+                  aria-label={label}
                   onClick={onNavClick}
                   className={linkClass(active, true)}
                 >

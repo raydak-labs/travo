@@ -1,15 +1,23 @@
 import { WifiOff } from 'lucide-react';
-import { useOnlineStatus } from '@/hooks/use-online-status';
+import { useRouterReachable } from '@/hooks/use-router-reachable';
 
 export function OfflineBanner() {
-  const isOnline = useOnlineStatus();
+  // Router reachability, not `navigator.onLine`: see use-router-reachable.
+  const routerReachable = useRouterReachable();
 
-  if (isOnline) return null;
+  if (routerReachable) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 bg-yellow-500 px-4 py-2 text-sm font-medium text-yellow-950">
-      <WifiOff className="h-4 w-4" />
-      <span>No connection to router — you are offline</span>
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-center justify-center gap-2 bg-yellow-500 px-4 py-2 text-sm font-medium text-yellow-950"
+    >
+      <WifiOff className="h-4 w-4" aria-hidden="true" />
+      <span>
+        Cannot reach the router. Your device may still have internet, but this page needs the
+        router.
+      </span>
     </div>
   );
 }

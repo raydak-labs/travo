@@ -453,6 +453,9 @@ export function useSetBandSwitching() {
     mutationFn: (config: BandSwitchConfig) =>
       apiClient.put<{ status: string }>(API_ROUTES.wifi.bandSwitching, config),
     onSuccess: () => {
+      // Without a success toast this toggle read from a 10s-polled query, so
+      // enabling it looked like nothing happened.
+      toast.success('Band switching updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'band-switching'] });
     },
     onError: (error) => {

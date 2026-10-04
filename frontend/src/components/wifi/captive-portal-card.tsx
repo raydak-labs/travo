@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { clearPortalNotification, notifyPortalOnce } from '@/lib/captive-portal-notifier';
 import { isSafeExternalUrl, openExternalUrl } from '@/lib/external-url';
 
@@ -23,6 +24,7 @@ export function CaptivePortalCard() {
   const dnsBypass = useCaptiveDNSBypass();
   const dnsRestore = useCaptiveDNSRestore();
   const [autoTry, setAutoTry] = useState(() => localStorage.getItem(AUTO_TRY_KEY) === '1');
+  const [confirmingBypass, setConfirmingBypass] = useState(false);
   const triedForPortalRef = useRef<string | null>(null);
 
   // Clear notification tracking when portal clears
@@ -92,6 +94,11 @@ export function CaptivePortalCard() {
       },
       onError: (e) => toast.error(e instanceof Error ? e.message : 'Auto-accept failed'),
     });
+  };
+
+  const confirmDNSBypass = () => {
+    setConfirmingBypass(false);
+    handleDNSBypass();
   };
 
   const handleDNSBypass = () => {
@@ -248,7 +255,7 @@ export function CaptivePortalCard() {
                   size="sm"
                   variant={dnsNeedsBypass ? 'default' : 'outline'}
                   disabled={dnsBypass.isPending}
-                  onClick={handleDNSBypass}
+                  onClick={() => setConfirmingBypass(true)}
                 >
                   {dnsBypass.isPending ? 'Bypassing…' : 'Bypass DNS'}
                 </Button>
@@ -280,10 +287,14 @@ export function CaptivePortalCard() {
             <div className="border-t border-amber-200 pt-2.5 dark:border-amber-900/50">
               <Switch
                 id="captive-auto-try-card"
-                label="Auto-try accept on detection"
+                label="Auto-submit portal logins on any network"
                 checked={autoTry}
                 onChange={(e) => handleToggleAutoTry(e.target.checked)}
               />
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                Travo submits the sign-in form for any captive portal it detects on any network,
+                without asking. Remembered on this device until you turn it off.
+              </p>
             </div>
           </div>
         )}
@@ -300,6 +311,18 @@ export function CaptivePortalCard() {
             {dnsRestore.isPending ? 'Restoring…' : 'Restore DNS (AdGuard / dnsmasq)'}
           </Button>
         )}
+        {/* Bypassing DNS overrides the configured resolver (AdGuard / dnsmasq)
+            and persists until restored, which the button alone did not say. */}
+        <ConfirmDialog
+          open={confirmingBypass}
+          onOpenChange={setConfirmingBypass}
+          title="Bypass your DNS settings?"
+          description="Portal logins need the network's own resolver, so this overrides your configured DNS."
+          warningText="AdGuard / custom DNS filtering stays off until you choose Restore DNS. This affects every device on the network."
+          confirmLabel="Bypass DNS"
+          isPending={dnsBypass.isPending}
+          onConfirm={confirmDNSBypass}
+        />
       </CardContent>
     </Card>
   );

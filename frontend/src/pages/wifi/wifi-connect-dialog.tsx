@@ -16,8 +16,6 @@ interface WifiConnectDialogProps {
   error: string | null;
   onConnect: (ssid: string, password: string, band?: string) => void;
   onCancel: () => void;
-  /** When true, renders inline without overlay */
-  embedded?: boolean;
 }
 
 export function WifiConnectDialog({
@@ -26,7 +24,6 @@ export function WifiConnectDialog({
   error,
   onConnect,
   onCancel,
-  embedded,
 }: WifiConnectDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
   const needsPassword = group.encryption !== 'none';
@@ -80,17 +77,9 @@ export function WifiConnectDialog({
     />
   );
 
-  if (embedded) return content;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      role="dialog"
-      aria-label="Connect to network"
-    >
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-900">
-        {content}
-      </div>
-    </div>
-  );
+  // The overlay branch was a hand-rolled role="dialog" with no focus trap, no
+  // aria-modal, no Escape and no focus restore — and nothing in production
+  // reached it. Removing it, rather than leaving it "in case", means dropping
+  // the `embedded` prop later cannot ship a modal with no keyboard containment.
+  return content;
 }

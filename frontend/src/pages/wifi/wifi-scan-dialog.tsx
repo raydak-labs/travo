@@ -66,7 +66,6 @@ export function WifiScanDialog() {
               error={connectMutation.error?.message ?? null}
               onConnect={handleConnect}
               onCancel={() => setSelectedGroup(null)}
-              embedded
             />
           ) : (
             <WifiScanList

@@ -141,17 +141,24 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
   });
 
-  it('keeps all groups collapsed on dashboard with empty storage', async () => {
+  it('opens Network by default and leaves the rest collapsed on first visit', async () => {
     renderSidebar('/dashboard');
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'WiFi' })).toBeInTheDocument();
     });
-    for (const name of ['WiFi', 'Network', 'Services', 'System']) {
+    // "Internet & LAN" is the most common travel-router task, so it is no
+    // longer behind a collapsed group.
+    for (const name of ['WiFi', 'Services', 'System']) {
       expect(screen.getByRole('button', { name: `Toggle ${name} menu` })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
     }
+    expect(screen.getByRole('button', { name: 'Toggle Network menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('link', { name: 'Internet & LAN' })).toBeInTheDocument();
   });
 
   it('auto-expands WiFi group on /wifi/advanced with empty storage', async () => {
@@ -162,7 +169,7 @@ describe('Sidebar', () => {
         'true',
       );
     });
-    const advanced = screen.getByRole('link', { name: 'Advanced' });
+    const advanced = screen.getByRole('link', { name: 'WiFi / Advanced' });
     expect(advanced).toHaveClass('bg-blue-50');
     expect(advanced).toHaveAttribute('href', '/wifi/advanced');
   });
@@ -170,9 +177,9 @@ describe('Sidebar', () => {
   it('marks only the Advanced leaf as current on /wifi/advanced', async () => {
     renderSidebar('/wifi/advanced');
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'WiFi / Advanced' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: 'Advanced' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'WiFi / Advanced' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
   });
 
@@ -184,7 +191,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Network' })).toHaveClass('bg-blue-50');
     expect(screen.queryByRole('link', { name: 'Status' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Internet & LAN' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Network / Advanced' })).toBeInTheDocument();
   });
 
   it('navigates to Connect when WiFi label is clicked without opening via arrow', async () => {
@@ -237,7 +244,7 @@ describe('Sidebar', () => {
       );
       expect(screen.getByRole('link', { name: 'WiFi' })).toHaveClass('bg-blue-50');
       expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'WiFi / Advanced' })).toBeInTheDocument();
     });
   });
 
@@ -249,7 +256,7 @@ describe('Sidebar', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Toggle WiFi menu' }));
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Advanced' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'WiFi / Advanced' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Connect' })).not.toBeInTheDocument();
     });
   });
