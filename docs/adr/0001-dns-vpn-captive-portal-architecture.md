@@ -66,7 +66,7 @@ We need:
 
 - The packaged `packaging/adguard/AdGuardHome.yaml` and the embedded fallback
   `defaultAdGuardConfig` in `adguard_service.go` both carry **`users: []`**. An earlier
-  build committed a bcrypt hash of a published `admin`/`admin` pair with the plaintext
+  build committed a bcrypt hash of a published `admin`/`password` pair with the plaintext
   in the README: one credential, identical on every device in the field, published to
   anyone who read the repository. That is a total compromise of every deployed unit
   and is not an acceptable alternative.
@@ -81,9 +81,19 @@ We need:
   here rather than in a commit message is the point: the tradeoff is real, it was
   chosen deliberately, and a future reader must not "fix" it by reintroducing a
   default account.
-- An operator can still claim the admin deliberately from Travo (Settings → AdGuard
+- An operator can still create an admin deliberately from Travo (Settings → AdGuard
   Password): `AdGuardService.SetPassword` hashes the password and writes it into
   `users`, appending the entry when none exists.
+- **Caveat, and it is the sharpest edge of this section:**
+  `SetPassword` *appends*, so it does not claim the wizard. If a LAN client completed
+  the first-run wizard before the operator got there, the operator's action adds a
+  **second** admin rather than replacing the first, and whoever arrived first keeps
+  full control of the filter — upstream resolvers, rewrites, per-client settings —
+  with no indication in the Travo UI. Until the loopback bind exists, the only
+  reliable recovery is to stop AdGuard, restore a config with a known `users` list,
+  and start it again; the UI cannot show which accounts exist, because
+  `GET /api/v1/adguard/config` redacts the password hashes and there is no
+  account-listing endpoint.
 - **The correct fix, not done here:** bind the AdGuard web UI to loopback
   (`127.0.0.1:3000`) and proxy it through Travo's authenticated API, so creating the
   admin account requires a Travo session. Until that exists the wizard race stays open
