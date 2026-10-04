@@ -157,7 +157,12 @@ func (w *WifiService) GetRadioStatus() (bool, error) {
 }
 
 // SetRadioEnabled enables or disables all WiFi radios.
-func (w *WifiService) SetRadioEnabled(enabled bool) (*WirelessApplyResult, error) {
+func (w *WifiService) SetRadioEnabled(enabled bool, req LockoutRequest) (*WirelessApplyResult, error) {
+	// Switching the radios off removes every access point; switching them on
+	// leaves at least the ones already in the config.
+	if err := w.guardLockout(req, enabled); err != nil {
+		return nil, err
+	}
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		value := "0"
 		if !enabled {
@@ -247,7 +252,16 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 // Role "both" is refused with ErrAPAndSTASameRadio when it would put an access
 // point and the uplink STA on one radio and the repeater split policy forbids
 // it (see rejectSameRadioAPSTA).
-func (w *WifiService) SetRadioRole(radioName, role string) (*WirelessApplyResult, error) {
+func (w *WifiService) SetRadioRole(radioName, role string, req LockoutRequest) (*WirelessApplyResult, error) {
+	// Roles that do not host an access point ("none", "sta") disable every AP on
+	// this radio; "ap" and "both" leave one enabled.
+	droppedRadio := ""
+	if role == "none" || role == "sta" {
+		droppedRadio = radioName
+	}
+	if err := w.guardLockoutExcluding(req, "", droppedRadio); err != nil {
+		return nil, err
+	}
 	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
 		// abort drops the staged wireless delta before surfacing a failure: the uci
 		// CLI delta is process-global, so an abandoned write would be committed by a
@@ -594,7 +608,14 @@ func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
 
 // SetAPConfig updates AP configuration for a specific section.
 // When update.Enabled is nil, UCI disabled is not modified (for repeater credential sync).
-func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate) (*WirelessApplyResult, error) {
+func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate, req LockoutRequest) (*WirelessApplyResult, error) {
+	// Only disabling removes the access point; every other field of this request
+	// (SSID, key, re-enabling) leaves it up and must not be policed.
+	if update.Enabled != nil && !*update.Enabled {
+		if err := w.guardLockoutExcluding(req, section, ""); err != nil {
+			return nil, err
+		}
+	}
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		opts, err := w.uci.GetAll("wireless", section)
 		if err != nil {
@@ -665,7 +686,14 @@ func (w *WifiService) GetGuestWifi() (*models.GuestWifiConfig, error) {
 }
 
 // SetGuestWifi creates or updates the guest WiFi network with full isolation.
-func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyResult, error) {
+func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig, req LockoutRequest) (*WirelessApplyResult, error) {
+	// Disabling guest WiFi takes the guest access point down; enabling it puts
+	// one up.
+	if !cfg.Enabled {
+		if err := w.guardLockoutExcluding(req, "guest", ""); err != nil {
+			return nil, err
+		}
+	}
 	return w.mutateWireless([]string{"wireless", "network", "dhcp", "firewall"}, func() (*WirelessApplyResult, error) {
 		if !cfg.Enabled {
 			return w.teardownGuestWifi()

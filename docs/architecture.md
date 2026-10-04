@@ -54,7 +54,12 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 - Per-radio enable switches stay visible.
 - A toggle may expose separate per-radio forms, but shared credentials are the default because it matches typical travel-router use.
 
-### 2.4 Health and recovery signals
+### 2.4 Lockout guard (no silent self-disconnect)
+
+- A mutating wireless request that would leave its caller with **no enabled `mode=ap` wifi-iface** is **refused (409, code `wifi_lockout_risk`) before anything is written** when the caller reached the router over WiFi; the same request from Ethernet, or one that leaves an access point up, proceeds unchanged.
+- The only way past it is the request body's explicit `acknowledge_lockout: true`. There is no implicit, "probably fine" path.
+
+### 2.5 Health and recovery signals
 
 - `GET /api/v1/wifi/health` is the place where frontend learns about wireless invariant violations and fragile layouts.
 - Repeater same-radio AP/STA situations must be surfaced as a warning and have a reconcile action.

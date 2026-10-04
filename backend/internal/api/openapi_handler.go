@@ -440,8 +440,11 @@ var openAPISpec = map[string]any{
 			),
 		},
 		"/wifi/mode": map[string]any{
+			// acknowledge_lockout is the opt-in for "do it anyway": switching to
+			// client mode removes every access point, so a caller on WiFi gets 409
+			// with code wifi_lockout_risk instead of the change.
 			"put": endpoint("SetWiFiMode", "Switch WiFi operating mode (ap/client/repeater)", true,
-				body("application/json", obj("mode")),
+				body("application/json", obj("mode", "acknowledge_lockout")),
 				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
@@ -460,7 +463,7 @@ var openAPISpec = map[string]any{
 		"/wifi/radio": map[string]any{
 			"get": endpoint("GetRadioStatus", "Get WiFi radio enabled state", true, nil, resp200("application/json", obj("enabled"))),
 			"put": endpoint("SetRadioEnabled", "Enable or disable all WiFi radios", true,
-				body("application/json", obj("enabled")),
+				body("application/json", obj("enabled", "acknowledge_lockout")),
 				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
@@ -472,7 +475,7 @@ var openAPISpec = map[string]any{
 		},
 		"/wifi/ap/{section}": map[string]any{
 			"put": endpoint("SetAPConfig", "Update AP configuration for a section", true,
-				body("application/json", obj("ssid", "key", "encryption")),
+				body("application/json", obj("ssid", "key", "encryption", "enabled", "acknowledge_lockout")),
 				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
@@ -490,7 +493,7 @@ var openAPISpec = map[string]any{
 		},
 		"/wifi/radios/{name}/role": map[string]any{
 			"put": endpoint("SetRadioRole", "Assign the sta or ap role to a radio (only one active STA)", true,
-				body("application/json", obj("role")),
+				body("application/json", obj("role", "acknowledge_lockout")),
 				resp200("application/json", wifiApplyEnvelope(nil)),
 				param("name", "Radio device name, e.g. radio0"),
 			),
@@ -533,7 +536,7 @@ var openAPISpec = map[string]any{
 		"/wifi/guest": map[string]any{
 			"get": endpoint("GetGuestWiFi", "Get guest network configuration", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetGuestWiFi", "Enable/disable guest network and set credentials", true,
-				body("application/json", obj("enabled", "ssid", "key")),
+				body("application/json", obj("enabled", "ssid", "key", "acknowledge_lockout")),
 				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},

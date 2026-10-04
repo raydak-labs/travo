@@ -184,7 +184,12 @@ func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
 // The user's browser polls to confirm the router is still reachable; if confirm succeeds,
 // the rollback is cancelled. This prevents soft-brick scenarios without needing a separate
 // guard file (which is only required for background tasks that run without user oversight).
-func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
+func (w *WifiService) SetMode(mode string, req LockoutRequest) (*WirelessApplyResult, error) {
+	// Client mode disables every access point, so the resulting config has none
+	// by definition; the other two modes keep them enabled.
+	if err := w.guardLockout(req, mode != "client"); err != nil {
+		return nil, err
+	}
 	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
 		validModes := map[string]bool{"ap": true, "client": true, "repeater": true}
 		if !validModes[mode] {

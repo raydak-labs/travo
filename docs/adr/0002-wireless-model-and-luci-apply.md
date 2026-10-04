@@ -227,6 +227,77 @@ round-trip timings the budget is built from — live in
 [`docs/tests/on-device-verification.md`](../tests/on-device-verification.md); this
 section records the decision, not the procedure.
 
+#### 5.2 The lockout guard: refuse unless acknowledged
+
+**The guarantee.** A mutating wireless request that would leave the operator who
+made it with no usable access point is **refused before anything is written**,
+unless the request explicitly acknowledges it. It is enforced **server-side**;
+the UI is a convenience, not the enforcement point.
+
+**Found by on-device testing, not by a test.** On a GL.iNet GL-AXT1800
+(OpenWrt 25.12.3) an operator joined the access point from an iPhone and switched
+the WiFi mode to Client. The access point was removed, the iPhone was
+disconnected and **could not rejoin**; only a separate Ethernet console brought
+the radio back. Nothing in the test suite failed, because nothing in the test
+suite asserted this: the mode switch had no reference to the caller's connection
+method anywhere in the service or the API. The unit tests were green *because*
+the behaviour was simply absent — which is the point worth keeping in this
+record. A guard that is only reachable by a human stranding themselves on real
+hardware is not a guard the suite can prove.
+
+Note what did **not** cause it: the confirm probe behaved correctly throughout.
+In Client mode there are no access points to prove and the uplink came up fine,
+so it confirmed a config that was working exactly as written. **The probe is not
+responsible for this property and must not be changed to take it over.**
+
+**The rule, in one place** (`backend/internal/services/wifi_lockout.go`,
+`WifiService.guardLockout` / `guardLockoutExcluding`) so it cannot drift
+per endpoint:
+
+> refuse when the caller is connected over WiFi (`wifi-client` or `wifi-ap`,
+> classified by `NetworkService.GetConnectionMethod` — the same code the
+> `GET /network/connection-method` endpoint uses) **and** the resulting config
+> would have no enabled `mode=ap` wifi-iface left on any radio.
+
+Why "no enabled AP left anywhere" and not "the caller's own AP goes away": it
+is conservative in the safe direction, it cannot strand anyone it does not
+refuse, and it does not fire when the operator is on the other radio and that
+radio's AP stays up — the everyday "turn 5G off while I am on 2.4G". A narrower
+rule would add a second thing to keep in agreement for no extra safety.
+
+**Endpoints covered.** All five mutators that can remove an access point:
+
+| endpoint | removes the AP when |
+| --- | --- |
+| `PUT /api/v1/wifi/mode` | mode `client` (Client removes every access point) |
+| `PUT /api/v1/wifi/radio` | `enabled: false` |
+| `PUT /api/v1/wifi/radios/{name}/role` | role `none` / `sta` on that radio |
+| `PUT /api/v1/wifi/ap/{section}` | `enabled: false` on that section |
+| `PUT /api/v1/wifi/guest` | `enabled: false` |
+
+Anything that cannot strand the caller — an SSID change, a key change, switching
+a radio off while the other radio's AP stays enabled — proceeds exactly as
+before. Refusing those would make the product unusable.
+
+**Refusal shape.** `ErrLockoutRefused` (the `ErrAPAndSTASameRadio` pattern) maps
+to **409 Conflict** with a stable machine-readable `code: "wifi_lockout_risk"`
+next to the message, so the frontend keys off the code and never off the message
+text. The message names the remedy: you are connected over WiFi, this removes the
+access point you are using, connect over Ethernet first.
+
+**The opt-in and what "refused" means.** The request bodies accept
+`acknowledge_lockout: true`; with it the change proceeds. Without it the guard
+runs **before** the mutation starts, so a refused request writes **no UCI
+change, no staged apply and no apply session** — the guard is not a rollback,
+it is a refusal. Pinned by the tests that compare the whole `wireless`,
+`network`, `dhcp`, `firewall` and `system` config against a pre-request dump and
+assert the apply session count did not move.
+
+**Client.** The 409 raises a dialog that cannot be accepted without ticking a box
+(`frontend/src/components/wifi/wifi-lockout-dialog.tsx`); only then is the same
+request re-sent with `acknowledge_lockout: true`. Wired in the mode card, the
+per-radio access-point section and the radio-hardware disable path.
+
 ### 6. Scripts, packaging, and `wifi` commands
 
 - **User-facing** wireless mutations go through the apply/confirm path above when `applier` is configured; they **must not** run **`wifi`**, **`wifi up`**, or **`wifi reload`** as part of apply (matches `docs/architecture.md` §3).

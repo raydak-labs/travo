@@ -237,7 +237,7 @@ func TestWifiGetConnection(t *testing.T) {
 func TestWifiSetMode(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	_, err := svc.SetMode("client")
+	_, err := svc.SetMode("client", LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -657,7 +657,7 @@ func TestSetAPConfig(t *testing.T) {
 		Encryption: "psk2",
 		Key:        "newpassword123",
 		Enabled:    models.BoolPtr(true),
-	})
+	}, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -692,7 +692,7 @@ func TestSetAPConfig_OmitEnabledPreservesDisabled(t *testing.T) {
 		SSID:       "OnlySSID",
 		Encryption: "psk2",
 		Key:        "password123",
-	})
+	}, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -713,7 +713,7 @@ func TestSetAPConfig_InvalidSection(t *testing.T) {
 		SSID:       "Test",
 		Encryption: "none",
 		Enabled:    models.BoolPtr(true),
-	})
+	}, LockoutRequest{})
 	if err == nil {
 		t.Error("expected error for nonexistent section")
 	}
@@ -730,7 +730,7 @@ func TestSetAPConfig_ReturnsApplyError(t *testing.T) {
 		Encryption: "psk2",
 		Key:        "newpassword123",
 		Enabled:    models.BoolPtr(true),
-	})
+	}, LockoutRequest{})
 	if err == nil || !strings.Contains(err.Error(), "apply failed") {
 		t.Fatalf("expected apply error, got %v", err)
 	}
@@ -745,7 +745,7 @@ func TestSetAPConfig_RepeaterRefusesEnableOnTheSTARadio(t *testing.T) {
 	_ = u.Set("wireless", "default_radio0", "device", "radio0")
 	_ = u.Set("wireless", "default_radio1", "device", "radio1")
 	_ = u.Set("wireless", "sta0", "device", "radio0")
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -758,7 +758,7 @@ func TestSetAPConfig_RepeaterRefusesEnableOnTheSTARadio(t *testing.T) {
 		Encryption: "psk2",
 		Key:        "password12",
 		Enabled:    models.BoolPtr(true),
-	})
+	}, LockoutRequest{})
 	if !errors.Is(err, ErrAPAndSTASameRadio) {
 		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
 	}
@@ -780,7 +780,7 @@ func TestSetAPConfig_APModeSkipsRepeaterReconcile(t *testing.T) {
 		Encryption: "psk2",
 		Key:        "password12",
 		Enabled:    models.BoolPtr(true),
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("SetAPConfig: %v", err)
 	}
 	dis, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -925,7 +925,7 @@ func TestSetGuestWifi_Enable(t *testing.T) {
 		SSID:       "Guest-Travel",
 		Encryption: "psk2",
 		Key:        "guestpass123",
-	})
+	}, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1014,10 +1014,10 @@ func TestSetGuestWifi_Disable(t *testing.T) {
 		SSID:       "Guest-Travel",
 		Encryption: "psk2",
 		Key:        "guestpass123",
-	})
+	}, LockoutRequest{})
 
 	// Disable
-	_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+	_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1039,7 +1039,7 @@ func TestSetGuestWifi_Disable(t *testing.T) {
 func TestSetGuestWifi_DisableWhenNotConfigured(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+	_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1054,7 +1054,7 @@ func TestSetGuestWifi_ReturnsApplyError(t *testing.T) {
 		SSID:       "Guest-Travel",
 		Encryption: "psk2",
 		Key:        "guestpass123",
-	})
+	}, LockoutRequest{})
 	if err == nil || !strings.Contains(err.Error(), "apply failed") {
 		t.Fatalf("expected apply error, got %v", err)
 	}
@@ -1090,7 +1090,7 @@ func TestGetRadioStatus_AllDisabled(t *testing.T) {
 func TestSetRadioEnabled_Disable(t *testing.T) {
 	svc, u := newTestWifiService()
 
-	_, err := svc.SetRadioEnabled(false)
+	_, err := svc.SetRadioEnabled(false, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1108,9 +1108,9 @@ func TestSetRadioEnabled_Enable(t *testing.T) {
 	svc, u := newTestWifiService()
 
 	// First disable
-	_, _ = svc.SetRadioEnabled(false)
+	_, _ = svc.SetRadioEnabled(false, LockoutRequest{})
 	// Then enable
-	_, err := svc.SetRadioEnabled(true)
+	_, err := svc.SetRadioEnabled(true, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1130,7 +1130,7 @@ func TestSetRadioEnabled_UsesDynamicRadioDiscovery(t *testing.T) {
 	_ = u.Set("wireless", "radio2", "band", "6g")
 	_ = u.Set("wireless", "radio2", "disabled", "0")
 
-	_, err := svc.SetRadioEnabled(false)
+	_, err := svc.SetRadioEnabled(false, LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1173,7 +1173,7 @@ func TestWifiSetMode_ClientDisablesAPsAndEnablesSTA(t *testing.T) {
 	_ = u.Set("wireless", "default_radio1", "disabled", "0")
 	_ = u.Set("wireless", "sta0", "disabled", "1")
 
-	_, err := svc.SetMode("client")
+	_, err := svc.SetMode("client", LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1204,7 +1204,7 @@ func TestWifiSetMode_RepeaterEnablesSTAAndAPs(t *testing.T) {
 	_ = u.Set("wireless", "default_radio0", "device", "radio0")
 	_ = u.Set("wireless", "default_radio1", "device", "radio1")
 
-	_, err := svc.SetMode("repeater")
+	_, err := svc.SetMode("repeater", LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1236,7 +1236,7 @@ func TestWifiSetMode_RepeaterAllowAPOnSTARadioOverridesSplit(t *testing.T) {
 	_ = u.Set("wireless", "default_radio0", "device", "radio0")
 	_ = u.Set("wireless", "default_radio1", "device", "radio1")
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -1266,7 +1266,7 @@ func TestSetRepeaterOptions_DisallowAPOnSTARadioRunsReconcileInRepeaterMode(t *t
 	if err := os.WriteFile(svc.repeaterOptionsFile, []byte(`{"allow_ap_on_sta_radio":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 	// Bad state: AP on STA radio enabled while we are about to disallow that policy.
@@ -1291,7 +1291,7 @@ func TestSetRepeaterOptions_DisallowAPOnSTARadioReturnsApplyWhenApplierConfigure
 		t.Fatal(err)
 	}
 	svc.applier = &fakeWirelessApplier{startToken: "opts-reconcile"}
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 	_ = u.Set("wireless", "default_radio0", "disabled", "0")
@@ -1315,7 +1315,7 @@ func TestSetModeRepeater_WithSingleRadio_AllowsCoexistence(t *testing.T) {
 	_ = u.Set("wireless", "default_radio0", "disabled", "1")
 	_ = u.Set("wireless", "sta0", "disabled", "1")
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 
@@ -1329,7 +1329,7 @@ func TestSetModeRepeater_WithSingleRadio_AllowsCoexistence(t *testing.T) {
 func TestWifiSetMode_InvalidMode(t *testing.T) {
 	svc, _ := newTestWifiService()
 
-	_, err := svc.SetMode("invalid")
+	_, err := svc.SetMode("invalid", LockoutRequest{})
 	if err == nil {
 		t.Fatal("expected invalid mode error")
 	}
@@ -2392,7 +2392,7 @@ func TestSetMode_PersistsModeFile(t *testing.T) {
 	tmpFile := t.TempDir() + "/wifi-mode"
 	svc, _ := newTestWifiServiceWithModeFile(tmpFile)
 
-	_, err := svc.SetMode("client")
+	_, err := svc.SetMode("client", LockoutRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -2411,7 +2411,7 @@ func TestDeriveWifiMode_ReadsFromModeFile(t *testing.T) {
 
 	// Both STA and AP are enabled in mock UCI, so UCI-only detection would return "repeater".
 	// After SetMode("client"), the mode file should make deriveWifiMode return "client".
-	_, err := svc.SetMode("client")
+	_, err := svc.SetMode("client", LockoutRequest{})
 	if err != nil {
 		t.Fatalf("SetMode error: %v", err)
 	}
@@ -2556,7 +2556,7 @@ func TestReconcileRepeaterAPLayout_DisablesSTARadioAP(t *testing.T) {
 	svc, u := newTestWifiService()
 	_ = u.Set("wireless", "default_radio0", "disabled", "0")
 	_ = u.Set("wireless", "default_radio1", "disabled", "0")
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 	ap0, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -2658,7 +2658,7 @@ func TestSetModeRepeater_WithMultipleSavedSTAs_EnablesOnlyHighestPriority(t *tes
 		t.Fatalf("ReorderNetworks: %v", err)
 	}
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 
@@ -2692,7 +2692,7 @@ func TestSetModeClient_WithMultipleSavedSTAs_EnablesOnlyHighestPriority(t *testi
 		t.Fatalf("ReorderNetworks: %v", err)
 	}
 
-	if _, err := svc.SetMode("client"); err != nil {
+	if _, err := svc.SetMode("client", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 
@@ -2729,7 +2729,7 @@ func TestConnectThenSetModeRepeater_PreservesSingleActiveSTA(t *testing.T) {
 		t.Fatalf("setup: expected sta0=1 sta1=0 after Connect, got %q %q", sta0Before, sta1Before)
 	}
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode: %v", err)
 	}
 
@@ -2828,7 +2828,7 @@ func TestSetRadioRole_ValidatesBeforeCommit(t *testing.T) {
 	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
 	svc := NewWifiServiceWithReloader(&dirtySTAUCI{u.MockUCI}, ubus.NewMockUbus(), &NoopWifiReloader{})
 
-	if _, err := svc.SetRadioRole("radio1", "sta"); !errors.Is(err, ErrMultipleActiveSTA) {
+	if _, err := svc.SetRadioRole("radio1", "sta", LockoutRequest{}); !errors.Is(err, ErrMultipleActiveSTA) {
 		t.Fatalf("expected ErrMultipleActiveSTA, got %v", err)
 	}
 	// The invalid config must never reach the committed state: an rpcd rollback
@@ -2844,7 +2844,7 @@ func TestSetRadioRole_DisablesOtherSTASections(t *testing.T) {
 	svc, u := newTestWifiService()
 	// sta0 is an enabled STA on radio0 bound to wwan; asking radio1 for the STA
 	// role would create a second active wwan STA without disabling the first.
-	if _, err := svc.SetRadioRole("radio1", "sta"); err != nil {
+	if _, err := svc.SetRadioRole("radio1", "sta", LockoutRequest{}); err != nil {
 		t.Fatalf("SetRadioRole: %v", err)
 	}
 	dis, _ := u.Get("wireless", "sta0", "disabled")
@@ -2869,7 +2869,7 @@ func TestSetRadioRole_NewAPGetsRandomKey(t *testing.T) {
 
 	// The apply result only exists on the rpcd apply path used in production.
 	svc.applier = &fakeWirelessApplier{startToken: "token-1"}
-	apply, err := svc.SetRadioRole("radio0", "ap")
+	apply, err := svc.SetRadioRole("radio0", "ap", LockoutRequest{})
 	if err != nil {
 		t.Fatalf("SetRadioRole: %v", err)
 	}
@@ -2946,7 +2946,7 @@ func TestSetRadioRole_BothIsRefusedWithoutAllowAPOnSTARadio(t *testing.T) {
 	}
 	assertNoSameRadioAPSTA(t, u, "radio0")
 
-	if _, err := svc.SetRadioRole("radio0", "both"); !errors.Is(err, ErrAPAndSTASameRadio) {
+	if _, err := svc.SetRadioRole("radio0", "both", LockoutRequest{}); !errors.Is(err, ErrAPAndSTASameRadio) {
 		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
 	}
 	// Nothing may reach the running config: the write is refused before Commit,
@@ -2972,7 +2972,7 @@ func TestSetRadioRole_BothIsRefusedWithoutAllowAPOnSTARadio(t *testing.T) {
 func TestSetRadioRole_BothIsAllowedWhenAllowAPOnSTARadioIsSet(t *testing.T) {
 	svc, u := repeaterModeService(t, true)
 
-	if _, err := svc.SetRadioRole("radio0", "both"); err != nil {
+	if _, err := svc.SetRadioRole("radio0", "both", LockoutRequest{}); err != nil {
 		t.Fatalf("SetRadioRole: %v", err)
 	}
 	apDis, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -2993,7 +2993,7 @@ func TestSetRadioRole_BothIsAllowedOnSingleRadio(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := svc.SetRadioRole("radio0", "both"); err != nil {
+	if _, err := svc.SetRadioRole("radio0", "both", LockoutRequest{}); err != nil {
 		t.Fatalf("SetRadioRole on single-radio hardware: %v", err)
 	}
 	apDis, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -3008,7 +3008,7 @@ func TestSetRadioRole_BothIsAllowedOnSingleRadio(t *testing.T) {
 func TestSetRadioRole_SplitRolesStillWorkOnMultiRadio(t *testing.T) {
 	svc, u := repeaterModeService(t, false)
 
-	if _, err := svc.SetRadioRole("radio0", "sta"); err != nil {
+	if _, err := svc.SetRadioRole("radio0", "sta", LockoutRequest{}); err != nil {
 		t.Fatalf("STA-only role should be accepted: %v", err)
 	}
 	apDis, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -3063,7 +3063,7 @@ func guestEnable() models.GuestWifiConfig {
 func TestSetGuestWifi_FallsBackToTheRadioWithoutTheUplink(t *testing.T) {
 	svc, u := clientModeService(t, false)
 
-	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+	if _, err := svc.SetGuestWifi(guestEnable(), LockoutRequest{}); err != nil {
 		t.Fatalf("SetGuestWifi on the 2.4 GHz uplink radio must fall back, got %v", err)
 	}
 	device, _ := u.Get("wireless", "guest", "device")
@@ -3094,7 +3094,7 @@ func TestSetGuestWifi_SingleRadioKeepsCoexistence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+	if _, err := svc.SetGuestWifi(guestEnable(), LockoutRequest{}); err != nil {
 		t.Fatalf("guest WiFi must stay available on single-radio hardware: %v", err)
 	}
 	device, _ := u.Get("wireless", "guest", "device")
@@ -3111,7 +3111,7 @@ func TestSetGuestWifi_AllowedOnTheRadioWithoutTheUplink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+	if _, err := svc.SetGuestWifi(guestEnable(), LockoutRequest{}); err != nil {
 		t.Fatalf("SetGuestWifi: %v", err)
 	}
 	device, _ := u.Get("wireless", "guest", "device")
@@ -3127,7 +3127,7 @@ func TestSetGuestWifi_AllowedOnTheRadioWithoutTheUplink(t *testing.T) {
 func TestSetGuestWifi_AllowedWithAllowAPOnSTARadio(t *testing.T) {
 	svc, u := clientModeService(t, true)
 
-	if _, err := svc.SetGuestWifi(guestEnable()); err != nil {
+	if _, err := svc.SetGuestWifi(guestEnable(), LockoutRequest{}); err != nil {
 		t.Fatalf("guest WiFi must be available with allow_ap_on_sta_radio: %v", err)
 	}
 	if dis, _ := u.Get("wireless", "guest", "disabled"); dis != "0" {
@@ -3232,7 +3232,7 @@ func TestSetAPConfig_EnableAllowedWithAllowAPOnSTARadio(t *testing.T) {
 	enabled := true
 	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID: "OpenWrt-Travel", Encryption: "psk2", Key: "travelrouter", Enabled: &enabled,
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("allow_ap_on_sta_radio must enable an access point on the uplink radio: %v", err)
 	}
 	if dis, _ := u.Get("wireless", "default_radio0", "disabled"); dis != "0" {
@@ -3249,7 +3249,7 @@ func TestSetAPConfig_EnableAllowedWithAllowAPOnSTARadio(t *testing.T) {
 func TestSetRadioRole_APRoleOnUplinkRadioLeavesAPOnly(t *testing.T) {
 	svc, u := clientModeService(t, false)
 
-	if _, err := svc.SetRadioRole("radio0", "ap"); err != nil {
+	if _, err := svc.SetRadioRole("radio0", "ap", LockoutRequest{}); err != nil {
 		t.Fatalf("role 'ap' on the uplink radio is a legitimate request: %v", err)
 	}
 	assertNoSameRadioAPSTA(t, u, "radio0")
@@ -3270,7 +3270,7 @@ func TestSetRadioRole_APRoleOnUplinkRadioCreatesAPOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := svc.SetRadioRole("radio0", "ap"); err != nil {
+	if _, err := svc.SetRadioRole("radio0", "ap", LockoutRequest{}); err != nil {
 		t.Fatalf("role 'ap' on the uplink radio is a legitimate request: %v", err)
 	}
 	if _, err := u.GetAll("wireless", "ap_radio0"); err != nil {
@@ -3285,7 +3285,7 @@ func TestSetAPConfig_EnableRefusesUplinkRadio(t *testing.T) {
 	enabled := true
 	_, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID: "OpenWrt-Travel", Encryption: "psk2", Key: "travelrouter", Enabled: &enabled,
-	})
+	}, LockoutRequest{})
 	if !errors.Is(err, ErrAPAndSTASameRadio) {
 		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
 	}
@@ -3307,7 +3307,7 @@ func TestSetAPConfig_EnableAllowedOnTheRadioWithoutTheUplink(t *testing.T) {
 	enabled := true
 	if _, err := svc.SetAPConfig("default_radio0", models.APConfigUpdate{
 		SSID: "OpenWrt-Travel", Encryption: "psk2", Key: "travelrouter", Enabled: &enabled,
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("SetAPConfig: %v", err)
 	}
 	dis, _ := u.Get("wireless", "default_radio0", "disabled")
@@ -3330,7 +3330,7 @@ func TestSetRadioRole_RefusalDoesNotCommitWwanOrFirewall(t *testing.T) {
 		t.Fatal("expected the mock to start without network.wwan")
 	}
 
-	if _, err := svc.SetRadioRole("radio0", "both"); !errors.Is(err, ErrAPAndSTASameRadio) {
+	if _, err := svc.SetRadioRole("radio0", "both", LockoutRequest{}); !errors.Is(err, ErrAPAndSTASameRadio) {
 		t.Fatalf("expected ErrAPAndSTASameRadio, got %v", err)
 	}
 	if _, err := u.GetAll("network", "wwan"); err == nil {
@@ -3355,10 +3355,10 @@ func TestSetGuestWifi_DisableTearsDownGuestNetwork(t *testing.T) {
 
 	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{
 		Enabled: true, SSID: "Guest-Travel", Encryption: "psk2", Key: "guestpass123",
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("enable guest: %v", err)
 	}
-	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}); err != nil {
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}, LockoutRequest{}); err != nil {
 		t.Fatalf("disable guest: %v", err)
 	}
 
@@ -3385,15 +3385,15 @@ func TestSetGuestWifi_DisableThenEnableRestoresNetwork(t *testing.T) {
 
 	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{
 		Enabled: true, SSID: "Guest-Travel", Encryption: "psk2", Key: "guestpass123",
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("enable guest: %v", err)
 	}
-	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}); err != nil {
+	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}, LockoutRequest{}); err != nil {
 		t.Fatalf("disable guest: %v", err)
 	}
 	if _, err := svc.SetGuestWifi(models.GuestWifiConfig{
 		Enabled: true, SSID: "Guest-2", Encryption: "psk2", Key: "guestpass123",
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("re-enable guest: %v", err)
 	}
 	net, err := u.GetAll("network", "guest")
@@ -3820,7 +3820,7 @@ func TestFirewallWritersAreMutuallyExclusive(t *testing.T) {
 	// config lock and with a staged delta it may yet revert.
 	guestDone := make(chan error, 1)
 	go func() {
-		_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: true, SSID: "guest", Key: "guestpass1"})
+		_, err := svc.SetGuestWifi(models.GuestWifiConfig{Enabled: true, SSID: "guest", Key: "guestpass1"}, LockoutRequest{})
 		guestDone <- err
 	}()
 	<-blocker.entered
@@ -3868,17 +3868,17 @@ func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
 	enabled := true
 	mutators := map[string]func(){
 		"SetAPConfig": func() {
-			_, _ = svc.SetAPConfig("default_radio0", models.APConfigUpdate{SSID: "travo", Enabled: &enabled})
+			_, _ = svc.SetAPConfig("default_radio0", models.APConfigUpdate{SSID: "travo", Enabled: &enabled}, LockoutRequest{})
 		},
-		"SetRadioRole":  func() { _, _ = svc.SetRadioRole("radio0", "ap") },
-		"SetMode":       func() { _, _ = svc.SetMode("ap") },
+		"SetRadioRole":  func() { _, _ = svc.SetRadioRole("radio0", "ap", LockoutRequest{}) },
+		"SetMode":       func() { _, _ = svc.SetMode("ap", LockoutRequest{}) },
 		"SetMACAddress": func() { _, _ = svc.SetMACAddress("AA:BB:CC:DD:EE:01") },
 		"RandomizeMAC":  func() { _, _, _ = svc.RandomizeMAC() },
 		"Connect":       func() { _, _ = svc.Connect(models.WifiConfig{SSID: "upstream", Password: "secret1234"}) },
 		"Disconnect":    func() { _, _ = svc.Disconnect() },
 		"DeleteNetwork": func() { _, _ = svc.DeleteNetwork("nonexistent") },
 		"SetGuestWifi": func() {
-			_, _ = svc.SetGuestWifi(models.GuestWifiConfig{Enabled: true, SSID: "guest", Key: "guestpass1"})
+			_, _ = svc.SetGuestWifi(models.GuestWifiConfig{Enabled: true, SSID: "guest", Key: "guestpass1"}, LockoutRequest{})
 		},
 		// The disable branch is the only way to reach teardownGuestWifi, which
 		// is deliberately NOT wrapped: it is called from inside SetGuestWifi's
@@ -3888,7 +3888,7 @@ func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
 		// fails this test instead of wedging the guest-WiFi endpoint in
 		// production while CI stays green.
 		"teardownGuestWifi": func() {
-			_, _ = svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false})
+			_, _ = svc.SetGuestWifi(models.GuestWifiConfig{Enabled: false}, LockoutRequest{})
 		},
 		"BlockClient":   func() { _ = net.BlockClient("AA:BB:CC:DD:EE:02") },
 		"UnblockClient": func() { _ = net.UnblockClient("AA:BB:CC:DD:EE:02") },

@@ -11,26 +11,43 @@ import {
   getWifiModeLabel,
 } from '@/components/wifi/wifi-mode-options';
 import { WifiModeSwitchDialog } from '@/components/wifi/wifi-mode-switch-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
 import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 
 export function WifiModeCard() {
   const { data: connection, isLoading } = useWifiConnection();
   const setMode = useWifiMode();
+  const lockout = useWifiLockout();
   const [pendingMode, setPendingMode] = useState<WifiMode | null>(null);
   const [switchingLabel, setSwitchingLabel] = useState<string | null>(null);
 
   const currentMode: WifiMode = connection?.mode ?? 'client';
 
+  // One place sends the request, with or without the acknowledgement, so the
+  // re-send after the dialog is the SAME request and not a rebuilt one that
+  // could differ in a field the operator never changed.
+  function submitMode(mode: WifiMode, acknowledge: boolean) {
+    setSwitchingLabel(getWifiModeLabel(mode));
+    setMode.mutate(
+      { mode, acknowledge_lockout: acknowledge },
+      {
+        onSettled: () => {
+          setPendingMode(null);
+          setSwitchingLabel(null);
+        },
+        onError: (error) => {
+          if (acknowledge) return;
+          lockout.onLockout(error, () => submitMode(mode, true));
+        },
+      },
+    );
+    setPendingMode(null);
+  }
+
   function handleConfirm() {
     if (!pendingMode) return;
-    setSwitchingLabel(getWifiModeLabel(pendingMode));
-    setMode.mutate(pendingMode, {
-      onSettled: () => {
-        setPendingMode(null);
-        setSwitchingLabel(null);
-      },
-    });
-    setPendingMode(null);
+    submitMode(pendingMode, false);
   }
 
   return (
@@ -128,6 +145,13 @@ export function WifiModeCard() {
           if (!open) setPendingMode(null);
         }}
         onConfirm={handleConfirm}
+      />
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={setMode.isPending}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
       />
     </>
   );

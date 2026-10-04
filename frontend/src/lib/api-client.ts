@@ -57,12 +57,45 @@ export function handleUnauthorized(): void {
 /** An HTTP error response, carrying the status code for callers that must branch on it. */
 export class ApiError extends Error {
   readonly status: number;
+  /**
+   * The server's machine-readable error code, when it sent one.
+   *
+   * Callers must branch on this rather than on the message: the wireless
+   * lockout refusal rewords its message whenever the remedy gets clearer, and a
+   * client that matched the text would stop recognising it.
+   */
+  readonly code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
+}
+
+/**
+ * Extracts the human-readable message and the optional machine-readable code
+ * from a failed response.
+ *
+ * A router can answer with an HTML error page (502 from a proxy, 401 from a
+ * captive portal, …), so the JSON body is parsed defensively and the HTTP
+ * status line is used as the fallback instead of a `SyntaxError`.
+ */
+export async function errorFromResponse(
+  response: Response,
+  fallback: string,
+): Promise<{ message: string; code?: string }> {
+  try {
+    const body = (await response.json()) as { error?: unknown; code?: unknown } | null;
+    if (body && typeof body.error === 'string' && body.error.length > 0) {
+      const code = typeof body.code === 'string' ? body.code : undefined;
+      return { message: body.error, code };
+    }
+  } catch {
+    // Non-JSON body (HTML error page, empty body) — keep the fallback.
+  }
+  return { message: fallback };
 }
 
 /**
@@ -76,15 +109,7 @@ export async function errorMessageFromResponse(
   response: Response,
   fallback: string,
 ): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown } | null;
-    if (body && typeof body.error === 'string' && body.error.length > 0) {
-      return body.error;
-    }
-  } catch {
-    // Non-JSON body (HTML error page, empty body) — keep the fallback.
-  }
-  return fallback;
+  return (await errorFromResponse(response, fallback)).message;
 }
 
 function buildHeaders(body: unknown): Record<string, string> {
@@ -124,10 +149,11 @@ async function send(path: string, method: string, body?: unknown, signal?: Abort
     if (response.status === 401 && !path.endsWith('/auth/login')) {
       handleUnauthorized();
     }
-    throw new ApiError(
-      response.status,
-      await errorMessageFromResponse(response, `Request failed with status ${response.status}`),
+    const { message, code } = await errorFromResponse(
+      response,
+      `Request failed with status ${response.status}`,
     );
+    throw new ApiError(response.status, message, code);
   }
 
   return response;

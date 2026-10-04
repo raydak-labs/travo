@@ -25,7 +25,7 @@ func TestRepeater_RefusesWhenNoEnabledAPIsOnAnotherRadio(t *testing.T) {
 	_ = u.Set("wireless", "sta0", "device", "radio0")
 	_ = u.Set("wireless", "sta0", "disabled", "0")
 
-	if _, err := svc.SetMode("repeater"); !errors.Is(err, ErrAPAndSTASameRadio) {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); !errors.Is(err, ErrAPAndSTASameRadio) {
 		t.Fatalf("SetMode(repeater) err = %v, want ErrAPAndSTASameRadio", err)
 	}
 	if got, _ := u.Get("wireless", "default_radio0", "disabled"); got != "0" {
@@ -45,7 +45,7 @@ func TestRepeater_RefusesWhenTheOnlyOtherRadioAPIsDisabled(t *testing.T) {
 	_ = u.Set("wireless", "sta0", "device", "radio0")
 	_ = u.Set("wireless", "sta0", "disabled", "0")
 
-	if _, err := svc.SetMode("repeater"); !errors.Is(err, ErrAPAndSTASameRadio) {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); !errors.Is(err, ErrAPAndSTASameRadio) {
 		t.Fatalf("SetMode(repeater) err = %v, want ErrAPAndSTASameRadio", err)
 	}
 	if got, _ := u.Get("wireless", "default_radio1", "disabled"); got != "1" {
@@ -64,7 +64,7 @@ func TestRepeater_KeepsSplitWhenAnotherRadioHasAnEnabledAP(t *testing.T) {
 	_ = u.Set("wireless", "sta0", "device", "radio0")
 	_ = u.Set("wireless", "sta0", "disabled", "0")
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode(repeater): %v", err)
 	}
 	if got, _ := u.Get("wireless", "default_radio0", "disabled"); got != "1" {
@@ -93,7 +93,7 @@ func TestRepeater_AllowAPOnSTARadioIsTheDocumentedEscape(t *testing.T) {
 	_ = u.Set("wireless", "default_radio1", "disabled", "1")
 	_ = u.Set("wireless", "sta0", "device", "radio0")
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode(repeater) with allow_ap_on_sta_radio: %v", err)
 	}
 	if got, _ := u.Get("wireless", "default_radio0", "disabled"); got != "0" {
@@ -110,7 +110,7 @@ func TestRepeater_SingleRadioStillCoexists(t *testing.T) {
 	_ = u.Set("wireless", "default_radio0", "device", "radio0")
 	_ = u.Set("wireless", "sta0", "device", "radio0")
 
-	if _, err := svc.SetMode("repeater"); err != nil {
+	if _, err := svc.SetMode("repeater", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode(repeater) on single-radio hardware: %v", err)
 	}
 	if got, _ := u.Get("wireless", "default_radio0", "disabled"); got != "0" {
@@ -125,7 +125,7 @@ func TestRepeater_ApModeIsUnaffected(t *testing.T) {
 	_ = u.Set("wireless", "default_radio1", "device", "radio1")
 	_ = u.Set("wireless", "default_radio1", "disabled", "1")
 
-	if _, err := svc.SetMode("ap"); err != nil {
+	if _, err := svc.SetMode("ap", LockoutRequest{}); err != nil {
 		t.Fatalf("SetMode(ap): %v", err)
 	}
 	if got, _ := u.Get("wireless", "default_radio1", "disabled"); got != "0" {

@@ -250,7 +250,7 @@ func TestSetGuestWifi_RefusesASubnetThatOverlapsLAN(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := svc.SetGuestWifi(guestEnable())
+	_, err := svc.SetGuestWifi(guestEnable(), LockoutRequest{})
 	if err == nil {
 		t.Fatal("expected guest WiFi to be refused on a LAN that overlaps its subnet")
 	}
@@ -409,7 +409,7 @@ func TestSetGuestWifi_StaysOffAHandWrittenSTARadio(t *testing.T) {
 		SSID:       "Guest-Travel",
 		Encryption: "psk2",
 		Key:        "guestpass123",
-	}); err != nil {
+	}, LockoutRequest{}); err != nil {
 		t.Fatalf("SetGuestWifi: %v", err)
 	}
 	device, err := u.Get("wireless", "guest", "device")

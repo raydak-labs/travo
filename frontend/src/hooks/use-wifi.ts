@@ -100,9 +100,23 @@ export function useWifiDisconnect() {
 export function useWifiMode() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mode: WifiMode) =>
-      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mode, { mode })),
-    onSuccess: (_data, mode) => {
+    // acknowledge_lockout rides along with the mode so the caller can re-send
+    // the SAME request once the operator has ticked the lockout dialog. The
+    // hook must not decide that: the dialog does, in the page.
+    mutationFn: ({
+      mode,
+      acknowledge_lockout,
+    }: {
+      mode: WifiMode;
+      acknowledge_lockout?: boolean;
+    }) =>
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mode, {
+          mode,
+          ...(acknowledge_lockout ? { acknowledge_lockout: true } : {}),
+        }),
+      ),
+    onSuccess: (_data, { mode }) => {
       toast.success(`WiFi mode changed to ${mode}`);
       void queryClient.invalidateQueries({ queryKey: ['wifi'] });
       void refreshRouterState(queryClient, [
@@ -113,6 +127,10 @@ export function useWifiMode() {
       ]);
     },
     onError: (error) => {
+      // The lockout refusal also raises its own acknowledgement dialog, but it
+      // is NOT swallowed here: this hook is shared by pages that do not wire
+      // that dialog, and silence there would leave a refused change with no
+      // explanation at all.
       toast.error('Failed to change WiFi mode', { description: error.message });
     },
   });
@@ -182,6 +200,7 @@ export function useSetAPConfig() {
       ]);
     },
     onError: (error) => {
+      // Not swallowed for the same reason as useWifiMode's onError.
       toast.error('Failed to update AP config', { description: error.message });
     },
   });
@@ -322,10 +341,21 @@ type RadioRoleMutationResponse = WifiMutationResponse & {
 export function useSetRadioRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, role }: { name: string; role: string }) =>
+    // acknowledge_lockout rides along so a refused role change can be re-sent
+    // once the operator has ticked the lockout dialog (ADR 0002 §5).
+    mutationFn: ({
+      name,
+      role,
+      acknowledge_lockout: acknowledge,
+    }: {
+      name: string;
+      role: string;
+      acknowledge_lockout?: boolean;
+    }) =>
       finalizeWifiMutation(
         apiClient.put<RadioRoleMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
           role,
+          ...(acknowledge ? { acknowledge_lockout: true } : {}),
         }),
       ),
     onSuccess: (data, { name }) => {

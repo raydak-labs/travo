@@ -171,7 +171,7 @@ router with Wi-Fi off entirely.
 | - | ------ | -------- |
 | B.1 | Over Wi-Fi, change an AP SSID. | Applied and **confirmed**; no "rolled back" toast. |
 | B.2 | Same, with a deliberately broken config (11-character key, impossible channel). | Rolled back to the previous working config after ~30 s; the UI says so specifically. |
-| B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Rollback.** The AP returns. This is the lockout case the model exists for. |
+| B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Refused, 409 with `code: "wifi_lockout_risk"`, and nothing changes** until the operator ticks the lockout box. This is the lockout case the model exists for; the guard is implemented server-side (ADR 0002 §5.2) but the **on-device re-run has not happened yet** — run it before trusting the claim. |
 | B.4 | Switch to Client mode over **Ethernet**. | Applies and confirms. |
 | B.5 | Connect to an upstream twice, no band pinned. | Both succeed. |
 | B.9 | Connect to an upstream that **does not exist**, or with a wrong password. | Must be **refused**: the uplink STA has no carrier, so it is not up. This is the only reliable way to make the uplink genuinely fail — an invalid channel is silently ignored and the access point stays up. |
@@ -179,6 +179,44 @@ router with Wi-Fi off entirely.
 | B.6 | Client mode with the uplink on 2.4 GHz, then enable guest Wi-Fi. | Guest AP lands on the radio that does **not** carry the STA: `uci show wireless` — guest's `device` vs the `wwan` STA's. Both APs may end up on one radio; the confirm must still prove **each** interface, not the radio. |
 | B.7 | With every enabled AP on the uplink radio, switch to Travel/repeater mode. | Must be **refused**, matching `Connect`'s behaviour. See B4. |
 | B.8 | Press Scan, or switch to Client mode, with no saved upstream on a stock layout where both radios run an AP. | The AP is moved off the uplink radio before the STA is enabled; `uci show wireless` must never show an enabled AP and an enabled STA on one `device`. See B7. |
+
+### 5.1 How the lockout guard is checked on the device (B.3)
+
+This is the check that found the defect the guard was written for: on a
+GL-AXT1800 the operator switched to Client from an iPhone, the AP was removed,
+and the phone could not rejoin — recoverable only from a wired console. No unit
+test failed, because no unit test asserted it.
+
+Run it **from a phone joined to the router's own access point**, with the config
+in repeater/AP mode, and watch both the response and the config:
+
+```sh
+# from the operator's device, while joined to the router AP
+curl -s -o /dev/stderr -w '\n%{http_code}\n' -X PUT http://192.168.8.1/api/v1/wifi/mode \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"mode":"client"}'
+#   -> 409, body {"error":"...connect over Ethernet first...","code":"wifi_lockout_risk"}
+#   -> the AP you are on is still there; nothing was written
+
+# the config must be byte-identical before and after the refusal
+md5sum /etc/config/wireless /etc/config/network /etc/config/firewall
+ls /var/run/rpcd  # no new apply session, no pending snapshot
+
+# only then, deliberately, accept the lockout
+curl -s -X PUT http://192.168.8.1/api/v1/wifi/mode \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"mode":"client","acknowledge_lockout":true}'
+#   -> 200 and the AP disappears; this device is now stranded by choice
+```
+
+The negative cases matter as much, because a guard that is too broad makes the
+product unusable:
+
+- same request over **Ethernet** → applies, no 409;
+- over Wi-Fi, change an **SSID** while an AP stays enabled → applies;
+- over Wi-Fi, disable **one** radio while the other radio's AP stays up →
+  applies;
+- over Wi-Fi, disable the **guest** AP while another AP stays up → applies.
 
 Assertion for B.6:
 

@@ -1866,32 +1866,48 @@ type ConnectionMethod struct {
 // dump for accurate address detection. On error, logs details and returns
 // "unknown" to avoid breaking UI.
 func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
+	return classifyClientConnection(n.ubus, clientIP), nil
+}
+
+// classifyClientConnection maps a client IP to the interface it is reachable
+// through, then to a connection method. It is a free function taking the ubus
+// client so the wireless lockout guard (wifi_lockout.go) can classify its caller
+// through the SAME code as GET /network/connection-method, instead of keeping a
+// second, drifting copy of "is this client on WiFi".
+//
+// It never fails: an unknown address, an IPv6 client or an unreadable dump all
+// answer "unknown", so a caller it cannot place is never mistaken for a
+// wireless one.
+func classifyClientConnection(ub ubus.Ubus, clientIP string) *ConnectionMethod {
+	unknown := func() *ConnectionMethod {
+		return &ConnectionMethod{Method: "unknown", IPAddress: clientIP}
+	}
 	// Handle localhost cases
 	if clientIP == "" || clientIP == "::1" || clientIP == "127.0.0.1" {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Parse client IP to validate it's valid
 	clientAddr, err := netip.ParseAddr(clientIP)
 	if err != nil {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// IPv6 addresses are not supported for connection method detection
 	if clientAddr.Is6() {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Get all network interface addresses via ubus
-	ifaceDump, err := n.ubus.Call("network.interface", "dump", nil)
+	ifaceDump, err := ub.Call("network.interface", "dump", nil)
 	if err != nil {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Parse the ubus response to find matching interfaces
 	interfaces, ok := ifaceDump["interface"].([]any)
 	if !ok {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	type ifaceInfo struct {
@@ -1992,7 +2008,7 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 
 	if matchedIface == nil {
 		// No match found - might be localhost or routed
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Determine connection method based on interface
@@ -2012,7 +2028,7 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		Method:    method,
 		Interface: matchedIface.name,
 		IPAddress: clientIP,
-	}, nil
+	}
 }
 
 // writeFileAtomic writes via a sibling temp file and renames, so a concurrent

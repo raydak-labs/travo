@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/select';
 import { useRadios, useRepeaterOptions, useSetRadioRole } from '@/hooks/use-wifi';
 import { ConfirmRadioDisableDialog } from '@/components/wifi/confirm-radio-disable-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
 import { InlineError } from '@/components/ui/inline-error';
 
 /**
@@ -31,6 +33,7 @@ export function WifiRadioHardwareCard() {
   const { data: radios, isLoading: radiosLoading } = useRadios();
   const { data: repeaterOptions } = useRepeaterOptions();
   const setRadioRole = useSetRadioRole();
+  const lockout = useWifiLockout();
   const [pendingDisable, setPendingDisable] = useState<{
     name: string;
     currentRole: string;
@@ -53,10 +56,25 @@ export function WifiRadioHardwareCard() {
     }
   }
 
+  // Switching the last access-point-carrying radio off is the guarded request
+  // (ADR 0002 §5): the router refuses when the operator is on WiFi and this
+  // would leave no access point, and the acknowledgement dialog re-sends it.
+  function submitDisable(name: string, acknowledge: boolean) {
+    setRadioRole.mutate(
+      { name, role: 'none', acknowledge_lockout: acknowledge },
+      {
+        onError: (error) => {
+          if (acknowledge) return;
+          lockout.onLockout(error, () => submitDisable(name, true));
+        },
+      },
+    );
+    setPendingDisable(null);
+  }
+
   function handleConfirmDisable() {
     if (pendingDisable) {
-      setRadioRole.mutate({ name: pendingDisable.name, role: 'none' });
-      setPendingDisable(null);
+      submitDisable(pendingDisable.name, false);
     }
   }
 
@@ -106,15 +124,6 @@ export function WifiRadioHardwareCard() {
                           </Badge>
                         )}
 
-                        {pendingDisable && (
-                          <ConfirmRadioDisableDialog
-                            open={true}
-                            radioName={pendingDisable.name}
-                            isPending={setRadioRole.isPending}
-                            onOpenChange={(open) => !open && setPendingDisable(null)}
-                            onConfirm={handleConfirmDisable}
-                          />
-                        )}
                         <Badge
                           variant={radio.disabled ? 'destructive' : 'success'}
                           className="shrink-0"
@@ -177,6 +186,26 @@ export function WifiRadioHardwareCard() {
           </div>
         )}
       </CardContent>
+
+      {/* Rendered once, outside the per-radio map: it depends only on
+          pendingDisable, and inside the loop a two-radio device mounted two
+          copies of the same dialog (same id, same content) on one click. */}
+      {pendingDisable && (
+        <ConfirmRadioDisableDialog
+          open={true}
+          radioName={pendingDisable.name}
+          isPending={setRadioRole.isPending}
+          onOpenChange={(open) => !open && setPendingDisable(null)}
+          onConfirm={handleConfirmDisable}
+        />
+      )}
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={setRadioRole.isPending}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
+      />
     </Card>
   );
 }

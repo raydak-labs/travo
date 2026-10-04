@@ -122,3 +122,86 @@ describe('WifiRadioHardwareCard', () => {
     expect(status).toHaveTextContent('radio0');
   });
 });
+
+describe('WifiRadioHardwareCard lockout guard', () => {
+  beforeEach(() => {
+    localStorage.setItem('openwrt-auth-token', 'test-token');
+  });
+
+  // Switching the last access-point-carrying radio off while on WiFi is refused
+  // by the router (ADR 0002 §5); the UI has to re-send it with the explicit
+  // acknowledgement and send nothing at all if the operator backs out.
+  it('re-sends a refused role change with acknowledge_lockout after the box is ticked', async () => {
+    const user = userEvent.setup();
+    const sent: { role: string; acknowledge_lockout?: boolean }[] = [];
+    let refused = true;
+    server.use(
+      http.put(API_ROUTES.wifi.radioRole, async ({ request }) => {
+        const body = (await request.json()) as { role: string; acknowledge_lockout?: boolean };
+        sent.push(body);
+        if (refused) {
+          refused = false;
+          return HttpResponse.json(
+            {
+              error: 'connect over Ethernet first',
+              code: 'wifi_lockout_risk',
+            },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json({ status: 'ok', apply: null });
+      }),
+      http.post(API_ROUTES.wifi.applyConfirm, () => HttpResponse.json({ status: 'ok' })),
+    );
+    renderCard();
+
+    await openRoleSelector(user);
+    await user.click(await screen.findByRole('option', { name: 'Disabled' }));
+    await user.type(await screen.findByPlaceholderText('Type CONFIRM'), 'CONFIRM');
+    const disable = await screen.findByRole('button', { name: /disable radio/i });
+    await waitFor(() => expect(disable).not.toBeDisabled());
+    await user.click(disable);
+
+    expect(await screen.findByText(/This will disconnect you/i)).toBeInTheDocument();
+    // The refusal came from a real request: it went out WITHOUT the
+    // acknowledgement and the router said no. Nothing is re-sent until the box
+    // is ticked.
+    expect(sent).toEqual([{ role: 'none' }]);
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /apply anyway/i }));
+
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toEqual({ role: 'none', acknowledge_lockout: true });
+  });
+
+  it('sends nothing when the acknowledgement dialog is dismissed', async () => {
+    const user = userEvent.setup();
+    const sent: { role: string; acknowledge_lockout?: boolean }[] = [];
+    server.use(
+      http.put(API_ROUTES.wifi.radioRole, async ({ request }) => {
+        sent.push((await request.json()) as { role: string; acknowledge_lockout?: boolean });
+        return HttpResponse.json(
+          { error: 'connect over Ethernet first', code: 'wifi_lockout_risk' },
+          { status: 409 },
+        );
+      }),
+    );
+    renderCard();
+
+    await openRoleSelector(user);
+    await user.click(await screen.findByRole('option', { name: 'Disabled' }));
+    await user.type(await screen.findByPlaceholderText('Type CONFIRM'), 'CONFIRM');
+    const disable = await screen.findByRole('button', { name: /disable radio/i });
+    await waitFor(() => expect(disable).not.toBeDisabled());
+    await user.click(disable);
+
+    await screen.findByText(/This will disconnect you/i);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/This will disconnect you/i)).not.toBeInTheDocument(),
+    );
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.acknowledge_lockout).toBeUndefined();
+  });
+});

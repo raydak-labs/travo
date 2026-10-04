@@ -48,12 +48,25 @@ func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
 // policy) that Travo itself broke.
 // ErrGuestSubnetOverlap is a 409 for the same reason: the guest subnet collides
 // with network.lan, so the request conflicts with the current configuration.
+// ErrLockoutRefused is a 409 too, and carries services.LockoutErrorCode in the
+// body so the frontend can raise its acknowledge-the-lockout dialog off the
+// code rather than off this message.
 func respondWifiMutationError(c fiber.Ctx, err error) error {
+	if errors.Is(err, services.ErrLockoutRefused) {
+		return RespondWithErrorCode(c, fiber.StatusConflict,
+			services.LockoutErrorCode, err.Error())
+	}
 	if errors.Is(err, services.ErrAPAndSTASameRadio) ||
 		errors.Is(err, services.ErrGuestSubnetOverlap) {
 		return RespondWithError(c, fiber.StatusConflict, err.Error())
 	}
 	return RespondWithServerError(c, err)
+}
+
+// lockoutRequest builds the guard input for a mutating wireless request from
+// the caller's address and the acknowledgement flag in its body.
+func lockoutRequest(c fiber.Ctx, acknowledged bool) services.LockoutRequest {
+	return services.LockoutRequest{ClientIP: c.IP(), AcknowledgeLockout: acknowledged}
 }
 
 // WifiScanHandler handles GET /api/v1/wifi/scan.
@@ -134,17 +147,21 @@ func WifiHealthHandler(svc *services.WifiService) fiber.Handler {
 func WifiSetModeHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
-			Mode string `json:"mode"`
+			Mode               string `json:"mode"`
+			AcknowledgeLockout bool   `json:"acknowledge_lockout"`
 		}
-		if err := c.Bind().Body(&body); err != nil {
+		// Strict, like every other whole-config write: a client that misspells
+		// "acknowledge_lockout" must be told, not silently answered 200 with the
+		// change refused by the guard.
+		if err := BindStrictBodyConfig(c, &body); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if strings.TrimSpace(body.Mode) == "" {
 			return RespondWithError(c, fiber.StatusBadRequest, "mode is required")
 		}
-		apply, err := svc.SetMode(body.Mode)
+		apply, err := svc.SetMode(body.Mode, lockoutRequest(c, body.AcknowledgeLockout))
 		if err != nil {
-			return RespondWithServerError(c, err)
+			return respondWifiMutationError(c, err)
 		}
 		return c.JSON(wifiMutationResponse(apply))
 	}
@@ -194,14 +211,16 @@ func GetRadioStatusHandler(svc *services.WifiService) fiber.Handler {
 func SetRadioEnabledHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
-			Enabled bool `json:"enabled"`
+			Enabled            bool `json:"enabled"`
+			AcknowledgeLockout bool `json:"acknowledge_lockout"`
 		}
-		if err := c.Bind().Body(&body); err != nil {
+		// Strict: see WifiSetModeHandler.
+		if err := BindStrictBodyConfig(c, &body); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
-		apply, err := svc.SetRadioEnabled(body.Enabled)
+		apply, err := svc.SetRadioEnabled(body.Enabled, lockoutRequest(c, body.AcknowledgeLockout))
 		if err != nil {
-			return RespondWithServerError(c, err)
+			return respondWifiMutationError(c, err)
 		}
 		return c.JSON(wifiMutationResponse(apply))
 	}
@@ -238,7 +257,7 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 		if update.Encryption != "" && update.Encryption != "none" && len(update.Key) < 8 {
 			return RespondWithError(c, fiber.StatusBadRequest, "password must be at least 8 characters")
 		}
-		apply, err := svc.SetAPConfig(section, update)
+		apply, err := svc.SetAPConfig(section, update, lockoutRequest(c, update.AcknowledgeLockout))
 		if err != nil {
 			return respondWifiMutationError(c, err)
 		}
@@ -363,10 +382,11 @@ func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		radioName := c.Params("name")
 		var req models.RadioRoleRequest
-		if err := c.Bind().Body(&req); err != nil {
+		// Strict: see WifiSetModeHandler.
+		if err := BindStrictBodyConfig(c, &req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
-		result, err := svc.SetRadioRole(radioName, req.Role)
+		result, err := svc.SetRadioRole(radioName, req.Role, lockoutRequest(c, req.AcknowledgeLockout))
 		if err != nil {
 			return respondWifiMutationError(c, err)
 		}
@@ -407,7 +427,7 @@ func SetGuestWifiHandler(svc *services.WifiService) fiber.Handler {
 				return RespondWithError(c, fiber.StatusBadRequest, "password must be at least 8 characters")
 			}
 		}
-		apply, err := svc.SetGuestWifi(cfg)
+		apply, err := svc.SetGuestWifi(cfg, lockoutRequest(c, cfg.AcknowledgeLockout))
 		if err != nil {
 			return respondWifiMutationError(c, err)
 		}
