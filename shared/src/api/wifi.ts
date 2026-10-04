@@ -184,6 +184,14 @@ export interface WifiApplyState {
   readonly pending: boolean;
   readonly token?: string;
   readonly rollback_timeout_seconds?: number;
+  /**
+   * Wall-clock seconds ONE confirm call can block on the device while it waits
+   * for the newly enabled interfaces to come up. A client that re-POSTs confirm
+   * until the rollback deadline must leave this much room, or a probe it starts
+   * late is answered only after rpcd has already rolled back. Absent on
+   * backends that predate the field; the client then assumes a default.
+   */
+  readonly probe_budget_seconds?: number;
 }
 
 /** Common WiFi mutation response */

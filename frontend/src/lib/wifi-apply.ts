@@ -47,12 +47,60 @@ export class WifiApplyRolledBackError extends Error {
   }
 }
 
+/**
+ * Probe budget assumed when apply.probe_budget_seconds is missing (a backend
+ * that predates the field) or is not a usable positive number. Same order of
+ * magnitude as the current device value, so an old backend costs one or two
+ * retries rather than a probe answered after the rollback.
+ */
+export const DEFAULT_PROBE_BUDGET_SECONDS = 4;
+
+/**
+ * Room left for request transit and scheduling jitter. No field in the apply
+ * envelope describes it: the probe budget bounds how long the device holds the
+ * call, not how long the request takes to reach it and come back.
+ */
+const PROBE_SAFETY_MARGIN_MS = 500;
+
+/**
+ * The last instant at which a confirm probe may still be issued.
+ *
+ * rpcd rolls the change back `rollbackTimeoutSeconds` after the apply, and one
+ * confirm call blocks on the device for up to `probeBudgetSeconds` while
+ * netifd brings the new interfaces up. A probe issued after this deadline is
+ * answered only after rpcd has already rolled back: the confirm lands on a dead
+ * session and the operator gets a confusing failure instead of a clean
+ * rollback, so the budget is subtracted rather than ignored.
+ *
+ * Neither degenerate input may break the loop: a missing or nonsensical budget
+ * must not yield a NaN deadline (every comparison against NaN is false, which
+ * silently skips all probing) nor a deadline in the past (same). So the budget
+ * falls back to DEFAULT_PROBE_BUDGET_SECONDS, is never allowed to eat more than
+ * half the rollback window, and never starts the deadline before `now`.
+ */
+export function confirmDeadlineMs(
+  rollbackTimeoutSeconds: number,
+  probeBudgetSeconds: number | undefined,
+  now: number,
+): number {
+  const rollbackWindowMs = Math.max(0, rollbackTimeoutSeconds) * 1000;
+  const budget =
+    typeof probeBudgetSeconds === 'number' &&
+    Number.isFinite(probeBudgetSeconds) &&
+    probeBudgetSeconds > 0
+      ? probeBudgetSeconds
+      : DEFAULT_PROBE_BUDGET_SECONDS;
+  const reserved = Math.min(budget * 1000 + PROBE_SAFETY_MARGIN_MS, rollbackWindowMs / 2);
+  return now + rollbackWindowMs - reserved;
+}
+
 export async function confirmWifiApply(
   token: string,
   rollbackTimeoutSeconds = 30,
   intervalMs = 1500,
+  probeBudgetSeconds: number = DEFAULT_PROBE_BUDGET_SECONDS,
 ): Promise<void> {
-  const deadline = Date.now() + rollbackTimeoutSeconds * 1000;
+  const deadline = confirmDeadlineMs(rollbackTimeoutSeconds, probeBudgetSeconds, Date.now());
   let lastError: unknown;
 
   while (Date.now() <= deadline) {
@@ -89,7 +137,12 @@ export async function finalizeWifiMutation<T extends WifiMutationResponse>(
   const response = await promise;
   const apply = response.apply;
   if (apply?.pending && apply.token) {
-    await confirmWifiApply(apply.token, apply.rollback_timeout_seconds ?? 30);
+    await confirmWifiApply(
+      apply.token,
+      apply.rollback_timeout_seconds ?? 30,
+      1500,
+      apply.probe_budget_seconds ?? DEFAULT_PROBE_BUDGET_SECONDS,
+    );
   }
   return response;
 }

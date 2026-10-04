@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { apiClient, ApiError } from '../api-client';
 import {
+  confirmDeadlineMs,
   confirmWifiApply,
+  DEFAULT_PROBE_BUDGET_SECONDS,
   finalizeWifiMutation,
   isTerminalApplyStatus,
   isWirelessNotVerifiedError,
@@ -129,5 +131,119 @@ describe('wifi-apply', () => {
     await vi.runAllTimersAsync();
 
     await assertion;
+  });
+});
+
+// apply.probe_budget_seconds is how long ONE confirm call can block on the
+// device while netifd brings the new interfaces up (~4 s today). The client
+// used to probe until the full rollback timeout, so a probe started near the
+// deadline was answered only after rpcd had already rolled back and the
+// operator saw a session failure instead of a clean rollback.
+describe('confirm probe budget', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('subtracts the probe budget and a margin from the rollback window', () => {
+    expect(confirmDeadlineMs(30, 4, 1_000)).toBe(1_000 + 30_000 - 4_000 - 500);
+  });
+
+  it('shortens the deadline as the declared probe budget grows', () => {
+    // A probe that may block longer must be issued earlier.
+    expect(confirmDeadlineMs(30, 1, 0)).toBeGreaterThan(confirmDeadlineMs(30, 8, 0));
+  });
+
+  // An older backend omits the field; the deadline must still be a usable
+  // finite instant in the future, not NaN and not in the past.
+  it.each([undefined, Number.NaN, 0, -5])(
+    'falls back to a default budget instead of a NaN or past deadline for %p',
+    (budget) => {
+      const deadline = confirmDeadlineMs(30, budget, 1_000);
+      expect(Number.isFinite(deadline)).toBe(true);
+      expect(deadline).toBe(1_000 + 30_000 - DEFAULT_PROBE_BUDGET_SECONDS * 1000 - 500);
+    },
+  );
+
+  it('never lets the budget consume more than half the rollback window', () => {
+    expect(confirmDeadlineMs(1, 4, 0)).toBe(500);
+  });
+
+  it('never issues a probe that could still be in flight when rpcd rolls back', async () => {
+    vi.useFakeTimers();
+    const rollbackMs = 30_000;
+    const probeMs = 4_000;
+    const probeStarted: number[] = [];
+
+    vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+      probeStarted.push(Date.now());
+      await new Promise((resolve) => setTimeout(resolve, probeMs));
+      throw new Error('network down');
+    });
+
+    const start = Date.now();
+    const assertion = expect(
+      confirmWifiApply('token-8', rollbackMs / 1000, 1500, probeMs / 1000),
+    ).rejects.toThrow(/rollback timeout/);
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    expect(probeStarted.length).toBeGreaterThan(1);
+    for (const issuedAt of probeStarted) {
+      // The probe is answered up to probeMs later; it must be back before
+      // rpcd's rollback fires at start + rollbackMs.
+      expect(issuedAt + probeMs).toBeLessThanOrEqual(start + rollbackMs);
+    }
+  });
+
+  it('passes the response probe budget on to the confirm loop', async () => {
+    vi.useFakeTimers();
+    // Last confirm probe issued, as milliseconds since the apply was answered.
+    const lastProbeAfterApply = async (probeBudgetSeconds: number): Promise<number> => {
+      const starts: number[] = [];
+      vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+        starts.push(Date.now());
+        throw new Error('network down');
+      });
+
+      const start = Date.now();
+      const assertion = expect(
+        finalizeWifiMutation(
+          Promise.resolve({
+            status: 'ok',
+            apply: {
+              pending: true,
+              token: 'token-9',
+              rollback_timeout_seconds: 30,
+              probe_budget_seconds: probeBudgetSeconds,
+            },
+          }),
+        ),
+      ).rejects.toThrow(/rollback timeout/);
+      await vi.runAllTimersAsync();
+      await assertion;
+      return starts[starts.length - 1] - start;
+    };
+
+    const withBudget = await lastProbeAfterApply(8);
+    const withoutBudget = await lastProbeAfterApply(1);
+
+    expect(withBudget).toBeLessThan(withoutBudget);
+    expect(withBudget).toBeLessThan(30_000);
+  });
+
+  // The envelope field is optional on the wire: an older backend must still be
+  // confirmable instead of failing before a single probe is sent.
+  it('confirms normally when the response omits probe_budget_seconds', async () => {
+    const spy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ status: 'ok' });
+
+    await expect(
+      finalizeWifiMutation(
+        Promise.resolve({
+          status: 'ok',
+          apply: { pending: true, token: 'token-10', rollback_timeout_seconds: 30 },
+        }),
+      ),
+    ).resolves.toMatchObject({ status: 'ok' });
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });
