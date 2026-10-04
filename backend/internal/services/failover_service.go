@@ -792,6 +792,23 @@ func (s *FailoverService) backupManagedSections() error {
 // short-circuit on errApplyRollingBack would make every failed save leave the
 // crash guard behind and permanently disable failover, which is the opposite of
 // what the restore is for.
+// mwan3ListOptions are the options mwan3 reads as UCI lists. Restoring one with
+// Set writes the whole joined value as a SINGLE element, which mwan3 then reads
+// as one invalid address — so they are rebuilt with AddList instead.
+//
+// The list is explicit rather than inferred from the value, because the backup
+// cannot tell a list from a scalar that happens to contain a comma: RealUCI
+// normalises a printed list ('a' 'b') to a,b so callers can split on it, and the
+// backup stores exactly that. An option outside this set that looks joined is
+// logged rather than guessed at, so a future list option is noticed instead of
+// silently written as one element.
+var mwan3ListOptions = map[string]bool{
+	"track_ip":   true, // interface
+	"use_member": true, // member and policy
+}
+
+// RestoreManagedSections is the rollback path: it must put the operator's
+// pre-save config back, not a lossy version of it.
 func (s *FailoverService) restoreManagedSections() error {
 	data, err := os.ReadFile(s.backupPath)
 	if err != nil {
@@ -818,6 +835,18 @@ func (s *FailoverService) restoreManagedSections() error {
 			if strings.HasPrefix(option, ".") {
 				continue
 			}
+			if mwan3ListOptions[option] {
+				if err := s.restoreListOption(name, option, value); err != nil {
+					return err
+				}
+				continue
+			}
+			if strings.Contains(value, ",") && !mwan3ScalarMayContainComma[option] {
+				log.Printf("WARNING: restoring mwan3.%s.%s as a scalar, but it holds a "+
+					"joined value %q — if it is a list option, add it to "+
+					"mwan3ListOptions or it will be restored as one invalid element",
+					name, option, value)
+			}
 			if err := s.uci.Set(mwan3ConfigName, name, option, value); err != nil {
 				return err
 			}
@@ -827,6 +856,25 @@ func (s *FailoverService) restoreManagedSections() error {
 		return err
 	}
 	return s.restoreApplyMwan3(func() error { return s.verifyManagedSections(sections) })
+}
+
+// mwan3ScalarMayContainComma are scalar options whose value legitimately holds
+// a comma, so they are not warned about. Kept small and explicit: a false
+// negative here is a spurious log line, a false positive is a real list option
+// silently restored as one element.
+var mwan3ScalarMayContainComma = map[string]bool{}
+
+func (s *FailoverService) restoreListOption(section, option, value string) error {
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if err := s.uci.AddList(mwan3ConfigName, section, option, item); err != nil {
+			return fmt.Errorf("restore list %s.%s: %w", section, option, err)
+		}
+	}
+	return nil
 }
 
 func (s *FailoverService) deleteManagedSections() error {
