@@ -16,6 +16,11 @@ import { useRadios, useRepeaterOptions, useSetRadioRole } from '@/hooks/use-wifi
 import { ConfirmRadioDisableDialog } from '@/components/wifi/confirm-radio-disable-dialog';
 import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
 import { useWifiLockout } from '@/hooks/use-wifi-lockout';
+// Complementary to the lockout guard, not a replacement: `useWifiLockout` only
+// reacts once the router has already refused, whereas these warn before a
+// disruptive role change is even sent.
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 import { InlineError } from '@/components/ui/inline-error';
 
 /**
@@ -27,7 +32,7 @@ import { InlineError } from '@/components/ui/inline-error';
 const BOTH_ROLE_REFUSAL_HINT =
   'Running an access point and the WiFi uplink on the same radio can crash the ' +
   'ath11k chipset. Give the uplink STA its own radio and put the downlink access ' +
-  'point on the other one, or enable allow_ap_on_sta_radio in repeater options.';
+  'point on the other one, or turn on "Allow Wi-Fi on uplink radio" under Wi-Fi > Advanced > Repeater.';
 
 export function WifiRadioHardwareCard() {
   const { data: radios, isLoading: radiosLoading } = useRadios();
@@ -38,6 +43,10 @@ export function WifiRadioHardwareCard() {
     name: string;
     currentRole: string;
   } | null>(null);
+  // Role changes other than "none" also disrupt: an AP role on the uplink radio
+  // disables that radio's STA sections, i.e. the uplink. Only the harmless
+  // transition was guarded before.
+  const [pendingRole, setPendingRole] = useState<{ name: string; role: string } | null>(null);
 
   // The backend refuses role "both" whenever the router has more than one
   // radio and allow_ap_on_sta_radio is off — see WifiService.rejectSameRadioAPSTA.
@@ -49,11 +58,8 @@ export function WifiRadioHardwareCard() {
   const generatedKey = setRadioRole.data?.generated_key;
 
   function handleRoleChange(name: string, role: string, currentRole: string) {
-    if (role === 'none') {
-      setPendingDisable({ name, currentRole });
-    } else {
-      setRadioRole.mutate({ name, role });
-    }
+    setPendingDisable(role === 'none' ? { name, currentRole } : null);
+    if (role !== 'none') setPendingRole({ name, role });
   }
 
   // Switching the last access-point-carrying radio off is the guarded request
@@ -75,6 +81,13 @@ export function WifiRadioHardwareCard() {
   function handleConfirmDisable() {
     if (pendingDisable) {
       submitDisable(pendingDisable.name, false);
+    }
+  }
+
+  function handleConfirmRole() {
+    if (pendingRole) {
+      setRadioRole.mutate(pendingRole);
+      setPendingRole(null);
     }
   }
 
@@ -184,6 +197,41 @@ export function WifiRadioHardwareCard() {
               </InlineError>
             )}
           </div>
+        )}
+        {/* Mounted outside the per-radio map: inside it, the dialog unmounted
+            with the row it belonged to while it was still open. */}
+        {pendingDisable && (
+          <ConfirmRadioDisableDialog
+            open={true}
+            radioName={pendingDisable.name}
+            radioCount={radios?.length ?? 1}
+            isPending={setRadioRole.isPending}
+            onOpenChange={(open) => !open && setPendingDisable(null)}
+            onConfirm={handleConfirmDisable}
+          />
+        )}
+        {pendingRole && (
+          <ConfirmDialog
+            open={true}
+            onOpenChange={(open) => !open && setPendingRole(null)}
+            title={`Change ${pendingRole.name} to ${pendingRole.role.toUpperCase()}?`}
+            description={`Applying this restarts the ${pendingRole.name} radio, which can take up to 30 seconds.`}
+            warningText={
+              pendingRole.role === 'ap'
+                ? 'If this radio carries the Wi-Fi uplink, its upstream connection is dropped.'
+                : 'Devices connected to access points on this radio will disconnect.'
+            }
+            confirmLabel="Change role"
+            isPending={setRadioRole.isPending}
+            onConfirm={handleConfirmRole}
+          />
+        )}
+        {setRadioRole.isPending && (
+          <OperationProgressDialog
+            open
+            title="Applying radio change"
+            description="Keep this page open until the change finishes."
+          />
         )}
       </CardContent>
 

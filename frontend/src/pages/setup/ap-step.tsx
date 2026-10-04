@@ -89,7 +89,7 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
   } = useForm<SetupApFormValues>({
     resolver: zodResolver(setupApFormSchema),
     defaultValues: { ssid: '', key: '' },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   useEffect(() => {

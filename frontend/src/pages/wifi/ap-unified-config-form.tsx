@@ -25,6 +25,7 @@ import {
 import { useSetAPConfig } from '@/hooks/use-wifi';
 import { useWifiLockout } from '@/hooks/use-wifi-lockout';
 import { isWifiLockoutError } from '@/lib/wifi-lockout';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
 import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
 import {
@@ -108,7 +109,7 @@ export function APUnifiedConfigForm({
     setValue,
     getValues,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<UnifiedApCredentialsValues>({
     resolver: zodResolver(unifiedApCredentialsSchema),
     defaultValues: {
@@ -116,19 +117,31 @@ export function APUnifiedConfigForm({
       encryption: normalizeApEncryption(primary.encryption),
       key: primary.key,
     },
-    mode: 'onChange',
+    // `onTouched`, not `onChange`: with a `min(8)` password schema, validating
+    // per keystroke showed a red error after the user's first character.
+    mode: 'onTouched',
   });
 
   const encryption = watch('encryption');
 
+  useUnsavedChanges(isDirty);
+
+  // Depend on the values, not on the array identity. `apConfigs` is a fresh
+  // array on every `['wifi', 'ap']` refetch, and four wifi mutations invalidate
+  // that key — so resetting on identity silently discarded whatever the user
+  // had typed. Skipping while dirty also protects against a genuine server-side
+  // change landing mid-edit.
+  const primarySsid = primary.ssid;
+  const primaryEncryption = primary.encryption;
+  const primaryKey = primary.key;
   useEffect(() => {
-    const p = pickPrimaryAp(apConfigs);
+    if (isDirty) return;
     reset({
-      ssid: p.ssid,
-      encryption: normalizeApEncryption(p.encryption),
-      key: p.key,
+      ssid: primarySsid,
+      encryption: normalizeApEncryption(primaryEncryption),
+      key: primaryKey,
     });
-  }, [apConfigs, reset]);
+  }, [primarySsid, primaryEncryption, primaryKey, isDirty, reset]);
 
   const buildSharedUpdate = (
     data: UnifiedApCredentialsValues,
@@ -346,17 +359,45 @@ export function APUnifiedConfigForm({
                 {...register('key')}
               />
               {errors.key ? (
-                <p className="text-xs text-red-500" role="alert">
+                <p className="text-xs text-red-600 dark:text-red-400" role="alert">
                   {errors.key.message}
                 </p>
               ) : null}
             </div>
           )}
 
-          <div className="flex gap-2">
+          {/* Saving a new name or password disconnects every client on every
+              band — the most common surprise on this page. */}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Saving a new network name or password disconnects every device on every band; they
+            must reconnect using the new password.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="submit" size="sm" disabled={applying || setAP.isPending}>
               {applying ? 'Saving...' : 'Save'}
             </Button>
+            {isDirty && (
+              <>
+                <span className="text-xs text-amber-700 dark:text-amber-300">
+                  Unsaved changes
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    reset({
+                      ssid: primary.ssid,
+                      encryption: normalizeApEncryption(primary.encryption),
+                      key: primary.key,
+                    })
+                  }
+                >
+                  Discard
+                </Button>
+              </>
+            )}
             <Button type="button" variant="outline" size="sm" onClick={openQrFromForm}>
               <QrCode className="mr-1 h-4 w-4" />
               QR Code
@@ -383,6 +424,7 @@ export function APUnifiedConfigForm({
           }
         }}
         isLastActive
+        action="save"
         onConfirm={confirmDisable}
         confirmPending={applying}
       />

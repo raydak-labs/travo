@@ -45,7 +45,7 @@ export function WifiConnectDialog({
   } = useForm<WifiConnectFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { password: '', selectedBand: '' },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const passwordValue = watch('password');

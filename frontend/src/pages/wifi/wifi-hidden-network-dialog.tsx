@@ -33,7 +33,7 @@ export function WifiHiddenNetworkDialog() {
   } = useForm<WifiHiddenNetworkFormValues>({
     resolver: zodResolver(wifiHiddenNetworkFormSchema),
     defaultValues: wifiHiddenNetworkDefaultValues,
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const encryption = watch('encryption');

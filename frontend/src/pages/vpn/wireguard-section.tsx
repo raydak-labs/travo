@@ -42,7 +42,7 @@ export function WireguardSection() {
   const importForm = useForm<WireguardProfileImportFormValues>({
     resolver: zodResolver(wireguardProfileImportFormSchema),
     defaultValues: { name: '', config: '' },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const wgStatus = vpnStatusQuery.data?.find((v) => v.type === 'wireguard');

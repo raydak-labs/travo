@@ -23,7 +23,7 @@ export function PasswordStep({ onNext, onBack }: { onNext: () => void; onBack: (
       new_password: '',
       confirm_password: '',
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const onSubmit = (data: SetupPasswordFormValues) => {

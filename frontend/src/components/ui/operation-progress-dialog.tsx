@@ -46,10 +46,19 @@ export function OperationProgressDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
 
+        {/* The elapsed timer re-renders four times a second; leaving it inside a
+            live region would flood the speech queue. Only the step list is
+            announced. */}
         <div className="space-y-3 text-sm">
-          <div className="text-xs text-gray-500 dark:text-gray-400">Elapsed: {elapsedSeconds}s</div>
+          <div aria-live="off" className="text-xs text-gray-500 dark:text-gray-400">
+            Elapsed: {elapsedSeconds}s
+          </div>
           {details && details.length > 0 && (
-            <ul className="space-y-1.5 rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+            <ul
+              aria-live="polite"
+              aria-relevant="additions"
+              className="space-y-1.5 rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300"
+            >
               {details.map((d) => (
                 <li key={d}>{d}</li>
               ))}

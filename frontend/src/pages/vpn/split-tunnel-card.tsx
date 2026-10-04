@@ -16,7 +16,7 @@ export function SplitTunnelCard() {
   const { register, handleSubmit, reset, watch } = useForm<SplitTunnelFormValues>({
     resolver: zodResolver(splitTunnelFormSchema),
     defaultValues: { mode: 'all', routes_text: '' },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const mode = watch('mode');

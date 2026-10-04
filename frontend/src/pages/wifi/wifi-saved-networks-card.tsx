@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
@@ -45,6 +46,11 @@ export function WifiSavedNetworksCard() {
     null,
   );
 
+  const [pendingConnect, setPendingConnect] = useState<{
+    ssid: string;
+    encryption: string;
+  } | null>(null);
+
   const handleDelete = () => {
     if (pendingDelete) {
       deleteMutation.mutate(pendingDelete.section);
@@ -53,6 +59,15 @@ export function WifiSavedNetworksCard() {
   };
 
   const isRiskyDelete = pendingDelete && savedNetworks.length === 1 && !autoReconnect?.enabled;
+  // Deleting the profile currently in use drops the uplink.
+  const isDeletingActive = pendingDelete !== null && connection?.ssid === pendingDelete.ssid;
+
+  function confirmConnect() {
+    const target = pendingConnect;
+    if (!target) return;
+    setPendingConnect(null);
+    connectMutation.mutate({ ssid: target.ssid, password: '', encryption: target.encryption });
+  }
 
   return (
     <Card className="flex h-full min-w-0 flex-col">
@@ -133,13 +148,7 @@ export function WifiSavedNetworksCard() {
                           ? 'Already connected to this network'
                           : 'Connect using saved password'
                       }
-                      onClick={() =>
-                        connectMutation.mutate({
-                          ssid: network.ssid,
-                          password: '',
-                          encryption: network.encryption,
-                        })
-                      }
+                      onClick={() => setPendingConnect(network)}
                     >
                       {connectMutation.isPending && connectMutation.variables?.ssid === network.ssid
                         ? 'Connecting…'
@@ -197,6 +206,21 @@ export function WifiSavedNetworksCard() {
           </ul>
         )}
 
+        <ConfirmDialog
+          open={pendingConnect !== null}
+          onOpenChange={(open) => !open && setPendingConnect(null)}
+          title={`Switch to ${pendingConnect?.ssid ?? ''}?`}
+          description="Connecting uses the saved password and can take up to 30 seconds."
+          warningText={
+            connection?.connected
+              ? `The current link drops and internet moves to ${pendingConnect?.ssid ?? 'this network'}. If you are managing the router over WiFi you may lose access.`
+              : undefined
+          }
+          confirmLabel="Connect"
+          isPending={connectMutation.isPending}
+          onConfirm={confirmConnect}
+        />
+
         <Dialog
           open={pendingDelete !== null}
           onOpenChange={(open) => !open && setPendingDelete(null)}
@@ -210,15 +234,28 @@ export function WifiSavedNetworksCard() {
               </DialogDescription>
             </DialogHeader>
 
-            {isRiskyDelete && (
-              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  This is your only saved network and auto-reconnect is disabled. You will lose
-                  automatic reconnection capability.
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
+                {/* The saved password is unrecoverable, so this always applies,
+                    not only in the narrow last-network case. */}
+                <p>
+                  The saved password is deleted and cannot be recovered — you would have to
+                  re-enter it to reconnect to this network.
                 </p>
+                {isDeletingActive && (
+                  <p className="font-medium">
+                    You are connected to this network right now. Removing it drops the uplink.
+                  </p>
+                )}
+                {isRiskyDelete && (
+                  <p>
+                    This is your only saved network and auto-reconnect is disabled. You will lose
+                    automatic reconnection capability.
+                  </p>
+                )}
               </div>
-            )}
+            </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setPendingDelete(null)} type="button">

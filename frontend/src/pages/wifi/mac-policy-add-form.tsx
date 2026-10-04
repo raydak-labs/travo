@@ -20,7 +20,7 @@ export function MACPolicyAddForm({ onValidSubmit, isPending }: MACPolicyAddFormP
   } = useForm<MacPolicyAddFormValues>({
     resolver: zodResolver(macPolicyAddFormSchema),
     defaultValues: { ssid: '', mac: '' },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   return (

@@ -23,7 +23,7 @@ export function MACAddressCard() {
   } = useForm<MacCloneFormValues>({
     resolver: zodResolver(macCloneFormSchema),
     defaultValues: { custom_mac: '' },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   useEffect(() => {

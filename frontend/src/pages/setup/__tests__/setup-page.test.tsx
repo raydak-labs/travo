@@ -95,6 +95,11 @@ describe('SetupPage', () => {
     const newPasswordInput = screen.getByPlaceholderText('Enter new password (min 8 chars)');
     await user.type(newPasswordInput, 'short');
 
+    // Validation is `onTouched`: flagging a `min(8)` password after the first
+    // character showed a red error while the user was still typing.
+    expect(screen.queryByText('Password must be at least 8 characters')).not.toBeInTheDocument();
+
+    await user.tab();
     expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
   });
 
