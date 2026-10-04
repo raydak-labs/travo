@@ -34,7 +34,7 @@ wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/instal
   sh -s -- --no-adguard --password 'your-root-password'
 ```
 
-The script downloads `travo_<version>_<arch>.tar.gz`, extracts to `/`, moves LuCI off port 80 when configured, optionally installs AdGuard, sets root password, enables `travo`, and **verifies that travo actually answers on port 3000 before reporting success** (dumping `logread` and failing if it does not).
+The script downloads `travo_<version>_<arch>.tar.gz`, extracts to `/`, moves LuCI off port 80 when configured, optionally installs AdGuard, sets root password, enables `travo`, and **verifies that travo actually answers on its configured port before reporting success** (dumping `logread` and failing if it does not).
 
 ## What gets installed
 

@@ -149,3 +149,95 @@ func TestReviewReportIsPresentAndScoped(t *testing.T) {
 			"paths are wrong or the citation check is broken", checked, unresolved)
 	}
 }
+
+// TestPublishedInstallInstructionsAreRunnable guards the two ways a security
+// fix to the installer can break every user's install without any test noticing.
+//
+// The installer refuses to run without --password (it is the LuCI, SSH and Travo
+// login for the device, so a published default is not acceptable), and the
+// one-liner that people actually paste has no TTY, so any prompt is skipped. A
+// documented or published one-liner that omits --password therefore dies at the
+// first step -- and .github/workflows/release.yml publishes that text to the
+// release page, which is not covered by any doc linter.
+func TestPublishedInstallInstructionsAreRunnable(t *testing.T) {
+	files := []string{
+		"../../../README.md",
+		"../../../docs/deployment.md",
+		"../../../.github/workflows/release.yml",
+		"../../../scripts/install.sh",
+	}
+
+	// A pipe into sh is the non-interactive shape: no TTY, so the password gate
+	// fires. Lines are joined across backslash continuations first, because that
+	// is how a long one-liner is written, and the trailing backslash is matched
+	// explicitly rather than assumed away.
+	pipeIntoSh := regexp.MustCompile(`\|\s*(\\\s*)?(sh|bash)\b`)
+
+	for _, f := range files {
+		body, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+
+		var command strings.Builder
+		for _, raw := range strings.Split(string(body), "\n") {
+			line := strings.TrimSpace(raw)
+			if command.Len() == 0 && (line == "" || strings.HasPrefix(line, "#")) {
+				continue
+			}
+			continues := strings.HasSuffix(line, "\\")
+			command.WriteString(strings.TrimSuffix(line, "\\"))
+			command.WriteString(" ")
+			if continues {
+				continue
+			}
+			cmd := strings.TrimSpace(command.String())
+			command.Reset()
+
+			if !strings.Contains(cmd, "install.sh") || strings.Contains(cmd, "--uninstall") {
+				continue
+			}
+			if !pipeIntoSh.MatchString(cmd) {
+				continue // run directly, or piped into something other than a shell
+			}
+			if !strings.Contains(cmd, "--password") {
+				t.Errorf("%s publishes a piped one-liner install with no --password:\n  %s\n"+
+					"The installer has no default password, so this command dies before it "+
+					"changes anything.", f, cmd)
+			}
+		}
+	}
+}
+
+// TestInstallerHealthProbeUsesTheConfiguredPort is the same class of bug in the
+// installer's own verification step: it hardcoded port 3000, but Travo defaults
+// to port 80 (the installer moves LuCI to 8080 precisely so Travo can take 80),
+// and with AdGuard installed 0.0.0.0:3000 belongs to AdGuard's web UI. Every
+// install therefore ended in a die for a service that was running correctly.
+func TestInstallerHealthProbeUsesTheConfiguredPort(t *testing.T) {
+	body, err := os.ReadFile("../../../scripts/install.sh")
+	if err != nil {
+		t.Fatalf("read install.sh: %v", err)
+	}
+	install := string(body)
+
+	if strings.Contains(install, "TRAVO_PORT") {
+		t.Error("scripts/install.sh still hardcodes a Travo port; read it from UCI " +
+			"(travo.main.port, default 80) instead")
+	}
+	probe := regexp.MustCompile(`wget[^\n]*api/health`)
+	if !probe.MatchString(install) {
+		t.Fatal("install.sh no longer probes /api/health after starting the service; " +
+			"the verify step is what stops it reporting success for a dead process")
+	}
+	// The probe must be bounded, or a filtered port makes each attempt block for
+	// busybox wget's default read timeout and the retry loop is not a 15s bound.
+	if !regexp.MustCompile(`wget[^\n]*-T\s+\d+[^\n]*api/health`).MatchString(install) {
+		t.Error("the /api/health probe has no timeout (-T); a filtered or blackholed " +
+			"port makes each attempt block and the install can hang for minutes")
+	}
+	// And it must read the port the service was actually configured with.
+	if !strings.Contains(install, `uci -q get "${PKG_NAME}.main.port"`) {
+		t.Error("install.sh does not read the port from travo.main.port")
+	}
+}

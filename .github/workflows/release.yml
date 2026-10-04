@@ -154,15 +154,20 @@ jobs:
           NOTES="$(cat <<EOF
           ## Quick Install (OpenWRT)
 
+          There is no default password: pass your own, or run the script from a
+          terminal to be prompted.
+
           \`\`\`sh
-          wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | sh
+          wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | \
+            sh -s -- --password 'your-strong-password'
           \`\`\`
 
           Or install a specific version:
 
           \`\`\`sh
           VERSION=${VERSION} \\
-            wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | sh
+            wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | \
+            sh -s -- --password 'your-strong-password'
           \`\`\`
 
           ## Downloads

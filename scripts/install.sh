@@ -3,7 +3,9 @@
 # install.sh — install or uninstall Travo on OpenWrt (release tarball from GitHub).
 #
 # Usage:
-#   wget -O- https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | sh
+#   # non-interactive (no TTY, so --password is required):
+#   wget -O- https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | \
+#     sh -s -- --password 'your-strong-password'
 #   wget -O- ... | sh -s -- --yes --version 1.0.0 --password 'secret'
 #   sh install.sh [OPTION]...
 #
@@ -11,7 +13,8 @@
 #
 # Options:
 #   --version VERSION   Release to install (default: latest GitHub release)
-#   --password PASS     Set root password for LuCI + Travo (default: prompt or admin)
+#   --password PASS     Root password for LuCI, SSH and Travo (min 8 chars;
+#                      required when not running interactively)
 #   --no-adguard        Skip AdGuard Home
 #   --no-luci-move      Do not move LuCI/uhttpd to 8080
 #   --uninstall         Remove Travo and restore uhttpd defaults (also runs remove-adguard when present)
@@ -35,9 +38,6 @@ GITHUB_RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/main"
 GITHUB_API_BASE="https://api.github.com/repos/${GITHUB_REPO}"
 GITHUB_RELEASE_BASE="https://github.com/${GITHUB_REPO}/releases/download"
 PKG_NAME="travo"
-# Travo serves its API on 3000 (config default; the init script passes it too).
-# Used by the post-start health probe below.
-TRAVO_PORT="3000"
 MIN_SPACE_KB=20480  # 20 MB
 
 # ============================================================
@@ -350,6 +350,46 @@ do_install() {
 
     confirm "Proceed with installation?" || { info "Aborted."; exit 0; }
 
+    # --- Step 0: Resolve the root password (before anything is changed) ---
+    # This is a fail-closed gate and it has to run BEFORE the first mutation.
+    # It used to sit after the tarball was extracted and /etc/config/travo
+    # overwritten, so a refusal left the device half-installed: new binary in
+    # place, nothing started, and no way for the operator to tell what state it
+    # is in.
+    #
+    # This password is the root/LuCI/dropbear login for the whole device, on a
+    # router whose entire premise is being used on networks the operator does
+    # not control, so there is deliberately no default: the documented one-liner
+    # (`wget -O- .../install.sh | sh`) runs with no TTY, so any prompt is
+    # skipped and a fallback would silently install a published password.
+    _pw="$PASSWORD"
+    if [ -z "$_pw" ]; then
+        if [ -t 0 ] && [ "$YES" = 0 ]; then
+            printf "Enter root password for LuCI and Travo (min 8 characters): "
+            read -r _pw </dev/tty || _pw=""
+            while [ -n "$_pw" ] && [ "${#_pw}" -lt 8 ]; do
+                warn "Password must be at least 8 characters."
+                printf "Enter root password for LuCI and Travo (min 8 characters): "
+                read -r _pw </dev/tty || _pw=""
+            done
+        fi
+        if [ -z "$_pw" ]; then
+            die "refusing to install without a root password (it is the LuCI, SSH and Travo login).
+       Re-run with:  --password '<your password>'
+       or run interactively from a terminal to be prompted."
+        fi
+    fi
+    if [ "${#_pw}" -lt 8 ]; then
+        die "root password must be at least 8 characters."
+    fi
+    mkdir -p /etc/travo
+    chmod 700 /etc/travo 2>/dev/null || true
+    if set_root_password "$_pw"; then
+        success "Root password configured (LuCI + Travo login)"
+    else
+        warn "Could not set root password non-interactively — run: passwd root"
+    fi
+
     # --- Step 1: Download tarball ---
     _tarball="/tmp/${PKG_NAME}_${VERSION}_${_arch}.tar.gz"
     _tarball_url="${GITHUB_RELEASE_BASE}/v${VERSION}/${PKG_NAME}_${VERSION}_${_arch}.tar.gz"
@@ -400,41 +440,7 @@ do_install() {
     done
     success "Files installed"
 
-    # --- Step 3: Set root password (LuCI + Travo) ---
-    # This password is the root/LuCI/dropbear password for the whole device, on
-    # a router whose entire premise is being used on networks the operator does
-    # not control. There is deliberately no default: the documented one-liner
-    # (`wget -O- .../install.sh | sh`) runs with no TTY, so any prompt is
-    # skipped and a fallback would silently install a published password.
-    _pw="$PASSWORD"
-    if [ -z "$_pw" ]; then
-        if [ -t 0 ] && [ "$YES" = 0 ]; then
-            printf "Enter root password for LuCI and Travo (min 8 characters): "
-            read -r _pw </dev/tty || _pw=""
-            while [ -n "$_pw" ] && [ "${#_pw}" -lt 8 ]; do
-                warn "Password must be at least 8 characters."
-                printf "Enter root password for LuCI and Travo (min 8 characters): "
-                read -r _pw </dev/tty || _pw=""
-            done
-        fi
-        if [ -z "$_pw" ]; then
-            die "refusing to install without a root password (it is the LuCI, SSH and Travo login).
-       Re-run with:  --password '<your password>'
-       or run interactively from a terminal to be prompted."
-        fi
-    fi
-    if [ "${#_pw}" -lt 8 ]; then
-        die "root password must be at least 8 characters."
-    fi
-    mkdir -p /etc/travo
-    chmod 700 /etc/travo 2>/dev/null || true
-    if set_root_password "$_pw"; then
-        success "Root password configured (LuCI + Travo login)"
-    else
-        warn "Could not set root password non-interactively — run: passwd root"
-    fi
-
-    # --- Step 4: Move LuCI to port 8080 ---
+    # --- Step 3: Move LuCI to port 8080 ---
     if [ "$MOVE_LUCI" = 1 ]; then
         _current_http="$(uci -q get uhttpd.main.listen_http 2>/dev/null || echo '')"
         case "$_current_http" in
@@ -450,7 +456,7 @@ do_install() {
         esac
     fi
 
-    # --- Step 5: Install AdGuard Home ---
+    # --- Step 4: Install AdGuard Home ---
     if [ "$INSTALL_ADGUARD" = 1 ]; then
         info "Installing AdGuard Home..."
         _adguard_script="/tmp/install-adguard.sh"
@@ -462,7 +468,7 @@ do_install() {
         success "AdGuard Home installed"
     fi
 
-    # --- Step 6: Start travel GUI ---
+    # --- Step 5: Start travel GUI ---
     info "Enabling and starting ${PKG_NAME}..."
     /etc/init.d/"$PKG_NAME" enable 2>/dev/null || true
     if ! /etc/init.d/"$PKG_NAME" start; then
@@ -474,10 +480,20 @@ do_install() {
     # procd's start can return 0 while the process dies immediately afterwards
     # (wrong arch, missing config, read-only overlay), so confirm the port
     # actually answers rather than trusting the exit code alone.
+    #
+    # The port is READ FROM UCI, not assumed: it defaults to 80 (the installer
+    # moves LuCI to 8080 precisely so Travo can take 80), and with AdGuard
+    # installed 0.0.0.0:3000 belongs to AdGuard's web UI, so probing a hardcoded
+    # 3000 both missed Travo and probed somebody else's server.
+    _port="$(uci -q get "${PKG_NAME}.main.port" 2>/dev/null || true)"
+    [ -n "$_port" ] || _port="80"
+    # -T bounds each attempt; without it a filtered port makes busybox wget block
+    # for its default read timeout and the retry loop below is not a 15-second
+    # bound at all.
     _ok=0
     _i=0
     while [ "$_i" -lt 15 ]; do
-        if wget -q -O /dev/null "http://127.0.0.1:${TRAVO_PORT}/api/health" 2>/dev/null; then
+        if wget -q -T 3 -O /dev/null "http://127.0.0.1:${_port}/api/health" 2>/dev/null; then
             _ok=1
             break
         fi
@@ -485,14 +501,14 @@ do_install() {
         _i=$((_i + 1))
     done
     if [ "$_ok" -ne 1 ]; then
-        warn "${PKG_NAME} started but is not answering on port ${TRAVO_PORT} — recent log lines follow."
+        warn "${PKG_NAME} started but is not answering on port ${_port} — recent log lines follow."
         logread 2>/dev/null | tail -n 20 || true
-        die "install did not complete: ${PKG_NAME} is not responding on port ${TRAVO_PORT}.
+        die "install did not complete: ${PKG_NAME} is not responding on port ${_port}.
        Check:  logread | grep -i travo"
     fi
     success "${PKG_NAME} is running"
 
-    # --- Step 7: Print success ---
+    # --- Step 6: Print success ---
     _lan_ip="$(detect_lan_ip)"
     echo ""
     printf "${GREEN}${BOLD}"
