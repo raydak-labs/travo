@@ -23,14 +23,27 @@ export function FirewallZonesSection({ zones, zonesLoading }: FirewallZonesSecti
       ) : zones && zones.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Firewall zones</caption>
             <thead>
               <tr className="border-b text-left text-gray-500 dark:text-gray-400">
-                <th className="pb-2 font-medium">Zone</th>
-                <th className="pb-2 font-medium">Networks</th>
-                <th className="pb-2 font-medium">Input</th>
-                <th className="pb-2 font-medium">Output</th>
-                <th className="pb-2 font-medium">Forward</th>
-                <th className="pb-2 font-medium">Masq</th>
+                <th scope="col" className="pb-2 font-medium">
+                  Zone
+                </th>
+                <th scope="col" className="pb-2 font-medium">
+                  Networks
+                </th>
+                <th scope="col" className="pb-2 font-medium">
+                  Input
+                </th>
+                <th scope="col" className="pb-2 font-medium">
+                  Output
+                </th>
+                <th scope="col" className="pb-2 font-medium">
+                  Forward
+                </th>
+                <th scope="col" className="pb-2 font-medium">
+                  Masq
+                </th>
               </tr>
             </thead>
             <tbody>

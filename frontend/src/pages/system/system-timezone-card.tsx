@@ -44,12 +44,12 @@ export function SystemTimezoneCard() {
             {editingTimezone ? (
               <>
                 <div className="space-y-1">
-                  <Label>Change Timezone</Label>
+                  <Label htmlFor="system-timezone">Change Timezone</Label>
                   <Select
                     value={selectedTz || timezoneConfig?.zonename || ''}
                     onValueChange={setSelectedTz}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="system-timezone">
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
                     <SelectContent>

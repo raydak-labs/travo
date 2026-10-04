@@ -87,8 +87,9 @@ export function DnsEntriesCard() {
               noValidate
             >
               <div className="space-y-1">
-                <Label>Hostname</Label>
+                <Label htmlFor="dns-entry-name">Hostname</Label>
                 <Input
+                  id="dns-entry-name"
                   placeholder="myserver"
                   aria-invalid={errors.name ? 'true' : undefined}
                   aria-describedby={errors.name ? 'dns-entry-name-err' : undefined}
@@ -101,8 +102,9 @@ export function DnsEntriesCard() {
                 ) : null}
               </div>
               <div className="space-y-1">
-                <Label>IP Address</Label>
+                <Label htmlFor="dns-entry-ip">IP Address</Label>
                 <Input
+                  id="dns-entry-ip"
                   placeholder="192.168.8.10"
                   className="font-mono"
                   aria-invalid={errors.ip ? 'true' : undefined}

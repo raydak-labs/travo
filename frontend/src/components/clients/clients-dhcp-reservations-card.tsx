@@ -73,6 +73,7 @@ export function ClientsDhcpReservationsCard() {
                         size="icon"
                         className="h-7 w-7 text-red-600"
                         title="Remove reservation"
+                        aria-label={`Remove reservation for ${r.name || r.mac}`}
                         onClick={() => r.section && deleteReservation.mutate(r.section)}
                         disabled={!r.section || deleteReservation.isPending}
                       >

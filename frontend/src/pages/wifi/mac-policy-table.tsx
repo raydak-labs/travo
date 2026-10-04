@@ -16,11 +16,18 @@ export function MACPolicyTable({ policies, onDelete, isPending }: MACPolicyTable
 
   return (
     <table className="w-full text-sm">
+      <caption className="sr-only">MAC policies</caption>
       <thead>
         <tr className="border-b text-xs text-gray-500 dark:text-gray-400">
-          <th className="pb-1 text-left font-medium">SSID</th>
-          <th className="pb-1 text-left font-medium">MAC Address</th>
-          <th className="pb-1" />
+          <th scope="col" className="pb-1 text-left font-medium">
+            SSID
+          </th>
+          <th scope="col" className="pb-1 text-left font-medium">
+            MAC Address
+          </th>
+          <th scope="col" className="pb-1">
+            <span className="sr-only">Actions</span>
+          </th>
         </tr>
       </thead>
       <tbody>

@@ -91,11 +91,11 @@ export function SplitTunnelCard() {
 
           {mode === 'custom' && (
             <div className="space-y-1.5">
-              <Label>CIDR ranges (comma-separated)</Label>
+              <Label htmlFor="split-tunnel-routes">CIDR ranges (comma-separated)</Label>
               <Textarea
+                id="split-tunnel-routes"
                 placeholder="e.g. 10.0.0.0/8, 192.168.1.0/24"
                 rows={3}
-                
                 {...register('routes_text')}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">

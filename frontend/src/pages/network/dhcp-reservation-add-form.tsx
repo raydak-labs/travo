@@ -26,8 +26,9 @@ export function DhcpReservationAddForm({
       noValidate
     >
       <div className="space-y-1">
-        <Label>Name</Label>
+        <Label htmlFor="dhcp-name">Name</Label>
         <Input
+          id="dhcp-name"
           placeholder="laptop"
           aria-invalid={errors.name ? 'true' : undefined}
           aria-describedby={errors.name ? 'dhcp-name-err' : undefined}
@@ -40,8 +41,9 @@ export function DhcpReservationAddForm({
         ) : null}
       </div>
       <div className="space-y-1">
-        <Label>MAC Address</Label>
+        <Label htmlFor="dhcp-mac">MAC Address</Label>
         <Input
+          id="dhcp-mac"
           placeholder="AA:BB:CC:DD:EE:FF"
           className="font-mono"
           aria-invalid={errors.mac ? 'true' : undefined}
@@ -55,8 +57,9 @@ export function DhcpReservationAddForm({
         ) : null}
       </div>
       <div className="space-y-1">
-        <Label>IP Address</Label>
+        <Label htmlFor="dhcp-ip">IP Address</Label>
         <Input
+          id="dhcp-ip"
           placeholder="192.168.8.50"
           className="font-mono"
           aria-invalid={errors.ip ? 'true' : undefined}

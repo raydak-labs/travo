@@ -57,8 +57,16 @@ export function InstallLogDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* role="log" so the streaming output is announced, and tabIndex so a
+            keyboard user can scroll it — without both, a multi-minute install
+            was silent and unreachable. */}
         <pre
           ref={logRef}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          tabIndex={0}
+          aria-label={`${title} output`}
           className="max-h-80 overflow-auto rounded-md bg-gray-950 p-4 font-mono text-xs text-gray-200"
         >
           {lines.length === 0 && status === 'streaming'

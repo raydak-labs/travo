@@ -36,7 +36,7 @@ export function DdnsEnabledFields({
   return (
     <>
       <div className="space-y-1">
-        <Label>Provider</Label>
+        <Label htmlFor="ddns-service">Provider</Label>
         <Controller
           control={control}
           name="service"
@@ -48,7 +48,7 @@ export function DdnsEnabledFields({
                 if (v !== 'custom') setValue('update_url', '');
               }}
             >
-              <SelectTrigger aria-invalid={errors.service ? 'true' : undefined}>
+              <SelectTrigger id="ddns-service" aria-invalid={errors.service ? 'true' : undefined}>
                 <SelectValue placeholder="Select a DDNS provider" />
               </SelectTrigger>
               <SelectContent>
@@ -71,8 +71,9 @@ export function DdnsEnabledFields({
       </div>
       {service === 'custom' && (
         <div className="space-y-1">
-          <Label>Update URL</Label>
+          <Label htmlFor="ddns-url">Update URL</Label>
           <Textarea
+            id="ddns-url"
             rows={3}
             placeholder="https://example.com/update?hostname=[DOMAIN]&myip=[IP]"
             className={cn(
@@ -95,8 +96,9 @@ export function DdnsEnabledFields({
         </div>
       )}
       <div className="space-y-1">
-        <Label>Domain</Label>
+        <Label htmlFor="ddns-domain">Domain</Label>
         <Input
+          id="ddns-domain"
           placeholder="myrouter.duckdns.org"
           aria-invalid={errors.domain ? 'true' : undefined}
           aria-describedby={errors.domain ? 'ddns-domain-err' : undefined}
@@ -110,17 +112,26 @@ export function DdnsEnabledFields({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label>Username / Token</Label>
-          <Input placeholder="username or token" {...register('username')} />
+          <Label htmlFor="ddns-username">Username / Token</Label>
+          <Input id="ddns-username" placeholder="username or token" {...register('username')} />
         </div>
         <div className="space-y-1">
-          <Label>Password</Label>
-          <Input type="password" placeholder="password" {...register('password')} />
+          <Label htmlFor="ddns-password">Password</Label>
+          <Input
+            id="ddns-password"
+            type="password"
+            placeholder="password"
+            {...register('password')}
+          />
         </div>
       </div>
       <div className="space-y-1">
-        <Label>Lookup Host</Label>
-        <Input placeholder="myrouter.duckdns.org" {...register('lookup_host')} />
+        <Label htmlFor="ddns-lookup-host">Lookup Host</Label>
+        <Input
+          id="ddns-lookup-host"
+          placeholder="myrouter.duckdns.org"
+          {...register('lookup_host')}
+        />
       </div>
     </>
   );
