@@ -15,6 +15,7 @@ import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { SourceDef } from '@/hooks/use-topology-data';
 import type { WanType } from '@shared/index';
+import { UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
 import { formatUptime } from '@/lib/utils';
 import { QuickActions } from '@/pages/dashboard/quick-actions';
 import { NetworkChart } from '@/pages/dashboard/network-chart';
@@ -429,7 +430,7 @@ export function DashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SourceCard title="Ethernet (WAN)" icon={Cable} connected={ethernetUp}>
+        <SourceCard title={UPLINK_LABELS.wan} icon={Cable} connected={ethernetUp}>
           {ethernetUp && wan ? (
             <>
               <DetailRow label="Protocol">
@@ -461,7 +462,7 @@ export function DashboardPage() {
           )}
         </SourceCard>
 
-        <SourceCard title="Repeater (WiFi)" icon={Wifi} connected={repeaterUp}>
+        <SourceCard title={UPLINK_LABELS.wwan} icon={Wifi} connected={repeaterUp}>
           {repeaterUp && wifiConn ? (
             <>
               <DetailRow label="SSID" mono>
@@ -477,7 +478,7 @@ export function DashboardPage() {
           )}
         </SourceCard>
 
-        <SourceCard title="USB Tethering" icon={Smartphone} connected={tetherUp}>
+        <SourceCard title={UPLINK_LABELS.usbtether} icon={Smartphone} connected={tetherUp}>
           {tetherUp ? (
             <>
               {usbTether?.detected && (
@@ -496,7 +497,7 @@ export function DashboardPage() {
             </>
           ) : (
             <p className="text-slate-500">
-              No tethering device found. Plug in your smartphone or USB modem to start.
+              {UPLINK_INACTIVE.usbtether} Plug in your smartphone or USB modem to start.
             </p>
           )}
         </SourceCard>

@@ -72,7 +72,7 @@ describe('DashboardPage', () => {
       expect(screen.getAllByText('GL-MT3000').length).toBeGreaterThan(0);
     });
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Ethernet (WAN)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ethernet' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Repeater (WiFi)' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'USB Tethering' })).toBeInTheDocument();
     });
@@ -80,7 +80,7 @@ describe('DashboardPage', () => {
 
   it('forces dark SourceCard chrome for light-mode contrast', async () => {
     renderDashboard();
-    const ethernet = await screen.findByRole('heading', { name: 'Ethernet (WAN)' });
+    const ethernet = await screen.findByRole('heading', { name: 'Ethernet' });
     const card = ethernet.closest('[class*="bg-slate-900"]');
     expect(card).toBeTruthy();
     expect(card?.className).toMatch(/border-slate-700/);
