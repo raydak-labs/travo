@@ -238,6 +238,40 @@ curl -s -o /dev/null -w '%{http_code}\n' http://<router>:3000
 Expect the first-run setup wizard, completable. This is the accepted risk in ADR 0001 §2.5. Confirm
 it still matches, then set the password from Travo -> System -> AdGuard Password.
 
+### 8.1 Reinstalling over an existing AdGuard can break LAN DNS silently
+
+Observed on `192.168.1.1` while running D.5: a fresh install put AdGuardHome **v0.107.54** in front
+of a configuration written by a newer build. AdGuard then crash-looped on every start:
+
+    [error] parsing configuration file: unknown current schema version 33
+
+Consequence, and the reason this deserves its own section: **dnsmasq keeps
+`server='127.0.0.1#5353'` with `noresolv=1`**, so once AdGuard is down every LAN client loses DNS —
+while the uplink still holds its lease, the AP is up, and Travo reports health `ok`. A cached answer
+resolves for a few minutes and hides it, so check with a name you have not looked up before.
+
+The config the init script actually reads is `/opt/AdGuardHome/AdGuardHome.yaml`, **not**
+`/etc/adguardhome/adguardhome.yaml` (which the UCI `config_file` option names) — editing the latter
+appears to do nothing.
+
+Recovery, when the saved config carries nothing worth keeping (`users: []` means the wizard was never
+completed, which is usually the case):
+
+```sh
+cp /opt/AdGuardHome/AdGuardHome.yaml /tmp/AdGuardHome.yaml.bak
+mv /opt/AdGuardHome/AdGuardHome.yaml /opt/AdGuardHome/AdGuardHome.yaml.schema33
+/etc/init.d/adguardhome restart          # now starts in first-run state
+
+# Configure it so DNS binds, otherwise dnsmasq still forwards into nothing:
+curl -s -X POST http://<router>:3000/control/install/configure \
+  -H 'Content-Type: application/json' \
+  -d '{"web":{"ip":"0.0.0.0","port":3000},"dns":{"ip":"0.0.0.0","port":5353},
+       "username":"admin","password":"<password>"}'
+```
+
+Worth deciding separately: whether a reinstall should refuse to downgrade AdGuard rather than leave
+the device with working routing and no DNS.
+
 ---
 
 ## 9. What one device cannot settle
