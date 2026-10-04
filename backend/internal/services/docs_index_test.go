@@ -84,6 +84,26 @@ func TestGoVersionPinsAgree(t *testing.T) {
 			"notices. Align them, or document which one is authoritative and why.",
 			miseVer, modVer)
 	}
+
+	// A third source exists and was not covered the first time this test was
+	// written. Dockerfile.dev pins only the MINOR version, so it cannot drift on
+	// the patch level, but it can drift on the minor one, which is the same class
+	// of problem: the dev container compiling something CI never compiles.
+	dockerfile, err := os.ReadFile("../../../Dockerfile.dev")
+	if err != nil {
+		t.Fatalf("read Dockerfile.dev: %v", err)
+	}
+	from := regexp.MustCompile(`FROM\s+golang:([0-9][0-9.]*)`).FindSubmatch(dockerfile)
+	if from == nil {
+		return // no golang base image; nothing to check
+	}
+	dockerMinor := strings.Split(string(from[1]), ".")[0]
+	modMinor := strings.Split(modVer, ".")[0]
+	if dockerMinor != modMinor {
+		t.Errorf("Dockerfile.dev builds against Go %s but go.mod declares %s: the dev "+
+			"container is a permanently divergent build environment.",
+			string(from[1]), modVer)
+	}
 }
 
 // TestReviewReportCitesOnlyExistingFiles keeps the review report honest about the

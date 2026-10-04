@@ -437,6 +437,12 @@ func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // ConfirmWifiApplyHandler handles POST /api/v1/wifi/apply/confirm.
+//
+// The call is not cheap: ConfirmApply proves on the device that the interfaces
+// the applied config enables are really up, so one call can block for up to
+// ProbeBudgetSeconds (see wifiMutationResponse). A client that re-POSTs confirm
+// until the rollback deadline has to leave that much room, or a probe it starts
+// near the deadline is only answered after rpcd has already rolled back.
 func ConfirmWifiApplyHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
