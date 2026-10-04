@@ -11,7 +11,7 @@ baseline: f3125f22 (clean tree)
 
 > ## Remediation status
 >
-> Fixes are landing on `fix/deep-review-2026-10-04` — 22 commits, all pushed. Everything in
+> Fixes are landing on `fix/deep-review-2026-10-04` — 24 commits, all pushed. Everything in
 > this report that needed no product decision is done: `make test`, `make lint` (0 issues),
 > `make build`, `pnpm format:check`, shellcheck and `go mod tidy -diff` are all green, and
 > `go test ./... -race` passes.
@@ -32,6 +32,7 @@ baseline: f3125f22 (clean tree)
 > | 4 | **The production app had no auth middleware at all.** Commit `93e6e2b` removed the `app.Use` line when it moved middleware to a group and, when that was reverted, never put it back — so the entire `/api/v1` surface was unauthenticated in the shipped binary, with a fully green suite. |
 > | 5 | **Every install ended in `die`.** The new health probe polled port 3000; Travo defaults to 80 and 3000 belongs to AdGuard. The published release-notes one-liner also still omitted `--password`. |
 > | 6 | The same-radio guard made guest WiFi impossible on the most common uplink layout; the contract field `probe_budget_seconds` was published but never read; ADR 0001 contradicted the code it owns. |
+| 7 | An already-flaky test caught a real defect the new guard had merely exposed: `Connect` chose the uplink radio by ranging over a map, so Go's randomised iteration order decided it — and that choice decides whether the uplink shares a PHY with an access point.
 >
 > The root cause of rounds 1, 4 and 5 is the same and it is worth naming: **every one of them
 > lived in how things are composed, and nothing tested the composition.** Tests build their own
@@ -55,7 +56,11 @@ baseline: f3125f22 (clean tree)
 >
 > ### Blocked on a decision
 >
-> 1. **AdGuard first-run wizard** — `users: []` means any LAN client can claim the DNS filter.
+> 1. ~~**AdGuard first-run wizard**~~ — **decided: leave it, document the risk.** `users: []` stays,
+>    the UI stays on the LAN, and the installer, the README and ADR 0001 §2.5 now all state that any
+>    LAN client can claim the DNS filter and that setting the password from Travo *adds* an account
+>    rather than replacing one. The correct fix (loopback bind plus an authenticated proxy) is
+>    recorded as not done.
 > 2. **Repeater wizard** — shipped, documented, mounted by nothing.
 > 3. **Kill-switch ownership**, and its interaction with split tunnelling.
 > 4. **Single-radio guest/AP coexistence** — now pinned as deliberate; worth confirming.
