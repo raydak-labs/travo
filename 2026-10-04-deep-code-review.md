@@ -54,17 +54,93 @@ baseline: f3125f22 (clean tree)
 > structural checks that matter regardless of who uploads: absolute paths, `..` traversal,
 > symlinks/hardlinks/device nodes, member count and size caps. See `ValidateRestoreArchive`.
 >
-> ### Blocked on a decision
+> ### Open decisions, and what I think about them
 >
-> 1. ~~**AdGuard first-run wizard**~~ — **decided: leave it, document the risk.** `users: []` stays,
->    the UI stays on the LAN, and the installer, the README and ADR 0001 §2.5 now all state that any
->    LAN client can claim the DNS filter and that setting the password from Travo *adds* an account
->    rather than replacing one. The correct fix (loopback bind plus an authenticated proxy) is
->    recorded as not done.
-> 2. **Repeater wizard** — shipped, documented, mounted by nothing.
-> 3. **Kill-switch ownership**, and its interaction with split tunnelling.
-> 4. **Single-radio guest/AP coexistence** — now pinned as deliberate; worth confirming.
-> 5. **Coverage thresholds** — measured at ~72%, ungated; gating needs a new dependency.
+> Each of these needs an owner decision, not a code change. My recommendation and reasoning are
+> recorded so the decision can be made deliberately rather than by whoever opens the file next.
+>
+> #### 1. Repeater wizard — **delete it**
+>
+> `components/wifi/repeater-wizard/` is shipped, documented as complete, tested, and imported by
+> nothing outside its own folder and its tests. ~800 lines plus tests.
+>
+> Note what the argument is *not*: the code in it is good. Its rollback logic is the best in the
+> repo, and it is genuinely better than what the real UI path does — three independent apply
+> windows (mode switch, connect, AP config) with no cross-operation rollback, which is how a
+> failed repeater setup leaves the operator with a new upstream and a half-applied AP.
+>
+> The argument is that **the shipped path has been good enough in production for long enough that
+> nobody noticed the wizard was missing.** Before spending a day wiring up a second entry point, it
+> is worth asking why the ordinary flow has not been a problem. If the answer is "it has been a
+> problem", mount it behind the mode switch rather than as a separate affordance, so the operator
+> reaches it exactly once.
+>
+> Confidence: medium. This is a judgement about product value, and I have no usage data.
+>
+> #### 2. Kill-switch ownership — **the VPN toggle should own it**
+>
+> The sharpest problem in this set. `travo_owner=vpn_toggle` already exists in the code, so
+> someone intended the toggle to own the switch and never wired it up. Today the switch is
+> user-owned forever: enable it, turn the VPN off, and the LAN is permanently `REJECT`ed to `wan`
+> with no UI warning — on a travel router, that means no internet until someone knows to clear it
+> by hand.
+>
+> Recommendation: have `enableWireGuard` install the rule with `travo_owner=vpn_toggle` and
+> `disableWireguard` remove it. Note the ordering question this raises honestly rather than
+> pretending it away — installing after tunnel verification leaves a small leak window; installing
+> before leaves a brief total outage. The outage is the better failure for a feature whose purpose
+> is preventing leaks.
+>
+> On **split-tunnel**: the two features cannot coexist as written. The switch `REJECT`s everything
+> to `wan`, which is exactly where custom split routes send traffic, so they silently negate each
+> other. Pick one: either split-tunnel disables the killswitch and says so plainly, or the switch
+> derives its rule from the split-tunnel config. I would take the first — it is smaller and honest.
+>
+> On **`dest=wan` scope**: do *not* silently widen it to every zone. `wan` is the conventional egress
+> zone and mwan3 members and `wwan` are already in it; widening is a much larger blast radius than
+> it looks. Soften the copy instead — "Blocks direct internet access for devices on the local
+> network" is accurate and changes no behaviour.
+>
+> Confidence: high on ownership (the failure mode is a stranded user), medium on the split-tunnel
+> resolution.
+>
+> #### 3. Single-radio guest/AP coexistence — **leave it**
+>
+> On hardware with one radio there is no split to make, so coexistence is allowed, and that is
+> deliberate and shared with `SetMode("repeater")` and `SetRadioRole`. It is now pinned by a test so
+> it is intentional rather than incidental.
+>
+> Adding a refusal here would remove guest WiFi from single-radio travel routers to protect against
+> a crash those users have evidently been living with. That is a regression dressed as a fix.
+> Leave it. Confidence: medium-high.
+>
+> #### 4. Coverage thresholds — **not yet, and not globally**
+>
+> Two reasons beyond the dependency. A global threshold gets disabled the first time it is
+> annoying, and the 72% here is not distributed the way a threshold would assume: it is
+> concentrated in the safety-critical code, with `ws/hub.go` partly at 0%. A single number would be
+> actively misleading.
+>
+> If a gate is wanted, make it **diff-scoped** — new code must be covered — which is the version
+> that catches the regressions this branch actually made, rather than rewarding the existing shape
+> of the codebase.
+>
+> #### 5. A gate I would add instead
+>
+> Fail the build when a new **safety-relevant** function ships without a test that fails without it.
+> That is what the seven review rounds did by hand, and it is mechanical to encode for the specific
+> classes this project keeps getting wrong: crash-guard lifetime, rollback behaviour, auth wiring,
+> and UCI lock scope. Confidence: high — this is the single highest-value follow-up.
+>
+> #### Process note
+>
+> This branch found a production authentication bypass **introduced by the remediation itself**,
+> after two rounds of review, because nothing tested the composition of `cmd/server/main.go`:
+> every auth test builds its own app and mounts its own middleware, so removing the middleware from
+> the production file left the suite fully green. The highest-value change in this branch is
+> therefore not any individual fix — it is `TestProductionAppRequiresAuthOnAPIRoutes`-style coverage of
+> the real wiring. Worth asking the same question elsewhere: what else is composed in a place
+> nothing exercises?
 >
 > ### Unverifiable without the device
 >
@@ -73,8 +149,12 @@ baseline: f3125f22 (clean tree)
 > unknown in the branch and must be checked on hardware before release.
 
 Follow-up to [`2026-09-26-critical-code-review.md`](./2026-09-26-critical-code-review.md).
-**No files were modified.** The device `192.168.1.1` was unreachable throughout, so this is
-static analysis plus local test/lint runs — no on-device validation.
+The findings below are as first reported. The fixes are **not** — see
+[Remediation status](#remediation-status) above; remediation is landing on
+`fix/deep-review-2026-10-04`. The device `192.168.1.1` was unreachable throughout, so this is
+static analysis plus local test/lint runs — no on-device validation. A punch list for that is in
+[`docs/tests/VERIFY-on-device-2026-10-04.md`](./docs/tests/VERIFY-on-device-2026-10-04.md)
+(a temporary file, to be deleted once the checks have run).
 
 ## Method
 
