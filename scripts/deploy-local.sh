@@ -153,8 +153,17 @@ deploy_direct() {
     local frontend_dir="${REPO_ROOT}/frontend/dist"
     [[ -d "$frontend_dir" ]] || error "Missing $frontend_dir"
     info "Uploading frontend assets..."
-    ssh_cmd "mkdir -p /www/travo"
-    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/travo/"
+    # Swap the directory rather than extracting over it. Vite emits
+    # content-hashed filenames, so extracting on top of the previous tree leaves
+    # every superseded chunk behind forever -- forty deploys while iterating on
+    # the UI is enough to fill a travel router's overlay, after which uci
+    # commits start failing and the device needs a reflash. The staged directory
+    # plus rename is busybox-safe and leaves no window where /www/travo is empty.
+    ssh_cmd "rm -rf /www/travo.new && mkdir -p /www/travo.new"
+    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/travo.new"
+    ssh_cmd "mv /www/travo /www/travo.old 2>/dev/null || true; \
+             mv /www/travo.new /www/travo; \
+             rm -rf /www/travo.old"
   else
     info "Skipping frontend (--binary-only)."
   fi

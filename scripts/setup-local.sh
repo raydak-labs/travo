@@ -43,7 +43,18 @@ SSH_KEY_VALUE=""
 # Optional WiFi AP naming (if unset, setup-wireless-ap.sh keeps OpenWrt-Travel / OpenWrt-Travel-5G + default key)
 WIFI_SSID_BASE=""
 WIFI_AP_KEY=""
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+# accept-new by default, matching deploy-local.sh and test/integration/*.sh.
+# StrictHostKeyChecking=no with UserKnownHostsFile=/dev/null was the one call
+# site the previous sweep missed: this script installs ~/.ssh/id_ed25519.pub as
+# a root authorized key, so on the hostile WLAN a travel router lives on, letting
+# the first ARP/DNS answer win hands over a root session. Opt out explicitly
+# with TRAVO_INSECURE_SSH=1.
+if [ "${TRAVO_INSECURE_SSH:-0}" = "1" ]; then
+    echo -e "${YELLOW}⚠${NC} TRAVO_INSECURE_SSH=1: host keys will NOT be verified"
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5"
+else
+    SSH_OPTS="-o StrictHostKeyChecking=accept-new -o LogLevel=ERROR -o ConnectTimeout=5"
+fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
