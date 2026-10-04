@@ -137,14 +137,21 @@ valid in a state the operator had since left. There is therefore **one** record.
 
 - **Location and shape**: **`/etc/trafo/dnsmasq-layers.json`** (`dnsmasqLayerStackPath`),
   holding `noresolv` and `servers` — dnsmasq's resolver state **before any layer was
-  enabled** — plus `layers`, the stack bottom-first, each `{name, servers}`. The two
-  layer names are `vpn` and `adguard`. A missing file is not an error: it is how
-  “no layer was ever enabled” is represented.
+  enabled** — plus `layers`, the stack bottom-first, each `{name, servers, noresolv?}`. The
+  three layer names are `vpn`, `adguard` and `captive`. A missing file is not an error: it is
+  how “no layer was ever enabled” is represented.
+- **The record is written atomically** (temp file + `fsync` + rename). It is the only restore
+  target for dnsmasq's resolvers, and a half-written JSON document is not a recoverable state:
+  `load` fails, so every layer enable aborts and every restore is refused until someone deletes
+  a file whose contents they cannot read.
 - **First layer to enable** reads the live `server`/`noresolv` as the base state (or
   the pre-stack snapshot of §3.2, when one exists), records it together with its own
   resolvers, and **writes the record before dnsmasq is touched**. A record that cannot
   be written aborts the change rather than following it: without a persisted restore
-  target there is nothing to put back.
+  target there is nothing to put back. A record that exists but holds **no layer**
+  is treated as “nothing owns dnsmasq”, so its base is re-read live: that is the shape
+  the heal of §3.3 leaves behind, and re-using its recorded base would put a
+  pre-heal resolver back over whatever the operator configured in LuCI in between.
 - **Last layer to disable** applies the base state to dnsmasq and then **removes the
   record**.
 - **A layer disabling while others remain** removes only its own entry and leaves
@@ -154,9 +161,10 @@ valid in a state the operator had since left. There is therefore **one** record.
 - **Enable is idempotent**: re-enabling a stacked layer refreshes its resolvers in
   place and never re-reads dnsmasq as the base, so a second enable can never record a
   layer's own entry as the pre-layer state.
-- **Every stacked layer sets `noresolv=1`** (forwarding must not fall back to
+- **A stacked layer sets `noresolv=1`** by default (forwarding must not fall back to
   `resolv.conf` while a layer owns the resolvers); an empty base `noresolv` is written
-  as `0`.
+  as `0`. A layer may record its own `noresolv` instead: the **captive** layer uses `0`,
+  because the bypass exists to hand resolution to the upstream network's own resolver.
 - **AdGuard disable with no record at all** falls back to `ClearNoResolv`: it clears
   `noresolv` only and leaves the server list alone, because that list may be entirely
   the operator's own split-DNS entries.
@@ -184,9 +192,11 @@ Two older files are still **read**, once, as the migration source for the base s
   snapshot from the same era.
 
 A device upgraded while a layer was active therefore still has a restorable base
-state. Both files are **removed** as soon as the stack next saves a record or applies
-the legacy restore: two files holding a restore target for the same two UCI options is
-precisely the collision the stack removes.
+state. **Both** files are **removed** as soon as the stack next saves a record or applies
+the legacy restore (plus whichever path the saving feature is configured with): two files
+holding a restore target for the same two UCI options is precisely the collision the stack
+removes. Removing only the saving feature's own file left the other feature's snapshot
+behind for the whole life of the record.
 
 ### 3.3 VPN DNS self-heal (a second restore entrypoint)
 
@@ -213,6 +223,13 @@ status read that heals rather than only reports, and that is deliberate.
   heal never runs, so dnsmasq keeps forwarding to tunnel resolvers until the profile is
   restored and toggled. Closing that needs a heal path that does not depend on `wg0`
   existing.
+- **A broken probe is not a broken tunnel.** `wg show wg0 dump` failing is ambiguous:
+  a busy router, a missing `wg` binary, or output that no longer parses all look like a
+  dead interface, and the debounce above only helps with the transient one. `wgRuntimeState`
+  therefore falls back to the link state when the tool is unusable, and an **UP `wg0`**
+  reports `up_no_handshake` — not healable. Without it, a persistently broken probe
+  eventually satisfies the debounce and pops the DNS layer of a tunnel that is carrying
+  it perfectly well.
 - **It deliberately keeps the record** (`RemoveLayer(vpn, keepRecord: true)`): popping
   the last layer still restores the base state, but the file survives so the heal is
   idempotent and a later **explicit** disable — or a re-enable followed by a disable —
@@ -228,12 +245,21 @@ status read that heals rather than only reports, and that is deliberate.
   - dnsmasq **`noresolv=1`** (custom forwarders only),
   - legacy **`network.wan`** static DNS with `peerdns=0`, or
   - **AdGuard using encrypted upstreams** (DoH/DoT), which cannot resolve hijacked “hotel” names the way the upstream expects.
-- **Mechanism**: before changing anything, Travo writes a **JSON backup** to **`/etc/trafo/captive-dns-in-progress`** (also acts as the “bypass active” marker) containing dnsmasq options, relevant `wan` DNS fields, and AdGuard upstream/bootstrap/fallback slices. It then:
-  - relaxes dnsmasq toward **DHCP-provided DNS** (reads **`/tmp/resolv.conf.d/resolv.conf.auto`**),
-  - may clear static WAN DNS overrides,
+- **Mechanism**: before changing anything, Travo writes a **JSON backup** to **`/etc/trafo/captive-dns-in-progress`** (also acts as the “bypass active” marker) containing relevant `wan` DNS fields, the dnsmasq `noresolv` flag, the dnsmasq `rebind_protection` flag, and AdGuard upstream/bootstrap/fallback slices. The dnsmasq **`server` list is recorded only by a bypass that actually removes it** — i.e. never by the current code; it appears in a guard file only when one was written before the layer stack (§3.2). A **`dnsmasq_layer`** flag records that this bypass put the resolvers under the stack's control, which is what lets a restore tell "the record is lost" from "this bypass never touched the list". It then:
+  - **pushes the hotel DNS onto the shared dnsmasq layer stack as the `captive` layer** with `noresolv=0`, whenever dnsmasq is actually blocking (`noresolv=1`). That is the only owner of `server`/`noresolv` (§3.1): a bypass that snapshotted those two options outside the stack cannot see the layer below it, so its restore replaces the VPN or AdGuard resolvers with whatever the bypass found, and the next enable then records the bypass's own value as the “pre-any-layer” base. On a VPN that means LAN DNS forwarding into a tunnel that is not there, with `noresolv=1` and no fallback left.
+  - clears static WAN DNS overrides when `peerdns=0`,
+  - turns off dnsmasq `rebind_protection` while the bypass is active (the hotel resolver answers with private addresses),
   - points **AdGuard upstream** at plain **hotel DNS** when available so the resolver that actually handles queries can see portal names.
-- **Restore** (`RestoreDNS`) reapplies the backup, removes the guard file, and restarts dnsmasq; AdGuard upstreams are restored when the backup captured them.
-- **Automatic restore**: when connectivity checks show the internet is reachable, **`MaybeAutoRestoreDNS`** triggers restore; a **5-minute** safety timeout also forces restore if bypass stayed on too long (`captiveDNSRestoreTimeout`).
+- **Restore** (`RestoreDNS`) pops the `captive` layer, which puts back whatever is stacked beneath it, restores `rebind_protection` and the `wan`/AdGuard fields from the guard file, and removes the guard file.
+- **Restore writes only what the guard file actually holds.** The no-layer fallback (a guard file written **before** the stack existed, §3.2) is applied **per field, and only when that field is present**: a `peerdns=0` or AdGuard-encrypted bypass never removed dnsmasq's `server` list, so its guard file records none, and a restore that deleted the list anyway destroyed a split-DNS entry the operator configured that nothing could put back. The same rule covers the staged `uci delete`: a delete that is staged is always followed by `uci commit dhcp` in the same restore, never left for the next unrelated writer of `dhcp` to flush. A guard file that carries no dnsmasq resolver state and no layer record leaves dnsmasq untouched. Applying recorded values **over a live layer** would break the layer that owns dnsmasq, so that case is skipped too.
+- **An unreadable layer record is not an empty one.** `hasAnyLayer` fails closed and reports the error: a torn `/etc/trafo/dnsmasq-layers.json` means dnsmasq may be owned by something the guard knows nothing about, so `RestoreDNS` fails loudly, keeps the guard file for retry, and writes nothing.
+- **A lost layer record is not an empty one either, and `RestoreDNS` REFUSES.** The record is **state**, not a crash guard (§3.1): a partial `/etc/trafo` loss or a cleanup from an older package layout can take it while the guard survives. The guard holds `noresolv` but **never the resolver list** (§4), so a restore that finds no record cannot learn what the list used to be — while the hotel resolver the bypass pushed is still sitting in it. Restoring `noresolv` alone there left dnsmasq forwarding **all** DNS to the portal's resolver and then reported success, restarted dnsmasq, logged "DNS restored" and deleted the guard, so nothing would ever retry.
+  - **Invariant: `RestoreDNS` never reports success while the bypass can still be in force.** If the pre-bypass resolver list cannot be determined, it writes **nothing** to dnsmasq, returns an error naming the missing `dnsmasq-layers.json`, and **keeps the guard** (ADR 0003 §2) so a later attempt can retry. Deleting the guard on a failure is the specific harm — the guard is the only remaining record that anything was ever bypassed.
+  - The bypass records **`dnsmasq_layer`** in the guard file, written out again right after the layer is pushed (the guard itself is persisted before any mutation, so a flag only known afterwards is recorded by rewriting it). It distinguishes "this bypass put dnsmasq's resolvers under the stack's control" from "this bypass never touched them", so the refusal cannot fire on the `peerdns=0` / AdGuard-encrypted paths — those bypasses never took a layer, have nothing to put back, and must still clear cleanly instead of wedging `dns_bypassed` on forever. A guard file written **before** the flag existed carries no flag, so a recorded `noresolv=1` with no recorded list is treated the same way: conservatively, as a bypass whose resolvers are unaccounted for.
+  - The opposite case needs no refusal: when **another layer is stacked**, that layer already re-applied its own resolvers on top, so dnsmasq is not pointing at the hotel resolver and the bypass is genuinely gone even though the `captive` entry is not in the record.
+  - No path through Travo's own code removes the `captive` entry without popping the layer first, so this is a **fail-open-on-inconsistent-state hole**, not a self-inflicted one; the hole is closed by refusing rather than by trusting the state to stay consistent.
+- **Automatic restore**: a **5-minute** safety timeout forces restore if bypass stayed on too long (`captiveDNSRestoreTimeout`, on the bounded startup reconcile).
+- **Restore on reconnect is not on the read path.** `GET /api/v1/captive/status` used to call `MaybeAutoRestoreDNS`, so every poll of the captive status committed `dhcp` and `network`, rewrote dnsmasq's resolver options and restarted dnsmasq. A GET that mutates DNS is indistinguishable from an outage when it lands mid-resolve. Recovery now has two mutating entrypoints: `POST /api/v1/captive/dns-restore` and the 5-minute startup restore. If restore-on-reconnect is wanted again it belongs on a scheduler that owns its own crash guard, not on a GET. (`MaybeAutoRestoreDNS` still exists for those callers; the handler no longer calls it.)
 
 ### 4.1 Captive auto-accept: the wwan bounce is conditional
 
@@ -265,23 +291,27 @@ new callers must not widen the condition.
 
 - **Temporary layers** must always have a **serialized prior state** on disk and a
   **restore entrypoint per feature that is named in this ADR**. There are three:
-  - captive: `RestoreDNS`, backed by the guard/backup
-    `/etc/trafo/captive-dns-in-progress` (ADR 0003 §2);
+  - captive: `RestoreDNS`, which pops the `captive` layer and is backed by the guard/backup
+    `/etc/trafo/captive-dns-in-progress` (ADR 0003 §2) for the `wan`, rebind and AdGuard fields.
+    It is the **only** restore entrypoint for dnsmasq's resolvers under the bypass, which makes
+    the invariant of §4 load-bearing: with the layer record gone it cannot restore the
+    pre-bypass resolver list, so it **refuses and keeps the guard** rather than reporting a
+    restore that never happened.
   - VPN, explicit disable: `disableVpnDNSForwarding`, which pops the `vpn` layer and,
     as the last layer, removes `/etc/trafo/dnsmasq-layers.json`;
   - VPN, read path: `maybeSelfHealVpnDNS` (§3.3), which pops the same layer on a
     terminal tunnel state and deliberately **keeps** the record.
 - The two VPN entrypoints are not redundant: one owns the record's lifecycle, the other
   is the heal that runs where a health check is guaranteed to happen, and they pass
-  different `keepRecord` values on purpose. Captive still keeps its own independent
-  backup rather than joining the stack — it also records `wan` DNS and AdGuard upstream
-  slices, which are not dnsmasq resolver options.
+  different `keepRecord` values on purpose. Captive keeps its own guard file for the state
+  that is **not** a dnsmasq resolver option — `wan` DNS, `rebind_protection`, AdGuard
+  upstreams — but its dnsmasq resolvers go through the shared stack like everyone else's.
 - **UI/API** should surface **`dns_bypassed`** and VPN state so users are not surprised
   by upstream changes.
 - **Operator expectations**: finishing captive flows (or explicit restore) before other
-  major DNS toggles reduces edge cases. The two dnsmasq resolver features **are** unified
-  on one stack today (§3.1); this ADR records that implementation rather than the older
-  per-feature snapshots it replaced.
+  major DNS toggles reduces edge cases. All three dnsmasq resolver features — VPN, AdGuard
+  and the captive bypass — are unified on the one stack of §3.1; this ADR records that
+  implementation rather than the older per-feature snapshots it replaced.
 - **Drift gate**: `TestDnsResolverStatePathsAreNamedInAdr0001` and
   `TestEtcTrafoStatePathsAreNamedInAnAdr` in
   `backend/internal/services/dns_docs_test.go` derive the persistent paths from the
@@ -297,7 +327,7 @@ new callers must not widen the condition.
 | Upstream DHCP DNS | `resolv.conf.auto` | Captive bypass reads hotel DNS |
 | AdGuard | YAML + `init.d/adguardhome` | `AdGuardService`, captive upstream patch |
 | WireGuard DNS | `network.wg0.dns` | `VpnService` forwarding to dnsmasq, through the shared layer record |
-| Shared dnsmasq resolver state | one record, `/etc/trafo/dnsmasq-layers.json` | `vpn_service.go` (stack, self-heal), `adguard_service.go` (forwarding) |
+| Shared dnsmasq resolver state | one record, `/etc/trafo/dnsmasq-layers.json` | `vpn_service.go` (stack, self-heal), `adguard_service.go` (forwarding), `captive_service.go` (bypass layer) |
 | VPN profiles / split tunnel | `/etc/travo/wireguard_profiles.json`, `/etc/travo/split-tunnel.json` | `VpnService` |
 
 ## Consequences
@@ -322,7 +352,8 @@ new callers must not widen the condition.
 - `backend/internal/services/vpn_service.go` — `/etc/trafo/dnsmasq-layers.json`
   (`dnsmasqLayerStackPath`), the legacy `/etc/travo/vpn-dns-snapshot.json`,
   `enableVpnDNSForwarding` / `disableVpnDNSForwarding`, `maybeSelfHealVpnDNS`
-- `backend/internal/services/captive_service.go` — bypass/restore, guard file, timeouts
+- `backend/internal/services/captive_service.go` — bypass as the `captive` layer, guard
+  file, restore, timeouts
 - `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
 - `backend/internal/services/network_service.go` — WAN custom DNS (`SetDNSConfig`)

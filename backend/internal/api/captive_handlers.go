@@ -18,8 +18,17 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 		status.DNSBypassed = svc.IsDNSBypassed()
 		status.DNSBypassNeeded = !status.DNSBypassed && status.Detected && svc.CheckDNSBypassNeeded()
 		status.STAConnected = svc.IsUpstreamConnected()
-		// Auto-restore DNS when internet is reachable
-		svc.MaybeAutoRestoreDNS(status.CanReachInternet)
+		// No side effects here. This handler used to call MaybeAutoRestoreDNS,
+		// so a GET committed `dhcp` and `network`, rewrote dnsmasq's resolver
+		// options and restarted dnsmasq — every poll of the captive status (the
+		// dashboard does it on a timer) mutated live state, and a read could
+		// interrupt DNS resolution mid-flight.
+		//
+		// Recovery from a stale bypass has two mutating entrypoints instead:
+		// POST /api/v1/captive/dns-restore, and the bounded 5-minute startup
+		// auto-restore (captiveDNSRestoreTimeout). Do not move the auto-restore
+		// back onto this path; if restore-on-reconnect is wanted again, it
+		// belongs on a scheduler that owns its own crash guard, not on a GET.
 		return c.JSON(status)
 	}
 }

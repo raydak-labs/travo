@@ -501,22 +501,32 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 		return "disabled"
 	}
 	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
-	if err != nil || strings.TrimSpace(string(out)) == "" {
-		return "enabled_not_up"
-	}
-	status, parseErr := ParseWgDump(string(out))
-	if parseErr != nil || status == nil {
-		return "enabled_not_up"
-	}
-	for _, peer := range status.Peers {
-		if peer.LatestHandshake > 0 {
-			return "connected"
+	if err == nil && strings.TrimSpace(string(out)) != "" {
+		if status, parseErr := ParseWgDump(string(out)); parseErr == nil && status != nil {
+			for _, peer := range status.Peers {
+				if peer.LatestHandshake > 0 {
+					return "connected"
+				}
+			}
+			if len(status.Peers) > 0 {
+				return "up_no_handshake"
+			}
+			return "configured"
 		}
 	}
-	if len(status.Peers) > 0 {
-		return "up_no_handshake"
+	// `wg show` is unusable — the binary is missing, or its output no longer
+	// parses. That is a broken PROBE, not a broken tunnel, and the two must not
+	// collapse into one reading: the debounced heal of ADR 0001 §3.3 pops the VPN
+	// resolver layer on enabled_not_up, so a persistently broken probe would
+	// eventually take the DNS layer away from a tunnel that is carrying it fine.
+	// The link state is the only evidence left, and an UP wg0 outranks the
+	// missing tool.
+	if link, lerr := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); lerr == nil {
+		if wireGuardIfaceLooksUp(string(link)) {
+			return "up_no_handshake"
+		}
 	}
-	return "configured"
+	return "enabled_not_up"
 }
 
 // GetVpnStatus returns all VPN connection statuses.
@@ -909,10 +919,28 @@ const (
 	// guard, so it keeps its own literal rather than deriving from crashGuardDir.
 	dnsmasqLayerStackPath = "/etc/trafo/dnsmasq-layers.json"
 
-	// The two features that stack onto dnsmasq's resolver options.
+	// dnsmasqLayerStackFileName is the record's file name on its own, so a
+	// service that resolves the record relative to its own state directory (the
+	// captive service, next to its guard file) lands on the same file.
+	dnsmasqLayerStackFileName = "dnsmasq-layers.json"
+
+	// The features that stack onto dnsmasq's resolver options.
 	dnsLayerVPN     = "vpn"
 	dnsLayerAdGuard = "adguard"
+	// dnsLayerCaptive is the captive portal bypass (ADR 0001 §4). It is a layer
+	// like the other two, not a second writer of the same two UCI options: a
+	// snapshot outside the stack cannot see the layers below it, so its restore
+	// lands on top of a state it never observed.
+	dnsLayerCaptive = "captive"
 )
+
+// legacyDnsmasqSnapshotPaths are the per-feature snapshots releases before the
+// shared stack wrote. They hold a restore target for the SAME two UCI options
+// the record now owns, so a record that has absorbed one must delete all of
+// them (ADR 0001 §3.2) — leaving the other behind gives the device a second,
+// stale restore target that no code path consults but every reader has to
+// reason about.
+var legacyDnsmasqSnapshotPaths = []string{legacyVpnDnsSnapshotPath, adguardDnsSnapshotPath}
 
 // dnsmasqResolverState is a dnsmasq resolver list plus its noresolv flag. It is
 // the shape the per-feature snapshots wrote, kept so a device that is upgraded
@@ -924,9 +952,23 @@ type dnsmasqResolverState struct {
 
 // dnsmasqLayer is one stacked feature and the resolvers it wants dnsmasq to
 // forward to.
+//
+// NoResolv is the flag this layer wants while it owns dnsmasq. It is absent
+// from the record unless a layer needs something other than the default: a
+// layer recorded before it existed means "1", so records written by earlier
+// releases keep meaning the same thing.
 type dnsmasqLayer struct {
-	Name    string   `json:"name"`
-	Servers []string `json:"servers"`
+	Name     string   `json:"name"`
+	Servers  []string `json:"servers"`
+	NoResolv string   `json:"noresolv,omitempty"`
+}
+
+// noResolvValue is the flag a layer applies while it owns dnsmasq.
+func (l dnsmasqLayer) noResolvValue() string {
+	if strings.TrimSpace(l.NoResolv) != "" {
+		return strings.TrimSpace(l.NoResolv)
+	}
+	return "1"
 }
 
 // dnsmasqLayerStack is the shared record. Layers are ordered bottom first, so
@@ -1028,11 +1070,37 @@ func (c commandRunnerDNS) commitAndRestart() error {
 
 func (c commandRunnerDNS) readFile(path string) ([]byte, error) { return os.ReadFile(path) }
 
+// writeFile writes the record atomically. A power cut or a concurrent reader
+// between the truncate and the write left a half-written JSON document, and a
+// record that does not parse is not a recoverable state: load() fails, so every
+// layer enable aborts and every restore is refused until an operator deletes a
+// file whose contents they cannot read.
 func (c commandRunnerDNS) writeFile(path string, data []byte, perm os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, perm)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // no-op after a successful rename
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func (c commandRunnerDNS) removeFile(path string) error {
@@ -1079,9 +1147,21 @@ func (f *dnsmasqLayerStackFile) save(st *dnsmasqLayerStack) error {
 	if err := f.dns.writeFile(f.path, data, 0o600); err != nil {
 		return err
 	}
-	// The shared record now owns the base state; leaving the old snapshot
-	// behind would give it a second, stale restore target.
-	return f.dns.removeFile(f.legacyPath)
+	// The shared record now owns the base state, so every pre-stack snapshot
+	// goes: each of them is a second, stale restore target for the same two
+	// options. Removing only this feature's own file left the other feature's
+	// snapshot behind for the whole life of the record. The feature's configured
+	// path is included because a test or a future caller can point it somewhere
+	// the shared list does not know about.
+	for _, legacy := range append([]string{f.legacyPath}, legacyDnsmasqSnapshotPaths...) {
+		if legacy == "" {
+			continue
+		}
+		if err := f.dns.removeFile(legacy); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // removeRecord drops the shared record. Called only once the base state has
@@ -1174,7 +1254,24 @@ func (f *dnsmasqLayerStackFile) applyTop(st *dnsmasqLayerStack) error {
 		return f.apply(dnsmasqResolverState{NoResolv: st.NoResolv, Servers: st.Servers})
 	}
 	top := st.Layers[len(st.Layers)-1]
-	return f.apply(dnsmasqResolverState{NoResolv: "1", Servers: top.Servers})
+	return f.apply(dnsmasqResolverState{NoResolv: top.noResolvValue(), Servers: top.Servers})
+}
+
+// hasAnyLayer reports whether any feature currently owns dnsmasq's
+// resolvers. A caller restoring something OUTSIDE the stack asks this first:
+// with another layer on top, dnsmasq is not in the state the caller left it
+// in, and "restoring" it would break the layer that is working.
+//
+// It fails closed. An unreadable record is not "no owner": it is the one case
+// where the caller must NOT write, because something may own dnsmasq in a way
+// this record can no longer describe. The error is returned so the caller can
+// fail loudly instead of guessing.
+func (f *dnsmasqLayerStackFile) hasAnyLayer() (bool, error) {
+	st, err := f.load()
+	if err != nil {
+		return false, err
+	}
+	return st != nil && len(st.Layers) > 0, nil
 }
 
 // EnableLayer pushes layer onto the stack and points dnsmasq at its resolvers.
@@ -1182,6 +1279,14 @@ func (f *dnsmasqLayerStackFile) applyTop(st *dnsmasqLayerStack) error {
 // resolvers in place and never re-reads dnsmasq as the base, so a second enable
 // can never record a layer's own entry as the pre-layer state.
 func (f *dnsmasqLayerStackFile) EnableLayer(layer string, servers []string) error {
+	return f.EnableLayerAs(layer, servers, "1")
+}
+
+// EnableLayerAs pushes a layer that wants a specific noresolv flag. The captive
+// bypass is the only caller: it points dnsmasq at the upstream network's own
+// resolver so a portal hostname resolves to the gateway, which means handing
+// fallback back to resolv.conf (noresolv=0) rather than cutting it off.
+func (f *dnsmasqLayerStackFile) EnableLayerAs(layer string, servers []string, noresolv string) error {
 	st, err := f.load()
 	if err != nil {
 		return err
@@ -1192,11 +1297,22 @@ func (f *dnsmasqLayerStackFile) EnableLayer(layer string, servers []string) erro
 			return bErr
 		}
 		st = &dnsmasqLayerStack{NoResolv: base.NoResolv, Servers: base.Servers}
+	} else if len(st.Layers) == 0 {
+		// A record with no layer left is not holding anything: the read-path
+		// heal keeps it so a later disable still has a base to restore. Keeping
+		// the base it was written with does not work, because the operator can
+		// edit dnsmasq in LuCI between the heal and that disable — and the
+		// disable would then put the pre-heal resolvers back over the change.
+		// Nothing owns dnsmasq right now, so the live state IS the pre-layer
+		// state and is read fresh.
+		live := f.liveState()
+		st.NoResolv, st.Servers = live.NoResolv, live.Servers
 	}
 	if i := st.indexOf(layer); i >= 0 {
 		st.Layers[i].Servers = servers
+		st.Layers[i].NoResolv = noresolv
 	} else {
-		st.Layers = append(st.Layers, dnsmasqLayer{Name: layer, Servers: servers})
+		st.Layers = append(st.Layers, dnsmasqLayer{Name: layer, Servers: servers, NoResolv: noresolv})
 	}
 	// The record is written before dnsmasq is touched: without it there would
 	// be nothing to restore, and a restore target that cannot be written must

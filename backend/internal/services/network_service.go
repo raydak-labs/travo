@@ -1028,6 +1028,20 @@ func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
 	return entries, nil
 }
 
+// uciSectionExists reports whether a UCI section is already present.
+//
+// It exists because real `uci set config.section=stype` CREATES OR UPDATES:
+// AddSection is not a duplicate check. Callers that relied on its error passed
+// under a stricter mock and silently UPSERTED on the device.
+func (n *NetworkService) uciSectionExists(config, section string) (bool, error) {
+	sections, err := n.uci.GetSections(config)
+	if err != nil {
+		return false, fmt.Errorf("reading %s sections: %w", config, err)
+	}
+	_, ok := sections[section]
+	return ok, nil
+}
+
 // AddDNSEntry adds a new local DNS entry as a named UCI section in dhcp config.
 func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 	// `dhcp` is locked, not just committed-and-hoped: the uci CLI keeps
@@ -1040,6 +1054,16 @@ func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 	// theoretical one.
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "dns_" + sanitizeSectionName(entry.Name)
+		// Explicit duplicate check, inside the lock: real uci reuses the section
+		// instead of failing, so a second entry with the same name would silently
+		// REPLACE the first one's IP.
+		exists, err := n.uciSectionExists("dhcp", section)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("DNS entry %q already exists", entry.Name)
+		}
 		if err := n.uci.AddSection("dhcp", section, "domain"); err != nil {
 			return fmt.Errorf("adding DNS entry section: %w", err)
 		}
@@ -1138,6 +1162,16 @@ func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error)
 func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "host_" + sanitizeSectionName(reservation.Name)
+		// Explicit duplicate check, inside the lock: a same-named reservation
+		// would otherwise be overwritten in place, silently changing which MAC
+		// gets which address.
+		exists, err := n.uciSectionExists("dhcp", section)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("DHCP reservation %q already exists", reservation.Name)
+		}
 		if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
 			return fmt.Errorf("adding DHCP reservation section: %w", err)
 		}
@@ -1249,6 +1283,16 @@ func (n *NetworkService) BlockClient(mac string) error {
 		section := "block_" + normalizeMACForSection(mac)
 		macUpper := strings.ToUpper(mac)
 
+		// Explicit duplicate check, inside the lock: real uci reuses the rule
+		// section, so re-blocking an already-blocked client would report success
+		// and restart the firewall for nothing.
+		exists, err := n.uciSectionExists("firewall", section)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("client %s is already blocked", macUpper)
+		}
 		if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
 			return fmt.Errorf("add firewall block rule: %w", err)
 		}

@@ -159,16 +159,20 @@ func (m *MockUCI) Commit(_ string) error {
 	return nil
 }
 
+// AddSection matches `uci set config.section=stype`: on an existing section
+// the type is re-set and the section is REUSED, not an error. Modelling that
+// reuse matters — an unfaithfully strict mock turns "the operator edited a
+// section this service owns" into "every later save fails".
 func (m *MockUCI) AddSection(config, section, stype string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.data[config] == nil {
 		m.data[config] = make(map[string]map[string]string)
 	}
-	if m.data[config][section] != nil {
-		return fmt.Errorf("uci: section %s.%s already exists", config, section)
+	if m.data[config][section] == nil {
+		m.data[config][section] = map[string]string{}
 	}
-	m.data[config][section] = map[string]string{".type": stype}
+	m.data[config][section][".type"] = stype
 	return nil
 }
 

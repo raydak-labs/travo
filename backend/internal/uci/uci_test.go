@@ -92,11 +92,25 @@ func TestMockUCIAddSection(t *testing.T) {
 	}
 }
 
-func TestMockUCIAddSectionAlreadyExists(t *testing.T) {
+// Real `uci set config.section=stype` REUSES an existing section and re-sets
+// its type; it is not an error. This mock used to be stricter than the layer it
+// stands in for, which turned "the operator edited a section this service owns"
+// into "every later save fails" — a caller could pass its tests and still break
+// on the device.
+func TestMockUCIAddSectionReusesExistingSection(t *testing.T) {
 	m := NewMockUCI()
-	err := m.AddSection("network", "wan", "interface")
-	if err == nil {
-		t.Error("expected error adding existing section")
+	if err := m.Set("network", "wan", "ifname", "eth9"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := m.AddSection("network", "wan", "interface"); err != nil {
+		t.Fatalf("add_section on an existing section: %v", err)
+	}
+	opts, _ := m.GetAll("network", "wan")
+	if opts[".type"] != "interface" {
+		t.Errorf(".type = %q, want %q", opts[".type"], "interface")
+	}
+	if opts["ifname"] != "eth9" {
+		t.Errorf("reuse must keep existing options, got %v", opts)
 	}
 }
 

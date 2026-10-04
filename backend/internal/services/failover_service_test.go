@@ -433,6 +433,49 @@ func TestFailbackPriorityOrderingWithHoldDown(t *testing.T) {
 	}
 }
 
+// Failback: a higher-priority uplink that recovers must take the connection
+// back once it has been online past the hold-down. The sticky "keep whatever is
+// active now" rule used to be evaluated FIRST and returned as soon as the
+// active uplink was online at all, so a lower-priority link that had failed
+// over first kept the connection forever and the hold-down branch was
+// unreachable.
+func TestFailbackReturnsToTheHigherPriorityLinkAfterHoldDown(t *testing.T) {
+	t.Parallel()
+
+	svc := newComputeActiveService(t)
+	candidates := []models.FailoverCandidate{
+		{Priority: 1, InterfaceName: "wan", Enabled: true, Available: true, IsUp: true,
+			TrackingState: models.FailoverTrackingStateOnline},
+		{Priority: 2, InterfaceName: "wwan", Enabled: true, Available: true, IsUp: true,
+			TrackingState: models.FailoverTrackingStateOnline},
+	}
+	// The failover to wwan already happened and is what the service last saw.
+	svc.lastActive = "wwan"
+	// wan comes back, but has not been stable long enough yet.
+	svc.onlineSince = map[string]time.Time{
+		"wan":  time.Now().Add(-failbackHoldDownDuration / 2),
+		"wwan": time.Now().Add(-time.Hour),
+	}
+	if got := svc.computeActiveInterface(candidates); got != "wwan" {
+		t.Errorf("during the hold-down the active uplink stays: got %q, want wwan", got)
+	}
+
+	svc.onlineSince["wan"] = time.Now().Add(-failbackHoldDownDuration - time.Second)
+	if got := svc.computeActiveInterface(candidates); got != "wan" {
+		t.Errorf("after the hold-down wan must take the connection back: got %q, want wan", got)
+	}
+}
+
+func newComputeActiveService(t *testing.T) *FailoverService {
+	t.Helper()
+	mockUCI := uci.NewMockUCI()
+	mockUbus := ubus.NewMockUbus()
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	return NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
+		&MockCommandRunner{}, &NoopUCIApplyConfirm{},
+		filepath.Join(t.TempDir(), "failover.json"))
+}
+
 // recordingApplier captures the rpcd apply/confirm calls and detects overlap.
 type recordingApplier struct {
 	mu           sync.Mutex
@@ -617,12 +660,23 @@ func TestFailoverRestoreManagedSectionsReloadsThroughStagedApply(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	// A legacy generated section: the restore must delete it as Travo-owned and
-	// put the backup back in its place.
-	seedLegacyGeneratedInterface(t, mockUCI, "wan")
-	_ = mockUCI.Set("mwan3", "wan", "proto", "dhcp")
+	// A generated section this save owns: the restore must delete it and put
+	// the backup back in its place. The stored config is what tells the restore
+	// which non-namespaced sections may be touched at all.
+	seedLegacyGeneratedSection(t, mockUCI, wanCandidate(), failoverTestHealth())
 	applier := &recordingApplier{}
 	svc, _ := newFailoverTestService(t, mockUCI, applier)
+	stored, err := json.Marshal(failoverConfigFile{
+		Enabled:    true,
+		Candidates: []models.FailoverCandidate{wanCandidate()},
+		Health:     failoverTestHealth(),
+	})
+	if err != nil {
+		t.Fatalf("marshal stored config: %v", err)
+	}
+	if err := os.WriteFile(svc.configPath, stored, 0o600); err != nil {
+		t.Fatalf("write stored config: %v", err)
+	}
 
 	backup, err := json.Marshal(map[string]map[string]string{
 		"wan": {".type": "interface", "proto": "dhcp", "family": "ipv4"},
@@ -782,15 +836,19 @@ func TestVerifyApplyRejectsStaleGeneratedSectionValues(t *testing.T) {
 	})
 }
 
+// A pre-namespacing section is NOT cleaned up, even when its content is
+// exactly what this save writes: content is indistinguishable from the operator
+// copying the stock mwan3 example, so a section this build cannot prove it wrote
+// is preserved. Losing the cleanup is deliberate (ADR 0005 §1).
 func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	// Pre-existing mwan3 state: two generated candidates written by an older
-	// build (sections named after the network interface), a hand-written
-	// interface section and a hand-written policy.
-	seedLegacyGeneratedInterface(t, mockUCI, "wan")
-	seedLegacyGeneratedInterface(t, mockUCI, "usb0")
+	// Pre-existing mwan3 state: a section from a pre-namespacing build for a
+	// candidate this save still configures, a hand-written interface section and
+	// a hand-written policy.
+	seedLegacyGeneratedSection(t, mockUCI, wanCandidate(), failoverTestHealth())
+	seedHandWrittenStockExample(t, mockUCI, "usb0")
 	_ = mockUCI.AddSection("mwan3", "hotel", "interface")
 	_ = mockUCI.Set("mwan3", "hotel", "ifname", "eth3")
 	_ = mockUCI.Set("mwan3", "hotel", "metric", "10")
@@ -807,11 +865,11 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSections: %v", err)
 	}
-	if _, ok := sections["usb0"]; ok {
-		t.Error("mwan3 interface section of a dropped candidate must be removed")
-	}
-	if _, ok := sections["wan"]; ok {
-		t.Error("a legacy generated interface section must be cleaned up by the next save")
+	for _, name := range []string{"usb0", "hotel", "wan", "my_custom_policy"} {
+		if _, ok := sections[name]; !ok {
+			t.Errorf("mwan3 section %q must not be deleted by a save, got %v",
+				name, slices.Sorted(maps.Keys(sections)))
+		}
 	}
 	if _, ok := sections[failoverIfWan]; !ok {
 		t.Errorf("expected the namespaced section %s, got %v",
@@ -820,9 +878,6 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	member, _ := mockUCI.Get("mwan3", "travo_wan_p1", "interface")
 	if member != failoverIfWan {
 		t.Errorf("member must reference the mwan3 interface section, got %q", member)
-	}
-	if _, ok := sections["my_custom_policy"]; !ok {
-		t.Error("unmanaged mwan3 sections must not be touched")
 	}
 
 	backupData, err := os.ReadFile(svc.backupPath)
@@ -833,8 +888,10 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	if err := json.Unmarshal(backupData, &backup); err != nil {
 		t.Fatalf("unmarshal backup: %v", err)
 	}
-	if _, ok := backup["usb0"]; !ok {
-		t.Error("dropped candidate must be restorable from the backup")
+	for _, name := range []string{"wan", "usb0", "hotel", "my_custom_policy"} {
+		if _, ok := backup[name]; ok {
+			t.Errorf("section %q is not this service's, so the backup must not claim it", name)
+		}
 	}
 }
 
@@ -870,44 +927,391 @@ func TestSetConfigKeepsForeignInterfaceSections(t *testing.T) {
 	}
 }
 
-func TestIsManagedSectionRecognisesOnlyTravoSections(t *testing.T) {
+// Ownership is proven by provenance only: the fingerprint THIS build wrote, on
+// a namespaced section. Content proves nothing — a non-namespaced section whose
+// options are exactly what a save writes is still the operator's copy of the
+// stock mwan3 example.
+func TestMayDeleteSectionRecognisesOnlyTravoSections(t *testing.T) {
 	t.Parallel()
 
-	generated := map[string]string{".type": "interface"}
-	for _, option := range generatedInterfaceOptions {
-		generated[option] = "1"
+	owned := map[string]string{"enabled": "0"}
+	owned[failoverOwnerOption] = sectionFingerprint(owned)
+	edited := map[string]string{"enabled": "0", "check_quality": "1"}
+	edited[failoverOwnerOption] = owned[failoverOwnerOption]
+
+	// Byte-identical to what this service writes for a default-health enabled
+	// wan candidate, and carrying no fingerprint: not provable, so not ours.
+	candidate := models.FailoverCandidate{
+		InterfaceName: "wan", Kind: models.FailoverCandidateKindEthernet,
+		Available: true, Enabled: true, Priority: 1,
 	}
-	// A hand-written section copied from the stock mwan3 example: it carries
-	// most, but not all, of the options this service writes.
-	handWrittenExample := map[string]string{
-		".type": "interface", "enabled": "1", "family": "ipv4", "count": "1",
-		"timeout": "2", "interval": "5", "failure_interval": "5",
-		"recovery_interval": "5", "down": "3", "up": "3", "track_ip": "1.1.1.1",
+	indistinguishable := map[string]string{".type": "interface"}
+	for option, value := range interfaceSectionOptions(candidate, failoverTestHealth()) {
+		indistinguishable[option] = value
 	}
-	legacyNames := legacyGeneratedNames([]models.FailoverCandidate{{InterfaceName: "wwan"}})
+	indistinguishable["track_ip"] = "1.1.1.1 8.8.8.8"
+
 	cases := []struct {
 		name string
 		opts map[string]string
 		want bool
 	}{
-		{"travo_if_wan", map[string]string{".type": "interface"}, true},
-		{"travo_failover", map[string]string{".type": "policy"}, true},
+		{"travo_if_wan", owned, true},
+		{"travo_if_wan", edited, false}, // operator edited it after Travo wrote it
+		{"travo_if_wan", map[string]string{".type": "interface"}, false},
 		{"hotel", map[string]string{".type": "interface", "ifname": "eth3"}, false},
 		{"my_custom_policy", map[string]string{".type": "policy"}, false},
-		{"wan", generated, true},  // legacy generated section, cleaned up once
-		{"wwan", generated, true}, // legacy section named after a candidate
-		// A candidate-named section this service never wrote must survive even
-		// though it looks like an mwan3 interface section.
-		{"wan", handWrittenExample, false},
-		{"wwan", handWrittenExample, false},
-		// The option signature alone is not enough any more either: the name has
-		// to be one a generated section could have had.
-		{"eth9", generated, false},
+		// No fingerprint, no provenance: never ours, however exact the content.
+		{"wan", indistinguishable, false},
+		{"usb0", indistinguishable, false},
 	}
 	for _, tc := range cases {
-		if got := isManagedSection(tc.name, tc.opts, legacyNames); got != tc.want {
-			t.Errorf("isManagedSection(%q) = %v, want %v", tc.name, got, tc.want)
+		if got := mayDeleteSection(tc.name, tc.opts); got != tc.want {
+			t.Errorf("mayDeleteSection(%q, %v) = %v, want %v", tc.name, tc.opts, got, tc.want)
 		}
+	}
+}
+
+// The backup predicate is deliberately WIDER than the deletion predicate: a save
+// writes over every namespaced section it regenerates, so every one of them must
+// be restorable — including an operator-edited one that must not be deleted.
+func TestNeedsBackupSectionCoversEveryNamespacedSection(t *testing.T) {
+	t.Parallel()
+
+	owned := map[string]string{"enabled": "0"}
+	owned[failoverOwnerOption] = sectionFingerprint(owned)
+	edited := map[string]string{"enabled": "0", "check_quality": "1"}
+	edited[failoverOwnerOption] = owned[failoverOwnerOption]
+
+	cases := []struct {
+		name       string
+		opts       map[string]string
+		wantDelete bool
+		wantBackup bool
+	}{
+		{"travo_if_wan", owned, true, true},
+		{"travo_if_wan", edited, false, true}, // adopted, but still overwritten
+		{"travo_failover", edited, false, true},
+		{"travo_default_v4", edited, false, true},
+		{"hotel", map[string]string{".type": "interface"}, false, false},
+		{"wan", map[string]string{".type": "interface"}, false, false},
+	}
+	for _, tc := range cases {
+		if got := mayDeleteSection(tc.name, tc.opts); got != tc.wantDelete {
+			t.Errorf("mayDeleteSection(%q) = %v, want %v", tc.name, got, tc.wantDelete)
+		}
+		if got := needsBackupSection(tc.name, tc.opts); got != tc.wantBackup {
+			t.Errorf("needsBackupSection(%q) = %v, want %v", tc.name, got, tc.wantBackup)
+		}
+	}
+}
+
+// A hand-written stock-example section named `wan` must survive a save. Name
+// plus option signature is not ownership: the stock mwan3 example sets exactly
+// the options this service writes, so a user who pasted it in lost that uplink
+// from mwan3 tracking on the next save, with no error and nothing to restore it
+// from.
+func TestSetConfigKeepsHandWrittenStockWanSection(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	seedHandWrittenStockExample(t, mockUCI, "wan")
+
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	if err := svc.SetConfig(failoverTestConfig(wanCandidate())); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	opts, ok := sections["wan"]
+	if !ok {
+		t.Fatalf("a hand-written 'config interface wan' was deleted by a save, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	if opts["track_ip"] != "9.9.9.9" {
+		t.Errorf("hand-written section was modified: %v", opts)
+	}
+	if _, ok := sections[failoverIfWan]; !ok {
+		t.Errorf("the generated section must still be written next to it, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+}
+
+// The stock mwan3 example, copied into `config interface 'wan'` and tracking
+// the same IPs this service tracks, is byte-identical to what this save writes
+// for the `wan` candidate. Content cannot tell the operator's copy from Travo's
+// own section, so a section with no ownership fingerprint must survive the save.
+// The backup that would have restored it is only read when a save FAILS, so
+// deleting it on the success path loses that uplink from mwan3 tracking for good.
+func TestSetConfigKeepsAnIdenticalNonNamespacedSection(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	if err := mockUCI.AddSection("mwan3", "wan", "interface"); err != nil {
+		t.Fatalf("AddSection: %v", err)
+	}
+	// The stock /etc/config/mwan3 example with the interval this save uses and
+	// the same track_ip list — i.e. indistinguishable from Travo's own output by
+	// content, and carrying no travo_owner fingerprint.
+	stock := map[string]string{
+		"enabled": "1", "family": "ipv4", "reliability": "1", "count": "1",
+		"timeout": "2", "interval": "10", "failure_interval": "5",
+		"recovery_interval": "5", "down": "3", "up": "3",
+	}
+	for option, value := range stock {
+		if err := mockUCI.Set("mwan3", "wan", option, value); err != nil {
+			t.Fatalf("Set(%s): %v", option, err)
+		}
+	}
+	for _, ip := range failoverTestHealth().TrackIPs {
+		if err := mockUCI.AddList("mwan3", "wan", "track_ip", ip); err != nil {
+			t.Fatalf("AddList(track_ip): %v", err)
+		}
+	}
+
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	if err := svc.SetConfig(failoverTestConfig(wanCandidate())); err != nil {
+		t.Fatalf("SetConfig: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	if _, ok := sections[failoverIfWan]; !ok {
+		t.Fatalf("expected the generated section %s, got %v",
+			failoverIfWan, slices.Sorted(maps.Keys(sections)))
+	}
+	opts, ok := sections["wan"]
+	if !ok {
+		t.Fatalf("the operator's hand-written 'config interface wan' was deleted by a save, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	for option, value := range stock {
+		if opts[option] != value {
+			t.Errorf("hand-written section option %s = %q, want %q", option, opts[option], value)
+		}
+	}
+	if got, want := normaliseOptionValue(opts["track_ip"]),
+		normaliseOptionValue(sections[failoverIfWan]["track_ip"]); got != want {
+		t.Errorf("hand-written section track_ip = %q, want %q", got, want)
+	}
+}
+
+// A travo_-namespaced section the operator hand-edited afterwards is left in
+// place rather than deleted: ownership is recorded, and an edit that no longer
+// matches the fingerprint is how the record says "this is mine now".
+func TestSetConfigKeepsAnOperatorEditedTravoSection(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+		Available: true, Enabled: true, Priority: 2}
+	if err := svc.SetConfig(failoverTestConfig(wanCandidate(), wwan)); err != nil {
+		t.Fatalf("first SetConfig: %v", err)
+	}
+	if err := mockUCI.Set("mwan3", failoverInterfaceSection("wwan"),
+		"check_quality", "1"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	// The second save drops the candidate, so its section would be retired.
+	if err := svc.SetConfig(failoverTestConfig(wanCandidate())); err != nil {
+		t.Fatalf("second SetConfig: %v", err)
+	}
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	if _, ok := sections[failoverInterfaceSection("wwan")]; !ok {
+		t.Error("an operator-edited Travo section must be adopted and preserved, not deleted")
+	}
+}
+
+// An operator edit inside a travo_ section must not make every later save fail.
+// Real `uci set mwan3.travo_if_wwan=interface` reuses an existing section; a
+// save regenerates the section it owns rather than failing with "already exists".
+func TestSetConfigReusesAnOperatorEditedTravoSection(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+		Available: true, Enabled: true, Priority: 2}
+	cfg := failoverTestConfig(wanCandidate(), wwan)
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("first SetConfig: %v", err)
+	}
+	section := failoverInterfaceSection("wwan")
+	if err := mockUCI.Set("mwan3", section, "check_quality", "1"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	// A second save of the SAME config: the candidate is still there, so the
+	// service rewrites the section it owns.
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("second SetConfig after an operator edit: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	opts, ok := sections[section]
+	if !ok {
+		t.Fatalf("an operator-edited Travo section must be adopted, not removed, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	if opts["check_quality"] != "1" {
+		t.Errorf("the operator's edit must survive the save: %v", opts)
+	}
+	if opts["family"] != "ipv4" {
+		t.Errorf("the section must still be regenerated for this save: %v", opts)
+	}
+}
+
+// failOnceApplier fails the first rpcd apply and succeeds afterwards, so a
+// save's apply fails while its own rollback restore can still complete.
+type failOnceApplier struct {
+	mu     sync.Mutex
+	failed bool
+}
+
+func (a *failOnceApplier) StartApply([]string) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.failed {
+		a.failed = true
+		return "", fmt.Errorf("rpcd apply rejected")
+	}
+	return "sess-restore", nil
+}
+
+func (a *failOnceApplier) Confirm(string) error { return nil }
+
+func (a *failOnceApplier) ApplyAndConfirm(configs []string) error {
+	sid, err := a.StartApply(configs)
+	if err != nil {
+		return err
+	}
+	return a.Confirm(sid)
+}
+
+// "Do not delete" and "can be restored later" are different questions, and only
+// the first one is answered by the ownership fingerprint. A save OVERWRITES an
+// operator-edited travo_ section (AddSection reuses it, then every option this
+// service writes is Set again), so the pre-save state must be in the backup even
+// though the save may not delete the section. Sharing one predicate left the
+// operator's tuning written over and never restorable: the backup is only read
+// on the failure path, so a failed apply left the device running Travo's values
+// while the operator had no way back to theirs.
+func TestSetConfigRestoresAnOperatorEditedTravoSectionAfterAFailedApply(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+		Available: true, Enabled: true, Priority: 2}
+	cfg := failoverTestConfig(wanCandidate(), wwan)
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("seed SetConfig: %v", err)
+	}
+
+	section := failoverInterfaceSection("wwan")
+	// The operator hand-tunes the health options Travo also writes. The
+	// fingerprint no longer matches, so the section is no longer deletable.
+	tuned := map[string]string{"reliability": "7", "timeout": "11", "down": "9", "up": "9"}
+	for option, value := range tuned {
+		if err := mockUCI.Set("mwan3", section, option, value); err != nil {
+			t.Fatalf("operator edit %s: %v", option, err)
+		}
+	}
+
+	// The next save fails while applying.
+	svc.applier = &failOnceApplier{}
+	if err := svc.SetConfig(cfg); err == nil {
+		t.Fatal("expected the failed apply to be reported")
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	opts, ok := sections[section]
+	if !ok {
+		t.Fatalf("the operator's section was deleted by a failed save, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	for option, want := range tuned {
+		if opts[option] != want {
+			t.Errorf("failed save did not restore the operator's %s: got %q, want %q",
+				option, opts[option], want)
+		}
+	}
+}
+
+// The success path for the same section. The provenance rule exists so that an
+// operator's edits are ADOPTED, not thrown away — but the write path overwrites
+// every option this service owns and re-stamps the fingerprint, so the edits to
+// those options are lost while the section (and its extra options) survive. This
+// pins that outcome deliberately: Travo's saved health config is authoritative
+// for the ten options it writes, and the overwrite is reported instead of being
+// silent.
+func TestSetConfigAdoptsAnOperatorEditedTravoSectionOnSuccess(t *testing.T) {
+	t.Parallel()
+
+	mockUCI := uci.NewMockUCI()
+	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	// Only Publish is exercised; the periodic checker is never started.
+	alerts := NewAlertService(nil)
+	svc.SetAlertService(alerts)
+	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+		Available: true, Enabled: true, Priority: 2}
+	cfg := failoverTestConfig(wanCandidate(), wwan)
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("seed SetConfig: %v", err)
+	}
+
+	section := failoverInterfaceSection("wwan")
+	if err := mockUCI.Set("mwan3", section, "reliability", "7"); err != nil {
+		t.Fatalf("operator edit: %v", err)
+	}
+	if err := mockUCI.Set("mwan3", section, "check_quality", "1"); err != nil {
+		t.Fatalf("operator extra option: %v", err)
+	}
+
+	if err := svc.SetConfig(cfg); err != nil {
+		t.Fatalf("second SetConfig after an operator edit: %v", err)
+	}
+
+	sections, err := mockUCI.GetSections("mwan3")
+	if err != nil {
+		t.Fatalf("GetSections: %v", err)
+	}
+	opts, ok := sections[section]
+	if !ok {
+		t.Fatalf("the operator's section must be adopted, not deleted, got %v",
+			slices.Sorted(maps.Keys(sections)))
+	}
+	if opts["check_quality"] != "1" {
+		t.Errorf("an option this service does not write must survive the save: %v", opts)
+	}
+	if opts["reliability"] != fmt.Sprintf("%d", cfg.Health.Reliability) {
+		t.Errorf("the saved health config must win for an option this service owns: %v", opts)
+	}
+
+	var warned bool
+	for _, alert := range alerts.GetAlerts() {
+		if alert.Type == operatorEditsOverwrittenAlert && strings.Contains(alert.Message, section) {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Errorf("overwriting the operator's tuning must be reported, alerts: %v", alerts.GetAlerts())
 	}
 }
 
@@ -940,9 +1344,13 @@ func TestSetConfigKeepsHandWrittenInterfaceSections(t *testing.T) {
 	if err := mockUCI.Set("mwan3", "wwan", "track_ip", "1.1.1.1"); err != nil {
 		t.Fatalf("Set track_ip: %v", err)
 	}
-	// office carries the FULL option signature but is not a name this service
-	// ever generated, so no build of it could have written that section.
-	seedLegacyGeneratedInterface(t, mockUCI, "office")
+	// office carries the full set of OPTION NAMES this service writes but is
+	// not a candidate of this save, so no build of this service could have
+	// written that section.
+	seedLegacyGeneratedSection(t, mockUCI, models.FailoverCandidate{
+		InterfaceName: "office", Kind: models.FailoverCandidateKindEthernet,
+		Available: true, Enabled: true, Priority: 3,
+	}, failoverTestHealth())
 
 	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
 	cfg := failoverTestConfig(
@@ -976,21 +1384,21 @@ func TestSetConfigKeepsHandWrittenInterfaceSections(t *testing.T) {
 	}
 }
 
-// The counterpart: a section carrying this service's full option signature under
-// a candidate's name was written by a pre-namespacing build, and the upgrade
-// path still has to clean it up.
-func TestSetConfigCleansLegacyGeneratedInterfaceOfACandidate(t *testing.T) {
+// A section carrying this service's full option signature under a candidate's
+// name is preserved, not cleaned up. It is byte-identical to what the operator
+// gets by pasting the stock mwan3 example, so nothing but the fingerprint — which
+// a pre-namespacing build never wrote — can tell them apart, and no fingerprint
+// means no deletion.
+func TestSetConfigKeepsALegacyGeneratedSectionOfACandidate(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	seedLegacyGeneratedInterface(t, mockUCI, "wwan")
+	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
+		Available: true, Enabled: true, Priority: 2}
+	seedLegacyGeneratedSection(t, mockUCI, wwan, failoverTestHealth())
 
 	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
-	cfg := failoverTestConfig(
-		wanCandidate(),
-		models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
-			Available: true, Enabled: true, Priority: 2},
-	)
+	cfg := failoverTestConfig(wanCandidate(), wwan)
 	if err := svc.SetConfig(cfg); err != nil {
 		t.Fatalf("SetConfig: %v", err)
 	}
@@ -999,8 +1407,9 @@ func TestSetConfigCleansLegacyGeneratedInterfaceOfACandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSections: %v", err)
 	}
-	if _, ok := sections["wwan"]; ok {
-		t.Error("a legacy generated interface section named after a candidate must be cleaned up")
+	if _, ok := sections["wwan"]; !ok {
+		t.Errorf("a section without an ownership fingerprint must be preserved, got %v",
+			slices.Sorted(maps.Keys(sections)))
 	}
 	if _, ok := sections[failoverInterfaceSection("wwan")]; !ok {
 		t.Errorf("expected the namespaced replacement, got %v", slices.Sorted(maps.Keys(sections)))
@@ -1084,15 +1493,53 @@ const failoverIfWan = failoverInterfaceSectionPrefix + "wan"
 // seedLegacyGeneratedInterface writes an mwan3 interface section the way a
 // pre-namespacing build did: named after the network interface, carrying every
 // option FailoverService writes.
-func seedLegacyGeneratedInterface(t *testing.T, u uci.UCI, name string) {
+// seedLegacyGeneratedSection writes an mwan3 interface section exactly as a
+// pre-namespacing build of this service would have written it: named after the
+// network interface, carrying the option values this save writes. It is the
+// only shape a legacy section may have for the upgrade cleanup to treat it as
+// generated — see seedHandWrittenStockExample for the case that must survive.
+func seedLegacyGeneratedSection(t *testing.T, u uci.UCI,
+	candidate models.FailoverCandidate, health models.FailoverHealthConfig,
+) {
+	t.Helper()
+	if err := u.AddSection("mwan3", candidate.InterfaceName, "interface"); err != nil {
+		t.Fatalf("AddSection(%s): %v", candidate.InterfaceName, err)
+	}
+	for option, value := range interfaceSectionOptions(candidate, health) {
+		if option == "track_ip" {
+			continue
+		}
+		if err := u.Set("mwan3", candidate.InterfaceName, option, value); err != nil {
+			t.Fatalf("Set(%s.%s): %v", candidate.InterfaceName, option, err)
+		}
+	}
+	for _, ip := range health.TrackIPs {
+		if err := u.AddList("mwan3", candidate.InterfaceName, "track_ip", ip); err != nil {
+			t.Fatalf("AddList(%s.track_ip): %v", candidate.InterfaceName, err)
+		}
+	}
+}
+
+// seedHandWrittenStockExample writes an mwan3 interface section the way a user
+// who pasted the stock mwan3 example would: the same option names this service
+// uses, the example's own values.
+func seedHandWrittenStockExample(t *testing.T, u uci.UCI, name string) {
 	t.Helper()
 	if err := u.AddSection("mwan3", name, "interface"); err != nil {
 		t.Fatalf("AddSection(%s): %v", name, err)
 	}
-	for _, option := range generatedInterfaceOptions {
-		if err := u.Set("mwan3", name, option, "1"); err != nil {
+	example := map[string]string{
+		"enabled": "1", "family": "ipv4", "reliability": "1", "count": "1",
+		"timeout": "2", "interval": "10", "failure_interval": "5",
+		"recovery_interval": "5", "down": "3", "up": "3",
+	}
+	for option, value := range example {
+		if err := u.Set("mwan3", name, option, value); err != nil {
 			t.Fatalf("Set(%s.%s): %v", name, option, err)
 		}
+	}
+	if err := u.AddList("mwan3", name, "track_ip", "9.9.9.9"); err != nil {
+		t.Fatalf("AddList(%s.track_ip): %v", name, err)
 	}
 }
 
