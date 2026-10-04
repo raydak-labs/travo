@@ -25,7 +25,10 @@ func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
 		// How long one confirm call can block on the device while it waits for the
 		// new interfaces to come up. A client that re-POSTs confirm until the
 		// rollback deadline has to leave this much room, or a probe it starts near
-		// the deadline is answered after rpcd has already rolled back.
+		// the deadline is answered after rpcd has already rolled back. The value
+		// is the worst-case blocking time (retries AND the ubus round-trips of
+		// the per-interface fallback), not the sum of the retry sleeps; see
+		// wirelessProbeBudgetSeconds and ADR 0002 §5.1.
 		//
 		// Emitted unconditionally: a key that appears only when non-zero is a
 		// worse contract than one that is always present, because a generated
@@ -43,8 +46,11 @@ func wifiMutationResponse(apply *services.WirelessApplyResult) fiber.Map {
 // hardware, which is a conflict with the device's current state, not a server
 // failure. Answering 500 would tell the operator (and the frontend's retry
 // policy) that Travo itself broke.
+// ErrGuestSubnetOverlap is a 409 for the same reason: the guest subnet collides
+// with network.lan, so the request conflicts with the current configuration.
 func respondWifiMutationError(c fiber.Ctx, err error) error {
-	if errors.Is(err, services.ErrAPAndSTASameRadio) {
+	if errors.Is(err, services.ErrAPAndSTASameRadio) ||
+		errors.Is(err, services.ErrGuestSubnetOverlap) {
 		return RespondWithError(c, fiber.StatusConflict, err.Error())
 	}
 	return RespondWithServerError(c, err)
@@ -443,6 +449,14 @@ func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
 // ProbeBudgetSeconds (see wifiMutationResponse). A client that re-POSTs confirm
 // until the rollback deadline has to leave that much room, or a probe it starts
 // near the deadline is only answered after rpcd has already rolled back.
+//
+// A failed proof returns before applier.Confirm, so rpcd's rollback window is
+// still open. Both failure modes are 5xx with a message that says which one it
+// is: "wireless apply not verified:" means the access points did not come up and
+// the change is being reverted, "wireless apply could not be verified:" means
+// this build could not read netifd's answer and nothing is known about the
+// change yet. The client keys on those two prefixes; renaming one without the
+// other turns a diagnostic into a false "the router rolled back" on screen.
 func ConfirmWifiApplyHandler(svc *services.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {

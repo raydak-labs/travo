@@ -2,10 +2,12 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -18,8 +20,11 @@ const (
 	defaultUpSwitchDelaySec        = 60
 	defaultMinViableSignalDBm      = -80
 	bandSwitchCooldownSec          = 120
-	bandSwitchGuardFile            = crashGuardDir + "/band-switch-in-progress"
 )
+
+// bandSwitchGuardFile is a var, not a const, so tests can point the crash guard
+// at a temp directory instead of the real /etc/trafo.
+var bandSwitchGuardFile = crashGuardDir + "/band-switch-in-progress"
 
 // BandSwitchConfig holds user-configurable parameters for automatic band switching.
 type BandSwitchConfig struct {
@@ -35,7 +40,12 @@ type BandSwitchConfig struct {
 
 // BandSwitchStatus holds the real-time monitoring state of the band switcher.
 type BandSwitchStatus struct {
-	// State: "inactive", "monitoring", "weak_signal", "cooldown"
+	// State: "inactive", "monitoring", "weak_signal", "cooldown", "blocked"
+	//
+	// "blocked" is reported when a switch the switcher wanted to make was
+	// refused because it would have put the uplink and an access point on one
+	// PHY. Without it the UI reads "monitoring" and the operator has no way to
+	// tell a feature that never fires from one that is working.
 	State            string `json:"state"`
 	CurrentBand      string `json:"current_band"`
 	SignalDBM        int    `json:"signal_dbm"`
@@ -52,8 +62,16 @@ type BandSwitchingService struct {
 	mu         sync.RWMutex
 	config     BandSwitchConfig
 	status     BandSwitchStatus
-	stopCh     chan struct{}
-	stopOnce   sync.Once
+	// blockedReason is why the last wanted switch could not be made, or "" when
+	// the switcher is free to switch. blockedRadio is the radio that switch
+	// wanted, which is what makes the block re-checkable. Read through liveState
+	// so the state the UI sees survives the next tick instead of being
+	// overwritten by "monitoring", and cleared by refreshBlocked once the layout
+	// allows that switch again.
+	blockedReason string
+	blockedRadio  string
+	stopCh        chan struct{}
+	stopOnce      sync.Once
 }
 
 // NewBandSwitchingService creates a new BandSwitchingService.
@@ -193,6 +211,8 @@ func (b *BandSwitchingService) Start() {
 				if !cfg.Enabled {
 					b.mu.Lock()
 					b.status = BandSwitchStatus{State: "inactive"}
+					b.blockedReason = ""
+					b.blockedRadio = ""
 					b.mu.Unlock()
 					weakSignalSecs = 0
 					upSignalSecs = 0
@@ -201,6 +221,11 @@ func (b *BandSwitchingService) Start() {
 					ticker.Reset(b.checkInterval())
 					continue
 				}
+
+				// A block belongs to the radio layout that caused it, so it is
+				// re-checked here rather than kept for good: the layout can
+				// change under the switcher at any time.
+				b.refreshBlocked()
 
 				// Safety: do not switch if crash guard is present.
 				if _, err := os.Stat(bandSwitchGuardFile); err == nil {
@@ -297,10 +322,7 @@ func (b *BandSwitchingService) Start() {
 					}
 				}
 
-				state := "monitoring"
-				if weakSignalSecs > 0 {
-					state = "weak_signal"
-				}
+				state := b.liveState(weakSignalSecs)
 				b.mu.Lock()
 				b.status = BandSwitchStatus{
 					State:            state,
@@ -326,6 +348,104 @@ func (b *BandSwitchingService) Stop() {
 	b.stopOnce.Do(func() { close(b.stopCh) })
 }
 
+// liveState names the state the switcher reports on an ordinary tick.
+//
+// A blocked switcher keeps reporting "blocked" while the layout still blocks
+// it: the block is a property of the radio layout, not of this tick, so the
+// next one has to say the same thing or the UI flips back to "monitoring" and
+// hides that the feature cannot fire. refreshBlocked is what ends the streak
+// once the layout leaves room for the switch.
+func (b *BandSwitchingService) liveState(weakSignalSecs int) string {
+	b.mu.RLock()
+	blocked := b.blockedReason
+	b.mu.RUnlock()
+	if blocked != "" {
+		return "blocked"
+	}
+	if weakSignalSecs > 0 {
+		return "weak_signal"
+	}
+	return "monitoring"
+}
+
+// setBlocked records or clears why the last wanted switch could not be made,
+// and on which radio. The status follows immediately so the very next API read
+// — the operator refreshing the card, not the following tick — already shows
+// it.
+func (b *BandSwitchingService) setBlocked(reason, radio string) {
+	b.mu.Lock()
+	b.blockedReason = reason
+	b.blockedRadio = radio
+	if reason != "" {
+		b.status.State = "blocked"
+	}
+	b.mu.Unlock()
+}
+
+// refreshBlocked drops a recorded block the current radio layout no longer
+// justifies.
+//
+// Latching it for good was wrong once SwitchSTAToRadio stopped refusing every
+// layout that carries an access point: the switcher would go on reporting
+// "blocked" for a layout it can switch from, which is the card claiming a fault
+// the switcher has not observed. Re-reading the layout each tick costs a UCI
+// read and only when a block is actually on record.
+func (b *BandSwitchingService) refreshBlocked() {
+	b.mu.RLock()
+	reason, radio := b.blockedReason, b.blockedRadio
+	b.mu.RUnlock()
+	if reason == "" || radio == "" {
+		return
+	}
+	blocked, err := b.switchBlocked(radio)
+	if err != nil {
+		// The layout could not be read. Keep what is known rather than
+		// dropping a block that may still hold.
+		return
+	}
+	if blocked {
+		return
+	}
+	b.mu.Lock()
+	b.blockedReason = ""
+	b.blockedRadio = ""
+	if b.status.State == "blocked" {
+		// The next tick writes the ordinary state; until then the UI must not
+		// keep reading a block that no longer exists.
+		b.status.State = "monitoring"
+	}
+	b.mu.Unlock()
+	log.Printf("band-switching: %s can host the uplink again; no longer blocked", radio)
+}
+
+// switchBlocked reports whether the uplink still cannot move to targetRadio:
+// the radio runs an access point, no other radio does, and repeater options do
+// not allow the uplink alongside an access point. That is the layout
+// WifiService refuses with ErrAPAndSTASameRadio, read here without writing
+// anything. A single-radio device never reaches this — it can make no split to
+// refuse — so only layouts with an alternate radio are described here.
+func (b *BandSwitchingService) switchBlocked(targetRadio string) (bool, error) {
+	aps, err := b.wifi.GetAPConfigs()
+	if err != nil {
+		return false, err
+	}
+	apOnTarget, apOnOtherRadio := false, false
+	for _, ap := range aps {
+		if !ap.Enabled || ap.Radio == "" {
+			continue
+		}
+		if ap.Radio == targetRadio {
+			apOnTarget = true
+		} else {
+			apOnOtherRadio = true
+		}
+	}
+	if !apOnTarget {
+		return false, nil
+	}
+	return !apOnOtherRadio && !b.wifi.repeaterAllowAPOnSTARadio(true), nil
+}
+
 func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 	// Write crash guard before touching wireless config.
 	if err := os.MkdirAll(filepath.Dir(bandSwitchGuardFile), 0750); err != nil {
@@ -340,19 +460,41 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 	// Remove guard on success; on failure the guard remains to prevent retry loop.
 	if err == nil {
 		_ = os.Remove(bandSwitchGuardFile)
+		b.setBlocked("", "")
 		log.Printf("band-switching: %s", reason)
 		b.mu.Lock()
 		b.status.LastSwitchAt = time.Now().UTC().Format(time.RFC3339)
 		b.status.LastSwitchReason = reason
 		b.mu.Unlock()
-	} else {
-		log.Printf("band-switching: switch failed: %v — guard file left in place", err)
+		return nil
 	}
+	if errors.Is(err, ErrAPAndSTASameRadio) {
+		// Refused before any write: nothing was applied and nothing is at
+		// risk, so the crash guard must not outlive it. Leaving it would
+		// disable automatic band switching for good over a request that was
+		// never attempted, until somebody removed the file by hand.
+		//
+		// The refusal is also reported instead of swallowed. SwitchSTAToRadio
+		// reconciles the access point off the target radio rather than
+		// refusing (that is what keeps the feature working on a layout with an
+		// AP on both radios), so what arrives here is a layout where no split
+		// is possible at all. Saying so is the difference between a feature the
+		// operator can see is stuck and one that silently never fires.
+		_ = os.Remove(bandSwitchGuardFile)
+		b.setBlocked(err.Error(), targetRadio)
+		log.Printf("band-switching: switch to %s blocked: %v — "+
+			"automatic band switching cannot make room on that radio", targetRadio, err)
+		b.mu.Lock()
+		b.status.LastSwitchReason = err.Error()
+		b.mu.Unlock()
+		return err
+	}
+	log.Printf("band-switching: switch failed: %v — guard file left in place", err)
 	return err
 }
 
 func (b *BandSwitchingService) findRadioByBand(radios []BandRadioInfo, band string) string {
-	for _, r := range radios {
+	for _, r := range sortedBandRadios(radios) {
 		if r.Band == band {
 			return r.Name
 		}
@@ -361,12 +503,22 @@ func (b *BandSwitchingService) findRadioByBand(radios []BandRadioInfo, band stri
 }
 
 func (b *BandSwitchingService) findAlternateRadio(radios []BandRadioInfo, current string) string {
-	for _, r := range radios {
+	for _, r := range sortedBandRadios(radios) {
 		if r.Name != current {
 			return r.Name
 		}
 	}
 	return ""
+}
+
+// sortedBandRadios orders the radio list by name. Both picks above decide
+// between candidates by taking the first match, so on a device where two radios
+// report the same band an unordered list made the switcher change its mind
+// every tick — alternating bands and never settling.
+func sortedBandRadios(radios []BandRadioInfo) []BandRadioInfo {
+	out := append([]BandRadioInfo(nil), radios...)
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 func (b *BandSwitchingService) bandForRadio(radios []BandRadioInfo, name string) string {

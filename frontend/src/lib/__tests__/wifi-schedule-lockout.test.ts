@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ConnectionMethod } from '@shared/api/network';
 import {
   describeScheduleLockout,
   formatClock,
@@ -11,6 +12,24 @@ function at(hours: number, minutes: number): Date {
   const d = new Date(2026, 9, 4, hours, minutes, 0, 0);
   return d;
 }
+
+/**
+ * The methods that reach the router over WiFi, taken from the API type rather
+ * than hard-coded: the schedule's toggle helper (the generated
+ * /usr/libexec/travo-wireless-toggle.sh) flips wireless.<device>.disabled for
+ * EVERY wifi-device in /etc/config/wireless, so one tick takes down the uplink
+ * STA radio and every access point alike. Every method that arrives over WiFi is
+ * therefore locked out, and ethernet is the only survivor.
+ *
+ * `Record` over the wifi-* members of ConnectionMethod makes the list
+ * exhaustive on purpose: a new WiFi connection method in the API type breaks
+ * this file until it is classified, instead of quietly losing its warning.
+ */
+type WifiConnectionMethod = Extract<ConnectionMethod['method'], `wifi-${string}`>;
+const WIFI_REACHABLE_METHODS: Record<WifiConnectionMethod, true> = {
+  'wifi-client': true,
+  'wifi-ap': true,
+};
 
 describe('wifi-schedule-lockout', () => {
   it('parses and rejects invalid clock times', () => {
@@ -64,19 +83,33 @@ describe('wifi-schedule-lockout', () => {
     ).toBe(true);
   });
 
-  it('does not warn over ethernet or on an AP link', () => {
+  it('warns every operator who reaches the router over WiFi', () => {
     const next = { enabled: true, onTime: '08:00', offTime: '22:00' };
-    expect(
-      shouldWarnScheduleLockout({ next, current: null, connectionMethod: 'wired', now: at(21, 0) }),
-    ).toBe(false);
-    expect(
-      shouldWarnScheduleLockout({
+    for (const method of Object.keys(WIFI_REACHABLE_METHODS)) {
+      const warned = shouldWarnScheduleLockout({
         next,
         current: null,
-        connectionMethod: undefined,
+        connectionMethod: method,
         now: at(21, 0),
-      }),
-    ).toBe(false);
+      });
+      expect(
+        warned,
+        `connection method ${method} must be warned: the toggle helper disables every radio`,
+      ).toBe(true);
+    }
+  });
+
+  it('does not warn over a wired connection or when the method is unknown', () => {
+    const next = { enabled: true, onTime: '08:00', offTime: '22:00' };
+    for (const method of ['ethernet', 'unknown', undefined]) {
+      const warned = shouldWarnScheduleLockout({
+        next,
+        current: null,
+        connectionMethod: method,
+        now: at(21, 0),
+      });
+      expect(warned).toBe(false);
+    }
   });
 
   it('does not warn when the saved schedule is unchanged', () => {

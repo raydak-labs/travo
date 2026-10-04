@@ -73,15 +73,16 @@ export function WiFiScheduleCard() {
       onTime: data.on_time,
       offTime: data.off_time,
     };
-    const isWifiClient = connectionMethod?.method === 'wifi-client';
     // Enabling a schedule while this session reaches the router over WiFi is a
     // lockout with no way back until the On time, so it needs an explicit
-    // confirm before the router is told anything.
+    // confirm before the router is told anything. The method is passed through
+    // rather than narrowed to the client case: the toggle helper tears down
+    // every radio, so an AP-linked session is affected too and must be warned.
     if (
       shouldWarnScheduleLockout({
         next,
         current: currentSchedule,
-        connectionMethod: isWifiClient ? 'wifi-client' : undefined,
+        connectionMethod: connectionMethod?.method,
       })
     ) {
       setPendingSave(data);

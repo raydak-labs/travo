@@ -79,6 +79,26 @@ describe('WiFiScheduleCard', () => {
     });
   });
 
+  it('warns an AP-connected operator too, because the toggle takes every radio down', async () => {
+    const user = userEvent.setup();
+    const saved: unknown[] = [];
+    server.use(
+      http.put(API_ROUTES.wifi.schedule, async ({ request }) => {
+        saved.push(await request.json());
+        return HttpResponse.json({ status: 'ok' });
+      }),
+    );
+
+    renderCard('wifi-ap');
+
+    await user.click(await screen.findByRole('checkbox', { name: /enable schedule/i }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain("this router's WiFi turns off");
+    expect(saved).toEqual([]);
+  });
+
   it('saves without a warning when the operator cancels', async () => {
     const user = userEvent.setup();
     const saved: unknown[] = [];

@@ -80,11 +80,30 @@ export interface ScheduleLockoutCheck {
   readonly next: ScheduleTimes;
   /** The schedule as it is on the router right now, or null if never loaded. */
   readonly current: ScheduleTimes | null;
-  /** ConnectionMethod.method of the session making the change. */
+  /**
+   * ConnectionMethod.method of the session making the change. */
   readonly connectionMethod: string | undefined;
   /** Only warn for an off time this soon. Defaults to 24 hours. */
   readonly warningWindowHours?: number;
   readonly now?: Date;
+}
+
+/**
+ * Connection methods that reach the router over WiFi.
+ *
+ * The schedule does not toggle one interface: the generated helper
+ * (/usr/libexec/travo-wireless-toggle.sh) sets wireless.<device>.disabled=1 for
+ * EVERY wifi-device in /etc/config/wireless, so a single "off" tick takes down
+ * the uplink STA radio and every access point at once. An operator on an AP link
+ * is therefore locked out exactly like an operator on a client link, and only a
+ * wired session survives the tick. Keying the warning on 'wifi-client' alone hid
+ * that case.
+ */
+const WIFI_REACHED_METHODS: readonly string[] = ['wifi-client', 'wifi-ap'];
+
+/** Whether the schedule's radio-wide toggle also takes down the session's own link. */
+export function isWifiReachedByToggle(connectionMethod: string | undefined): boolean {
+  return WIFI_REACHED_METHODS.includes(connectionMethod ?? '');
 }
 
 /**
@@ -99,7 +118,7 @@ export function shouldWarnScheduleLockout({
   warningWindowHours = 24,
   now = new Date(),
 }: ScheduleLockoutCheck): boolean {
-  if (connectionMethod !== 'wifi-client') return false;
+  if (!isWifiReachedByToggle(connectionMethod)) return false;
   const lockout = describeScheduleLockout(next, now);
   if (!lockout) return false;
   if (lockout.minutesUntilOff > warningWindowHours * 60) return false;

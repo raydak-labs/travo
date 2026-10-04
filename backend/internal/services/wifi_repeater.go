@@ -117,6 +117,37 @@ func (w *WifiService) applyRepeaterDownlinkAPPolicy(
 	return nil
 }
 
+// repeaterDownlinkLayout scans the AP sections once and reports whether an ENABLED access point
+// lives on a radio other than the STA's (so the downlink can be split off the uplink PHY), and
+// whether any AP section is bound to the STA's radio at all.
+//
+// A disabled section counts for neither: it hosts no downlink yet, so it cannot vouch for one.
+// Counting it is what let SetMode("repeater") keep an AP on the uplink radio just because a
+// disabled section happened to point somewhere else.
+func (w *WifiService) repeaterDownlinkLayout(
+	apSections []string,
+	staRadio string,
+	multiRadio bool,
+) (apOnOtherRadio, apOnSTA bool) {
+	if !multiRadio || staRadio == "" {
+		return false, false
+	}
+	for _, section := range apSections {
+		opts, err := w.uci.GetAll("wireless", section)
+		if err != nil || opts["device"] == "" {
+			continue
+		}
+		if opts["device"] == staRadio {
+			apOnSTA = true
+			continue
+		}
+		if opts["disabled"] != "1" {
+			apOnOtherRadio = true
+		}
+	}
+	return apOnOtherRadio, apOnSTA
+}
+
 // reconcileRepeaterAPRadioLayout re-applies STA/AP radio separation in repeater mode after AP
 // credential or enabled mutations (e.g. unified SSID save) so uplink PHY APs are not left on.
 func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
@@ -142,21 +173,7 @@ func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
 		return err
 	}
 	multiRadio := len(radios) >= 2
-	apOnOtherRadio := func() bool {
-		if !multiRadio || staRadio == "" {
-			return false
-		}
-		for _, section := range apSections {
-			opts, err := w.uci.GetAll("wireless", section)
-			if err != nil {
-				continue
-			}
-			if opts["device"] != "" && opts["device"] != staRadio {
-				return true
-			}
-		}
-		return false
-	}()
+	apOnOtherRadio, _ := w.repeaterDownlinkLayout(apSections, staRadio, multiRadio)
 	allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
 	return w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, true)
 }
@@ -225,22 +242,18 @@ func (w *WifiService) SetMode(mode string) (*WirelessApplyResult, error) {
 			return nil, err
 		}
 		multiRadio := len(radios) >= 2
-		apOnOtherRadio := func() bool {
-			if !multiRadio || staRadio == "" {
-				return false
-			}
-			for _, section := range apSections {
-				opts, err := w.uci.GetAll("wireless", section)
-				if err != nil {
-					continue
-				}
-				if opts["device"] != "" && opts["device"] != staRadio {
-					return true
-				}
-			}
-			return false
-		}()
+		apOnOtherRadio, apOnSTA := w.repeaterDownlinkLayout(apSections, staRadio, multiRadio)
 		allowSTAAP := w.repeaterAllowAPOnSTARadio(multiRadio)
+		// Repeater enables every AP section, so with the split unavailable the request would
+		// commit an AP onto the uplink PHY. Connect refuses the same state
+		// (splitAPOffUplinkRadio); refuse here too rather than fail open. Single-radio hardware
+		// is exempt because allowSTAAP is true there, and allow_ap_on_sta_radio is the
+		// documented escape hatch.
+		if enableAP && enableSTA && !allowSTAAP && apOnSTA && !apOnOtherRadio {
+			return nil, fmt.Errorf("%w: repeater mode would enable the access point on %s, "+
+				"which carries the WiFi uplink, and no access point is enabled on another radio",
+				ErrAPAndSTASameRadio, staRadio)
+		}
 		if err := w.applyRepeaterDownlinkAPPolicy(apSections, staRadio, apOnOtherRadio, allowSTAAP, enableAP); err != nil {
 			return nil, err
 		}

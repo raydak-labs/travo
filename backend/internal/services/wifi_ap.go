@@ -3,7 +3,10 @@ package services
 import (
 	"errors"
 	"fmt"
+	"net"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
@@ -18,6 +21,79 @@ import (
 var ErrAPAndSTASameRadio = errors.New("refusing to run an access point and the WiFi uplink " +
 	"on the same radio: give the uplink STA its own radio and put the downlink access " +
 	"point on the other one, or enable allow_ap_on_sta_radio in repeater options first")
+
+// The guest subnet is fixed, so enabling guest WiFi means claiming
+// 192.168.2.0/24 outright. On a router whose LAN is already on that subnet the
+// claim would create a second interface on one network — DHCP handing out
+// addresses the LAN already routes — so the request is refused instead.
+// ErrGuestSubnetOverlap is returned so the API can map it to a 4xx.
+var ErrGuestSubnetOverlap = errors.New("refusing to create the guest network: its subnet " +
+	"overlaps an existing network interface on this router")
+
+const (
+	guestNetwork = "guest"
+	guestIPAddr  = "192.168.2.1"
+	guestNetmask = "255.255.255.0"
+)
+
+// ifaceSections returns the wifi-iface sections of one mode that are bound to a
+// radio, sorted by section name.
+//
+// The sort is the point: callers that pick a radio out of such a list have to
+// make the same pick on every call. Go randomises map iteration, so an unsorted
+// list silently turned "the first radio with this band" into a coin toss.
+func ifaceSections(sections map[string]map[string]string, mode string) []string {
+	var names []string
+	for name, opts := range sections {
+		if opts["mode"] != mode || opts["device"] == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// activeIfaces narrows ifaceSections to the ones the config leaves enabled.
+func activeIfaces(sections map[string]map[string]string, mode string) []string {
+	var names []string
+	for _, name := range ifaceSections(sections, mode) {
+		if sections[name]["disabled"] != "1" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// uplinkRadio returns the radio carrying the WiFi uplink, or "" when no WiFi
+// client interface is enabled.
+//
+// This is the single definition of "the uplink radio" for this package: ANY
+// enabled mode=sta wifi-iface counts, not only one bound to network=wwan.
+// network=wwan is what makes a STA the routed internet uplink, and a wwan STA
+// wins when several radios qualify — but a hand-written client interface without
+// it still runs on that PHY, so it must occupy the radio for every guard. The
+// looser definition (wwan only) let the same-radio guards see an empty uplink
+// while the health API, which counts every enabled STA, reported the radio as
+// running "both": the API declared safe the state the guard had just refused.
+// ErrAPAndSTASameRadio exists because the PHY constraint is physical, so the
+// strict direction — more radios count as the uplink — is the safe one.
+func (w *WifiService) uplinkRadio() (string, error) {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		return "", err
+	}
+	names := activeIfaces(sections, "sta")
+	for _, name := range names {
+		if sections[name]["network"] == "wwan" {
+			return sections[name]["device"], nil
+		}
+	}
+	if len(names) == 0 {
+		return "", nil
+	}
+	return sections[names[0]]["device"], nil
+}
 
 // preferredGuestRadio picks the radio the guest access point goes on: the
 // 2.4 GHz one when it is free, otherwise the best radio that does NOT carry the
@@ -42,7 +118,7 @@ func (w *WifiService) preferredGuestRadio() (string, error) {
 	if len(radios) == 0 {
 		return "", fmt.Errorf("no radio found for guest wifi")
 	}
-	uplinkRadio, err := w.enabledUwanSTARadio()
+	uplinkRadio, err := w.uplinkRadio()
 	if err != nil {
 		return "", err
 	}
@@ -112,32 +188,30 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 		return nil, fmt.Errorf("reading wireless sections: %w", err)
 	}
 	// Build role map: for each radio name, detect active AP/STA ifaces.
+	// activeIfaces is the same predicate the same-radio guards read, so the
+	// role reported here can never contradict what the guards refuse.
 	type roleFlags struct{ ap, sta bool }
 	roles := map[string]roleFlags{}
-	for _, opts := range sections {
-		if opts["mode"] == "" || opts["type"] != "" {
-			continue // skip radio device sections
-		}
-		device := opts["device"]
-		if device == "" || opts["disabled"] == "1" {
-			continue
-		}
-		rf := roles[device]
-		switch opts["mode"] {
-		case "ap":
-			rf.ap = true
-		case "sta":
-			rf.sta = true
-		}
-		roles[device] = rf
+	for _, name := range activeIfaces(sections, "ap") {
+		roles[sections[name]["device"]] = roleFlags{ap: true}
 	}
-	var radios []models.RadioInfo
+	for _, name := range activeIfaces(sections, "sta") {
+		rf := roles[sections[name]["device"]]
+		rf.sta = true
+		roles[sections[name]["device"]] = rf
+	}
+	radios := make([]models.RadioInfo, 0, len(sections))
+	names := make([]string, 0, len(sections))
 	for name, opts := range sections {
 		// wifi-device sections have a "type" option (e.g. "mac80211")
-		devType := opts["type"]
-		if devType == "" {
+		if opts["type"] == "" {
 			continue
 		}
+		names = append(names, name)
+	}
+	sort.Strings(names) // band switching picks a radio out of this list
+	for _, name := range names {
+		opts := sections[name]
 		channel := 0
 		if ch, ok := opts["channel"]; ok {
 			if v, err := strconv.Atoi(ch); err == nil {
@@ -159,7 +233,7 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 			Band:     opts["band"],
 			Channel:  channel,
 			HTMode:   opts["htmode"],
-			Type:     devType,
+			Type:     opts["type"],
 			Disabled: opts["disabled"] == "1",
 			Role:     role,
 		})
@@ -402,7 +476,7 @@ func (w *WifiService) rejectSameRadioAPSTA(radioName string, enableAP, enableSTA
 // reason names the request in the error (e.g. "guest access point enabled"), so
 // the operator can see which of their two radios is the problem.
 func (w *WifiService) rejectAPOnUplinkRadio(radioName, reason string) error {
-	uplinkRadio, err := w.enabledUwanSTARadio()
+	uplinkRadio, err := w.uplinkRadio()
 	if err != nil {
 		return err
 	}
@@ -485,38 +559,16 @@ func (w *WifiService) splitAPOffUplinkRadio(radioName string) error {
 	return w.applyRepeaterDownlinkAPPolicy(apSections, radioName, apOnOtherRadio, allowSTAAP, true)
 }
 
-// enabledUwanSTARadio returns the radio of the enabled STA bound to network=wwan
-// — the WiFi uplink — or "" when no uplink is enabled. It reads the same
-// sections the confirmation probe proves (enabledWwanSTAs), so the state the
-// guard inspects is the state the rollback protects.
-func (w *WifiService) enabledUwanSTARadio() (string, error) {
-	sections, err := w.uci.GetSections("wireless")
-	if err != nil {
-		return "", err
-	}
-	for _, name := range enabledWwanSTAs(sections) {
-		if device := sections[name]["device"]; device != "" {
-			return device, nil
-		}
-	}
-	return "", nil
-}
-
 // GetAPConfigs returns the AP configuration for all radios.
 func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return nil, err
 	}
-	var configs []models.APConfig
-	for section, opts := range sections {
-		if opts["mode"] != "ap" {
-			continue
-		}
+	configs := make([]models.APConfig, 0, len(sections))
+	for _, section := range ifaceSections(sections, "ap") {
+		opts := sections[section]
 		radio := opts["device"]
-		if radio == "" {
-			continue
-		}
 		radioOpts, _ := w.uci.GetAll("wireless", radio)
 		band := radioOpts["band"]
 		channel := 0
@@ -618,6 +670,12 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyRe
 		if !cfg.Enabled {
 			return w.teardownGuestWifi()
 		}
+		// The guest subnet is fixed, so the only question is whether this
+		// router already has it. Refuse first: the network, dhcp and firewall
+		// commits below cannot be undone by revertUCIConfig.
+		if err := w.rejectGuestSubnetOverlap(); err != nil {
+			return nil, err
+		}
 		// Pick the radio and police it before writing anything. The refusal has to
 		// come first: the network and dhcp commits below cannot be undone by
 		// revertUCIConfig, so a request answered as "refused" must not already
@@ -636,10 +694,10 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyRe
 		if err := w.uci.Set("network", "guest", "proto", "static"); err != nil {
 			return nil, err
 		}
-		if err := w.uci.Set("network", "guest", "ipaddr", "192.168.2.1"); err != nil {
+		if err := w.uci.Set("network", "guest", "ipaddr", guestIPAddr); err != nil {
 			return nil, err
 		}
-		if err := w.uci.Set("network", "guest", "netmask", "255.255.255.0"); err != nil {
+		if err := w.uci.Set("network", "guest", "netmask", guestNetmask); err != nil {
 			return nil, err
 		}
 		if err := w.uci.Commit("network"); err != nil {
@@ -764,6 +822,57 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig) (*WirelessApplyRe
 		}
 		return w.stageWirelessApply()
 	})
+}
+
+// rejectGuestSubnetOverlap refuses the fixed guest subnet when an existing
+// network interface already claims it. Two interfaces on one subnet is not a
+// cosmetic problem: the guest DHCP scope hands out addresses the LAN already
+// routes, and the guest firewall zone then applies to LAN traffic as well.
+func (w *WifiService) rejectGuestSubnetOverlap() error {
+	sections, err := w.uci.GetSections("network")
+	if err != nil {
+		return fmt.Errorf("reading network sections: %w", err)
+	}
+	guest := ipv4Net(guestIPAddr, guestNetmask)
+	if guest == nil {
+		return fmt.Errorf("guest subnet %s/%s is not a valid IPv4 network", guestIPAddr, guestNetmask)
+	}
+	names := make([]string, 0, len(sections))
+	for name := range sections {
+		names = append(names, name)
+	}
+	sort.Strings(names) // the error must name the same section every time
+	for _, name := range names {
+		if name == guestNetwork {
+			continue // re-enabling the guest network itself is not an overlap
+		}
+		opts := sections[name]
+		existing := ipv4Net(opts["ipaddr"], opts["netmask"])
+		if existing == nil || !subnetsOverlap(guest, existing) {
+			continue
+		}
+		return fmt.Errorf("%w: network.%s is %s/%s",
+			ErrGuestSubnetOverlap, name, opts["ipaddr"], opts["netmask"])
+	}
+	return nil
+}
+
+// ipv4Net turns an address/netmask pair into its network, or nil when either is
+// absent or not IPv4. Interfaces without both (DHCP clients, wireguard peers)
+// are skipped: they have no static subnet to collide with.
+func ipv4Net(ip, mask string) *net.IPNet {
+	addr := net.ParseIP(strings.TrimSpace(ip)).To4()
+	m := net.ParseIP(strings.TrimSpace(mask)).To4()
+	if addr == nil || m == nil {
+		return nil
+	}
+	netmask := net.IPMask(m)
+	return &net.IPNet{IP: addr.Mask(netmask), Mask: netmask}
+}
+
+// subnetsOverlap reports whether two IPv4 networks share any address.
+func subnetsOverlap(a, b *net.IPNet) bool {
+	return a.Contains(b.IP) || b.Contains(a.IP)
 }
 
 // teardownGuestWifi disables the guest AP and removes the guest subnet it
