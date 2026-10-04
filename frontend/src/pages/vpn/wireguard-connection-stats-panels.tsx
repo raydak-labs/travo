@@ -1,3 +1,4 @@
+import {CardInset} from '@/components/ui/card-inset';
 import { formatBytes } from '@/lib/utils';
 import type { VpnStatus, WireGuardStatus } from '@shared/index';
 import { formatWireguardHandshakeTime } from '@/pages/vpn/wireguard-utils';
@@ -13,7 +14,7 @@ export function WireguardConnectionStatsPanels({
 }: WireguardConnectionStatsPanelsProps) {
   if (wgStatus?.connected && wgLiveStatus && (wgLiveStatus.peers?.length ?? 0) > 0) {
     return (
-      <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+      <CardInset variant="muted">
         <h4 className="mb-2 font-medium text-gray-700 dark:text-gray-300">Connection Status</h4>
         {(wgLiveStatus.peers ?? []).map((peer) => (
           <div key={peer.public_key} className="grid grid-cols-2 gap-2">
@@ -31,13 +32,13 @@ export function WireguardConnectionStatsPanels({
             <span className="text-gray-900 dark:text-white">{peer.allowed_ips}</span>
           </div>
         ))}
-      </div>
+      </CardInset>
     );
   }
 
   if (wgStatus?.connected && !wgLiveStatus) {
     return (
-      <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+      <CardInset variant="muted">
         <div className="grid grid-cols-2 gap-2">
           <span className="text-gray-500 dark:text-gray-400">Endpoint</span>
           <span className="text-gray-900 dark:text-white">{wgStatus.endpoint}</span>
@@ -46,7 +47,7 @@ export function WireguardConnectionStatsPanels({
           <span className="text-gray-500 dark:text-gray-400">TX</span>
           <span className="text-gray-900 dark:text-white">{formatBytes(wgStatus.tx_bytes)}</span>
         </div>
-      </div>
+      </CardInset>
     );
   }
 

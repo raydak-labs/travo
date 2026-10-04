@@ -39,7 +39,7 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
             {...register('start', { valueAsNumber: true })}
           />
           {errors.start ? (
-            <p id="dhcp-start-err" className="text-xs text-red-500" role="alert">
+            <p id="dhcp-start-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.start.message}
             </p>
           ) : null}
@@ -58,7 +58,7 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
             {...register('limit', { valueAsNumber: true })}
           />
           {errors.limit ? (
-            <p id="dhcp-limit-err" className="text-xs text-red-500" role="alert">
+            <p id="dhcp-limit-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.limit.message}
             </p>
           ) : null}

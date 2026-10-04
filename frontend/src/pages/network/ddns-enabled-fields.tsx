@@ -1,3 +1,4 @@
+import { Textarea } from '@/components/ui/textarea';
 import {
   Controller,
   type Control,
@@ -63,7 +64,7 @@ export function DdnsEnabledFields({
           )}
         />
         {errors.service ? (
-          <p className="text-xs text-red-500" role="alert">
+          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.service.message}
           </p>
         ) : null}
@@ -71,7 +72,7 @@ export function DdnsEnabledFields({
       {service === 'custom' && (
         <div className="space-y-1">
           <Label>Update URL</Label>
-          <textarea
+          <Textarea
             rows={3}
             placeholder="https://example.com/update?hostname=[DOMAIN]&myip=[IP]"
             className={cn(
@@ -83,7 +84,7 @@ export function DdnsEnabledFields({
             {...register('update_url')}
           />
           {errors.update_url ? (
-            <p id="ddns-url-err" className="text-xs text-red-500" role="alert">
+            <p id="ddns-url-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.update_url.message}
             </p>
           ) : null}
@@ -102,7 +103,7 @@ export function DdnsEnabledFields({
           {...register('domain')}
         />
         {errors.domain ? (
-          <p id="ddns-domain-err" className="text-xs text-red-500" role="alert">
+          <p id="ddns-domain-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.domain.message}
           </p>
         ) : null}

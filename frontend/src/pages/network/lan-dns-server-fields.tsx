@@ -24,7 +24,7 @@ export function LanDnsServerFields({ register, errors }: LanDnsServerFieldsProps
           {...register('server1')}
         />
         {errors.server1 ? (
-          <p id="lan-dns-s1-err" className="text-xs text-red-500" role="alert">
+          <p id="lan-dns-s1-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.server1.message}
           </p>
         ) : null}

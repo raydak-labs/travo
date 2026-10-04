@@ -35,7 +35,7 @@ export function FirewallPortForwardAddFormGrid({
           {...register('name')}
         />
         {errors.name ? (
-          <p id="pf-name-err" className="text-xs text-red-500" role="alert">
+          <p id="pf-name-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.name.message}
           </p>
         ) : null}
@@ -68,7 +68,7 @@ export function FirewallPortForwardAddFormGrid({
           {...register('src_dport')}
         />
         {errors.src_dport ? (
-          <p id="pf-ext-err" className="text-xs text-red-500" role="alert">
+          <p id="pf-ext-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.src_dport.message}
           </p>
         ) : null}
@@ -82,7 +82,7 @@ export function FirewallPortForwardAddFormGrid({
           {...register('dest_ip')}
         />
         {errors.dest_ip ? (
-          <p id="pf-ip-err" className="text-xs text-red-500" role="alert">
+          <p id="pf-ip-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.dest_ip.message}
           </p>
         ) : null}
@@ -96,7 +96,7 @@ export function FirewallPortForwardAddFormGrid({
           {...register('dest_port')}
         />
         {errors.dest_port ? (
-          <p id="pf-int-err" className="text-xs text-red-500" role="alert">
+          <p id="pf-int-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.dest_port.message}
           </p>
         ) : null}

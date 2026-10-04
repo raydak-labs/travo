@@ -46,7 +46,7 @@ export function WoLCard() {
               {...register('mac')}
             />
             {errors.mac ? (
-              <p id="wol-mac-err" className="text-xs text-red-500" role="alert">
+              <p id="wol-mac-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.mac.message}
               </p>
             ) : null}
@@ -56,7 +56,7 @@ export function WoLCard() {
             <Input placeholder="br-lan" {...register('interface')} />
           </div>
           <Button type="submit" disabled={sendWoL.isPending}>
-            <Zap className="mr-1.5 h-3.5 w-3.5" />
+            <Zap className="h-3.5 w-3.5" />
             {sendWoL.isPending ? 'Sending…' : 'Send Magic Packet'}
           </Button>
         </form>

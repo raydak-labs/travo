@@ -27,7 +27,7 @@ export function InterfacesCard() {
             {network.interfaces.map((iface) => (
               <div
                 key={iface.name}
-                className="flex items-center justify-between rounded-md bg-gray-50 p-3 dark:bg-gray-900"
+                className="flex items-center justify-between dark:bg-gray-900"
               >
                 <div className="flex items-center gap-3">
                   <Badge variant={iface.is_up ? 'success' : 'secondary'}>

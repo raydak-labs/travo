@@ -134,7 +134,7 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
                 disabled={saveAllAPs.isPending || isLoading || !firstAP}
                 className="flex-1"
               >
-                {saveAllAPs.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {saveAllAPs.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save AP Config
               </Button>
             </div>

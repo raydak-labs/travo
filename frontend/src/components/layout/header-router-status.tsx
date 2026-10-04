@@ -1,4 +1,5 @@
 import type { SystemInfo } from '@shared/index';
+import { statusDotClass } from '@/lib/status-dot';
 
 type HeaderRouterStatusProps = {
   systemInfo: SystemInfo | undefined;
@@ -7,6 +8,9 @@ type HeaderRouterStatusProps = {
 
 export function HeaderRouterStatus({ systemInfo, systemError }: HeaderRouterStatusProps) {
   const isConnected = !!systemInfo && !systemError;
+  const label = isConnected
+    ? `Connected to ${systemInfo?.hostname ?? 'router'}`
+    : 'Connection lost';
 
   return (
     <>
@@ -15,14 +19,15 @@ export function HeaderRouterStatus({ systemInfo, systemError }: HeaderRouterStat
           {systemInfo.hostname}
         </span>
       )}
-      <span
-        className={`inline-block h-2 w-2 rounded-full ${
-          isConnected
-            ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] dark:bg-emerald-400'
-            : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)] dark:bg-red-400'
-        }`}
-        title={isConnected ? `Connected to ${systemInfo?.hostname ?? 'router'}` : 'Connection lost'}
-      />
+      {/* The dot was colour-only and carried its state in a `title` on a
+          non-interactive span, which is not reliably exposed. A deuteranopic
+          user could not tell the states, and a screen reader user had no
+          channel at all to learn the router dropped — the single most important
+          global status in the app. */}
+      <span role="status" aria-live="polite" className="inline-flex items-center">
+        <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${statusDotClass(isConnected)}`} />
+        <span className="sr-only">{label}</span>
+      </span>
     </>
   );
 }

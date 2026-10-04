@@ -56,7 +56,7 @@ export function ApRadioFormCredentialsAndActions({
           {...register('ssid')}
         />
         {errors.ssid ? (
-          <p id={`ap-ssid-err-${ap.section}`} className="text-xs text-red-500" role="alert">
+          <p id={`ap-ssid-err-${ap.section}`} className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.ssid.message}
           </p>
         ) : null}
@@ -104,7 +104,7 @@ export function ApRadioFormCredentialsAndActions({
             {...register('key')}
           />
           {errors.key ? (
-            <p id={`ap-key-err-${ap.section}`} className="text-xs text-red-500" role="alert">
+            <p id={`ap-key-err-${ap.section}`} className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.key.message}
             </p>
           ) : null}
@@ -115,7 +115,7 @@ export function ApRadioFormCredentialsAndActions({
           {savePending ? 'Saving...' : 'Save'}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={onOpenQr}>
-          <QrCode className="mr-1 h-4 w-4" />
+          <QrCode className="h-4 w-4" />
           QR Code
         </Button>
       </div>

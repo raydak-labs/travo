@@ -1,3 +1,4 @@
+import {CardInset} from '@/components/ui/card-inset';
 import { Network } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { QueryCard } from '@/components/ui/query-card';
@@ -20,7 +21,7 @@ export function LanConfigCard() {
           onRetry={() => void refetch()}
         >
           {network ? (
-            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+            <CardInset variant="muted">
               <div className="grid grid-cols-2 gap-2">
                 <span className="text-gray-500 dark:text-gray-400">IP Address</span>
                 <span className="text-gray-900 dark:text-white">{network.lan.ip_address}</span>
@@ -29,7 +30,7 @@ export function LanConfigCard() {
                 <span className="text-gray-500 dark:text-gray-400">MAC</span>
                 <span className="text-gray-900 dark:text-white">{network.lan.mac_address}</span>
               </div>
-            </div>
+            </CardInset>
           ) : null}
         </QueryCard>
       </CardContent>

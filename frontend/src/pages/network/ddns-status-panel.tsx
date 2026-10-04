@@ -1,3 +1,4 @@
+import { statusDotClass, statusDotIdleClass } from '@/lib/status-dot';
 import type { DDNSStatus } from '@shared/index';
 
 type DdnsStatusPanelProps = {
@@ -8,14 +9,14 @@ export function DdnsStatusPanel({ status }: DdnsStatusPanelProps) {
   if (!status || (!status.running && !status.public_ip)) return null;
 
   return (
-    <div className="flex items-center gap-3 rounded-md bg-gray-50 p-3 dark:bg-gray-900">
+    <div className="flex items-center gap-3">
       <span
+        aria-hidden="true"
         className={`inline-block h-2.5 w-2.5 rounded-full ${
-          status.running
-            ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] dark:bg-emerald-400'
-            : 'bg-gray-300 dark:bg-gray-600'
+          status.running ? statusDotClass(true) : statusDotIdleClass
         }`}
       />
+      <span className="sr-only">Dynamic DNS {status.running ? 'running' : 'stopped'}</span>
       <div className="flex-1 text-sm">
         <span className="font-medium text-gray-900 dark:text-white">
           {status.running ? 'Running' : 'Stopped'}

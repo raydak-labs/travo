@@ -36,7 +36,7 @@ export function PasswordStepFormFields({
           placeholder="Enter current password"
         />
         {errors.current_password ? (
-          <p id="setup-current-password-err" className="mt-1 text-xs text-red-500" role="alert">
+          <p id="setup-current-password-err" className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.current_password.message}
           </p>
         ) : null}
@@ -68,7 +68,7 @@ export function PasswordStepFormFields({
           </button>
         </div>
         {errors.new_password ? (
-          <p id="setup-new-password-err" className="mt-1 text-xs text-red-500" role="alert">
+          <p id="setup-new-password-err" className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.new_password.message}
           </p>
         ) : null}
@@ -90,7 +90,7 @@ export function PasswordStepFormFields({
           placeholder="Confirm new password"
         />
         {errors.confirm_password ? (
-          <p id="setup-confirm-password-err" className="mt-1 text-xs text-red-500" role="alert">
+          <p id="setup-confirm-password-err" className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.confirm_password.message}
           </p>
         ) : null}

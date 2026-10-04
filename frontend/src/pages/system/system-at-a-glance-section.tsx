@@ -1,3 +1,4 @@
+import {CardInset} from '@/components/ui/card-inset';
 import { Server, Cpu, HardDrive } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -50,7 +51,7 @@ export function SystemAtAGlanceSection() {
               }
             >
               {info ? (
-              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+              <CardInset variant="muted">
                 <div className="grid grid-cols-2 gap-2">
                   <span className="text-gray-500 dark:text-gray-400">Hostname</span>
                   <span className="flex items-center gap-1 text-gray-900 dark:text-white">
@@ -67,7 +68,7 @@ export function SystemAtAGlanceSection() {
                     {formatUptime(info.uptime_seconds)}
                   </span>
                 </div>
-              </div>
+              </CardInset>
               ) : null}
             </QueryCard>
           </CardContent>

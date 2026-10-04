@@ -30,7 +30,7 @@ export function CompleteStep({
         </ul>
       </div>
       <Button onClick={onFinish} size="lg" className="w-full" disabled={isPending}>
-        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
         Go to Dashboard
       </Button>
     </div>

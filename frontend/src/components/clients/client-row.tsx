@@ -65,7 +65,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
       <td className="py-3 text-right">
         <div className="flex items-center justify-end gap-1">
           {isBlocked && (
-            <Badge variant="destructive" className="mr-1 text-xs">
+            <Badge variant="destructive" className="text-xs">
               Blocked
             </Badge>
           )}

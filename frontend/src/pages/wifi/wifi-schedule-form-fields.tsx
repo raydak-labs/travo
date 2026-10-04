@@ -55,7 +55,7 @@ export function WiFiScheduleFormFields({
                 {...register('on_time')}
               />
               {errors.on_time ? (
-                <span id="wifi-on-err" className="text-xs text-red-500" role="alert">
+                <span id="wifi-on-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                   {errors.on_time.message}
                 </span>
               ) : null}
@@ -78,7 +78,7 @@ export function WiFiScheduleFormFields({
                 {...register('off_time')}
               />
               {errors.off_time ? (
-                <span id="wifi-off-err" className="text-xs text-red-500" role="alert">
+                <span id="wifi-off-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                   {errors.off_time.message}
                 </span>
               ) : null}

@@ -1,3 +1,4 @@
+import { Textarea } from '@/components/ui/textarea';
 import type { UseFormReturn } from 'react-hook-form';
 import { Plus, Upload, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ export function WireguardImportProfileForm({
         {...register('name')}
       />
       {importErrors.name ? (
-        <p id="wg-name-err" className="text-xs text-red-500" role="alert">
+        <p id="wg-name-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
           {importErrors.name.message}
         </p>
       ) : null}
@@ -67,7 +68,7 @@ export function WireguardImportProfileForm({
         />
         <span className="text-xs text-gray-500 dark:text-gray-400">or paste below</span>
       </div>
-      <textarea
+      <Textarea
         className={cn(
           'w-full rounded-md border bg-white p-2 text-sm font-mono dark:bg-gray-900 dark:text-white',
           importErrors.config
@@ -86,7 +87,7 @@ export function WireguardImportProfileForm({
         </p>
       ) : null}
       <Button type="submit" disabled={isSaving}>
-        <Plus className="mr-1 h-4 w-4" />
+        <Plus className="h-4 w-4" />
         {isSaving ? 'Saving...' : 'Save Profile'}
       </Button>
     </form>

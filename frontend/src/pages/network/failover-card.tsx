@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CardInset } from '@/components/ui/card-inset';
+import {CardInset} from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryCard } from '@/components/ui/query-card';
@@ -206,7 +206,7 @@ export function FailoverCard() {
         {!isEditing ? (
           <div className="space-y-3">
             {overwriteWarning}
-            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+            <CardInset variant="muted">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 dark:text-gray-400">Status</span>
                 <span>
@@ -254,7 +254,7 @@ export function FailoverCard() {
                 <span className="text-gray-500 dark:text-gray-400">Last event</span>
                 <span>{events[0] ? new Date(events[0].timestamp).toLocaleString() : '—'}</span>
               </div>
-            </div>
+            </CardInset>
 
             {!current.service_installed ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -329,7 +329,7 @@ export function FailoverCard() {
                         )
                       }
                     >
-                      <ArrowUp className="mr-1 h-4 w-4" />
+                      <ArrowUp className="h-4 w-4" />
                       Move up
                     </Button>
                     <Button
@@ -347,7 +347,7 @@ export function FailoverCard() {
                         )
                       }
                     >
-                      <ArrowDown className="mr-1 h-4 w-4" />
+                      <ArrowDown className="h-4 w-4" />
                       Move down
                     </Button>
                   </div>

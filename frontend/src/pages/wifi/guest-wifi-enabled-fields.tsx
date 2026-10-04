@@ -44,7 +44,7 @@ export function GuestWifiEnabledFields({
           {...register('ssid')}
         />
         {errors.ssid ? (
-          <p id="guest-ssid-err" className="text-xs text-red-500" role="alert">
+          <p id="guest-ssid-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.ssid.message}
           </p>
         ) : null}
@@ -89,7 +89,7 @@ export function GuestWifiEnabledFields({
             {...register('key')}
           />
           {errors.key ? (
-            <p id="guest-key-err" className="text-xs text-red-500" role="alert">
+            <p id="guest-key-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.key.message}
             </p>
           ) : null}

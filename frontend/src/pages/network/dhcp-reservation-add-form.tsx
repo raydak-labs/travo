@@ -34,7 +34,7 @@ export function DhcpReservationAddForm({
           {...register('name')}
         />
         {errors.name ? (
-          <p id="dhcp-name-err" className="text-xs text-red-500" role="alert">
+          <p id="dhcp-name-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.name.message}
           </p>
         ) : null}
@@ -49,7 +49,7 @@ export function DhcpReservationAddForm({
           {...register('mac')}
         />
         {errors.mac ? (
-          <p id="dhcp-mac-err" className="text-xs text-red-500" role="alert">
+          <p id="dhcp-mac-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.mac.message}
           </p>
         ) : null}
@@ -64,7 +64,7 @@ export function DhcpReservationAddForm({
           {...register('ip')}
         />
         {errors.ip ? (
-          <p id="dhcp-ip-err" className="text-xs text-red-500" role="alert">
+          <p id="dhcp-ip-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.ip.message}
           </p>
         ) : null}

@@ -57,7 +57,7 @@ export function OperationProgressDialog({
             <ul
               aria-live="polite"
               aria-relevant="additions"
-              className="space-y-1.5 rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300"
+              className="space-y-1.5 rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-900/50 dark:text-gray-300"
             >
               {details.map((d) => (
                 <li key={d}>{d}</li>

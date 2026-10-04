@@ -52,7 +52,7 @@ export function ReserveIpForm({ initial, onCancel }: ReserveIpFormProps) {
             {...register('name')}
           />
           {errors.name ? (
-            <span className="text-xs text-red-500" role="alert">
+            <span className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.name.message}
             </span>
           ) : null}
@@ -65,7 +65,7 @@ export function ReserveIpForm({ initial, onCancel }: ReserveIpFormProps) {
             {...register('ip')}
           />
           {errors.ip ? (
-            <span className="text-xs text-red-500" role="alert">
+            <span className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.ip.message}
             </span>
           ) : null}

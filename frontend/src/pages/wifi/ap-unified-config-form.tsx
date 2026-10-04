@@ -310,7 +310,7 @@ export function APUnifiedConfigForm({
               {...register('ssid')}
             />
             {errors.ssid ? (
-              <p className="text-xs text-red-500" role="alert">
+              <p className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.ssid.message}
               </p>
             ) : null}
@@ -399,7 +399,7 @@ export function APUnifiedConfigForm({
               </>
             )}
             <Button type="button" variant="outline" size="sm" onClick={openQrFromForm}>
-              <QrCode className="mr-1 h-4 w-4" />
+              <QrCode className="h-4 w-4" />
               QR Code
             </Button>
           </div>

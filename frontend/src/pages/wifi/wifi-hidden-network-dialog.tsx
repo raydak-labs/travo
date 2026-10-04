@@ -81,7 +81,7 @@ export function WifiHiddenNetworkDialog() {
         aria-label="Hidden network"
         title="Hidden network"
       >
-        <WifiOff className="mr-1.5 h-3.5 w-3.5" />
+        <WifiOff className="h-3.5 w-3.5" />
         Hidden
       </Button>
 

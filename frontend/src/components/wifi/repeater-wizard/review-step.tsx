@@ -95,13 +95,13 @@ export function RepeaterWizardReviewStep({
 
       <DialogFooter>
         <Button variant="outline" onClick={onBack} disabled={applying}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
         <Button onClick={onApply} disabled={applying}>
           {applying ? (
             <>
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               Applying...
             </>
           ) : (

@@ -95,7 +95,7 @@ export function DnsEntriesCard() {
                   {...register('name')}
                 />
                 {errors.name ? (
-                  <p id="dns-entry-name-err" className="text-xs text-red-500" role="alert">
+                  <p id="dns-entry-name-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                     {errors.name.message}
                   </p>
                 ) : null}
@@ -110,7 +110,7 @@ export function DnsEntriesCard() {
                   {...register('ip')}
                 />
                 {errors.ip ? (
-                  <p id="dns-entry-ip-err" className="text-xs text-red-500" role="alert">
+                  <p id="dns-entry-ip-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                     {errors.ip.message}
                   </p>
                 ) : null}

@@ -34,7 +34,7 @@ export function APStepCredentialsFields({
           placeholder="e.g. MyTravelRouter"
         />
         {errors.ssid ? (
-          <p id="setup-ap-ssid-err" className="mt-1 text-xs text-red-500" role="alert">
+          <p id="setup-ap-ssid-err" className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.ssid.message}
           </p>
         ) : null}
@@ -66,7 +66,7 @@ export function APStepCredentialsFields({
           </button>
         </div>
         {errors.key ? (
-          <p id="setup-ap-key-err" className="mt-1 text-xs text-red-500" role="alert">
+          <p id="setup-ap-key-err" className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.key.message}
           </p>
         ) : null}

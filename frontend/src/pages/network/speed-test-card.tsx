@@ -1,3 +1,4 @@
+import {CardInset} from '@/components/ui/card-inset';
 import { Gauge } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ export function SpeedTestCard() {
         )}
 
         {speedTest.data && (
-          <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+          <CardInset variant="muted">
             <div className="grid grid-cols-2 gap-2">
               <span className="text-gray-500 dark:text-gray-400">Download</span>
               <span className="font-medium text-gray-900 dark:text-white">
@@ -45,7 +46,7 @@ export function SpeedTestCard() {
               <span className="text-gray-500 dark:text-gray-400">Server</span>
               <span className="text-gray-900 dark:text-white">{speedTest.data.server}</span>
             </div>
-          </div>
+          </CardInset>
         )}
 
         {speedTest.isError && <InlineError>{speedTest.error.message}</InlineError>}

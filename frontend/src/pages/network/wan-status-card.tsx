@@ -1,3 +1,4 @@
+import { statusDotClass, statusDotIdleClass } from '@/lib/status-dot';
 import { Info, Cable, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +15,7 @@ function UplinkRow({ uplink }: { uplink: ResolvedUplink }) {
       <span
         aria-hidden="true"
         className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-          uplink.active
-            ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] dark:bg-emerald-400'
-            : 'bg-gray-300 dark:bg-gray-600'
+          uplink.active ? statusDotClass(true) : statusDotIdleClass
         }`}
       />
       <span className="sr-only">{`${uplink.longLabel}: ${state}`}</span>

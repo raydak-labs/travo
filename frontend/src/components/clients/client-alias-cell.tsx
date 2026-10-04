@@ -90,7 +90,7 @@ export function ClientAliasCell({
           {errors.alias ? (
             <span
               id={`alias-err-${client.mac_address}`}
-              className="text-xs text-red-500"
+              className="text-xs text-red-600 dark:text-red-400"
               role="alert"
             >
               {errors.alias.message}

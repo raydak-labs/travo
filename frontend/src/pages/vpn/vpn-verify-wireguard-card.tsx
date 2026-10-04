@@ -76,7 +76,7 @@ export function VpnVerifyWireguardCard() {
                 <Badge variant="destructive">Issues detected</Badge>
               )}
             </div>
-            <div className="space-y-1.5 rounded-md bg-gray-50 p-3 dark:bg-gray-800">
+            <div className="space-y-1.5 dark:bg-gray-800">
               <StatusRow label="Interface up (wg0)" ok={result.interface_up} />
               <StatusRow label="Recent handshake (< 3 min)" ok={result.handshake_ok} />
               <StatusRow label="Default route via wg0" ok={result.route_ok} />

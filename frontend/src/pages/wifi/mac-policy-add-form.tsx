@@ -40,7 +40,7 @@ export function MACPolicyAddForm({ onValidSubmit, isPending }: MACPolicyAddFormP
               {...register('ssid')}
             />
             {errors.ssid ? (
-              <span id="mac-policy-ssid-err" className="text-xs text-red-500" role="alert">
+              <span id="mac-policy-ssid-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.ssid.message}
               </span>
             ) : null}
@@ -54,7 +54,7 @@ export function MACPolicyAddForm({ onValidSubmit, isPending }: MACPolicyAddFormP
               {...register('mac')}
             />
             {errors.mac ? (
-              <span id="mac-policy-mac-err" className="text-xs text-red-500" role="alert">
+              <span id="mac-policy-mac-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.mac.message}
               </span>
             ) : null}

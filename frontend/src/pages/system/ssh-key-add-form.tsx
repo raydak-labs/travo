@@ -22,7 +22,7 @@ export function SSHKeyAddForm({ register, errors, onSubmit, addPending }: SSHKey
         {...register('key')}
       />
       {errors.key ? (
-        <p id="ssh-key-error" className="text-xs text-red-500" role="alert">
+        <p id="ssh-key-error" className="text-xs text-red-600 dark:text-red-400" role="alert">
           {errors.key.message}
         </p>
       ) : null}

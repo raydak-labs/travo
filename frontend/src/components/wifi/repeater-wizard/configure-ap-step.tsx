@@ -131,7 +131,7 @@ export function RepeaterWizardConfigureApStep({
                     placeholder="Minimum 8 characters"
                   />
                   {apConfig.key.length > 0 && apConfig.key.length < 8 && (
-                    <p className="text-xs text-red-500">Password must be at least 8 characters</p>
+                    <p className="text-xs text-red-600 dark:text-red-400">Password must be at least 8 characters</p>
                   )}
                 </div>
               )}
@@ -274,7 +274,7 @@ export function RepeaterWizardConfigureApStep({
 
       <DialogFooter>
         <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
         <Button onClick={onNext} disabled={!canProceedAP}>

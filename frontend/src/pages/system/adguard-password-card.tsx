@@ -71,7 +71,7 @@ export function AdGuardPasswordCard() {
               {...register('new_password')}
             />
             {errors.new_password ? (
-              <p id="ag-pw-new-err" className="text-sm text-red-500" role="alert">
+              <p id="ag-pw-new-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
                 {errors.new_password.message}
               </p>
             ) : null}
@@ -84,7 +84,7 @@ export function AdGuardPasswordCard() {
               {...register('confirm_password')}
             />
             {errors.confirm_password ? (
-              <p id="ag-pw-confirm-err" className="text-sm text-red-500" role="alert">
+              <p id="ag-pw-confirm-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
                 {errors.confirm_password.message}
               </p>
             ) : null}
