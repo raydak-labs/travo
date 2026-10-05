@@ -113,6 +113,18 @@ decision, not an oversight; the reasoning is in the linked ADR or lane report.
       re-pins a dropped digest but does not fail a build when one is missing. All current `uses:`
       are SHA-pinned; nothing enforces it.
 
+- [ ] **`Connect` can disable the caller's OWN access point.** Connecting the uplink to the
+      band the operator is standing on disables the AP they are on, while another band survives.
+      That is a disruption, not a strand, so the lockout rule correctly stays silent — but the
+      operator gets no acknowledgement. `guardLockoutExcluding(excludeRadio)` is exactly the
+      mechanism; `Connect` does not take a `LockoutRequest`. Needs a product decision first.
+- [ ] **Banner freshness is evaluated once at render.** A stale adopt-warning that is on screen
+      when the page goes quiet keeps its wording until the next reload, and the clock-skew slack
+      is one-directional (a future-dated timestamp can read as fresh indefinitely).
+- [ ] **Unpinned edges.** The overwrite-warning freshness window boundary has no test, and the
+      `Connect`/`Disconnect`/`Reconcile` "keeps an access point up" assertions do not pin the
+      caller classification they depend on at the HTTP boundary.
+
 ## 17. Held Dependency Upgrades
 
 Consolidating the Renovate branches on 2026-10-02 surfaced three upgrades that could not land
