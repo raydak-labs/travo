@@ -76,6 +76,54 @@
   }
 }
 
+/*
+ * Semantic status tokens. Pages must read status meaning from here instead of
+ * writing raw `bg-green-100 text-green-800` pairs: those strings had drifted
+ * into ~100 near-duplicate spellings with no dark-mode discipline. Each tone
+ * needs text + surface + border so a status can appear as text, as a tinted
+ * panel, or as a bordered row without re-deriving the colour.
+ */
+:root {
+  --status-ok-text: #166534;
+  --status-ok-surface: #dcfce7;
+  --status-ok-border: #86efac;
+  --status-warn-text: #854d0e;
+  --status-warn-surface: #fef9c3;
+  --status-warn-border: #fde047;
+  --status-danger-text: #991b1b;
+  --status-danger-surface: #fee2e2;
+  --status-danger-border: #fca5a5;
+  --status-info-text: #1e40af;
+  --status-info-surface: #dbeafe;
+  --status-info-border: #93c5fd;
+  --status-neutral-text: #374151;
+  --status-neutral-surface: #f3f4f6;
+  --status-neutral-border: #d1d5db;
+  --status-stale-text: #6b7280;
+  --status-stale-surface: #f3f4f6;
+  --status-stale-border: #e5e7eb;
+}
+.dark {
+  --status-ok-text: #bbf7d0;
+  --status-ok-surface: #052e16;
+  --status-ok-border: #166534;
+  --status-warn-text: #fef08a;
+  --status-warn-surface: #422006;
+  --status-warn-border: #854d0e;
+  --status-danger-text: #fecaca;
+  --status-danger-surface: #450a0a;
+  --status-danger-border: #991b1b;
+  --status-info-text: #bfdbfe;
+  --status-info-surface: #172554;
+  --status-info-border: #1e40af;
+  --status-neutral-text: #e5e7eb;
+  --status-neutral-surface: #1f2937;
+  --status-neutral-border: #374151;
+  --status-stale-text: #9ca3af;
+  --status-stale-surface: #1f2937;
+  --status-stale-border: #374151;
+}
+
 /* Chart colour tokens — respond to dark mode */
 :root {
   --chart-grid: #e5e7eb;
