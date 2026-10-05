@@ -75,6 +75,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
 		Alerts:         services.NewAlertService(systemSvc),
 		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
+		TrafficHistory: services.NewTrafficHistoryService(services.TrafficHistoryDefaultPoints),
 	}
 
 	// CaseSensitive mirrors production (cmd/server/main.go). Without it the

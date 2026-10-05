@@ -15,6 +15,7 @@ Short reference for Tailwind + dark mode in `frontend/`.
 |-----------|------------------|
 | **`CardTitle`** | `text-sm font-medium leading-none tracking-tight` + `text-gray-900 dark:text-white`. Prefer layout-only `className` overrides (`flex items-center gap-2`). Exceptions: Login hero (`text-2xl`); Setup step titles that are not `CardTitle`. |
 | **`Label`** | `text-xs font-medium text-gray-500 dark:text-gray-400`. Dense forms use this; Login may override to `text-sm font-medium` for prominence. |
+| **`SectionHeading`** | The only in-page group label (`mb-3 text-xs font-semibold uppercase tracking-wider` + gray tones). Six pages had hand-rolled it; a seventh copy is a defect. |
 | **Loading** | `Skeleton` for card/page content. Spinners (`Loader2`) only for in-button/submit busy. |
 | **Empty** | `EmptyState` from `@/components/ui/empty-state`. |
 | **Load/display errors** | `InlineError` (`role="alert"`, `text-sm`, red border/bg light+dark pairs). Mutation success/failure stays on `sonner` toasts. |
@@ -77,11 +78,44 @@ that is 3.76:1 on white and fails AA at the sizes used here.
 `mr-*` between a button's icon and its label — 41 call sites had drifted across
 `mr-2`, `mr-1.5` and `mr-1`.
 
+## Card plane
+
+Every panel uses `cardSurfaceVariants()` (`card-surface.tsx`). There is no exempt
+screen: the dashboard source card and the setup wizard were normalized rather than
+grandfathered, because "all but two pages differ" is what produced the drift
+(ADR 0012). Use `CardInset` for nested regions rather than a second card.
+
 ## Status dots
 
 Use `statusDotClass(up)` / `statusDotIdleClass` from `@/lib/status-dot` rather
 than an inline `shadow-[0_0_6px_rgba(...)]`. State must never be colour-only:
 pair the dot with a visually hidden text node and `role="status"`.
+
+## Status colours
+
+Normative rules are in [ADR 0012](./adr/0012-ui-consistency-and-status-language.md);
+this is the token reference. Status colour comes from `--status-*` tokens in
+`index.css` and reaches the screen through **`StatusPill`**
+(`tone="ok|warn|danger|info|neutral|stale"`). Raw `bg-green-*` / `text-red-*`
+status strings are a defect, not a style choice.
+
+| Tone | Means |
+| ---- | ----- |
+| `ok` | working as configured |
+| `warn` | degraded, user may want to act |
+| `danger` | broken / not reachable |
+| `info` | noteworthy but not a problem |
+| `neutral` | inactive or not applicable |
+| `stale` | last known value; weaker than `warn`, never blanks the value |
+
+Use `StatValue stale` rather than recolouring a fact to grey.
+
+## Summary band
+
+A page with more than one status question starts with an always-visible
+**`SummaryBand`** of flat `SummaryTile`s. Not collapsible; each tile carries its
+own loading, error and stale state. `wifi-summary-band.tsx` is the reference
+implementation.
 
 ## Nested regions
 
@@ -103,9 +137,8 @@ default Inputs.
 | Exception | Where | Why |
 |-----------|--------|-----|
 | **`LogsLevelBadge`** | `logs-level-badge.tsx` | Dense uppercase terminal chips; parallel to `Badge` by design |
-| **Dashboard `SourceCard` status pill** | `dashboard-page.tsx` | Forced-dark topology card; custom chip, not `Badge` |
 
-Elsewhere prefer `Badge` variants (`success` / `destructive` / `default` / `secondary` / `outline` / `warning`) over hand-rolled `bg-green-*` / `bg-red-*` / `bg-blue-*` className overrides.
+Elsewhere prefer `Badge` variants (`success` / `destructive` / `default` / `secondary` / `outline` / `warning`) for neutral category labels, and `StatusPill` for anything that reports state. Hand-rolled `bg-green-*` / `bg-red-*` / `bg-blue-*` overrides are no longer accepted (ADR 0012).
 
 ## Borders in dark mode
 

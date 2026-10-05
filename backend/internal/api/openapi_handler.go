@@ -221,6 +221,11 @@ var openAPISpec = map[string]any{
 		"/network/status": map[string]any{
 			"get": endpoint("GetNetworkStatus", "WAN/LAN/WWAN interface status, internet reachability", true, nil, resp200("application/json", nil)),
 		},
+		"/network/traffic-history": map[string]any{
+			"get": endpoint("GetTrafficHistory", "Recent per-interface RX/TX counters (~10 minutes, empty right after boot) plus the seconds actually retained", true, nil,
+				resp200("application/json", obj("points", "retained_seconds")),
+			),
+		},
 		"/network/connection-method": map[string]any{
 			"get": endpoint("GetConnectionMethod", "How the calling client is connected (wifi-client/wifi-ap/ethernet) and its interface/IP", true, nil,
 				resp200("application/json", obj("method", "interface", "ip_address")),

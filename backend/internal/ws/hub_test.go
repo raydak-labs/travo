@@ -2,6 +2,8 @@ package ws
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -16,7 +18,7 @@ func TestNewHub(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
 	alertSvc := services.NewAlertService(svc)
-	hub := NewHub(svc, alertSvc, nil)
+	hub := NewHub(svc, alertSvc, nil, nil)
 
 	if hub == nil {
 		t.Fatal("expected non-nil hub")
@@ -30,7 +32,7 @@ func TestHubStartStop(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
 	alertSvc := services.NewAlertService(svc)
-	hub := NewHub(svc, alertSvc, nil)
+	hub := NewHub(svc, alertSvc, nil, nil)
 	hub.BroadcastInterval = 10 * time.Millisecond
 
 	hub.Start()
@@ -45,7 +47,7 @@ func TestHub_BroadcastsNetworkStatus(t *testing.T) {
 	alertSvc := services.NewAlertService(svc)
 
 	nsCh := make(chan models.NetworkStatus, 1)
-	hub := NewHub(svc, alertSvc, nsCh)
+	hub := NewHub(svc, alertSvc, nsCh, nil)
 	hub.BroadcastInterval = 10 * time.Millisecond
 
 	hub.Start()
@@ -139,7 +141,65 @@ func TestHub_StopIsIdempotent(t *testing.T) {
 func newTestHub() *Hub {
 	ub := ubus.NewMockUbus()
 	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	return NewHub(svc, services.NewAlertService(svc), nil)
+	return NewHub(svc, services.NewAlertService(svc), nil, nil)
+}
+
+// The traffic history exists so a dashboard opening the page has ~10 minutes of
+// history to paint. That is exactly the no-client case, so the broadcast loop
+// must sample while ClientCount() == 0 (it used to return early, leaving the
+// history permanently empty).
+func TestHub_SamplesTrafficHistoryWithNoClients(t *testing.T) {
+	root := fixtureSysfsNet(t)
+	ub := ubus.NewMockUbus()
+	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
+	history := services.NewTrafficHistoryService(10)
+	restore := services.SetSysfsNetRootForTesting(root)
+	defer restore()
+
+	hub := NewHub(svc, services.NewAlertService(svc), nil, history)
+	hub.BroadcastInterval = 10 * time.Millisecond
+	hub.Start()
+
+	time.Sleep(60 * time.Millisecond)
+	hub.Stop()
+	// Let an already-selected tick finish before reading the fixture.
+	time.Sleep(20 * time.Millisecond)
+
+	if got := hub.ClientCount(); got != 0 {
+		t.Fatalf("precondition: expected no clients, got %d", got)
+	}
+	if got := len(history.History()); got == 0 {
+		t.Error("expected traffic samples with zero WebSocket clients connected")
+	}
+}
+
+// fixtureSysfsNet creates a temporary tree holding the interfaces
+// readNetworkStats monitors and returns its root, to be handed to
+// services.SetSysfsNetRootForTesting.
+func fixtureSysfsNet(t *testing.T) (root string) {
+	t.Helper()
+	root = t.TempDir()
+	for _, iface := range []string{"br-lan", "wwan0", "wg0", "eth0"} {
+		dir := filepath.Join(root, iface, "statistics")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+		for name, value := range map[string]string{"rx_bytes": "100", "tx_bytes": "200"} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(value+"\n"), 0o644); err != nil {
+				t.Fatalf("write %s/%s: %v", iface, name, err)
+			}
+		}
+	}
+	return root
+}
+
+// A hub wired without a history must keep working (nil history = no sampling).
+func TestHub_NilTrafficHistoryDoesNotPanic(t *testing.T) {
+	hub := newTestHub()
+	hub.BroadcastInterval = 10 * time.Millisecond
+	hub.Start()
+	time.Sleep(30 * time.Millisecond)
+	hub.Stop()
 }
 
 func TestHub_BroadcastRemovesDeadClients(t *testing.T) {

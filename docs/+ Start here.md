@@ -30,6 +30,8 @@ updated: 2026-09-28
 - [[adr/0009-persistent-store-bbolt]]
 - [[adr/0010-uci-write-serialisation-and-request-contracts]]
 - [[adr/0011-frontend-lint-toolchain-oxlint-and-typescript-7]]
+- [[adr/0012-ui-consistency-and-status-language]]
+- [[adr/0012-ui-consistency-and-status-language]]
 
 ## Backlog and shipped work
 
