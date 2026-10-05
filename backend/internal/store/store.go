@@ -1,7 +1,7 @@
 // Package store is a thin bbolt wrapper providing durable key/value buckets
 // at /etc/travo/travo.db. Chosen over SQLite (modernc.org/sqlite adds ~10 MB
 // to a 12 MB binary) and flat JSON (no transactional multi-key writes) — see
-// docs/plans/2026-07-08-hardening-followups-and-persistence.md.
+// ADR 0013 rule 3 (the measured bbolt/sqlite cost this choice rests on).
 //
 // Flash-write discipline: callers must batch writes (periodic flushes, not
 // per-request/per-sample) — /etc/travo sits on NAND-backed overlayfs.

@@ -1,14 +1,24 @@
+---
+title: Connection failover verification
+description: Device playbook for multi-WAN failover with two real uplinks, verifying mwan3 priority, failback hold-down and the resulting routing.
+updated: 2026-10-05
+status: ready for device testing
+tags: [testing, on-device, failover, mwan3]
+---
+
 # Connection Failover Verification
 
-**Base plan:** `connection-failover.md` Phase 5
+**Design of record:** [ADR 0005](../adr/0005-multi-wan-failover-mwan3.md) (its Phase 5 became this playbook)
 **Status:** Ready for device testing
-**Target device:** OpenWRT 23.05+ (GL.iNet Beryl AX, Slate AXT1800)
+**Target device:** GL.iNet Beryl AX or Slate AXT1800 on OpenWrt 23.05+; the firmware this
+playbook was last exercised against is 25.12.3 (see `on-device-verification.md`), which is
+also the version the apk package manager in `architecture/overview.md` assumes.
 
 ---
 
 ## Prerequisites
 
-- Device: GL.iNet Beryl AX (MT3000) or Slate AXT1800 with OpenWRT 23.05+
+- Device: GL.iNet Beryl AX (MT3000) or Slate AXT1800 with OpenWrt 23.05+ (tested on 25.12.3)
 - Travo installed and running
 - At least 2 uplink interfaces available (Ethernet + WiFi, or WiFi + USB tether)
 - SSH access to device at `192.168.1.1`

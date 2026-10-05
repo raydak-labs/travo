@@ -29,7 +29,8 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 | [`tests/`](./tests/) | On-device verification playbooks | Every playbook must be linked from somewhere in `docs/`; a Go test enforces it. |
 | [`plans/`](./plans/README.md) | Live and normative plans only | A shipped plan is deleted once its decisions are folded into an ADR. |
 | [`requirements/`](./requirements/) | Backlog (`tasks_open`) and shipped log (`tasks_done`) | Remove from one, add to the other, in the same commit. |
-| [`_archive/`](./_archive/) | Frozen historical exports | Never a source of truth, never edited. |
+| [`images/`](./images/) | Screenshots and assets referenced from docs and the repo README | Binary assets only; no prose. |
+| [`_archive/`](./_archive/) | Frozen historical exports: the legacy checkbox dump and the point-in-time review reports | Never a source of truth, never edited, never linked as current. |
 
 ## Current pointers
 
@@ -52,8 +53,8 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 
 ## Other
 
-- [`INIT_PROMPT.md`](../INIT_PROMPT.md) — initial project prompt
-- [`2026-09-26-critical-code-review.md`](../2026-09-26-critical-code-review.md) and
-  [`2026-10-04-deep-code-review.md`](../2026-10-04-deep-code-review.md) — point-in-time
-  review reports. They quote paths and states as they were on that date; do not
-  treat their path references as current.
+- [`_archive/init-prompt.md`](./_archive/init-prompt.md) — the initial project prompt
+- [`_archive/reviews/`](./_archive/reviews/) — the 2026-09-26 and 2026-10-04 code reviews.
+  Frozen point-in-time reports: a Go test still resolves the paths they cite and requires
+  them to exist, but they describe paths and states as they were on that date. Do not
+  treat their references as current.

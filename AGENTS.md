@@ -30,7 +30,7 @@ look for it, and link rather than duplicate:
 | Fact | Home | Not |
 | ---- | ---- | --- |
 | A durable decision (hard to reverse, surprising without context, real trade-off) | a numbered ADR in `docs/adr/` | a plan, a code comment, a task |
-| An invariant or safety rule that spans subsystems | `docs/architecture/overview.md` | an ADR, if one already owns it |
+| An invariant or safety rule that spans subsystems | `docs/architecture/overview.md`, or [ADR 0013](docs/adr/0013-operational-invariants-and-device-findings.md) once an ADR owns it | the other one |
 | How to do something | `docs/guides/<task>.md` | `docs/reference/` |
 | What something is (tokens, tables, contracts) | `docs/reference/` | a guide |
 | A check that only settles on hardware | `docs/tests/<area>-verification.md` | a guide, if the guide only runs commands |

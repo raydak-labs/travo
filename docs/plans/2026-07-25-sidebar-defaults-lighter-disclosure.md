@@ -2,6 +2,7 @@
 title: "Sidebar defaults + lighter disclosure"
 description: "Parent group navigates to daily default; arrow toggles submenu; fewer PageSections"
 updated: 2026-07-25
+status: normative
 tags: [plan, frontend, ux, ia]
 ---
 

@@ -1,5 +1,6 @@
 ---
 title: "ADR 0006: Application platform, repo shape, and API contract"
+description: Platform contract: one static Go binary, tree-shaken frontend bundles, the API surface, and the OpenAPI document as the automation contract.
 status: Accepted
 date: 2026-05-14
 updated: 2026-09-28

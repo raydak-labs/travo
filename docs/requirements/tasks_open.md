@@ -9,7 +9,7 @@ tags: [backlog, requirements, tasks]
 
 Working backlog only — no duplicate “priority queue”; each item appears once under its area.
 
-Stable rules: [`../architecture.md`](../architecture/overview.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
+Stable rules: [`../architecture/overview.md`](../architecture/overview.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
 > **Last updated:** 2026-10-04 (the `updated:` field in the frontmatter is the same date; keep them in step)
 

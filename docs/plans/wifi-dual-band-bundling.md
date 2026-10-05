@@ -2,6 +2,7 @@
 title: "Plan: WiFi dual-band bundling & automatic band switching"
 description: "Planning / design notes: Plan: WiFi dual-band bundling & automatic band switching"
 updated: 2026-04-13
+status: active
 tags: [plan, traceability, wifi]
 ---
 
@@ -90,7 +91,7 @@ A background monitor periodically checks signal quality of the active STA connec
 3. **Band switch procedure:**
    - Scan the alternate radio for the current SSID (via `iwinfo <other-radio-ap> scan | grep SSID`).
    - If SSID found with signal above a **minimum viable threshold** (-80 dBm):
-     - Write crash guard file `/etc/openwrt-travel-gui/band-switch-in-progress`
+     - Write crash guard file `/etc/trafo/band-switch-in-progress`
      - `uci set wireless.sta0.device=<other-radio>`
      - UCI apply/confirm (uses existing safe rollback flow)
      - Remove crash guard on success
@@ -118,7 +119,7 @@ A background monitor periodically checks signal quality of the active STA connec
 
 ### Config file
 
-`/etc/openwrt-travel-gui/band-switching.json`:
+`/etc/travo/band-switching.json`:
 ```json
 {
   "enabled": false,
@@ -134,7 +135,7 @@ A background monitor periodically checks signal quality of the active STA connec
 
 ### Safety
 
-- **Crash guard:** `/etc/openwrt-travel-gui/band-switch-in-progress` — prevents retry loop on reboot.
+- **Crash guard:** `/etc/trafo/band-switch-in-progress` — prevents retry loop on reboot.
 - **UCI rollback:** Uses `uci apply` with 30s rollback timeout. If the device crashes during switch, old config is restored on boot.
 - **Rate limiting:** After any switch, impose a cooldown (2 minutes) before the next switch to avoid rapid flapping.
 - **Only when connected:** Monitor only runs when STA has an active connection. If disconnected, auto-reconnect (existing feature) handles reconnection first.
@@ -191,7 +192,7 @@ When creating/moving the STA for a new connection:
 - Traceability: [tasks_done.md](../requirements/tasks_done.md#wifi-and-network-foundation) (dual-band shipped)
 - Current scan: backend `WifiService.Scan()` returns flat list from all radios; frontend `WifiScanList` renders one row per result.
 - Connect flow: `WifiConnectDialog` passes `network.ssid` and password; backend `Connect()` sets STA SSID/key and applies; band is determined by which radio the STA is on.
-- Auto-reconnect pattern: `/etc/openwrt-travel-gui/autoreconnect.json` + cron script + crash guard.
+- Auto-reconnect pattern: `/etc/travo/autoreconnect.json` + cron script + crash guard.
 - Alert service pattern: `AlertService` goroutine with `time.NewTicker` for periodic checks.
 - UCI apply/confirm: `services/uci_apply.go` — safe rollback-based wireless apply.
 - Verified on device: AXT1800 (IPQ6018) supports cross-radio scanning while STA is connected; band switch via UCI device change works.

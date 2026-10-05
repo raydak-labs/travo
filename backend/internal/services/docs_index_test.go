@@ -48,10 +48,11 @@ func TestPlansIndexListsEveryPlan(t *testing.T) {
 				"catalog of every plan in this directory", name)
 		}
 	}
-	if listed < 5 {
+	if listed < 3 {
 		t.Fatalf("only %d plans found — the directory walk is probably broken, or live "+
 			"and normative plans were deleted without folding their decisions into an ADR "+
-			"(ADR 0013)", listed)
+			"(ADR 0013). The floor is deliberately well below today's count: deletion is "+
+			"the normal end of a plan's life, so the gate must not punish it.", listed)
 	}
 }
 
@@ -117,7 +118,7 @@ func TestGoVersionPinsAgree(t *testing.T) {
 // one thing that made it hard to trust the previous one: completion marks that
 // assert things about files which do not contain them.
 func TestReviewReportIsPresentAndScoped(t *testing.T) {
-	const report = "../../../2026-10-04-deep-code-review.md"
+	const report = "../../../docs/_archive/reviews/2026-10-04-deep-code-review.md"
 
 	body, err := os.ReadFile(report)
 	if err != nil {

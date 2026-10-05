@@ -1,5 +1,6 @@
 ---
 title: "ADR 0001: DNS resolution, VPN, captive portal, and restore semantics"
+description: Why DNS resolution, VPN tunnelling and captive-portal handling share one dnsmasq resolver layer stack instead of separate snapshots.
 status: Accepted
 date: 2026-05-14
 updated: 2026-10-04
@@ -56,7 +57,7 @@ We need:
 
 - Detected when AdGuard’s YAML **`dns.port`** is **53** (`GetDNSMode` returns `adguard-direct`).
 - Typically implies dnsmasq is no longer the LAN-facing DNS listener on 53 (operator or packaging may set **`port=0`** on dnsmasq or equivalent). This mode is **powerful but fragile**: DHCP-supplied local names, some split-DNS setups, and naive VPN DNS assumptions may break.
-- **Product stance**: forwarding mode is the default safe path; direct mode is **expert / YAML-driven**, with UI copy and plans (`docs/plans/adguard-auto-configure.md`) describing risks.
+- **Product stance**: forwarding mode is the default safe path; direct mode is **expert / YAML-driven**, with UI copy and ADR 0013 rule 7 describing risks.
 
 **2.4 API-visible mode**
 
@@ -362,7 +363,7 @@ new callers must not widen the condition.
 - `docs/adr/0003-crash-guards-and-live-state.md` — guard directory contract (§2)
 - `docs/adr/0010-uci-write-serialisation-and-request-contracts.md` — the `dhcp` lock
 - `packaging/adguard/AdGuardHome.yaml` — the shipped AdGuard config, incl. `users: []`
-- `docs/examples/adguard.yml` — the documented example of the same file
-- `docs/plans/adguard-auto-configure.md` — historical plan: primary vs forwarding
-- `docs/plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md` — VPN DNS restore
+- `packaging/adguard/AdGuardHome.yaml` — the shipped template itself (no second copy)
+- [ADR 0013](./0013-operational-invariants-and-device-findings.md) rule 7 — AdGuard forwarding vs primary DNS
+- [ADR 0013](./0013-operational-invariants-and-device-findings.md) rule 8 — the retired VPN disable latency question
 - `docs/guides/deployment.md` — packaged AdGuard port and dnsmasq relationship

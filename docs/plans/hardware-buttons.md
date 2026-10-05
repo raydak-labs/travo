@@ -2,6 +2,7 @@
 title: "Plan: Hardware Buttons (GL.iNet AXT1800)"
 description: "Planning / design notes: Plan: Hardware Buttons (GL.iNet AXT1800)"
 updated: 2026-04-13
+status: active
 tags: [hardware, plan, traceability]
 ---
 
@@ -83,7 +84,7 @@ The GL.iNet GL-AXT1800 has the following button-related infrastructure:
 - Parse each script to determine current action
 - For `rfkill`: check if script contains `wifi` commands → `wifi_toggle`
 - For `wps`: check `/etc/rc.wps/` for custom scripts
-- Store custom action config in `/etc/openwrt-travel-gui/buttons.json`
+- Store custom action config in `/etc/travo/buttons.json`
 
 ### Phase 2 — Configure Button Actions
 
@@ -157,7 +158,7 @@ done
 
 ## Notes
 
-- **Backup original scripts:** Before modifying any `/etc/rc.button/` script, save backup to `/etc/openwrt-travel-gui/button-backups/`
+- **Backup original scripts:** Before modifying any `/etc/rc.button/` script, save backup to `/etc/trafo/button-backups/`
 - **Safety constraint:** Reset button action MUST NOT be user-configurable (always factory reset)
 - **Other devices:** The detection should work generically; different GL.iNet models or generic OpenWRT routers will have different buttons in `/etc/rc.button/`
 - **The AXT1800 toggle switch** acts as rfkill — switching it sends `TYPE=switch` with `ACTION=pressed`/`released`. This is different from a momentary button.

@@ -1,5 +1,6 @@
 ---
 title: "ADR 0012: UI consistency — card plane, status language, summary bands, traffic history"
+description: One card plane, one status language, one group heading, one load/error contract, summary bands, and server-owned traffic history.
 status: Accepted
 date: 2026-10-05
 updated: 2026-10-05
@@ -105,6 +106,7 @@ is precisely the case that looked broken.
   reachability because "is my internet up" is the question a user asks on the
   WiFi page. The alternative (leaving it to Network) answers the question in the
   wrong place.
+
 ## Provenance: work folded in from executed plans
 
 This ADR supersedes the contracts in the UI consistency and nested-cards plans of
@@ -121,11 +123,13 @@ deleted rather than archived. What survives from them:
   built by that work and are unchanged.
 - **Page rhythm.** `space-y-6` at the page root and `CardHeader`/`CardTitle` as
   the card title contract.
-- **What was deliberately reversed.** The old plan allowed an ad-hoc status class
-  and allowed the dashboard source card to keep custom chrome. Both are now
+- **What was deliberately reversed, and why.** The old plan allowed an ad-hoc status
+  class and allowed the dashboard source card to keep custom chrome. Both are now
   defects: raw `bg-*/text-*` status strings are banned (decision 2) and there is
-  no exempt screen (decision 1). Read the plan, not this paragraph, if you are
-  looking for permission to reintroduce either.
+  no exempt screen (decision 1). Each was allowed for a reason that no longer
+  holds — the ad-hoc class because per-page status colours were faster to write,
+  the source-card exemption because that card predated the shared card plane — so
+  if you want one of them back, you owe a new ADR, not a local exception.
 
 Health fixtures on the repeater tests must disable conflicting mock radios, or
 `repeater_same_radio_ap_sta` (ADR 0002) fires in unrelated tests.
