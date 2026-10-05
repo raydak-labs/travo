@@ -18,12 +18,21 @@ export function DhcpReservationsTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
+        <caption className="sr-only">Static DHCP reservations</caption>
         <thead>
           <tr className="border-b text-left text-gray-500 dark:text-gray-400">
-            <th className="pb-2 font-medium">Name</th>
-            <th className="pb-2 font-medium">MAC Address</th>
-            <th className="pb-2 font-medium">IP Address</th>
-            <th className="w-16 pb-2 font-medium"></th>
+            <th scope="col" className="pb-2 font-medium">
+              Name
+            </th>
+            <th scope="col" className="pb-2 font-medium">
+              MAC Address
+            </th>
+            <th scope="col" className="pb-2 font-medium">
+              IP Address
+            </th>
+            <th scope="col" className="w-16 pb-2 font-medium">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>

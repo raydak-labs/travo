@@ -72,7 +72,7 @@ describe('DashboardPage', () => {
       expect(screen.getAllByText('GL-MT3000').length).toBeGreaterThan(0);
     });
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Ethernet (WAN)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ethernet' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Repeater (WiFi)' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'USB Tethering' })).toBeInTheDocument();
     });
@@ -80,7 +80,7 @@ describe('DashboardPage', () => {
 
   it('forces dark SourceCard chrome for light-mode contrast', async () => {
     renderDashboard();
-    const ethernet = await screen.findByRole('heading', { name: 'Ethernet (WAN)' });
+    const ethernet = await screen.findByRole('heading', { name: 'Ethernet' });
     const card = ethernet.closest('[class*="bg-slate-900"]');
     expect(card).toBeTruthy();
     expect(card?.className).toMatch(/border-slate-700/);
@@ -99,9 +99,15 @@ describe('DashboardPage', () => {
     renderDashboard();
     await waitFor(() => {
       expect(screen.getByText('Quick status')).toBeInTheDocument();
-      expect(screen.getByText('Reachable')).toBeInTheDocument();
+      // `internet_reachable` is a WAN-carrier check, not a reachability probe,
+      // so it must not be presented as "Internet".
+      expect(screen.getAllByText('Uplink').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Connected').length).toBeGreaterThan(0);
     });
-    const reachable = screen.getByText('Reachable');
+    const reachable = screen
+      .getAllByText('Connected')
+      .find((el) => el.tagName === 'P' && el.className.includes('font-medium'))!;
+    expect(reachable).toBeDefined();
     expect(reachable.className).toMatch(/text-emerald-600/);
     expect(reachable.className).toMatch(/dark:text-emerald-400/);
     const vpnState = screen.getByText(/^(On|Off)$/);
@@ -131,7 +137,7 @@ describe('DashboardPage', () => {
   it('renders network throughput chart section', async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText('Network Throughput')).toBeInTheDocument();
+      expect(screen.getByText('Internet Throughput')).toBeInTheDocument();
     });
   });
 
@@ -143,7 +149,7 @@ describe('DashboardPage', () => {
     expect(desktop.className).toMatch(/hidden/);
     expect(desktop.className).toMatch(/@xl:flex/);
     await waitFor(() => {
-      expect(screen.getAllByText('Internet').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Uplink').length).toBeGreaterThan(0);
     });
   });
 

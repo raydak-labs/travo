@@ -61,7 +61,7 @@ export function QueryCard({
         <InlineError>{errorText(error)}</InlineError>
         {onRetry ? (
           <Button variant="outline" size="sm" onClick={onRetry}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            <RefreshCw className="h-3.5 w-3.5" />
             Retry
           </Button>
         ) : null}

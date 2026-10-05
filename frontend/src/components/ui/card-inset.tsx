@@ -4,11 +4,17 @@ import { type HTMLAttributes, forwardRef } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/cn';
 
-const cardInsetVariants = cva('rounded-md border border-gray-200 p-3 dark:border-white/10', {
+/** Base inset chrome, exported so an ad-hoc muted nest matches the token. */
+export const insetClassName = 'rounded-md border border-gray-200 p-3 dark:border-white/10';
+
+/** The muted fill, which reads `dark:bg-gray-900/50` — not `dark:bg-gray-900`. */
+export const insetMutedClassName = 'bg-gray-50 dark:bg-gray-900/50';
+
+const cardInsetVariants = cva(insetClassName, {
   variants: {
     variant: {
       default: '',
-      muted: 'bg-gray-50 dark:bg-gray-900/50',
+      muted: insetMutedClassName,
     },
   },
   defaultVariants: {

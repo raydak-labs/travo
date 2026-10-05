@@ -9,7 +9,13 @@ import { filterClientsBySearch } from '@/pages/clients/clients-filter';
 import { ClientsSearchBar } from '@/pages/clients/clients-search-bar';
 
 export function ClientsConnectedClientsCard() {
-  const { data: clients, isLoading: clientsLoading } = useClients();
+  const {
+    data: clients,
+    isLoading: clientsLoading,
+    isError: clientsError,
+    error: clientsErrorDetail,
+    refetch: refetchClients,
+  } = useClients();
   const { data: blockedMacs } = useBlockedClients();
   const { data: reservations } = useDHCPReservations();
 
@@ -49,6 +55,9 @@ export function ClientsConnectedClientsCard() {
 
         <ClientsConnectedTable
           clientsLoading={clientsLoading}
+          clientsError={clientsError}
+          clientsErrorDetail={clientsErrorDetail}
+          clientsRefetch={() => void refetchClients()}
           filtered={filtered}
           hasSearch={Boolean(search)}
           blockedSet={blockedSet}

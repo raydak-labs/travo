@@ -58,7 +58,7 @@ export function LedScheduleForm({
               />
             </div>
             {errors.on_time ? (
-              <p id="led-on-err" className="text-xs text-red-500" role="alert">
+              <p id="led-on-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.on_time.message}
               </p>
             ) : null}
@@ -76,7 +76,7 @@ export function LedScheduleForm({
               />
             </div>
             {errors.off_time ? (
-              <p id="led-off-err" className="text-xs text-red-500" role="alert">
+              <p id="led-off-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.off_time.message}
               </p>
             ) : null}

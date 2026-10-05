@@ -1,92 +1,105 @@
+import { statusDotClass, statusDotIdleClass } from '@/lib/status-dot';
 import { Info, Cable, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNetworkStatus } from '@/hooks/use-network';
+import { CardInset } from '@/components/ui/card-inset';
+import { useNetworkStatus, useFailoverConfig } from '@/hooks/use-network';
+import { resolveUplinks, type ResolvedUplink } from '@/lib/uplink';
 import type { NetworkInterface } from '@shared/index';
 
-const WAN_SOURCES = [
-  {
-    key: 'wan',
-    label: 'WAN (Ethernet)',
-    match: (iface: NetworkInterface) =>
-      iface.type === 'wan' || (iface.name === 'wan' && iface.type !== 'wifi'),
-    description: 'Wired ethernet uplink via the WAN port.',
-  },
-  {
-    key: 'wwan',
-    label: 'WWAN (WiFi Client)',
-    match: (iface: NetworkInterface) =>
-      iface.type === 'wifi' && (iface.name.startsWith('wlan-sta') || iface.name.startsWith('wwan')),
-    description: 'Wireless uplink connected to an upstream WiFi network.',
-  },
-] as const;
+function UplinkRow({ uplink }: { uplink: ResolvedUplink }) {
+  const state = uplink.active ? 'Active' : 'Inactive';
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        aria-hidden="true"
+        className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+          uplink.active ? statusDotClass(true) : statusDotIdleClass
+        }`}
+      />
+      <span className="sr-only">{`${uplink.longLabel}: ${state}`}</span>
+      <div className="flex-1">
+        <span className="text-sm font-medium text-gray-900 dark:text-white">{uplink.label}</span>
+        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+          {uplink.active
+            ? (uplink.iface?.ip_address ?? '')
+            : uplink.iface
+              ? uplink.inactiveCopy
+              : uplink.notConfiguredCopy}
+        </span>
+      </div>
+      <Badge variant={uplink.active ? 'success' : 'secondary'}>{state}</Badge>
+    </div>
+  );
+}
+
+/**
+ * Explains what the router will actually do, which depends on whether
+ * automatic failover is switched on. The previous copy claimed traffic
+ * "automatically fails over to WiFi" unconditionally, while the Advanced tab
+ * showed mwan3 as disabled — the two pages contradicted each other.
+ */
+function UplinkExplanation({
+  anyActive,
+  failoverEnabled,
+  failoverAvailable,
+}: {
+  anyActive: boolean;
+  failoverEnabled: boolean;
+  failoverAvailable: boolean;
+}) {
+  let message: string;
+  if (!anyActive) {
+    message =
+      'No uplink is active. Connect an ethernet cable, join an upstream WiFi network, or plug in a tethered phone to get internet access.';
+  } else if (failoverEnabled) {
+    message =
+      'Automatic failover is on. The router monitors each uplink and moves traffic to the highest-priority one that is online.';
+  } else if (failoverAvailable) {
+    message =
+      'Both uplinks can be connected at the same time; the router uses the wired one. Turn on Connection Failover under Advanced to switch automatically.';
+  } else {
+    message =
+      'Both uplinks can be connected at the same time; the router prefers the wired link, then WiFi, then USB. Automatic switching is unavailable.';
+  }
+
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
 
 function WanInterplay({ interfaces }: { interfaces: readonly NetworkInterface[] }) {
-  const sources = WAN_SOURCES.map((src) => {
-    const iface = interfaces.find(src.match);
-    const active = iface != null && iface.is_up && iface.ip_address !== '';
-    return { ...src, iface, active };
-  });
-
-  const anyActive = sources.some((s) => s.active);
+  const { data: failover } = useFailoverConfig();
+  const uplinks = resolveUplinks(interfaces);
+  const anyActive = uplinks.some((u) => u.active);
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        {sources.map((src) => (
-          <div
-            key={src.key}
-            className="flex items-center gap-3 rounded-md bg-gray-50 p-3 dark:bg-gray-900"
-          >
-            <span
-              className={`inline-block h-2.5 w-2.5 rounded-full ${
-                src.active
-                  ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] dark:bg-emerald-400'
-                  : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-              aria-label={src.active ? 'Active' : 'Inactive'}
-            />
-            <div className="flex-1">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">{src.label}</span>
-              {src.iface && (
-                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  {src.active ? src.iface.ip_address : 'down'}
-                </span>
-              )}
-              {!src.iface && (
-                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  not configured
-                </span>
-              )}
-            </div>
-            <Badge variant={src.active ? 'success' : 'secondary'}>
-              {src.active ? 'Active' : 'Inactive'}
-            </Badge>
-          </div>
+      <CardInset variant="muted" className="space-y-3">
+        {uplinks.map((uplink) => (
+          <UplinkRow key={uplink.key} uplink={uplink} />
         ))}
-      </div>
+      </CardInset>
 
-      <div
-        className={`flex items-start gap-2 rounded-md border p-3 text-xs ${
-          anyActive
-            ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300'
-            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
-        }`}
-      >
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>
-          {anyActive
-            ? 'OpenWrt uses the highest-priority active source for internet. When both WAN (ethernet) and WWAN (WiFi) are connected, ethernet takes priority. If the wired link drops, traffic automatically fails over to WiFi.'
-            : 'No WAN source is active. Connect an ethernet cable or join an upstream WiFi network to get internet access.'}
-        </span>
-      </div>
+      <UplinkExplanation
+        anyActive={anyActive}
+        failoverEnabled={failover?.enabled === true}
+        failoverAvailable={failover?.available === true}
+      />
     </div>
   );
 }
 
 export function WanStatusCard() {
   const { data: network, isLoading } = useNetworkStatus();
+  // `internet_reachable` is a WAN-carrier check, not a reachability probe: a
+  // DHCP lease on a dead or captive-portaled uplink still reads true. Naming it
+  // "Internet" is the one word a non-expert trusts most.
+  const uplinkUp = network?.internet_reachable === true;
 
   return (
     <Card>
@@ -95,28 +108,28 @@ export function WanStatusCard() {
         <Cable className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Internet connectivity row */}
         <div className="flex items-center gap-2">
           {isLoading ? (
             <Skeleton className="h-4 w-1/3" />
-          ) : network?.internet_reachable ? (
+          ) : uplinkUp ? (
             <>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Internet Connected
+                Uplink Connected
               </span>
+              <span className="sr-only">WAN link is up.</span>
               <Badge variant="success">Online</Badge>
             </>
           ) : (
             <>
-              <XCircle className="h-4 w-4 text-red-500" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">No Internet</span>
+              <XCircle className="h-4 w-4 text-red-500" aria-hidden="true" />
+              <span className="text-sm font-medium text-gray-900 dark:text-white">No Uplink</span>
+              <span className="sr-only">WAN link is down.</span>
               <Badge variant="destructive">Offline</Badge>
             </>
           )}
         </div>
 
-        {/* WAN source interplay */}
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-8 w-full" />

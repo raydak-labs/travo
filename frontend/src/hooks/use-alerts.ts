@@ -34,20 +34,23 @@ export function alertsRefetchInterval(wsConnected: boolean): number | false {
 }
 
 export function useAlerts() {
-  const { alerts, unreadCount, addAlert, setAlerts, markAllRead } = useAlertStore();
+  const { alerts, unreadCount, addAlert, mergeAlerts, markAllRead } = useAlertStore();
   const { connected, subscribe } = useWsSubscribe();
   const wasDisconnectedRef = useRef(false);
 
   // Fetch history on mount; poll only while the WebSocket is down.
-  const { refetch } = useQuery({
+  const { data, refetch } = useQuery({
     queryKey: ['system', 'alerts'],
-    queryFn: async () => {
-      const data = await apiClient.get<AlertsResponse>(API_ROUTES.system.alerts);
-      setAlerts([...data.alerts]);
-      return data;
-    },
+    queryFn: ({ signal }) => apiClient.get<AlertsResponse>(API_ROUTES.system.alerts, signal),
     refetchInterval: alertsRefetchInterval(connected),
   });
+
+  // Merge rather than replace: this response describes the router as of when
+  // the request went out, and any alert pushed over the socket since then is
+  // absent from it.
+  useEffect(() => {
+    if (data) mergeAlerts(data.alerts);
+  }, [data, mergeAlerts]);
 
   // Catch up on alerts missed while the socket was down.
   useEffect(() => {

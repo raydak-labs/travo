@@ -69,7 +69,8 @@ describe('useBackup', () => {
     await expect(result.current.mutateAsync()).rejects.toThrow('Unauthorized');
 
     await waitFor(() => expect(getToken()).toBeNull());
-    expect(assignMock).toHaveBeenCalledWith('/login');
+    // The destination is preserved so the user comes back here after login.
+    expect(assignMock).toHaveBeenCalledWith('/login?redirect=%2F');
   });
 });
 

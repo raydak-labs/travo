@@ -54,7 +54,11 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           {...register('limit_gb')}
         />
         {errors.limit_gb ? (
-          <span id={`budget-limit-${ifaceName}`} className="text-xs text-red-500" role="alert">
+          <span
+            id={`budget-limit-${ifaceName}`}
+            className="text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
             {errors.limit_gb.message}
           </span>
         ) : null}
@@ -69,7 +73,11 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           {...register('warning_threshold_pct')}
         />
         {errors.warning_threshold_pct ? (
-          <span id={`budget-warn-${ifaceName}`} className="text-xs text-red-500" role="alert">
+          <span
+            id={`budget-warn-${ifaceName}`}
+            className="text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
             {errors.warning_threshold_pct.message}
           </span>
         ) : null}

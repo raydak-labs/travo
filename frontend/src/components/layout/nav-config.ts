@@ -53,7 +53,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     defaultTo: '/wifi',
     items: [
       { to: '/wifi', label: 'Connect' },
-      { to: '/wifi/advanced', label: 'Advanced' },
+      // Qualified: the Network group has an "Advanced" too, and two identical
+      // nav items plus two identical header titles gave no way to tell which
+      // section you were in.
+      { to: '/wifi/advanced', label: 'WiFi / Advanced' },
     ],
   },
   {
@@ -65,7 +68,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     items: [
       { to: '/network', label: 'Status' },
       { to: '/network/configuration', label: 'Internet & LAN' },
-      { to: '/network/advanced', label: 'Advanced' },
+      { to: '/network/advanced', label: 'Network / Advanced' },
     ],
   },
   {
@@ -134,7 +137,9 @@ const STORAGE_KEY_GROUPS = 'otg-sidebar-groups-v3';
 /** Default open state for groups (first visit). */
 const defaultOpen: Record<string, boolean> = {
   wifi: false,
-  network: false,
+  // Open by default: "Internet & LAN" (change WAN, DHCP, DNS) is the most
+  // common travel-router task, and it was buried behind a collapsed group.
+  network: true,
   services: false,
   system: false,
 };
@@ -167,9 +172,10 @@ export function isRouteActive(navTo: string, pathname: string): boolean {
   let path = pathname;
   if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
 
-  if (navTo === '/services') {
-    return path === '/services';
-  }
+  // Group children match exactly. `/services` previously needed its own
+  // hard-coded special case purely because it is both a top-level item and a
+  // group parent, and `/wifi` and `/network` escaped prefix matching only by
+  // accident of also appearing in GROUP_CHILD_PATHS.
   if (GROUP_CHILD_PATHS.has(navTo)) {
     return path === navTo;
   }

@@ -32,7 +32,7 @@ export function GuestNetworkCard() {
       encryption: 'psk2',
       key: '',
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const enabled = watch('enabled');

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -15,6 +16,8 @@ import { useConnectionMethod } from '@/hooks/use-network';
 interface ConfirmRadioDisableDialogProps {
   open: boolean;
   radioName: string;
+  /** Total radios on the device. `SetRadioRole` only touches the named radio. */
+  radioCount: number;
   isPending: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
@@ -23,12 +26,14 @@ interface ConfirmRadioDisableDialogProps {
 export function ConfirmRadioDisableDialog({
   open,
   radioName,
+  radioCount,
   isPending,
   onOpenChange,
   onConfirm,
 }: ConfirmRadioDisableDialogProps) {
   const { data: connectionMethod } = useConnectionMethod();
   const isWifiClient = connectionMethod?.method === 'wifi-client';
+  const isOnlyRadio = radioCount <= 1;
 
   const [confirmText, setConfirmText] = useState('');
   const isConfirmed = confirmText === 'CONFIRM';
@@ -62,17 +67,28 @@ export function ConfirmRadioDisableDialog({
             <div className="flex items-start gap-3">
               <Radio className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
               <div className="flex-1">
+                {/* `SetRadioRole` disables only the sections bound to the
+                    named radio. Claiming "all WiFi" on a two-radio device is a
+                    false all-clear about blast radius in the one dialog that is
+                    supposed to be maximally scary. */}
                 <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
-                  All WiFi will stop working
+                  {isOnlyRadio
+                    ? 'All WiFi will stop working'
+                    : `This radio will stop working — the other band stays up`}
                 </h3>
                 <p className="mt-1 text-sm text-red-800 dark:text-red-200">
-                  Disabling this radio will turn off all WiFi functionality. This includes:
+                  Disabling {radioName} turns off everything running on it:
                 </p>
                 <ul className="mt-2 space-y-1 text-sm text-red-700 dark:text-red-300">
-                  <li>• WiFi client connections (uplink)</li>
-                  <li>• WiFi access points (for connecting devices)</li>
-                  <li>• Guest WiFi and any wireless features</li>
+                  <li>• WiFi client connections (uplink) on {radioName}</li>
+                  <li>• Access points and guest networks hosted on {radioName}</li>
+                  <li>• Devices currently connected to those networks</li>
                 </ul>
+                {!isOnlyRadio && (
+                  <p className="mt-2 text-sm text-red-800 dark:text-red-200">
+                    The other radio keeps working, so devices on that band stay connected.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -109,13 +125,12 @@ export function ConfirmRadioDisableDialog({
             >
               Type <span className="font-mono font-bold">CONFIRM</span> to proceed
             </Label>
-            <input
+            <Input
               id="confirm-input"
-              type="text"
+              className="mt-2 font-mono"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
               placeholder="Type CONFIRM"
-              className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-mono text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
           </div>
         </div>

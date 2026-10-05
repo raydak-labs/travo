@@ -1,3 +1,4 @@
+import { CardInset } from '@/components/ui/card-inset';
 import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -31,24 +32,24 @@ export function SystemTimezoneCard() {
           <Skeleton className="h-4 w-1/2" />
         ) : (
           <div className="space-y-4">
-            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+            <CardInset variant="muted">
               <div className="grid grid-cols-2 gap-2">
                 <span className="text-gray-500 dark:text-gray-400">Timezone</span>
                 <span className="text-gray-900 dark:text-white">
                   {timezoneConfig?.zonename || '—'}
                 </span>
               </div>
-            </div>
+            </CardInset>
 
             {editingTimezone ? (
               <>
                 <div className="space-y-1">
-                  <Label>Change Timezone</Label>
+                  <Label htmlFor="system-timezone">Change Timezone</Label>
                   <Select
                     value={selectedTz || timezoneConfig?.zonename || ''}
                     onValueChange={setSelectedTz}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="system-timezone">
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
                     <SelectContent>

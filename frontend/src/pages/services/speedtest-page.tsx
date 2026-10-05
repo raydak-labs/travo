@@ -33,7 +33,7 @@ export function SpeedtestPage() {
     return (
       <div className="space-y-6">
         <InlineError>
-          <AlertTriangle className="mr-2 inline h-4 w-4" />
+          <AlertTriangle className="inline h-4 w-4" />
           Failed to load speedtest service: {statusError.message}
         </InlineError>
       </div>
@@ -56,7 +56,7 @@ export function SpeedtestPage() {
           <Gauge className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
+          <div className="grid gap-4 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900/50 md:grid-cols-2">
             <div>
               <span className="text-gray-500 dark:text-gray-400">Installed</span>
               <span className="ml-2 font-medium">{status.installed ? 'Yes' : 'No'}</span>
@@ -132,7 +132,7 @@ export function SpeedtestPage() {
           </Button>
 
           {runMutation.data && (
-            <div className="grid gap-3 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900 md:grid-cols-2">
+            <div className="grid gap-3 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900/50 md:grid-cols-2">
               <div className="flex items-center gap-2">
                 <Download className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span className="text-gray-500 dark:text-gray-400">Download</span>

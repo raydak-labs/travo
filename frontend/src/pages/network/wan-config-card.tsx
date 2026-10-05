@@ -1,3 +1,4 @@
+import { CardInset } from '@/components/ui/card-inset';
 import { Search, Wifi } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +35,7 @@ export function WanConfigCard() {
           onRetry={() => void refetchNetwork()}
         >
           {network?.wan ? (
-            <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+            <CardInset variant="muted">
               <div className="grid grid-cols-2 gap-2">
                 <span className="text-gray-500 dark:text-gray-400">Medium</span>
                 <span className="text-gray-900 dark:text-white">{networkMedium(network.wan)}</span>
@@ -55,7 +56,7 @@ export function WanConfigCard() {
                   ↓ {formatBytes(network.wan.rx_bytes)} / ↑ {formatBytes(network.wan.tx_bytes)}
                 </span>
               </div>
-            </div>
+            </CardInset>
           ) : (
             <EmptyState message="WAN not configured" />
           )}
@@ -67,7 +68,7 @@ export function WanConfigCard() {
             onClick={() => detectWanType.mutate()}
             disabled={detectWanType.isPending}
           >
-            <Search className="mr-1.5 h-3.5 w-3.5" />
+            <Search className="h-3.5 w-3.5" />
             {detectWanType.isPending ? 'Detecting…' : 'Auto-detect WAN Type'}
           </Button>
           {detectWanType.data && (

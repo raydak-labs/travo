@@ -5,6 +5,7 @@ import { apiClient, isTokenRemembered, setToken } from '@/lib/api-client';
 import { resetSetupStatusCache } from '@/lib/setup-status';
 import { routeWithSegment } from '@/lib/api-url';
 import { useWsSubscribe } from '@/lib/ws-context';
+import { useRefetchOnWsReconnect } from '@/hooks/use-refetch-on-ws-reconnect';
 import { API_ROUTES } from '@shared/index';
 import type {
   SystemInfo,
@@ -46,6 +47,9 @@ export function statsRefetchInterval(wsConnected: boolean): number | false {
 export function useSystemStats() {
   const { connected, subscribe } = useWsSubscribe();
   const queryClient = useQueryClient();
+  // Polling stops while connected, so a reconnect has to re-request whatever
+  // the socket missed while it was down.
+  useRefetchOnWsReconnect([['system', 'stats']]);
 
   // Feed WebSocket pushes straight into the query cache — every consumer of
   // this hook sees live data without duplicate HTTP requests to the router.
@@ -103,24 +107,31 @@ export function useFactoryReset() {
   });
 }
 
-export function useSystemLogs(service?: string, level?: string) {
+/**
+ * `enabled` exists so the Logs page can fetch only the visible tab. Both log
+ * queries used to be always-on, so opening the page ran `logread` *and*
+ * `dmesg` and switching tabs refetched the one being left.
+ */
+export function useSystemLogs(service?: string, level?: string, enabled = true) {
   return useQuery({
     queryKey: ['system', 'logs', service ?? '', level ?? ''],
-    queryFn: () => {
+    enabled,
+    queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       if (service) params.set('service', service);
       if (level) params.set('level', level);
       const qs = params.toString();
       const url = qs ? `${API_ROUTES.system.logs}?${qs}` : API_ROUTES.system.logs;
-      return apiClient.get<LogResponse>(url);
+      return apiClient.get<LogResponse>(url, signal);
     },
   });
 }
 
-export function useKernelLogs() {
+export function useKernelLogs(enabled = true) {
   return useQuery({
     queryKey: ['system', 'logs', 'kernel'],
-    queryFn: () => apiClient.get<LogResponse>(API_ROUTES.system.kernelLogs),
+    enabled,
+    queryFn: ({ signal }) => apiClient.get<LogResponse>(API_ROUTES.system.kernelLogs, signal),
   });
 }
 

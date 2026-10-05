@@ -71,14 +71,14 @@ export function MacAddressCloneBlock({
           {...register('custom_mac')}
         />
         {errors.custom_mac ? (
-          <p id="mac-clone-err" className="text-xs text-red-500" role="alert">
+          <p id="mac-clone-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.custom_mac.message}
           </p>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={onRandomLocal}>
-          <Shuffle className="mr-1 h-4 w-4" />
+          <Shuffle className="h-4 w-4" />
           Random
         </Button>
         <Button
@@ -87,14 +87,14 @@ export function MacAddressCloneBlock({
           disabled={randomizePending}
           onClick={onRandomizeApply}
         >
-          <Shuffle className="mr-1 h-4 w-4" />
+          <Shuffle className="h-4 w-4" />
           {randomizePending ? 'Randomizing...' : 'Randomize & Apply'}
         </Button>
         <Button type="submit" disabled={setMacPending}>
           {setMacPending ? 'Applying...' : 'Apply'}
         </Button>
         <Button type="button" variant="outline" disabled={setMacPending} onClick={onResetDefault}>
-          <RotateCcw className="mr-1 h-4 w-4" />
+          <RotateCcw className="h-4 w-4" />
           Reset to Default
         </Button>
       </div>

@@ -51,7 +51,11 @@ describe('WifiRadioHardwareCard', () => {
     expect(screen.getByText(/Both \(repeater\) is unavailable\./i)).toBeInTheDocument();
     // Both remedies, not just a greyed-out option.
     expect(screen.getByText(/own radio/i)).toBeInTheDocument();
-    expect(screen.getByText(/allow_ap_on_sta_radio/)).toBeInTheDocument();
+    // Names the reachable control, not a UCI option and not a wizard that
+    // nothing mounts.
+    expect(
+      screen.getByText(/Allow Wi-Fi on uplink radio.*Wi-Fi > Advanced > Repeater/i),
+    ).toBeInTheDocument();
   });
 
   it('keeps Both (repeater) selectable when allow_ap_on_sta_radio is set', async () => {
@@ -97,6 +101,8 @@ describe('WifiRadioHardwareCard', () => {
 
     await openRoleSelector(user);
     await user.click(screen.getByRole('option', { name: 'AP only' }));
+    // A role change is disruptive, so it no longer applies on selection.
+    await user.click(await screen.findByRole('button', { name: /change role/i }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Radio role was not changed.');
@@ -116,6 +122,7 @@ describe('WifiRadioHardwareCard', () => {
 
     await openRoleSelector(user);
     await user.click(screen.getByRole('option', { name: 'AP only' }));
+    await user.click(await screen.findByRole('button', { name: /change role/i }));
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('inv3nted-passphrase');

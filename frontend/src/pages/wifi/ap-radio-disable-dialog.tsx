@@ -11,6 +11,8 @@ type ApRadioDisableDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isLastActive: boolean;
+  /** `save` when triggered by Save rather than by an explicit disable. */
+  action?: 'save' | 'disable';
   onConfirm: () => void;
   confirmPending: boolean;
 };
@@ -19,15 +21,23 @@ export function ApRadioDisableDialog({
   open,
   onOpenChange,
   isLastActive,
+  action = 'disable',
   onConfirm,
   confirmPending,
 }: ApRadioDisableDialogProps) {
+  const isSave = action === 'save';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isLastActive ? '⚠️ Disable Last Access Point?' : 'Disable Access Point?'}
+            {isLastActive
+              ? isSave
+                ? '⚠️ Turn Off the Last Access Point and Save?'
+                : '⚠️ Disable Last Access Point?'
+              : isSave
+                ? 'Turn Off Access Point and Save?'
+                : 'Disable Access Point?'}
           </DialogTitle>
         </DialogHeader>
         {isLastActive ? (
@@ -38,8 +48,10 @@ export function ApRadioDisableDialog({
           </p>
         ) : (
           <p className="text-sm text-gray-700 dark:text-gray-300">
-            Disabling this access point will disconnect all clients currently connected to it. Are
-            you sure?
+            {isSave
+              ? 'This turn the access point off and then saved. Clients connected to it are disconnected.'
+              : 'Disabling this access point will disconnect all clients currently connected to it. Are you sure?'}
+            Are you sure?
           </p>
         )}
         <DialogFooter>
@@ -47,7 +59,7 @@ export function ApRadioDisableDialog({
             Cancel
           </Button>
           <Button type="button" variant="destructive" onClick={onConfirm} disabled={confirmPending}>
-            Disable
+            {isSave ? 'Turn Off and Save' : 'Disable'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -15,6 +15,7 @@ import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { SourceDef } from '@/hooks/use-topology-data';
 import type { WanType } from '@shared/index';
+import { UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
 import { formatUptime } from '@/lib/utils';
 import { QuickActions } from '@/pages/dashboard/quick-actions';
 import { NetworkChart } from '@/pages/dashboard/network-chart';
@@ -403,7 +404,7 @@ export function DashboardPage() {
     wifiConn,
     usbTether,
     sysInfo,
-    vpnActive,
+    vpn: vpnStatus,
     internetUp,
     allClients,
   } = useTopologyData();
@@ -429,7 +430,7 @@ export function DashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SourceCard title="Ethernet (WAN)" icon={Cable} connected={ethernetUp}>
+        <SourceCard title={UPLINK_LABELS.wan} icon={Cable} connected={ethernetUp}>
           {ethernetUp && wan ? (
             <>
               <DetailRow label="Protocol">
@@ -461,7 +462,7 @@ export function DashboardPage() {
           )}
         </SourceCard>
 
-        <SourceCard title="Repeater (WiFi)" icon={Wifi} connected={repeaterUp}>
+        <SourceCard title={UPLINK_LABELS.wwan} icon={Wifi} connected={repeaterUp}>
           {repeaterUp && wifiConn ? (
             <>
               <DetailRow label="SSID" mono>
@@ -477,7 +478,7 @@ export function DashboardPage() {
           )}
         </SourceCard>
 
-        <SourceCard title="USB Tethering" icon={Smartphone} connected={tetherUp}>
+        <SourceCard title={UPLINK_LABELS.usbtether} icon={Smartphone} connected={tetherUp}>
           {tetherUp ? (
             <>
               {usbTether?.detected && (
@@ -496,7 +497,7 @@ export function DashboardPage() {
             </>
           ) : (
             <p className="text-slate-500">
-              No tethering device found. Plug in your smartphone or USB modem to start.
+              {UPLINK_INACTIVE.usbtether} Plug in your smartphone or USB modem to start.
             </p>
           )}
         </SourceCard>
@@ -519,7 +520,11 @@ export function DashboardPage() {
             <>
               <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Internet</span>
+                  {/* `internet_reachable` is a WAN-carrier check, not a
+                      reachability probe: a DHCP lease on a dead or
+                      captive-portaled uplink still reads true. Labelling it
+                      "Internet" is the one word a non-expert trusts most. */}
+                  <span className="text-gray-500 dark:text-gray-400">Uplink</span>
                   <p
                     className={`mt-0.5 font-medium ${
                       internetUp
@@ -527,25 +532,36 @@ export function DashboardPage() {
                         : 'text-red-600 dark:text-red-400'
                     }`}
                   >
-                    {internetUp ? 'Reachable' : 'Unreachable'}
+                    {internetUp ? 'Connected' : 'Disconnected'}
                   </p>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">VPN</span>
+                  {/* Distinguishes configured-but-not-connected from off, so this
+                      no longer reads "Off" directly above a "Disable VPN"
+                      button. */}
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    {vpnActive ? (
-                      <>
-                        <Shield className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                          On
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                        <span className="font-medium text-gray-500 dark:text-gray-400">Off</span>
-                      </>
-                    )}
+                    <Shield
+                      aria-hidden="true"
+                      className={
+                        vpnStatus.healthy
+                          ? 'h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400'
+                          : vpnStatus.active
+                            ? 'h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400'
+                            : 'h-3.5 w-3.5 text-gray-500 dark:text-gray-400'
+                      }
+                    />
+                    <span
+                      className={
+                        vpnStatus.healthy
+                          ? 'font-medium text-emerald-600 dark:text-emerald-400'
+                          : vpnStatus.active
+                            ? 'font-medium text-yellow-600 dark:text-yellow-400'
+                            : 'font-medium text-gray-500 dark:text-gray-400'
+                      }
+                    >
+                      {vpnStatus.label}
+                    </span>
                   </div>
                 </div>
                 <div>

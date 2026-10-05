@@ -1,15 +1,9 @@
 import type { ReactNode } from 'react';
-import { createContext, useContext } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cardSurfaceVariants } from '@/components/ui/card-surface';
+import { PageSectionContext } from '@/components/ui/page-section-context';
 import { cn } from '@/lib/cn';
-
-const PageSectionContext = createContext(false);
-
-/** True when rendering inside an expanded/collapsed PageSection body. */
-export function useInPageSection(): boolean {
-  return useContext(PageSectionContext);
-}
 
 type PageSectionProps = {
   title: string;
@@ -19,12 +13,7 @@ type PageSectionProps = {
 
 export function PageSection({ title, defaultOpen = false, children }: PageSectionProps) {
   return (
-    <Collapsible
-      defaultOpen={defaultOpen}
-      className={cn(
-        'rounded-lg border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-950',
-      )}
-    >
+    <Collapsible defaultOpen={defaultOpen} className={cardSurfaceVariants()}>
       <CollapsibleTrigger
         type="button"
         className={cn(

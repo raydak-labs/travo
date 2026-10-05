@@ -1,3 +1,5 @@
+import { currentRelativeLocation } from '@/lib/auth-redirect';
+
 const TOKEN_KEY = 'openwrt-auth-token';
 
 /**
@@ -46,11 +48,14 @@ export function clearToken(): void {
   notifyTokenChange();
 }
 
-/** Clears auth state and redirects to the login page. Exported for testability. */
+/**
+ * Clears auth state and redirects to the login page, carrying the current
+ * location so the user lands back where they were. Exported for testability.
+ */
 export function handleUnauthorized(): void {
   clearToken();
   if (typeof window !== 'undefined') {
-    window.location.assign('/login');
+    window.location.assign(`/login?redirect=${encodeURIComponent(currentRelativeLocation())}`);
   }
 }
 
@@ -159,21 +164,31 @@ async function send(path: string, method: string, body?: unknown, signal?: Abort
   return response;
 }
 
-function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  return send(path, method, body).then((response) => response.json() as Promise<T>);
+function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  return send(path, method, body, signal).then((response) => response.json() as Promise<T>);
 }
 
 /** GET that returns a binary body (e.g. a backup archive). */
-function requestBlob(path: string): Promise<Blob> {
-  return send(path, 'GET').then((response) => response.blob());
+function requestBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  return send(path, 'GET', undefined, signal).then((response) => response.blob());
 }
 
+/**
+ * `signal` is threaded through every read so React Query can cancel in-flight
+ * requests. Without it, changing a log filter or leaving a page leaves the
+ * previous fetch running on a router with 128 MB of RAM.
+ */
 export const apiClient = {
-  get<T>(path: string): Promise<T> {
-    return request<T>('GET', path);
+  get<T>(path: string, signal?: AbortSignal): Promise<T> {
+    return request<T>('GET', path, undefined, signal);
   },
-  getBlob(path: string): Promise<Blob> {
-    return requestBlob(path);
+  getBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+    return requestBlob(path, signal);
   },
   post<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('POST', path, body);

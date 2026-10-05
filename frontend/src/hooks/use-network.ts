@@ -48,7 +48,7 @@ export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus
 
   return useQuery({
     queryKey: ['network', 'status'],
-    queryFn: () => apiClient.get<NetworkStatus>(API_ROUTES.network.status),
+    queryFn: ({ signal }) => apiClient.get<NetworkStatus>(API_ROUTES.network.status, signal),
     ...options,
   });
 }
@@ -56,7 +56,7 @@ export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus
 export function useWanConfig() {
   return useQuery({
     queryKey: ['network', 'wan'],
-    queryFn: () => apiClient.get<WanConfig>(API_ROUTES.network.wan),
+    queryFn: ({ signal }) => apiClient.get<WanConfig>(API_ROUTES.network.wan, signal),
   });
 }
 
@@ -67,7 +67,10 @@ export function useSetWanConfig() {
       apiClient.put<{ success: boolean }>(API_ROUTES.network.wan, config),
     onSuccess: () => {
       toast.success('WAN configuration updated');
-      void queryClient.invalidateQueries({ queryKey: ['network'] });
+      // Only the keys this change can actually alter — a broad `['network']`
+      // refetches DHCP leases, reservations and DNS on every WAN edit.
+      void queryClient.invalidateQueries({ queryKey: ['network', 'wan'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
     },
     onError: (error) => {
       toast.error('Failed to update WAN config', { description: error.message });
@@ -75,24 +78,42 @@ export function useSetWanConfig() {
   });
 }
 
+/**
+ * The connected-client list rides along in `network_status`, which the
+ * WebSocket already pushes on interface and client changes. Seeding this cache
+ * from those pushes keeps the Clients page live instead of stale until the
+ * window regains focus.
+ */
 export function useClients() {
+  const queryClient = useQueryClient();
+  const { subscribe } = useWsSubscribe();
+
+  useEffect(() => {
+    return subscribe('network_status', (raw) => {
+      const status = raw as NetworkStatus;
+      if (status.clients) {
+        queryClient.setQueryData<Client[]>(['network', 'clients'], [...status.clients]);
+      }
+    });
+  }, [subscribe, queryClient]);
+
   return useQuery({
     queryKey: ['network', 'clients'],
-    queryFn: () => apiClient.get<Client[]>(API_ROUTES.network.clients),
+    queryFn: ({ signal }) => apiClient.get<Client[]>(API_ROUTES.network.clients, signal),
   });
 }
 
 export function useDHCPConfig() {
   return useQuery({
     queryKey: ['network', 'dhcp'],
-    queryFn: () => apiClient.get<DHCPConfig>(API_ROUTES.network.dhcp),
+    queryFn: ({ signal }) => apiClient.get<DHCPConfig>(API_ROUTES.network.dhcp, signal),
   });
 }
 
 export function useDHCPLeases() {
   return useQuery({
     queryKey: ['network', 'dhcpLeases'],
-    queryFn: () => apiClient.get<DHCPLease[]>(API_ROUTES.network.dhcpLeases),
+    queryFn: ({ signal }) => apiClient.get<DHCPLease[]>(API_ROUTES.network.dhcpLeases, signal),
     refetchInterval: 30000,
   });
 }
@@ -100,7 +121,7 @@ export function useDHCPLeases() {
 export function useDNSConfig() {
   return useQuery({
     queryKey: ['network', 'dns'],
-    queryFn: () => apiClient.get<DNSConfig>(API_ROUTES.network.dns),
+    queryFn: ({ signal }) => apiClient.get<DNSConfig>(API_ROUTES.network.dns, signal),
   });
 }
 
@@ -141,7 +162,8 @@ export function useSetClientAlias() {
       apiClient.put<{ status: string }>(API_ROUTES.network.clientAlias, data),
     onSuccess: () => {
       toast.success('Client alias updated');
-      void queryClient.invalidateQueries({ queryKey: ['network'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
     },
     onError: (error) => {
       toast.error('Failed to update alias', { description: error.message });
@@ -152,7 +174,7 @@ export function useSetClientAlias() {
 export function useDNSEntries() {
   return useQuery({
     queryKey: ['network', 'dnsEntries'],
-    queryFn: () => apiClient.get<DNSEntry[]>(API_ROUTES.network.dnsEntries),
+    queryFn: ({ signal }) => apiClient.get<DNSEntry[]>(API_ROUTES.network.dnsEntries, signal),
   });
 }
 
@@ -189,7 +211,8 @@ export function useDeleteDNSEntry() {
 export function useDHCPReservations() {
   return useQuery({
     queryKey: ['network', 'dhcpReservations'],
-    queryFn: () => apiClient.get<DHCPReservation[]>(API_ROUTES.network.dhcpReservations),
+    queryFn: ({ signal }) =>
+      apiClient.get<DHCPReservation[]>(API_ROUTES.network.dhcpReservations, signal),
   });
 }
 
@@ -226,11 +249,16 @@ export function useDeleteDHCPReservation() {
 }
 
 export function useKickClient() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (mac: string) =>
       apiClient.post<{ status: string }>(API_ROUTES.network.clientKick, { mac }),
     onSuccess: () => {
       toast.success('Client disconnected');
+      // Without this the kicked device stays in the table until the next
+      // window focus refetch.
+      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
     },
     onError: (error) => {
       toast.error('Failed to kick client', { description: error.message });
@@ -246,6 +274,8 @@ export function useBlockClient() {
     onSuccess: () => {
       toast.success('Client blocked');
       void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
     },
     onError: (error) => {
       toast.error('Failed to block client', { description: error.message });
@@ -261,6 +291,8 @@ export function useUnblockClient() {
     onSuccess: () => {
       toast.success('Client unblocked');
       void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
     },
     onError: (error) => {
       toast.error('Failed to unblock client', { description: error.message });
@@ -271,7 +303,7 @@ export function useUnblockClient() {
 export function useBlockedClients() {
   return useQuery({
     queryKey: ['network', 'blockedClients'],
-    queryFn: () => apiClient.get<string[]>(API_ROUTES.network.clientBlocked),
+    queryFn: ({ signal }) => apiClient.get<string[]>(API_ROUTES.network.clientBlocked, signal),
   });
 }
 
@@ -284,7 +316,7 @@ export function useSetInterfaceState() {
       }),
     onSuccess: (_data, variables) => {
       toast.success(`Interface ${variables.name} ${variables.up ? 'brought up' : 'brought down'}`);
-      void queryClient.invalidateQueries({ queryKey: ['network'] });
+      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
     },
     onError: (error) => {
       toast.error('Failed to change interface state', { description: error.message });
@@ -304,14 +336,14 @@ export function useDetectWanType() {
 export function useDDNSConfig() {
   return useQuery({
     queryKey: ['network', 'ddns'],
-    queryFn: () => apiClient.get<DDNSConfigResponse>(API_ROUTES.network.ddns),
+    queryFn: ({ signal }) => apiClient.get<DDNSConfigResponse>(API_ROUTES.network.ddns, signal),
   });
 }
 
 export function useDDNSStatus() {
   return useQuery({
     queryKey: ['network', 'ddnsStatus'],
-    queryFn: () => apiClient.get<DDNSStatus>(API_ROUTES.network.ddnsStatus),
+    queryFn: ({ signal }) => apiClient.get<DDNSStatus>(API_ROUTES.network.ddnsStatus, signal),
     refetchInterval: 30000,
   });
 }
@@ -319,7 +351,7 @@ export function useDDNSStatus() {
 export function useUptimeLog() {
   return useQuery({
     queryKey: ['network', 'uptimeLog'],
-    queryFn: () => apiClient.get<UptimeEvent[]>(API_ROUTES.network.uptimeLog),
+    queryFn: ({ signal }) => apiClient.get<UptimeEvent[]>(API_ROUTES.network.uptimeLog, signal),
     refetchInterval: 60000,
   });
 }
@@ -327,7 +359,7 @@ export function useUptimeLog() {
 export function useFailoverConfig() {
   return useQuery({
     queryKey: ['network', 'failover'],
-    queryFn: () => apiClient.get<FailoverConfig>(API_ROUTES.network.failover),
+    queryFn: ({ signal }) => apiClient.get<FailoverConfig>(API_ROUTES.network.failover, signal),
   });
 }
 
@@ -351,7 +383,8 @@ export function useSetFailoverConfig() {
 export function useFailoverEvents() {
   return useQuery({
     queryKey: ['network', 'failoverEvents'],
-    queryFn: () => apiClient.get<FailoverEvent[]>(API_ROUTES.network.failoverEvents),
+    queryFn: ({ signal }) =>
+      apiClient.get<FailoverEvent[]>(API_ROUTES.network.failoverEvents, signal),
     refetchInterval: 15000,
   });
 }
@@ -437,7 +470,7 @@ export function useRunDiagnostics() {
 export function useDoHConfig() {
   return useQuery({
     queryKey: ['network', 'doh'],
-    queryFn: () => apiClient.get<DoHConfig>(API_ROUTES.network.doh),
+    queryFn: ({ signal }) => apiClient.get<DoHConfig>(API_ROUTES.network.doh, signal),
   });
 }
 
@@ -458,7 +491,7 @@ export function useSetDoHConfig() {
 export function useIPv6Status() {
   return useQuery({
     queryKey: ['network', 'ipv6'],
-    queryFn: () => apiClient.get<IPv6Status>(API_ROUTES.network.ipv6),
+    queryFn: ({ signal }) => apiClient.get<IPv6Status>(API_ROUTES.network.ipv6, signal),
   });
 }
 
@@ -492,7 +525,8 @@ export function useSendWoL() {
 export function useConnectionMethod() {
   return useQuery({
     queryKey: ['network', 'connectionMethod'],
-    queryFn: () => apiClient.get<ConnectionMethod>(API_ROUTES.network.connectionMethod),
+    queryFn: ({ signal }) =>
+      apiClient.get<ConnectionMethod>(API_ROUTES.network.connectionMethod, signal),
     // Cache for 1 minute - connection method doesn't change rapidly
     staleTime: 60000,
   });

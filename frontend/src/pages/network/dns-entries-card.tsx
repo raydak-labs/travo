@@ -87,22 +87,28 @@ export function DnsEntriesCard() {
               noValidate
             >
               <div className="space-y-1">
-                <Label>Hostname</Label>
+                <Label htmlFor="dns-entry-name">Hostname</Label>
                 <Input
+                  id="dns-entry-name"
                   placeholder="myserver"
                   aria-invalid={errors.name ? 'true' : undefined}
                   aria-describedby={errors.name ? 'dns-entry-name-err' : undefined}
                   {...register('name')}
                 />
                 {errors.name ? (
-                  <p id="dns-entry-name-err" className="text-xs text-red-500" role="alert">
+                  <p
+                    id="dns-entry-name-err"
+                    className="text-xs text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
                     {errors.name.message}
                   </p>
                 ) : null}
               </div>
               <div className="space-y-1">
-                <Label>IP Address</Label>
+                <Label htmlFor="dns-entry-ip">IP Address</Label>
                 <Input
+                  id="dns-entry-ip"
                   placeholder="192.168.8.10"
                   className="font-mono"
                   aria-invalid={errors.ip ? 'true' : undefined}
@@ -110,7 +116,11 @@ export function DnsEntriesCard() {
                   {...register('ip')}
                 />
                 {errors.ip ? (
-                  <p id="dns-entry-ip-err" className="text-xs text-red-500" role="alert">
+                  <p
+                    id="dns-entry-ip-err"
+                    className="text-xs text-red-600 dark:text-red-400"
+                    role="alert"
+                  >
                     {errors.ip.message}
                   </p>
                 ) : null}

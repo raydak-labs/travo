@@ -1,4 +1,4 @@
-import { Cable, Wifi, Smartphone, Signal } from 'lucide-react';
+import { Cable, Wifi, Smartphone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { NetworkStatus, WanType } from '@shared/index';
 import { networkMedium, type NetworkMedium } from '@shared/index';
@@ -7,6 +7,8 @@ import { useWifiConnection } from './use-wifi';
 import { useVpnStatus } from './use-vpn';
 import { useSystemInfo } from './use-system';
 import { useUSBTetherStatus } from './use-usb-tether';
+import { useRefetchOnWsReconnect } from './use-refetch-on-ws-reconnect';
+import { describeVpnStatus, UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
 import { useWsSubscribe } from '@/lib/ws-context';
 
 export interface SourceDef {
@@ -36,7 +38,8 @@ export interface TopologyData {
   wifiConn: ReturnType<typeof useWifiConnection>['data'];
   usbTether: ReturnType<typeof useUSBTetherStatus>['data'];
   sysInfo: ReturnType<typeof useSystemInfo>['data'];
-  vpnActive: boolean;
+  /** Tunnels need three states, not two: off, configured but down, up. */
+  vpn: { label: string; active: boolean; healthy: boolean };
   ipv6Enabled: boolean;
   internetUp: boolean;
   allClients: NonNullable<NetworkStatus['clients']>;
@@ -56,6 +59,9 @@ export function topologyRefetchInterval(wsConnected: boolean): number | false {
 
 export function useTopologyData(): TopologyData {
   const { connected } = useWsSubscribe();
+  // Anything pushed while the socket was down is gone for good; without this
+  // the dashboard holds pre-outage WAN/client state indefinitely.
+  useRefetchOnWsReconnect([['network', 'status']]);
   // A finite staleTime (instead of `Infinity`) plus focus/reconnect refetching
   // is what makes the dashboard heal when the WebSocket never delivered a
   // push: `staleTime: Infinity` also disabled refetchOnWindowFocus and
@@ -83,7 +89,7 @@ export function useTopologyData(): TopologyData {
     (wifiConn?.connected === true && wifiConn.mode === 'client');
   const tetherUp = (wan?.is_up === true && wanMedium === 'usb') || usbTether?.is_up === true;
 
-  const vpnActive = vpnStatus?.some((v) => v.connected) ?? false;
+  const vpn = describeVpnStatus(vpnStatus);
   const ipv6Enabled = ipv6Status?.enabled ?? false;
   const internetUp = network?.internet_reachable ?? false;
 
@@ -97,31 +103,35 @@ export function useTopologyData(): TopologyData {
   ).length;
   const lanClients = allClients.length - wlanClients;
 
+  // Labels and inactive copy come from the shared uplink vocabulary so the
+  // dashboard and the Network Status page name the same things the same way.
+  //
+  // There is deliberately no permanent "Cellular / No modem" branch: a branch
+  // that can never come up trains users to ignore grey lines, which is exactly
+  // the signal they would need to notice when a real uplink drops.
   return {
     sources: [
       {
-        label: 'Ethernet',
+        label: UPLINK_LABELS.wan,
         icon: Cable,
         connected: ethernetUp,
-        detail: ethernetUp ? (wan?.ip_address ?? undefined) : undefined,
+        detail: ethernetUp ? (wan?.ip_address ?? undefined) : UPLINK_INACTIVE.wan,
       },
       {
-        label: 'Repeater (WiFi)',
+        label: UPLINK_LABELS.wwan,
         icon: Wifi,
         connected: repeaterUp,
-        detail: repeaterUp ? (wifiConn?.ssid ?? wan?.ip_address ?? undefined) : 'Disabled',
+        detail: repeaterUp
+          ? (wifiConn?.ssid ?? wan?.ip_address ?? undefined)
+          : UPLINK_INACTIVE.wwan,
       },
       {
-        label: 'USB Tethering',
+        label: UPLINK_LABELS.usbtether,
         icon: Smartphone,
         connected: tetherUp,
-        detail: tetherUp ? usbTether?.device_type || wan?.ip_address || 'Connected' : 'No device',
-      },
-      {
-        label: 'Cellular',
-        icon: Signal,
-        connected: false,
-        detail: 'No modem',
+        detail: tetherUp
+          ? usbTether?.device_type || wan?.ip_address || 'Connected'
+          : UPLINK_INACTIVE.usbtether,
       },
     ],
     clients: [
@@ -130,8 +140,8 @@ export function useTopologyData(): TopologyData {
     ],
     features: [
       { label: 'IPv6', active: ipv6Enabled },
-      { label: 'VPN', active: vpnActive },
-      { label: 'Internet', active: internetUp },
+      { label: 'VPN', active: vpn.active },
+      { label: 'Uplink', active: internetUp },
     ],
     router: {
       hostname: sysInfo?.hostname ?? '',
@@ -147,7 +157,7 @@ export function useTopologyData(): TopologyData {
     wifiConn,
     usbTether,
     sysInfo,
-    vpnActive,
+    vpn,
     ipv6Enabled,
     internetUp,
     allClients,

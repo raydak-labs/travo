@@ -36,7 +36,7 @@ export function WiFiScheduleCard() {
       on_time: '08:00',
       off_time: '22:00',
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const enabled = watch('enabled');

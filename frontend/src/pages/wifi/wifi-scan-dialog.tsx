@@ -48,7 +48,7 @@ export function WifiScanDialog() {
         aria-label="Scan networks"
         title="Scan networks"
       >
-        <Search className="mr-1.5 h-3.5 w-3.5" />
+        <Search className="h-3.5 w-3.5" />
         Scan
       </Button>
 
@@ -66,7 +66,6 @@ export function WifiScanDialog() {
               error={connectMutation.error?.message ?? null}
               onConnect={handleConnect}
               onCancel={() => setSelectedGroup(null)}
-              embedded
             />
           ) : (
             <WifiScanList

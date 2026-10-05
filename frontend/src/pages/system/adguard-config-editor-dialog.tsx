@@ -1,3 +1,4 @@
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -35,8 +36,7 @@ export function AdGuardConfigEditorDialog({
             saving.
           </DialogDescription>
         </DialogHeader>
-        <textarea
-          className="h-96 w-full rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+        <Textarea
           value={configContent}
           onChange={(e) => onConfigContentChange(e.target.value)}
           spellCheck={false}

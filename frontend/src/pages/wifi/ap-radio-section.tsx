@@ -42,7 +42,7 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
       encryption: normalizeApEncryption(ap.encryption),
       key: ap.key,
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const enabled = watch('enabled');

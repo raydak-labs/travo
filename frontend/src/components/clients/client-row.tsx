@@ -23,6 +23,10 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
       ? new Date(client.connected_since).toLocaleString()
       : null;
 
+  // Icon-only action buttons carry no visible text, so the accessible name has
+  // to be explicit (WCAG 4.1.2). Resolve the same identity the row displays.
+  const clientLabel = client.alias || client.hostname || client.mac_address;
+
   return (
     <tr className="group border-b border-gray-100 dark:border-white/[0.08] last:border-0">
       <td className="py-3 pr-4">
@@ -65,7 +69,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
       <td className="py-3 text-right">
         <div className="flex items-center justify-end gap-1">
           {isBlocked && (
-            <Badge variant="destructive" className="mr-1 text-xs">
+            <Badge variant="destructive" className="text-xs">
               Blocked
             </Badge>
           )}
@@ -75,6 +79,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
               size="icon"
               className="h-7 w-7 text-blue-600"
               title="Reserve this IP (static DHCP)"
+              aria-label={`Reserve IP for ${clientLabel}`}
               onClick={() => onReserveIP(client)}
             >
               <BookmarkPlus className="h-3.5 w-3.5" />
@@ -85,6 +90,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
             size="icon"
             className="h-7 w-7"
             title="Kick (disconnect)"
+            aria-label={`Kick ${clientLabel}`}
             onClick={() => kick.mutate(client.mac_address)}
             disabled={kick.isPending}
           >
@@ -96,6 +102,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
               size="icon"
               className="h-7 w-7 text-green-600"
               title="Unblock"
+              aria-label={`Unblock ${clientLabel}`}
               onClick={() => unblock.mutate(client.mac_address)}
               disabled={unblock.isPending}
             >
@@ -107,6 +114,7 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
               size="icon"
               className="h-7 w-7 text-red-600"
               title="Block"
+              aria-label={`Block ${clientLabel}`}
               onClick={() => block.mutate(client.mac_address)}
               disabled={block.isPending}
             >

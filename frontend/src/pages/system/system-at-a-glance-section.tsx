@@ -1,14 +1,28 @@
+import { CardInset } from '@/components/ui/card-inset';
 import { Server, Cpu, HardDrive } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { HostnameInlineForm } from './hostname-inline-form';
 import { useSystemInfo, useSystemStats } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
 
 export function SystemAtAGlanceSection() {
-  const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useSystemInfo();
-  const { data: stats, isLoading: statsLoading } = useSystemStats();
+  const {
+    data: info,
+    isLoading: infoLoading,
+    isError: infoError,
+    error: infoErrorDetail,
+    refetch: refetchInfo,
+  } = useSystemInfo();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    error: statsErrorDetail,
+    refetch: refetchStats,
+  } = useSystemStats();
 
   return (
     <div>
@@ -22,31 +36,44 @@ export function SystemAtAGlanceSection() {
             <Server className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent>
-            {infoLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ) : info ? (
-              <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
-                <div className="grid grid-cols-2 gap-2">
-                  <span className="text-gray-500 dark:text-gray-400">Hostname</span>
-                  <span className="flex items-center gap-1 text-gray-900 dark:text-white">
-                    <HostnameInlineForm hostname={info.hostname} onUpdated={() => refetchInfo()} />
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">Model</span>
-                  <span className="text-gray-900 dark:text-white">{info.model}</span>
-                  <span className="text-gray-500 dark:text-gray-400">Firmware</span>
-                  <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
-                  <span className="text-gray-500 dark:text-gray-400">Kernel</span>
-                  <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
-                  <span className="text-gray-500 dark:text-gray-400">Uptime</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {formatUptime(info.uptime_seconds)}
-                  </span>
+            {/* Without this the card body rendered nothing at all on failure,
+                which reads as an empty section rather than a broken request. */}
+            <QueryCard
+              isLoading={infoLoading}
+              isError={infoError}
+              error={infoErrorDetail}
+              onRetry={() => void refetchInfo()}
+              loading={
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
                 </div>
-              </div>
-            ) : null}
+              }
+            >
+              {info ? (
+                <CardInset variant="muted">
+                  <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-500 dark:text-gray-400">Hostname</span>
+                    <span className="flex items-center gap-1 text-gray-900 dark:text-white">
+                      <HostnameInlineForm
+                        hostname={info.hostname}
+                        onUpdated={() => refetchInfo()}
+                      />
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">Model</span>
+                    <span className="text-gray-900 dark:text-white">{info.model}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Firmware</span>
+                    <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Kernel</span>
+                    <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Uptime</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {formatUptime(info.uptime_seconds)}
+                    </span>
+                  </div>
+                </CardInset>
+              ) : null}
+            </QueryCard>
           </CardContent>
         </Card>
 
@@ -56,63 +83,71 @@ export function SystemAtAGlanceSection() {
             <Cpu className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent className="space-y-4">
-            {statsLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : stats ? (
-              <>
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">CPU</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {stats.cpu.usage_percent.toFixed(1)}%
-                      {stats.cpu.temperature_celsius != null && (
-                        <span className="ml-2 text-gray-500 dark:text-gray-400">
-                          {stats.cpu.temperature_celsius}°C
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <Progress value={stats.cpu.usage_percent} />
-                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
-                    {stats.cpu.cores} cores
-                  </p>
+            <QueryCard
+              isLoading={statsLoading}
+              isError={statsError}
+              error={statsErrorDetail}
+              onRetry={() => void refetchStats()}
+              loading={
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
                 </div>
-
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">Memory</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {stats.memory.usage_percent.toFixed(1)}% (
-                      {formatBytes(stats.memory.used_bytes)} /{' '}
-                      {formatBytes(stats.memory.total_bytes)})
-                    </span>
-                  </div>
-                  <Progress value={stats.memory.usage_percent} />
-                </div>
-
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">
-                      <span className="inline-flex items-center gap-1">
-                        <HardDrive className="h-3.5 w-3.5" />
-                        Storage
+              }
+            >
+              {stats ? (
+                <>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">CPU</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.cpu.usage_percent.toFixed(1)}%
+                        {stats.cpu.temperature_celsius != null && (
+                          <span className="ml-2 text-gray-500 dark:text-gray-400">
+                            {stats.cpu.temperature_celsius}°C
+                          </span>
+                        )}
                       </span>
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {stats.storage.usage_percent.toFixed(1)}% (
-                      {formatBytes(stats.storage.used_bytes)} /{' '}
-                      {formatBytes(stats.storage.total_bytes)})
-                    </span>
+                    </div>
+                    <Progress value={stats.cpu.usage_percent} />
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
+                      {stats.cpu.cores} cores
+                    </p>
                   </div>
-                  <Progress value={stats.storage.usage_percent} />
-                </div>
-              </>
-            ) : null}
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">Memory</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.memory.usage_percent.toFixed(1)}% (
+                        {formatBytes(stats.memory.used_bytes)} /{' '}
+                        {formatBytes(stats.memory.total_bytes)})
+                      </span>
+                    </div>
+                    <Progress value={stats.memory.usage_percent} />
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        <span className="inline-flex items-center gap-1">
+                          <HardDrive className="h-3.5 w-3.5" />
+                          Storage
+                        </span>
+                      </span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.storage.usage_percent.toFixed(1)}% (
+                        {formatBytes(stats.storage.used_bytes)} /{' '}
+                        {formatBytes(stats.storage.total_bytes)})
+                      </span>
+                    </div>
+                    <Progress value={stats.storage.usage_percent} />
+                  </div>
+                </>
+              ) : null}
+            </QueryCard>
           </CardContent>
         </Card>
       </div>

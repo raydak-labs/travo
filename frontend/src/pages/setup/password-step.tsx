@@ -23,7 +23,7 @@ export function PasswordStep({ onNext, onBack }: { onNext: () => void; onBack: (
       new_password: '',
       confirm_password: '',
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const onSubmit = (data: SetupPasswordFormValues) => {
@@ -50,7 +50,7 @@ export function PasswordStep({ onNext, onBack }: { onNext: () => void; onBack: (
             Back
           </Button>
           <Button type="submit" disabled={changePasswordMutation.isPending} className="flex-1">
-            {changePasswordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {changePasswordMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Change Password
           </Button>
         </div>

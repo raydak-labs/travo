@@ -204,7 +204,10 @@ describe('NetworkPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('WAN Status')).toBeInTheDocument();
-      expect(screen.getByText('Internet Connected')).toBeInTheDocument();
+      // A WAN carrier check labelled "Internet" is the one word a non-expert
+      // trusts most, and it is the one that lies on a dead or captive uplink.
+      expect(screen.getByText('Uplink Connected')).toBeInTheDocument();
+      expect(screen.queryByText('Internet Connected')).not.toBeInTheDocument();
     });
   });
 

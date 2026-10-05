@@ -1,3 +1,4 @@
+import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 
 type NtpConfigSummaryViewProps = {
@@ -19,7 +20,7 @@ export function NtpConfigSummaryView({
 }: NtpConfigSummaryViewProps) {
   return (
     <div className="space-y-3">
-      <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+      <CardInset variant="muted">
         <div className="flex items-center justify-between">
           <span className="text-gray-500 dark:text-gray-400">NTP</span>
           <span className="text-gray-900 dark:text-white">
@@ -33,7 +34,7 @@ export function NtpConfigSummaryView({
             {serversSummary}
           </div>
         </div>
-      </div>
+      </CardInset>
 
       <div className="flex flex-wrap gap-2">
         <Button

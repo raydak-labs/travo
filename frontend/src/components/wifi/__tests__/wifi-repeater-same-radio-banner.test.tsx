@@ -39,7 +39,7 @@ describe('WifiRepeaterSameRadioBanner', () => {
     expect(screen.getByRole('button', { name: /fix radio layout/i })).toBeInTheDocument();
   });
 
-  it('calls reconcile when fix is clicked', async () => {
+  it('confirms before reconciling, because it restarts wireless', async () => {
     const user = userEvent.setup();
     let posted = false;
     server.use(
@@ -62,6 +62,12 @@ describe('WifiRepeaterSameRadioBanner', () => {
       expect(screen.getByRole('button', { name: /fix radio layout/i })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: /fix radio layout/i }));
+
+    // One click must not restart the wireless subsystem.
+    expect(posted).toBe(false);
+    expect(screen.getByText(/Move the uplink to the other radio/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^apply$/i }));
 
     await waitFor(() => {
       expect(posted).toBe(true);

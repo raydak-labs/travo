@@ -146,6 +146,21 @@ oxlint — see [`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
       `Cannot read properties of undefined (reading '_buffer')` before MSW sees it.
       Watch: a Vitest release that resolves the impl symbol explicitly.
 
+## 17b. On-Device Verification Of The 2026-10-04 UI Remediation
+
+- [ ] **Confirm the USB-tether uplink on real hardware.** The backend now surfaces `network.usbtether`
+      in `status.Interfaces` and treats it as the effective WAN when it is the only uplink. All
+      frontend coverage is unit-level; the failure mode it fixes ("dashboard says No Internet while
+      phone-tethered") was reported from source reading, not reproduced. Tether a phone with no
+      ethernet and confirm `WAN Status` shows the USB row active.
+- [ ] **Confirm the dialog animations actually appear.** `animate-in` / `zoom-in-95` /
+      `slide-in-from-*` were dead class strings: `index.css` never imported `tw-animate-css`, so the
+      mobile drawer and every modal snapped instead of animating. The plugin is now imported. Dead
+      utilities do not fail lint or tsc — only a device or a look at `dist/assets/*.css` shows this.
+- [ ] **Check dark mode on native controls.** `color-scheme` is now declared, which changes how
+      `type="time"`, `type="range"`, `type="file"` inputs and scrollbars render. Verify the LED and
+      Wi-Fi schedule pickers and the firmware file input in dark mode.
+
 ## 18. Research And Open Questions
 
 - [x] ~~Investigate whether a lightweight database such as SQLite makes sense for Travo
@@ -163,3 +178,13 @@ oxlint — see [`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
 4. AdGuard DNS setup: should install move dnsmasq to `5353`, or should AdGuard forward to dnsmasq?
 5. Repeater mode implications: should same-radio repeater performance loss be surfaced more aggressively to users?
 6. GL.iNet feature parity targets: which multi-WAN, VPN policy, and remote-management ideas are actually in scope?
+7. **`RepeaterWizard` is implemented but mounted nowhere** (`frontend/src/components/wifi/repeater-wizard/`;
+   no non-test file imports it). Repeater setup today is the generic path — mode switch, then
+   `useWifiConnect`, then the AP save — as three independent apply windows with no cross-operation
+   rollback, which is the exact failure `use-repeater-wizard.ts` `rollback()` was written to prevent
+   (ADR 0002 §2: an AP and the STA on the same PHY can crash ath11k/IPQ6018). Two of its settings
+   (`allow_ap_on_sta_radio`) are reachable *only* inside it. **Decide: mount it behind the repeater
+   mode switch, or delete it.** The UI copy no longer points users at it in the meantime — the
+   2026-10-04 UI review found copy telling operators to enable a setting in a screen that does not
+   exist. Not decided here because deleting working rollback logic and adding a new entry point are
+   both beyond a UI-review remediation.

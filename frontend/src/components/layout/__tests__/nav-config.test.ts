@@ -18,23 +18,24 @@ describe('nav-config traveler IA', () => {
     expect(wifi?.kind === 'group' && wifi.defaultTo).toBe('/wifi');
     expect(wifi?.kind === 'group' && wifi.items.map((i) => i.label)).toEqual([
       'Connect',
-      'Advanced',
+      // Qualified so the two "Advanced" pages are distinguishable in the nav.
+      'WiFi / Advanced',
     ]);
     expect(network?.kind === 'group' && network.defaultTo).toBe('/network');
     expect(network?.kind === 'group' && network.items.map((i) => i.label)).toEqual([
       'Status',
       'Internet & LAN',
-      'Advanced',
+      'Network / Advanced',
     ]);
     expect(services?.kind === 'group' && services.defaultTo).toBe('/services');
     expect(services?.kind === 'group' && services.items[0]?.label).toBe('Apps');
     expect(system?.kind === 'group' && system.defaultTo).toBe('/system');
   });
 
-  it('defaults all groups collapsed when storage empty', () => {
+  it('defaults Network open when storage empty', () => {
     expect(loadSidebarGroupState()).toEqual({
       wifi: false,
-      network: false,
+      network: true,
       services: false,
       system: false,
     });

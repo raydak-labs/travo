@@ -53,7 +53,7 @@ export function SystemQuickLinksCard() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                  <ExternalLink className="h-3.5 w-3.5" />
                   LuCI Web Interface
                 </a>
               </Button>
@@ -64,7 +64,7 @@ export function SystemQuickLinksCard() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    <ExternalLink className="h-3.5 w-3.5" />
                     AdGuard Dashboard
                   </a>
                 </Button>
@@ -76,7 +76,7 @@ export function SystemQuickLinksCard() {
                   onClick={handleOpenConfigEditor}
                   disabled={adguardConfigQuery.isFetching}
                 >
-                  <FileEdit className="mr-1.5 h-3.5 w-3.5" />
+                  <FileEdit className="h-3.5 w-3.5" />
                   {adguardConfigQuery.isFetching ? 'Loading…' : 'AdGuard Config'}
                 </Button>
               )}
