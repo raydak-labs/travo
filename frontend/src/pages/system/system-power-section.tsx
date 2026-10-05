@@ -15,7 +15,7 @@ export function SystemPowerSection() {
   return (
     <>
       <div>
-        <Card className="border-red-200 dark:border-red-900">
+        <Card className="border-[var(--status-danger-border)]">
           <CardContent className="space-y-4 pt-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               These actions are irreversible or will cause a service interruption. Proceed with

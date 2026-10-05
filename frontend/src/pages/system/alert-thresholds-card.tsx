@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Bell } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAlertThresholds, useSetAlertThresholds } from '@/hooks/use-system';
 import {
@@ -13,7 +15,7 @@ import {
 import { AlertThresholdSlider } from '@/pages/system/alert-threshold-slider';
 
 export function AlertThresholdsCard() {
-  const { data, isLoading } = useAlertThresholds();
+  const { data, isLoading, isError, error, refetch } = useAlertThresholds();
   const setThresholds = useSetAlertThresholds();
 
   const {
@@ -60,13 +62,21 @@ export function AlertThresholdsCard() {
         <Bell className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-5">
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-        ) : (
+        {/* A failed read fell through to the form defaults (90/90/90), which
+            read as the thresholds the router actually had. */}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          }
+        >
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
             <AlertThresholdSlider
               label="Storage %"
@@ -88,16 +98,14 @@ export function AlertThresholdsCard() {
             />
 
             {errors.storage_percent?.message ? (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-                {errors.storage_percent.message}
-              </p>
+              <FieldError>{errors.storage_percent.message}</FieldError>
             ) : null}
 
             <Button type="submit" disabled={setThresholds.isPending} size="sm">
               {setThresholds.isPending ? 'Saving…' : 'Save Thresholds'}
             </Button>
           </form>
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

@@ -1,6 +1,7 @@
 import { Wifi, Users } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { StatusPill } from '@/components/ui/status-pill';
+import { StatValue } from '@/components/ui/stat-value';
 import { Switch } from '@/components/ui/switch';
 import type { TailscaleStatus } from '@shared/index';
 import { TailscalePeerRow } from './tailscale-peer-row';
@@ -28,21 +29,29 @@ export function TailscaleLoggedInPanel({
 }: TailscaleLoggedInPanelProps) {
   return (
     <>
-      <div className="space-y-1 text-sm dark:bg-gray-900">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-          <span className="text-gray-500 dark:text-gray-400">IP Address</span>
-          <span className="font-mono text-gray-900 dark:text-white">{status.ip_address}</span>
-          <span className="text-gray-500 dark:text-gray-400">Hostname</span>
-          <span className="text-gray-900 dark:text-white">{status.hostname}</span>
+      <div className="space-y-1 text-sm">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatValue
+            label="IP Address"
+            value={<span className="font-mono">{status.ip_address}</span>}
+          />
+          <StatValue
+            label="Hostname"
+            value={<span className="font-mono">{status.hostname}</span>}
+          />
         </div>
         {status.exit_node && (
           <div className="mt-2 flex items-center gap-2 border-t border-gray-200 pt-2 dark:border-gray-700">
-            <Wifi className="h-3 w-3 text-blue-500" />
+            <Wifi className="h-3 w-3 text-gray-500 dark:text-gray-400" />
             <span className="text-xs text-gray-500 dark:text-gray-400">Exit node:</span>
             <span className="font-mono text-xs text-gray-900 dark:text-white">
               {status.exit_node}
             </span>
-            {status.exit_node_active && <Badge variant="success">Active</Badge>}
+            {status.exit_node_active && (
+              <StatusPill tone="ok" withDot>
+                Active
+              </StatusPill>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -77,7 +86,7 @@ export function TailscaleLoggedInPanel({
       {status.peers && status.peers.length > 0 && (
         <div className="space-y-1">
           {wireguardEnabled && (
-            <p className="rounded-md border border-amber-200 bg-amber-50/90 px-3 py-2 text-sm dark:border-amber-800 dark:bg-amber-950/50">
+            <p className="rounded-md border border-[var(--status-warn-border)] bg-[var(--status-warn-surface)] px-3 py-2 text-sm text-[var(--status-warn-text)]">
               WireGuard is enabled. Using a Tailscale exit node turns WireGuard off first so only
               one full-tunnel VPN path runs at a time.
             </p>

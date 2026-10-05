@@ -1,5 +1,6 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import type { SshPublicKeyFormValues } from '@/lib/schemas/system-forms';
 
 type SSHKeyAddFormProps = {
@@ -21,11 +22,7 @@ export function SSHKeyAddForm({ register, errors, onSubmit, addPending }: SSHKey
         aria-describedby={errors.key ? 'ssh-key-error' : undefined}
         {...register('key')}
       />
-      {errors.key ? (
-        <p id="ssh-key-error" className="text-xs text-red-600 dark:text-red-400" role="alert">
-          {errors.key.message}
-        </p>
-      ) : null}
+      {errors.key ? <FieldError id="ssh-key-error">{errors.key.message}</FieldError> : null}
       <Button type="submit" disabled={addPending} className="w-full sm:w-auto">
         {addPending ? 'Adding…' : 'Add Key'}
       </Button>

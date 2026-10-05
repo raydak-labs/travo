@@ -1,5 +1,6 @@
 import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
+import { StatValue } from '@/components/ui/stat-value';
 
 type NtpConfigSummaryViewProps = {
   ntpEnabled: boolean;
@@ -21,18 +22,9 @@ export function NtpConfigSummaryView({
   return (
     <div className="space-y-3">
       <CardInset variant="muted">
-        <div className="flex items-center justify-between">
-          <span className="text-gray-500 dark:text-gray-400">NTP</span>
-          <span className="text-gray-900 dark:text-white">
-            {ntpEnabled ? 'Enabled' : 'Disabled'}
-          </span>
-        </div>
-
-        <div className="mt-2">
-          <div className="text-xs text-gray-500 dark:text-gray-400">Servers</div>
-          <div className="mt-1 font-mono text-sm text-gray-900 dark:text-white">
-            {serversSummary}
-          </div>
+        <StatValue label="NTP" value={ntpEnabled ? 'Enabled' : 'Disabled'} />
+        <div className="mt-3">
+          <StatValue label="Servers" value={<span className="font-mono">{serversSummary}</span>} />
         </div>
       </CardInset>
 

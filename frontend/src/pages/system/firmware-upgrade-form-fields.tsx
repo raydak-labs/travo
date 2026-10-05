@@ -2,6 +2,7 @@ import type { ChangeEvent, RefObject } from 'react';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Zap, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { formatBytes } from '@/lib/utils';
@@ -52,11 +53,7 @@ export function FirmwareUpgradeFormFields({
             Selected: {firmwareFile.name} ({formatBytes(firmwareFile.size)})
           </p>
         )}
-        {errors.firmware ? (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.firmware.message}
-          </p>
-        ) : null}
+        {errors.firmware ? <FieldError>{errors.firmware.message}</FieldError> : null}
       </div>
       <div className="flex items-center justify-between">
         <Label htmlFor="keep-settings" className="text-sm text-gray-700 dark:text-gray-300">

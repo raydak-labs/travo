@@ -6,6 +6,7 @@ import type {
   UseFormReturn,
 } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import type { NtpConfigFormValues, NtpServerDraftFormValues } from '@/lib/schemas/system-forms';
@@ -58,11 +59,7 @@ export function NtpConfigEditForm({
         addServerForm={addServerForm}
       />
 
-      {errors.servers?.message ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-          {errors.servers.message}
-        </p>
-      ) : null}
+      {errors.servers?.message ? <FieldError>{errors.servers.message}</FieldError> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={savePending} size="sm">

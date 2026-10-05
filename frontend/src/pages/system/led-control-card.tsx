@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lightbulb } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { QueryCard } from '@/components/ui/query-card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   useLEDStatus,
   useSetLEDStealth,
@@ -14,7 +16,7 @@ import { LedStealthStatusPanel } from './led-stealth-status-panel';
 import { LedScheduleForm } from './led-schedule-form';
 
 export function LEDControlCard() {
-  const { data: ledStatus } = useLEDStatus();
+  const { data: ledStatus, isLoading, isError, error, refetch } = useLEDStatus();
   const setLEDStealthMutation = useSetLEDStealth();
   const { data: ledSchedule } = useLEDSchedule();
   const setLEDScheduleMutation = useSetLEDSchedule();
@@ -68,7 +70,9 @@ export function LEDControlCard() {
     );
   };
 
-  if (!ledStatus || ledStatus.led_count === 0) return null;
+  // A device that answered with zero LEDs hides the card; a device that did not
+  // answer gets an error instead of silently disappearing.
+  if (ledStatus && ledStatus.led_count === 0) return null;
 
   return (
     <Card>
@@ -77,24 +81,36 @@ export function LEDControlCard() {
         <Lightbulb className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        <LedStealthStatusPanel
-          ledStatus={ledStatus}
-          stealthPending={setLEDStealthMutation.isPending}
-          onToggleStealth={() =>
-            setLEDStealthMutation.mutate({ stealth_mode: !ledStatus.stealth_mode })
-          }
-        />
-        <LedScheduleForm
-          register={register}
-          handleSubmit={handleSubmit}
-          errors={errors}
-          scheduleEnabled={scheduleEnabled}
-          onSave={onSaveSchedule}
-          savePending={setLEDScheduleMutation.isPending}
-          serverScheduleActive={!!ledSchedule?.enabled}
-          onRemoveSchedule={onRemoveSchedule}
-          removePending={setLEDScheduleMutation.isPending}
-        />
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={<Skeleton className="h-24 w-full" />}
+        >
+          {ledStatus ? (
+            <>
+              <LedStealthStatusPanel
+                ledStatus={ledStatus}
+                stealthPending={setLEDStealthMutation.isPending}
+                onToggleStealth={() =>
+                  setLEDStealthMutation.mutate({ stealth_mode: !ledStatus.stealth_mode })
+                }
+              />
+              <LedScheduleForm
+                register={register}
+                handleSubmit={handleSubmit}
+                errors={errors}
+                scheduleEnabled={scheduleEnabled}
+                onSave={onSaveSchedule}
+                savePending={setLEDScheduleMutation.isPending}
+                serverScheduleActive={!!ledSchedule?.enabled}
+                onRemoveSchedule={onRemoveSchedule}
+                removePending={setLEDScheduleMutation.isPending}
+              />
+            </>
+          ) : null}
+        </QueryCard>
       </CardContent>
     </Card>
   );

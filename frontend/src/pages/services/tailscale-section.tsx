@@ -1,7 +1,7 @@
 import { Globe, ExternalLink } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/status-pill';
 import { Switch } from '@/components/ui/switch';
 import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,7 +64,7 @@ export function TailscaleSection() {
       <Card className={!isInstalled ? 'opacity-60' : undefined}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Tailscale</CardTitle>
-          <Globe className="h-4 w-4 text-blue-500" />
+          <Globe className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         </CardHeader>
         <CardContent className="space-y-4">
           <QueryCard
@@ -94,10 +94,10 @@ export function TailscaleSection() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700 dark:text-gray-300">Status</span>
-                    <Badge variant={status.logged_in ? 'success' : 'outline'}>
+                    <StatusPill tone={status.logged_in ? 'ok' : 'neutral'} withDot>
                       {status.logged_in ? 'Logged In' : 'Logged Out'}
-                    </Badge>
-                    {status.running && <Badge variant="success">Running</Badge>}
+                    </StatusPill>
+                    {status.running && <StatusPill tone="ok">Running</StatusPill>}
                   </div>
                   <Switch
                     id="tailscale-toggle"

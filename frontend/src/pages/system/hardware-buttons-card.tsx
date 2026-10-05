@@ -3,6 +3,8 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ToggleLeft } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { QueryCard } from '@/components/ui/query-card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useHardwareButtons, useSetButtonActions } from '@/hooks/use-system';
 import {
   hardwareButtonsFormSchema,
@@ -12,9 +14,10 @@ import { HardwareButtonsSummaryView } from './hardware-buttons-summary-view';
 import { HardwareButtonsEditForm } from './hardware-buttons-edit-form';
 
 export function HardwareButtonsCard() {
-  const { data: hardwareButtons = [] } = useHardwareButtons();
+  const { data: hardwareButtons, isLoading, isError, error, refetch } = useHardwareButtons();
   const setButtonActions = useSetButtonActions();
   const [isEditing, setIsEditing] = useState(false);
+  const buttons = hardwareButtons ?? [];
 
   const { control, handleSubmit, reset } = useForm<HardwareButtonsFormValues>({
     resolver: zodResolver(hardwareButtonsFormSchema),
@@ -27,7 +30,7 @@ export function HardwareButtonsCard() {
   });
 
   useEffect(() => {
-    if (hardwareButtons.length > 0 && !isEditing) {
+    if (hardwareButtons && hardwareButtons.length > 0 && !isEditing) {
       reset({
         buttons: hardwareButtons.map((b) => ({ name: b.name, action: b.action })),
       });
@@ -36,14 +39,14 @@ export function HardwareButtonsCard() {
 
   const openEdit = () => {
     reset({
-      buttons: hardwareButtons.map((b) => ({ name: b.name, action: b.action })),
+      buttons: buttons.map((b) => ({ name: b.name, action: b.action })),
     });
     setIsEditing(true);
   };
 
   const onCancel = () => {
     reset({
-      buttons: hardwareButtons.map((b) => ({ name: b.name, action: b.action })),
+      buttons: buttons.map((b) => ({ name: b.name, action: b.action })),
     });
     setIsEditing(false);
   };
@@ -57,7 +60,9 @@ export function HardwareButtonsCard() {
     );
   };
 
-  if (hardwareButtons.length === 0) return null;
+  // Only a list that actually arrived may hide the card: an empty fallback
+  // after a failed GET read as "this device has no buttons".
+  if (!isLoading && !isError && buttons.length === 0) return null;
 
   return (
     <Card>
@@ -71,22 +76,30 @@ export function HardwareButtonsCard() {
           Configure what each physical button does when pressed.
         </p>
 
-        {!isEditing ? (
-          <HardwareButtonsSummaryView
-            buttons={hardwareButtons}
-            onEdit={openEdit}
-            editDisabled={setButtonActions.isPending}
-          />
-        ) : (
-          <HardwareButtonsEditForm
-            fields={fields}
-            control={control}
-            handleSubmit={handleSubmit}
-            onValidSubmit={onSubmit}
-            onCancel={onCancel}
-            savePending={setButtonActions.isPending}
-          />
-        )}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={<Skeleton className="h-16 w-full" />}
+        >
+          {!isEditing ? (
+            <HardwareButtonsSummaryView
+              buttons={buttons}
+              onEdit={openEdit}
+              editDisabled={setButtonActions.isPending}
+            />
+          ) : (
+            <HardwareButtonsEditForm
+              fields={fields}
+              control={control}
+              handleSubmit={handleSubmit}
+              onValidSubmit={onSubmit}
+              onCancel={onCancel}
+              savePending={setButtonActions.isPending}
+            />
+          )}
+        </QueryCard>
       </CardContent>
     </Card>
   );
