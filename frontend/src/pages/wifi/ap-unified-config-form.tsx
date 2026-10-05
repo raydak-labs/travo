@@ -23,7 +23,10 @@ import {
   type UnifiedApCredentialsValues,
 } from '@/lib/schemas/wifi-forms';
 import { useSetAPConfig } from '@/hooks/use-wifi';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
+import { isWifiLockoutError } from '@/lib/wifi-lockout';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
 import {
   ApApplyRollbackError,
   describeApApplyRollback,
@@ -61,6 +64,17 @@ function credentialsMatchAcross(aps: APConfig[]): boolean {
   );
 }
 
+/**
+ * Whether a failed apply left the router on the settings it had before.
+ *
+ * A restore that failed too means the router is holding a half-applied config,
+ * which the operator has to see spelled out instead of a dialog that promises
+ * nothing has changed yet.
+ */
+function rollbackIsComplete(error: unknown): boolean {
+  return !(error instanceof ApApplyRollbackError) || error.rollback.failed.length === 0;
+}
+
 type APUnifiedConfigFormProps = {
   apConfigs: APConfig[];
   enabledBySection: Record<string, boolean>;
@@ -75,6 +89,7 @@ export function APUnifiedConfigForm({
   onEnabledChange,
 }: APUnifiedConfigFormProps) {
   const setAP = useSetAPConfig();
+  const lockout = useWifiLockout();
   const [qrOpen, setQrOpen] = useState(false);
   const [qrPayload, setQrPayload] = useState<APConfig | null>(null);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
@@ -123,9 +138,17 @@ export function APUnifiedConfigForm({
     key: data.encryption === 'none' ? '' : data.key,
   });
 
-  const applyAll = async (data: UnifiedApCredentialsValues) => {
+  // `snapshots` is taken by the caller before the first PUT and carried
+  // through the retry on purpose: a refetch after a successful section can hand
+  // this form an `apConfigs` prop in which an earlier band already shows the
+  // NEW name, and re-deriving "previous" from that would make the re-send's
+  // rollback restore the new values — a silent, permanent half-applied router.
+  const applyAll = async (
+    data: UnifiedApCredentialsValues,
+    acknowledge: boolean,
+    snapshots: readonly ApSectionSnapshot[],
+  ) => {
     const shared = buildSharedUpdate(data);
-    const snapshots = snapshotApSections(apConfigs);
     const written: ApSectionSnapshot[] = [];
     setApplying(true);
     setApplyError(null);
@@ -135,7 +158,11 @@ export function APUnifiedConfigForm({
         try {
           await setAP.mutateAsync({
             section: snapshot.section,
-            config: { ...shared, enabled },
+            config: {
+              ...shared,
+              enabled,
+              ...(acknowledge ? { acknowledge_lockout: true } : {}),
+            },
           });
           written.push(snapshot);
         } catch (error) {
@@ -153,22 +180,40 @@ export function APUnifiedConfigForm({
     }
   };
 
-  const runApply = async (data: UnifiedApCredentialsValues) => {
+  const runApply = async (
+    data: UnifiedApCredentialsValues,
+    snapshots: readonly ApSectionSnapshot[],
+    acknowledge = false,
+  ) => {
     try {
-      await applyAll(data);
+      await applyAll(data, acknowledge, snapshots);
       setApplyError(null);
     } catch (error) {
       const description = describeApApplyRollback(error);
       setApplyError(description);
+      // Both conditions are load-bearing: the router refused THIS change for
+      // the lockout reason (not any other failure), and every band already
+      // written was put back, so the router still holds the previous settings
+      // and the dialog's "nothing has been changed yet" is true. The retry
+      // re-sends the WHOLE pending apply with the acknowledgement: it covers
+      // every band, not just the one the router refused.
+      const refusal = error instanceof ApApplyRollbackError ? error.cause : error;
+      if (!acknowledge && isWifiLockoutError(refusal) && rollbackIsComplete(error)) {
+        lockout.onLockout(refusal, () => void runApply(data, snapshots, true));
+        return;
+      }
       toast.error('Failed to save WiFi settings', { description });
     }
   };
 
   const onSubmit = async (data: UnifiedApCredentialsValues) => {
+    // Snapshotted here, while the prop still describes the device: everything
+    // below, including the acknowledged retry, rolls back to this.
+    const snapshots = snapshotApSections(apConfigs);
     if (activeEnabledCount < 1) {
       if (!apConfigs.some((ap) => ap.enabled)) return;
       setPendingApply(() => {
-        void runApply(data).finally(() => {
+        void runApply(data, snapshots, false).finally(() => {
           setPendingApply(null);
           setDisableDialogOpen(false);
         });
@@ -177,7 +222,7 @@ export function APUnifiedConfigForm({
       return;
     }
 
-    await runApply(data);
+    await runApply(data, snapshots, false);
   };
 
   const confirmDisable = () => {
@@ -340,6 +385,13 @@ export function APUnifiedConfigForm({
         isLastActive
         onConfirm={confirmDisable}
         confirmPending={applying}
+      />
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={applying}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
       />
     </>
   );
