@@ -7,7 +7,8 @@ import { useWebSocket, type InterfaceDataPoint } from '@/hooks/use-websocket';
 import { useTrafficHistory } from '@/hooks/use-data-usage';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import { formatRate } from '@/lib/utils';
-import { computeNetworkRates, mergeTrafficSeries } from '@/pages/dashboard/network-chart-utils';
+import { computeNetworkRates } from '@/pages/dashboard/network-chart-utils';
+import { interfaceNames, mergeInterfaceSeries } from '@/lib/traffic-series';
 import { uplinkInterfaceName } from '@/lib/uplink';
 
 /** Adapts a per-interface series to the shape `computeNetworkRates` expects. */
@@ -33,17 +34,14 @@ export function NetworkChart() {
 
   // Chart the uplink that is actually carrying the internet. Previously this
   // took `msg.network[0]`, which is always `br-lan`.
-  const historyIfaces = history ? [...new Set(history.points.map((p) => p.ifname))] : [];
   const uplinkName = uplinkInterfaceName(
-    [...Object.keys(interfaceDataPoints), ...historyIfaces],
+    interfaceNames(history?.points, interfaceDataPoints),
     wan?.name ?? null,
   );
   const live = uplinkName ? interfaceDataPoints[uplinkName] : undefined;
   const series = useMemo(
     () =>
-      uplinkName
-        ? mergeTrafficSeries(history?.points ?? [], toStatsPoints(live ?? []), uplinkName)
-        : undefined,
+      uplinkName ? mergeInterfaceSeries(history?.points ?? [], live ?? [], uplinkName) : undefined,
     [history, uplinkName, live],
   );
 

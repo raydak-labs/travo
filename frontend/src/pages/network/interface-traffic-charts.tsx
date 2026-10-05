@@ -3,16 +3,24 @@ import { Activity } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { statusDotToneClass } from '@/components/ui/status-pill';
 import { useWebSocket } from '@/hooks/use-websocket';
+import { useTrafficHistory } from '@/hooks/use-data-usage';
+import { interfaceNames, mergeInterfaceSeries } from '@/lib/traffic-series';
 import { sortInterfaceNames } from './interface-traffic-utils';
 import { InterfaceTrafficChartCard } from './interface-traffic-chart-card';
 
 export function InterfaceTrafficCharts() {
   const { interfaceDataPoints, connected } = useWebSocket();
+  // Retained server history, so the charts draw real traffic on a fresh page
+  // load instead of sitting on "Collecting data…" until the live buffer fills.
+  const { data: history } = useTrafficHistory();
 
-  const sortedNames = useMemo(
-    () => sortInterfaceNames(Object.keys(interfaceDataPoints)),
-    [interfaceDataPoints],
+  const names = useMemo(
+    () => sortInterfaceNames(interfaceNames(history?.points, interfaceDataPoints)),
+    [history, interfaceDataPoints],
   );
+
+  const seriesFor = (name: string) =>
+    mergeInterfaceSeries(history?.points ?? [], interfaceDataPoints[name] ?? [], name);
 
   return (
     <Card>
@@ -32,7 +40,7 @@ export function InterfaceTrafficCharts() {
         </div>
       </CardHeader>
       <CardContent>
-        {sortedNames.length === 0 ? (
+        {names.length === 0 ? (
           <div className="flex h-[100px] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
             {connected
               ? 'Waiting for interface data…'
@@ -40,12 +48,8 @@ export function InterfaceTrafficCharts() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {sortedNames.map((name) => (
-              <InterfaceTrafficChartCard
-                key={name}
-                name={name}
-                points={interfaceDataPoints[name]}
-              />
+            {names.map((name) => (
+              <InterfaceTrafficChartCard key={name} name={name} points={seriesFor(name)} />
             ))}
           </div>
         )}
