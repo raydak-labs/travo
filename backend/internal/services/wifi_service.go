@@ -1144,18 +1144,77 @@ func (w *WifiService) ensureSectionRadioEnabled(section string) error {
 	return w.uci.Set("wireless", radio, "disabled", "0")
 }
 
-func (w *WifiService) deriveWifiMode() string {
-	// Persisted mode is authoritative: "client" and "repeater" both have STA+AP
-	// enabled in UCI, so UCI-only detection can't distinguish them.
-	if w.modeFile != "" {
-		if data, err := os.ReadFile(w.modeFile); err == nil {
-			saved := strings.TrimSpace(string(data))
-			if saved == "client" || saved == "ap" || saved == "repeater" {
-				return saved
-			}
+// persistedWifiMode reads the mode file and answers only the three modes the
+// product knows. An unreadable or unrecognised file is not an error: it just
+// means the mode has to come from the config.
+func (w *WifiService) persistedWifiMode() (string, bool) {
+	if w.modeFile == "" {
+		return "", false
+	}
+	data, err := os.ReadFile(w.modeFile)
+	if err != nil {
+		return "", false
+	}
+	saved := strings.TrimSpace(string(data))
+	switch saved {
+	case "client", "ap", "repeater":
+		return saved, true
+	default:
+		return "", false
+	}
+}
+
+// configMatchesWifiMode reports whether the live config is consistent with the
+// persisted mode. "client" requires no enabled access point, "ap" requires no
+// enabled STA, and "repeater" requires both — the same shape the UCI detection
+// below uses, so the two paths cannot disagree about what a mode looks like.
+func (w *WifiService) configMatchesWifiMode(mode string) bool {
+	sections, err := w.uci.GetSections("wireless")
+	if err != nil {
+		// Cannot prove it matches; let UCI detection answer instead.
+		return false
+	}
+	var hasSTA, hasAP bool
+	for _, opts := range sections {
+		if opts["disabled"] == "1" {
+			continue
+		}
+		switch opts["mode"] {
+		case "sta":
+			hasSTA = true
+		case "ap":
+			hasAP = true
 		}
 	}
-	// Fall back to UCI detection (used before any explicit SetMode() call).
+	switch mode {
+	case "client":
+		return !hasAP
+	case "ap":
+		return hasAP && !hasSTA
+	case "repeater":
+		return hasAP && hasSTA
+	default:
+		return false
+	}
+}
+
+func (w *WifiService) deriveWifiMode() string {
+	// The persisted mode is preferred over UCI detection, but only when the live
+	// config is consistent with it. Client mode leaves NO access point enabled
+	// and repeater mode leaves one, so the two are distinguishable in UCI after
+	// all — which means a persisted value the config disagrees with is stale
+	// rather than authoritative.
+	//
+	// Staleness is reachable: a rollback, a config restore, a hand edit, or a
+	// write that did not go through SetMode all leave the file behind. Observed on
+	// 192.168.1.1: the file said "client" while an access point was enabled, the
+	// UI reported Client as already active, and selecting Client again did nothing
+	// at all — the operator could not change mode from the UI, with no error.
+	if saved, ok := w.persistedWifiMode(); ok && w.configMatchesWifiMode(saved) {
+		return saved
+	}
+	// Fall back to UCI detection (used before any explicit SetMode() call, and
+	// whenever the persisted mode is stale).
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "client"

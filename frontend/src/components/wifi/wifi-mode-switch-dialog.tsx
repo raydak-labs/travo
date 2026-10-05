@@ -16,7 +16,11 @@ import { getWifiModeLabel } from '@/components/wifi/wifi-mode-options';
 
 interface WifiModeSwitchDialogProps {
   open: boolean;
-  currentMode: WifiMode;
+  // Optional because the mode is derived from a query: while it is loading or has
+  // failed there is no known mode, and saying "client" would both misreport the
+  // state and suppress the mode-specific warnings below, which are chosen by
+  // comparing against it.
+  currentMode?: WifiMode;
   targetMode: WifiMode | null;
   isPending: boolean;
   onOpenChange: (open: boolean) => void;

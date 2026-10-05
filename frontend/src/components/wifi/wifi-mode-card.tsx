@@ -22,7 +22,13 @@ export function WifiModeCard() {
   const [pendingMode, setPendingMode] = useState<WifiMode | null>(null);
   const [switchingLabel, setSwitchingLabel] = useState<string | null>(null);
 
-  const currentMode: WifiMode = connection?.mode ?? 'client';
+  // Defaulting to "client" when the connection query failed made the page claim
+  // Client mode on a repeater, and selecting Client then did nothing at all:
+  // the operator was told they were in a mode they were not, and could not
+  // change mode, with no error anywhere. An absent observation is not a mode.
+  // Until the query resolves the selection reads as unknown, so nothing is
+  // highlighted and no target mode is treated as already active.
+  const currentMode: WifiMode | undefined = connection?.mode;
 
   // One place sends the request, with or without the acknowledgement, so the
   // re-send after the dialog is the SAME request and not a rebuilt one that
