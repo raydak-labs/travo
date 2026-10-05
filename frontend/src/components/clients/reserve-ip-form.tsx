@@ -37,10 +37,10 @@ export function ReserveIpForm({ initial, onCancel }: ReserveIpFormProps) {
           { onSuccess: onCancel },
         ),
       )}
-      className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
+      className="mt-4 rounded-md border border-[var(--status-info-border)] bg-[var(--status-info-surface)] p-3"
       noValidate
     >
-      <p className="mb-2 text-sm font-medium text-blue-900 dark:text-blue-200">
+      <p className="mb-2 text-sm font-medium text-[var(--status-info-text)]">
         Reserve IP for {initial.mac}
       </p>
       <div className="flex flex-wrap items-end gap-2">

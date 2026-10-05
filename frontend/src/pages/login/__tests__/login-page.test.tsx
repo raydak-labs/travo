@@ -175,9 +175,8 @@ describe('LoginPage', () => {
     await waitFor(() => {
       const alert = screen.getByRole('alert');
       expect(alert).toBeInTheDocument();
-      // Alert should be styled with red classes (border, bg)
-      expect(alert.className).toContain('border-red');
-      expect(alert.className).toContain('bg-red');
+      expect(alert.className).toContain('var(--status-danger-border)');
+      expect(alert.className).toContain('var(--status-danger-surface)');
     });
   });
 

@@ -70,9 +70,7 @@ export function NetworkChart() {
           <span
             aria-hidden="true"
             className={`h-2 w-2 rounded-full ${
-              connected
-                ? 'bg-[var(--status-ok-border)]'
-                : 'bg-[var(--status-neutral-border)]'
+              connected ? 'bg-[var(--status-ok-border)]' : 'bg-[var(--status-neutral-border)]'
             }`}
           />
           <span className="sr-only">Live updates {connected ? 'connected' : 'disconnected'}</span>

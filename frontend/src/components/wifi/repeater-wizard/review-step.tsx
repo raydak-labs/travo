@@ -60,7 +60,7 @@ export function RepeaterWizardReviewStep({
             </p>
           )}
           {allowApOnStaRadio && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-1 text-xs text-[var(--status-warn-text)]">
               Uplink-radio AP allowed (less stable on dual-radio setups).
             </p>
           )}
@@ -69,9 +69,9 @@ export function RepeaterWizardReviewStep({
 
       {/* State the consequences before an apply that can block for a minute and
           roll back. */}
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+      <div className="rounded-lg border border-[var(--status-warn-border)] bg-[var(--status-warn-surface)] p-3 text-sm text-[var(--status-warn-text)]">
         <p className="font-semibold">What happens when you apply</p>
-        <ul className="mt-1 list-disc space-y-0.5 pl-5 text-amber-800 dark:text-amber-200">
+        <ul className="mt-1 list-disc space-y-0.5 pl-5">
           <li>The router switches to repeater mode and restarts the wireless subsystem.</li>
           <li>Your uplink moves to {upstream.ssid}; the current link drops.</li>
           <li>Devices must reconnect to the access point using its new name and password.</li>
@@ -81,13 +81,13 @@ export function RepeaterWizardReviewStep({
       </div>
 
       {applyError && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/30">
+        <div className="rounded-md border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-3">
           {failedStep && (
-            <p className="text-sm font-medium text-red-700 dark:text-red-300">
+            <p className="text-sm font-medium text-[var(--status-danger-text)]">
               Failed while applying: {failedStep}
             </p>
           )}
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          <p className="text-sm text-[var(--status-danger-text)]" role="alert">
             {applyError}
           </p>
         </div>

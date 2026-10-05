@@ -44,7 +44,7 @@ export function TimezoneAlert() {
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+      className="flex flex-wrap items-start gap-3 rounded-lg border border-[var(--status-warn-border)] bg-[var(--status-warn-surface)] p-3 text-sm text-[var(--status-warn-text)]"
     >
       <Clock className="mt-0.5 h-4 w-4 shrink-0" />
       <span className="min-w-0 flex-1 basis-[12rem]">
@@ -55,7 +55,7 @@ export function TimezoneAlert() {
         <Button
           variant="outline"
           size="sm"
-          className="border-amber-400 text-amber-900 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900"
+          className="border-[var(--status-warn-border)] text-[var(--status-warn-text)] hover:bg-[var(--status-warn-surface)]"
           onClick={handleUpdate}
           disabled={setTimezoneMutation.isPending}
         >
@@ -64,7 +64,7 @@ export function TimezoneAlert() {
         <button
           type="button"
           aria-label="Dismiss timezone alert"
-          className="rounded p-1 hover:bg-amber-200 dark:hover:bg-amber-800"
+          className="rounded p-1 hover:bg-[var(--status-warn-border)]"
           onClick={handleDismiss}
         >
           <X className="h-4 w-4" />

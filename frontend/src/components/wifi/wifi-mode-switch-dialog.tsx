@@ -191,20 +191,20 @@ export function WifiModeSwitchDialog({
             className={cn(
               'flex items-start gap-3 rounded-lg border p-3',
               warning!.severity === 'high'
-                ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'
+                ? 'border-[var(--status-danger-border)] bg-[var(--status-danger-surface)]'
                 : warning!.severity === 'medium'
-                  ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950'
-                  : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950',
+                  ? 'border-[var(--status-warn-border)] bg-[var(--status-warn-surface)]'
+                  : 'border-[var(--status-info-border)] bg-[var(--status-info-surface)]',
             )}
           >
             <AlertTriangle
               className={cn(
                 'mt-0.5 h-4 w-4 shrink-0',
                 warning!.severity === 'high'
-                  ? 'text-red-600 dark:text-red-400'
+                  ? 'text-[var(--status-danger-text)]'
                   : warning!.severity === 'medium'
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-blue-600 dark:text-blue-400',
+                    ? 'text-[var(--status-warn-text)]'
+                    : 'text-[var(--status-info-text)]',
               )}
             />
             <div className="flex-1">
@@ -212,10 +212,10 @@ export function WifiModeSwitchDialog({
                 className={cn(
                   'text-sm font-medium',
                   warning!.severity === 'high'
-                    ? 'text-red-900 dark:text-red-100'
+                    ? 'text-[var(--status-danger-text)]'
                     : warning!.severity === 'medium'
-                      ? 'text-amber-900 dark:text-amber-100'
-                      : 'text-blue-900 dark:text-blue-100',
+                      ? 'text-[var(--status-warn-text)]'
+                      : 'text-[var(--status-info-text)]',
                 )}
               >
                 {warning!.title}
@@ -224,10 +224,10 @@ export function WifiModeSwitchDialog({
                 className={cn(
                   'text-xs mt-1',
                   warning!.severity === 'high'
-                    ? 'text-red-800 dark:text-red-200'
+                    ? 'text-[var(--status-danger-text)]'
                     : warning!.severity === 'medium'
-                      ? 'text-amber-800 dark:text-amber-200'
-                      : 'text-blue-800 dark:text-blue-200',
+                      ? 'text-[var(--status-warn-text)]'
+                      : 'text-[var(--status-info-text)]',
                 )}
               >
                 {warning!.message}
@@ -236,8 +236,8 @@ export function WifiModeSwitchDialog({
           </div>
 
           {warning!.extraWarning && (
-            <div className="rounded-lg border border-red-300 bg-red-100 p-3 dark:border-red-700 dark:bg-red-900">
-              <p className="text-sm font-medium text-red-900 dark:text-red-100">
+            <div className="rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-3">
+              <p className="text-sm font-medium text-[var(--status-danger-text)]">
                 {warning!.extraWarning}
               </p>
             </div>
@@ -265,8 +265,8 @@ export function WifiModeSwitchDialog({
             </div>
           )}
 
-          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+          <div className="flex items-start gap-3 rounded-lg border border-[var(--status-info-border)] bg-[var(--status-info-surface)] p-3">
+            <p className="text-sm text-[var(--status-info-text)]">
               <span className="font-medium">Keep this page open:</span> a progress dialog shows the
               apply being confirmed for up to 30 seconds while the previous mode is still active. If
               the new mode does not come up, the router rolls back on its own and reload this page
@@ -285,7 +285,10 @@ export function WifiModeSwitchDialog({
             onClick={onConfirm}
             disabled={isPending}
             type="button"
-            className={warning!.severity === 'high' ? 'bg-red-600 hover:bg-red-700' : undefined}
+            // A high-severity warning is confirmed with the destructive button
+            // primitive instead of an ad-hoc red override, so the hover pair
+            // lives in one place.
+            variant={warning!.severity === 'high' ? 'destructive' : 'default'}
           >
             {isPending ? 'Switching...' : 'I understand, switch mode'}
           </Button>

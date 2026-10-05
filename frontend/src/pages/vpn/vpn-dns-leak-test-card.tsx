@@ -44,19 +44,19 @@ export function VpnDnsLeakTestCard() {
         {result && (
           <div className="space-y-2 rounded-md border p-3 text-sm">
             {result.vpn_active && result.potentially_leaking ? (
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <div className="flex items-center gap-2 text-[var(--status-danger-text)]">
                 <ShieldAlert className="h-4 w-4 shrink-0" />
                 <span className="font-medium">DNS leak detected</span>
                 <Badge variant="destructive">Leaking</Badge>
               </div>
             ) : result.vpn_active ? (
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <div className="flex items-center gap-2 text-[var(--status-ok-text)]">
                 <CheckCircle className="h-4 w-4 shrink-0" />
                 <span className="font-medium">No DNS leak detected</span>
                 <Badge variant="success">OK</Badge>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+              <div className="flex items-center gap-2 text-[var(--status-warn-text)]">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span className="font-medium">VPN not active — test inconclusive</span>
               </div>

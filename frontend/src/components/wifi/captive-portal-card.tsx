@@ -178,7 +178,7 @@ export function CaptivePortalCard() {
 
         {staConnected && internetOk && !dnsBypassed && (
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--status-ok-text)]" />
             <div>
               <p className="text-sm font-medium leading-none">Connected</p>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -193,10 +193,10 @@ export function CaptivePortalCard() {
 
         {staConnected && internetOk && dnsBypassed && (
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--status-ok-text)]" />
             <div>
               <p className="text-sm font-medium leading-none">Connected</p>
-              <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+              <p className="mt-0.5 text-xs text-[var(--status-warn-text)]">
                 DNS bypass active — restore when done
               </p>
             </div>
@@ -208,7 +208,7 @@ export function CaptivePortalCard() {
 
         {staConnected && portalDetected && !internetOk && (
           <div className="flex items-center gap-2.5">
-            <ShieldAlert className="h-5 w-5 shrink-0 text-amber-500" />
+            <ShieldAlert className="h-5 w-5 shrink-0 text-[var(--status-warn-text)]" />
             <div className="min-w-0">
               <p className="text-sm font-medium leading-none">Login Required</p>
               {portalUrl && (
@@ -225,7 +225,7 @@ export function CaptivePortalCard() {
 
         {staConnected && !portalDetected && !internetOk && (
           <div className="flex items-center gap-2.5">
-            <WifiOff className="h-5 w-5 shrink-0 text-red-500" />
+            <WifiOff className="h-5 w-5 shrink-0 text-[var(--status-danger-text)]" />
             <div>
               <p className="text-sm font-medium leading-none">No Internet</p>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -240,11 +240,11 @@ export function CaptivePortalCard() {
 
         {/* Portal action box — ONLY when genuinely detected + upstream connected */}
         {staConnected && portalDetected && !internetOk && (
-          <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <div className="space-y-3 rounded-lg border border-[var(--status-warn-border)] bg-[var(--status-warn-surface)] p-3">
             {dnsNeedsBypass && (
               <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                <p className="text-xs text-amber-700 dark:text-amber-300">
+                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--status-warn-text)]" />
+                <p className="text-xs text-[var(--status-warn-text)]">
                   Custom DNS is blocking portal access. Bypass DNS first, then open the login page.
                 </p>
               </div>
@@ -284,14 +284,14 @@ export function CaptivePortalCard() {
                 {autoAccept.isPending ? 'Trying…' : 'Auto-accept'}
               </Button>
             </div>
-            <div className="border-t border-amber-200 pt-2.5 dark:border-amber-900/50">
+            <div className="border-t border-[var(--status-warn-border)] pt-2.5">
               <Switch
                 id="captive-auto-try-card"
                 label="Auto-submit portal logins on any network"
                 checked={autoTry}
                 onChange={(e) => handleToggleAutoTry(e.target.checked)}
               />
-              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+              <p className="mt-1 text-xs text-[var(--status-warn-text)]">
                 Travo submits the sign-in form for any captive portal it detects on any network,
                 without asking. Remembered on this device until you turn it off.
               </p>

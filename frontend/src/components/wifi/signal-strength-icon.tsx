@@ -25,11 +25,13 @@ export function SignalStrengthIcon({ signalPercent, className }: SignalStrengthI
     );
   }
 
+  // Strength is a status, so it uses the status tokens rather than raw hues:
+  // they carry a dark-mode variant and stay legible on both card surfaces.
   const colorMap: Record<number, string> = {
-    1: 'text-red-500',
-    2: 'text-yellow-500',
-    3: 'text-green-500',
-    4: 'text-green-600',
+    1: 'text-[var(--status-danger-text)]',
+    2: 'text-[var(--status-warn-text)]',
+    3: 'text-[var(--status-ok-text)]',
+    4: 'text-[var(--status-ok-text)]',
   };
 
   return (
