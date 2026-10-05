@@ -198,18 +198,6 @@ export function WifiRadioHardwareCard() {
             )}
           </div>
         )}
-        {/* Mounted outside the per-radio map: inside it, the dialog unmounted
-            with the row it belonged to while it was still open. */}
-        {pendingDisable && (
-          <ConfirmRadioDisableDialog
-            open={true}
-            radioName={pendingDisable.name}
-            radioCount={radios?.length ?? 1}
-            isPending={setRadioRole.isPending}
-            onOpenChange={(open) => !open && setPendingDisable(null)}
-            onConfirm={handleConfirmDisable}
-          />
-        )}
         {pendingRole && (
           <ConfirmDialog
             open={true}
@@ -242,6 +230,7 @@ export function WifiRadioHardwareCard() {
         <ConfirmRadioDisableDialog
           open={true}
           radioName={pendingDisable.name}
+          radioCount={radios?.length ?? 1}
           isPending={setRadioRole.isPending}
           onOpenChange={(open) => !open && setPendingDisable(null)}
           onConfirm={handleConfirmDisable}
