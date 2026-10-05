@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { Input } from '@/components/ui/input';
 import { useSetHostname } from '@/hooks/use-system';
 import { hostnameFormSchema, type HostnameFormValues } from '@/lib/schemas/system-forms';
@@ -81,13 +82,9 @@ export function HostnameInlineForm({
           Cancel
         </Button>
         {errors.hostname ? (
-          <span
-            id="hostname-inline-error"
-            className="w-full text-xs text-red-600 dark:text-red-400"
-            role="alert"
-          >
+          <FieldError id="hostname-inline-error" className="w-full">
             {errors.hostname.message}
-          </span>
+          </FieldError>
         ) : null}
       </form>
     );

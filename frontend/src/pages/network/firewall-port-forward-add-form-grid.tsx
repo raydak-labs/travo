@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { PortForwardFormValues } from '@/lib/schemas/network-forms';
+import { FieldError } from '@/components/ui/field-error';
 
 type FirewallPortForwardAddFormGridProps = {
   register: UseFormRegister<PortForwardFormValues>;
@@ -35,11 +36,7 @@ export function FirewallPortForwardAddFormGrid({
           aria-describedby={errors.name ? 'pf-name-err' : undefined}
           {...register('name')}
         />
-        {errors.name ? (
-          <p id="pf-name-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.name.message}
-          </p>
-        ) : null}
+        {errors.name ? <FieldError id="pf-name-err">{errors.name.message}</FieldError> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="pf-protocol">Protocol</Label>
@@ -70,9 +67,7 @@ export function FirewallPortForwardAddFormGrid({
           {...register('src_dport')}
         />
         {errors.src_dport ? (
-          <p id="pf-ext-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.src_dport.message}
-          </p>
+          <FieldError id="pf-ext-err">{errors.src_dport.message}</FieldError>
         ) : null}
       </div>
       <div className="space-y-1">
@@ -84,11 +79,7 @@ export function FirewallPortForwardAddFormGrid({
           aria-describedby={errors.dest_ip ? 'pf-ip-err' : undefined}
           {...register('dest_ip')}
         />
-        {errors.dest_ip ? (
-          <p id="pf-ip-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.dest_ip.message}
-          </p>
-        ) : null}
+        {errors.dest_ip ? <FieldError id="pf-ip-err">{errors.dest_ip.message}</FieldError> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="pf-int-port">Internal Port</Label>
@@ -100,9 +91,7 @@ export function FirewallPortForwardAddFormGrid({
           {...register('dest_port')}
         />
         {errors.dest_port ? (
-          <p id="pf-int-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.dest_port.message}
-          </p>
+          <FieldError id="pf-int-err">{errors.dest_port.message}</FieldError>
         ) : null}
       </div>
       <Button type="submit" className="self-end" disabled={isPending}>

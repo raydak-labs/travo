@@ -78,14 +78,15 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('forces dark SourceCard chrome for light-mode contrast', async () => {
+  it('keeps source cards on the shared card plane instead of a private dark surface', async () => {
     renderDashboard();
     const ethernet = await screen.findByRole('heading', { name: 'Ethernet' });
-    const card = ethernet.closest('[class*="bg-slate-900"]');
+    const card = ethernet.closest('[data-slot], div.rounded-lg');
     expect(card).toBeTruthy();
-    expect(card?.className).toMatch(/border-slate-700/);
-    expect(card?.className).toMatch(/bg-slate-900/);
-    expect(ethernet.className).toMatch(/text-slate-100/);
+    // The plane is owned by Card/cardSurfaceVariants; a page-level override
+    // here is what used to drift from every other card.
+    expect(card?.className).not.toMatch(/bg-slate-900/);
+    expect(ethernet.className).not.toMatch(/(?<!dark:)text-slate-100/);
   });
 
   it('shows repeater details when WiFi is connected', async () => {
@@ -108,15 +109,13 @@ describe('DashboardPage', () => {
       .getAllByText('Connected')
       .find((el) => el.tagName === 'P' && el.className.includes('font-medium'))!;
     expect(reachable).toBeDefined();
-    expect(reachable.className).toMatch(/text-emerald-600/);
-    expect(reachable.className).toMatch(/dark:text-emerald-400/);
+    expect(reachable.className).toMatch(/var\(--status-ok-text\)/);
     const vpnState = screen.getByText(/^(On|Off)$/);
     if (vpnState.textContent === 'Off') {
       expect(vpnState.className).toMatch(/text-gray-500 dark:text-gray-400/);
       expect(vpnState.className).toMatch(/dark:text-gray-400/);
     } else {
-      expect(vpnState.className).toMatch(/text-emerald-600/);
-      expect(vpnState.className).toMatch(/dark:text-emerald-400/);
+      expect(vpnState.className).toMatch(/var\(--status-ok-text\)/);
     }
     expect(screen.getByRole('link', { name: /Device details and settings/i })).toHaveAttribute(
       'href',

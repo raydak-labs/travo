@@ -39,8 +39,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <div className="flex min-h-[400px] items-center justify-center p-6" role="alert">
           <div className="mx-auto max-w-md text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-              <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--status-danger-surface)]">
+              <AlertTriangle className="h-8 w-8 text-[var(--status-danger-text)]" />
             </div>
             <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
               Something went wrong
@@ -53,7 +53,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
                   Error details
                 </summary>
-                <pre className="mt-2 overflow-auto rounded-md bg-gray-100 p-3 text-xs text-red-700 dark:bg-gray-800 dark:text-red-400">
+                <pre className="mt-2 overflow-auto rounded-md bg-gray-100 p-3 text-xs text-[var(--status-danger-text)] dark:bg-gray-800">
                   {this.state.error.message}
                 </pre>
               </details>

@@ -450,6 +450,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	}
 	statsHistory.Start()
 
+	// Traffic history: sampled on every WebSocket broadcast tick (2s), ~10 min
+	// per interface, so a freshly loaded dashboard chart is not empty.
+	trafficHistory := services.NewTrafficHistoryService(services.TrafficHistoryDefaultPoints)
+
 	// Token blocklist with cleanup goroutine
 	var blocklist *auth.TokenBlocklist
 	if db != nil {
@@ -512,6 +516,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		BandSwitching:  bandSwitchSvc,
 		Failover:       failoverSvc,
 		StatsHistory:   statsHistory,
+		TrafficHistory: trafficHistory,
 		Speedtest:      services.NewSpeedtestService(),
 
 		TimeSyncMinPlausible: minPlausibleTime(),
@@ -521,7 +526,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	api.SetupRoutes(app, deps)
 
 	// WebSocket (with auth from query parameter)
-	hub := ws.NewHub(systemSvc, alertSvc, netWatcher.Ch())
+	hub := ws.NewHub(systemSvc, alertSvc, netWatcher.Ch(), trafficHistory)
 	app.Use("/api/v1/ws", ws.UpgradeMiddleware(authSvc, splitCORSOrigins(cfg.CorsOrigins)))
 	app.Get("/api/v1/ws", ws.Handler(hub, authSvc, ws.HandlerOptions{}))
 	hub.Start()

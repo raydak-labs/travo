@@ -1,12 +1,13 @@
 import { Globe } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useIPv6Status, useSetIPv6Enabled } from '@/hooks/use-network';
 
 export function IPv6Card() {
-  const { data: status, isLoading } = useIPv6Status();
+  const { data: status, isLoading, isError, error, refetch } = useIPv6Status();
   const setIPv6Enabled = useSetIPv6Enabled();
 
   return (
@@ -16,12 +17,18 @@ export function IPv6Card() {
         <Globe className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        ) : (
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          }
+        >
           <>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-700 dark:text-gray-300">Enable IPv6</span>
@@ -48,7 +55,7 @@ export function IPv6Card() {
               )}
             </div>
           </>
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

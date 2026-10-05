@@ -20,7 +20,8 @@ interface StreamAction {
 }
 
 export function ServicesPage() {
-  const { data: services = [], isLoading } = useServices();
+  const servicesQuery = useServices();
+  const services = servicesQuery.data ?? [];
   const installMutation = useInstallService();
   const removeMutation = useRemoveService();
   const startMutation = useStartService();
@@ -87,7 +88,10 @@ export function ServicesPage() {
 
       <ServicesInstalledCard
         services={services}
-        isLoading={isLoading}
+        isLoading={servicesQuery.isLoading}
+        isError={servicesQuery.isError}
+        error={servicesQuery.error}
+        onRetry={() => void servicesQuery.refetch()}
         onInstall={handleInstall}
         onRemove={handleRemove}
         onStart={(id) => startMutation.mutate(id)}

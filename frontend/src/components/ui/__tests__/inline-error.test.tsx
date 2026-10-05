@@ -3,18 +3,17 @@ import { render, screen } from '@testing-library/react';
 import { InlineError } from '../inline-error';
 
 describe('InlineError', () => {
-  it('exposes an alert with red light/dark chrome', () => {
+  it('exposes an alert in the danger tone', () => {
     render(<InlineError>Failed to load status</InlineError>);
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('Failed to load status');
     expect(alert.className).toContain('text-sm');
-    expect(alert.className).toContain('border-red');
-    expect(alert.className).toContain('bg-red');
-    expect(alert.className).toContain('dark:border-red');
-    expect(alert.className).toContain('dark:bg-red');
-    expect(alert.className).toContain('text-red');
-    expect(alert.className).toContain('dark:text-red');
+    // Light and dark chrome now come from one danger token set (ADR 0012),
+    // so the alert cannot be half-converted and lose its dark variant.
+    expect(alert.className).toContain('var(--status-danger-border)');
+    expect(alert.className).toContain('var(--status-danger-surface)');
+    expect(alert.className).toContain('var(--status-danger-text)');
   });
 
   it('merges className overrides', () => {

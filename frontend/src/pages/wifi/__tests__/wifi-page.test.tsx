@@ -125,7 +125,9 @@ describe('WifiPage', () => {
     renderWifiPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/82%/)).toBeInTheDocument();
+      // The summary band shows the same reading as the connection card, so both
+      // matches are expected here.
+      expect(screen.getAllByText(/82%/).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText(/192\.168\.1\.105/)).toBeInTheDocument();
     });
   });

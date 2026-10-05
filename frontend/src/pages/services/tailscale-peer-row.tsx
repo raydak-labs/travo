@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { statusDotToneClass } from '@/components/ui/status-pill';
 import type { TailscalePeer } from '@shared/index';
+import { cn } from '@/lib/cn';
 
 export type TailscalePeerRowProps = {
   peer: TailscalePeer;
@@ -13,9 +15,10 @@ export function TailscalePeerRow({ peer, onSetExitNode, isPending }: TailscalePe
     <div className="flex items-center justify-between py-1.5">
       <div className="flex min-w-0 items-center gap-2">
         <span
-          className={`h-2 w-2 shrink-0 rounded-full ${
-            peer.online ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-300 dark:bg-gray-600'
-          }`}
+          className={cn(
+            'h-2 w-2 shrink-0 rounded-full',
+            peer.online ? statusDotToneClass.ok : statusDotToneClass.neutral,
+          )}
         />
         <div className="min-w-0">
           <span className="truncate text-sm font-medium">{peer.hostname}</span>

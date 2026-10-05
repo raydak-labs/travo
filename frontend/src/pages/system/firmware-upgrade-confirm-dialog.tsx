@@ -29,7 +29,7 @@ export function FirmwareUpgradeConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+          <DialogTitle className="flex items-center gap-2 text-[var(--status-danger-text)]">
             <AlertTriangle className="h-5 w-5" />
             Firmware Upgrade
           </DialogTitle>
@@ -41,7 +41,7 @@ export function FirmwareUpgradeConfirmDialog({
               ? ' Current settings will be preserved.'
               : ' All settings will be erased.'}
           </p>
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+          <div className="rounded-md border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-3 text-sm text-[var(--status-danger-text)]">
             <strong>Do not power off the device during the upgrade.</strong> The device will reboot
             automatically.
           </div>

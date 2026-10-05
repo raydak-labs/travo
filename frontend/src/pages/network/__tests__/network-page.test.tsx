@@ -227,6 +227,25 @@ describe('NetworkPage', () => {
     });
   });
 
+  it('reports a failed network status instead of an empty client list', async () => {
+    server.use(
+      http.get(API_ROUTES.network.status, () =>
+        HttpResponse.json({ error: 'ubus busy' }, { status: 500 }),
+      ),
+    );
+    renderNetworkPage('/network');
+
+    // Every card fed by this query says so: the WAN card and the client list.
+    await waitFor(() => {
+      expect(screen.getAllByRole('alert').length).toBeGreaterThanOrEqual(2);
+    });
+    for (const alert of screen.getAllByRole('alert')) {
+      expect(alert).toHaveTextContent('ubus busy');
+    }
+    expect(screen.queryByText('No clients connected')).not.toBeInTheDocument();
+    expect(screen.queryByText('No Uplink')).not.toBeInTheDocument();
+  });
+
   it('previews at most 5 clients and links to /clients', async () => {
     const manyClients = Array.from({ length: 7 }, (_, i) => makeClient(i + 1));
     server.use(

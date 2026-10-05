@@ -59,11 +59,9 @@ export function ClientRow({ client, isBlocked, hasReservation, onReserveIP }: Cl
       </td>
       <td className="hidden py-3 pr-4 text-sm text-gray-500 dark:text-gray-400 sm:table-cell">
         <div className="text-xs">
-          <span className="text-blue-600 dark:text-blue-400">↓ {formatBytes(client.rx_bytes)}</span>
+          <span className="text-[var(--chart-rx)]">↓ {formatBytes(client.rx_bytes)}</span>
           {' / '}
-          <span className="text-orange-600 dark:text-orange-400">
-            ↑ {formatBytes(client.tx_bytes)}
-          </span>
+          <span className="text-[var(--chart-tx)]">↑ {formatBytes(client.tx_bytes)}</span>
         </div>
       </td>
       <td className="py-3 text-right">

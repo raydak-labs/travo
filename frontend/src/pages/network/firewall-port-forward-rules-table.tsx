@@ -58,7 +58,7 @@ export function FirewallPortForwardRulesTable({
                   onClick={() => deleteRule.mutate(rule.id)}
                   disabled={deleteRule.isPending}
                 >
-                  <Trash2 className="h-4 w-4 text-red-500" />
+                  <Trash2 className="h-4 w-4 text-[var(--status-danger-text)]" />
                 </Button>
               </td>
             </tr>

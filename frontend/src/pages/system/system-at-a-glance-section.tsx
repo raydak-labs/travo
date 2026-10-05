@@ -4,6 +4,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryCard } from '@/components/ui/query-card';
+import { SectionHeading } from '@/components/ui/section-heading';
+import { StatValue } from '@/components/ui/stat-value';
 import { HostnameInlineForm } from './hostname-inline-form';
 import { useSystemInfo, useSystemStats } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
@@ -26,9 +28,7 @@ export function SystemAtAGlanceSection() {
 
   return (
     <div>
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-        At a Glance
-      </h2>
+      <SectionHeading>At a Glance</SectionHeading>
       <div className="space-y-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -52,24 +52,20 @@ export function SystemAtAGlanceSection() {
             >
               {info ? (
                 <CardInset variant="muted">
-                  <div className="grid grid-cols-2 gap-2">
-                    <span className="text-gray-500 dark:text-gray-400">Hostname</span>
-                    <span className="flex items-center gap-1 text-gray-900 dark:text-white">
-                      <HostnameInlineForm
-                        hostname={info.hostname}
-                        onUpdated={() => refetchInfo()}
-                      />
-                    </span>
-                    <span className="text-gray-500 dark:text-gray-400">Model</span>
-                    <span className="text-gray-900 dark:text-white">{info.model}</span>
-                    <span className="text-gray-500 dark:text-gray-400">Firmware</span>
-                    <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
-                    <span className="text-gray-500 dark:text-gray-400">Kernel</span>
-                    <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
-                    <span className="text-gray-500 dark:text-gray-400">Uptime</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatUptime(info.uptime_seconds)}
-                    </span>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StatValue
+                      label="Hostname"
+                      value={
+                        <HostnameInlineForm
+                          hostname={info.hostname}
+                          onUpdated={() => refetchInfo()}
+                        />
+                      }
+                    />
+                    <StatValue label="Model" value={info.model} />
+                    <StatValue label="Firmware" value={info.firmware_version} />
+                    <StatValue label="Kernel" value={info.kernel_version} />
+                    <StatValue label="Uptime" value={formatUptime(info.uptime_seconds)} />
                   </div>
                 </CardInset>
               ) : null}

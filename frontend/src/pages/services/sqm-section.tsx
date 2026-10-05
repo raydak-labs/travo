@@ -10,8 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { InlineError } from '@/components/ui/inline-error';
 import { Label } from '@/components/ui/label';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ServiceInfo, SQMConfig, SQMQdisc, SQMScript } from '@shared/index';
 import { useApplySQM, useSQMConfig, useSetSQMConfig } from '@/hooks/use-sqm';
@@ -36,7 +36,7 @@ function toInt(s: string) {
 
 export function SQMSection({ sqmService }: Props) {
   const installed = sqmService.state !== 'not_installed';
-  const { data, isLoading, isError } = useSQMConfig(installed);
+  const { data, isLoading, isError, error, refetch } = useSQMConfig(installed);
   const setCfg = useSetSQMConfig();
   const apply = useApplySQM();
 
@@ -60,141 +60,149 @@ export function SQMSection({ sqmService }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {data?.advanced_hint ? <p className="text-sm">{data.advanced_hint}</p> : null}
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
-        ) : null}
-        {isError ? <InlineError>Failed to load SQM configuration.</InlineError> : null}
-        {hasUnsavedChanges ? (
-          <p className="text-sm">You have unsaved changes. Save before applying.</p>
-        ) : null}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          }
+        >
+          {hasUnsavedChanges ? (
+            <p className="text-sm">You have unsaved changes. Save before applying.</p>
+          ) : null}
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="sqm-enabled" className="text-sm font-medium leading-none">
-              Enable SQM
-            </Label>
-          </div>
-          <Switch
-            id="sqm-enabled"
-            checked={current.enabled}
-            disabled={disabled || !canEdit}
-            onChange={(e) =>
-              setDraft((p) => ({ ...(p ?? current), enabled: e.currentTarget.checked }))
-            }
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="sqm-interface" className="text-sm font-medium leading-none">
-              Interface
-            </Label>
-            <Input
-              id="sqm-interface"
-              placeholder="pppoe-wan / eth0.2 / wan"
-              value={current.interface}
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="sqm-enabled" className="text-sm font-medium leading-none">
+                Enable SQM
+              </Label>
+            </div>
+            <Switch
+              id="sqm-enabled"
+              checked={current.enabled}
               disabled={disabled || !canEdit}
-              onChange={(e) => setDraft((p) => ({ ...(p ?? current), interface: e.target.value }))}
+              onChange={(e) =>
+                setDraft((p) => ({ ...(p ?? current), enabled: e.currentTarget.checked }))
+              }
             />
           </div>
 
-          <div className="space-y-2">
-            <div className="text-sm font-medium leading-none">Queue discipline</div>
-            <Select
-              value={qdisc}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="sqm-interface" className="text-sm font-medium leading-none">
+                Interface
+              </Label>
+              <Input
+                id="sqm-interface"
+                placeholder="pppoe-wan / eth0.2 / wan"
+                value={current.interface}
+                disabled={disabled || !canEdit}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...(p ?? current), interface: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium leading-none">Queue discipline</div>
+              <Select
+                value={qdisc}
+                disabled={disabled || !canEdit}
+                onValueChange={(v) => {
+                  const next = v as SQMQdisc;
+                  setDraft((p) => ({
+                    ...(p ?? current),
+                    qdisc: next,
+                    script: next === 'fq_codel' ? 'simple.qos' : 'piece_of_cake.qos',
+                  }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cake">cake</SelectItem>
+                  <SelectItem value="fq_codel">fq_codel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium leading-none">Script preset</div>
+              <Select
+                value={script}
+                disabled={disabled || !canEdit}
+                onValueChange={(v) =>
+                  setDraft((p) => ({ ...(p ?? current), script: v as SQMScript }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="piece_of_cake.qos">piece_of_cake.qos</SelectItem>
+                  <SelectItem value="layer_cake.qos">layer_cake.qos</SelectItem>
+                  <SelectItem value="simple.qos">simple.qos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="sqm-download" className="text-sm font-medium leading-none">
+                Download (kbit/s)
+              </Label>
+              <Input
+                id="sqm-download"
+                inputMode="numeric"
+                value={String(current.download_kbit)}
+                disabled={disabled || !canEdit}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...(p ?? current), download_kbit: toInt(e.target.value) }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sqm-upload" className="text-sm font-medium leading-none">
+                Upload (kbit/s)
+              </Label>
+              <Input
+                id="sqm-upload"
+                inputMode="numeric"
+                value={String(current.upload_kbit)}
+                disabled={disabled || !canEdit}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...(p ?? current), upload_kbit: toInt(e.target.value) }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
               disabled={disabled || !canEdit}
-              onValueChange={(v) => {
-                const next = v as SQMQdisc;
-                setDraft((p) => ({
-                  ...(p ?? current),
-                  qdisc: next,
-                  script: next === 'fq_codel' ? 'simple.qos' : 'piece_of_cake.qos',
-                }));
+              onClick={() => {
+                setCfg.mutate(current, { onSuccess: () => setDraft(null) });
               }}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cake">cake</SelectItem>
-                <SelectItem value="fq_codel">fq_codel</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium leading-none">Script preset</div>
-            <Select
-              value={script}
-              disabled={disabled || !canEdit}
-              onValueChange={(v) =>
-                setDraft((p) => ({ ...(p ?? current), script: v as SQMScript }))
-              }
+              Save
+            </Button>
+            <Button
+              disabled={disabled || !canEdit || hasUnsavedChanges}
+              onClick={() => apply.mutate()}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="piece_of_cake.qos">piece_of_cake.qos</SelectItem>
-                <SelectItem value="layer_cake.qos">layer_cake.qos</SelectItem>
-                <SelectItem value="simple.qos">simple.qos</SelectItem>
-              </SelectContent>
-            </Select>
+              Apply
+            </Button>
           </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="sqm-download" className="text-sm font-medium leading-none">
-              Download (kbit/s)
-            </Label>
-            <Input
-              id="sqm-download"
-              inputMode="numeric"
-              value={String(current.download_kbit)}
-              disabled={disabled || !canEdit}
-              onChange={(e) =>
-                setDraft((p) => ({ ...(p ?? current), download_kbit: toInt(e.target.value) }))
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sqm-upload" className="text-sm font-medium leading-none">
-              Upload (kbit/s)
-            </Label>
-            <Input
-              id="sqm-upload"
-              inputMode="numeric"
-              value={String(current.upload_kbit)}
-              disabled={disabled || !canEdit}
-              onChange={(e) =>
-                setDraft((p) => ({ ...(p ?? current), upload_kbit: toInt(e.target.value) }))
-              }
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            disabled={disabled || !canEdit}
-            onClick={() => {
-              setCfg.mutate(current, { onSuccess: () => setDraft(null) });
-            }}
-          >
-            Save
-          </Button>
-          <Button
-            disabled={disabled || !canEdit || hasUnsavedChanges}
-            onClick={() => apply.mutate()}
-          >
-            Apply
-          </Button>
-        </div>
+        </QueryCard>
       </CardContent>
     </Card>
   );

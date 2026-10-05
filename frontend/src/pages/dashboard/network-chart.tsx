@@ -4,33 +4,46 @@ import { ArrowDownToLine, ArrowUpFromLine, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useWebSocket, type InterfaceDataPoint } from '@/hooks/use-websocket';
+import { useTrafficHistory } from '@/hooks/use-data-usage';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import { formatRate } from '@/lib/utils';
 import { computeNetworkRates } from '@/pages/dashboard/network-chart-utils';
+import { interfaceNames, mergeInterfaceSeries } from '@/lib/traffic-series';
 import { uplinkInterfaceName } from '@/lib/uplink';
 
 /** Adapts a per-interface series to the shape `computeNetworkRates` expects. */
 function toRatePoints(series: InterfaceDataPoint[]) {
-  return computeNetworkRates(
-    series.map((p) => ({
-      timestamp: p.timestamp,
-      cpu: 0,
-      memoryUsed: 0,
-      memoryTotal: 0,
-      rxBytes: p.rxBytes,
-      txBytes: p.txBytes,
-    })),
-  );
+  return computeNetworkRates(toStatsPoints(series));
+}
+
+function toStatsPoints(series: InterfaceDataPoint[]) {
+  return series.map((p) => ({
+    timestamp: p.timestamp,
+    cpu: 0,
+    memoryUsed: 0,
+    memoryTotal: 0,
+    rxBytes: p.rxBytes,
+    txBytes: p.txBytes,
+  }));
 }
 
 export function NetworkChart() {
   const { interfaceDataPoints, connected } = useWebSocket();
+  const { data: history } = useTrafficHistory();
   const { wan, wanMedium } = useTopologyData();
 
   // Chart the uplink that is actually carrying the internet. Previously this
   // took `msg.network[0]`, which is always `br-lan`.
-  const uplinkName = uplinkInterfaceName(Object.keys(interfaceDataPoints), wan?.name ?? null);
-  const series = uplinkName ? interfaceDataPoints[uplinkName] : undefined;
+  const uplinkName = uplinkInterfaceName(
+    interfaceNames(history?.points, interfaceDataPoints),
+    wan?.name ?? null,
+  );
+  const live = uplinkName ? interfaceDataPoints[uplinkName] : undefined;
+  const series = useMemo(
+    () =>
+      uplinkName ? mergeInterfaceSeries(history?.points ?? [], live ?? [], uplinkName) : undefined,
+    [history, uplinkName, live],
+  );
 
   const chartData = useMemo(() => toRatePoints(series ?? []), [series]);
 
@@ -55,7 +68,7 @@ export function NetworkChart() {
           <span
             aria-hidden="true"
             className={`h-2 w-2 rounded-full ${
-              connected ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-600'
+              connected ? 'bg-[var(--status-ok-border)]' : 'bg-[var(--status-neutral-border)]'
             }`}
           />
           <span className="sr-only">Live updates {connected ? 'connected' : 'disconnected'}</span>

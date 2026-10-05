@@ -46,8 +46,8 @@ export function InstallLogDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {status === 'streaming' && <Loader2 className="h-4 w-4 animate-spin" />}
-            {status === 'done' && <CheckCircle className="h-4 w-4 text-green-500" />}
-            {status === 'error' && <XCircle className="h-4 w-4 text-red-500" />}
+            {status === 'done' && <CheckCircle className="h-4 w-4 text-[var(--status-ok-text)]" />}
+            {status === 'error' && <XCircle className="h-4 w-4 text-[var(--status-danger-text)]" />}
             {title}
           </DialogTitle>
           <DialogDescription>

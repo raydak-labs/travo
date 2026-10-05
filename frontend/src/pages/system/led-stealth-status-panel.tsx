@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/status-pill';
 import type { LEDStatus } from '@shared/index';
 
 type LedStealthStatusPanelProps = {
@@ -44,9 +44,9 @@ export function LedStealthStatusPanel({
                 className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-900/50"
               >
                 <span className="text-xs text-gray-700 dark:text-gray-300">{led.name}</span>
-                <Badge variant={led.brightness > 0 ? 'success' : 'secondary'}>
+                <StatusPill tone={led.brightness > 0 ? 'ok' : 'neutral'}>
                   {led.brightness > 0 ? 'On' : 'Off'}
-                </Badge>
+                </StatusPill>
               </div>
             ))}
           </div>

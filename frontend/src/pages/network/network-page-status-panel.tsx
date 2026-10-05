@@ -5,7 +5,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNetworkStatus } from '@/hooks/use-network';
 import { ClientsTable } from '@/pages/network/clients-table';
 import { InterfaceTrafficCharts } from '@/pages/network/interface-traffic-charts';
 import { UptimeLogCard } from '@/pages/network/uptime-log-card';
@@ -16,18 +15,20 @@ const CLIENTS_PREVIEW_LIMIT = 5;
 type NetworkPageStatusPanelProps = {
   network: NetworkStatus | undefined;
   isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  onRetry: () => void;
   blockedClients: string[] | undefined;
 };
 
 export function NetworkPageStatusPanel({
   network,
   isLoading,
+  isError,
+  error,
+  onRetry,
   blockedClients,
 }: NetworkPageStatusPanelProps) {
-  // NetworkPage owns the network-status query and forwards only the loading
-  // flag. Observing the same query key here (deduped by react-query) is what
-  // lets a failed GET render an error instead of an empty client list.
-  const { isError, error, refetch } = useNetworkStatus();
   const hasClients = Boolean(network?.clients && network.clients.length > 0);
 
   return (
@@ -49,7 +50,7 @@ export function NetworkPageStatusPanel({
             isLoading={isLoading}
             isError={isError}
             error={error}
-            onRetry={() => void refetch()}
+            onRetry={onRetry}
             loading={
               <div className="space-y-2">
                 <Skeleton className="h-8 w-full" />

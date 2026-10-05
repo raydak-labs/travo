@@ -12,8 +12,14 @@ export function DataUsageUsageBar({ used, limit, label }: UsageBarProps) {
   // which is exactly the information a metered traveler needs.
   const barPct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
   const over = limit > 0 && used > limit;
+  // Budget pressure is a status, so it wears the status tokens: danger past the
+  // limit, warn approaching it, info below.
   const color =
-    over || barPct >= 90 ? 'bg-red-500' : barPct >= 80 ? 'bg-yellow-500' : 'bg-blue-500';
+    over || barPct >= 90
+      ? 'bg-[var(--status-danger-border)]'
+      : barPct >= 80
+        ? 'bg-[var(--status-warn-border)]'
+        : 'bg-[var(--status-info-border)]';
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -29,7 +35,7 @@ export function DataUsageUsageBar({ used, limit, label }: UsageBarProps) {
         />
       </div>
       {over && (
-        <p className="text-xs font-medium text-red-600 dark:text-red-400">
+        <p className="text-xs font-medium text-[var(--status-danger-text)]">
           Over budget by {formatBytes(used - limit)}
         </p>
       )}

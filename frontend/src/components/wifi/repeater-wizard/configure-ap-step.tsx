@@ -49,9 +49,9 @@ export function RepeaterWizardConfigureApStep({
 }: ConfigureApStepProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
-        <Radio className="h-4 w-4 text-blue-600" />
-        <p className="text-sm text-blue-800 dark:text-blue-200">
+      <div className="flex items-center gap-3 rounded-lg border border-[var(--status-info-border)] bg-[var(--status-info-surface)] p-3">
+        <Radio className="h-4 w-4 text-[var(--status-info-text)]" />
+        <p className="text-sm text-[var(--status-info-text)]">
           Configure the access point that your devices will connect to.
         </p>
       </div>

@@ -8,7 +8,7 @@ import {
 } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/cn';
+import { FieldError } from '@/components/ui/field-error';
 import {
   Select,
   SelectContent,
@@ -63,31 +63,20 @@ export function DdnsEnabledFields({
             </Select>
           )}
         />
-        {errors.service ? (
-          <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.service.message}
-          </p>
-        ) : null}
+        {errors.service ? <FieldError>{errors.service.message}</FieldError> : null}
       </div>
       {service === 'custom' && (
         <div className="space-y-1">
           <Label htmlFor="ddns-url">Update URL</Label>
           <Textarea
             id="ddns-url"
-            rows={3}
             placeholder="https://example.com/update?hostname=[DOMAIN]&myip=[IP]"
-            className={cn(
-              'flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500',
-              errors.update_url && 'border-red-500',
-            )}
             aria-invalid={errors.update_url ? 'true' : undefined}
             aria-describedby={errors.update_url ? 'ddns-url-err' : undefined}
             {...register('update_url')}
           />
           {errors.update_url ? (
-            <p id="ddns-url-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-              {errors.update_url.message}
-            </p>
+            <FieldError id="ddns-url-err">{errors.update_url.message}</FieldError>
           ) : null}
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Use ddns-scripts placeholders such as [IP], [DOMAIN], [USERNAME], [PASSWORD] as required
@@ -105,9 +94,7 @@ export function DdnsEnabledFields({
           {...register('domain')}
         />
         {errors.domain ? (
-          <p id="ddns-domain-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.domain.message}
-          </p>
+          <FieldError id="ddns-domain-err">{errors.domain.message}</FieldError>
         ) : null}
       </div>
       <div className="grid grid-cols-2 gap-4">

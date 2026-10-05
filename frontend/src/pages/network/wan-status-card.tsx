@@ -1,15 +1,15 @@
 import { statusDotClass, statusDotIdleClass } from '@/lib/status-dot';
 import { Info, Cable, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
+import { StatusPill } from '@/components/ui/status-pill';
 import { CardInset } from '@/components/ui/card-inset';
 import { useNetworkStatus, useFailoverConfig } from '@/hooks/use-network';
 import { resolveUplinks, type ResolvedUplink } from '@/lib/uplink';
 import type { NetworkInterface } from '@shared/index';
 
 function UplinkRow({ uplink }: { uplink: ResolvedUplink }) {
-  const state = uplink.active ? 'Active' : 'Inactive';
   return (
     <div className="flex items-center gap-3">
       <span
@@ -18,7 +18,7 @@ function UplinkRow({ uplink }: { uplink: ResolvedUplink }) {
           uplink.active ? statusDotClass(true) : statusDotIdleClass
         }`}
       />
-      <span className="sr-only">{`${uplink.longLabel}: ${state}`}</span>
+      <span className="sr-only">{`${uplink.longLabel}: ${uplink.active ? 'Active' : 'Inactive'}`}</span>
       <div className="flex-1">
         <span className="text-sm font-medium text-gray-900 dark:text-white">{uplink.label}</span>
         <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
@@ -29,7 +29,9 @@ function UplinkRow({ uplink }: { uplink: ResolvedUplink }) {
               : uplink.notConfiguredCopy}
         </span>
       </div>
-      <Badge variant={uplink.active ? 'success' : 'secondary'}>{state}</Badge>
+      <StatusPill tone={uplink.active ? 'ok' : 'neutral'}>
+        {uplink.active ? 'Active' : 'Inactive'}
+      </StatusPill>
     </div>
   );
 }
@@ -65,7 +67,7 @@ function UplinkExplanation({
   }
 
   return (
-    <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+    <div className="flex items-start gap-2 rounded-md border border-[var(--status-info-border)] bg-[var(--status-info-surface)] p-3 text-xs text-[var(--status-info-text)]">
       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span>{message}</span>
     </div>
@@ -95,7 +97,7 @@ function WanInterplay({ interfaces }: { interfaces: readonly NetworkInterface[] 
 }
 
 export function WanStatusCard() {
-  const { data: network, isLoading } = useNetworkStatus();
+  const { data: network, isLoading, isError, error, refetch } = useNetworkStatus();
   // `internet_reachable` is a WAN-carrier check, not a reachability probe: a
   // DHCP lease on a dead or captive-portaled uplink still reads true. Naming it
   // "Internet" is the one word a non-expert trusts most.
@@ -108,36 +110,45 @@ export function WanStatusCard() {
         <Cable className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-2">
-          {isLoading ? (
-            <Skeleton className="h-4 w-1/3" />
-          ) : uplinkUp ? (
-            <>
-              <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Uplink Connected
-              </span>
-              <span className="sr-only">WAN link is up.</span>
-              <Badge variant="success">Online</Badge>
-            </>
-          ) : (
-            <>
-              <XCircle className="h-4 w-4 text-red-500" aria-hidden="true" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">No Uplink</span>
-              <span className="sr-only">WAN link is down.</span>
-              <Badge variant="destructive">Offline</Badge>
-            </>
-          )}
-        </div>
-
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          }
+        >
+          <div className="flex items-center gap-2">
+            {uplinkUp ? (
+              <>
+                <CheckCircle className="h-4 w-4 text-[var(--status-ok-text)]" aria-hidden="true" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  Uplink Connected
+                </span>
+                <span className="sr-only">WAN link is up.</span>
+                <StatusPill tone="ok" withDot>
+                  Online
+                </StatusPill>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-4 w-4 text-[var(--status-danger-text)]" aria-hidden="true" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">No Uplink</span>
+                <span className="sr-only">WAN link is down.</span>
+                <StatusPill tone="danger" withDot>
+                  Offline
+                </StatusPill>
+              </>
+            )}
           </div>
-        ) : (
+
           <WanInterplay interfaces={network?.interfaces ?? []} />
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

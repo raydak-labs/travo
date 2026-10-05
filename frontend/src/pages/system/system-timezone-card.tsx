@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatValue } from '@/components/ui/stat-value';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -16,7 +18,13 @@ import { useTimezone, useSetTimezone } from '@/hooks/use-system';
 import { TIMEZONES } from '@/lib/timezones';
 
 export function SystemTimezoneCard() {
-  const { data: timezoneConfig, isLoading: tzLoading } = useTimezone();
+  const {
+    data: timezoneConfig,
+    isLoading: tzLoading,
+    isError: tzError,
+    error: tzErrorDetail,
+    refetch: refetchTz,
+  } = useTimezone();
   const setTz = useSetTimezone();
   const [selectedTz, setSelectedTz] = useState<string>('');
   const [editingTimezone, setEditingTimezone] = useState(false);
@@ -28,17 +36,18 @@ export function SystemTimezoneCard() {
         <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {tzLoading ? (
-          <Skeleton className="h-4 w-1/2" />
-        ) : (
+        {/* A failed timezone read used to render the same panel as a real one,
+            with the value falling back to an em dash. */}
+        <QueryCard
+          isLoading={tzLoading}
+          isError={tzError}
+          error={tzErrorDetail}
+          onRetry={() => void refetchTz()}
+          loading={<Skeleton className="h-4 w-1/2" />}
+        >
           <div className="space-y-4">
             <CardInset variant="muted">
-              <div className="grid grid-cols-2 gap-2">
-                <span className="text-gray-500 dark:text-gray-400">Timezone</span>
-                <span className="text-gray-900 dark:text-white">
-                  {timezoneConfig?.zonename || '—'}
-                </span>
-              </div>
+              <StatValue label="Timezone" value={timezoneConfig?.zonename ?? null} />
             </CardInset>
 
             {editingTimezone ? (
@@ -108,7 +117,7 @@ export function SystemTimezoneCard() {
               </Button>
             )}
           </div>
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

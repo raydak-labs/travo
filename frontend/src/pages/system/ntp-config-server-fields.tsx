@@ -6,6 +6,7 @@ import type {
 } from 'react-hook-form';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { NtpConfigFormValues, NtpServerDraftFormValues } from '@/lib/schemas/system-forms';
@@ -40,7 +41,7 @@ export function NtpConfigServerFields({
             type="button"
             size="icon"
             variant="ghost"
-            className="shrink-0 text-red-500 hover:text-red-700"
+            className="shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
             onClick={() => remove(index)}
             aria-label={`Remove NTP server ${index + 1}`}
           >
@@ -67,13 +68,9 @@ export function NtpConfigServerFields({
             }}
           />
           {addServerForm.formState.errors.server ? (
-            <span
-              id="ntp-draft-err"
-              className="text-xs text-red-600 dark:text-red-400"
-              role="alert"
-            >
+            <FieldError id="ntp-draft-err" className="w-full">
               {addServerForm.formState.errors.server.message}
-            </span>
+            </FieldError>
           ) : null}
         </div>
         <Button

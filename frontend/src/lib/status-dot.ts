@@ -1,15 +1,16 @@
 /**
  * Status dot for "this link is up" / "this link is down".
  *
- * The glow was an inline `rgba()` literal duplicated in three files — the only
- * hardcoded `rgb()` left outside `index.css`. One definition keeps the up and
- * down treatments from drifting apart again.
+ * The colours come from the semantic status tokens rather than a palette
+ * literal, so an up/down dot in the header, a client row or the DDNS panel is
+ * the same green/red the StatusPill next to it uses, in both themes. The glow
+ * is the same token: a second colour literal here would drift from the dot.
  */
 export function statusDotClass(up: boolean): string {
   return up
-    ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)] dark:bg-emerald-400'
-    : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)] dark:bg-red-400';
+    ? 'bg-[var(--status-ok-border)] shadow-[0_0_6px_var(--status-ok-border)]'
+    : 'bg-[var(--status-danger-border)] shadow-[0_0_6px_var(--status-danger-border)]';
 }
 
 /** Neutral dot for a link that is simply not present or not applicable. */
-export const statusDotIdleClass = 'bg-gray-300 dark:bg-gray-600';
+export const statusDotIdleClass = 'bg-[var(--status-neutral-border)]';

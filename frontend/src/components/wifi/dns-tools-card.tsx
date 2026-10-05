@@ -75,9 +75,9 @@ export function DNSToolsCard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {dnsBypassed ? (
-                <ShieldOff className="h-4 w-4 text-amber-500" />
+                <ShieldOff className="h-4 w-4 text-[var(--status-warn-text)]" />
               ) : (
-                <Shield className="h-4 w-4 text-green-500" />
+                <Shield className="h-4 w-4 text-[var(--status-ok-text)]" />
               )}
               <span className="text-sm font-medium">
                 {dnsBypassed ? 'DNS Bypass Active' : 'DNS Normal'}

@@ -11,9 +11,9 @@ function StatusRow({ label, ok }: { label: string; ok: boolean }) {
     <div className="flex items-center justify-between text-sm">
       <span className="text-gray-600 dark:text-gray-400">{label}</span>
       {ok ? (
-        <CheckCircle className="h-4 w-4 text-green-500" />
+        <CheckCircle className="h-4 w-4 text-[var(--status-ok-text)]" />
       ) : (
-        <XCircle className="h-4 w-4 text-red-500" />
+        <XCircle className="h-4 w-4 text-[var(--status-danger-text)]" />
       )}
     </div>
   );

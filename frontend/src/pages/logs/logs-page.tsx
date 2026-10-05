@@ -29,6 +29,8 @@ export function LogsPage() {
   const {
     data: systemLogs,
     isLoading: systemLoading,
+    isError: systemFailed,
+    error: systemError,
     refetch: refetchSystem,
   } = useSystemLogs(
     activeTab === 'system' ? activeService || undefined : undefined,
@@ -38,12 +40,18 @@ export function LogsPage() {
   const {
     data: kernelLogs,
     isLoading: kernelLoading,
+    isError: kernelFailed,
+    error: kernelError,
     refetch: refetchKernel,
   } = useKernelLogs(activeTab === 'kernel');
 
   const logs = activeTab === 'system' ? systemLogs : kernelLogs;
   const isLoading = activeTab === 'system' ? systemLoading : kernelLoading;
   const refetch = activeTab === 'system' ? refetchSystem : refetchKernel;
+  // Each tab's own failure, so the view can tell an empty log from a request
+  // that never reached the router.
+  const logsFailed = activeTab === 'system' ? systemFailed : kernelFailed;
+  const logsError = activeTab === 'system' ? systemError : kernelError;
 
   const filteredLines = useMemo(() => {
     if (!logs?.lines) return [];
@@ -93,6 +101,9 @@ export function LogsPage() {
           <LogsTextView
             logRef={logRef}
             isLoading={isLoading}
+            isError={logsFailed}
+            error={logsError}
+            onRetry={() => void refetch()}
             filteredLines={filteredLines}
             lineFilter={lineFilter}
             logs={logs}

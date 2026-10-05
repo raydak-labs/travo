@@ -42,17 +42,17 @@ export function WifiHealthBanner() {
   const title = isError ? 'WiFi configuration mismatch' : warningBannerTitle(issuesForTitle);
   const Icon = isError ? AlertCircle : AlertTriangle;
   const containerClasses = isError
-    ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950'
-    : 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950';
+    ? 'border-[var(--status-danger-border)] bg-[var(--status-danger-surface)]'
+    : 'border-[var(--status-warn-border)] bg-[var(--status-warn-surface)]';
   const iconClasses = isError
-    ? 'text-red-600 dark:text-red-400'
-    : 'text-amber-600 dark:text-amber-400';
+    ? 'text-[var(--status-danger-text)]'
+    : 'text-[var(--status-warn-text)]';
   const titleClasses = isError
-    ? 'text-red-900 dark:text-red-100'
-    : 'text-amber-900 dark:text-amber-100';
+    ? 'text-[var(--status-danger-text)]'
+    : 'text-[var(--status-warn-text)]';
   const bodyClasses = isError
-    ? 'text-red-800 dark:text-red-200'
-    : 'text-amber-800 dark:text-amber-200';
+    ? 'text-[var(--status-danger-text)]'
+    : 'text-[var(--status-warn-text)]';
 
   return (
     <div role="alert" className={`flex gap-3 rounded-lg border p-4 ${containerClasses}`}>

@@ -5,7 +5,9 @@ import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryCard } from '@/components/ui/query-card';
+import { FieldError } from '@/components/ui/field-error';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatusPill, type StatusPillProps } from '@/components/ui/status-pill';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
@@ -36,6 +38,35 @@ const TRACKING_LABEL: Record<FailoverTrackingState, string> = {
 function trackingLabel(candidate: FailoverCandidate): string {
   if (!candidate.enabled) return 'Skipped';
   return TRACKING_LABEL[candidate.tracking_state] ?? candidate.tracking_state;
+}
+
+/**
+ * A tracking state is a status, not a caption: it gets the shared pill so
+ * "Online" in the order list is the same green as "Online" anywhere else. A
+ * disabled candidate is the operator's own choice, so it reads as neutral
+ * rather than as a problem.
+ */
+function trackingTone(candidate: FailoverCandidate): StatusPillProps['tone'] {
+  if (!candidate.enabled) return 'neutral';
+  switch (candidate.tracking_state) {
+    case 'online':
+      return 'ok';
+    case 'offline':
+      return 'danger';
+    case 'not_installed':
+    case 'not_available':
+      return 'warn';
+    case 'disabled':
+      return 'neutral';
+    default:
+      return 'stale';
+  }
+}
+
+/** The mwan3 service state as one pill: missing service, on, or off. */
+function operatorStateTone(config: FailoverConfig): StatusPillProps['tone'] {
+  if (!config.service_installed) return 'warn';
+  return config.enabled ? 'ok' : 'neutral';
 }
 
 function cloneConfig(config: FailoverConfig): FailoverConfig {
@@ -203,13 +234,13 @@ export function FailoverCard() {
             <CardInset variant="muted">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 dark:text-gray-400">Status</span>
-                <span>
+                <StatusPill tone={operatorStateTone(current)}>
                   {!current.service_installed
                     ? 'Not installed'
                     : current.enabled
                       ? 'Enabled'
                       : 'Disabled'}
-                </span>
+                </StatusPill>
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-gray-500 dark:text-gray-400">Active uplink</span>
@@ -226,8 +257,10 @@ export function FailoverCard() {
                       <span>
                         {candidate.priority}. {candidate.label}
                       </span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        <span title={candidate.tracking_state}>{trackingLabel(candidate)}</span>
+                      <span title={candidate.tracking_state}>
+                        <StatusPill tone={trackingTone(candidate)}>
+                          {trackingLabel(candidate)}
+                        </StatusPill>
                       </span>
                     </div>
                   ))}
@@ -398,13 +431,9 @@ export function FailoverCard() {
                       onBlur={() => commitHealthField(field, raw)}
                     />
                     {invalid && (
-                      <p
-                        id={`${inputId}-error`}
-                        role="alert"
-                        className="text-xs text-red-600 dark:text-red-400"
-                      >
+                      <FieldError id={`${inputId}-error`}>
                         Enter a number of at least {min}.
-                      </p>
+                      </FieldError>
                     )}
                   </div>
                 );
@@ -412,9 +441,9 @@ export function FailoverCard() {
             </div>
 
             {draft?.enabled && enabledCount === 0 ? (
-              <p className="text-sm text-red-600 dark:text-red-400">
+              <FieldError>
                 Enable at least one uplink before turning automatic failover on.
-              </p>
+              </FieldError>
             ) : null}
 
             <div className="flex flex-wrap gap-2">
