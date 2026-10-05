@@ -3,9 +3,8 @@ import { useRadios, useWifiConnection, useWifiHealth } from '@/hooks/use-wifi';
 import { SummaryBand, SummaryTile } from '@/components/ui/summary-band';
 import { StatValue } from '@/components/ui/stat-value';
 import { getWifiModeLabel } from '@/components/wifi/wifi-mode-options';
-import type { WifiBand } from '@shared/index';
 
-function bandLabel(band: WifiBand | string): string {
+function bandLabel(band: string): string {
   switch (band) {
     case '2.4ghz':
       return '2.4 GHz';
