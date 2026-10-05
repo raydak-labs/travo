@@ -29,22 +29,26 @@ type Hub struct {
 	mu                sync.RWMutex
 	systemSvc         *services.SystemService
 	alertSvc          *services.AlertService
+	trafficHistory    *services.TrafficHistoryService
 	networkStatusCh   <-chan models.NetworkStatus
 	stopCh            chan struct{}
 	stopOnce          sync.Once
 	BroadcastInterval time.Duration
 }
 
-// NewHub creates a new WebSocket hub.
+// NewHub creates a new WebSocket hub. trafficHistory may be nil, in which case
+// no traffic samples are retained.
 func NewHub(
 	systemSvc *services.SystemService,
 	alertSvc *services.AlertService,
 	networkStatusCh <-chan models.NetworkStatus,
+	trafficHistory *services.TrafficHistoryService,
 ) *Hub {
 	return &Hub{
 		clients:           make(map[Conn]bool),
 		systemSvc:         systemSvc,
 		alertSvc:          alertSvc,
+		trafficHistory:    trafficHistory,
 		networkStatusCh:   networkStatusCh,
 		stopCh:            make(chan struct{}),
 		BroadcastInterval: 2 * time.Second,
@@ -155,12 +159,25 @@ func (h *Hub) Stop() {
 }
 
 func (h *Hub) broadcastStats() {
+	// Sampling happens BEFORE the client-count check: the traffic history exists
+	// precisely for the case where nobody is watching yet (a dashboard page
+	// loading with no WebSocket client), so skipping it while ClientCount() == 0
+	// would keep the history permanently empty.
 	if h.ClientCount() == 0 {
+		// Idle: retain only the byte counters the chart needs, so the router is
+		// not paying for a ubus call and a storage probe every 2s forever just
+		// to keep a chart's history warm.
+		if h.trafficHistory != nil {
+			h.trafficHistory.Append(h.systemSvc.ReadNetworkStats())
+		}
 		return
 	}
 	stats, err := h.systemSvc.GetSystemStats()
 	if err != nil {
 		return
+	}
+	if h.trafficHistory != nil {
+		h.trafficHistory.Append(stats.Network)
 	}
 	msg := map[string]any{
 		"type": "system_stats",

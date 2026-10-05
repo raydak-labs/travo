@@ -34,7 +34,8 @@ This directory is an **Obsidian vault** (`.obsidian/`). For graph and wikilink n
 - [`docs/testing.md`](./testing.md) — on-device checks (scripts + full playbook)
 - [`docs/tests/on-device-verification.md`](./tests/on-device-verification.md) — standing playbook for
   checks that only settle on real hardware, and the hardware facts behind them
-- [`docs/ui-theming.md`](./ui-theming.md) — frontend theming rules and tokens
+- [`docs/ui-theming.md`](./ui-theming.md) — frontend theming rules and tokens; the normative
+  decisions now live in [ADR 0012](./adr/0012-ui-consistency-and-status-language.md)
 
 ## Plans and history
 

@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 func TestNetworkStatusEndpoint(t *testing.T) {
@@ -851,5 +853,75 @@ func TestSetClientAlias_RejectsUnknownField(t *testing.T) {
 		`{"mac":"aa:bb:cc:dd:ee:ff","nickname":"nope"}`)
 	if code != http.StatusBadRequest {
 		t.Errorf("expected 400 for an unknown field, got %d: %s", code, body)
+	}
+}
+
+// The chart on a freshly loaded dashboard page is fed by this endpoint, so it
+// must report both the sampled points and how much history they actually span.
+func TestGetTrafficHistoryEndpoint(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+
+	deps.TrafficHistory.Append([]models.NetworkInterfaceStats{
+		{Interface: "br-lan", RxBytes: 1000, TxBytes: 2000},
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/traffic-history", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d, body: %s", resp.StatusCode, b)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var data struct {
+		Points []struct {
+			T       int64  `json:"t"`
+			IfName  string `json:"ifname"`
+			RxBytes int64  `json:"rx_bytes"`
+			TxBytes int64  `json:"tx_bytes"`
+		} `json:"points"`
+		RetainedSeconds int64 `json:"retained_seconds"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(data.Points) != 1 {
+		t.Fatalf("expected 1 point, got %d", len(data.Points))
+	}
+	p := data.Points[0]
+	if p.IfName != "br-lan" || p.RxBytes != 1000 || p.TxBytes != 2000 || p.T == 0 {
+		t.Errorf("unexpected point: %+v", p)
+	}
+	if data.RetainedSeconds != 0 {
+		t.Errorf("expected retained_seconds 0 for a single sample, got %d", data.RetainedSeconds)
+	}
+}
+
+// Before the first broadcast tick the history is simply empty; the endpoint
+// must still answer 200 with an empty array rather than failing.
+func TestGetTrafficHistoryEndpoint_EmptyAfterBoot(t *testing.T) {
+	app, deps := setupTestApp(t)
+	token, _, _ := deps.Auth.Login("admin")
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/network/traffic-history", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), `"points":[]`) {
+		t.Errorf("expected an empty points array, got %s", body)
 	}
 }

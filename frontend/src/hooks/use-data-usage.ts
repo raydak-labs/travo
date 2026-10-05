@@ -2,13 +2,29 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { DataUsageStatus, DataBudgetConfig } from '@shared/index';
+import type { DataUsageStatus, DataBudgetConfig, TrafficHistoryResponse } from '@shared/index';
 
 export function useDataUsage() {
   return useQuery({
     queryKey: ['data-usage'],
     queryFn: () => apiClient.get<DataUsageStatus>(API_ROUTES.network.dataUsage),
     refetchInterval: 60_000, // refresh every minute
+  });
+}
+
+/**
+ * The server's bounded per-interface traffic history, fetched once per page
+ * load. The chart owns the live tail over WebSocket; this exists so a freshly
+ * loaded dashboard has something to draw instead of an empty axis.
+ */
+export function useTrafficHistory() {
+  return useQuery({
+    queryKey: ['network', 'traffic-history'],
+    queryFn: ({ signal }) =>
+      apiClient.get<TrafficHistoryResponse>(API_ROUTES.network.trafficHistory, signal),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

@@ -167,6 +167,25 @@ export interface DataUsagePeriod {
   readonly tx_bytes: number;
 }
 
+/** One cumulative RX/TX sample for a single interface (GET /network/traffic-history) */
+export interface TrafficHistoryPoint {
+  /** Unix timestamp in seconds */
+  readonly t: number;
+  readonly ifname: string;
+  readonly rx_bytes: number;
+  readonly tx_bytes: number;
+}
+
+/**
+ * Recent per-interface traffic samples so the chart has something to paint on
+ * page load. `points` is empty right after boot; `retained_seconds` is how much
+ * history the server actually holds (~600s at the 2s sampling tick).
+ */
+export interface TrafficHistoryResponse {
+  readonly points: readonly TrafficHistoryPoint[];
+  readonly retained_seconds: number;
+}
+
 /** Traffic data for a single monitored network interface */
 export interface DataUsageInterface {
   readonly name: string;

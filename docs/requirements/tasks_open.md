@@ -67,6 +67,14 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 ## 12. UX And UI Polish
 
 - [ ] Multi-language support (i18n)
+- [ ] **Summary band on the remaining top-level pages.** WiFi has one
+      ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)); Network, System, Services and
+      VPN do not. The band is the template: always visible, flat tiles, per-tile degradation. Roll it
+      out one page at a time, reusing each page's existing queries.
+- [ ] **Live radio state is still missing.** The WiFi Radios tile shows the *configured* radio
+      (UCI-derived), not what the radio is doing on the air. A `/api/v1/wifi/radios/status`
+      endpoint (country, actual channel/width, TX power, noise, bitrate) would fill it without
+      changing the tile contract. Needs device validation on the ath11k/IPQ6018 target.
 
 ## 13. Deployment And Packaging
 

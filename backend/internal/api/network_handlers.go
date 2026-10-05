@@ -640,3 +640,17 @@ func ConnectionMethodHandler(svc *services.NetworkService) fiber.Handler {
 		return c.JSON(resp)
 	}
 }
+
+// GetTrafficHistoryHandler handles GET /api/v1/network/traffic-history.
+//
+// It lets the dashboard chart paint the last minutes of per-interface traffic on
+// page load instead of starting empty and waiting for WebSocket pushes. The
+// point list is empty right after boot, which is a valid response.
+func GetTrafficHistoryHandler(svc *services.TrafficHistoryService) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"points":           svc.History(),
+			"retained_seconds": svc.RetainedSeconds(),
+		})
+	}
+}

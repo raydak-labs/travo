@@ -288,9 +288,25 @@ func readNetworkStats() []models.NetworkInterfaceStats {
 	return result
 }
 
-// readSysfsCounter reads a single counter value from /sys/class/net/<iface>/statistics/<counter>.
+// sysfsNetRoot is the directory holding the per-interface counter directories.
+// It is a variable only so tests can point it at a fixture tree: the device
+// interfaces readNetworkStats looks for (br-lan, wwan0, wg0, eth0) do not exist
+// on a CI or developer host, which would otherwise make any test of network
+// sampling silently pass on empty input.
+var sysfsNetRoot = "/sys/class/net"
+
+// SetSysfsNetRootForTesting points interface-counter reads at root and returns
+// a function restoring the previous value. Call it before starting any
+// background sampler; like SetBcryptCostForTesting it is not lock-protected.
+func SetSysfsNetRootForTesting(root string) (restore func()) {
+	previous := sysfsNetRoot
+	sysfsNetRoot = root
+	return func() { sysfsNetRoot = previous }
+}
+
+// readSysfsCounter reads a single counter value from <sysfsNetRoot>/<iface>/statistics/<counter>.
 func readSysfsCounter(iface, counter string) (int64, error) {
-	path := filepath.Join("/sys/class/net", iface, "statistics", counter)
+	path := filepath.Join(sysfsNetRoot, iface, "statistics", counter)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err

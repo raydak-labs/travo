@@ -60,6 +60,7 @@ export const API_ROUTES = {
     failover: '/api/v1/network/failover',
     failoverEvents: '/api/v1/network/failover/events',
     dataUsage: '/api/v1/network/data-usage',
+    trafficHistory: '/api/v1/network/traffic-history',
     dataUsageReset: '/api/v1/network/data-usage/reset',
     dataUsageBudget: '/api/v1/network/data-usage/budget',
     usbTethering: '/api/v1/network/usb-tethering',
