@@ -23,6 +23,59 @@ var ErrLockoutRefused = errors.New("refusing to remove the access point you are 
 // LockoutErrorCode is the stable machine-readable code the HTTP layer puts next
 // to the lockout message. The frontend keys off this, never off the message
 // text, so the wording above can be reworded without breaking clients.
+// The mutators that are deliberately NOT guarded, and the checkable reason for
+// each. What all three have in common is WHICH outcome of the one rule they can
+// reach. The rule (guardLockout) refuses on "caller may be on WiFi AND no
+// enabled mode=ap wifi-iface would be left on an enabled radio", so a mutator is
+// safe to leave unguarded when it cannot CREATE that second condition: nothing
+// it writes takes the last enabled access point down.
+//
+//   - Connect: every write that disables an access point is
+//     applyRepeaterDownlinkAPPolicy's `apDisabled` branch, reached only when
+//     apOnOtherRadio is true — an ENABLED access point on a radio other than
+//     the uplink's already exists at that moment, and the same pass leaves it
+//     enabled. splitAPOffUplinkRadio refuses with ErrAPAndSTASameRadio rather
+//     than disabling anything when that other radio is bare. Its other writes
+//     are on the STA section and on the STA's radio.
+//   - Disconnect: writes disabled=1 on exactly one mode=sta section and commits.
+//     No mode=ap section is read or written, so the enabled-access-point set is
+//     the same before and after — including in repeater mode, where the
+//     downlink does not depend on the uplink staying.
+//   - ReconcileRepeaterAPLayout: reconcileRepeaterAPRadioLayout, i.e. the same
+//     applyRepeaterDownlinkAPPolicy branch as Connect.
+//
+// What that claim is and is not:
+//   - It IS: "these three cannot leave the caller with NO access point." At least
+//     one access point that was enabled before the change is still enabled after
+//     it. Note what that does NOT say: they may REDUCE the count. Connect's
+//     split turns default_radio1 off and the reconcile moves the downlink to
+//     the other radio; what neither does is end the config with none. Pinned at
+//     the service boundary by wifi_lockout_coverage_test.go and, over the
+//     ordinary configuration and a caller the guard REFUSES, at the HTTP
+//     boundary by the KeepsAnAccessPointUp tests in
+//     wifi_lockout_handlers_test.go. Those assert the property, not the
+//     ABSENCE of a refusal: a guard wired into these endpoints the documented
+//     way — guardLockoutExcluding(req, "", "") — returns nil on those fixtures
+//     because an access point genuinely remains, which is the correct outcome
+//     rather than a test that failed to notice.
+//   - It is NOT: "a guard here could never fire". The rule reads the config as
+//     it finds it, so a guard on these endpoints would still refuse whenever the
+//     router already has no enabled access point — a condition these mutators
+//     do not cause and the rule cannot tell from one they did. That refusal is
+//     a false positive, which is why they are not guarded.
+//   - It is NOT: a netifd-level guarantee. repeaterDownlinkLayout counts AP
+//     SECTIONS, not radios, so the access point that survives may sit on a
+//     radio with disabled=1 and never come up. enabledAPRemains is stricter on
+//     this point than the argument above, so the two are not interchangeable.
+//
+// Two Connect outcomes the single rule cannot express, recorded rather than
+// papered over: allow_ap_on_sta_radio (and single-radio hardware) let an access
+// point stay ENABLED on the uplink PHY, which the driver may still take down
+// with a failing STA; and the ErrAPAndSTASameRadio refusal is raised inside
+// mutateWireless, after ensureWwanNetwork has committed, so its restore depends
+// on the applier snapshot rather than on the refusal itself. Neither is this
+// rule, and widening the rule to cover them is a decision for ADR 0002, not
+// something to smuggle in as an endpoint guard.
 const LockoutErrorCode = "wifi_lockout_risk"
 
 // LockoutRequest carries the caller's identity and their acknowledgement into
