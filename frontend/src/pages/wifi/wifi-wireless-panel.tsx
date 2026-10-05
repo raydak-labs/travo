@@ -3,6 +3,7 @@ import { CaptivePortalCard } from '@/components/wifi/captive-portal-card';
 import { WifiHealthBanner } from '@/components/wifi/wifi-health-banner';
 import { WifiModeCard } from '@/components/wifi/wifi-mode-card';
 import { WifiCurrentConnectionCard } from './wifi-current-connection-card';
+import { WifiSummaryBand } from './wifi-summary-band';
 import { WifiSavedNetworksCard } from './wifi-saved-networks-card';
 import { APConfigCard } from './ap-config-card';
 
@@ -14,6 +15,7 @@ export function WifiWirelessPanel() {
 
   return (
     <div className="space-y-6">
+      <WifiSummaryBand />
       <WifiHealthBanner />
       {!isPureAP && <CaptivePortalCard />}
       <WifiModeCard />
