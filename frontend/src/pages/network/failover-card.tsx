@@ -10,6 +10,13 @@ import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { useFailoverConfig, useSetFailoverConfig, useFailoverEvents } from '@/hooks/use-network';
+import { useAlertStore } from '@/stores/alert-store';
+import { OperatorEditOverwriteWarning } from './failover-operator-edit-warning';
+import {
+  OPERATOR_EDIT_OVERWRITE_ALERT,
+  dismissedOverwriteAlerts,
+  rememberDismissedOverwriteAlert,
+} from './operator-edit-overwrite';
 import type { FailoverCandidate, FailoverConfig } from '@shared/index';
 
 function cloneConfig(config: FailoverConfig): FailoverConfig {
@@ -53,6 +60,35 @@ export function FailoverCard() {
   const setConfig = useSetFailoverConfig();
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<FailoverConfig | null>(null);
+  // Alerts of this type are the record a save left behind. Unlike a toast they
+  // are still in the feed after a reload, so the operator is told again when
+  // they come back to the card rather than exactly once.
+  const alerts = useAlertStore((state) => state.alerts);
+  // Dismissals survive the card unmounting: the feed does not, so a dismissal
+  // held in component state would be lost on the next visit and the operator
+  // would be shown — and have to clear — the same banner again.
+  const [dismissedAlerts, setDismissedAlerts] =
+    useState<readonly string[]>(dismissedOverwriteAlerts);
+
+  // Memoised: the store holds a stable array but filter does not, and a fresh
+  // array on every render would re-render this card without end.
+  const latestOverwrite = useMemo(
+    () =>
+      alerts.find(
+        (alert) =>
+          alert.type === OPERATOR_EDIT_OVERWRITE_ALERT && !dismissedAlerts.includes(alert.id),
+      ),
+    [alerts, dismissedAlerts],
+  );
+
+  // The operator's own tuning is being replaced under their hands: say so on
+  // the card they pressed Save on, and keep saying so while they edit it.
+  const overwriteWarning = latestOverwrite ? (
+    <OperatorEditOverwriteWarning
+      alert={latestOverwrite}
+      onDismiss={(id) => setDismissedAlerts(rememberDismissedOverwriteAlert(id))}
+    />
+  ) : null;
 
   const current = isEditing ? (draft ?? data) : data;
   const enabledCount = useMemo(
@@ -125,6 +161,7 @@ export function FailoverCard() {
       <CardContent>
         {!isEditing ? (
           <div className="space-y-3">
+            {overwriteWarning}
             <div className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 dark:text-gray-400">Status</span>
@@ -182,6 +219,7 @@ export function FailoverCard() {
           </div>
         ) : (
           <div className="space-y-4">
+            {overwriteWarning}
             <Switch
               id="failover-enabled"
               label="Enable automatic failover"
