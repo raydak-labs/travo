@@ -1,8 +1,11 @@
 ---
 title: Critical code review remediation — 2026-09-26
+description: Remediation plan for the 2026-09-26 critical code review; completion marks are unreliable, open items live in tasks_open.md sections 15 and 16.
+updated: 2026-10-05
+tags: [review, remediation, traceability]
 date: 2026-09-28
-source: 2026-09-26-critical-code-review.md (repo root)
-status: in progress
+source: ../_archive/reviews/2026-09-26-critical-code-review.md (frozen report)
+status: superseded
 ---
 
 # Critical code review remediation

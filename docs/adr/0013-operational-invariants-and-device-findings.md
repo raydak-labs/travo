@@ -1,5 +1,6 @@
 ---
 title: "ADR 0013: Operational invariants and device findings"
+description: Cross-cutting operational invariants and the device findings behind them: VPN disable route recovery, push wiring, store cost, band switching, buttons, AdGuard.
 status: Accepted
 date: 2026-10-05
 updated: 2026-10-05
@@ -39,8 +40,17 @@ API shape suggests. The shipped recovery is in `VpnService.restoreDefaultRouteAf
    falling back to `[wwan, wan]` — for both the interface and its `6` variant, then
    reload and wait up to 2 s.
 3. Still nothing: force a down/up cycle on those uplinks, reload, wait up to 5 s.
-4. Still nothing: **return an error**. Success is never reported without a kernel
-   default route, and the crash guard stays (ADR 0003).
+4. Still nothing: last resort, run the netifd helper scripts (`ifdown`/`ifup`) on
+   those uplinks, reload, and wait up to 8 s. On some devices the helper scripts
+   re-trigger proto handlers where a ubus down/up alone does not.
+5. The function itself returns nothing. `disableWireguard` re-checks
+   `hasKernelDefaultRoute` and, if the kernel still has no default route, returns
+   `WireGuard disabled but no default route was restored; internet may be down` and
+   keeps the crash guard (ADR 0003). Success is never reported without a kernel
+   default route.
+
+Worst-case disable latency is therefore bounded by those three waits (2 s + 5 s +
+8 s) plus the apply/confirm cycle — do not read step 4 as optional.
 
 Two rules follow. Disable recovery must not assume the uplink is `wan` — on a
 travel router the internet often arrives over a WiFi STA link. And the check must
@@ -144,8 +154,9 @@ convenience, the token in the query string forever) was cheaper and wrong.
   is deleted.
 - Device findings recorded here are evidence, not behaviour. Changing the code
   does not invalidate the finding; superseding it does, explicitly.
-- Rule 1 is enforced in code by `hasKernelDefaultRoute` and its two wait windows;
-  changing either without re-checking the failover path is a behaviour change.
+- Rule 1 is enforced in code by `hasKernelDefaultRoute` and its three wait windows
+  (2 s / 5 s / 8 s); changing any of them without re-checking the failover path is
+  a behaviour change.
 
 ## Deliberate ceilings
 

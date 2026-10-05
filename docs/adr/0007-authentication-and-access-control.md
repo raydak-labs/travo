@@ -1,5 +1,6 @@
 ---
 title: "ADR 0007: Authentication, JWT, and LAN access control"
+description: Authentication and access control: clock-independent sessions, the token revocation set, and the access-control rules around it.
 status: Accepted
 date: 2026-05-14
 updated: 2026-10-04

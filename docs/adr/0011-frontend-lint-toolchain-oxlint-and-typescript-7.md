@@ -1,5 +1,6 @@
 ---
 title: "ADR 0011: Frontend lint toolchain (oxlint and TypeScript 7)"
+description: Why the frontend lints with oxlint (including type-aware rules) on TypeScript 7, and what the gate accepts.
 status: Accepted
 date: 2026-10-02
 updated: 2026-10-02

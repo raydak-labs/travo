@@ -1,5 +1,6 @@
 ---
 title: "ADR 0005: Multi-WAN connection failover (mwan3)"
+description: Multi-WAN failover with mwan3: priority ordering, failback hold-down, and how WAN liveness is probed.
 status: Accepted
 date: 2026-05-14
 updated: 2026-10-04
@@ -47,7 +48,7 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 
 ### 2. IPv4-only phase
 
-- Phase 1 emits mwan3 rules with **`family: ipv4`** only. **IPv6 failover is explicitly deferred** until validated on hardware (see `docs/plans/connection-failover.md` and `docs/architecture/overview.md` §6.1).
+- Phase 1 emits mwan3 rules with **`family: ipv4`** only. **IPv6 failover is explicitly deferred** until validated on hardware (see this ADR §2 and `docs/architecture/overview.md` §6.1).
 
 ### 3. Safety guards and backup
 
@@ -83,7 +84,7 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 - `backend/internal/services/network_service.go` (explicit duplicate checks, §6)
 - `backend/internal/models/failover.go`
 - `docs/architecture/overview.md` §6.1–6.2
-- `docs/plans/connection-failover.md`
+- `docs/architecture/overview.md` §6.1
 
 ## Device findings: liveness probing
 

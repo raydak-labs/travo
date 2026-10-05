@@ -2,6 +2,7 @@
 title: Auth hardening follow-ups
 description: Small plan for the remaining auth-transport weaknesses — blocklist persistence, WS token transport, token storage — after the clock-independent session work.
 updated: 2026-07-08
+status: active
 tags: [auth, security, sessions, websocket]
 ---
 
@@ -40,7 +41,7 @@ logs. On a LAN-only admin device with TLS optional this is low severity, but
 it is the only place a bearer token appears in a URL.
 
 **Proposal:** Issue a short-lived (30s, single-use) WS ticket from an
-authenticated `POST /auth/ws-ticket`, pass the ticket in the query string
+authenticated `POST /api/v1/auth/ws-ticket`, pass the ticket in the query string
 instead of the real token. Alternative (less code): accept the token via
 `Sec-WebSocket-Protocol` header, which browsers can set.
 

@@ -1,5 +1,6 @@
 ---
 title: "ADR 0002: Wireless model, health, and LuCI-style UCI apply"
+description: The wireless model: configured vs live radio, role assignment, LuCI-style apply/rollback/confirm, and the health API that reports fragile layouts.
 status: Accepted
 date: 2026-05-14
 updated: 2026-10-04

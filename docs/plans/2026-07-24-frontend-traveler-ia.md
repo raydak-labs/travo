@@ -2,17 +2,18 @@
 title: "Frontend traveler IA"
 description: "Sidebar-only navigation and progressive disclosure for non-technical travel-router users"
 updated: 2026-07-24
+status: normative
 tags: [plan, frontend, ux, ia]
 ---
 
 # Frontend traveler IA
 
 > **Status:** Design approved; follow-up: [`2026-07-25-sidebar-defaults-lighter-disclosure.md`](2026-07-25-sidebar-defaults-lighter-disclosure.md) (parent→default, Advanced labels, lighter PageSections)  
-> **Implementation plan:** [`2026-07-24-frontend-traveler-ia-implementation.md`](../reference/ui-theming.md)  
+> **Shipped as:** the sidebar and disclosure rules now in [`reference/ui-theming.md`](../reference/ui-theming.md) § Navigation patterns  
 > **Goal:** Make daily travel jobs obvious; keep every existing feature reachable without duplicate nav chrome.  
 > **Primary user:** Non-technical traveler (hotel WiFi, “am I online?”, VPN on/off).
 
-**Supersedes** the *nav chrome* parts of [`ux-overhaul.md`](../adr/0012-ui-consistency-and-status-language.md) (in-page WiFi/Network tab bars). Normative nav rules also live in [`../ui-theming.md`](../reference/ui-theming.md) § Navigation patterns. Does **not** move cards between routes; disclosure collapses content **where it already lives**.
+**Supersedes** the *nav chrome* parts of the 2026-07 UX overhaul (in-page WiFi/Network tab bars); the card and status contracts of that work are now [ADR 0012](../adr/0012-ui-consistency-and-status-language.md). Normative nav rules also live in [`../ui-theming.md`](../reference/ui-theming.md) § Navigation patterns. Does **not** move cards between routes; disclosure collapses content **where it already lives**.
 
 ---
 
@@ -122,7 +123,7 @@ Page-section open/closed **not** persisted in the first implementation (defaults
 - Persisted accordion state for page sections.
 - Breadcrumbs / command palette.
 - LuCI escape-hatch link in System.
-- Updating [`2026-07-20-ui-consistency.md`](../adr/0012-ui-consistency-and-status-language.md) “Tabbed page” spacing contract (do when removing tab bars).
+- The “tabbed page” spacing contract from the 2026-07 UI consistency plan is closed: [ADR 0012](../adr/0012-ui-consistency-and-status-language.md) governs page rhythm now.
 
 ---
 
@@ -153,6 +154,6 @@ Not an implementation plan — pointers for the next plan:
 
 ## Related
 
-- [`ux-overhaul.md`](../adr/0012-ui-consistency-and-status-language.md) — historical; nav chrome superseded.
+- [ADR 0012](../adr/0012-ui-consistency-and-status-language.md) — card, status and page-rhythm contracts that replaced that UX plan.
 - [`../ui-theming.md`](../reference/ui-theming.md) — normative Navigation patterns (aligned with this plan).
 - Peer pattern: GL.iNet admin — task top-level, geek stuff under Network/System, no twin tab chrome for the same axis.

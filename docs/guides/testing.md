@@ -124,5 +124,5 @@ Some changes only settle on hardware. If `192.168.1.1` cannot be reached:
   assuming they were covered.
 - **Expect a punch list, and expect it to be temporary.** The 2026-10-04 review could only do
   static analysis while the device was down
-  ([report](../../2026-10-04-deep-code-review.md)); the checklist it produced was replaced by the
+  ([report](../_archive/reviews/2026-10-04-deep-code-review.md)); the checklist it produced was replaced by the
   standing playbook once the device came back. Add findings to the playbook, not to a new list.

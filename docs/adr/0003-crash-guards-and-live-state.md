@@ -1,5 +1,6 @@
 ---
 title: "ADR 0003: Crash guards and automated live-state changes"
+description: The crash-guard contract for automated live-state changes: what is guarded in /etc/trafo, where ordinary state lives, and how a guard is cleared.
 status: Accepted
 date: 2026-05-14
 updated: 2026-10-04

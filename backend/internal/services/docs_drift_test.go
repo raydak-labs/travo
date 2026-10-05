@@ -25,12 +25,61 @@ const (
 	docsDir   = "../../../docs"
 	agentsMD  = "../../../AGENTS.md"
 	claudeMD  = "../../../CLAUDE.md"
-	reviewDoc = "../../../2026-10-04-deep-code-review.md"
+	reviewDoc = "../../../docs/_archive/reviews/2026-10-04-deep-code-review.md"
 )
 
 // guardNameRe matches a crash-guard path as written in prose, e.g.
 // "/etc/trafo/failover-in-progress".
-var guardNameRe = regexp.MustCompile(`(/etc/trav[ao]/[a-z0-9-]*(?:-in-progress|-crash-guard|-failcount))`)
+//
+// It deliberately matches ANY /etc/<dir>/ prefix rather than the two directories
+// this repo uses. The narrow "/etc/trav[ao]/" form was a hole: the retired
+// pre-unification directory was invisible to it, so a plan an agent was about to
+// execute could prescribe "/etc/openwrt-travel-gui/band-switch-in-progress" — a
+// guard deploy-local.sh cannot clear — and this gate stayed green.
+var guardNameRe = regexp.MustCompile(`(/etc/[a-z0-9-]+/[a-z0-9-]*(?:-in-progress|-crash-guard|-failcount))`)
+
+// retiredStateDirRe matches the pre-unification state directory ADR 0003 retired
+// on 2026-09-28. It is banned outright rather than per-suffix, because the
+// damage is not only guard files: a persisted state path under the old directory
+// is invisible to the operator and to every recovery script that clears
+// /etc/trafo (ADR 0013 rule 6).
+var retiredStateDirRe = regexp.MustCompile(`/etc/openwrt-travel-gui/`)
+
+// retiredStateDirAllowed names the documents permitted to mention the retired
+// directory, and only to explain that it is retired.
+var retiredStateDirAllowed = map[string]bool{
+	filepath.Join(docsDir, "adr", "0003-crash-guards-and-live-state.md"):                true,
+	filepath.Join(docsDir, "adr", "0013-operational-invariants-and-device-findings.md"): true,
+	filepath.Join(docsDir, "requirements", "tasks_open.md"):                             true,
+}
+
+// TestDocsDoNotNameTheRetiredStateDirectory fails when a document prescribes a
+// path in the directory ADR 0003 retired. Before the docs restructure two live
+// plans did exactly that (band-switching guard + state, button actions), which
+// would have reintroduced the stale-guard failure ADR 0003 exists to prevent.
+func TestDocsDoNotNameTheRetiredStateDirectory(t *testing.T) {
+	files := docsToScan(t)
+
+	var problems []string
+	for _, f := range files {
+		if retiredStateDirAllowed[f] {
+			continue
+		}
+		body, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		if retiredStateDirRe.Match(body) {
+			problems = append(problems, f)
+		}
+	}
+	for _, p := range problems {
+		t.Errorf("%s names the retired state directory /etc/openwrt-travel-gui/ — guards "+
+			"live in /etc/trafo and ordinary state in /etc/travo (ADR 0003 section 2). A "+
+			"guard written to the retired directory is never cleared by deploy-local.sh, "+
+			"so the feature stays disabled with no log line.", p)
+	}
+}
 
 // docsToScan walks the documentation files an agent or operator is likely to
 // read before touching a guard or the persistent store.

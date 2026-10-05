@@ -1,5 +1,6 @@
 ---
 title: "ADR 0004: Firewall zones, forwarding, and interface topology"
+description: Firewall zone ownership and which interface policy changes require an apply, plus the USB tethering and uplink findings.
 status: Accepted
 date: 2026-05-14
 updated: 2026-09-28

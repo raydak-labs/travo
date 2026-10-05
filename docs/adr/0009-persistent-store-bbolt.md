@@ -1,7 +1,9 @@
 ---
 title: "ADR 0009: Persistent key/value store (bbolt at /etc/travo/travo.db)"
+description: Why the persistent store is bbolt at /etc/travo/travo.db, what it holds, and the measured cost that selected it over SQLite.
 status: Accepted
 date: 2026-09-28
+updated: 2026-09-28
 tags: [adr, storage, bbolt, flash, persistence, auth, stats]
 ---
 
@@ -32,7 +34,7 @@ repo, `go.etcd.io/bbolt` adds **247 KB** to the stripped binary (12.57 → 12.83
 while `modernc.org/sqlite` would add roughly **10 MB**; flat JSON files cannot do a
 transactional multi-key write and need hand-rolled locking. bbolt won on footprint
 and on transactional `Update`. See
-[`docs/plans/2026-07-08-hardening-followups-and-persistence.md`](0013-operational-invariants-and-device-findings.md)
+[ADR 0013](./0013-operational-invariants-and-device-findings.md) rule 3
 (Q4) for the measurement.
 
 ## Decision
@@ -136,5 +138,5 @@ accepted only for a device whose UI is the recovery path.
 - `backend/internal/services/stats_history.go` — `stats_history` bucket, `flushEvery`
 - `docs/architecture/overview.md` §8 — device constraints
 - [ADR 0007](./0007-authentication-and-access-control.md) — sessions, revocations
-- [`docs/plans/2026-07-08-hardening-followups-and-persistence.md`](0013-operational-invariants-and-device-findings.md)
+- [ADR 0013](./0013-operational-invariants-and-device-findings.md) rule 3
   — the footprint measurement behind the bbolt decision

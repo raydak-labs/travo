@@ -1,7 +1,9 @@
 ---
 title: "ADR 0008: SSH key management (root authorized_keys)"
+description: Root authorized_keys management: adding and deleting keys, and what the API refuses to do.
 status: Accepted
 date: 2026-09-28
+updated: 2026-09-28
 tags: [adr, auth, ssh, dropbear, security, system]
 ---
 

@@ -1,8 +1,10 @@
 ---
 title: On-device verification
+description: Standing device playbook: what to run, in what order, and which defect classes local suites demonstrably cannot catch.
 status: standing — run whenever a change touches wireless, DNS/VPN layering, guards or install
-last-verified-against: 192.168.1.1 (GL.iNet GL-AXT1800, OpenWrt 25.12.3), branch
-fix/deep-review-2026-10-04 @ 3634ea6
+last-verified-against: 192.168.1.1 (GL.iNet GL-AXT1800, OpenWrt 25.12.3), commit 3634ea6
+updated: 2026-10-05
+tags: [testing, on-device, playbook]
 ---
 
 # On-device verification
