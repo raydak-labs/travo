@@ -65,7 +65,7 @@ function WifiLockoutContent({
     <>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+          <DialogTitle className="flex items-center gap-2 text-[var(--status-danger-text)]">
             <AlertTriangle className="h-5 w-5" />
             This will disconnect you
           </DialogTitle>
@@ -76,11 +76,11 @@ function WifiLockoutContent({
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-700 dark:bg-red-950">
-            <p className="text-sm text-red-900 dark:text-red-100">
+          <div className="rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-4">
+            <p className="text-sm text-[var(--status-danger-text)]">
               Your device will lose its connection to this router and will not be able to rejoin.
             </p>
-            <p className="mt-2 text-sm text-red-800 dark:text-red-200">
+            <p className="mt-2 text-sm text-[var(--status-danger-text)]">
               <strong>Before you continue:</strong> connect this device to the router with an
               Ethernet cable. If you have no cable, do not continue — you will need physical access
               to the router to turn WiFi back on.

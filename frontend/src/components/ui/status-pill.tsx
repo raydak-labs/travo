@@ -43,8 +43,7 @@ export const statusDotToneClass: Record<NonNullable<StatusPillProps['tone']>, st
 };
 
 interface StatusPillProps
-  extends HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof statusPillVariants> {
+  extends HTMLAttributes<HTMLSpanElement>, VariantProps<typeof statusPillVariants> {
   /** Renders a leading dot. Only meaningful for a pill that names its own state. */
   withDot?: boolean;
 }

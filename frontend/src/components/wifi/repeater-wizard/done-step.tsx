@@ -10,7 +10,7 @@ type DoneStepProps = {
 export function RepeaterWizardDoneStep({ upstreamSsid, apSummaryLine, onDone }: DoneStepProps) {
   return (
     <div className="flex flex-col items-center gap-4 py-6">
-      <CheckCircle2 className="h-12 w-12 text-green-500" />
+      <CheckCircle2 className="h-12 w-12 text-[var(--status-ok-text)]" />
       <div className="text-center">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           Repeater Setup Complete

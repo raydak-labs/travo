@@ -52,7 +52,7 @@ export function ConfirmRadioDisableDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
+          <DialogTitle className="flex items-center gap-2 text-[var(--status-danger-text)]">
             <AlertTriangle className="h-5 w-5" />
             Disable WiFi Radio
           </DialogTitle>
@@ -63,29 +63,29 @@ export function ConfirmRadioDisableDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-700 dark:bg-red-950">
+          <div className="rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-4">
             <div className="flex items-start gap-3">
-              <Radio className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+              <Radio className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-danger-text)]" />
               <div className="flex-1">
                 {/* `SetRadioRole` disables only the sections bound to the
                     named radio. Claiming "all WiFi" on a two-radio device is a
                     false all-clear about blast radius in the one dialog that is
                     supposed to be maximally scary. */}
-                <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+                <h3 className="text-sm font-semibold text-[var(--status-danger-text)]">
                   {isOnlyRadio
                     ? 'All WiFi will stop working'
                     : `This radio will stop working — the other band stays up`}
                 </h3>
-                <p className="mt-1 text-sm text-red-800 dark:text-red-200">
+                <p className="mt-1 text-sm text-[var(--status-danger-text)]">
                   Disabling {radioName} turns off everything running on it:
                 </p>
-                <ul className="mt-2 space-y-1 text-sm text-red-700 dark:text-red-300">
+                <ul className="mt-2 space-y-1 text-sm text-[var(--status-danger-text)]">
                   <li>• WiFi client connections (uplink) on {radioName}</li>
                   <li>• Access points and guest networks hosted on {radioName}</li>
                   <li>• Devices currently connected to those networks</li>
                 </ul>
                 {!isOnlyRadio && (
-                  <p className="mt-2 text-sm text-red-800 dark:text-red-200">
+                  <p className="mt-2 text-sm text-[var(--status-danger-text)]">
                     The other radio keeps working, so devices on that band stay connected.
                   </p>
                 )}
@@ -94,21 +94,21 @@ export function ConfirmRadioDisableDialog({
           </div>
 
           {isWifiClient && (
-            <div className="rounded-lg border-2 border-red-500 bg-red-100 p-4 dark:bg-red-900">
+            <div className="rounded-lg border-2 border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-danger-text)]" />
                 <div>
-                  <h3 className="text-sm font-bold text-red-900 dark:text-red-100">
+                  <h3 className="text-sm font-bold text-[var(--status-danger-text)]">
                     You will lose all access to this device
                   </h3>
-                  <p className="mt-1 text-sm text-red-800 dark:text-red-200">
+                  <p className="mt-1 text-sm text-[var(--status-danger-text)]">
                     You are currently connected via WiFi client. Disabling the radio will cut off
                     your connection immediately.
                   </p>
-                  <p className="mt-2 text-sm text-red-800 dark:text-red-200">
+                  <p className="mt-2 text-sm text-[var(--status-danger-text)]">
                     <strong>Recovery options:</strong>
                   </p>
-                  <ul className="mt-1 space-y-1 text-sm text-red-700 dark:text-red-300">
+                  <ul className="mt-1 space-y-1 text-sm text-[var(--status-danger-text)]">
                     <li>• Connect via Ethernet cable to LAN port</li>
                     <li>• Reboot the router and connect to the AP network it comes up with</li>
                     <li>• Access via serial console (advanced)</li>

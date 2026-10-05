@@ -17,13 +17,13 @@ export function WifiRepeaterSameRadioBanner() {
   return (
     <div
       role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 rounded-lg border border-[var(--status-warn-border)] bg-[var(--status-warn-surface)] p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex gap-3">
-        <Radio className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-        <div className="space-y-1 text-sm text-amber-900 dark:text-amber-100">
+        <Radio className="mt-0.5 h-5 w-5 shrink-0 text-[var(--status-warn-text)]" />
+        <div className="space-y-1 text-sm text-[var(--status-warn-text)]">
           <p className="font-semibold">Uplink and downlink AP share one radio</p>
-          <p className="text-amber-800 dark:text-amber-200">
+          <p>
             The network your devices join (downlink AP) should usually use the other radio than the
             Wi‑Fi uplink; same-radio AP+STA is unstable on many hardware. Prefer the other radio for
             the AP, or enable “Wi‑Fi on uplink radio” in repeater options—not the separate Guest

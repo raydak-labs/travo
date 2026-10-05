@@ -42,7 +42,7 @@ describe('WifiHealthBanner', () => {
     });
   });
 
-  it('renders a red banner on error status with issue messages', async () => {
+  it('renders the danger-tone banner on error status with issue messages', async () => {
     server.use(
       http.get(API_ROUTES.wifi.health, () =>
         HttpResponse.json({
@@ -108,7 +108,7 @@ describe('WifiHealthBanner', () => {
     expect(screen.queryByText(/Repeater:/i)).not.toBeInTheDocument();
   });
 
-  it('renders an amber banner on warning status', async () => {
+  it('renders the warn-tone banner on warning status', async () => {
     server.use(
       http.get(API_ROUTES.wifi.health, () =>
         HttpResponse.json({

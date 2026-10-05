@@ -182,7 +182,7 @@ describe('SpeedtestPage', () => {
       const alerts = screen.getAllByRole('alert');
       expect(alerts.length).toBe(2);
       expect(alerts[0]).toHaveTextContent(/Failed to load speedtest service/i);
-      expect(alerts[0].className).toContain('border-red');
+      expect(alerts[0].className).toContain('var(--status-danger-border)');
     });
     expect(screen.getAllByRole('button', { name: /Retry/ }).length).toBe(2);
   });
