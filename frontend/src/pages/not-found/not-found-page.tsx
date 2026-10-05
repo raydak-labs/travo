@@ -8,8 +8,8 @@ export function NotFoundPage() {
       <CardHeader>
         <CardTitle>Page not found</CardTitle>
         <CardDescription>
-          That address does not match any page in Travo. It may have been renamed, or the link
-          that brought you here may be out of date.
+          That address does not match any page in Travo. It may have been renamed, or the link that
+          brought you here may be out of date.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">

@@ -1,4 +1,4 @@
-import {CardInset} from '@/components/ui/card-inset';
+import { CardInset } from '@/components/ui/card-inset';
 import { Network } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { QueryCard } from '@/components/ui/query-card';

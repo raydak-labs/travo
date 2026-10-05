@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {CardInset} from '@/components/ui/card-inset';
+import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryCard } from '@/components/ui/query-card';
@@ -17,11 +17,7 @@ import {
   dismissedOverwriteAlerts,
   rememberDismissedOverwriteAlert,
 } from './operator-edit-overwrite';
-import type {
-  FailoverCandidate,
-  FailoverConfig,
-  FailoverTrackingState,
-} from '@shared/index';
+import type { FailoverCandidate, FailoverConfig, FailoverTrackingState } from '@shared/index';
 
 /**
  * The tracking state as something a user can act on. `not_available` vs
@@ -184,9 +180,7 @@ export function FailoverCard() {
   const commitHealthField = (field: 'interval' | 'down' | 'up', raw: string) => {
     const parsed = Number.parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return;
-    setDraft((prev) =>
-      prev ? { ...prev, health: { ...prev.health, [field]: parsed } } : prev,
-    );
+    setDraft((prev) => (prev ? { ...prev, health: { ...prev.health, [field]: parsed } } : prev));
   };
 
   const handleEdit = () => {
@@ -404,7 +398,11 @@ export function FailoverCard() {
                       onBlur={() => commitHealthField(field, raw)}
                     />
                     {invalid && (
-                      <p id={`${inputId}-error`} role="alert" className="text-xs text-red-600 dark:text-red-400">
+                      <p
+                        id={`${inputId}-error`}
+                        role="alert"
+                        className="text-xs text-red-600 dark:text-red-400"
+                      >
                         Enter a number of at least {min}.
                       </p>
                     )}

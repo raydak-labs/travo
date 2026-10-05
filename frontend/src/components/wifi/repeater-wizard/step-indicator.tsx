@@ -60,7 +60,10 @@ export function RepeaterWizardStepIndicator({
                 </span>
               </button>
             ) : (
-              <span aria-current={isActive ? 'step' : undefined} className="flex flex-col items-center gap-1">
+              <span
+                aria-current={isActive ? 'step' : undefined}
+                className="flex flex-col items-center gap-1"
+              >
                 {circle}
                 <span aria-hidden="true" className="text-xs text-gray-500 dark:text-gray-400">
                   {LABELS[i]}

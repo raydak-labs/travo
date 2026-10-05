@@ -7,13 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDHCPReservations, useDeleteDHCPReservation } from '@/hooks/use-network';
 
 export function ClientsDhcpReservationsCard() {
-  const {
-    data: reservations,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useDHCPReservations();
+  const { data: reservations, isLoading, isError, error, refetch } = useDHCPReservations();
   const deleteReservation = useDeleteDHCPReservation();
 
   return (
@@ -34,57 +28,57 @@ export function ClientsDhcpReservationsCard() {
           {!reservations || reservations.length === 0 ? (
             <EmptyState message="No static reservations. Use the bookmark icon next to a connected client to reserve its IP." />
           ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <caption className="sr-only">Static DHCP reservations</caption>
-              <thead>
-                <tr className="border-b border-gray-200 text-left dark:border-gray-700">
-                  <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
-                    Hostname
-                  </th>
-                  <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
-                    MAC
-                  </th>
-                  <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
-                    IP
-                  </th>
-                  <th
-                    scope="col"
-                    className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {reservations.map((r) => (
-                  <tr
-                    key={r.section ?? r.mac}
-                    className="border-b border-gray-100 last:border-0 dark:border-white/[0.08]"
-                  >
-                    <td className="py-2 pr-4 text-gray-900 dark:text-white">{r.name}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-gray-500 dark:text-gray-400">
-                      {r.mac}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{r.ip}</td>
-                    <td className="py-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-600"
-                        title="Remove reservation"
-                        aria-label={`Remove reservation for ${r.name || r.mac}`}
-                        onClick={() => r.section && deleteReservation.mutate(r.section)}
-                        disabled={!r.section || deleteReservation.isPending}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Static DHCP reservations</caption>
+                <thead>
+                  <tr className="border-b border-gray-200 text-left dark:border-gray-700">
+                    <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
+                      Hostname
+                    </th>
+                    <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
+                      MAC
+                    </th>
+                    <th scope="col" className="pb-2 font-medium text-gray-500 dark:text-gray-400">
+                      IP
+                    </th>
+                    <th
+                      scope="col"
+                      className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {reservations.map((r) => (
+                    <tr
+                      key={r.section ?? r.mac}
+                      className="border-b border-gray-100 last:border-0 dark:border-white/[0.08]"
+                    >
+                      <td className="py-2 pr-4 text-gray-900 dark:text-white">{r.name}</td>
+                      <td className="py-2 pr-4 font-mono text-xs text-gray-500 dark:text-gray-400">
+                        {r.mac}
+                      </td>
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{r.ip}</td>
+                      <td className="py-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-600"
+                          title="Remove reservation"
+                          aria-label={`Remove reservation for ${r.name || r.mac}`}
+                          onClick={() => r.section && deleteReservation.mutate(r.section)}
+                          disabled={!r.section || deleteReservation.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </QueryCard>
       </CardContent>

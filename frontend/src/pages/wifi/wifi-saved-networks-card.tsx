@@ -240,8 +240,8 @@ export function WifiSavedNetworksCard() {
                 {/* The saved password is unrecoverable, so this always applies,
                     not only in the narrow last-network case. */}
                 <p>
-                  The saved password is deleted and cannot be recovered — you would have to
-                  re-enter it to reconnect to this network.
+                  The saved password is deleted and cannot be recovered — you would have to re-enter
+                  it to reconnect to this network.
                 </p>
                 {isDeletingActive && (
                   <p className="font-medium">

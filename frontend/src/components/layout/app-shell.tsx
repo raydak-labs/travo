@@ -49,10 +49,7 @@ export function AppShell({ children, title }: AppShellProps) {
 
       {/* Mobile drawer */}
       {isMobile && (
-        <Sheet
-          open={mobileOpen}
-          onOpenChange={(open) => setDrawerOpenedOn(open ? pathname : null)}
-        >
+        <Sheet open={mobileOpen} onOpenChange={(open) => setDrawerOpenedOn(open ? pathname : null)}>
           <SheetContent side="left" className="w-72 p-0">
             <Sidebar
               collapsed={false}
@@ -65,9 +62,18 @@ export function AppShell({ children, title }: AppShellProps) {
       )}
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header title={title} showMenuButton={isMobile} onMenuToggle={() => setDrawerOpenedOn(pathname)} />
+        <Header
+          title={title}
+          showMenuButton={isMobile}
+          onMenuToggle={() => setDrawerOpenedOn(pathname)}
+        />
         <OfflineBanner />
-        <main id="main-content" tabIndex={-1} ref={mainRef} className="flex-1 overflow-y-auto p-4 sm:p-6 focus:outline-none">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          ref={mainRef}
+          className="flex-1 overflow-y-auto p-4 sm:p-6 focus:outline-none"
+        >
           <div className="animate-page-fade-in">{children}</div>
         </main>
       </div>

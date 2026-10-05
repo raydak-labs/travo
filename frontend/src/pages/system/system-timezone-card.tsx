@@ -1,4 +1,4 @@
-import {CardInset} from '@/components/ui/card-inset';
+import { CardInset } from '@/components/ui/card-inset';
 import { useState } from 'react';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';

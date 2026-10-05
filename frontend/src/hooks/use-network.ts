@@ -211,7 +211,8 @@ export function useDeleteDNSEntry() {
 export function useDHCPReservations() {
   return useQuery({
     queryKey: ['network', 'dhcpReservations'],
-    queryFn: ({ signal }) => apiClient.get<DHCPReservation[]>(API_ROUTES.network.dhcpReservations, signal),
+    queryFn: ({ signal }) =>
+      apiClient.get<DHCPReservation[]>(API_ROUTES.network.dhcpReservations, signal),
   });
 }
 
@@ -382,7 +383,8 @@ export function useSetFailoverConfig() {
 export function useFailoverEvents() {
   return useQuery({
     queryKey: ['network', 'failoverEvents'],
-    queryFn: ({ signal }) => apiClient.get<FailoverEvent[]>(API_ROUTES.network.failoverEvents, signal),
+    queryFn: ({ signal }) =>
+      apiClient.get<FailoverEvent[]>(API_ROUTES.network.failoverEvents, signal),
     refetchInterval: 15000,
   });
 }
@@ -523,7 +525,8 @@ export function useSendWoL() {
 export function useConnectionMethod() {
   return useQuery({
     queryKey: ['network', 'connectionMethod'],
-    queryFn: ({ signal }) => apiClient.get<ConnectionMethod>(API_ROUTES.network.connectionMethod, signal),
+    queryFn: ({ signal }) =>
+      apiClient.get<ConnectionMethod>(API_ROUTES.network.connectionMethod, signal),
     // Cache for 1 minute - connection method doesn't change rapidly
     staleTime: 60000,
   });

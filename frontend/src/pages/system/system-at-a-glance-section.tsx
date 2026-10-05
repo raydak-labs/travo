@@ -1,4 +1,4 @@
-import {CardInset} from '@/components/ui/card-inset';
+import { CardInset } from '@/components/ui/card-inset';
 import { Server, Cpu, HardDrive } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -51,24 +51,27 @@ export function SystemAtAGlanceSection() {
               }
             >
               {info ? (
-              <CardInset variant="muted">
-                <div className="grid grid-cols-2 gap-2">
-                  <span className="text-gray-500 dark:text-gray-400">Hostname</span>
-                  <span className="flex items-center gap-1 text-gray-900 dark:text-white">
-                    <HostnameInlineForm hostname={info.hostname} onUpdated={() => refetchInfo()} />
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">Model</span>
-                  <span className="text-gray-900 dark:text-white">{info.model}</span>
-                  <span className="text-gray-500 dark:text-gray-400">Firmware</span>
-                  <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
-                  <span className="text-gray-500 dark:text-gray-400">Kernel</span>
-                  <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
-                  <span className="text-gray-500 dark:text-gray-400">Uptime</span>
-                  <span className="text-gray-900 dark:text-white">
-                    {formatUptime(info.uptime_seconds)}
-                  </span>
-                </div>
-              </CardInset>
+                <CardInset variant="muted">
+                  <div className="grid grid-cols-2 gap-2">
+                    <span className="text-gray-500 dark:text-gray-400">Hostname</span>
+                    <span className="flex items-center gap-1 text-gray-900 dark:text-white">
+                      <HostnameInlineForm
+                        hostname={info.hostname}
+                        onUpdated={() => refetchInfo()}
+                      />
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">Model</span>
+                    <span className="text-gray-900 dark:text-white">{info.model}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Firmware</span>
+                    <span className="text-gray-900 dark:text-white">{info.firmware_version}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Kernel</span>
+                    <span className="text-gray-900 dark:text-white">{info.kernel_version}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Uptime</span>
+                    <span className="text-gray-900 dark:text-white">
+                      {formatUptime(info.uptime_seconds)}
+                    </span>
+                  </div>
+                </CardInset>
               ) : null}
             </QueryCard>
           </CardContent>
@@ -94,55 +97,55 @@ export function SystemAtAGlanceSection() {
               }
             >
               {stats ? (
-              <>
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">CPU</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {stats.cpu.usage_percent.toFixed(1)}%
-                      {stats.cpu.temperature_celsius != null && (
-                        <span className="ml-2 text-gray-500 dark:text-gray-400">
-                          {stats.cpu.temperature_celsius}°C
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <Progress value={stats.cpu.usage_percent} />
-                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
-                    {stats.cpu.cores} cores
-                  </p>
-                </div>
-
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">Memory</span>
-                    <span className="text-gray-900 dark:text-white">
-                      {stats.memory.usage_percent.toFixed(1)}% (
-                      {formatBytes(stats.memory.used_bytes)} /{' '}
-                      {formatBytes(stats.memory.total_bytes)})
-                    </span>
-                  </div>
-                  <Progress value={stats.memory.usage_percent} />
-                </div>
-
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">
-                      <span className="inline-flex items-center gap-1">
-                        <HardDrive className="h-3.5 w-3.5" />
-                        Storage
+                <>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">CPU</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.cpu.usage_percent.toFixed(1)}%
+                        {stats.cpu.temperature_celsius != null && (
+                          <span className="ml-2 text-gray-500 dark:text-gray-400">
+                            {stats.cpu.temperature_celsius}°C
+                          </span>
+                        )}
                       </span>
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {stats.storage.usage_percent.toFixed(1)}% (
-                      {formatBytes(stats.storage.used_bytes)} /{' '}
-                      {formatBytes(stats.storage.total_bytes)})
-                    </span>
+                    </div>
+                    <Progress value={stats.cpu.usage_percent} />
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      Load: {stats.cpu.load_average.map((v) => v.toFixed(2)).join(', ')} ·{' '}
+                      {stats.cpu.cores} cores
+                    </p>
                   </div>
-                  <Progress value={stats.storage.usage_percent} />
-                </div>
-              </>
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">Memory</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.memory.usage_percent.toFixed(1)}% (
+                        {formatBytes(stats.memory.used_bytes)} /{' '}
+                        {formatBytes(stats.memory.total_bytes)})
+                      </span>
+                    </div>
+                    <Progress value={stats.memory.usage_percent} />
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        <span className="inline-flex items-center gap-1">
+                          <HardDrive className="h-3.5 w-3.5" />
+                          Storage
+                        </span>
+                      </span>
+                      <span className="text-gray-900 dark:text-white">
+                        {stats.storage.usage_percent.toFixed(1)}% (
+                        {formatBytes(stats.storage.used_bytes)} /{' '}
+                        {formatBytes(stats.storage.total_bytes)})
+                      </span>
+                    </div>
+                    <Progress value={stats.storage.usage_percent} />
+                  </div>
+                </>
               ) : null}
             </QueryCard>
           </CardContent>

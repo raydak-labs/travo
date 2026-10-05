@@ -68,7 +68,9 @@ export function RepeaterWizardSelectUpstreamStep({
                 autoFocus
               />
               {upstream.password.length > 0 && upstream.password.length < 8 && (
-                <p className="text-xs text-red-600 dark:text-red-400">Password must be at least 8 characters</p>
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Password must be at least 8 characters
+                </p>
               )}
             </div>
           )}

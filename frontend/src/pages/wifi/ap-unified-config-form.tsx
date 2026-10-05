@@ -369,8 +369,8 @@ export function APUnifiedConfigForm({
           {/* Saving a new name or password disconnects every client on every
               band — the most common surprise on this page. */}
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Saving a new network name or password disconnects every device on every band; they
-            must reconnect using the new password.
+            Saving a new network name or password disconnects every device on every band; they must
+            reconnect using the new password.
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -379,9 +379,7 @@ export function APUnifiedConfigForm({
             </Button>
             {isDirty && (
               <>
-                <span className="text-xs text-amber-700 dark:text-amber-300">
-                  Unsaved changes
-                </span>
+                <span className="text-xs text-amber-700 dark:text-amber-300">Unsaved changes</span>
                 <Button
                   type="button"
                   variant="outline"

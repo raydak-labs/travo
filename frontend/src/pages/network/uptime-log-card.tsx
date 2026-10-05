@@ -39,7 +39,10 @@ function summarize(events: readonly UptimeEvent[], now: number) {
     if (!next || event.state !== 'connected') return total;
     return total + (event.timestamp - next.timestamp);
   }, 0);
-  const observedMs = Math.max(0, now - Math.min(now, inWindow[inWindow.length - 1]?.timestamp ?? now));
+  const observedMs = Math.max(
+    0,
+    now - Math.min(now, inWindow[inWindow.length - 1]?.timestamp ?? now),
+  );
   const availability = observedMs > 0 ? Math.round((connectedMs / observedMs) * 100) : null;
   return { outages, availability };
 }
@@ -71,7 +74,7 @@ export function UptimeLogCard() {
           <div className="space-y-3">
             <UptimeSummary events={uptimeLog} now={now} />
             <ol className="space-y-2">
-              {(showAll ? uptimeLog : uptimeLog.slice(0, VISIBLE_LIMIT)).map((event, i, ) => {
+              {(showAll ? uptimeLog : uptimeLog.slice(0, VISIBLE_LIMIT)).map((event, i) => {
                 const isConnected = event.state === 'connected';
                 // The newest entry describes the *ongoing* state, so its
                 // duration is now - timestamp rather than null.

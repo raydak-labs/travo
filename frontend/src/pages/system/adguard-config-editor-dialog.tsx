@@ -37,7 +37,6 @@ export function AdGuardConfigEditorDialog({
           </DialogDescription>
         </DialogHeader>
         <Textarea
-          
           value={configContent}
           onChange={(e) => onConfigContentChange(e.target.value)}
           spellCheck={false}

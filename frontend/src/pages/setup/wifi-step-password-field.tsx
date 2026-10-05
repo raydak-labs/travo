@@ -47,7 +47,11 @@ export function WifiStepPasswordField({
         </button>
       </div>
       {errors.wifiPassword ? (
-        <p id="setup-wifi-psk-err" className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
+        <p
+          id="setup-wifi-psk-err"
+          className="mt-1 text-xs text-red-600 dark:text-red-400"
+          role="alert"
+        >
           {errors.wifiPassword.message}
         </p>
       ) : null}

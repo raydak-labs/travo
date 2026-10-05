@@ -113,10 +113,7 @@ export function WanStatusCard() {
             <Skeleton className="h-4 w-1/3" />
           ) : uplinkUp ? (
             <>
-              <CheckCircle
-                className="h-4 w-4 text-green-500"
-                aria-hidden="true"
-              />
+              <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />
               <span className="text-sm font-medium text-gray-900 dark:text-white">
                 Uplink Connected
               </span>
@@ -126,9 +123,7 @@ export function WanStatusCard() {
           ) : (
             <>
               <XCircle className="h-4 w-4 text-red-500" aria-hidden="true" />
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                No Uplink
-              </span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">No Uplink</span>
               <span className="sr-only">WAN link is down.</span>
               <Badge variant="destructive">Offline</Badge>
             </>

@@ -25,7 +25,10 @@ export function HeaderRouterStatus({ systemInfo, systemError }: HeaderRouterStat
           channel at all to learn the router dropped — the single most important
           global status in the app. */}
       <span role="status" aria-live="polite" className="inline-flex items-center">
-        <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${statusDotClass(isConnected)}`} />
+        <span
+          aria-hidden="true"
+          className={`inline-block h-2 w-2 rounded-full ${statusDotClass(isConnected)}`}
+        />
         <span className="sr-only">{label}</span>
       </span>
     </>

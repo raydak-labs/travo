@@ -29,10 +29,7 @@ export function NetworkChart() {
 
   // Chart the uplink that is actually carrying the internet. Previously this
   // took `msg.network[0]`, which is always `br-lan`.
-  const uplinkName = uplinkInterfaceName(
-    Object.keys(interfaceDataPoints),
-    wan?.name ?? null,
-  );
+  const uplinkName = uplinkInterfaceName(Object.keys(interfaceDataPoints), wan?.name ?? null);
   const series = uplinkName ? interfaceDataPoints[uplinkName] : undefined;
 
   const chartData = useMemo(() => toRatePoints(series ?? []), [series]);
@@ -54,20 +51,14 @@ export function NetworkChart() {
             </span>
           )}
         </CardTitle>
-        <span
-          role="status"
-          aria-live="polite"
-          className="flex items-center gap-2"
-        >
+        <span role="status" aria-live="polite" className="flex items-center gap-2">
           <span
             aria-hidden="true"
             className={`h-2 w-2 rounded-full ${
               connected ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-600'
             }`}
           />
-          <span className="sr-only">
-            Live updates {connected ? 'connected' : 'disconnected'}
-          </span>
+          <span className="sr-only">Live updates {connected ? 'connected' : 'disconnected'}</span>
         </span>
       </CardHeader>
       <CardContent>

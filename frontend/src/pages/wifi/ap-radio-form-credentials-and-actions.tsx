@@ -56,7 +56,11 @@ export function ApRadioFormCredentialsAndActions({
           {...register('ssid')}
         />
         {errors.ssid ? (
-          <p id={`ap-ssid-err-${ap.section}`} className="text-xs text-red-600 dark:text-red-400" role="alert">
+          <p
+            id={`ap-ssid-err-${ap.section}`}
+            className="text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
             {errors.ssid.message}
           </p>
         ) : null}
@@ -104,7 +108,11 @@ export function ApRadioFormCredentialsAndActions({
             {...register('key')}
           />
           {errors.key ? (
-            <p id={`ap-key-err-${ap.section}`} className="text-xs text-red-600 dark:text-red-400" role="alert">
+            <p
+              id={`ap-key-err-${ap.section}`}
+              className="text-xs text-red-600 dark:text-red-400"
+              role="alert"
+            >
               {errors.key.message}
             </p>
           ) : null}

@@ -1,4 +1,4 @@
-import {CardInset} from '@/components/ui/card-inset';
+import { CardInset } from '@/components/ui/card-inset';
 import { Button } from '@/components/ui/button';
 
 type NtpConfigSummaryViewProps = {

@@ -164,7 +164,12 @@ async function send(path: string, method: string, body?: unknown, signal?: Abort
   return response;
 }
 
-function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   return send(path, method, body, signal).then((response) => response.json() as Promise<T>);
 }
 

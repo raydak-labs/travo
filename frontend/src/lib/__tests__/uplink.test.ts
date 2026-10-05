@@ -74,9 +74,7 @@ describe('uplinkStatsInterface', () => {
   });
 
   it('never silently falls back to the LAN bridge', () => {
-    const lanOnly: NetworkInterfaceStats[] = [
-      { interface: 'br-lan', rx_bytes: 1, tx_bytes: 1 },
-    ];
+    const lanOnly: NetworkInterfaceStats[] = [{ interface: 'br-lan', rx_bytes: 1, tx_bytes: 1 }];
     // No uplink series exists, so there is nothing to plot.
     expect(uplinkStatsInterface(lanOnly, 'eth0')).toBeUndefined();
   });
@@ -105,9 +103,9 @@ describe('describeVpnStatus', () => {
   });
 
   it('names a missing handshake', () => {
-    expect(describeVpnStatus([status({ enabled: true, status_detail: 'up_no_handshake' })]).label).toBe(
-      'Enabled, no handshake',
-    );
+    expect(
+      describeVpnStatus([status({ enabled: true, status_detail: 'up_no_handshake' })]).label,
+    ).toBe('Enabled, no handshake');
   });
 
   it('reports a fully disabled tunnel as off', () => {

@@ -1,4 +1,4 @@
-import {CardInset} from '@/components/ui/card-inset';
+import { CardInset } from '@/components/ui/card-inset';
 import { formatBytes } from '@/lib/utils';
 import type { VpnStatus, WireGuardStatus } from '@shared/index';
 import { formatWireguardHandshakeTime } from '@/pages/vpn/wireguard-utils';
