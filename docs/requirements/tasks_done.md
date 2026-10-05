@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-10-02
+updated: 2026-10-05
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-10-02 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-05 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## Milestone checklist (compact)
 
@@ -47,6 +47,17 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - System: reboot, shutdown, firmware upgrade, factory reset, hostname, backup/restore, LED, timezone, NTP, password, hardware buttons.
 - Logs: system/kernel filters, search, export.
 - UI: responsive layout, sidebar + mobile drawer, dark mode, skeletons, onboarding, grouped IA.
+- UI consistency pass (2026-10-05): one card plane everywhere (dashboard source card and setup
+  wizard normalized), one status language (semantic tokens + `StatusPill`), one group heading
+  (`SectionHeading`), one load/error contract (`QueryCard`) across system, services, network, logs,
+  vpn and the shared component layer ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
+- WiFi summary band: always-visible connection / internet / radios / mode / health tiles with
+  per-tile degradation; the first page to use the band pattern.
+- Dashboard traffic history: `GET /api/v1/network/traffic-history` serves a bounded ~10-minute
+  in-memory ring so the throughput chart paints real history on page load instead of an empty axis.
+- **Not verified on device:** the 2026-10-05 pass was completed without access to 192.168.1.1
+  (host has no route to it), so light/dark rendering, the new band, and history accumulation on
+  real hardware still need the standing device checks.
 
 ## Frontend Toolchain
 
