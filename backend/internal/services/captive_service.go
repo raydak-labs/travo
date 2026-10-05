@@ -860,15 +860,6 @@ func (c *CaptiveService) autoRestoreStaleBypass() {
 	}
 }
 
-// MaybeAutoRestoreDNS restores DNS if internet is now reachable and bypass is active.
-func (c *CaptiveService) MaybeAutoRestoreDNS(canReachInternet bool) {
-	if !canReachInternet || !c.IsDNSBypassed() {
-		return
-	}
-	log.Printf("captive: internet reachable, auto-restoring DNS")
-	_ = c.RestoreDNS()
-}
-
 // refreshBypassTimestamp updates the guard file timestamp to prevent stale auto-restore.
 // It takes c.mu (the same lock BypassDNS/RestoreDNS hold) and rewrites the file
 // atomically, so it can never race a concurrent bypass/restore into producing a

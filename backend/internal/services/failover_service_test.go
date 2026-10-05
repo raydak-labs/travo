@@ -1006,7 +1006,7 @@ func TestNeedsBackupSectionCoversEveryNamespacedSection(t *testing.T) {
 		if got := mayDeleteSection(tc.name, tc.opts); got != tc.wantDelete {
 			t.Errorf("mayDeleteSection(%q) = %v, want %v", tc.name, got, tc.wantDelete)
 		}
-		if got := needsBackupSection(tc.name, tc.opts); got != tc.wantBackup {
+		if got := needsBackupSection(tc.name); got != tc.wantBackup {
 			t.Errorf("needsBackupSection(%q) = %v, want %v", tc.name, got, tc.wantBackup)
 		}
 	}

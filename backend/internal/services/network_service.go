@@ -1955,7 +1955,7 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 	}
 	// Atomic: os.WriteFile truncates first, so a power cut or a concurrent read
 	// left a half-written file that silently falls back to the default provider.
-	if err := writeFileAtomic(dohConfigFile, data, 0600); err != nil {
+	if err := writeFileAtomic(dohConfigFile, data); err != nil {
 		return err
 	}
 	// Apply: configure dnsmasq to use a local DoH proxy if enabled.
@@ -2241,9 +2241,9 @@ func arpMACForIP(arpFile, ip string) (string, bool) {
 // running busybox crond. A reader that catches the window sees a partial
 // crontab and can stop scheduling — the same defect class that produced
 // "unexpected end of JSON input" on the port-forward store.
-func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+func writeFileAtomic(path string, data []byte) error {
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, perm); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)

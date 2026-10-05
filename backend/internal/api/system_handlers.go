@@ -449,7 +449,7 @@ func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
 		// A parse failure means the UI would show "no buttons configured" while
 		// the generated hotplug script still runs the last saved actions, so
 		// report the failure instead of a misleading empty list.
-		buttons, err := svc.GetHardwareButtonsWithError()
+		buttons, err := svc.GetHardwareButtons()
 		if err != nil {
 			return RespondWithServerError(c, err)
 		}

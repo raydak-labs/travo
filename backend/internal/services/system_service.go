@@ -601,7 +601,7 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 		lines = append(lines, offLine, onLine)
 	}
 	lines = append(lines, "")
-	if err := writeFileAtomic(ledCrontabPath, []byte(strings.Join(lines, "\n")), 0600); err != nil {
+	if err := writeFileAtomic(ledCrontabPath, []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")
@@ -1318,20 +1318,10 @@ func detectButtonNames() []string {
 	return names
 }
 
-// GetHardwareButtons returns the detected hardware buttons with their configured actions.
-func (s *SystemService) GetHardwareButtons() []models.HardwareButton {
-	buttons, err := s.GetHardwareButtonsWithError()
-	if err != nil {
-		// The on-disk hotplug script still runs the previous actions, so the
-		// user must not be shown "no buttons configured" without a hint.
-		log.Printf("ERROR: reading %s: %v (the generated hotplug script still uses the last saved actions)", buttonActionsFile, err)
-	}
-	return buttons
-}
-
-// GetHardwareButtonsWithError is GetHardwareButtons with the config-parse
-// error surfaced, so a caller that can report it does.
-func (s *SystemService) GetHardwareButtonsWithError() ([]models.HardwareButton, error) {
+// GetHardwareButtons returns the detected hardware buttons with their configured
+// actions. The config-parse error is surfaced so the caller can report it rather
+// than show "no buttons configured" without a hint.
+func (s *SystemService) GetHardwareButtons() ([]models.HardwareButton, error) {
 	names := detectButtonNames()
 	configured, err := s.loadButtonActions()
 	if err != nil {

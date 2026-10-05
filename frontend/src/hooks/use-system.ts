@@ -19,7 +19,6 @@ import type {
   LEDSchedule,
   TimezoneConfig,
   NTPConfig,
-  SetupStatus,
   HardwareButton,
   ButtonActionsRequest,
   SSHKeysResponse,
@@ -354,13 +353,6 @@ export function useSetButtonActions() {
     onError: (error) => {
       toast.error('Failed to save button actions', { description: error.message });
     },
-  });
-}
-
-export function useSetupStatus() {
-  return useQuery({
-    queryKey: ['system', 'setup-complete'],
-    queryFn: () => apiClient.get<SetupStatus>(API_ROUTES.system.setupComplete),
   });
 }
 

@@ -1423,9 +1423,3 @@ func (w *WifiService) guardDirs() []string {
 	}
 	return []string{resolved, configured}
 }
-
-// ApplyWireless applies the current wireless (and related) UCI config via apply+confirm.
-// Exported for use after EnsureAPRunning when fixes were applied so they take effect without reboot.
-func (w *WifiService) ApplyWireless() error {
-	return w.applyWireless()
-}

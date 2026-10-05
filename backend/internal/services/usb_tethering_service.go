@@ -233,15 +233,6 @@ func (s *USBTetheringService) isUSBInterface(name string) bool {
 	return strings.Contains(resolved, "/usb")
 }
 
-// guessDeviceType returns a rough classification based on the interface name.
-func guessDeviceType(name string) string {
-	if strings.HasPrefix(name, "usb") {
-		return "android"
-	}
-	// eth1+ could be iOS ipheth or Android NCM.
-	return "android"
-}
-
 // GetStatus returns the current USB tethering detection state.
 func (s *USBTetheringService) GetStatus() USBTetherStatus {
 	for _, candidate := range usbCandidateInterfaces {
@@ -251,8 +242,11 @@ func (s *USBTetheringService) GetStatus() USBTetherStatus {
 		// Found a USB-backed interface.
 		configured := s.isConfigured()
 		return USBTetherStatus{
-			Detected:   true,
-			DeviceType: guessDeviceType(candidate),
+			Detected: true,
+			// ponytail: always "android", so the interface name is not yet
+			// discriminating. eth1+ could be iOS ipheth or Android NCM; widen
+			// this once that is detectable.
+			DeviceType: "android",
 			Interface:  candidate,
 			IsUp:       s.runner.IsIfaceUp(candidate),
 			IPAddress:  s.runner.GetIfaceIP(candidate),

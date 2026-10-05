@@ -12,7 +12,6 @@ import (
 // Dependencies holds all service dependencies for API handlers.
 type Dependencies struct {
 	Auth           *auth.AuthService
-	AuthStore      *auth.FileAuthStore
 	Blocklist      *auth.TokenBlocklist
 	RateLimiter    *auth.RateLimiter
 	System         *services.SystemService

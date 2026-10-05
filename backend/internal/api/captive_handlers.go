@@ -18,7 +18,7 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 		status.DNSBypassed = svc.IsDNSBypassed()
 		status.DNSBypassNeeded = !status.DNSBypassed && status.Detected && svc.CheckDNSBypassNeeded()
 		status.STAConnected = svc.IsUpstreamConnected()
-		// No side effects here. This handler used to call MaybeAutoRestoreDNS,
+		// No side effects here. This handler used to auto-restore DNS,
 		// so a GET committed `dhcp` and `network`, rewrote dnsmasq's resolver
 		// options and restarted dnsmasq — every poll of the captive status (the
 		// dashboard does it on a timer) mutated live state, and a read could
