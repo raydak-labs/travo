@@ -72,9 +72,23 @@ Unlisted direct firewall commits are a defect.
 
 ## References
 
-- `docs/architecture.md` §5
+- `docs/architecture/overview.md` §5
 - `backend/internal/services/vpn_service.go` — `setupWireGuardFirewall` and related
 - `backend/internal/services/usb_tethering_service.go` — `wanZoneSection`, `Configure`, `Unconfigure`
 - `backend/internal/services/wifi_service.go` — `uciApplyConfigs`, WWAN / guest paths
 - `backend/internal/services/failover_service.go` — mwan3 + network interaction
 - [ADR 0003](./0003-crash-guards-and-live-state.md) — the guards this table depends on
+
+## Device findings: USB tethering
+
+Tethering devices present differently depending on the phone, and the firewall
+change is the same either way: `usbtether` joins the `wan` zone.
+
+- Android typically enumerates as RNDIS on `usb0` and needs `kmod-usb-net-rndis`;
+  some devices enumerate as CDC-NCM on `usb0` and need `kmod-usb-net-cdc-ncm`.
+- iOS needs `usbmuxd` plus `libimobiledevice`; it does not appear as a plain
+  RNDIS or NCM device.
+
+Detection therefore probes for both drivers rather than assuming one, and the
+uplink medium is the discriminator for the interface — not the address (see
+`NetworkMedium` in `docs/architecture/overview.md`).

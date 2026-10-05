@@ -1484,7 +1484,7 @@ func quietConfirmRetries(t *testing.T) {
 }
 
 // A radio that stays down must NOT have its rollback cancelled: that is the
-// "proof of reachability" docs/architecture.md §3 and ADR 0002 §5 require, and
+// "proof of reachability" docs/architecture/overview.md §3 and ADR 0002 §5 require, and
 // it is what a client-confirms-instantly bug silently skipped.
 func TestConfirmApply_KeepsRollbackArmedWhenAPIsDown(t *testing.T) {
 	svc, _ := newTestWifiService()

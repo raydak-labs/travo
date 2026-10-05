@@ -32,7 +32,7 @@ repo, `go.etcd.io/bbolt` adds **247 KB** to the stripped binary (12.57 → 12.83
 while `modernc.org/sqlite` would add roughly **10 MB**; flat JSON files cannot do a
 transactional multi-key write and need hand-rolled locking. bbolt won on footprint
 and on transactional `Update`. See
-[`docs/plans/2026-07-08-hardening-followups-and-persistence.md`](../plans/2026-07-08-hardening-followups-and-persistence.md)
+[`docs/plans/2026-07-08-hardening-followups-and-persistence.md`](0013-operational-invariants-and-device-findings.md)
 (Q4) for the measurement.
 
 ## Decision
@@ -134,7 +134,7 @@ accepted only for a device whose UI is the recovery path.
   ownership and shutdown order
 - `backend/internal/auth/blocklist.go` — `blocklist` bucket, hashing, retention
 - `backend/internal/services/stats_history.go` — `stats_history` bucket, `flushEvery`
-- `docs/architecture.md` §8 — device constraints
+- `docs/architecture/overview.md` §8 — device constraints
 - [ADR 0007](./0007-authentication-and-access-control.md) — sessions, revocations
-- [`docs/plans/2026-07-08-hardening-followups-and-persistence.md`](../plans/2026-07-08-hardening-followups-and-persistence.md)
+- [`docs/plans/2026-07-08-hardening-followups-and-persistence.md`](0013-operational-invariants-and-device-findings.md)
   — the footprint measurement behind the bbolt decision

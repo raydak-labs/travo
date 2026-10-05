@@ -286,4 +286,4 @@ RepeaterWizard (folder)
 
 ---
 
-_When adding features, keep `docs/architecture.md`, `docs/requirements/tasks_open.md`, and `docs/requirements/tasks_done.md` in sync as needed._
+_When adding features, keep `docs/architecture/overview.md`, `docs/requirements/tasks_open.md`, and `docs/requirements/tasks_done.md` in sync as needed._

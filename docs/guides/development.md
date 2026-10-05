@@ -1,13 +1,13 @@
 ---
 title: Development guide
 description: Local prerequisites, install, dev servers, tests, lint, CI, MSW.
-updated: 2026-10-02
+updated: 2026-10-05
 tags: [docs, development, workflow]
 ---
 
 # Development Guide
 
-Tooling versions are also pinned in [`.mise.toml`](../.mise.toml) (use [mise](https://mise.jdx.dev/) if you want a single installer).
+Tooling versions are also pinned in [`.mise.toml`](../../.mise.toml) (use [mise](https://mise.jdx.dev/) if you want a single installer).
 
 ## Prerequisites
 
@@ -87,7 +87,7 @@ cd frontend && pnpm test
 
 ## Linting
 
-The repo root [`.oxlintrc.json`](../.oxlintrc.json) is the single lint config.
+The repo root [`.oxlintrc.json`](../../.oxlintrc.json) is the single lint config.
 
 ```bash
 mise exec -- pnpm lint          # frontend/src + shared/src
@@ -105,7 +105,7 @@ they take no `-c` flag.
   and CI does not depend on it.
 
 Why oxlint and not ESLint, what the rule map does and does not do, and the
-accepted parity losses: [ADR 0011](./adr/0011-frontend-lint-toolchain-oxlint-and-typescript-7.md).
+accepted parity losses: [ADR 0011](../adr/0011-frontend-lint-toolchain-oxlint-and-typescript-7.md).
 
 ## Backend mock mode
 
@@ -119,13 +119,13 @@ Plain `go run ./cmd/server` (no flag) expects real UCI/ubus and is mainly for on
 
 ## CI (GitHub Actions)
 
-- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): backend tests, shared + frontend tests, oxlint, golangci-lint, build check.
-- [`.github/workflows/release.yml`](../.github/workflows/release.yml): release artifacts on version tags.
-- [`.github/workflows/race-detector.yml`](../.github/workflows/race-detector.yml): optional Go race runs.
+- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml): backend tests, shared + frontend tests, oxlint, golangci-lint, build check.
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml): release artifacts on version tags.
+- [`.github/workflows/race-detector.yml`](../../.github/workflows/race-detector.yml): optional Go race runs.
 
 ## Releases
 
-Tag and push; the release workflow builds tarballs and publishes them (see `docs/deployment.md`).
+Tag and push; the release workflow builds tarballs and publishes them (see `docs/guides/deployment.md`).
 
 ```bash
 git tag v1.0.0

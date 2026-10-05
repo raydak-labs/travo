@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-10-04
+updated: 2026-10-05
 ---
 
 # Architecture Decisions
@@ -15,8 +15,8 @@ first place to update when we decide or change:
 - deployment assumptions
 - performance or footprint constraints
 
-For active backlog use [`docs/requirements/tasks_open.md`](./requirements/tasks_open.md).  
-For completed work use [`docs/requirements/tasks_done.md`](./requirements/tasks_done.md).
+For active backlog use [`docs/requirements/tasks_open.md`](../requirements/tasks_open.md).  
+For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks_done.md).
 
 ## 1. System Shape
 
@@ -29,11 +29,11 @@ For completed work use [`docs/requirements/tasks_done.md`](./requirements/tasks_
 - Backend is the source of truth for OpenWRT mutations; frontend drives API calls and renders device state.
 - The backend exposes a machine-readable OpenAPI contract at `GET /api/openapi.json` for automation and integration work.
 
-Normative detail for repo layout, LuCI coexistence, OpenAPI, and footprint expectations: **[`docs/adr/0006-application-platform-and-api-contract.md`](./adr/0006-application-platform-and-api-contract.md)**.
+Normative detail for repo layout, LuCI coexistence, OpenAPI, and footprint expectations: **[`docs/adr/0006-application-platform-and-api-contract.md`](../adr/0006-application-platform-and-api-contract.md)**.
 
 ## 2. Wireless Model And Invariants
 
-These rules are stable product behavior, not backlog notes. **Expanded wireless + LuCI apply/confirm behavior:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](./adr/0002-wireless-model-and-luci-apply.md).
+These rules are stable product behavior, not backlog notes. **Expanded wireless + LuCI apply/confirm behavior:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](../adr/0002-wireless-model-and-luci-apply.md).
 
 ### 2.1 STA / WWAN ownership
 
@@ -67,7 +67,7 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 
 ## 3. Wireless Apply And Rollback Flow
 
-Wireless mutation safety is intentionally modeled after LuCI. **Implementation reference:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](./adr/0002-wireless-model-and-luci-apply.md).
+Wireless mutation safety is intentionally modeled after LuCI. **Implementation reference:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](../adr/0002-wireless-model-and-luci-apply.md).
 
 - Backend wireless changes use rpcd session login, copy config into session state, `uci apply` with rollback timeout, then explicit `uci confirm`.
 - **The rollback that actually restores is ours, not rpcd's window.** The change is committed before the apply, so rpcd snapshots the already-changed config and `uci revert` is a no-op. Travo copies `/etc/config/<name>` into its own snapshot **before** the mutation commits and restores it explicitly (`uci reload_config` + `network reload`) when the probe refuses or the mutation fails. See ADR 0002 §5.0.
@@ -88,7 +88,7 @@ Wireless mutation safety is intentionally modeled after LuCI. **Implementation r
 
 ## 4. Crash Guards For Automated Live-State Changes
 
-**The authoritative guard catalog (path → owning file → what it protects) is the table in [`docs/adr/0003-crash-guards-and-live-state.md` §2](./adr/0003-crash-guards-and-live-state.md).** Read it before adding a live-state mutation and before debugging "feature won't run" — this file deliberately does not restate the list, because a partial copy is what made the recovery path unverifiable.
+**The authoritative guard catalog (path → owning file → what it protects) is the table in [`docs/adr/0003-crash-guards-and-live-state.md` §2](../adr/0003-crash-guards-and-live-state.md).** Read it before adding a live-state mutation and before debugging "feature won't run" — this file deliberately does not restate the list, because a partial copy is what made the recovery path unverifiable.
 
 Contract:
 
@@ -114,18 +114,18 @@ This rule applies to:
 
 ## 5. Firewall And Interface Policy
 
-**Full-zone and topology rules:** [`docs/adr/0004-firewall-zones-and-interface-policy.md`](./adr/0004-firewall-zones-and-interface-policy.md).
+**Full-zone and topology rules:** [`docs/adr/0004-firewall-zones-and-interface-policy.md`](../adr/0004-firewall-zones-and-interface-policy.md).
 
 - New zones, forwarding paths, or interfaces must include the full required firewall changes.
 - Follow existing default `wan` patterns instead of inventing a separate one-off policy model.
 - WWAN, WAN, VPN, guest, and future interfaces should be treated as explicit routing and firewall topology decisions, not UI-only toggles.
-- **Two firewall mutations deliberately bypass the rpcd apply/confirm flow** — the `wg0` VPN zone and the `usbtether` entry in the `wan` zone. They are guarded and reversible; the exceptions and the rule for any new direct `commit firewall` path are in **[`docs/adr/0004` §5](./adr/0004-firewall-zones-and-interface-policy.md)**.
+- **Two firewall mutations deliberately bypass the rpcd apply/confirm flow** — the `wg0` VPN zone and the `usbtether` entry in the `wan` zone. They are guarded and reversible; the exceptions and the rule for any new direct `commit firewall` path are in **[`docs/adr/0004` §5](../adr/0004-firewall-zones-and-interface-policy.md)**.
 
 ## 6. Networking Invariants
 
 ### 6.1 Multi-WAN failover (mwan3)
 
-**Normative failover generation, guards, and IPv4 scope:** [`docs/adr/0005-multi-wan-failover-mwan3.md`](./adr/0005-multi-wan-failover-mwan3.md).
+**Normative failover generation, guards, and IPv4 scope:** [`docs/adr/0005-multi-wan-failover-mwan3.md`](../adr/0005-multi-wan-failover-mwan3.md).
 
 - Connection failover uses OpenWRT's mwan3 package for health tracking and route management.
 - Failover policy is generated deterministically from `/etc/travo/failover.json` into `/etc/config/mwan3`.
@@ -139,18 +139,19 @@ This rule applies to:
 - Generated failover rules specify `family: 'ipv4'` explicitly.
 - No IPv6 failover policies or tracking rules are created in Phase 1.
 - Future IPv6 support requires device verification of mwan3's IPv6 stability.
-- See [`docs/plans/connection-failover.md`](./plans/connection-failover.md) Phase 0 decision track for detailed rationale.
+- See [ADR 0005](../adr/0005-multi-wan-failover-mwan3.md) for the mwan3 failover design, and its
+  *Device findings* section for how liveness is probed.
 
 ### 6.2 Failover safety guards
 
-- Applying failover configuration writes live routing policy and requires an explicit guard: `/etc/trafo/failover-in-progress`. The **full** guard list, including the other guards a redeploy clears, is in **[`docs/adr/0003` §2](./adr/0003-crash-guards-and-live-state.md)** — do not restate a partial list here.
+- Applying failover configuration writes live routing policy and requires an explicit guard: `/etc/trafo/failover-in-progress`. The **full** guard list, including the other guards a redeploy clears, is in **[`docs/adr/0003` §2](../adr/0003-crash-guards-and-live-state.md)** — do not restate a partial list here.
 - The guard is written before the staged mwan3 apply and removed only after verification succeeds; a manual redeploy via `deploy-local.sh` clears stuck guards. A stuck failover guard silently disables the monitor (the skip path does not log).
 - Wireless changes during failover apply must preserve LuCI-style rollback semantics: the mwan3 apply is **staged** — rpcd `apply` with rollback → verify every managed section → `Confirm`.
 - Any new routes, zones, or firewall changes added for failover must include complete firewall zone configuration.
 
 ### 6.3 DNS resolution, VPN, captive portal, and temporary restore
 
-Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive portal DNS bypass**, and **snapshot/restore** semantics are normative in **[`docs/adr/0001-dns-vpn-captive-portal-architecture.md`](./adr/0001-dns-vpn-captive-portal-architecture.md)**. Read that ADR before changing `CaptiveService`, `VpnService` DNS helpers, `AdGuardService` DNS integration, or `NetworkService` WAN DNS.
+Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive portal DNS bypass**, and **snapshot/restore** semantics are normative in **[`docs/adr/0001-dns-vpn-captive-portal-architecture.md`](../adr/0001-dns-vpn-captive-portal-architecture.md)**. Read that ADR before changing `CaptiveService`, `VpnService` DNS helpers, `AdGuardService` DNS integration, or `NetworkService` WAN DNS.
 
 The captive auto-accept flow's conditional `wwan` DHCP bounce lives in that ADR (§4.1), not here: it is a captive-portal behavior, and putting the "only when `wwan` is the active uplink" condition next to the DNS bypass rules keeps the whole captive surface in one place.
 
@@ -183,10 +184,10 @@ Normative rules:
 ## 7. Authentication And API Access
 
 - Administrative login uses the **root** password validated via **rpcd** on device; Travo issues **JWT** bearer tokens for API access.
-- **Session validity is clock-independent**: a monotonic-clock registry decides token lifetime; clients receive relative `expires_in` seconds and must never compare server timestamps against their own clock. Normative details in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
-- Optional **IP allowlist** and auth hardening details are normative in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
+- **Session validity is clock-independent**: a monotonic-clock registry decides token lifetime; clients receive relative `expires_in` seconds and must never compare server timestamps against their own clock. Normative details in **[`docs/adr/0007-authentication-and-access-control.md`](../adr/0007-authentication-and-access-control.md)**.
+- Optional **IP allowlist** and auth hardening details are normative in **[`docs/adr/0007-authentication-and-access-control.md`](../adr/0007-authentication-and-access-control.md)**.
 - Changing the password **revokes every live session** and returns a replacement token; token revocations persist in `/etc/travo/travo.db`, so they survive a backend restart.
-- SSH key management grants root SSH access and has its own rules in **[`docs/adr/0008-ssh-key-management.md`](./adr/0008-ssh-key-management.md)**.
+- SSH key management grants root SSH access and has its own rules in **[`docs/adr/0008-ssh-key-management.md`](../adr/0008-ssh-key-management.md)**.
 - Unknown `GET /api/*` paths return a **JSON 404**, never the SPA `index.html`.
 
 ## 8. Device Constraints
@@ -204,15 +205,15 @@ Router hardware is constrained. Every feature must justify its footprint.
   - **`iw event`** in `network_event_watcher.go`, the only remaining raw `exec.Command` in the backend. It is a long-running event listener whose lifetime is bounded by the service's stop channel and a `Process.Kill()`, not by a timeout tier; forcing it through `execx` would kill it immediately.
 - **Package operations use the `PackageManager` abstraction** (`service_manager.go`), which detects **apk** (OpenWrt 25.x+) vs **opkg** at runtime and refreshes the package index best-effort before installs (opkg lists live in `/tmp` and vanish on reboot). Never hardcode `opkg` or `apk` in feature code. Package install/remove writes init scripts, `/etc/config` and kernel modules, so it is crash-guarded (`pkg-install-in-progress`).
 - **Every long-lived background goroutine is either registered in `appLifecycle` (`cmd/server/main.go`) or stopped through it.** The startup workers (AP repair, auto-reconnect script refresh, radio discovery) and the network event watcher run via `lifecycle.Go` with a `stop` channel, so a worker waiting on a delay bails out on SIGTERM instead of committing UCI afterwards. The services that own their own ticker (`hub`, `alertSvc`, `uptimeTracker`, `bandSwitchSvc`, `failoverSvc`, rate limiters, `statsHistory`, `captiveSvc`) are shut down by `lifecycle.Stop()`, which is `sync.Once`-guarded and runs in order after the HTTP server has drained. The untracked goroutines that remain are the terminal operations named above.
-- **Persistent state is deliberate and bounded.** `/etc/travo/travo.db` (bbolt) holds only the token-revocation set and the stats-history ring buffer; it batches writes because `/etc/trafo` is NAND-backed overlayfs, and it degrades to memory-only if the open fails rather than blocking the UI. Rules, retention and the bucket table: **[`docs/adr/0009-persistent-store-bbolt.md`](./adr/0009-persistent-store-bbolt.md)**.
-- **UCI writes go through the `mutateUCI` / `mutateWireless` helpers, which take the config list ONCE** and derive both the lock set and the revert set from it. This is not a style preference: the `uci` CLI keeps uncommitted changes in a process-global `/tmp/.uci/<config>/changes` file, so two concurrent writers of one config destroy each other's staged sections, and a failed sequence left staged is committed by the next unrelated writer. Locks are keyed on the config name (not the service — `WifiService` and `NetworkService` both write `firewall`) and acquired in a globally sorted order, so nesting cannot deadlock; they are **not reentrant**, so a helper reachable from inside a transaction also exposes a `…Locked` core. A missing optional package (`ddns-scripts`, `tailscale`) is `503`, not `500`, and a config `PUT` rejects unknown request fields so a wrong-shaped body cannot silently zero the user's settings. Full rules, the non-obvious config sets, and the matching tests: **[`docs/adr/0010-uci-write-serialisation-and-request-contracts.md`](./adr/0010-uci-write-serialisation-and-request-contracts.md)**.
+- **Persistent state is deliberate and bounded.** `/etc/travo/travo.db` (bbolt) holds only the token-revocation set and the stats-history ring buffer; it batches writes because `/etc/trafo` is NAND-backed overlayfs, and it degrades to memory-only if the open fails rather than blocking the UI. Rules, retention and the bucket table: **[`docs/adr/0009-persistent-store-bbolt.md`](../adr/0009-persistent-store-bbolt.md)**.
+- **UCI writes go through the `mutateUCI` / `mutateWireless` helpers, which take the config list ONCE** and derive both the lock set and the revert set from it. This is not a style preference: the `uci` CLI keeps uncommitted changes in a process-global `/tmp/.uci/<config>/changes` file, so two concurrent writers of one config destroy each other's staged sections, and a failed sequence left staged is committed by the next unrelated writer. Locks are keyed on the config name (not the service — `WifiService` and `NetworkService` both write `firewall`) and acquired in a globally sorted order, so nesting cannot deadlock; they are **not reentrant**, so a helper reachable from inside a transaction also exposes a `…Locked` core. A missing optional package (`ddns-scripts`, `tailscale`) is `503`, not `500`, and a config `PUT` rejects unknown request fields so a wrong-shaped body cannot silently zero the user's settings. Full rules, the non-obvious config sets, and the matching tests: **[`docs/adr/0010-uci-write-serialisation-and-request-contracts.md`](../adr/0010-uci-write-serialisation-and-request-contracts.md)**.
 - **A handler panic returns 500 instead of killing the process.** `recover` middleware is registered first, before CORS and auth. The router keeps forwarding traffic with no UI until something restarts `travo`, and a nil service dependency is the easy way to trigger it.
 
 ## 9. Documentation Rules
 
 - Put stable rules here, not in backlog files.
 - Put open work in `tasks_open.md`, completed work in `tasks_done.md`.
-- Use [`docs/README.md`](./README.md) as the documentation map; plans live under [`docs/plans/`](./plans/) with a searchable [`docs/plans/README.md`](./plans/README.md).
-- Long-lived topic decisions that need more room than this file may become **ADRs** under [`docs/adr/`](./adr/) (see [`docs/adr/README.md`](./adr/README.md)); `docs/architecture.md` links to them where relevant.
+- Use [`docs/README.md`](../README.md) as the documentation map; plans live under [`docs/plans/`](../plans) with a searchable [`docs/plans/README.md`](../plans/README.md).
+- Long-lived topic decisions that need more room than this file may become **ADRs** under [`docs/adr/`](../adr) (see [`docs/adr/README.md`](../adr/README.md)); `docs/architecture/overview.md` links to them where relevant.
 - The **`docs/`** tree is an **Obsidian vault**; humans and agents with the Obsidian CLI should start from **`+ Start here.md`** (see `AGENTS.md` → *Documentation retrieval (Obsidian CLI)*).
 - When a plan graduates into a durable rule, copy the essential decision here and link back to the plan for rationale if useful.

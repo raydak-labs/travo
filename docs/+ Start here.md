@@ -8,7 +8,7 @@ tags:
   - docs
   - hub
   - travo
-updated: 2026-09-28
+updated: 2026-10-05
 ---
 
 # Travo documentation hub
@@ -17,7 +17,7 @@ updated: 2026-09-28
 
 ## Normative (read before changing behavior)
 
-- [[architecture]] — invariants, safety, pointers into ADRs
+- [[architecture/overview|architecture]] — invariants, safety, pointers into ADRs
 - [[adr/README]] — ADR index (source of truth by topic)
 - [[adr/0001-dns-vpn-captive-portal-architecture]]
 - [[adr/0002-wireless-model-and-luci-apply]]
@@ -31,31 +31,33 @@ updated: 2026-09-28
 - [[adr/0010-uci-write-serialisation-and-request-contracts]]
 - [[adr/0011-frontend-lint-toolchain-oxlint-and-typescript-7]]
 - [[adr/0012-ui-consistency-and-status-language]]
-- [[adr/0012-ui-consistency-and-status-language]]
+- [[adr/0013-operational-invariants-and-device-findings]]
 
 ## Backlog and shipped work
 
 - [[requirements/tasks_open]]
 - [[requirements/tasks_done]]
 
-## Workflow
+## Guides (how to do something)
 
-- [[development]]
-- [[deployment]]
-- [[testing]]
-- [[ui-theming]]
+- [[guides/development]] — local dev workflow
+- [[guides/deployment]] — install, packaging, deployment
+- [[guides/testing]] — how to run the checks
 
-## Plans (history / design notes)
+## Reference (what things are)
 
-- [[plans/README]] — catalog of `plans/`
-- [[plans/connection-failover]] — mwan3 context (see ADR 0005)
+- [[reference/ui-theming|ui-theming]] — frontend tokens and component contracts
 
-## Archive
+## Plans (live and normative work)
 
-- [[_archive/requirements_done]] — legacy exhaustive export (read-only)
+- [[plans/README]] — catalog of `plans/`; shipped plans are deleted once folded into ADRs
 
 ## On-device verification
 
 - [[tests/failover-verification]]
 - [[tests/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
   guard or install change touches a device
+
+## Archive
+
+- [[_archive/requirements_done]] — legacy exhaustive export (read-only)

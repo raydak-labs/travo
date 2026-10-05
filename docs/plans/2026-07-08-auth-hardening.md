@@ -29,7 +29,7 @@ Three known weaknesses remain. Each is listed with impact, proposal, effort.
 ## 1. Token blocklist is memory-only — ✅ DONE (2026-07-08)
 
 Implemented via the bbolt store (`internal/store`, see
-[[2026-07-08-hardening-followups-and-persistence]]): SHA-256 token hashes with
+[ADR 0009](../adr/0009-persistent-store-bbolt.md)): SHA-256 token hashes with
 expiry persist in `/etc/travo/travo.db`, loaded on start and pruned on the
 existing cleanup tick. Revocations now survive backend restarts.
 
