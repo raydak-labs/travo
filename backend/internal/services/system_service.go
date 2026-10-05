@@ -269,6 +269,13 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 	return stats, nil
 }
 
+// ReadNetworkStats returns only the per-interface byte counters, without the
+// ubus call and storage probe GetSystemStats also does. The WebSocket hub uses
+// it to keep the traffic history warm while no client is connected.
+func (s *SystemService) ReadNetworkStats() []models.NetworkInterfaceStats {
+	return readNetworkStats()
+}
+
 // readNetworkStats reads cumulative RX/TX byte counters from sysfs for key interfaces.
 func readNetworkStats() []models.NetworkInterfaceStats {
 	interfaces := []string{"br-lan", "wwan0", "wg0", "eth0"}
