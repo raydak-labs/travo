@@ -3,7 +3,9 @@
 # install.sh — install or uninstall Travo on OpenWrt (release tarball from GitHub).
 #
 # Usage:
-#   wget -O- https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | sh
+#   # non-interactive (no TTY, so --password is required):
+#   wget -O- https://raw.githubusercontent.com/OWNER/REPO/main/scripts/install.sh | \
+#     sh -s -- --password 'your-strong-password'
 #   wget -O- ... | sh -s -- --yes --version 1.0.0 --password 'secret'
 #   sh install.sh [OPTION]...
 #
@@ -11,7 +13,8 @@
 #
 # Options:
 #   --version VERSION   Release to install (default: latest GitHub release)
-#   --password PASS     Set root password for LuCI + Travo (default: prompt or admin)
+#   --password PASS     Root password for LuCI, SSH and Travo (min 8 chars;
+#                      required when not running interactively)
 #   --no-adguard        Skip AdGuard Home
 #   --no-luci-move      Do not move LuCI/uhttpd to 8080
 #   --uninstall         Remove Travo and restore uhttpd defaults (also runs remove-adguard when present)
@@ -149,7 +152,8 @@ Usage: install.sh [OPTIONS]
 
 Options:
   --version VERSION   Install a specific version (default: latest)
-  --password PASSWORD Set the root password for LuCI and Travo login (default: prompt or "admin")
+  --password PASSWORD Set the root password for LuCI, SSH and Travo login (min 8 chars, required
+                   when not running interactively)
   --no-adguard        Skip AdGuard Home installation
   --no-luci-move      Skip moving LuCI to port 8080
   --uninstall         Remove Travo and restore defaults
@@ -166,8 +170,9 @@ Examples:
   # Install without AdGuard Home
   sh install.sh --no-adguard
 
-  # Piped install (non-interactive, uses defaults)
-  wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
+  # Piped install (non-interactive, password must be supplied separately)
+  wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh > install.sh
+  sh install.sh --password 'your-strong-password'
 
   # Uninstall everything
   sh install.sh --uninstall
@@ -345,6 +350,46 @@ do_install() {
 
     confirm "Proceed with installation?" || { info "Aborted."; exit 0; }
 
+    # --- Step 0: Resolve the root password (before anything is changed) ---
+    # This is a fail-closed gate and it has to run BEFORE the first mutation.
+    # It used to sit after the tarball was extracted and /etc/config/travo
+    # overwritten, so a refusal left the device half-installed: new binary in
+    # place, nothing started, and no way for the operator to tell what state it
+    # is in.
+    #
+    # This password is the root/LuCI/dropbear login for the whole device, on a
+    # router whose entire premise is being used on networks the operator does
+    # not control, so there is deliberately no default: the documented one-liner
+    # (`wget -O- .../install.sh | sh`) runs with no TTY, so any prompt is
+    # skipped and a fallback would silently install a published password.
+    _pw="$PASSWORD"
+    if [ -z "$_pw" ]; then
+        if [ -t 0 ] && [ "$YES" = 0 ]; then
+            printf "Enter root password for LuCI and Travo (min 8 characters): "
+            read -r _pw </dev/tty || _pw=""
+            while [ -n "$_pw" ] && [ "${#_pw}" -lt 8 ]; do
+                warn "Password must be at least 8 characters."
+                printf "Enter root password for LuCI and Travo (min 8 characters): "
+                read -r _pw </dev/tty || _pw=""
+            done
+        fi
+        if [ -z "$_pw" ]; then
+            die "refusing to install without a root password (it is the LuCI, SSH and Travo login).
+       Re-run with:  --password '<your password>'
+       or run interactively from a terminal to be prompted."
+        fi
+    fi
+    if [ "${#_pw}" -lt 8 ]; then
+        die "root password must be at least 8 characters."
+    fi
+    mkdir -p /etc/travo
+    chmod 700 /etc/travo 2>/dev/null || true
+    if set_root_password "$_pw"; then
+        success "Root password configured (LuCI + Travo login)"
+    else
+        warn "Could not set root password non-interactively — run: passwd root"
+    fi
+
     # --- Step 1: Download tarball ---
     _tarball="/tmp/${PKG_NAME}_${VERSION}_${_arch}.tar.gz"
     _tarball_url="${GITHUB_RELEASE_BASE}/v${VERSION}/${PKG_NAME}_${VERSION}_${_arch}.tar.gz"
@@ -395,24 +440,7 @@ do_install() {
     done
     success "Files installed"
 
-    # --- Step 3: Set root password (LuCI + Travo) ---
-    _pw="$PASSWORD"
-    if [ -z "$_pw" ]; then
-        if [ -t 0 ] && [ "$YES" = 0 ]; then
-            printf "Enter root password for LuCI and Travo (default: admin): "
-            read -r _pw </dev/tty || _pw=""
-        fi
-        [ -z "$_pw" ] && _pw="admin"
-    fi
-    mkdir -p /etc/travo
-    chmod 700 /etc/travo 2>/dev/null || true
-    if set_root_password "$_pw"; then
-        success "Root password configured (LuCI + Travo login)"
-    else
-        warn "Could not set root password non-interactively — run: passwd root"
-    fi
-
-    # --- Step 4: Move LuCI to port 8080 ---
+    # --- Step 3: Move LuCI to port 8080 ---
     if [ "$MOVE_LUCI" = 1 ]; then
         _current_http="$(uci -q get uhttpd.main.listen_http 2>/dev/null || echo '')"
         case "$_current_http" in
@@ -428,7 +456,7 @@ do_install() {
         esac
     fi
 
-    # --- Step 5: Install AdGuard Home ---
+    # --- Step 4: Install AdGuard Home ---
     if [ "$INSTALL_ADGUARD" = 1 ]; then
         info "Installing AdGuard Home..."
         _adguard_script="/tmp/install-adguard.sh"
@@ -440,13 +468,47 @@ do_install() {
         success "AdGuard Home installed"
     fi
 
-    # --- Step 6: Start travel GUI ---
+    # --- Step 5: Start travel GUI ---
     info "Enabling and starting ${PKG_NAME}..."
     /etc/init.d/"$PKG_NAME" enable 2>/dev/null || true
-    /etc/init.d/"$PKG_NAME" start  2>/dev/null || true
+    if ! /etc/init.d/"$PKG_NAME" start; then
+        warn "${PKG_NAME} failed to start — recent log lines follow."
+        logread 2>/dev/null | tail -n 20 || true
+        die "install did not complete: ${PKG_NAME} is not running.
+       Check:  logread | grep -i travo"
+    fi
+    # procd's start can return 0 while the process dies immediately afterwards
+    # (wrong arch, missing config, read-only overlay), so confirm the port
+    # actually answers rather than trusting the exit code alone.
+    #
+    # The port is READ FROM UCI, not assumed: it defaults to 80 (the installer
+    # moves LuCI to 8080 precisely so Travo can take 80), and with AdGuard
+    # installed 0.0.0.0:3000 belongs to AdGuard's web UI, so probing a hardcoded
+    # 3000 both missed Travo and probed somebody else's server.
+    _port="$(uci -q get "${PKG_NAME}.main.port" 2>/dev/null || true)"
+    [ -n "$_port" ] || _port="80"
+    # -T bounds each attempt; without it a filtered port makes busybox wget block
+    # for its default read timeout and the retry loop below is not a 15-second
+    # bound at all.
+    _ok=0
+    _i=0
+    while [ "$_i" -lt 15 ]; do
+        if wget -q -T 3 -O /dev/null "http://127.0.0.1:${_port}/api/health" 2>/dev/null; then
+            _ok=1
+            break
+        fi
+        sleep 1
+        _i=$((_i + 1))
+    done
+    if [ "$_ok" -ne 1 ]; then
+        warn "${PKG_NAME} started but is not answering on port ${_port} — recent log lines follow."
+        logread 2>/dev/null | tail -n 20 || true
+        die "install did not complete: ${PKG_NAME} is not responding on port ${_port}.
+       Check:  logread | grep -i travo"
+    fi
     success "${PKG_NAME} is running"
 
-    # --- Step 7: Print success ---
+    # --- Step 6: Print success ---
     _lan_ip="$(detect_lan_ip)"
     echo ""
     printf "${GREEN}${BOLD}"
@@ -456,11 +518,7 @@ do_install() {
     printf "${NC}\n"
     echo ""
     printf "  ${BLUE}Travo:${NC}         http://${_lan_ip}\n"
-    if [ "$_pw" != "admin" ]; then
-        printf "  ${BLUE}Login:${NC}         root + your password (LuCI / Travo)\n"
-    else
-        printf "  ${YELLOW}Login:${NC}         root / admin ${YELLOW}(change via passwd or System settings!)${NC}\n"
-    fi
+    printf "  ${BLUE}Login:${NC}         root + the password you just set (LuCI / Travo)\n"
     if [ "$INSTALL_ADGUARD" = 1 ]; then
         printf "  ${BLUE}AdGuard Home:${NC}  http://${_lan_ip}:3000\n"
     fi
@@ -535,6 +593,29 @@ do_uninstall() {
     # --- Step 5: Clean up config ---
     uci -q delete "$PKG_NAME" 2>/dev/null || true
     uci commit "$PKG_NAME" 2>/dev/null || true
+
+    # --- Step 5b: Report, do not silently delete, Travo-managed live state ---
+    # authorized_keys, the button hotplug script and /etc/crontabs/root entries
+    # are things Travo writes that outlive it. Deleting authorized_keys would
+    # risk locking out an operator whose only access is that key, and there is
+    # no way to tell a key the operator added from one that was added without
+    # their knowledge — so print them for review instead.
+    echo ""
+    info "Travo leaves the following behind. Review them:"
+    if [ -s /etc/dropbear/authorized_keys ]; then
+        echo ""
+        warn "/etc/dropbear/authorized_keys (root SSH access — remove any key you do not recognise):"
+        sed 's/^/    /' /etc/dropbear/authorized_keys
+    fi
+    if [ -f /etc/hotplug.d/button/50-gui-button-actions ]; then
+        warn "/etc/hotplug.d/button/50-gui-button-actions still exists (runs as root on button press):"
+        echo "    rm /etc/hotplug.d/button/50-gui-button-actions"
+    fi
+    if [ -f /etc/crontabs/root ] && grep -q 'travo\|wifi-toggle' /etc/crontabs/root 2>/dev/null; then
+        warn "/etc/crontabs/root contains Travo entries:"
+        grep -n 'travo\|wifi-toggle' /etc/crontabs/root | sed 's/^/    /'
+    fi
+    echo ""
 
     # Clean leftover files
     rm -rf /www/travo 2>/dev/null || true

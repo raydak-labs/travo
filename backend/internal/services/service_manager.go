@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -270,8 +271,20 @@ func (sm *ServiceManager) guardPath() string {
 }
 
 // writeInstallGuard records that a mutating package operation has started.
+//
+// It REFUSES when the guard already exists (ADR 0003 §1.2): a guard on disk
+// means a previous install or remove died part-way — init scripts rewritten,
+// the package database mid-update — and blindly retrying it is precisely what
+// the guard exists to prevent. The recovery path is deploy-local.sh or removing
+// the file by hand, both of which clear every guard listed in ADR 0003 §2.
 func (sm *ServiceManager) writeInstallGuard(reason string) error {
 	path := sm.guardPath()
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("pkg guard: %s exists from an interrupted install/remove; "+
+			"remove it or redeploy before retrying", path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("pkg guard: stat %s: %w", path, err)
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return fmt.Errorf("pkg guard: mkdir: %w", err)
 	}
@@ -449,6 +462,15 @@ func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) er
 }
 
 // Start starts a service via init.d.
+//
+// No crash guard, deliberately: every service in the catalog is an ordinary
+// procd daemon (adguardhome, tailscale, vnstat, sqm, mwan3, watchcat,
+// cloudflared), and `init.d <name> start` is idempotent and retryable — procd
+// converges on "running" however often it is repeated, and a repeat after a
+// power cut cannot make the outcome worse. A guard here would satisfy
+// ADR 0003 §1 only formally: it would disable start/stop for the whole device
+// after one power cut until a redeploy, and ADR 0003 §2 lists what a guard has
+// to protect. Package install/remove, which is NOT retryable, is guarded above.
 func (sm *ServiceManager) Start(serviceID string) error {
 	sm.opMu.Lock()
 	defer sm.opMu.Unlock()
@@ -471,7 +493,7 @@ func (sm *ServiceManager) Start(serviceID string) error {
 	return nil
 }
 
-// Stop stops a service via init.d.
+// Stop stops a service via init.d. Unguarded for the same reason as Start.
 func (sm *ServiceManager) Stop(serviceID string) error {
 	sm.opMu.Lock()
 	defer sm.opMu.Unlock()

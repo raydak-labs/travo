@@ -534,11 +534,11 @@ Applying failover settings writes live routing policy, so the apply path needs a
 
 Use the mandatory guard-file pattern for the app-managed apply step:
 
-- `/etc/travo/failover-in-progress`
+- `/etc/trafo/failover-in-progress`
 
 Apply flow:
 
-1. write `/etc/travo/failover-in-progress`
+1. write `/etc/trafo/failover-in-progress`
 2. back up the current app-owned `mwan3` sections or generated file content
 3. replace only app-owned generated `mwan3` sections/rules, not unrelated `mwan3` content
 4. reload `mwan3`

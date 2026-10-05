@@ -322,3 +322,123 @@ func TestAppLifecycle_GoUnwindsOnStop(t *testing.T) {
 		}
 	}
 }
+
+// TestProductionAppRequiresAuthOnAPIRoutes drives the app that setupApp builds —
+// that is, the real production wiring — and asserts that the protected API is
+// actually protected.
+//
+// This exists because the composition of cmd/server/main.go was untested. Every
+// auth test in internal/api and internal/auth builds its own app with its own
+// middleware registration, so all of them stayed green while main.go itself
+// registered none: commit 93e6e2b moved the middleware onto a route group and,
+// when that approach was reverted in the same file's history, the app.Use line
+// was never put back. The result was the exact vulnerability 70193d6 exists to
+// close — the entire /api/v1 surface reachable without a token — shipping with
+// a fully green test suite.
+//
+// A regression that drops or reorders this middleware fails here and nowhere
+// else, which is the point: the gap was that no test observed the real wiring.
+func TestProductionAppRequiresAuthOnAPIRoutes(t *testing.T) {
+	app := setupApp()
+
+	// One representative route per shape: a plain GET, a parameterised path, and
+	// a mutating POST. Each must be rejected without a token.
+	protected := []struct {
+		method string
+		path   string
+		why    string
+	}{
+		{http.MethodGet, "/api/v1/system/info", "plain GET"},
+		{http.MethodGet, "/api/v1/system/ssh-keys", "collection GET"},
+		{http.MethodPost, "/api/v1/system/ssh-keys", "root SSH key grant (mutating)"},
+		{http.MethodPost, "/api/v1/system/reboot", "device control (mutating)"},
+		{http.MethodPost, "/api/v1/system/factory-reset", "destructive (mutating)"},
+		{http.MethodGet, "/api/v1/wifi/scan", "radio operation"},
+		{http.MethodGet, "/api/v1/network/status", "network read"},
+	}
+
+	for _, tc := range protected {
+		t.Run(tc.why+" "+tc.path, func(t *testing.T) {
+			req, err := http.NewRequest(tc.method, tc.path, nil)
+			if err != nil {
+				t.Fatalf("build request: %v", err)
+			}
+			resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			status := resp.StatusCode
+			resp.Body.Close()
+			if status != http.StatusUnauthorized {
+				t.Errorf("unauthenticated %s %s returned %d, want 401 — the auth "+
+					"middleware is not mounted on the production app",
+					tc.method, tc.path, status)
+			}
+		})
+	}
+}
+
+// TestProductionAppKeepsPublicEndpointsOpen is the other half: a fix that mounts
+// the middleware carelessly must not close the bootstrap paths. Both of these
+// broke in this branch's history — time-sync answered 401 while a group-scoped
+// middleware swallowed it.
+func TestProductionAppKeepsPublicEndpointsOpen(t *testing.T) {
+	app := setupApp()
+
+	t.Run("health", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		status := resp.StatusCode
+		resp.Body.Close()
+		if status != http.StatusOK {
+			t.Errorf("GET /api/health = %d, want 200 (public per auth.PublicPaths)", status)
+		}
+	})
+
+	t.Run("openapi", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/api/openapi.json", nil)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		status := resp.StatusCode
+		resp.Body.Close()
+		if status != http.StatusOK {
+			t.Errorf("GET /api/openapi.json = %d, want 200 (public: it is the "+
+				"machine-readable contract for automation)", status)
+		}
+	})
+
+	t.Run("time-sync", func(t *testing.T) {
+		// Reaches the handler and is rejected for its own reasons (a missing
+		// body), NOT by the auth middleware. A 401 here means the pre-login
+		// clock recovery path is closed again.
+		req, _ := http.NewRequest(http.MethodPost, "/api/v1/system/time-sync", nil)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		status := resp.StatusCode
+		resp.Body.Close()
+		if status == http.StatusUnauthorized {
+			t.Error("POST /api/v1/system/time-sync = 401: the pre-login clock " +
+				"recovery path must stay reachable without a token")
+		}
+	})
+
+	t.Run("login", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+		resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		status := resp.StatusCode
+		resp.Body.Close()
+		if status == http.StatusUnauthorized {
+			t.Error("POST /api/v1/auth/login = 401: login cannot require its own token")
+		}
+	})
+}

@@ -72,6 +72,12 @@ export interface APConfigUpdate {
   readonly encryption: string;
   readonly key: string;
   readonly enabled?: boolean;
+  /**
+   * Set to true to apply a change that would remove the last access point while
+   * the caller is on WiFi. Without it the router answers 409 with code
+   * `wifi_lockout_risk` and changes nothing (ADR 0002 §5).
+   */
+  readonly acknowledge_lockout?: boolean;
 }
 
 /** Persisted repeater radio policy (/etc/travo/repeater-options.json). */
@@ -167,6 +173,8 @@ export interface GuestWifiConfig {
   readonly ssid: string;
   readonly encryption: string;
   readonly key: string;
+  /** Opt-in to disabling guest WiFi when it is the last access point (ADR 0002 §5). */
+  readonly acknowledge_lockout?: boolean;
 }
 
 /** Request to reorder saved network priorities */
@@ -184,6 +192,14 @@ export interface WifiApplyState {
   readonly pending: boolean;
   readonly token?: string;
   readonly rollback_timeout_seconds?: number;
+  /**
+   * Wall-clock seconds ONE confirm call can block on the device while it waits
+   * for the newly enabled interfaces to come up. A client that re-POSTs confirm
+   * until the rollback deadline must leave this much room, or a probe it starts
+   * late is answered only after rpcd has already rolled back. Absent on
+   * backends that predate the field; the client then assumes a default.
+   */
+  readonly probe_budget_seconds?: number;
 }
 
 /** Common WiFi mutation response */

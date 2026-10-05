@@ -67,6 +67,19 @@ func normalizeMAC(mac string) (string, error) {
 // option, verified, and applied. Only after the staged apply is started does it
 // touch the live link with "ip link": doing that before would take the interface
 // down with a possibly invalid address and outside any crash guard.
+//
+// The guard is cleared only when the WHOLE synchronous sequence succeeded,
+// including the live `ip link` change. A failed link step returns an error and
+// keeps the guard (ADR 0003 §1.3: the marker is removed only after the operation
+// completes end-to-end).
+//
+// This path self-confirms as far as the guard is concerned, unlike a
+// browser-driven apply: stageWirelessApply calls StartApply AFTER the commit, so
+// rpcd's rollback snapshot already contains the new wireless.<sta>.macaddr —
+// rolling the apply back restores the same committed value, and the only thing
+// the pending confirm decides is whether that value is kept. The browser is
+// never the witness that the live interface actually took the MAC; the link
+// step below is, and it is now error-checked.
 func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		targetMAC := ""
@@ -116,7 +129,12 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 			return nil, err
 		}
 		// The apply is in flight; only now is it safe to change the live link.
-		w.applyMACImmediate(targetMAC)
+		// The error is returned rather than logged and dropped: a caller that got
+		// 200 with the STA link still down has no way to learn that it lost the
+		// interface it was connected through.
+		if err := w.applyMACImmediate(targetMAC); err != nil {
+			return nil, err
+		}
 		guardStays = false
 		w.clearCrashGuard(macGuardFeature)
 		return apply, nil
@@ -125,35 +143,53 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 
 // applyMACImmediate applies (or restores) the MAC address on the live STA
 // interface right now using ip link, without requiring a wifi restart.
-// Errors are logged: the staged UCI apply is the authoritative path, but a
-// failure here means the running address does not match the committed config,
-// which the operator must be able to see in the log.
-func (w *WifiService) applyMACImmediate(mac string) {
+//
+// The sequence is down -> set address -> up, so a failure in the middle leaves
+// the interface DOWN. That is the worst possible outcome here: the STA is the
+// router's own upstream link, so it silently disappears behind a successful HTTP
+// response and the operator loses connectivity with nothing to act on. Every
+// failure path therefore restores the link and returns the error.
+func (w *WifiService) applyMACImmediate(mac string) error {
 	if w.cmd == nil {
-		return
+		return nil
 	}
 	ifname, _, err := w.findSTADevice()
 	if err != nil || ifname == "" {
-		return
+		return nil
 	}
 	if mac == "" {
 		// Restore hardware MAC from the phy's permanent address list.
 		hwMAC := w.readPhyHardwareMAC(ifname)
 		if hwMAC == "" {
-			return // can't restore without knowing the permanent MAC
+			return nil // can't restore without knowing the permanent MAC
 		}
 		mac = hwMAC
 	}
 	if _, err := w.cmd.Run("ip", "link", "set", ifname, "down"); err != nil {
-		log.Printf("WARNING: ip link set %s down: %v", ifname, err)
-		return
+		return fmt.Errorf("ip link set %s down: %w", ifname, err)
 	}
 	if _, err := w.cmd.Run("ip", "link", "set", ifname, "address", mac); err != nil {
-		log.Printf("WARNING: applying MAC %s to %s: %v", mac, ifname, err)
+		// The link is down right now and would stay down if we stopped here.
+		w.bringLinkUp(ifname)
+		return fmt.Errorf("applying MAC %s to %s (link brought back up): %w", mac, ifname, err)
+	}
+	if _, err := w.cmd.Run("ip", "link", "set", ifname, "up"); err != nil {
+		w.bringLinkUp(ifname)
+		return fmt.Errorf("ip link set %s up: %w", ifname, err)
+	}
+	return nil
+}
+
+// bringLinkUp makes a best-effort attempt to return an interface to the up
+// state after a failed MAC change, so a rejected address cannot strand the STA
+// offline. Its own failure is only logged: the caller is already returning the
+// error that caused the interface to be down.
+func (w *WifiService) bringLinkUp(ifname string) {
+	if w.cmd == nil {
 		return
 	}
 	if _, err := w.cmd.Run("ip", "link", "set", ifname, "up"); err != nil {
-		log.Printf("WARNING: ip link set %s up: %v", ifname, err)
+		log.Printf("WARNING: could not bring %s back up after a failed MAC change: %v", ifname, err)
 	}
 }
 

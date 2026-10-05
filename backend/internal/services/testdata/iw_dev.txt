@@ -1,0 +1,12 @@
+phy#0
+	Interface phy0-sta0
+		ifindex 23
+		wdev 0x9
+		addr 9e:6c:d4:9d:05:d0
+		ssid Cappuxinno
+		type managed
+		channel 149 (5745 MHz), width: 80 MHz, center1: 5775 MHz
+		txpower 24.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	0	0	0	0	0	0		0

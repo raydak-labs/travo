@@ -13,25 +13,26 @@ export function LanDnsServerFields({ register, errors }: LanDnsServerFieldsProps
   return (
     <div className="grid grid-cols-2 gap-4">
       <div className="space-y-1">
-        <Label className="flex items-center gap-1">
+        <Label className="flex items-center gap-1" htmlFor="lan-dns-s1">
           Primary DNS
           <InfoTooltip text="DNS server that resolves domain names to IP addresses for all LAN clients. E.g., 8.8.8.8 (Google), 1.1.1.1 (Cloudflare), 9.9.9.9 (Quad9)." />
         </Label>
         <Input
+          id="lan-dns-s1"
           placeholder="8.8.8.8"
           aria-invalid={errors.server1 ? 'true' : undefined}
           aria-describedby={errors.server1 ? 'lan-dns-s1-err' : undefined}
           {...register('server1')}
         />
         {errors.server1 ? (
-          <p id="lan-dns-s1-err" className="text-xs text-red-500" role="alert">
+          <p id="lan-dns-s1-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.server1.message}
           </p>
         ) : null}
       </div>
       <div className="space-y-1">
-        <Label>Secondary DNS</Label>
-        <Input placeholder="8.8.4.4" {...register('server2')} />
+        <Label htmlFor="lan-dns-s2">Secondary DNS</Label>
+        <Input id="lan-dns-s2" placeholder="8.8.4.4" {...register('server2')} />
       </div>
     </div>
   );

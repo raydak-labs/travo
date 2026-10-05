@@ -28,6 +28,16 @@ func RespondWithServerError(c fiber.Ctx, err error) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 }
 
+// RespondWithErrorCode sends a JSON error response carrying a stable
+// machine-readable "code" next to the human-readable "error".
+//
+// It exists for the wireless lockout refusal: the message has to name the
+// remedy, which means it will be reworded, and a client that matched on the
+// message would break the next time somebody improves it.
+func RespondWithErrorCode(c fiber.Ctx, status int, code, message string) error {
+	return c.Status(status).JSON(fiber.Map{"error": message, "code": code})
+}
+
 // RespondOK sends a JSON {"status":"ok"} response.
 func RespondOK(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok"})

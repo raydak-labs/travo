@@ -32,6 +32,7 @@ INIT_SCRIPT="/etc/init.d/adguardhome"
 
 # ---------- helpers ----------
 log()  { printf '[adguard-install] %s\n' "$*"; }
+warn() { printf '[adguard-install] WARNING: %s\n' "$*" >&2; }
 die()  { printf '[adguard-install] ERROR: %s\n' "$*" >&2; exit 1; }
 
 # ---------- parse flags ----------
@@ -197,7 +198,18 @@ enable_and_start() {
     log "Starting adguardhome service ..."
     "$INIT_SCRIPT" start
     log "AdGuard Home is running — web UI at http://<router-ip>:3000"
-    log "Default credentials: admin / password  (change immediately via Settings → AdGuard Password)"
+    log "No default AdGuard account is installed."
+    log ""
+    warn "AdGuard's web UI is reachable by anyone on the LAN, and with no account"
+    warn "it shows a first-run setup wizard. Whoever completes it first becomes the"
+    warn "admin of every DNS query this router makes."
+    log ""
+    log "Create the admin account now, from Travo: System -> AdGuard Password."
+    log "Doing it there keeps the password out of this terminal's scrollback."
+    log "Note that it ADDS an account rather than replacing one, so if someone else"
+    log "already completed the wizard you will share control with them. See"
+    log "docs/adr/0001 section 2.5 (docs/adr/0001-dns-vpn-captive-portal-architecture.md)."
+    log ""
 }
 
 # ---------- configure router DNS ----------

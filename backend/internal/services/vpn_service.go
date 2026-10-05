@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -121,27 +123,62 @@ type VpnService struct {
 	// guardFile is the crash guard path for VPN live-state changes. Empty
 	// disables the guard (only the production constructor sets it).
 	guardFile string
+	// dnsStackPath and legacyDnsSnapshotPath are fields rather than bare
+	// constants so the layer-stack lifecycle can be exercised against a temp
+	// dir instead of /etc/trafo.
+	dnsStackPath string
+	// legacyDnsSnapshotPath is the per-feature snapshot this service wrote
+	// before the shared dnsmasq layer stack existed. Read-only: it is consumed
+	// once as a migration source for the base state and then removed.
+	legacyDnsSnapshotPath string
+
+	// dnsHealMu guards the self-heal debounce below. GET /vpn/status is polled
+	// by several pages at once, so the counters are shared.
+	dnsHealMu sync.Mutex
+	// dnsHealStreak counts consecutive enabled_not_up readings and dnsHealSince
+	// stamps the first of them, so a heal needs the tunnel down for a whole
+	// grace period rather than for a single reading.
+	dnsHealStreak int
+	dnsHealSince  time.Time
 }
 
-const vpnDnsSnapshotPath = "/etc/trafo/vpn-dns-snapshot.json"
-
 // legacyVpnDnsSnapshotPath is where releases before the guard-directory
-// unification wrote the snapshot. Read-only: a restore removes both.
+// unification wrote the per-feature snapshot. It is now only read, as a
+// migration source for the shared dnsmasq layer stack.
 const legacyVpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
 
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
-	return &VpnService{uci: u, cmd: &RealCommandRunner{}, profilesPath: "/etc/travo/wireguard_profiles.json", guardFile: vpnGuardPath}
+	return &VpnService{
+		uci:                   u,
+		cmd:                   &RealCommandRunner{},
+		profilesPath:          "/etc/travo/wireguard_profiles.json",
+		guardFile:             vpnGuardPath,
+		dnsStackPath:          dnsmasqLayerStackPath,
+		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+	}
 }
 
 // NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
 func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
-	return &VpnService{uci: u, cmd: cmd, profilesPath: "/etc/travo/wireguard_profiles.json"}
+	return &VpnService{
+		uci:                   u,
+		cmd:                   cmd,
+		profilesPath:          "/etc/travo/wireguard_profiles.json",
+		dnsStackPath:          dnsmasqLayerStackPath,
+		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+	}
 }
 
 // NewVpnServiceWithProfilesPath creates a VpnService with a custom profiles path (for tests).
 func NewVpnServiceWithProfilesPath(u uci.UCI, cmd CommandRunner, profilesPath string) *VpnService {
-	return &VpnService{uci: u, cmd: cmd, profilesPath: profilesPath}
+	return &VpnService{
+		uci:                   u,
+		cmd:                   cmd,
+		profilesPath:          profilesPath,
+		dnsStackPath:          dnsmasqLayerStackPath,
+		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+	}
 }
 
 func wireGuardIfaceLooksUp(linkShowOutput string) bool {
@@ -464,25 +501,48 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 		return "disabled"
 	}
 	out, err := v.cmd.Run(openwrtWgBin, "show", "wg0", "dump")
-	if err != nil || strings.TrimSpace(string(out)) == "" {
-		return "enabled_not_up"
-	}
-	status, parseErr := ParseWgDump(string(out))
-	if parseErr != nil || status == nil {
-		return "enabled_not_up"
-	}
-	for _, peer := range status.Peers {
-		if peer.LatestHandshake > 0 {
-			return "connected"
+	if err == nil && strings.TrimSpace(string(out)) != "" {
+		if status, parseErr := ParseWgDump(string(out)); parseErr == nil && status != nil {
+			for _, peer := range status.Peers {
+				if peer.LatestHandshake > 0 {
+					return "connected"
+				}
+			}
+			if len(status.Peers) > 0 {
+				return "up_no_handshake"
+			}
+			return "configured"
 		}
 	}
-	if len(status.Peers) > 0 {
-		return "up_no_handshake"
+	// `wg show` is unusable — the binary is missing, or its output no longer
+	// parses. That is a broken PROBE, not a broken tunnel, and the two must not
+	// collapse into one reading: the debounced heal of ADR 0001 §3.3 pops the VPN
+	// resolver layer on enabled_not_up, so a persistently broken probe would
+	// eventually take the DNS layer away from a tunnel that is carrying it fine.
+	// The link state is the only evidence left, and an UP wg0 outranks the
+	// missing tool.
+	if link, lerr := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); lerr == nil {
+		if wireGuardIfaceLooksUp(string(link)) {
+			return "up_no_handshake"
+		}
 	}
-	return "configured"
+	return "enabled_not_up"
 }
 
 // GetVpnStatus returns all VPN connection statuses.
+//
+// It also runs the DNS self-heal reconcile (ADR 0001 §3): if the VPN is still a
+// stacked layer on the shared dnsmasq record but the tunnel that justified it
+// can no longer carry DNS, the layer below it is restored here rather than
+// waiting for an operator to toggle the VPN off. This is a status read that
+// heals rather than just reporting, which is deliberate: GET /vpn/status is
+// polled by the dashboard and the VPN page, so it is the only health signal that
+// is guaranteed to be hit after a reboot.
+//
+// Because the poll rate is the operator's UI and not a health check, the heal
+// is debounced: it fires only on a terminal tunnel state, or on enabled_not_up
+// seen vpnDNSHealStreakRequired times in a row spanning
+// vpnDNSHealGracePeriod. See maybeSelfHealVpnDNS.
 func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 	var statuses []models.VpnStatus
 
@@ -494,6 +554,10 @@ func (v *VpnService) GetVpnStatus() ([]models.VpnStatus, error) {
 		wgStatus := models.VpnStatus{Type: "wireguard",
 			Enabled: disabled != "1"}
 		wgStatus.StatusDetail = v.wgRuntimeState(wgStatus.Enabled)
+		// The heal logs itself. StatusDetail is left at its documented value:
+		// the frontend matches it by exact equality, so a suffixed value would
+		// render no status text at all.
+		v.maybeSelfHealVpnDNS(wgStatus.StatusDetail)
 		wgStatus.Connected = wgStatus.StatusDetail == "connected"
 		if wgStatus.Enabled {
 			wgStatus.Endpoint = v.combinePeerEndpointFromUCI("wg0_peer0")
@@ -696,7 +760,6 @@ func (v *VpnService) clearVpnGuard() {
 }
 
 func (v *VpnService) enableWireguard() error {
-	_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 	if err := v.ensureWireGuardInterface(); err != nil {
 		return fmt.Errorf("normalizing wg0 interface: %w", err)
 	}
@@ -730,6 +793,12 @@ func (v *VpnService) enableWireguard() error {
 		return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 	}
 
+	// The tunnel is verified up, so clearing the Tailscale exit node can no
+	// longer strand a failed enable. It used to run first, which meant a failed
+	// enable silently changed where the router's own traffic egresses with
+	// nothing to put it back (rollbackWireguardEnable never restored it).
+	_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
+
 	if err := v.setupWireGuardFirewall(); err != nil {
 		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
 			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %v)", err, v.guardFile, rbErr)
@@ -738,7 +807,13 @@ func (v *VpnService) enableWireguard() error {
 		return fmt.Errorf("setting up WireGuard firewall: %w", err)
 	}
 
-	v.enableVpnDNSForwarding()
+	if err := v.enableVpnDNSForwarding(); err != nil {
+		// DNS forwarding was aborted on purpose (the dnsmasq layer record
+		// could not be written), so dnsmasq still has the pre-VPN resolvers.
+		// The tunnel is up and verified; failing the toggle here would tear
+		// down a working VPN over a DNS bookkeeping problem. Record it.
+		log.Printf("vpn: tunnel up but LAN DNS left unchanged: %v", err)
+	}
 	v.clearVpnGuard()
 	return nil
 }
@@ -766,6 +841,32 @@ func (v *VpnService) rollbackWireguardEnable(prevDisabled string) error {
 }
 
 func (v *VpnService) disableWireguard() error {
+	// The disable path bounces uplinks (ubus down/up, then ifdown/ifup as a last
+	// resort). That is live state, so it needs the crash guard exactly like the
+	// enable path (ADR 0003). It used to be written only by enableWireguard, so
+	// an interrupted bounce left the uplink down with no marker at all.
+	if err := v.writeVpnGuard(); err != nil {
+		return err
+	}
+	// Every exit path tears the wg0 firewall plumbing down. Returning early on
+	// the missing-default-route branch used to leave firewall.wg0_zone and
+	// firewall.wg0_fwd committed across reboots, and the next enable reused
+	// those stale sections.
+	//
+	// The guard is cleared inside this defer, after the teardown, so a device
+	// that dies mid-teardown still has the marker. routeConfirmed is false on
+	// every error return, which keeps the guard when the uplink bounce may not
+	// have taken.
+	routeConfirmed := false
+	defer func() {
+		if err := v.teardownWireGuardFirewall(); err != nil {
+			log.Printf("vpn: tearing down WireGuard firewall: %v", err)
+		}
+		if routeConfirmed {
+			v.clearVpnGuard()
+		}
+	}()
+
 	_ = v.uci.Set("network", "wg0", "disabled", "1")
 	if err := v.uci.Commit("network"); err != nil {
 		return err
@@ -785,67 +886,517 @@ func (v *VpnService) disableWireguard() error {
 	v.restoreDefaultRouteAfterWireGuardDisable()
 	// Rock-solid semantics: do not report success if the device has no default route.
 	if !v.hasKernelDefaultRoute() {
+		// Guard stays (routeConfirmed is false): the uplink bounce may not
+		// have taken, and the operator needs the marker (ADR 0003).
 		return fmt.Errorf("WireGuard disabled but no default route was restored; internet may be down")
 	}
-	_ = v.teardownWireGuardFirewall()
+	routeConfirmed = true
 	return nil
 }
 
-type vpnDnsSnapshot struct {
+// ---------------------------------------------------------------------------
+// Shared dnsmasq resolver layer stack (ADR 0001 §3)
+//
+// AdGuard forwarding and VPN DNS forwarding both write the SAME two options of
+// the SAME section: dhcp.@dnsmasq[0].server and .noresolv. Separate per-feature
+// snapshot FILES cannot keep them from colliding — the files stay separate but
+// the EFFECTS overwrite each other, so the last restore wins with a value that
+// was valid in a state the operator has since left.
+//
+// The stack is the single owner of the pre-any-layer state:
+//
+//   - the first layer to enable records the base state and its own resolvers;
+//   - the last layer to disable restores the base and drops the record;
+//   - a layer disabling while others remain only removes its own entry and
+//     leaves dnsmasq pointing at whatever is now on top.
+//
+// The record lives here rather than in AdGuardService because VpnService is the
+// service that also owns the self-heal that pops a layer on the read path;
+// AdGuardService drives the same code through AdGuardChecker.
+const (
+	// dnsmasqLayerStackPath holds the base dnsmasq resolver state plus the
+	// layers currently stacked, bottom first. It is a state file, not a crash
+	// guard, so it keeps its own literal rather than deriving from crashGuardDir.
+	dnsmasqLayerStackPath = "/etc/trafo/dnsmasq-layers.json"
+
+	// dnsmasqLayerStackFileName is the record's file name on its own, so a
+	// service that resolves the record relative to its own state directory (the
+	// captive service, next to its guard file) lands on the same file.
+	dnsmasqLayerStackFileName = "dnsmasq-layers.json"
+
+	// The features that stack onto dnsmasq's resolver options.
+	dnsLayerVPN     = "vpn"
+	dnsLayerAdGuard = "adguard"
+	// dnsLayerCaptive is the captive portal bypass (ADR 0001 §4). It is a layer
+	// like the other two, not a second writer of the same two UCI options: a
+	// snapshot outside the stack cannot see the layers below it, so its restore
+	// lands on top of a state it never observed.
+	dnsLayerCaptive = "captive"
+)
+
+// legacyDnsmasqSnapshotPaths are the per-feature snapshots releases before the
+// shared stack wrote. They hold a restore target for the SAME two UCI options
+// the record now owns, so a record that has absorbed one must delete all of
+// them (ADR 0001 §3.2) — leaving the other behind gives the device a second,
+// stale restore target that no code path consults but every reader has to
+// reason about.
+var legacyDnsmasqSnapshotPaths = []string{legacyVpnDnsSnapshotPath, adguardDnsSnapshotPath}
+
+// dnsmasqResolverState is a dnsmasq resolver list plus its noresolv flag. It is
+// the shape the per-feature snapshots wrote, kept so a device that is upgraded
+// while a layer is active is still readable.
+type dnsmasqResolverState struct {
 	NoResolv string   `json:"noresolv"`
 	Servers  []string `json:"servers"`
 }
 
-func (v *VpnService) readDnsmasqServers() []string {
-	out, err := v.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")
-	if err != nil {
-		return nil
-	}
-	s := strings.TrimSpace(string(out))
-	if s == "" {
-		return nil
-	}
-	// `uci get` returns a space-separated list for list options.
-	return strings.Fields(s)
+// dnsmasqLayer is one stacked feature and the resolvers it wants dnsmasq to
+// forward to.
+//
+// NoResolv is the flag this layer wants while it owns dnsmasq. It is absent
+// from the record unless a layer needs something other than the default: a
+// layer recorded before it existed means "1", so records written by earlier
+// releases keep meaning the same thing.
+type dnsmasqLayer struct {
+	Name     string   `json:"name"`
+	Servers  []string `json:"servers"`
+	NoResolv string   `json:"noresolv,omitempty"`
 }
 
-func (v *VpnService) readDnsmasqNoResolv() string {
-	out, err := v.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].noresolv")
-	if err != nil {
-		return ""
+// noResolvValue is the flag a layer applies while it owns dnsmasq.
+func (l dnsmasqLayer) noResolvValue() string {
+	if strings.TrimSpace(l.NoResolv) != "" {
+		return strings.TrimSpace(l.NoResolv)
 	}
-	return strings.TrimSpace(string(out))
+	return "1"
 }
 
-func (v *VpnService) writeVpnDnsSnapshot(snap vpnDnsSnapshot) error {
-	if err := os.MkdirAll(filepath.Dir(vpnDnsSnapshotPath), 0o755); err != nil {
-		return err
-	}
-	data, err := json.Marshal(snap)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(vpnDnsSnapshotPath, data, 0o600)
+// dnsmasqLayerStack is the shared record. Layers are ordered bottom first, so
+// the last entry is the one that owns dnsmasq right now.
+type dnsmasqLayerStack struct {
+	NoResolv string         `json:"noresolv"`
+	Servers  []string       `json:"servers"`
+	Layers   []dnsmasqLayer `json:"layers"`
 }
 
-func (v *VpnService) loadVpnDnsSnapshot() (*vpnDnsSnapshot, error) {
-	data, err := os.ReadFile(vpnDnsSnapshotPath)
-	if err != nil {
-		// Fall back to the pre-unification location. A device upgraded while the
-		// VPN was enabled has its snapshot under the old path; failing to read it
-		// would leave dnsmasq with noresolv=1 forwarding to VPN resolvers that
-		// are no longer reachable, i.e. LAN DNS stays broken after the tunnel
-		// goes down.
-		data, err = os.ReadFile(legacyVpnDnsSnapshotPath)
-		if err != nil {
-			return nil, err
+// indexOf returns the position of the named layer, or -1.
+func (s *dnsmasqLayerStack) indexOf(layer string) int {
+	for i, l := range s.Layers {
+		if l.Name == layer {
+			return i
 		}
 	}
-	var snap vpnDnsSnapshot
-	if err := json.Unmarshal(data, &snap); err != nil {
+	return -1
+}
+
+// dnsmasqDNS is the surface the shared stack needs: dnsmasq's two resolver
+// options plus one small file. VpnService reaches the system through
+// CommandRunner and AdGuardService through AdGuardChecker; the stack needs
+// neither, so both implement this.
+type dnsmasqDNS interface {
+	getServers() ([]string, error)
+	getNoResolv() (string, error)
+	setServers(servers []string) error
+	setNoResolv(value string) error
+	commitAndRestart() error
+	readFile(path string) ([]byte, error)
+	writeFile(path string, data []byte, perm os.FileMode) error
+	removeFile(path string) error
+}
+
+// commandRunnerDNS drives the stack through VpnService's CommandRunner.
+//
+// The dnsmasq writes are spelled out one shell-out per call rather than
+// assembled from an argument slice so they stay greppable:
+// TestShelledOutUCIWritesAreOnTheRecord asserts that this file still names every
+// shelled-out `dhcp` write, which is what keeps `dhcp` in vpnFlowConfigs
+// (ADR 0010).
+type commandRunnerDNS struct{ cmd CommandRunner }
+
+func (c commandRunnerDNS) getServers() ([]string, error) {
+	out, err := c.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")
+	if err != nil {
 		return nil, err
 	}
-	return &snap, nil
+	// `uci get` returns a space-separated list for list options.
+	return strings.Fields(strings.TrimSpace(string(out))), nil
+}
+
+func (c commandRunnerDNS) getNoResolv() (string, error) {
+	out, err := c.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].noresolv")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func (c commandRunnerDNS) setServers(servers []string) error {
+	// Best-effort clear: `uci delete` exits 1 with "Entry not found" when the
+	// list is already empty, which is the normal state on a router that has
+	// never had forwarding configured.
+	_, _ = c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, s := range servers {
+		if err := c.addDnsmasqServer(s); err != nil {
+			return fmt.Errorf("adding dnsmasq server %q: %w", s, err)
+		}
+	}
+	return nil
+}
+
+// addDnsmasqServer appends one entry to dhcp.@dnsmasq[0].server. The
+// fmt.Sprintf stays on the call line so TestShelledOutUCIWritesAreOnTheRecord
+// can still find this shelled-out `dhcp` write.
+func (c commandRunnerDNS) addDnsmasqServer(s string) error {
+	_, err := c.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
+	return err
+}
+
+func (c commandRunnerDNS) setNoResolv(value string) error {
+	if _, err := c.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv="+value); err != nil {
+		return fmt.Errorf("setting dnsmasq noresolv=%s: %w", value, err)
+	}
+	return nil
+}
+
+func (c commandRunnerDNS) commitAndRestart() error {
+	if _, err := c.cmd.Run("uci", "commit", "dhcp"); err != nil {
+		return fmt.Errorf("committing dhcp: %w", err)
+	}
+	if _, err := c.cmd.Run("/etc/init.d/dnsmasq", "restart"); err != nil {
+		return fmt.Errorf("restarting dnsmasq: %w", err)
+	}
+	return nil
+}
+
+func (c commandRunnerDNS) readFile(path string) ([]byte, error) { return os.ReadFile(path) }
+
+// writeFile writes the record atomically. A power cut or a concurrent reader
+// between the truncate and the write left a half-written JSON document, and a
+// record that does not parse is not a recoverable state: load() fails, so every
+// layer enable aborts and every restore is refused until an operator deletes a
+// file whose contents they cannot read.
+func (c commandRunnerDNS) writeFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // no-op after a successful rename
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
+}
+
+func (c commandRunnerDNS) removeFile(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// dnsmasqLayerStackFile is the shared record together with the per-feature
+// snapshot that predates it.
+type dnsmasqLayerStackFile struct {
+	dns  dnsmasqDNS
+	path string
+	// legacyPath is the snapshot this feature wrote when it owned dnsmasq's
+	// resolvers alone. It is read once, as the migration source for the base
+	// state, and then removed: two files holding a restore target for the same
+	// two options is how the two features ended up restoring over each other.
+	legacyPath string
+}
+
+// load reads the persisted stack. A missing record is not an error — it is how
+// "no layer was ever enabled" is represented.
+func (f *dnsmasqLayerStackFile) load() (*dnsmasqLayerStack, error) {
+	data, err := f.dns.readFile(f.path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var st dnsmasqLayerStack
+	if err := json.Unmarshal(data, &st); err != nil {
+		return nil, fmt.Errorf("parsing the dnsmasq layer stack %s: %w", f.path, err)
+	}
+	return &st, nil
+}
+
+func (f *dnsmasqLayerStackFile) save(st *dnsmasqLayerStack) error {
+	data, err := json.Marshal(st)
+	if err != nil {
+		return err
+	}
+	if err := f.dns.writeFile(f.path, data, 0o600); err != nil {
+		return err
+	}
+	// The shared record now owns the base state, so every pre-stack snapshot
+	// goes: each of them is a second, stale restore target for the same two
+	// options. Removing only this feature's own file left the other feature's
+	// snapshot behind for the whole life of the record. The feature's configured
+	// path is included because a test or a future caller can point it somewhere
+	// the shared list does not know about.
+	for _, legacy := range append([]string{f.legacyPath}, legacyDnsmasqSnapshotPaths...) {
+		if legacy == "" {
+			continue
+		}
+		if err := f.dns.removeFile(legacy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// removeRecord drops the shared record. Called only once the base state has
+// been applied to dnsmasq.
+func (f *dnsmasqLayerStackFile) removeRecord() error {
+	return f.dns.removeFile(f.path)
+}
+
+// loadLegacy reads the pre-stack snapshot. A missing one is not an error.
+func (f *dnsmasqLayerStackFile) loadLegacy() (*dnsmasqResolverState, error) {
+	if f.legacyPath == "" {
+		return nil, nil
+	}
+	data, err := f.dns.readFile(f.legacyPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var state dnsmasqResolverState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("parsing the legacy dnsmasq snapshot %s: %w", f.legacyPath, err)
+	}
+	return &state, nil
+}
+
+// liveState reads dnsmasq's current resolver options. A missing option is
+// normal (an unset list, unset noresolv), so read errors are not failures.
+func (f *dnsmasqLayerStackFile) liveState() dnsmasqResolverState {
+	var state dnsmasqResolverState
+	if servers, err := f.dns.getServers(); err == nil {
+		state.Servers = servers
+	}
+	if noresolv, err := f.dns.getNoResolv(); err == nil {
+		state.NoResolv = noresolv
+	}
+	return state
+}
+
+// baseState returns dnsmasq's resolvers as they were before ANY layer was
+// enabled: the legacy snapshot if a pre-stack release left one, else the live
+// state.
+func (f *dnsmasqLayerStackFile) baseState() (dnsmasqResolverState, error) {
+	legacy, err := f.loadLegacy()
+	if err != nil {
+		return dnsmasqResolverState{}, err
+	}
+	if legacy != nil {
+		return *legacy, nil
+	}
+	return f.liveState(), nil
+}
+
+// hasLayer reports whether layer is stacked and dnsmasq is currently pointed at
+// it. A legacy snapshot counts: it is this feature's own record of that.
+func (f *dnsmasqLayerStackFile) hasLayer(layer string) bool {
+	st, err := f.load()
+	if err != nil {
+		return false
+	}
+	if st == nil {
+		legacy, lerr := f.loadLegacy()
+		return lerr == nil && legacy != nil
+	}
+	return st.indexOf(layer) >= 0
+}
+
+// apply writes a resolver list and its noresolv flag, then commits and
+// restarts dnsmasq.
+func (f *dnsmasqLayerStackFile) apply(state dnsmasqResolverState) error {
+	if err := f.dns.setServers(state.Servers); err != nil {
+		return err
+	}
+	noresolv := strings.TrimSpace(state.NoResolv)
+	if noresolv == "" {
+		noresolv = "0"
+	}
+	if err := f.dns.setNoResolv(noresolv); err != nil {
+		return err
+	}
+	return f.dns.commitAndRestart()
+}
+
+// applyTop points dnsmasq at the top of the stack, or at the base state when
+// no layer is left. Every stacked layer sets noresolv=1 — forwarding must not
+// fall back to resolv.conf while a layer owns the resolvers.
+func (f *dnsmasqLayerStackFile) applyTop(st *dnsmasqLayerStack) error {
+	if len(st.Layers) == 0 {
+		return f.apply(dnsmasqResolverState{NoResolv: st.NoResolv, Servers: st.Servers})
+	}
+	top := st.Layers[len(st.Layers)-1]
+	return f.apply(dnsmasqResolverState{NoResolv: top.noResolvValue(), Servers: top.Servers})
+}
+
+// hasAnyLayer reports whether any feature currently owns dnsmasq's
+// resolvers. A caller restoring something OUTSIDE the stack asks this first:
+// with another layer on top, dnsmasq is not in the state the caller left it
+// in, and "restoring" it would break the layer that is working.
+//
+// It fails closed. An unreadable record is not "no owner": it is the one case
+// where the caller must NOT write, because something may own dnsmasq in a way
+// this record can no longer describe. The error is returned so the caller can
+// fail loudly instead of guessing.
+func (f *dnsmasqLayerStackFile) hasAnyLayer() (bool, error) {
+	st, err := f.load()
+	if err != nil {
+		return false, err
+	}
+	return st != nil && len(st.Layers) > 0, nil
+}
+
+// EnableLayer pushes layer onto the stack and points dnsmasq at its resolvers.
+// It is idempotent: re-enabling a layer that is already stacked updates its
+// resolvers in place and never re-reads dnsmasq as the base, so a second enable
+// can never record a layer's own entry as the pre-layer state.
+func (f *dnsmasqLayerStackFile) EnableLayer(layer string, servers []string) error {
+	return f.EnableLayerAs(layer, servers, "1")
+}
+
+// EnableLayerAs pushes a layer that wants a specific noresolv flag. The captive
+// bypass is the only caller: it points dnsmasq at the upstream network's own
+// resolver so a portal hostname resolves to the gateway, which means handing
+// fallback back to resolv.conf (noresolv=0) rather than cutting it off.
+func (f *dnsmasqLayerStackFile) EnableLayerAs(layer string, servers []string, noresolv string) error {
+	st, err := f.load()
+	if err != nil {
+		return err
+	}
+	if st == nil {
+		base, bErr := f.baseState()
+		if bErr != nil {
+			return bErr
+		}
+		st = &dnsmasqLayerStack{NoResolv: base.NoResolv, Servers: base.Servers}
+	} else if len(st.Layers) == 0 {
+		// A record with no layer left is not holding anything: the read-path
+		// heal keeps it so a later disable still has a base to restore. Keeping
+		// the base it was written with does not work, because the operator can
+		// edit dnsmasq in LuCI between the heal and that disable — and the
+		// disable would then put the pre-heal resolvers back over the change.
+		// Nothing owns dnsmasq right now, so the live state IS the pre-layer
+		// state and is read fresh.
+		live := f.liveState()
+		st.NoResolv, st.Servers = live.NoResolv, live.Servers
+	}
+	if i := st.indexOf(layer); i >= 0 {
+		st.Layers[i].Servers = servers
+		st.Layers[i].NoResolv = noresolv
+	} else {
+		st.Layers = append(st.Layers, dnsmasqLayer{Name: layer, Servers: servers, NoResolv: noresolv})
+	}
+	// The record is written before dnsmasq is touched: without it there would
+	// be nothing to restore, and a restore target that cannot be written must
+	// abort the change rather than follow it.
+	if err := f.save(st); err != nil {
+		return fmt.Errorf("recording the dnsmasq %s layer: %w", layer, err)
+	}
+	return f.applyTop(st)
+}
+
+// RemoveLayer takes layer off the stack.
+//
+// keepRecord is for the read-path heal. Popping the last layer still restores
+// the base state, but the record survives so the heal is idempotent and a
+// later explicit disable — or a re-enable followed by a disable — still
+// restores the true pre-any-layer state. The explicit disable path passes
+// false: it has applied the base, so the record is done.
+//
+// Returns applied=false when there was no record for this feature at all, so
+// the caller can decide on a no-layer fallback instead of having this decide
+// for it.
+func (f *dnsmasqLayerStackFile) RemoveLayer(layer string, keepRecord bool) (bool, error) {
+	st, err := f.load()
+	if err != nil {
+		return false, err
+	}
+	if st == nil {
+		return f.removeLegacyLayer(keepRecord)
+	}
+	if i := st.indexOf(layer); i >= 0 {
+		st.Layers = slices.Delete(st.Layers, i, i+1)
+	} else if len(st.Layers) > 0 {
+		// This layer is not stacked and something else is on top of dnsmasq:
+		// that layer owns the state, and touching it would break the one
+		// currently working.
+		return false, nil
+	}
+	if err := f.applyTop(st); err != nil {
+		return false, err
+	}
+	if len(st.Layers) > 0 || keepRecord {
+		return true, f.save(st)
+	}
+	return true, f.removeRecord()
+}
+
+// removeLegacyLayer handles a device whose only record predates the stack. Such
+// a snapshot belongs to exactly one feature, so it needs no layer name.
+func (f *dnsmasqLayerStackFile) removeLegacyLayer(keepRecord bool) (bool, error) {
+	legacy, err := f.loadLegacy()
+	if err != nil || legacy == nil {
+		return false, err
+	}
+	if err := f.apply(*legacy); err != nil {
+		return false, err
+	}
+	if keepRecord {
+		// The heal path leaves the snapshot alone: it is still the only record
+		// of the pre-layer state.
+		return true, nil
+	}
+	if err := f.dns.removeFile(f.legacyPath); err != nil {
+		return true, err
+	}
+	return true, f.removeRecord()
+}
+
+// ClearNoResolv hands resolution back to resolv.conf without touching the
+// server list. It is the only safe action when no record exists: the list may
+// be entirely the operator's own split-DNS entries.
+func (f *dnsmasqLayerStackFile) ClearNoResolv() error {
+	if err := f.dns.setNoResolv("0"); err != nil {
+		return err
+	}
+	return f.dns.commitAndRestart()
+}
+
+// dnsmasqLayers returns this service's view of the shared stack.
+func (v *VpnService) dnsmasqLayers() *dnsmasqLayerStackFile {
+	return &dnsmasqLayerStackFile{
+		dns:        commandRunnerDNS{cmd: v.cmd},
+		path:       v.dnsStackPath,
+		legacyPath: v.legacyDnsSnapshotPath,
+	}
 }
 
 // splitWireGuardDNSOption splits UCI network.wg0.dns. OpenWrt normally uses
@@ -874,58 +1425,117 @@ func (v *VpnService) wgConfiguredDNSServers() []string {
 	return splitWireGuardDNSOption(dns)
 }
 
-// enableVpnDNSForwarding points dnsmasq at the tunnel's resolvers. It is
-// best-effort by design and cannot report failure: the tunnel is already
-// verified up before it runs, so a failure here cannot strand LAN DNS on
-// unreachable resolvers and must never fail the toggle.
-func (v *VpnService) enableVpnDNSForwarding() {
+// enableVpnDNSForwarding pushes the VPN onto the shared dnsmasq layer stack. It
+// reports failure but must never fail the toggle: the tunnel is already
+// verified up before it runs, so aborting the whole enable over DNS bookkeeping
+// would tear down a working VPN. Returning an error lets the caller record why
+// LAN DNS was left alone.
+//
+// Enabling is idempotent: a layer already stacked has its resolvers refreshed
+// and the base state is left alone.
+func (v *VpnService) enableVpnDNSForwarding() error {
 	vpnDNS := v.wgConfiguredDNSServers()
 	if len(vpnDNS) == 0 {
-		return
+		return nil
 	}
-
-	currentServers := v.readDnsmasqServers()
-	// Snapshot current dnsmasq (including AdGuard 127.0.0.1#5353) so we can restore
-	// on WireGuard disable. LAN DNS must forward to VPN DNS while the tunnel is up,
-	// otherwise queries would still go to AdGuard only.
-	_ = v.writeVpnDnsSnapshot(vpnDnsSnapshot{
-		NoResolv: v.readDnsmasqNoResolv(),
-		Servers:  currentServers,
-	})
-
-	// Apply: forward to VPN DNS only.
-	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
-	for _, s := range vpnDNS {
-		_, _ = v.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
-	}
-	_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=1")
-	_, _ = v.cmd.Run("uci", "commit", "dhcp")
-	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
+	return v.dnsmasqLayers().EnableLayer(dnsLayerVPN, vpnDNS)
 }
 
-// disableVpnDNSForwarding restores the dnsmasq snapshot taken when forwarding
-// was enabled. Like enable, it is best-effort and reports nothing.
+// disableVpnDNSForwarding pops the VPN off the shared dnsmasq layer stack,
+// restoring the layer below it — or the pre-any-layer state when it was the
+// last one. It is best-effort and reports nothing.
 func (v *VpnService) disableVpnDNSForwarding() {
-	snap, err := v.loadVpnDnsSnapshot()
-	if err != nil {
-		// Nothing to restore.
-		return
+	if _, err := v.dnsmasqLayers().RemoveLayer(dnsLayerVPN, false); err != nil {
+		log.Printf("vpn: restoring dnsmasq from the layer stack: %v", err)
+	}
+}
+
+// The DNS self-heal debounce.
+//
+// GET /vpn/status is polled by the dashboard and the VPN page, so the heal runs
+// on a timer the operator does not control. `wg show wg0 dump` failing once — a
+// busy router, a network flap — reports enabled_not_up even though the tunnel
+// is healthy, and healing on that single reading rewrote dnsmasq back to the
+// pre-VPN resolvers AND dropped the snapshot, so nothing put VPN DNS back until
+// the operator toggled the tunnel off and on again.
+//
+// The debounce therefore requires the down state to be observed
+// vpnDNSHealStreakRequired times IN A ROW and to have persisted for at least
+// vpnDNSHealGracePeriod. Any other reading — connected, configured,
+// up_no_handshake, or disabled — resets the streak, so one healthy poll in
+// between is enough to prove the failure was transient. These are variables so
+// tests can compress the window instead of waiting it out.
+var (
+	vpnDNSHealStreakRequired = 3
+	vpnDNSHealGracePeriod    = 2 * time.Minute
+)
+
+// observeTunnelDown debounces a repeated enabled_not_up state and reports
+// whether the heal may fire.
+func (v *VpnService) observeTunnelDown(tunnelDetail string) bool {
+	v.dnsHealMu.Lock()
+	defer v.dnsHealMu.Unlock()
+	if tunnelDetail != "enabled_not_up" {
+		v.dnsHealStreak = 0
+		v.dnsHealSince = time.Time{}
+		return false
+	}
+	if v.dnsHealStreak == 0 {
+		v.dnsHealSince = time.Now()
+	}
+	v.dnsHealStreak++
+	if v.dnsHealStreak < vpnDNSHealStreakRequired {
+		return false
+	}
+	return time.Since(v.dnsHealSince) >= vpnDNSHealGracePeriod
+}
+
+// maybeSelfHealVpnDNS pops the VPN layer when the tunnel that justified it can
+// no longer carry DNS: wg0 is absent for good, or the tunnel is disabled in UCI.
+//
+// It heals only on TERMINAL states. `configured` (no peers yet) and
+// `up_no_handshake` (peers, tunnel up, no handshake yet) both mean the tunnel
+// is on its way up, and burning the restore on them is what a reboot into an
+// unreachable upstream used to do. `enabled_not_up` is the one ambiguous state
+// — it is also what a single failed `wg show` looks like — so it is debounced
+// (see observeTunnelDown) instead of trusted.
+//
+// tunnelDetail is the already-computed wgRuntimeState detail, so this costs no
+// extra shell-out. Returns true when a restore happened.
+func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
+	// Reset the streak on anything that is not the ambiguous down reading.
+	healable := v.observeTunnelDown(tunnelDetail)
+	switch tunnelDetail {
+	case "connected", "up_no_handshake", "configured":
+		return false
+	case "enabled_not_up":
+		if !healable {
+			return false
+		}
+	default:
+		// "disabled": the tunnel is off in UCI, which is terminal rather than
+		// a reading that could be transient.
 	}
 
-	// Restore previous servers/noresolv.
-	_, _ = v.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0].server")
-	for _, s := range snap.Servers {
-		_, _ = v.cmd.Run("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", s))
+	layers := v.dnsmasqLayers()
+	if !layers.hasLayer(dnsLayerVPN) {
+		// No layer stacked: dnsmasq was never pointed at the tunnel.
+		return false
 	}
-	if snap.NoResolv != "" {
-		_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv="+snap.NoResolv)
-	} else {
-		_, _ = v.cmd.Run("uci", "set", "dhcp.@dnsmasq[0].noresolv=0")
+	log.Printf("vpn: tunnel state %q with the VPN resolver layer stacked;"+
+		" restoring the dnsmasq layer below it", tunnelDetail)
+	// The stack shells out to `uci` for dhcp, so it needs the same lock every
+	// other dhcp writer holds (ADR 0010).
+	if err := withConfigLocks([]string{"dhcp"}, func() error {
+		// keepRecord: the heal must not drop the pre-any-layer state, or a
+		// later explicit disable has nothing to restore.
+		_, err := layers.RemoveLayer(dnsLayerVPN, true)
+		return err
+	}); err != nil {
+		log.Printf("vpn: healing dnsmasq after tunnel state %q: %v", tunnelDetail, err)
+		return false
 	}
-	_, _ = v.cmd.Run("uci", "commit", "dhcp")
-	_, _ = v.cmd.Run("/etc/init.d/dnsmasq", "restart")
-	_ = os.Remove(vpnDnsSnapshotPath)
-	_ = os.Remove(legacyVpnDnsSnapshotPath)
+	return true
 }
 
 // Config sets for the VPN flows.
@@ -1602,7 +2212,11 @@ func (v *VpnService) RunDNSLeakTest() models.DNSLeakResult {
 	result := models.DNSLeakResult{}
 
 	// 1. Effective upstream nameservers (resolv.conf + dnsmasq when resolv is loopback-only).
-	dnsmasqServers := v.readDnsmasqServers()
+	servers, err := v.dnsmasqLayers().dns.getServers()
+	if err != nil {
+		servers = nil
+	}
+	dnsmasqServers := servers
 	result.Nameservers = effectiveNameserversForMerge(readResolvConfNameservers(), dnsmasqServers)
 
 	// 2. Check VPN status.

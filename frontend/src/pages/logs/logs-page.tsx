@@ -33,8 +33,13 @@ export function LogsPage() {
   } = useSystemLogs(
     activeTab === 'system' ? activeService || undefined : undefined,
     activeTab === 'system' ? levelFilter || undefined : undefined,
+    activeTab === 'system',
   );
-  const { data: kernelLogs, isLoading: kernelLoading, refetch: refetchKernel } = useKernelLogs();
+  const {
+    data: kernelLogs,
+    isLoading: kernelLoading,
+    refetch: refetchKernel,
+  } = useKernelLogs(activeTab === 'kernel');
 
   const logs = activeTab === 'system' ? systemLogs : kernelLogs;
   const isLoading = activeTab === 'system' ? systemLoading : kernelLoading;

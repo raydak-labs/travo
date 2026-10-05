@@ -67,6 +67,19 @@ export function RepeaterWizardReviewStep({
         </div>
       </div>
 
+      {/* State the consequences before an apply that can block for a minute and
+          roll back. */}
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+        <p className="font-semibold">What happens when you apply</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-5 text-amber-800 dark:text-amber-200">
+          <li>The router switches to repeater mode and restarts the wireless subsystem.</li>
+          <li>Your uplink moves to {upstream.ssid}; the current link drops.</li>
+          <li>Devices must reconnect to the access point using its new name and password.</li>
+          <li>If any step fails, earlier steps are rolled back automatically.</li>
+          <li>Keep this page open until it finishes.</li>
+        </ul>
+      </div>
+
       {applyError && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/30">
           {failedStep && (
@@ -82,13 +95,13 @@ export function RepeaterWizardReviewStep({
 
       <DialogFooter>
         <Button variant="outline" onClick={onBack} disabled={applying}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
         <Button onClick={onApply} disabled={applying}>
           {applying ? (
             <>
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
               Applying...
             </>
           ) : (

@@ -2,7 +2,7 @@
 title: "ADR 0007: Authentication, JWT, and LAN access control"
 status: Accepted
 date: 2026-05-14
-updated: 2026-09-28
+updated: 2026-10-04
 tags: [adr, auth, jwt, rpcd, security, openwrt, sessions]
 ---
 
@@ -30,7 +30,8 @@ On device, the administrative password is the **root** password shared with **Lu
 - **Session validity is decided by a monotonic-clock registry** (`session_registry.go`), not by comparing `exp` against the wall clock: travel routers boot with wrong clocks and get large NTP/time-sync jumps, which previously invalidated sessions or locked users out after moving timezones. `time.Since` on the registered issue time is immune to wall-clock changes.
 - Tokens with an **unknown `jti`** (issued before a backend restart, or from older builds) fall back to standard `exp` validation with a 2-minute leeway. The registry is deliberately memory-only; the fail direction is safe, and cross-restart **revocation** is the blocklist's job (§4, ADR 0009).
 - Login and `GET /auth/session` return a **relative `expires_in` (seconds)**. Clients must count down locally (frontend uses `performance.now()`) and must **never compare server `exp` timestamps against the client clock** — a real expiry surfaces as a 401.
-- Protected handlers require **`Authorization: Bearer …`** unless explicitly public. The middleware is **default-deny**: only an explicit allowlist bypasses it (`/api/health`, `/api/openapi.json`, `/api/v1/auth/login`, `/api/v1/ws`, `/api/v1/system/time-sync`). Adding to that list is a security change, not a convenience one.
+- Protected handlers require **`Authorization: Bearer …`** unless explicitly public. Public endpoints are the ones mounted **outside** the authenticated route group, not the ones a middleware decides to skip: `SetupRoutes` registers `/api/openapi.json`, `/api/v1/auth/login` and `/api/v1/system/time-sync` on the app itself and attaches `AuthService.Middleware()` to the `/api/v1` group that carries everything else. `api.PublicRoutes` is the complete list and `TestAuthCoversEveryRoute` walks the live route table to assert it. Adding to that list is a security change, not a convenience one.
+- **Why this is structural (2026-10-04):** the middleware used to skip auth by testing `strings.HasPrefix(c.Path(), "/api/")` against the raw request path. Fiber routes on a lowercased copy of the path but `c.Path()` returns the original, so with Fiber's default case-insensitive routing a request to `/API/v1/system/reboot` matched the registered route while failing the prefix test — the entire `/api/v1` surface, including root SSH key installation and firmware flash, was reachable from the LAN with no token. The middleware now has **no path logic at all**, so it cannot drift from routing, and `fiber.Config.CaseSensitive` is `true` so a case-variant request matches no route rather than reaching a handler.
 
 ### 2a. Pre-login time sync
 
@@ -56,7 +57,7 @@ On device, the administrative password is the **root** password shared with **Lu
 ### 5. Storage paths
 
 - **`/etc/trafo/auth.json`** — sealed auth metadata / JWT secret storage (see `config.Config` `AuthConfigPath`).
-- **`/etc/trafo/travo.db`** — the bbolt key/value store opened beside `auth.json`, holding the persisted token-revocation set and the stats-history ring buffer. Opened with a 5 s timeout; failure degrades to **memory-only** with a warning rather than blocking startup. Retention, flash-write batching and the full bucket table are in [ADR 0009](./0009-persistent-store-bbolt.md).
+- **`/etc/travo/travo.db`** — the bbolt key/value store opened beside `auth.json`, holding the persisted token-revocation set and the stats-history ring buffer. Opened with a 5 s timeout; failure degrades to **memory-only** with a warning rather than blocking startup. Retention, flash-write batching and the full bucket table are in [ADR 0009](./0009-persistent-store-bbolt.md).
 - **TLS** material may live under `/etc/trafo/tls.crt` / `tls.key` when HTTPS is enabled for the Travo listener.
 
 ## Consequences

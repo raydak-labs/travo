@@ -1,0 +1,158 @@
+{
+	"_provenance": [
+		"VERBATIM capture of `ubus call network.interface dump` on the test device",
+		"192.168.1.1 (GL.iNet GL-AXT1800, OpenWrt 25.12.3), taken by",
+		"ssh root@192.168.1.1 'ubus call network.interface dump'.",
+		"",
+		"Only two edits were made, both removals of noise: the `inactive` sub-object",
+		"of each interface, and the `wan6` interface. Every other key, value,",
+		"address and mask is exactly what the device emitted. Re-capture it rather",
+		"than editing it by hand.",
+		"",
+		"REDACTED: two LAN client MAC addresses were replaced with the locally-",
+		"administered 02:00:00:00:00:0x series so the repository carries no real",
+		"hardware identifier. The shape, the columns and the wiring are untouched,",
+		"which is all the classifier depends on.",
+		"",
+		"THE KEY THAT MATTERS: netifd reports each IPv4 address as a BARE address",
+		"plus a SEPARATE integer netmask length, e.g. address=192.168.1.1 mask=24.",
+		"There is no `ipv4-prefix` key anywhere in this payload. The classifier used",
+		"to match `ipv4-prefix` against a CIDR string, so it matched nothing and",
+		"every real LAN client classified as `unknown`."
+	],
+	"interface": [
+		{
+			"interface": "lan",
+			"up": true,
+			"pending": false,
+			"available": true,
+			"autostart": true,
+			"dynamic": false,
+			"uptime": 36853,
+			"l3_device": "br-lan",
+			"proto": "static",
+			"device": "br-lan",
+			"updated": [
+				"addresses"
+			],
+			"metric": 0,
+			"dns_metric": 0,
+			"delegation": true,
+			"ipv4-address": [
+				{
+					"address": "192.168.1.1",
+					"mask": 24
+				}
+			],
+			"ipv6-address": [],
+			"ipv6-prefix": [],
+			"ipv6-prefix-assignment": [
+				{
+					"address": "fdc7:8957:dc2d::",
+					"mask": 60,
+					"local-address": {
+						"address": "fdc7:8957:dc2d::1",
+						"mask": 60
+					}
+				}
+			],
+			"route": [],
+			"dns-server": [],
+			"dns-search": [],
+			"neighbors": [],
+			"data": {}
+		},
+		{
+			"interface": "loopback",
+			"up": true,
+			"pending": false,
+			"available": true,
+			"autostart": true,
+			"dynamic": false,
+			"uptime": 36853,
+			"l3_device": "lo",
+			"proto": "static",
+			"device": "lo",
+			"updated": [
+				"addresses"
+			],
+			"metric": 0,
+			"dns_metric": 0,
+			"delegation": true,
+			"ipv4-address": [
+				{
+					"address": "127.0.0.1",
+					"mask": 8
+				}
+			],
+			"ipv6-address": [],
+			"ipv6-prefix": [],
+			"ipv6-prefix-assignment": [],
+			"route": [],
+			"dns-server": [],
+			"dns-search": [],
+			"neighbors": [],
+			"data": {}
+		},
+		{
+			"interface": "wan",
+			"up": false,
+			"pending": false,
+			"available": true,
+			"autostart": true,
+			"dynamic": false,
+			"proto": "dhcp",
+			"device": "wan",
+			"data": {}
+		},
+		{
+			"interface": "wwan",
+			"up": true,
+			"pending": false,
+			"available": true,
+			"autostart": true,
+			"dynamic": false,
+			"uptime": 6844,
+			"l3_device": "phy0-sta0",
+			"proto": "dhcp",
+			"device": "phy0-sta0",
+			"updated": [
+				"addresses",
+				"routes",
+				"data"
+			],
+			"metric": 0,
+			"dns_metric": 0,
+			"delegation": true,
+			"ipv4-address": [
+				{
+					"address": "10.0.1.110",
+					"mask": 24
+				}
+			],
+			"ipv6-address": [],
+			"ipv6-prefix": [],
+			"ipv6-prefix-assignment": [],
+			"route": [
+				{
+					"target": "0.0.0.0",
+					"mask": 0,
+					"nexthop": "10.0.1.1",
+					"source": "10.0.1.110/32"
+				}
+			],
+			"dns-server": [
+				"10.0.1.1"
+			],
+			"dns-search": [
+				"lan"
+			],
+			"neighbors": [],
+			"data": {
+				"dhcpserver": "10.0.1.1",
+				"hostname": "OpenWrt",
+				"leasetime": 43200
+			}
+		}
+	]
+}

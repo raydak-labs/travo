@@ -19,7 +19,7 @@ export function ChangePasswordEditFields({ register, errors }: ChangePasswordEdi
         {...register('current_password')}
       />
       {errors.current_password ? (
-        <p id="sys-cpw-current-err" className="text-sm text-red-500" role="alert">
+        <p id="sys-cpw-current-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
           {errors.current_password.message}
         </p>
       ) : null}
@@ -32,7 +32,7 @@ export function ChangePasswordEditFields({ register, errors }: ChangePasswordEdi
         {...register('new_password')}
       />
       {errors.new_password ? (
-        <p id="sys-cpw-new-err" className="text-sm text-red-500" role="alert">
+        <p id="sys-cpw-new-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
           {errors.new_password.message}
         </p>
       ) : null}
@@ -45,7 +45,7 @@ export function ChangePasswordEditFields({ register, errors }: ChangePasswordEdi
         {...register('confirm_password')}
       />
       {errors.confirm_password ? (
-        <p id="sys-cpw-confirm-err" className="text-sm text-red-500" role="alert">
+        <p id="sys-cpw-confirm-err" className="text-sm text-red-600 dark:text-red-400" role="alert">
           {errors.confirm_password.message}
         </p>
       ) : null}

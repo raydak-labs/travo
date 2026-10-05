@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"log"
 	"sync"
 	"time"
 
@@ -83,18 +84,29 @@ func (s *StatsHistoryService) Stop() {
 }
 
 // Flush persists the current ring buffer to the store (no-op without one).
+//
+// The counter is only reset once the write landed. Resetting it first (and
+// dropping the bbolt error) meant a failing flash — the exact case on NAND
+// overlayfs — silently dropped the batch forever: the next 20 samples tried
+// again, also failed, and nobody ever saw a log line.
 func (s *StatsHistoryService) Flush() {
 	if s.db == nil {
 		return
 	}
-	s.mu.Lock()
+	s.mu.RLock()
 	data, err := json.Marshal(s.points)
-	s.sinceFlush = 0
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if err != nil {
+		log.Printf("WARNING: stats history: marshal: %v", err)
 		return
 	}
-	_ = s.db.Put(statsHistoryBucket, statsHistoryKey, data)
+	if err := s.db.Put(statsHistoryBucket, statsHistoryKey, data); err != nil {
+		log.Printf("WARNING: stats history: flush %d points failed: %v", len(data), err)
+		return
+	}
+	s.mu.Lock()
+	s.sinceFlush = 0
+	s.mu.Unlock()
 }
 
 func (s *StatsHistoryService) collectLoop() {

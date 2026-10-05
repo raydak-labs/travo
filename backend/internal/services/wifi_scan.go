@@ -25,20 +25,30 @@ func (w *WifiService) ensureSTASectionForScan() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("wireless sections: %w", err)
 	}
-	var firstRadio string
-	for name, opts := range sections {
-		if opts["type"] != "" {
-			firstRadio = name
-			break
-		}
+	// Reuse the Connect chooser: the same determinism and free-radio preference
+	// apply here, because this section becomes the uplink too. Picking the
+	// first radio a map range turned up made the choice differ between calls,
+	// and that choice decides whether the uplink shares a PHY with an AP.
+	staRadio, err := w.radioForNewSTA(sections)
+	if err != nil {
+		return "", err
 	}
-	if firstRadio == "" {
-		return "", fmt.Errorf("no radio found in wireless config")
+	// Free the radio before the section exists: on a stock config every radio
+	// runs an access point, so radioForNewSTA has nothing free to pick and
+	// falls back to radios[0] — committing an enabled AP and an enabled uplink
+	// STA on one PHY, the state ADR 0002 §2 says is enough to crash
+	// ath11k/IPQ6018. This is the same split Connect performs, with the same
+	// exemptions: single-radio hardware has no split to make, and
+	// allow_ap_on_sta_radio is the documented override. If the chosen radio
+	// runs the only access point the request is refused with
+	// ErrAPAndSTASameRadio rather than taking the router's WiFi away.
+	if err := w.splitAPOffUplinkRadio(staRadio); err != nil {
+		return "", err
 	}
 	if err := w.uci.AddSection("wireless", "sta0", "wifi-iface"); err != nil {
 		return "", fmt.Errorf("adding sta0: %w", err)
 	}
-	_ = w.uci.Set("wireless", "sta0", "device", firstRadio)
+	_ = w.uci.Set("wireless", "sta0", "device", staRadio)
 	_ = w.uci.Set("wireless", "sta0", "mode", "sta")
 	_ = w.uci.Set("wireless", "sta0", "network", "wwan")
 	_ = w.uci.Set("wireless", "sta0", "disabled", "0")
@@ -286,8 +296,24 @@ func (w *WifiService) ScanRadioForSSID(radioName, ssid string) (int, bool, error
 // SwitchSTAToRadio moves the active STA section to a different radio device and
 // applies the change. This is for automated background switches; it uses
 // applyWireless (ApplyAndConfirm) rather than the staged browser-confirm flow.
+//
+// The target radio is freed the way Connect frees it: the access points on it
+// are disabled and the downlink moves to the other band, which is what
+// reconcileRepeaterAPRadioLayout does inside repeater mode and does nothing at
+// all outside it. Refusing instead was the wrong call here — the common
+// repeater layout carries an access point on BOTH radios, so every candidate
+// was refused, the crash guard was dropped and the feature reported itself
+// enabled while never firing. splitAPOffUplinkRadio still refuses the one
+// layout where no split exists (the target runs the only access point), so the
+// invariant — never an enabled AP and the uplink on one PHY — is unchanged.
 func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
 	_, err := w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
+		// Before any write, like every other writer that would enable a STA on
+		// a radio: this either frees the radio or refuses, and never leaves the
+		// two roles sharing a PHY.
+		if err := w.splitAPOffUplinkRadio(targetRadio); err != nil {
+			return nil, err
+		}
 		section, err := w.findSTASection()
 		if err != nil {
 			return nil, fmt.Errorf("no STA section to switch: %w", err)

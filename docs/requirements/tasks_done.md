@@ -51,7 +51,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 ## Frontend Toolchain
 
 - **ESLint replaced by oxlint, TypeScript 7 adopted.** The `TypeScript 7 — blocked by
-  typescript-eslint` hold in [`tasks_open.md`](./tasks_open.md) §16 (and the matching
+  typescript-eslint` hold in [`tasks_open.md`](./tasks_open.md) §17 (and the matching
   Renovate `allowedVersions` rule) is resolved by the escape hatch it named: ESLint and
   `typescript-eslint` are gone, `.oxlintrc.json` replaces `eslint.config.js`, and
   `typescript` is pinned to `7.0.2` in the root, `frontend/`, and `shared/` packages.
@@ -88,7 +88,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 Moved here from `tasks_open.md` because the code shipped; the items were still listed as open.
 
 - **Connection failover (§2.7) — all four items implemented.** Priority-based WAN source with deterministic generation from `/etc/travo/failover.json`, mwan3 health checks (configurable target), automatic switching to the next source on failure, and event notifications. Service: `services/failover_service.go`; routes `GET`/`PUT /api/v1/network/failover` and `GET /api/v1/network/failover/events`, all present in the OpenAPI spec. Normative detail: [ADR 0005](../adr/0005-multi-wan-failover-mwan3.md). Device validation with two uplinks is still outstanding; see [`docs/tests/failover-verification.md`](../tests/failover-verification.md).
-- **Persistence backend (§16) — decided and implemented as bbolt.** `/etc/trafo/travo.db` (bbolt, 0600, 5 s open timeout) replaces the "is SQLite a better fit?" research item; measured at +247 KB on the stripped binary versus ~10 MB for `modernc.org/sqlite`. Degrades to memory-only on open failure. Buckets, retention and the flash-write batching rule: [ADR 0009](../adr/0009-persistent-store-bbolt.md).
+- **Persistence backend (§16) — decided and implemented as bbolt.** `/etc/travo/travo.db` (bbolt, 0600, 5 s open timeout) replaces the "is SQLite a better fit?" research item; measured at +247 KB on the stripped binary versus ~10 MB for `modernc.org/sqlite`. Degrades to memory-only on open failure. Buckets, retention and the flash-write batching rule: [ADR 0009](../adr/0009-persistent-store-bbolt.md).
 - **Historical data (§6.2) — the 6 h ring buffer shipped.** 720 points at a 30 s interval via `GET /api/v1/system/stats/history`, persisted in the bbolt store and flushed every 20 collects. Extending the window is a separate, still-open product decision.
 
 - **Guard directory unified on `/etc/trafo`.** Crash guards were split across `/etc/trafo/` and

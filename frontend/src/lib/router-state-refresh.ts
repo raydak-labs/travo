@@ -16,16 +16,21 @@ async function refetchAll(queryClient: QueryClient, queryKeys: Array<readonly un
  *
  * We do an immediate refetch plus a short bounded follow-up refetch to avoid
  * requiring a manual browser reload.
+ *
+ * `skipImmediate` is for callers that have already invalidated the same keys —
+ * repeating the immediate pass fetches them a second time per mutation.
  */
 export async function refreshRouterState(
   queryClient: QueryClient,
   queryKeys: Array<readonly unknown[]>,
-  opts?: { followUps?: number; followUpDelayMs?: number },
+  opts?: { followUps?: number; followUpDelayMs?: number; skipImmediate?: boolean },
 ) {
   const followUps = opts?.followUps ?? 2;
   const followUpDelayMs = opts?.followUpDelayMs ?? 2000;
 
-  await refetchAll(queryClient, queryKeys);
+  if (!opts?.skipImmediate) {
+    await refetchAll(queryClient, queryKeys);
+  }
 
   for (let i = 0; i < followUps; i++) {
     await sleep(followUpDelayMs);

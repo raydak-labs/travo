@@ -11,6 +11,7 @@ import {
 import { InstallLogDialog } from '@/pages/services/install-log-dialog';
 import { ServicesInstalledCard } from '@/pages/services/services-installed-card';
 import { WireguardPostInstallDialog } from '@/pages/services/wireguard-post-install-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface StreamAction {
   serviceId: string;
@@ -28,6 +29,7 @@ export function ServicesPage() {
   const queryClient = useQueryClient();
 
   const [streamAction, setStreamAction] = useState<StreamAction | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<StreamAction | null>(null);
   const [showWireguardWizard, setShowWireguardWizard] = useState(false);
 
   const isPending =
@@ -41,9 +43,22 @@ export function ServicesPage() {
     setStreamAction({ serviceId: id, serviceName: service?.name ?? id, action: 'install' });
   };
 
+  // Removal is not reversible from the UI and its log dialog starts the
+  // uninstall stream the moment it mounts, so it needs an explicit confirm
+  // before anything is sent to the router.
   const handleRemove = (id: string) => {
     const service = services.find((s) => s.id === id);
-    setStreamAction({ serviceId: id, serviceName: service?.name ?? id, action: 'remove' });
+    setPendingRemove({
+      serviceId: id,
+      serviceName: service?.name ?? id,
+      action: 'remove',
+    });
+  };
+
+  const confirmRemove = () => {
+    if (!pendingRemove) return;
+    setStreamAction(pendingRemove);
+    setPendingRemove(null);
   };
 
   const handleStreamComplete = () => {
@@ -58,6 +73,18 @@ export function ServicesPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemove(null);
+        }}
+        title={`Remove ${pendingRemove?.serviceName ?? 'package'}?`}
+        description={`This uninstalls ${pendingRemove?.serviceName ?? 'the package'} from the router.`}
+        warningText="Removing it deletes the package and its configuration from the router, and the installation log dialog starts the uninstall immediately after you confirm. There is no undo in this UI — reinstall and reconfigure it if you change your mind."
+        confirmLabel="Remove now"
+        onConfirm={confirmRemove}
+      />
+
       <ServicesInstalledCard
         services={services}
         isLoading={isLoading}

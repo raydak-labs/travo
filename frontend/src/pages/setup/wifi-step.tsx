@@ -62,7 +62,7 @@ export function WifiStep({ onNext, onBack }: { onNext: () => void; onBack: () =>
         />
 
         {errors.selectedSsid ? (
-          <p className="text-sm text-red-500" role="alert">
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
             {errors.selectedSsid.message}
           </p>
         ) : null}
@@ -82,7 +82,7 @@ export function WifiStep({ onNext, onBack }: { onNext: () => void; onBack: () =>
             Back
           </Button>
           <Button type="submit" disabled={connectMutation.isPending} className="flex-1">
-            {connectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {connectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Connect
           </Button>
         </div>

@@ -2,10 +2,10 @@ export function shellTitleForPath(pathname: string): string {
   const map: Record<string, string> = {
     '/dashboard': 'Dashboard',
     '/wifi': 'Connect',
-    '/wifi/advanced': 'Advanced',
+    '/wifi/advanced': 'WiFi / Advanced',
     '/network': 'Status',
     '/network/configuration': 'Internet & LAN',
-    '/network/advanced': 'Advanced',
+    '/network/advanced': 'Network / Advanced',
     '/clients': 'Clients',
     '/vpn': 'VPN',
     '/services': 'Services',

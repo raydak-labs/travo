@@ -7,6 +7,7 @@ import {
   Outlet,
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/layout/app-shell';
+import { ThemeProvider } from '@/components/layout/theme-provider';
 import { LazyPageBoundary } from '@/components/layout/lazy-page-boundary';
 import { shellTitleForPath } from '@/components/layout/shell-titles';
 import { LoginPage } from '@/pages/login/login-page';
@@ -25,20 +26,41 @@ import {
   WifiPage,
 } from '@/router/lazy-loaded-pages';
 import { requireAuth, requireSetupComplete } from '@/router/route-guards';
+import { NotFoundPage } from '@/pages/not-found/not-found-page';
+import { TopProgressBar } from '@/components/layout/top-progress-bar';
 
 const rootRoute = createRootRoute({
   component: Outlet,
+  // TanStack resolves an unmatched path through `notFoundComponent`, not
+  // through a `path: '*'` child of a pathless parent — without this the router
+  // rendered its bare "Not Found" text and the styled page below was never
+  // reached.
+  //
+  // Wrapped in AppShell because root-level not-found renders outside the route
+  // shell, and a bare card floating on an empty page looks like a crash rather
+  // than a wrong address.
+  notFoundComponent: () => (
+    <ThemeProvider>
+      <AppShell title="Not Found">
+        <NotFoundPage />
+      </AppShell>
+    </ThemeProvider>
+  ),
 });
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
+    typeof search.redirect === 'string' ? { redirect: search.redirect } : {},
   component: LoginPage,
 });
 
 const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/setup',
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
+    typeof search.redirect === 'string' ? { redirect: search.redirect } : {},
   beforeLoad: () => {
     requireAuth();
   },
@@ -179,14 +201,6 @@ const logsRoute = createRoute({
   component: shellPage('/logs', LogsPage),
 });
 
-const notFoundRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '*',
-  beforeLoad: () => {
-    throw redirect({ to: '/dashboard' });
-  },
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -210,10 +224,15 @@ const routeTree = rootRoute.addChildren([
     systemRoute,
     logsRoute,
   ]),
-  notFoundRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  // `requireSetupComplete` awaits the setup status on every navigation. With
+  // its 30s cache, that guard can leave the UI unresponsive with no feedback.
+  defaultPendingMs: 200,
+  defaultPendingComponent: TopProgressBar,
+});
 
 declare module '@tanstack/react-router' {
   interface Register {

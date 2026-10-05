@@ -27,7 +27,7 @@ export function SystemBackupRestoreCard() {
               onClick={() => backup.mutate()}
               disabled={backup.isPending}
             >
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="h-4 w-4" />
               {backup.isPending ? 'Creating backup…' : 'Download Backup'}
             </Button>
             <div>
@@ -51,7 +51,7 @@ export function SystemBackupRestoreCard() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={restore.isPending}
               >
-                <Upload className="mr-2 h-4 w-4" />
+                <Upload className="h-4 w-4" />
                 {restore.isPending ? 'Restoring…' : 'Restore from Backup'}
               </Button>
             </div>

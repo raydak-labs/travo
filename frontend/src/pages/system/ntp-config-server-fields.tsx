@@ -67,7 +67,11 @@ export function NtpConfigServerFields({
             }}
           />
           {addServerForm.formState.errors.server ? (
-            <span id="ntp-draft-err" className="text-xs text-red-500" role="alert">
+            <span
+              id="ntp-draft-err"
+              className="text-xs text-red-600 dark:text-red-400"
+              role="alert"
+            >
               {addServerForm.formState.errors.server.message}
             </span>
           ) : null}

@@ -19,10 +19,9 @@ export function SignalStrengthIcon({ signalPercent, className }: SignalStrengthI
 
   if (bars === 0) {
     return (
-      <WifiOff
-        className={clsx('h-5 w-5 text-gray-500 dark:text-gray-400', className)}
-        aria-label="No signal"
-      />
+      <span role="img" aria-label="No signal">
+        <WifiOff className={clsx('h-5 w-5 text-gray-500 dark:text-gray-400', className)} />
+      </span>
     );
   }
 
@@ -34,8 +33,15 @@ export function SignalStrengthIcon({ signalPercent, className }: SignalStrengthI
   };
 
   return (
-    <div className={clsx('relative', className)} aria-label={`Signal strength ${bars} of 4 bars`}>
+    // role="img", not a bare div: aria-label is ignored on role=generic, so
+    // signal quality — the deciding input on the repeater network picker —
+    // reached screen readers only through icon colour.
+    <span
+      role="img"
+      aria-label={`Signal strength ${bars} of 4 bars (${signalPercent}%)`}
+      className={clsx('relative', className)}
+    >
       <Wifi className={clsx('h-5 w-5', colorMap[bars])} />
-    </div>
+    </span>
   );
 }

@@ -22,12 +22,21 @@ export function DhcpLeasesCard() {
         ) : dhcpLeases && dhcpLeases.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+              <caption className="sr-only">Active DHCP leases</caption>
               <thead>
                 <tr className="border-b text-left text-gray-500 dark:text-gray-400">
-                  <th className="pb-2 font-medium">Hostname</th>
-                  <th className="pb-2 font-medium">IP Address</th>
-                  <th className="pb-2 font-medium">MAC Address</th>
-                  <th className="pb-2 font-medium">Expires</th>
+                  <th scope="col" className="pb-2 font-medium">
+                    Hostname
+                  </th>
+                  <th scope="col" className="pb-2 font-medium">
+                    IP Address
+                  </th>
+                  <th scope="col" className="pb-2 font-medium">
+                    MAC Address
+                  </th>
+                  <th scope="col" className="pb-2 font-medium">
+                    Expires
+                  </th>
                 </tr>
               </thead>
               <tbody>

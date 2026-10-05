@@ -43,15 +43,27 @@ type Dependencies struct {
 	TimeSyncGate *TimeSyncGate
 }
 
-// SetupRoutes registers all API routes under /api/v1/.
+// PublicRoutes re-exports the auth package's public path set, which is the
+// single source of truth for "reachable without a token".
+//
+// It is deliberately NOT enforced by mounting the auth middleware on the /api/v1
+// group: Fiber v3 group middleware is scoped by path prefix rather than by which
+// router a route was registered on, so that also intercepted routes registered
+// directly on the app -- the WebSocket upgrade and the pre-login time-sync
+// endpoint. See auth.Middleware.
+var PublicRoutes = auth.PublicPaths
+
+// SetupRoutes registers all API routes. Authentication is enforced by
+// auth.Middleware, mounted by the caller, against the auth.PublicPaths allowlist.
 func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	// OpenAPI spec — served without auth for agent/automation use.
 	app.Get("/api/openapi.json", OpenAPIHandler())
 
+	app.Post("/api/v1/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
+	app.Post("/api/v1/system/time-sync", SyncTimeHandler(deps))
+
 	v1 := app.Group("/api/v1")
 
-	// Auth routes (login does not require auth)
-	v1.Post("/auth/login", LoginHandler(deps.Auth, deps.RateLimiter))
 	v1.Post("/auth/logout", LogoutHandler(deps.Auth, deps.Blocklist))
 	v1.Get("/auth/session", SessionHandler(deps.Auth))
 	v1.Put("/auth/password", ChangePasswordHandler(deps.Auth))
@@ -80,7 +92,6 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) {
 	v1.Post("/system/ntp/sync", NTPSyncHandler(deps.System))
 	v1.Get("/system/setup-complete", GetSetupCompleteHandler(deps.System))
 	v1.Post("/system/setup-complete", SetSetupCompleteHandler(deps.System))
-	v1.Post("/system/time-sync", SyncTimeHandler(deps))
 	v1.Get("/system/alerts", SystemAlertsHandler(deps.Alerts))
 	v1.Get("/system/alert-thresholds", GetAlertThresholdsHandler(deps.Alerts))
 	v1.Put("/system/alert-thresholds", SetAlertThresholdsHandler(deps.Alerts))

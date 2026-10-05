@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
@@ -122,6 +123,8 @@ func (f *fakeUbusApply) Call(path, method string, args map[string]any) (map[stri
 		if f.confirmErr != nil {
 			return nil, f.confirmErr
 		}
+		return map[string]any{}, nil
+	case "uci.reload_config", "network.reload":
 		return map[string]any{}, nil
 	}
 	return nil, errors.New("ubus: unexpected call " + path + "." + method)
@@ -359,5 +362,206 @@ func TestRealUCIApplyConfirm_DefaultsToDevicePaths(t *testing.T) {
 	}
 	if applier.etcConfigDir != "/etc/config" {
 		t.Errorf("etcConfigDir = %q, want /etc/config", applier.etcConfigDir)
+	}
+}
+
+// indexOf returns the position of the first recorded call, or -1.
+func (f *fakeUbusApply) indexOf(path, method string) int {
+	for i, c := range f.calls {
+		if c.path == path && c.method == method {
+			return i
+		}
+	}
+	return -1
+}
+
+const snapshotWireless = "config wifi-device 'radio0'\n\tenabled '1'\n"
+
+// The hardware finding: Travo commits the UCI change BEFORE either rollback
+// mechanism runs, so rpcd's window snapshots the already-changed config and
+// `uci revert` is a no-op on a committed delta. A refused confirm therefore left
+// the broken profile enabled. Only a file-level snapshot taken BEFORE the
+// mutation commits can put the previous config back.
+func TestRealUCIApplyConfirm_RollbackRestoresACommittedConfig(t *testing.T) {
+	t.Parallel()
+
+	fu := &fakeUbusApply{loginSID: "sess-rb"}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	cfg := filepath.Join(etcDir, "wireless")
+	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
+		t.Fatalf("write wireless config: %v", err)
+	}
+
+	if err := applier.Snapshot([]string{"wireless"}); err != nil {
+		t.Fatalf("Snapshot error = %v", err)
+	}
+	// The mutation commits: this is the state a refused confirm used to leave.
+	committed := "config wifi-iface 'sta0'\n\tmode 'sta'\n\tdisabled '0'\n"
+	if err := os.WriteFile(cfg, []byte(committed), 0600); err != nil {
+		t.Fatalf("commit wireless config: %v", err)
+	}
+	sid, err := applier.StartApply([]string{"wireless"})
+	if err != nil {
+		t.Fatalf("StartApply error = %v", err)
+	}
+
+	if err := applier.Rollback(sid); err != nil {
+		t.Fatalf("Rollback error = %v", err)
+	}
+	got, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read wireless config after rollback: %v", err)
+	}
+	if string(got) != snapshotWireless {
+		t.Errorf("wireless config after rollback =\n%q\nwant the snapshot\n%q", got, snapshotWireless)
+	}
+}
+
+// Confirm is the success path: the snapshot it discards must not be able to
+// undo a LATER, unrelated change.
+func TestRealUCIApplyConfirm_ConfirmDiscardsTheSnapshot(t *testing.T) {
+	t.Parallel()
+
+	fu := &fakeUbusApply{loginSID: "sess-ok"}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	cfg := filepath.Join(etcDir, "wireless")
+	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
+		t.Fatalf("write wireless config: %v", err)
+	}
+
+	if err := applier.Snapshot([]string{"wireless"}); err != nil {
+		t.Fatalf("Snapshot error = %v", err)
+	}
+	sid, err := applier.StartApply([]string{"wireless"})
+	if err != nil {
+		t.Fatalf("StartApply error = %v", err)
+	}
+	if err := applier.Confirm(sid); err != nil {
+		t.Fatalf("Confirm error = %v", err)
+	}
+	// A later, unrelated edit that must survive a stale rollback attempt.
+	later := "config wifi-iface 'guest'\n\tmode 'ap'\n"
+	if err := os.WriteFile(cfg, []byte(later), 0600); err != nil {
+		t.Fatalf("write later config: %v", err)
+	}
+
+	if err := applier.Rollback(sid); err == nil {
+		t.Fatal("Rollback after Confirm must fail: the snapshot is gone, so there is nothing to restore")
+	}
+	got, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if string(got) != later {
+		t.Errorf("config was overwritten by a stale rollback: %q", got)
+	}
+}
+
+// A rollback that cannot find what to restore must not report success.
+func TestRealUCIApplyConfirm_RollbackWithoutASnapshotFails(t *testing.T) {
+	t.Parallel()
+
+	fu := &fakeUbusApply{}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	cfg := filepath.Join(etcDir, "wireless")
+	if err := os.WriteFile(cfg, []byte("changed\n"), 0600); err != nil {
+		t.Fatalf("write wireless config: %v", err)
+	}
+
+	if err := applier.Rollback("sess-never"); err == nil {
+		t.Fatal("expected an error when no snapshot exists for the session")
+	}
+	got, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if string(got) != "changed\n" {
+		t.Errorf("a failed rollback must not touch the config, got %q", got)
+	}
+	if fu.indexOf("uci", "reload_config") >= 0 || fu.indexOf("network", "reload") >= 0 {
+		t.Error("a rollback that restored nothing must not ask the device to reload")
+	}
+}
+
+// Restoring files is not enough: rpcd and netifd have to be told to re-read
+// them. `network reload` is the bounded-recovery exception to the "no wifi up"
+// rule (ADR 0003) and is the ONLY thing allowed to act on the restored config.
+func TestRealUCIApplyConfirm_RollbackReloadsUciAndNetworkAndNeverRunsWifi(t *testing.T) {
+	t.Parallel()
+
+	fu := &fakeUbusApply{loginSID: "sess-load"}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	cfg := filepath.Join(etcDir, "wireless")
+	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
+		t.Fatalf("write wireless config: %v", err)
+	}
+	if err := applier.Snapshot([]string{"wireless"}); err != nil {
+		t.Fatalf("Snapshot error = %v", err)
+	}
+	if err := os.WriteFile(cfg, []byte("broken\n"), 0600); err != nil {
+		t.Fatalf("commit broken config: %v", err)
+	}
+	sid, err := applier.StartApply([]string{"wireless"})
+	if err != nil {
+		t.Fatalf("StartApply error = %v", err)
+	}
+	if err := applier.Rollback(sid); err != nil {
+		t.Fatalf("Rollback error = %v", err)
+	}
+
+	reloadCfg := fu.indexOf("uci", "reload_config")
+	reloadNet := fu.indexOf("network", "reload")
+	if reloadCfg < 0 {
+		t.Error("Rollback must issue `uci reload_config` so rpcd re-reads /etc/config")
+	}
+	if reloadNet < 0 {
+		t.Error("Rollback must issue `network reload` so netifd acts on the restored config")
+	}
+	restore := fu.indexOf("uci", "apply")
+	if reloadCfg >= 0 && reloadCfg < restore {
+		t.Error("the config must be restored before rpcd is asked to re-read it")
+	}
+	if reloadCfg >= 0 && reloadNet >= 0 && reloadCfg > reloadNet {
+		t.Error("rpcd must re-read the config before netifd acts on it")
+	}
+	for _, c := range fu.calls {
+		if c.method == "wifi" || c.method == "wifi up" || c.method == "wifi reload" {
+			t.Errorf("Rollback must never run wifi: %s %s", c.path, c.method)
+		}
+	}
+}
+
+// A confirmed apply that fails at the end must leave nothing armed: the
+// previous config is put back, the device is told to re-read it, and no snapshot
+// is left behind to undo a LATER unrelated change.
+func TestRealUCIApplyConfirm_ApplyAndConfirmRestoresWhenConfirmFails(t *testing.T) {
+	t.Parallel()
+
+	fu := &fakeUbusApply{loginSID: "sess-aac", confirmErr: errors.New("confirm rejected")}
+	applier, etcDir, runDir := newTestUCIApply(t, fu)
+	cfg := filepath.Join(etcDir, "wireless")
+	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
+		t.Fatalf("write wireless config: %v", err)
+	}
+
+	if err := applier.ApplyAndConfirm([]string{"wireless"}); err == nil {
+		t.Fatal("expected ApplyAndConfirm to report the failed confirm")
+	}
+	if fu.indexOf("uci", "reload_config") < 0 || fu.indexOf("network", "reload") < 0 {
+		t.Error("a failed ApplyAndConfirm must restore and re-read the previous config")
+	}
+	if entries, err := os.ReadDir(runDir); err == nil {
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), uciSnapshotPrefix) {
+				t.Errorf("snapshot %s survived a failed ApplyAndConfirm and can undo a later change", e.Name())
+			}
+		}
+	}
+	got, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if string(got) != snapshotWireless {
+		t.Errorf("config after a failed ApplyAndConfirm = %q, want the pre-apply snapshot", got)
 	}
 }

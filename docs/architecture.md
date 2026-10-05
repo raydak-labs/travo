@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-09-28
+updated: 2026-10-04
 ---
 
 # Architecture Decisions
@@ -54,7 +54,12 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 - Per-radio enable switches stay visible.
 - A toggle may expose separate per-radio forms, but shared credentials are the default because it matches typical travel-router use.
 
-### 2.4 Health and recovery signals
+### 2.4 Lockout guard (no silent self-disconnect)
+
+- A mutating wireless request that would leave its caller with **no enabled `mode=ap` wifi-iface** is **refused (409, code `wifi_lockout_risk`) before anything is written** when the caller reached the router over WiFi; the same request from Ethernet, or one that leaves an access point up, proceeds unchanged.
+- The only way past it is the request body's explicit `acknowledge_lockout: true`. There is no implicit, "probably fine" path.
+
+### 2.5 Health and recovery signals
 
 - `GET /api/v1/wifi/health` is the place where frontend learns about wireless invariant violations and fragile layouts.
 - Repeater same-radio AP/STA situations must be surfaced as a warning and have a reconcile action.
@@ -65,6 +70,7 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 Wireless mutation safety is intentionally modeled after LuCI. **Implementation reference:** [`docs/adr/0002-wireless-model-and-luci-apply.md`](./adr/0002-wireless-model-and-luci-apply.md).
 
 - Backend wireless changes use rpcd session login, copy config into session state, `uci apply` with rollback timeout, then explicit `uci confirm`.
+- **The rollback that actually restores is ours, not rpcd's window.** The change is committed before the apply, so rpcd snapshots the already-changed config and `uci revert` is a no-op. Travo copies `/etc/config/<name>` into its own snapshot **before** the mutation commits and restores it explicitly (`uci reload_config` + `network reload`) when the probe refuses or the mutation fails. See ADR 0002 §5.0.
 - Confirmation must happen only after the caller proves the router is still reachable.
 - Backend must **not** self-confirm immediately after starting rollback apply.
 - Scripts and SSH setup flows must **not** run `wifi`, `wifi up`, or `wifi reload` as part of applying user wireless changes.
@@ -74,7 +80,9 @@ Wireless mutation safety is intentionally modeled after LuCI. **Implementation r
   `/usr/libexec/travo-wireless-toggle.sh` (owned by the backend). It flips
   `wireless.*.disabled`, commits, and goes through rpcd `apply` (rollback, 30 s) →
   `confirm`, behind the `wifi-toggle-in-progress` guard. **Both** the WiFi on/off
-  **schedule** (`/etc/cron.d/openwrt-gui-wifi-schedule`) and the **hardware button**
+  **schedule** (`/etc/crontabs/root` — OpenWrt has no `/etc/cron.d`; writing there
+  fails with ENOENT while the JSON state file has already been written, so the UI
+  would report a schedule that never fires) and the **hardware button**
   hotplug toggle (`/etc/hotplug.d/button/50-gui-button-actions`, run as root) call it,
   so neither path runs `wifi up` / `wifi down` any more. Details in ADR 0002 §6.1.
 
@@ -87,7 +95,7 @@ Contract:
 1. Write a guard file to persistent storage under `/etc/trafo/` **before** the dangerous operation. That single directory is authoritative: `internal/services/guards_test.go` fails the build if a guard path reappears under `/etc/travo/`, and `deploy-local.sh` clears both so a device upgraded from an older build still recovers (see ADR 0003 §2).
 2. While the guard exists, the operation is skipped. Not every skip logs: **check the filesystem** (`ls /etc/trafo`) rather than assuming a log line.
 3. Remove the guard only after the whole operation completed successfully.
-4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and `TestCrashGuardsAllLiveUnderEtcTrafo` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
+4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and ``TestCrashGuardDirIsEtcTrafo`, `TestCrashGuardPathsResolveUnderCrashGuardDir` and `TestNoGuardIsDeclaredUnderEtcTravo` in `backend/internal/services/guards_test.go`` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
 5. Startup is also a repair point for pre-fix artifacts: `cmd/server/main.go` reconciles the auto-reconnect script and cron entry in **both** directions (enabled *and* disabled) and re-writes the WiFi schedule cron entry from the stored config, so a device carrying the old `wifi reload` / `/sbin/wifi up` lines converges onto the generated toggle helper without waiting for the user to re-save a setting.
 
 Guard naming convention:
@@ -146,12 +154,38 @@ Stable rules for **dnsmasq vs AdGuard**, **WireGuard DNS forwarding**, **captive
 
 The captive auto-accept flow's conditional `wwan` DHCP bounce lives in that ADR (§4.1), not here: it is a captive-portal behavior, and putting the "only when `wwan` is the active uplink" condition next to the DNS bypass rules keeps the whole captive surface in one place.
 
+### 6.4 Uplink identity and what the UI may call it
+
+The dashboard, the Network Status page and the VPN/throughput readouts all
+describe the same three uplinks (`wan`, `wwan`, `usbtether`). One vocabulary
+defines them: `frontend/src/lib/uplink.ts`.
+
+Normative rules:
+
+- **`status.Interfaces` must include every candidate uplink.** USB tethering
+  creates its own logical interface (`network.usbtether`) in the wan zone, so
+  `NetworkService` surfaces it alongside WAN/LAN/wwan and promotes it to the
+  effective WAN when it is up. Omitting it makes a phone-tethered router report
+  "No Internet" while the internet is up.
+- **`internet_reachable` is a WAN-carrier check, not a reachability probe.** It
+  is `status.WAN != nil && status.WAN.IsUp`. The only word that must not sit
+  next to it is "Internet"; the UI says "Uplink". A real probe is
+  `uptime_tracker.go`, and it is a different signal on purpose.
+- **Throughput charts plot a named uplink, never `network[0]`.**
+  `system_service.go` emits stats in a fixed order whose first entry is
+  `br-lan`, so index 0 is LAN traffic. `uplinkInterfaceName` selects by name and
+  returns nothing rather than falling back to the LAN bridge.
+- **Tunnel state has three values, not two.** `VpnStatus.status_detail` exists to
+  distinguish disabled / configured / enabled-not-up / no-handshake / connected;
+  collapsing `enabled` and `connected` produced "Off" directly above a
+  "Disable VPN" button.
+
 ## 7. Authentication And API Access
 
 - Administrative login uses the **root** password validated via **rpcd** on device; Travo issues **JWT** bearer tokens for API access.
 - **Session validity is clock-independent**: a monotonic-clock registry decides token lifetime; clients receive relative `expires_in` seconds and must never compare server timestamps against their own clock. Normative details in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
 - Optional **IP allowlist** and auth hardening details are normative in **[`docs/adr/0007-authentication-and-access-control.md`](./adr/0007-authentication-and-access-control.md)**.
-- Changing the password **revokes every live session** and returns a replacement token; token revocations persist in `/etc/trafo/travo.db`, so they survive a backend restart.
+- Changing the password **revokes every live session** and returns a replacement token; token revocations persist in `/etc/travo/travo.db`, so they survive a backend restart.
 - SSH key management grants root SSH access and has its own rules in **[`docs/adr/0008-ssh-key-management.md`](./adr/0008-ssh-key-management.md)**.
 - Unknown `GET /api/*` paths return a **JSON 404**, never the SPA `index.html`.
 
@@ -170,7 +204,7 @@ Router hardware is constrained. Every feature must justify its footprint.
   - **`iw event`** in `network_event_watcher.go`, the only remaining raw `exec.Command` in the backend. It is a long-running event listener whose lifetime is bounded by the service's stop channel and a `Process.Kill()`, not by a timeout tier; forcing it through `execx` would kill it immediately.
 - **Package operations use the `PackageManager` abstraction** (`service_manager.go`), which detects **apk** (OpenWrt 25.x+) vs **opkg** at runtime and refreshes the package index best-effort before installs (opkg lists live in `/tmp` and vanish on reboot). Never hardcode `opkg` or `apk` in feature code. Package install/remove writes init scripts, `/etc/config` and kernel modules, so it is crash-guarded (`pkg-install-in-progress`).
 - **Every long-lived background goroutine is either registered in `appLifecycle` (`cmd/server/main.go`) or stopped through it.** The startup workers (AP repair, auto-reconnect script refresh, radio discovery) and the network event watcher run via `lifecycle.Go` with a `stop` channel, so a worker waiting on a delay bails out on SIGTERM instead of committing UCI afterwards. The services that own their own ticker (`hub`, `alertSvc`, `uptimeTracker`, `bandSwitchSvc`, `failoverSvc`, rate limiters, `statsHistory`, `captiveSvc`) are shut down by `lifecycle.Stop()`, which is `sync.Once`-guarded and runs in order after the HTTP server has drained. The untracked goroutines that remain are the terminal operations named above.
-- **Persistent state is deliberate and bounded.** `/etc/trafo/travo.db` (bbolt) holds only the token-revocation set and the stats-history ring buffer; it batches writes because `/etc/trafo` is NAND-backed overlayfs, and it degrades to memory-only if the open fails rather than blocking the UI. Rules, retention and the bucket table: **[`docs/adr/0009-persistent-store-bbolt.md`](./adr/0009-persistent-store-bbolt.md)**.
+- **Persistent state is deliberate and bounded.** `/etc/travo/travo.db` (bbolt) holds only the token-revocation set and the stats-history ring buffer; it batches writes because `/etc/trafo` is NAND-backed overlayfs, and it degrades to memory-only if the open fails rather than blocking the UI. Rules, retention and the bucket table: **[`docs/adr/0009-persistent-store-bbolt.md`](./adr/0009-persistent-store-bbolt.md)**.
 - **UCI writes go through the `mutateUCI` / `mutateWireless` helpers, which take the config list ONCE** and derive both the lock set and the revert set from it. This is not a style preference: the `uci` CLI keeps uncommitted changes in a process-global `/tmp/.uci/<config>/changes` file, so two concurrent writers of one config destroy each other's staged sections, and a failed sequence left staged is committed by the next unrelated writer. Locks are keyed on the config name (not the service — `WifiService` and `NetworkService` both write `firewall`) and acquired in a globally sorted order, so nesting cannot deadlock; they are **not reentrant**, so a helper reachable from inside a transaction also exposes a `…Locked` core. A missing optional package (`ddns-scripts`, `tailscale`) is `503`, not `500`, and a config `PUT` rejects unknown request fields so a wrong-shaped body cannot silently zero the user's settings. Full rules, the non-obvious config sets, and the matching tests: **[`docs/adr/0010-uci-write-serialisation-and-request-contracts.md`](./adr/0010-uci-write-serialisation-and-request-contracts.md)**.
 - **A handler panic returns 500 instead of killing the process.** `recover` middleware is registered first, before CORS and auth. The router keeps forwarding traffic with no UI until something restarts `travo`, and a nil service dependency is the easy way to trigger it.
 

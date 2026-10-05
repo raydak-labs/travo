@@ -35,6 +35,93 @@ import {
   mockDDNSStatus,
   mockSQMConfig,
 } from './data';
+import type {
+  AdGuardConfig,
+  ConnectionMethod,
+  FailoverConfig,
+  FailoverEvent,
+  SpeedTestResult,
+  SpeedtestServiceStatus,
+} from '@shared/index';
+
+// Fixtures for routes that had no mock until now. They live here rather than in
+// mocks/data.ts because that file belongs to another lane's change set.
+const mockSpeedtestServiceStatus: SpeedtestServiceStatus = {
+  installed: true,
+  supported: true,
+  architecture: 'aarch64_cortex-a53',
+  version: '1.1.0',
+  package_name: 'wget-ssp-speedtest',
+  storage_size_mb: 2,
+};
+
+const mockSpeedTestResult: SpeedTestResult = {
+  download_mbps: 84.2,
+  upload_mbps: 21.5,
+  ping_ms: 18,
+  server: 'Mock ISP, Frankfurt',
+};
+
+const mockConnectionMethod: ConnectionMethod = {
+  method: 'wifi-client',
+  interface: 'wwan0',
+  ip_address: '192.168.1.105',
+};
+
+const mockFailoverConfig: FailoverConfig = {
+  available: true,
+  service_installed: true,
+  enabled: false,
+  active_interface: 'wwan0',
+  candidates: [
+    {
+      id: 'wan',
+      label: 'WAN (Ethernet)',
+      interface_name: 'wan',
+      kind: 'ethernet',
+      available: true,
+      enabled: true,
+      priority: 1,
+      tracking_state: 'online',
+      is_up: true,
+    },
+    {
+      id: 'wwan',
+      label: 'WWAN (WiFi Client)',
+      interface_name: 'wwan0',
+      kind: 'wifi',
+      available: true,
+      enabled: true,
+      priority: 2,
+      tracking_state: 'online',
+      is_up: true,
+    },
+  ],
+  health: {
+    track_ips: ['1.1.1.1', '8.8.8.8'],
+    reliability: 2,
+    count: 3,
+    timeout: 3,
+    interval: 60,
+    failure_interval: 10,
+    recovery_interval: 60,
+    down: 3,
+    up: 2,
+  },
+};
+
+const mockFailoverEvents: FailoverEvent[] = [
+  {
+    from_interface: 'eth2',
+    to_interface: 'wwan0',
+    timestamp: 1772000000,
+    reason: 'wan link down',
+  },
+];
+
+const mockAdGuardConfig: AdGuardConfig = {
+  content: 'dns:\n  bind_hosts:\n    - 0.0.0.0\n  port: 53\nfilters: []\n',
+};
 
 export const handlers = [
   http.get(API_ROUTES.system.info, () => {
@@ -570,7 +657,7 @@ export const handlers = [
       apply: { pending: true, token: 'apply-repeater-reconcile', rollback_timeout_seconds: 30 },
     });
   }),
-  http.put(/\/api\/v1\/wifi\/ap\/.*/, () => {
+  http.put(`${API_ROUTES.wifi.ap}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 
@@ -829,6 +916,69 @@ export const handlers = [
   }),
 
   http.put(API_ROUTES.wifi.macPolicies, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  // Routes below had no handler at all. Without them the dev server hit the
+  // network for real (main.tsx starts MSW with onUnhandledRequest "bypass") and
+  // every test asserted against whatever the machine answered.
+
+  http.get(API_ROUTES.system.speedtestService, () => {
+    return HttpResponse.json(mockSpeedtestServiceStatus);
+  }),
+
+  http.post(API_ROUTES.system.speedtestServiceInstall, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.system.speedtestServiceUninstall, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(API_ROUTES.system.speedtestServiceRun, () => {
+    return HttpResponse.json(mockSpeedTestResult);
+  }),
+
+  http.get(API_ROUTES.network.connectionMethod, () => {
+    return HttpResponse.json(mockConnectionMethod);
+  }),
+
+  http.get(API_ROUTES.network.failover, () => {
+    return HttpResponse.json(mockFailoverConfig);
+  }),
+
+  http.put(API_ROUTES.network.failover, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.get(API_ROUTES.network.failoverEvents, () => {
+    return HttpResponse.json(mockFailoverEvents);
+  }),
+
+  http.post(API_ROUTES.vpn.wireguard.import, async ({ request }) => {
+    const body = (await request.json()) as { name?: string; config?: string };
+    return HttpResponse.json({
+      id: 'profile-imported',
+      name: body.name ?? 'Imported profile',
+      config: body.config ?? '',
+      active: false,
+      created_at: '2026-03-11T09:00:00Z',
+    });
+  }),
+
+  http.post(API_ROUTES.vpn.speedTest, () => {
+    return HttpResponse.json(mockSpeedTestResult);
+  }),
+
+  http.get(API_ROUTES.adguard.config, () => {
+    return HttpResponse.json(mockAdGuardConfig);
+  }),
+
+  http.put(API_ROUTES.adguard.config, () => {
+    return HttpResponse.json({ status: 'ok' });
+  }),
+
+  http.put(API_ROUTES.adguard.password, () => {
     return HttpResponse.json({ status: 'ok' });
   }),
 ];

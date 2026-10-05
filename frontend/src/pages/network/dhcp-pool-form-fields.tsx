@@ -26,11 +26,12 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
     <>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label className="flex items-center gap-1">
+          <Label className="flex items-center gap-1" htmlFor="dhcp-start">
             Start Offset
             <InfoTooltip text="First IP offset assigned to clients. Offset 100 on 192.168.1.x means the first assigned address is 192.168.1.100." />
           </Label>
           <Input
+            id="dhcp-start"
             type="number"
             min={2}
             max={254}
@@ -39,17 +40,18 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
             {...register('start', { valueAsNumber: true })}
           />
           {errors.start ? (
-            <p id="dhcp-start-err" className="text-xs text-red-500" role="alert">
+            <p id="dhcp-start-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.start.message}
             </p>
           ) : null}
         </div>
         <div className="space-y-1">
-          <Label className="flex items-center gap-1">
+          <Label className="flex items-center gap-1" htmlFor="dhcp-limit">
             Pool Size
             <InfoTooltip text="Maximum number of clients that can receive an IP address. E.g., 50 means up to 50 devices can connect." />
           </Label>
           <Input
+            id="dhcp-limit"
             type="number"
             min={1}
             max={253}
@@ -58,14 +60,14 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
             {...register('limit', { valueAsNumber: true })}
           />
           {errors.limit ? (
-            <p id="dhcp-limit-err" className="text-xs text-red-500" role="alert">
+            <p id="dhcp-limit-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.limit.message}
             </p>
           ) : null}
         </div>
       </div>
       <div className="space-y-1">
-        <Label className="flex items-center gap-1">
+        <Label className="flex items-center gap-1" htmlFor="dhcp-lease-time">
           Lease Time
           <InfoTooltip text="How long a DHCP lease is valid before renewal. Shorter times reclaim IPs faster; longer times reduce DHCP traffic." />
         </Label>
@@ -74,7 +76,10 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
           control={control}
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger aria-invalid={errors.lease_time ? 'true' : undefined}>
+              <SelectTrigger
+                id="dhcp-lease-time"
+                aria-invalid={errors.lease_time ? 'true' : undefined}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

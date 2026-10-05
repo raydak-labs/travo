@@ -32,6 +32,8 @@ This directory is an **Obsidian vault** (`.obsidian/`). For graph and wikilink n
 - [`docs/development.md`](./development.md) — local dev workflow
 - [`docs/deployment.md`](./deployment.md) — install, packaging, deployment
 - [`docs/testing.md`](./testing.md) — on-device checks (scripts + full playbook)
+- [`docs/tests/on-device-verification.md`](./tests/on-device-verification.md) — standing playbook for
+  checks that only settle on real hardware, and the hardware facts behind them
 - [`docs/ui-theming.md`](./ui-theming.md) — frontend theming rules and tokens
 
 ## Plans and history

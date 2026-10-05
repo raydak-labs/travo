@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -62,10 +63,24 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 //     saved wireless config is broken (e.g. after an rpcd rollback restored a
 //     pre-incident bad config) and cron would otherwise replay the failure
 //     forever. Counter is cleared on any successful reconnect or on redeploy.
+//
+// BOTH guards are worthless unless the script can create them, and the script
+// runs from cron — potentially before the backend has ever run — so nothing
+// else guarantees /etc/trafo exists. Without `mkdir -p` the writes fail
+// silently (there is no `set -e`), the guard check cannot see a leftover
+// guard, and the one sanctioned `wifi up` in the whole tree runs unguarded
+// every minute, forever, with a fail counter that never increments. The
+// directory is therefore created first and the script exits non-zero when that
+// fails. Same shape as the toggle helper (wifi_toggle_script.go).
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
-	"GUARD=\"" + crashGuardDir + "/autoreconnect-crash-guard\"\n" +
-	"FAILCOUNT_FILE=\"" + crashGuardDir + "/autoreconnect-failcount\"\n" +
+	"GUARD_DIR=\"" + crashGuardDir + "\"\n" +
+	"GUARD=\"$GUARD_DIR/autoreconnect-crash-guard\"\n" +
+	"FAILCOUNT_FILE=\"$GUARD_DIR/autoreconnect-failcount\"\n" +
 	"MAX_FAIL=5\n\n" +
+	"# The guard directory must exist before anything below can write a guard\n" +
+	"# or the retry counter. If it cannot be created, exit non-zero: running\n" +
+	"# `wifi up` from here would be the one unguarded wifi invocation in the tree.\n" +
+	"mkdir -p \"$GUARD_DIR\" || exit 1\n\n" +
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
 	"FAILCOUNT=0\n" +
 	"if [ -f \"$FAILCOUNT_FILE\" ]; then\n    FAILCOUNT=$(cat \"$FAILCOUNT_FILE\" 2>/dev/null || echo 0)\nfi\n" +
@@ -73,7 +88,7 @@ const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networ
 	"IP=$(ubus call network.interface.wwan status 2>/dev/null | jsonfilter -e '@[\"ipv4-address\"][0].address' 2>/dev/null)\n" +
 	"if [ -n \"$IP\" ]; then\n    rm -f \"$FAILCOUNT_FILE\"\n    exit 0\nfi\n\n" +
 	"# Connection dropped — write crash guard, bring up WiFi, update counters on exit\n" +
-	"echo wifi-reconnect > \"$GUARD\"\n" +
+	"echo wifi-reconnect > \"$GUARD\" || exit 1\n" +
 	"if wifi up; then\n" +
 	"    rm -f \"$GUARD\" \"$FAILCOUNT_FILE\"\n" +
 	"else\n" +
@@ -86,7 +101,7 @@ func (w *WifiService) enableAutoReconnect() error {
 	if err := os.MkdirAll(scriptDir, 0750); err != nil {
 		return fmt.Errorf("creating script directory: %w", err)
 	}
-	if err := os.WriteFile(w.reconnectScript, []byte(reconnectScriptContent), 0750); err != nil {
+	if err := writeGeneratedScript(w.reconnectScript, reconnectScriptContent, 0o750); err != nil {
 		return fmt.Errorf("writing reconnect script: %w", err)
 	}
 
@@ -110,7 +125,7 @@ func (w *WifiService) WriteReconnectScriptSafe() {
 	if _, err := os.Stat(w.reconnectScript); err != nil {
 		return // script not present, nothing to fix
 	}
-	_ = os.WriteFile(w.reconnectScript, []byte(reconnectScriptContent), 0750)
+	_ = writeGeneratedScript(w.reconnectScript, reconnectScriptContent, 0o750)
 }
 
 func (w *WifiService) disableAutoReconnect() error {
@@ -232,6 +247,48 @@ func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 		return err
 	}
 	return os.WriteFile(w.wifiScheduleStatePath(), data, 0o644)
+}
+
+// wifiScheduleOffWindow reports whether the persisted WiFi schedule says WiFi
+// must currently be OFF, i.e. now falls inside the arc from off_time to the next
+// on_time — which wraps past midnight when off_time is later than on_time.
+//
+// Startup AP repair (ap_health.go) consults this: the generated toggle helper
+// expresses "off" as wireless.@wifi-device[*].disabled=1 with the AP ifaces
+// still disabled=0, so without this check a backend restart inside the off
+// window would re-enable the radios and quietly cancel the operator's schedule.
+//
+// An unreadable, disabled, incomplete or malformed schedule reports false, i.e.
+// the caller keeps its previous behaviour: a repair must not be switched off by
+// a config file that cannot be read.
+func (w *WifiService) wifiScheduleOffWindow() bool {
+	schedule, err := w.GetWiFiSchedule()
+	if err != nil || !schedule.Enabled || schedule.OnTime == "" || schedule.OffTime == "" {
+		return false
+	}
+	return scheduleWindowIsOff(time.Now(), schedule.OnTime, schedule.OffTime)
+}
+
+// The off window is the arc from off_time to the NEXT on_time, so it is the
+// same-day interval [off, on) when off is earlier, and wraps past midnight when
+// it is later. Equal times express no off window at all, so they report false
+// (leave the radios alone rather than guess).
+func scheduleWindowIsOff(now time.Time, onTime, offTime string) bool {
+	on, onErr := time.Parse("15:04", strings.TrimSpace(onTime))
+	off, offErr := time.Parse("15:04", strings.TrimSpace(offTime))
+	if onErr != nil || offErr != nil {
+		return false
+	}
+	nowMin := now.Hour()*60 + now.Minute()
+	onMin := on.Hour()*60 + on.Minute()
+	offMin := off.Hour()*60 + off.Minute()
+	if offMin < onMin {
+		return nowMin >= offMin && nowMin < onMin
+	}
+	if offMin > onMin {
+		return nowMin >= offMin || nowMin < onMin
+	}
+	return false
 }
 
 // writeWiFiScheduleCronLines replaces our tagged crontab lines with entries for

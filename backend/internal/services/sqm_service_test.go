@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -107,5 +108,37 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 	_, err = s.Apply()
 	if err == nil {
 		t.Fatalf("expected error")
+	}
+}
+
+// SQM writes share the process-global /tmp/.uci delta, so SetConfig must hold
+// the sqm config lock (ADR 0010) instead of committing and hoping.
+func TestSQMService_SetConfig_TakesTheSqmConfigLock(t *testing.T) {
+	t.Parallel()
+
+	s := NewSQMServiceWithRunner(uci.NewMockUCI(), &MockCommandRunner{})
+	unlock := lockUCIConfigs("sqm")
+	done := make(chan error, 1)
+	go func() {
+		done <- s.SetConfig(models.SQMConfig{
+			Enabled: true, Interface: "eth0", DownloadKbit: 50000, UploadKbit: 10000,
+		})
+	}()
+
+	select {
+	case err := <-done:
+		unlock()
+		t.Fatalf("SetConfig must wait for the sqm config lock, returned early: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	unlock()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("SetConfig after the lock was released: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("SetConfig did not resume after the lock was released")
 	}
 }

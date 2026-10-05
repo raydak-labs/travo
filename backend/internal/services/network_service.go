@@ -31,6 +31,11 @@ type NetworkService struct {
 	// same pattern as aliasFile.
 	portForwardsFile string
 
+	// arpFile is the neighbour table the client classifier reads an IP to a MAC
+	// through. Overridable so a test can answer with the table captured from the
+	// device instead of the build machine's.
+	arpFile string
+
 	// ddnsInitScript is the ddns-scripts init script. Its absence is how we know
 	// the package is not installed, because that is the only thing on the device
 	// that can service a `ddns` config. Overridable for tests.
@@ -80,7 +85,7 @@ func stringFromBytes(data []byte) string {
 
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
 	return &NetworkService{
-		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd,
+		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd, arpFile: procNetARP,
 		wifiMACsSeen:     make(map[string]time.Time),
 		portForwardsFile: defaultPortForwardsFile,
 		ddnsInitScript:   ddnsInitScriptPath,
@@ -243,6 +248,11 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	// Also check wwan (WiFi uplink) — common on travel routers
 	wwanData, wwanErr := n.ubus.Call("network.interface.wwan", "status", nil)
 
+	// USB tethering (typically a phone) creates its own logical interface in
+	// the wan zone. It has to appear in Interfaces, or a phone-tethered router
+	// reports the uplink as down while it is up.
+	usbData, usbErr := n.ubus.Call("network.interface."+usbTetherUCIName, "status", nil)
+
 	status.Interfaces = []models.NetworkInterface{}
 	if status.WAN != nil {
 		status.Interfaces = append(status.Interfaces, *status.WAN)
@@ -256,6 +266,14 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 		// If wwan is up and wan is not, use wwan as the effective WAN
 		if wwanIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
 			status.WAN = &wwanIface
+		}
+	}
+
+	if usbErr == nil {
+		usbIface := parseInterface(usbTetherUCIName, usbTetherUCIName, usbData, n.ubus)
+		status.Interfaces = append(status.Interfaces, usbIface)
+		if usbIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
+			status.WAN = &usbIface
 		}
 	}
 
@@ -348,6 +366,182 @@ func connectedSinceFromLeaseExpiry(expires, leaseSec float64) string {
 	return time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
 }
 
+// procNetARP is the kernel neighbour table. It is the only place on the device
+// that maps a client IP to the MAC actually sitting behind it.
+const procNetARP = "/proc/net/arp"
+
+// arpEntry is one row of the neighbour table, reduced to what callers need.
+type arpEntry struct{ flags, iface string }
+
+// parseArpTable turns /proc/net/arp into ip → entry and MAC → ip lookups. It is
+// the ONE neighbour-table reader: the client list and the lockout guard's
+// classifier both go through it, so they cannot disagree about who is who.
+//
+// The header row is skipped by position (it is the only non-numeric field[0]),
+// and incomplete/incomplete-MAC rows are dropped rather than half-read.
+func parseArpTable(raw string) (map[string]arpEntry, map[string]string) {
+	ipToARP := make(map[string]arpEntry) // ip  → entry
+	macToIP := make(map[string]string)   // MAC → ip  (last wins on dup)
+	for _, line := range strings.Split(raw, "\n")[1:] {
+		f := strings.Fields(line)
+		if len(f) < 6 {
+			continue
+		}
+		ip, flags, mac, iface := f[0], f[2], strings.ToUpper(f[3]), f[5]
+		if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
+			continue
+		}
+		ipToARP[ip] = arpEntry{flags: flags, iface: iface}
+		macToIP[mac] = ip
+	}
+	return ipToARP, macToIP
+}
+
+// readArpFile returns the neighbour table, or "" when it cannot be read. A
+// caller that gets "" sees no neighbours, which classifies as `unknown` rather
+// than as a guess.
+func readArpFile(path string) string {
+	if path == "" {
+		path = procNetARP
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+// parseStationMACs returns just the MACs from "iw dev <iface> station dump".
+// The classifier needs membership ("is this MAC associated?"), not the traffic
+// counters, so it does not pay for the full parse.
+func parseStationMACs(output string) map[string]struct{} {
+	macs := make(map[string]struct{})
+	for line := range strings.SplitSeq(output, "\n") {
+		after, ok := strings.CutPrefix(strings.TrimSpace(line), "Station ")
+		if !ok {
+			continue
+		}
+		if f := strings.Fields(after); len(f) >= 1 && f[0] != "" {
+			macs[strings.ToUpper(f[0])] = struct{}{}
+		}
+	}
+	return macs
+}
+
+// apStationMACs returns every MAC currently associated with any access point.
+//
+// It asks the radio directly, the same way the client list does, rather than
+// inferring WiFi membership from the fact that a bridge is carrying traffic —
+// on this hardware the LAN bridge carries both wired and wireless clients, so
+// that inference classifies every client as wireless.
+//
+// An interface whose station dump cannot be read is SKIPPED. A client MAC that
+// would have been on it then reads as "not associated", which is the one way
+// this answer can be wrong; the caller below narrows that by treating an
+// unreadable radio as unprovable rather than as wired.
+func apStationMACs(cmd CommandRunner) map[string]struct{} {
+	macs := make(map[string]struct{})
+	iwDev, err := cmd.Run("iw", "dev")
+	if err != nil {
+		return macs
+	}
+	for _, iface := range parseIwDev(string(iwDev)) {
+		dump, err := cmd.Run("iw", "dev", iface, "station", "dump")
+		if err != nil {
+			continue
+		}
+		for mac := range parseStationMACs(string(dump)) {
+			macs[mac] = struct{}{}
+		}
+	}
+	return macs
+}
+
+// parseIfaceIPv4Prefixes extracts an interface's IPv4 prefixes from one entry of
+// `ubus call network.interface dump`.
+//
+// It reads BOTH shapes, because they differ between netifd builds:
+//
+//   - {"address": "192.168.1.1", "mask": 24} — a bare address plus a separate
+//     integer netmask length. This is what the device on 192.168.1.1 emits, and
+//     it is the shape the classifier used to ignore.
+//   - {"address": "192.168.8.0/24"} — a CIDR string, which is what the previous
+//     test fixture invented under an `ipv4-prefix` key the device never sends.
+//
+// A malformed entry is SKIPPED and the rest of the list is still returned.
+// Returning an empty list on any bad entry is the failure mode that made every
+// real client `unknown`: no prefix, no match, no discrimination.
+func parseIfaceIPv4Prefixes(iface map[string]any) []netip.Prefix {
+	var prefixes []netip.Prefix
+	for _, key := range []string{"ipv4-address", "ipv4-prefix"} {
+		entries, _ := iface[key].([]any)
+		for _, raw := range entries {
+			if prefix, ok := parseIfaceIPv4Entry(raw); ok {
+				prefixes = append(prefixes, prefix)
+			}
+		}
+	}
+	return prefixes
+}
+
+// parseIfaceIPv4Entry turns one address entry into a prefix, accepting both the
+// bare-address-plus-mask and CIDR forms. The boolean is false for an entry that
+// cannot be read, which the caller skips.
+func parseIfaceIPv4Entry(raw any) (netip.Prefix, bool) {
+	entry, ok := raw.(map[string]any)
+	if !ok {
+		return netip.Prefix{}, false
+	}
+	addrStr, _ := entry["address"].(string)
+	if addrStr == "" {
+		return netip.Prefix{}, false
+	}
+	// CIDR form, in either key.
+	if strings.Contains(addrStr, "/") {
+		prefix, err := netip.ParsePrefix(addrStr)
+		if err != nil {
+			return netip.Prefix{}, false
+		}
+		return prefix.Masked(), true
+	}
+	// Bare address plus a separate integer mask. An absent or out-of-range mask
+	// yields no prefix rather than a /0, which would match the whole internet
+	// and place every caller on the first interface in the dump.
+	addr, err := netip.ParseAddr(addrStr)
+	if err != nil || addr.Is6() {
+		return netip.Prefix{}, false
+	}
+	bits, ok := maskBits(entry["mask"])
+	if !ok {
+		return netip.Prefix{}, false
+	}
+	return netip.PrefixFrom(addr, bits).Masked(), true
+}
+
+// maskBits reads a netmask length from a ubus value. ubus JSON decodes numbers
+// as float64, so both that and the integers a hand-built fixture carries are
+// accepted.
+func maskBits(raw any) (int, bool) {
+	var n int
+	switch v := raw.(type) {
+	case float64:
+		n = int(v)
+		if float64(n) != v {
+			return 0, false
+		}
+	case int:
+		n = v
+	case int64:
+		n = int(v)
+	default:
+		return 0, false
+	}
+	if n < 0 || n > 32 {
+		return 0, false
+	}
+	return n, true
+}
+
 // parseDHCPLeasesFile reads /tmp/dhcp.leases and returns a map of uppercase MAC → lease info.
 // Format: <expiry_epoch> <mac> <ip> <hostname> [clientid]
 func parseDHCPLeasesFile() map[string]dhcpLease {
@@ -425,23 +619,7 @@ func (n *NetworkService) fetchDHCPClients() []models.Client {
 	recentlyWifi := n.updateKnownWifiMACs(wifiStats)
 
 	// ── 2. ARP table: build lookup maps ──────────────────────────────────
-	type arpEntry struct{ flags, iface string }
-	ipToARP := make(map[string]arpEntry) // ip  → {flags, iface}
-	macToIP := make(map[string]string)   // MAC → ip  (last wins on dup)
-	if raw, err := os.ReadFile("/proc/net/arp"); err == nil {
-		for _, line := range strings.Split(string(raw), "\n")[1:] {
-			f := strings.Fields(line)
-			if len(f) < 6 {
-				continue
-			}
-			ip, flags, mac, iface := f[0], f[2], strings.ToUpper(f[3]), f[5]
-			if mac == "00:00:00:00:00:00" || ip == "0.0.0.0" {
-				continue
-			}
-			ipToARP[ip] = arpEntry{flags: flags, iface: iface}
-			macToIP[mac] = ip
-		}
-	}
+	ipToARP, macToIP := parseArpTable(readArpFile(n.arpFile))
 
 	// ── 3. Build a deduplicated client map (keyed by uppercase MAC) ───────
 	byMAC := make(map[string]models.Client)
@@ -763,12 +941,59 @@ func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
 	}, nil
 }
 
+// wanStaticOptions are the options that only mean something for a static WAN.
+// They are deleted when the WAN is switched to another mode: leaving them behind
+// is how a static→dhcp switch produced a WAN that kept a stale ipaddr/netmask/
+// gateway, and — combined with a leftover peerdns=0 + dns from SetDNSConfig —
+// kept resolving through a DNS server the DHCP lease never handed out.
+var wanStaticOptions = []string{"ip4addr", "netmask", "gateway"}
+
+// errPPPoEUnsupported is returned for a save that would create a PPPoE WAN
+// without credentials. Writing proto=pppoe alone produces a WAN that can never
+// authenticate: the handler validates "type", not a username/password pair the
+// model does not have.
+var errPPPoEUnsupported = errors.New(
+	"PPPoE needs a username and password that this API cannot store: " +
+		"configure PPPoE in LuCI (Network -> Interfaces -> WAN), then save other WAN fields here")
+
 // SetWanConfig updates the WAN configuration.
+//
+// Everything the request declares is written. MTU and the DNS servers used to be
+// validated by the handler, published in the OpenAPI body and then dropped on
+// the floor, so the documented "GET, change a field, PUT it back" client pattern
+// answered 200 having changed nothing at all.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	return mutateUCI(n.uci, []string{"network"}, func() error {
+		if config.MTU != 0 && (config.MTU < 68 || config.MTU > 9000) {
+			return fmt.Errorf("MTU must be between 68 and 9000, got %d", config.MTU)
+		}
+		current := map[string]string{}
+		if opts, err := n.uci.GetAll("network", "wan"); err == nil {
+			current = opts
+		}
+		if config.Type == "pppoe" {
+			// Editing other fields of an already-configured PPPoE WAN is fine;
+			// switching INTO one is not.
+			if current["proto"] != "pppoe" || current["username"] == "" || current["password"] == "" {
+				return errPPPoEUnsupported
+			}
+		}
 		if config.Type != "" {
 			if err := n.uciSet("network", "wan", "proto", config.Type); err != nil {
 				return err
+			}
+			if config.Type != current["proto"] && config.Type != "static" {
+				for _, option := range wanStaticOptions {
+					// Only options that are actually set: `uci delete` on a
+					// missing entry is itself an error, and that must not fail
+					// the whole save.
+					if _, present := current[option]; !present {
+						continue
+					}
+					if err := n.uci.DeleteOption("network", "wan", option); err != nil {
+						return fmt.Errorf("clear %s after switching WAN to %s: %w", option, config.Type, err)
+					}
+				}
 			}
 		}
 		if config.IPAddress != "" {
@@ -783,6 +1008,25 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 		}
 		if config.Gateway != "" {
 			if err := n.uciSet("network", "wan", "gateway", config.Gateway); err != nil {
+				return err
+			}
+		}
+		if config.MTU > 0 {
+			if err := n.uciSet("network", "wan", "mtu", strconv.Itoa(config.MTU)); err != nil {
+				return err
+			}
+		}
+		// A nil dns_servers means "not part of this save"; an explicit empty
+		// list means "go back to the DHCP-provided resolvers".
+		if config.DNSServers != nil {
+			peerdns := "1"
+			if len(config.DNSServers) > 0 {
+				peerdns = "0"
+			}
+			if err := n.uciSet("network", "wan", "peerdns", peerdns); err != nil {
+				return err
+			}
+			if err := n.uciSet("network", "wan", "dns", strings.Join(config.DNSServers, " ")); err != nil {
 				return err
 			}
 		}
@@ -962,6 +1206,20 @@ func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
 	return entries, nil
 }
 
+// uciSectionExists reports whether a UCI section is already present.
+//
+// It exists because real `uci set config.section=stype` CREATES OR UPDATES:
+// AddSection is not a duplicate check. Callers that relied on its error passed
+// under a stricter mock and silently UPSERTED on the device.
+func (n *NetworkService) uciSectionExists(config, section string) (bool, error) {
+	sections, err := n.uci.GetSections(config)
+	if err != nil {
+		return false, fmt.Errorf("reading %s sections: %w", config, err)
+	}
+	_, ok := sections[section]
+	return ok, nil
+}
+
 // AddDNSEntry adds a new local DNS entry as a named UCI section in dhcp config.
 func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 	// `dhcp` is locked, not just committed-and-hoped: the uci CLI keeps
@@ -974,6 +1232,16 @@ func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 	// theoretical one.
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "dns_" + sanitizeSectionName(entry.Name)
+		// Explicit duplicate check, inside the lock: real uci reuses the section
+		// instead of failing, so a second entry with the same name would silently
+		// REPLACE the first one's IP.
+		exists, err := n.uciSectionExists("dhcp", section)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("DNS entry %q already exists", entry.Name)
+		}
 		if err := n.uci.AddSection("dhcp", section, "domain"); err != nil {
 			return fmt.Errorf("adding DNS entry section: %w", err)
 		}
@@ -992,11 +1260,43 @@ func (n *NetworkService) DeleteDNSEntry(section string) error {
 	// Same lock as AddDNSEntry, and for the same reason: a delete that reverts
 	// or commits `dhcp` concurrently with an add silently discards the add.
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.requireNamedDHCPSection(section, "domain"); err != nil {
+			return err
+		}
 		if err := n.uci.DeleteSection("dhcp", section); err != nil {
 			return fmt.Errorf("deleting DNS entry: %w", err)
 		}
 		return n.uci.Commit("dhcp")
 	})
+}
+
+// requireNamedDHCPSection rejects anything that is not a named section of the
+// expected type before it is deleted.
+//
+// uci.validSectionName deliberately admits anonymous references (@dnsmasq[0]),
+// because stock /etc/config files use them, so
+// DELETE /api/v1/network/dns/entries/@dnsmasq[0] passed validation and
+// `uci delete dhcp.@dnsmasq[0]` removed the whole dnsmasq section and committed
+// it: DHCP pool, lease time, DNS servers, DHCPv6 and RA all gone, with nothing
+// but a 200 to show for it. Both add paths only ever create named sections, so
+// no legitimate caller can produce an anonymous reference.
+func (n *NetworkService) requireNamedDHCPSection(section, wantType string) error {
+	if strings.HasPrefix(section, "@") {
+		return fmt.Errorf("refusing to delete anonymous dhcp section %s: "+
+			"it is part of the file, not one entry", section)
+	}
+	sections, err := n.uci.GetSections("dhcp")
+	if err != nil {
+		return fmt.Errorf("reading dhcp sections: %w", err)
+	}
+	opts, ok := sections[section]
+	if !ok {
+		return fmt.Errorf("dhcp section not found: %s", section)
+	}
+	if opts[".type"] != wantType {
+		return fmt.Errorf("dhcp section %s is a %q section, not %q", section, opts[".type"], wantType)
+	}
+	return nil
 }
 
 // sanitizeSectionName converts a hostname to a valid UCI section name.
@@ -1040,6 +1340,16 @@ func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error)
 func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "host_" + sanitizeSectionName(reservation.Name)
+		// Explicit duplicate check, inside the lock: a same-named reservation
+		// would otherwise be overwritten in place, silently changing which MAC
+		// gets which address.
+		exists, err := n.uciSectionExists("dhcp", section)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("DHCP reservation %q already exists", reservation.Name)
+		}
 		if err := n.uci.AddSection("dhcp", section, "host"); err != nil {
 			return fmt.Errorf("adding DHCP reservation section: %w", err)
 		}
@@ -1059,6 +1369,9 @@ func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) 
 // DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
 func (n *NetworkService) DeleteDHCPReservation(section string) error {
 	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+		if err := n.requireNamedDHCPSection(section, "host"); err != nil {
+			return err
+		}
 		if err := n.uci.DeleteSection("dhcp", section); err != nil {
 			return fmt.Errorf("deleting DHCP reservation: %w", err)
 		}
@@ -1132,11 +1445,32 @@ func (n *NetworkService) KickClient(mac string) error {
 // delta: the uci CLI keeps uncommitted changes in /tmp/.uci/firewall/changes,
 // so an abandoned half-written rule would be committed by a later, unrelated
 // `uci commit firewall`.
+//
+// This is a direct `uci commit firewall` + firewall reload rather than the rpcd
+// apply/confirm flow, because a block has to be enforced on the running firewall
+// immediately — a rollback window that silently expires on a policy change would
+// unblock a client the operator believes is filtered. ADR 0004 §5 requires such
+// a path to be listed there with a named crash guard AND a rollback; the
+// rollback is the undoFirewallSection call below. The guard row is still
+// missing (it needs ADR 0004 §5, ADR 0003 §2, scripts/deploy-local.sh and
+// scripts/install.sh), and writing a guard here without those would be worse
+// than no guard: nothing would clear it, and blocking would stay dead until a
+// redeploy.
 func (n *NetworkService) BlockClient(mac string) error {
 	return mutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 		macUpper := strings.ToUpper(mac)
 
+		// Explicit duplicate check, inside the lock: real uci reuses the rule
+		// section, so re-blocking an already-blocked client would report success
+		// and restart the firewall for nothing.
+		exists, err := n.uciSectionExists("firewall", section)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("client %s is already blocked", macUpper)
+		}
 		if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
 			return fmt.Errorf("add firewall block rule: %w", err)
 		}
@@ -1156,6 +1490,11 @@ func (n *NetworkService) BlockClient(mac string) error {
 			return err
 		}
 		if err := n.restartService("firewall"); err != nil {
+			// The rule is committed but the running firewall never loaded it.
+			// Take it back out so the file and the running firewall agree.
+			if undoErr := n.undoFirewallSection(section, nil); undoErr != nil {
+				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %v)", err, section, undoErr)
+			}
 			return fmt.Errorf("restart firewall: %w", err)
 		}
 		return nil
@@ -1167,6 +1506,7 @@ func (n *NetworkService) UnblockClient(mac string) error {
 	return mutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 
+		previous, _ := n.uci.GetAll("firewall", section)
 		if err := n.uci.DeleteSection("firewall", section); err != nil {
 			return fmt.Errorf("delete firewall block rule: %w", err)
 		}
@@ -1175,10 +1515,42 @@ func (n *NetworkService) UnblockClient(mac string) error {
 			return err
 		}
 		if err := n.restartService("firewall"); err != nil {
+			// Same contract as BlockClient: the committed config must not be
+			// left saying "unblocked" while the running firewall still drops it.
+			if undoErr := n.undoFirewallSection(section, previous); undoErr != nil {
+				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %v)", err, section, undoErr)
+			}
 			return fmt.Errorf("restart firewall: %w", err)
 		}
 		return nil
 	})
+}
+
+// undoFirewallSection restores a firewall section to a previous option set —
+// nil means the section must be gone — and commits the result.
+func (n *NetworkService) undoFirewallSection(section string, previous map[string]string) error {
+	// An unblock has usually already deleted the section by this point, and a
+	// missing section IS the target state, so a failed delete is only an error
+	// when the section is in fact still there.
+	if _, err := n.uci.GetAll("firewall", section); err == nil {
+		if err := n.uci.DeleteSection("firewall", section); err != nil {
+			return err
+		}
+	}
+	if previous != nil {
+		if err := n.uci.AddSection("firewall", section, "rule"); err != nil {
+			return err
+		}
+		for option, value := range previous {
+			if strings.HasPrefix(option, ".") {
+				continue
+			}
+			if err := n.uci.Set("firewall", section, option, value); err != nil {
+				return err
+			}
+		}
+	}
+	return n.uciCommit("firewall")
 }
 
 // GetBlockedClients returns a list of blocked MAC addresses.
@@ -1499,8 +1871,17 @@ func (n *NetworkService) savePortForwards(rules []models.PortForwardRule) error 
 }
 
 // RunDiagnostics runs ping, traceroute, or DNS lookup and returns the output.
+//
+// The target becomes the final argv entry of a root-run command, so it is
+// validated as a hostname or IP literal first: an unvalidated target of "-f"
+// turned `ping` into a root flood of the whole internet, and "-w1"/"-s" style
+// values rewrite its behaviour.
 func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.DiagnosticsResult {
 	result := models.DiagnosticsResult{Type: req.Type, Target: req.Target}
+	if err := validateDiagnosticTarget(req.Target); err != nil {
+		result.Error = err.Error()
+		return result
+	}
 	var out []byte
 	var err error
 	switch req.Type {
@@ -1519,6 +1900,33 @@ func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.Di
 	}
 	result.Output = string(out)
 	return result
+}
+
+// validateDiagnosticTarget accepts a hostname or an IP literal and nothing else.
+func validateDiagnosticTarget(target string) error {
+	trimmed := strings.TrimSpace(target)
+	if trimmed == "" {
+		return errors.New("target is required")
+	}
+	if trimmed != target || strings.HasPrefix(target, "-") {
+		return fmt.Errorf("invalid diagnostic target %q: must be a hostname or IP address", target)
+	}
+	if _, err := netip.ParseAddr(target); err == nil {
+		return nil
+	}
+	for _, label := range strings.Split(target, ".") {
+		if label == "" {
+			return fmt.Errorf("invalid diagnostic target %q: must be a hostname or IP address", target)
+		}
+		for _, r := range label {
+			isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+			isDigit := r >= '0' && r <= '9'
+			if !isLetter && !isDigit && r != '-' && r != '_' {
+				return fmt.Errorf("invalid diagnostic target %q: must be a hostname or IP address", target)
+			}
+		}
+	}
+	return nil
 }
 
 const dohConfigFile = "/etc/travo/doh-config.json"
@@ -1545,7 +1953,9 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(dohConfigFile, data, 0600); err != nil {
+	// Atomic: os.WriteFile truncates first, so a power cut or a concurrent read
+	// left a half-written file that silently falls back to the default provider.
+	if err := writeFileAtomic(dohConfigFile, data, 0600); err != nil {
 		return err
 	}
 	// Apply: configure dnsmasq to use a local DoH proxy if enabled.
@@ -1634,32 +2044,69 @@ type ConnectionMethod struct {
 // dump for accurate address detection. On error, logs details and returns
 // "unknown" to avoid breaking UI.
 func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
+	return classifyClientConnection(classifyDeps{
+		ubus: n.ubus, cmd: n.cmd, arpFile: n.arpFile,
+	}, clientIP), nil
+}
+
+// classifyDeps is everything the classifier reads off the router. It is a
+// struct rather than a long argument list because both services build one, and
+// a fifth positional argument would make it easy to pass the neighbour table
+// where the command runner belongs.
+type classifyDeps struct {
+	ubus    ubus.Ubus
+	cmd     CommandRunner
+	arpFile string
+}
+
+// classifyClientConnection maps a client IP to the interface it is reachable
+// through, then to a connection method. It is a free function taking the router
+// dependencies so the wireless lockout guard (wifi_lockout.go) can classify its
+// caller through the SAME code as GET /network/connection-method, instead of
+// keeping a second, drifting copy of "is this client on WiFi".
+//
+// Matching the IP against the interface dump only says which SUBNET the caller
+// is on. On this hardware that is not enough: br-lan carries both wired and
+// wireless clients in the same /24, so a subnet match alone cannot tell a phone
+// from the laptop next to it. A client that lands on the LAN bridge is
+// therefore resolved to a MAC through the neighbour table and then asked whether
+// that MAC is associated with an access point. Only the uplink STA (where the
+// router itself is the WiFi client) answers from the interface name alone.
+//
+// It never fails: an unknown address, an IPv6 client, an unreadable dump or an
+// unresolvable MAC all answer "unknown", so a caller it cannot place is never
+// mistaken for a wireless one. The guard treats that answer as unsafe (see
+// guardLockout).
+func classifyClientConnection(deps classifyDeps, clientIP string) *ConnectionMethod {
+	unknown := func() *ConnectionMethod {
+		return &ConnectionMethod{Method: "unknown", IPAddress: clientIP}
+	}
 	// Handle localhost cases
 	if clientIP == "" || clientIP == "::1" || clientIP == "127.0.0.1" {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Parse client IP to validate it's valid
 	clientAddr, err := netip.ParseAddr(clientIP)
 	if err != nil {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// IPv6 addresses are not supported for connection method detection
 	if clientAddr.Is6() {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Get all network interface addresses via ubus
-	ifaceDump, err := n.ubus.Call("network.interface", "dump", nil)
+	ifaceDump, err := deps.ubus.Call("network.interface", "dump", nil)
 	if err != nil {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	// Parse the ubus response to find matching interfaces
 	interfaces, ok := ifaceDump["interface"].([]any)
 	if !ok {
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
 	type ifaceInfo struct {
@@ -1692,47 +2139,11 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 		}
 
 		info := ifaceInfo{
-			name:   name,
-			device: device,
-			up: func() bool {
-				if up, ok := ifaceMap["up"].(bool); ok {
-					return up
-				}
-				return false
-			}(),
-			interfaceUp: func() bool {
-				if up, ok := ifaceMap["interface"].(bool); ok {
-					return up
-				}
-				return false
-			}(),
-		}
-
-		// Extract IPv4 addresses with netmasks
-		if ipv4Addrs, ok := ifaceMap["ipv4-address"].([]any); ok {
-			for _, addrRaw := range ipv4Addrs {
-				if addrMap, ok := addrRaw.(map[string]any); ok {
-					if addrStr, ok := addrMap["address"].(string); ok {
-						// Parse address with netmask
-						if addr, err := netip.ParseAddr(addrStr); err == nil {
-							info.ipv4Addrs = append(info.ipv4Addrs, netip.PrefixFrom(addr, 32))
-						}
-					}
-				}
-			}
-		}
-
-		// Also extract IPv4 prefix data if available (includes netmask)
-		if ipv4Prefixes, ok := ifaceMap["ipv4-prefix"].([]any); ok {
-			for _, prefixRaw := range ipv4Prefixes {
-				if prefixMap, ok := prefixRaw.(map[string]any); ok {
-					if prefixStr, ok := prefixMap["address"].(string); ok {
-						if prefix, err := netip.ParsePrefix(prefixStr); err == nil {
-							info.ipv4Addrs = append(info.ipv4Addrs, prefix)
-						}
-					}
-				}
-			}
+			name:        name,
+			device:      device,
+			ipv4Addrs:   parseIfaceIPv4Prefixes(ifaceMap),
+			up:          ifaceMap["up"] == true,
+			interfaceUp: ifaceMap["interface"] == true,
 		}
 
 		ifaces = append(ifaces, info)
@@ -1760,27 +2171,67 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 
 	if matchedIface == nil {
 		// No match found - might be localhost or routed
-		return &ConnectionMethod{Method: "unknown", Interface: "", IPAddress: clientIP}, nil
+		return unknown()
 	}
 
-	// Determine connection method based on interface
-	method := "unknown"
-	switch {
-	case strings.HasPrefix(matchedIface.name, "wwan") ||
-		strings.HasPrefix(matchedIface.device, "phy") && strings.Contains(matchedIface.device, "-sta"):
-		method = "wifi-client"
-	case matchedIface.name == "br-lan" || matchedIface.name == "lan":
-		// Check if this is AP via wireless device presence
-		method = "wifi-ap" // Default to AP for LAN
-	case strings.HasPrefix(matchedIface.name, "eth") || strings.HasPrefix(matchedIface.device, "eth"):
-		method = "ethernet"
-	}
+	method := classifyMatchedIface(deps, matchedIface.name, matchedIface.device, clientIP)
 
 	return &ConnectionMethod{
 		Method:    method,
 		Interface: matchedIface.name,
 		IPAddress: clientIP,
-	}, nil
+	}
+}
+
+// classifyMatchedIface turns a resolved interface plus the client address into a
+// connection method. Split out so the ordering rule below is readable on its own.
+func classifyMatchedIface(deps classifyDeps, name, device, clientIP string) string {
+	switch {
+	case strings.HasPrefix(name, "wwan") ||
+		strings.HasPrefix(device, "phy") && strings.Contains(device, "-sta"):
+		// The router is itself the WiFi client on this uplink: whoever is behind
+		// it gets its connectivity over the air.
+		return "wifi-client"
+	case name == "br-lan" || name == "lan":
+		return classifyLanClient(deps, clientIP)
+	case strings.HasPrefix(name, "eth") || strings.HasPrefix(device, "eth"):
+		return "ethernet"
+	}
+	return "unknown"
+}
+
+// classifyLanClient decides whether a client on the LAN bridge is on a wire or
+// on an access point. The bridge cannot answer that, so the client's MAC is
+// resolved through the neighbour table and checked against the radio's station
+// lists — the same source of truth the client list uses.
+//
+// It returns "unknown" rather than guessing whenever the answer is not provable:
+// no MAC for the address, or the access-point side could not be read. "unknown"
+// is not a safe default here, it is the safe direction — the guard refuses on
+// it (see guardLockout).
+func classifyLanClient(deps classifyDeps, clientIP string) string {
+	mac, ok := arpMACForIP(deps.arpFile, clientIP)
+	if !ok {
+		return "unknown"
+	}
+	if _, isWifi := apStationMACs(deps.cmd)[mac]; isWifi {
+		return "wifi-ap"
+	}
+	return "ethernet"
+}
+
+// arpMACForIP resolves one client address to its MAC through the neighbour table.
+func arpMACForIP(arpFile, ip string) (string, bool) {
+	ipToARP, macToIP := parseArpTable(readArpFile(arpFile))
+	if _, ok := ipToARP[ip]; !ok {
+		return "", false
+	}
+	for mac, mip := range macToIP {
+		if mip == ip {
+			return mac, true
+		}
+	}
+	return "", false
 }
 
 // writeFileAtomic writes via a sibling temp file and renames, so a concurrent

@@ -153,8 +153,17 @@ deploy_direct() {
     local frontend_dir="${REPO_ROOT}/frontend/dist"
     [[ -d "$frontend_dir" ]] || error "Missing $frontend_dir"
     info "Uploading frontend assets..."
-    ssh_cmd "mkdir -p /www/travo"
-    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/travo/"
+    # Swap the directory rather than extracting over it. Vite emits
+    # content-hashed filenames, so extracting on top of the previous tree leaves
+    # every superseded chunk behind forever -- forty deploys while iterating on
+    # the UI is enough to fill a travel router's overlay, after which uci
+    # commits start failing and the device needs a reflash. The staged directory
+    # plus rename is busybox-safe and leaves no window where /www/travo is empty.
+    ssh_cmd "rm -rf /www/travo.new && mkdir -p /www/travo.new"
+    COPYFILE_DISABLE=1 tar -cf - -C "$frontend_dir" . | ssh_cmd "tar -xf - -C /www/travo.new"
+    ssh_cmd "mv /www/travo /www/travo.old 2>/dev/null || true; \
+             mv /www/travo.new /www/travo; \
+             rm -rf /www/travo.old"
   else
     info "Skipping frontend (--binary-only)."
   fi
@@ -187,34 +196,13 @@ restart_service() {
   # guards -- a stuck guard permanently disables those features, so the
   # documented recovery path (architecture.md section 4, step 4) did not exist
   # for them.
-  info "Clearing crash guards..."
-  # autoreconnect-failcount is intentionally NOT cleared: it is the bounded
-  # retry counter that stops a broken saved network being replayed every
-  # minute. A successful reconnect clears it on the device.
-  # firmware-upgrade-in-progress and factory-reset-in-progress are also NOT
-  # cleared: ADR 0003 section 2 keeps them so an interrupted sysupgrade or
-  # firstboot stays discoverable after the reboot. deploy-local.sh restarts the
-  # service but must not erase the record of a device mid-recovery.
   #
-  # One ssh call, not one per guard per directory: 12 guards x 2 directories is
-  # 24 round-trips, and a device that accepts TCP but then hangs costs
-  # ConnectTimeout seconds on each of them before the restart even starts.
-  # The paths are expanded here rather than with a remote brace expansion,
-  # which BusyBox ash does not support.
-  #
-  # /etc/travo is the legacy location: guards were split across both directories
-  # before they were unified on /etc/trafo, so a device upgraded from an older
-  # build can still carry a guard there. Clear both.
-  local guard_paths=()
-  for guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
-    captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
-    wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
-    system-config-in-progress autoreconnect-crash-guard; do
-    for dir in /etc/trafo /etc/travo; do
-      guard_paths+=("${dir}/${guard}")
-    done
-  done
-  ssh_cmd "rm -f ${guard_paths[*]}" >/dev/null 2>&1 || true
+  # ORDER MATTERS (ADR 0003 section 1.3): the guards are cleared only AFTER the
+  # restarted service is verified running. Clearing them first meant a restart
+  # that failed left the device with no guard and no live feature: the exact
+  # ambiguous half-finished state the guard exists to make discoverable, and the
+  # documented recovery path (this script) could no longer tell a stuck guard
+  # from a clean one.
   info "Restarting travo..."
   ssh_cmd "/etc/init.d/travo restart 2>/dev/null || /etc/init.d/travo start 2>/dev/null || true"
   info "Waiting for process..."
@@ -223,6 +211,34 @@ restart_service() {
   while [[ $attempts -lt 5 ]]; do
     if ssh_cmd "pgrep -f travo >/dev/null 2>&1"; then
       echo -e "${GREEN}OK${NC} travo running"
+      info "Clearing crash guards..."
+      # autoreconnect-failcount is intentionally NOT cleared: it is the bounded
+      # retry counter that stops a broken saved network being replayed every
+      # minute. A successful reconnect clears it on the device.
+      # firmware-upgrade-in-progress and factory-reset-in-progress are also NOT
+      # cleared: ADR 0003 section 2 keeps them so an interrupted sysupgrade or
+      # firstboot stays discoverable after the reboot. A redeploy restarts the
+      # service but must not erase the record of a device mid-recovery.
+      #
+      # One ssh call, not one per guard per directory: 12 guards x 2 directories
+      # is 24 round-trips, and a device that accepts TCP but then hangs costs
+      # ConnectTimeout seconds on each of them before the restart even starts.
+      # The paths are expanded here rather than with a remote brace expansion,
+      # which BusyBox ash does not support.
+      #
+      # /etc/travo is the legacy location: guards were split across both
+      # directories before they were unified on /etc/trafo, so a device
+      # upgraded from an older build can still carry a guard there. Clear both.
+      local guard_paths=()
+      for guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
+        captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
+        wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
+        system-config-in-progress autoreconnect-crash-guard; do
+        for dir in /etc/trafo /etc/travo; do
+          guard_paths+=("${dir}/${guard}")
+        done
+      done
+      ssh_cmd "rm -f ${guard_paths[*]}" >/dev/null 2>&1 || true
       return 0
     fi
     attempts=$((attempts + 1))

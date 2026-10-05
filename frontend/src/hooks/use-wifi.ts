@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { routeWithParam, routeWithSegment } from '@/lib/api-url';
@@ -50,6 +51,22 @@ export function useWifiHealth() {
   });
 }
 
+/**
+ * A WiFi change perturbs every `wifi` query plus a few router-wide ones.
+ *
+ * The broad invalidate covers all `wifi` keys (including ones that need no
+ * follow-up, like the radio scan); `refreshRouterState` then only repeats the
+ * delayed passes on `refreshKeys`. Calling both in full fetched the listed keys
+ * four times per mutation.
+ */
+function wifiMutationSettled(queryClient: QueryClient, refreshKeys: Array<readonly unknown[]>) {
+  void queryClient.invalidateQueries({ queryKey: ['wifi'] });
+  for (const queryKey of refreshKeys) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+  void refreshRouterState(queryClient, refreshKeys, { skipImmediate: true });
+}
+
 export function useWifiConnect() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -64,8 +81,7 @@ export function useWifiConnect() {
       finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.connect, params)),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'saved'],
         ['network', 'status'],
@@ -84,8 +100,7 @@ export function useWifiDisconnect() {
       finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.disconnect)),
     onSuccess: () => {
       toast.success('Disconnected from WiFi');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'saved'],
         ['network', 'status'],
@@ -100,12 +115,25 @@ export function useWifiDisconnect() {
 export function useWifiMode() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mode: WifiMode) =>
-      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mode, { mode })),
-    onSuccess: (_data, mode) => {
+    // acknowledge_lockout rides along with the mode so the caller can re-send
+    // the SAME request once the operator has ticked the lockout dialog. The
+    // hook must not decide that: the dialog does, in the page.
+    mutationFn: ({
+      mode,
+      acknowledge_lockout,
+    }: {
+      mode: WifiMode;
+      acknowledge_lockout?: boolean;
+    }) =>
+      finalizeWifiMutation(
+        apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mode, {
+          mode,
+          ...(acknowledge_lockout ? { acknowledge_lockout: true } : {}),
+        }),
+      ),
+    onSuccess: (_data, { mode }) => {
       toast.success(`WiFi mode changed to ${mode}`);
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'saved'],
         ['wifi', 'ap'],
@@ -113,6 +141,10 @@ export function useWifiMode() {
       ]);
     },
     onError: (error) => {
+      // The lockout refusal also raises its own acknowledgement dialog, but it
+      // is NOT swallowed here: this hook is shared by pages that do not wire
+      // that dialog, and silence there would leave a refused change with no
+      // explanation at all.
       toast.error('Failed to change WiFi mode', { description: error.message });
     },
   });
@@ -182,6 +214,7 @@ export function useSetAPConfig() {
       ]);
     },
     onError: (error) => {
+      // Not swallowed for the same reason as useWifiMode's onError.
       toast.error('Failed to update AP config', { description: error.message });
     },
   });
@@ -223,8 +256,7 @@ export function useRepeaterRadioReconcile() {
       ),
     onSuccess: () => {
       toast.success('Repeater radio layout updated');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'health'],
         ['wifi', 'ap'],
         ['wifi', 'connection'],
@@ -309,19 +341,49 @@ export function useRadios() {
   });
 }
 
+/**
+ * Response of the radio-role endpoint: the shared envelope plus, when the
+ * service had to invent a WPA passphrase for a default AP it created,
+ * generated_key. The passphrase is returned exactly once and is unrecoverable
+ * afterwards, so callers must surface it.
+ */
+type RadioRoleMutationResponse = WifiMutationResponse & {
+  readonly generated_key?: string;
+};
+
 export function useSetRadioRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, role }: { name: string; role: string }) =>
+    // acknowledge_lockout rides along so a refused role change can be re-sent
+    // once the operator has ticked the lockout dialog (ADR 0002 §5).
+    mutationFn: ({
+      name,
+      role,
+      acknowledge_lockout: acknowledge,
+    }: {
+      name: string;
+      role: string;
+      acknowledge_lockout?: boolean;
+    }) =>
       finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
+        apiClient.put<RadioRoleMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
           role,
+          ...(acknowledge ? { acknowledge_lockout: true } : {}),
         }),
       ),
-    onSuccess: () => {
-      toast.success('Radio role updated');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+    onSuccess: (data, { name }) => {
+      // A radio switched to AP with no key gets a passphrase invented by the
+      // service. It is returned exactly once, in this response, and the new AP
+      // on the air uses it — so it has to reach the operator here or the network
+      // ends up with a password nobody knows.
+      if (data.generated_key) {
+        toast.success(`Radio ${name} updated`, {
+          description: `Generated WiFi password for ${name}: ${data.generated_key}`,
+        });
+      } else {
+        toast.success('Radio role updated');
+      }
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'radios'],
         ['wifi', 'ap'],
@@ -329,6 +391,8 @@ export function useSetRadioRole() {
       ]);
     },
     onError: (error) => {
+      // Keep the backend's own wording: a refused role names both remedies, and
+      // the radio card repeats the same message inline next to the selector.
       toast.error('Failed to update radio role', { description: error.message });
     },
   });
@@ -341,8 +405,7 @@ export function useSetRadioEnabled() {
       finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.radio, { enabled })),
     onSuccess: () => {
       toast.success('WiFi radio updated');
-      void queryClient.invalidateQueries({ queryKey: ['wifi'] });
-      void refreshRouterState(queryClient, [
+      wifiMutationSettled(queryClient, [
         ['wifi', 'connection'],
         ['wifi', 'radios'],
         ['network', 'status'],
@@ -390,6 +453,9 @@ export function useSetBandSwitching() {
     mutationFn: (config: BandSwitchConfig) =>
       apiClient.put<{ status: string }>(API_ROUTES.wifi.bandSwitching, config),
     onSuccess: () => {
+      // Without a success toast this toggle read from a 10s-polled query, so
+      // enabling it looked like nothing happened.
+      toast.success('Band switching updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'band-switching'] });
     },
     onError: (error) => {

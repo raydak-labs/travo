@@ -21,6 +21,13 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
+	// The shared app's requests come from fiber's in-memory connection, whose
+	// peer address is 0.0.0.0 and therefore cannot be placed by the router.
+	// Registering a wired L3 device makes the lockout guard classify every
+	// request in this app as a proven ethernet caller, so the many tests here
+	// that are about something else are not refused by it. Tests that are ABOUT
+	// the guard register their own dump instead (wifi_lockout_handlers_test.go).
+	ub.RegisterResponse("network.interface.dump", interfaceDump("eth0"))
 	authSvc := auth.NewAuthService("admin", "test-secret")
 	blocklist := auth.NewTokenBlocklist()
 	authSvc.SetBlocklist(blocklist)
@@ -70,10 +77,17 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
 	}
 
-	app := fiber.New()
+	// CaseSensitive mirrors production (cmd/server/main.go). Without it the
+	// test app would not reproduce the routing behaviour the auth coverage
+	// test in auth_coverage_test.go exists to guard.
+	app := fiber.New(fiber.Config{CaseSensitive: true})
+
+	// Auth middleware is mounted by the caller in production (main.go) and must
+	// be mounted here too, or the coverage test in auth_coverage_test.go would
+	// pass vacuously.
 	app.Use(authSvc.Middleware())
 
-	// Health endpoint (excluded from auth)
+	// Health endpoint is public: auth.PublicPaths exempts it.
 	app.Get("/api/health", func(c fiber.Ctx) error {
 		return RespondOK(c)
 	})

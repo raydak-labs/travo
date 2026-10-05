@@ -3,13 +3,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Key } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { useSSHKeys, useAddSSHKey, useDeleteSSHKey } from '@/hooks/use-system';
 import { sshPublicKeyFormSchema, type SshPublicKeyFormValues } from '@/lib/schemas/system-forms';
 import { SSHKeyAddForm } from '@/pages/system/ssh-key-add-form';
 import { SSHKeysList } from '@/pages/system/ssh-keys-list';
 
 export function SSHKeysCard() {
-  const { data: keys = [], isLoading } = useSSHKeys();
+  const { data: keys, isLoading, isError, error, refetch } = useSSHKeys();
   const addSSHKey = useAddSSHKey();
   const deleteSSHKey = useDeleteSSHKey();
 
@@ -40,15 +41,21 @@ export function SSHKeysCard() {
         <Key className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : (
+        {/* `keys = []` on failure read as "no keys configured" — an empty
+            authoritative-looking list. QueryCard states the failure instead. */}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={<Skeleton className="h-16 w-full" />}
+        >
           <SSHKeysList
-            keys={[...keys]}
+            keys={[...(keys ?? [])]}
             deletePending={deleteSSHKey.isPending}
             onDelete={(index) => deleteSSHKey.mutate(index)}
           />
-        )}
+        </QueryCard>
 
         <SSHKeyAddForm
           register={register}

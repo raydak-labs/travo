@@ -96,7 +96,7 @@ Follow TDD: write tests first, see them fail, write minimal code to pass.
 
 Follow full rationale and examples in `docs/architecture.md`. Core rules:
 
-- Any automated action that modifies live system state must use a crash guard file in `/etc/travo/<feature>-in-progress`.
+- Any automated action that modifies live system state must use a crash guard file in `/etc/trafo/<feature>-in-progress` (ADR 0003 §2 lists every path; non-guard state stays in `/etc/travo/`).
 - Remove guard files only after the dangerous operation completes successfully.
 - A manual redeploy via `deploy-local.sh` clears guard files and is the explicit retry path.
 - Wireless changes must preserve LuCI-style rollback semantics: backend uses rpcd `uci apply` plus rollback plus `uci confirm`.

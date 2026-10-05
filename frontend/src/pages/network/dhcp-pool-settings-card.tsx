@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Settings } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { QueryCard } from '@/components/ui/query-card';
 import { useDHCPConfig, useSetDHCPConfig } from '@/hooks/use-network';
 import {
   dhcpPoolFormSchema,
@@ -14,7 +14,13 @@ import {
 import { DhcpPoolFormFields } from './dhcp-pool-form-fields';
 
 export function DhcpPoolSettingsCard() {
-  const { data: dhcpConfig, isLoading: dhcpLoading } = useDHCPConfig();
+  const {
+    data: dhcpConfig,
+    isLoading: dhcpLoading,
+    isError: dhcpFailed,
+    error: dhcpError,
+    refetch: refetchDhcp,
+  } = useDHCPConfig();
   const setDHCP = useSetDHCPConfig();
 
   const {
@@ -54,19 +60,23 @@ export function DhcpPoolSettingsCard() {
         <Settings className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {dhcpLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSaveDhcp)} className="space-y-4" noValidate>
-            <DhcpPoolFormFields register={register} control={control} errors={dhcpErrors} />
-            <Button type="submit" disabled={setDHCP.isPending} size="sm">
-              {setDHCP.isPending ? 'Saving…' : 'Save DHCP Settings'}
-            </Button>
-          </form>
-        )}
+        {/* The form is only editable once the pool has been read: a failed GET
+            with hard-coded defaults would let a Save overwrite the real pool. */}
+        <QueryCard
+          isLoading={dhcpLoading}
+          isError={dhcpFailed}
+          error={dhcpError}
+          onRetry={() => void refetchDhcp()}
+        >
+          {dhcpConfig ? (
+            <form onSubmit={handleSubmit(onSaveDhcp)} className="space-y-4" noValidate>
+              <DhcpPoolFormFields register={register} control={control} errors={dhcpErrors} />
+              <Button type="submit" disabled={setDHCP.isPending} size="sm">
+                {setDHCP.isPending ? 'Saving…' : 'Save DHCP Settings'}
+              </Button>
+            </form>
+          ) : null}
+        </QueryCard>
       </CardContent>
     </Card>
   );

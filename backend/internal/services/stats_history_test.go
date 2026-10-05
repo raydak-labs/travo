@@ -109,3 +109,32 @@ func TestStatsHistory_RestoreRespectsMaxLen(t *testing.T) {
 		t.Errorf("expected restore capped at maxLen=3, got %d", got)
 	}
 }
+
+// A failing flash write must be visible and must not silently retire the
+// pending batch: the counter is only reset once the write landed, so the next
+// batch tries again instead of the history being dropped forever.
+func TestStatsHistory_FailedFlushKeepsPendingPoints(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "history.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	checker := newTestStatsHistory(time.Minute).checker
+	s := NewStatsHistoryServiceWithStore(checker, time.Minute, 10, db)
+
+	s.collect()
+	if s.sinceFlush != 1 {
+		t.Fatalf("precondition: expected one unflushed point, got %d", s.sinceFlush)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+
+	s.Flush()
+
+	if s.sinceFlush != 1 {
+		t.Errorf("a failed flush must not reset the flush counter, got %d", s.sinceFlush)
+	}
+	if len(s.GetHistory()) != 1 {
+		t.Errorf("a failed flush must not drop the in-memory points, got %d", len(s.GetHistory()))
+	}
+}

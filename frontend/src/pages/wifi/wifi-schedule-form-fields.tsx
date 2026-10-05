@@ -24,7 +24,8 @@ export function WiFiScheduleFormFields({
         <div className="space-y-0.5">
           <p className="text-sm">Enable schedule</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Automatically turn WiFi on and off at set times (cron-based)
+            Turns this router&apos;s WiFi on and off every day at the times below. Anything
+            connected over WiFi loses its connection while WiFi is off.
           </p>
         </div>
         <Switch
@@ -54,7 +55,11 @@ export function WiFiScheduleFormFields({
                 {...register('on_time')}
               />
               {errors.on_time ? (
-                <span id="wifi-on-err" className="text-xs text-red-500" role="alert">
+                <span
+                  id="wifi-on-err"
+                  className="text-xs text-red-600 dark:text-red-400"
+                  role="alert"
+                >
                   {errors.on_time.message}
                 </span>
               ) : null}
@@ -77,7 +82,11 @@ export function WiFiScheduleFormFields({
                 {...register('off_time')}
               />
               {errors.off_time ? (
-                <span id="wifi-off-err" className="text-xs text-red-500" role="alert">
+                <span
+                  id="wifi-off-err"
+                  className="text-xs text-red-600 dark:text-red-400"
+                  role="alert"
+                >
                   {errors.off_time.message}
                 </span>
               ) : null}

@@ -81,7 +81,11 @@ export function HostnameInlineForm({
           Cancel
         </Button>
         {errors.hostname ? (
-          <span id="hostname-inline-error" className="w-full text-xs text-red-500" role="alert">
+          <span
+            id="hostname-inline-error"
+            className="w-full text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
             {errors.hostname.message}
           </span>
         ) : null}

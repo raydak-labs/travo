@@ -177,3 +177,47 @@ func TestIsValidMAC(t *testing.T) {
 		}
 	}
 }
+
+// The diagnostics target is handed to ping / traceroute / nslookup as one argv
+// element, so this is not about shell injection: a leading "-" would be read as
+// an option (ping -f floods, -w and -i change the probe), and a value with
+// whitespace or a slash is never a host.
+func TestIsValidDiagnosticsTarget(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"8.8.8.8", true},
+		{"192.168.1.1", true},
+		{"example.com", true},
+		{"router.lan", true},
+		{"my-router", true},
+		// Leading dash: read as a flag by the diagnostic tool.
+		{"-f", false},
+		{"-c", false},
+		{"--help", false},
+		{"", false},
+		{" ", false},
+		// Not a host.
+		{"example.com; reboot", false},
+		{"example.com && id", false},
+		{"$(id)", false},
+		{"/etc/passwd", false},
+		{"8.8.8.8 8.8.4.4", false},
+		{"a b", false},
+		{"example.com:8080", false},
+		// Dotted-numeric targets are syntactically valid hostnames; ping and
+		// nslookup resolve them (or fail to), and neither reads them as an
+		// option, so they are not rejected here.
+		{"1.2.3", true},
+		{"256.256.256.256", true},
+		{"-8.8.8.8", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			if got := isValidDiagnosticsTarget(tc.input); got != tc.want {
+				t.Errorf("isValidDiagnosticsTarget(%q) = %v, want %v", tc.input, got, tc.want)
+			}
+		})
+	}
+}

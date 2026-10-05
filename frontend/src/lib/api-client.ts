@@ -1,3 +1,5 @@
+import { currentRelativeLocation } from '@/lib/auth-redirect';
+
 const TOKEN_KEY = 'openwrt-auth-token';
 
 /**
@@ -46,23 +48,59 @@ export function clearToken(): void {
   notifyTokenChange();
 }
 
-/** Clears auth state and redirects to the login page. Exported for testability. */
+/**
+ * Clears auth state and redirects to the login page, carrying the current
+ * location so the user lands back where they were. Exported for testability.
+ */
 export function handleUnauthorized(): void {
   clearToken();
   if (typeof window !== 'undefined') {
-    window.location.assign('/login');
+    window.location.assign(`/login?redirect=${encodeURIComponent(currentRelativeLocation())}`);
   }
 }
 
 /** An HTTP error response, carrying the status code for callers that must branch on it. */
 export class ApiError extends Error {
   readonly status: number;
+  /**
+   * The server's machine-readable error code, when it sent one.
+   *
+   * Callers must branch on this rather than on the message: the wireless
+   * lockout refusal rewords its message whenever the remedy gets clearer, and a
+   * client that matched the text would stop recognising it.
+   */
+  readonly code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
   }
+}
+
+/**
+ * Extracts the human-readable message and the optional machine-readable code
+ * from a failed response.
+ *
+ * A router can answer with an HTML error page (502 from a proxy, 401 from a
+ * captive portal, …), so the JSON body is parsed defensively and the HTTP
+ * status line is used as the fallback instead of a `SyntaxError`.
+ */
+export async function errorFromResponse(
+  response: Response,
+  fallback: string,
+): Promise<{ message: string; code?: string }> {
+  try {
+    const body = (await response.json()) as { error?: unknown; code?: unknown } | null;
+    if (body && typeof body.error === 'string' && body.error.length > 0) {
+      const code = typeof body.code === 'string' ? body.code : undefined;
+      return { message: body.error, code };
+    }
+  } catch {
+    // Non-JSON body (HTML error page, empty body) — keep the fallback.
+  }
+  return { message: fallback };
 }
 
 /**
@@ -76,15 +114,7 @@ export async function errorMessageFromResponse(
   response: Response,
   fallback: string,
 ): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: unknown } | null;
-    if (body && typeof body.error === 'string' && body.error.length > 0) {
-      return body.error;
-    }
-  } catch {
-    // Non-JSON body (HTML error page, empty body) — keep the fallback.
-  }
-  return fallback;
+  return (await errorFromResponse(response, fallback)).message;
 }
 
 function buildHeaders(body: unknown): Record<string, string> {
@@ -124,30 +154,41 @@ async function send(path: string, method: string, body?: unknown, signal?: Abort
     if (response.status === 401 && !path.endsWith('/auth/login')) {
       handleUnauthorized();
     }
-    throw new ApiError(
-      response.status,
-      await errorMessageFromResponse(response, `Request failed with status ${response.status}`),
+    const { message, code } = await errorFromResponse(
+      response,
+      `Request failed with status ${response.status}`,
     );
+    throw new ApiError(response.status, message, code);
   }
 
   return response;
 }
 
-function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  return send(path, method, body).then((response) => response.json() as Promise<T>);
+function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  return send(path, method, body, signal).then((response) => response.json() as Promise<T>);
 }
 
 /** GET that returns a binary body (e.g. a backup archive). */
-function requestBlob(path: string): Promise<Blob> {
-  return send(path, 'GET').then((response) => response.blob());
+function requestBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  return send(path, 'GET', undefined, signal).then((response) => response.blob());
 }
 
+/**
+ * `signal` is threaded through every read so React Query can cancel in-flight
+ * requests. Without it, changing a log filter or leaving a page leaves the
+ * previous fetch running on a router with 128 MB of RAM.
+ */
 export const apiClient = {
-  get<T>(path: string): Promise<T> {
-    return request<T>('GET', path);
+  get<T>(path: string, signal?: AbortSignal): Promise<T> {
+    return request<T>('GET', path, undefined, signal);
   },
-  getBlob(path: string): Promise<Blob> {
-    return requestBlob(path);
+  getBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+    return requestBlob(path, signal);
   },
   post<T>(path: string, body?: unknown): Promise<T> {
     return request<T>('POST', path, body);

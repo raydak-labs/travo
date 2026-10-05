@@ -1,13 +1,19 @@
 package services
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -665,9 +671,19 @@ func uniqueTempPath(dir, pattern string) (string, error) {
 }
 
 // RestoreBackup applies a configuration backup from the given file path.
-// `sysupgrade -r` rewrites /etc/config, so a crash guard is written first and
-// removed only after the restore returned successfully (ADR 0003).
+//
+// The archive is validated FIRST: `sysupgrade -r` extracts the tarball at /,
+// so an unvalidated upload is an arbitrary-root-file-write primitive (any path
+// under /etc/crontabs, /etc/init.d or /etc/uci-defaults becomes a root code
+// execution path). Validation happens before the crash guard is written because
+// a rejected archive has touched nothing, so it must leave no state behind.
+//
+// A guard is then written and only removed once sysupgrade returned
+// successfully: `sysupgrade -r` rewrites /etc/config (ADR 0003).
 func (s *SystemService) RestoreBackup(path string) error {
+	if err := ValidateRestoreArchive(path); err != nil {
+		return err
+	}
 	if err := s.writeGuard(restoreGuardName, "restore backup "+path); err != nil {
 		return err
 	}
@@ -680,26 +696,492 @@ func (s *SystemService) RestoreBackup(path string) error {
 	return nil
 }
 
+// ErrInvalidBackupArchive marks an uploaded restore archive that must never
+// reach sysupgrade. Handlers map it to 400: the operator uploaded something
+// that is not a configuration backup.
+var ErrInvalidBackupArchive = errors.New("invalid backup archive")
+
+// Restore archive limits. A travel router has a ~128 MB tmpfs, so an upload is
+// untrusted input that must not be able to fill it.
+const (
+	// maxRestoreArchiveMembers bounds the number of tar headers. A genuine
+	// `sysupgrade -b` archive holds a few hundred files at most.
+	maxRestoreArchiveMembers = 4096
+	// maxRestoreArchiveBytes bounds the total UNCOMPRESSED size claimed by the
+	// members, which is what a decompression bomb inflates.
+	maxRestoreArchiveBytes = 64 << 20 // 64 MiB
+	// maxRestoreMemberBytes bounds a single member.
+	maxRestoreMemberBytes = 8 << 20 // 8 MiB
+)
+
+// restoreArchiveNeedsUCIConfig is the one structural requirement that
+// distinguishes a configuration backup from an arbitrary tarball. A genuine
+// `sysupgrade -b` archive always carries the UCI packages under etc/config,
+// so requiring at least one regular FILE there rejects "here is a tar of
+// whatever I liked" without having to enumerate every path a real overlay
+// contains.
+//
+// There is deliberately no directory allowlist beyond that. An earlier version
+// restricted members to etc/config and etc/ppp, on the reasoning that an
+// archive able to write etc/crontabs/root is an execution primitive. That was
+// defence for the wrong layer: restore is an authenticated-admin-only endpoint
+// (ADR 0007 section 2), and that admin already holds root through
+// POST /system/ssh-keys, firmware flash and factory reset. The allowlist bought
+// no real protection while guaranteeing that every genuine backup taken on
+// THIS device was refused, because the application itself writes
+// /etc/crontabs/root (LED and WiFi schedules), /etc/dropbear/authorized_keys
+// and, after a password change, /etc/shadow — all of which `sysupgrade -b`
+// captures. Refusing those silently breaks restore for real users, and a
+// partial restore is its own surprise: the operator believes their
+// configuration came back and it did not.
+const restoreArchiveNeedsUCIConfig = "etc/config/"
+
+// ValidateRestoreArchive checks that path is a structurally safe gzip tar
+// archive carrying at least one UCI config member.
+//
+// Rejected: absolute paths, ".." traversal, symlinks, hardlinks, device nodes,
+// archives exceeding the size/member caps, and archives with nothing under
+// etc/config (i.e. not a configuration backup).
+//
+// It does NOT police WHICH paths an administrator may write. Authorization is
+// that boundary (ADR 0007 section 2), and this function exists to reject
+// malformed and hostile archives — traversal, link substitution and
+// decompression bombs — so a corrupted or third-party file cannot damage a
+// device the operator is trying to recover.
+func ValidateRestoreArchive(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidBackupArchive, err)
+	}
+	defer func() { _ = f.Close() }()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("%w: not a gzip archive: %w", ErrInvalidBackupArchive, err)
+	}
+	defer func() { _ = gz.Close() }()
+
+	tr := tar.NewReader(gz)
+	var total int64
+	members := 0
+	sawUCIConfig := false
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("%w: unreadable tar stream: %w", ErrInvalidBackupArchive, err)
+		}
+		members++
+		if members > maxRestoreArchiveMembers {
+			return fmt.Errorf("%w: more than %d members", ErrInvalidBackupArchive, maxRestoreArchiveMembers)
+		}
+		if err := checkRestoreMember(hdr); err != nil {
+			return err
+		}
+		if hdr.Size < 0 || hdr.Size > maxRestoreMemberBytes {
+			return fmt.Errorf("%w: member %q is larger than %d bytes", ErrInvalidBackupArchive, hdr.Name, maxRestoreMemberBytes)
+		}
+		total += hdr.Size
+		if total > maxRestoreArchiveBytes {
+			return fmt.Errorf("%w: uncompressed size exceeds %d bytes", ErrInvalidBackupArchive, maxRestoreArchiveBytes)
+		}
+		// A DIRECTORY entry under etc/config is not evidence of anything: the
+		// message claims a UCI config member, so the witness has to be a real
+		// file. An archive carrying only "etc/config/" would otherwise pass.
+		if hdr.Typeflag == tar.TypeReg &&
+			strings.HasPrefix(cleanRestoreName(hdr.Name), restoreArchiveNeedsUCIConfig) {
+			sawUCIConfig = true
+		}
+	}
+	if members == 0 {
+		return fmt.Errorf("%w: archive is empty", ErrInvalidBackupArchive)
+	}
+	if !sawUCIConfig {
+		return fmt.Errorf("%w: not a configuration backup: no member under %s",
+			ErrInvalidBackupArchive, restoreArchiveNeedsUCIConfig)
+	}
+	return nil
+}
+
+// cleanRestoreName normalises a member path for the etc/config membership test.
+func cleanRestoreName(name string) string {
+	return path.Clean(strings.TrimPrefix(name, "/"))
+}
+
+// checkRestoreMember rejects one tar header that sysupgrade -r would extract
+// unsafely — outside the archive root, or as anything other than a plain file.
+func checkRestoreMember(hdr *tar.Header) error {
+	name := hdr.Name
+	if name == "" {
+		return fmt.Errorf("%w: member with an empty name", ErrInvalidBackupArchive)
+	}
+	// sysupgrade -r extracts relative to /, so a leading slash writes outside
+	// the config tree and "..", however it is spelled, walks out of it.
+	if strings.HasPrefix(name, "/") || strings.Contains(name, `\`) {
+		return fmt.Errorf("%w: member %q is not a relative path", ErrInvalidBackupArchive, name)
+	}
+	clean := path.Clean(name)
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
+		return fmt.Errorf("%w: member %q escapes the archive root", ErrInvalidBackupArchive, name)
+	}
+	// Only regular files and the directories that contain them: a symlink or
+	// hard link member is a write-what-where primitive (tar replaces the link
+	// target's contents, or re-points it), and device nodes have no business in
+	// a config backup.
+	switch hdr.Typeflag {
+	case tar.TypeReg, tar.TypeDir:
+	default:
+		return fmt.Errorf("%w: member %q has type %q, only regular files are allowed",
+			ErrInvalidBackupArchive, name, string(rune(hdr.Typeflag)))
+	}
+	return nil
+}
+
+// Firmware image validation. A `.bin` extension check is not validation: a
+// junk file with the right name is the textbook way to brick a router, and a
+// travel router has no serial console to recover from. sysupgrade does re-check
+// the image, but it does so in the background AFTER this endpoint answered 200,
+// so doing it here turns a brick into a 400.
+var (
+	// ErrInvalidFirmware marks an image that must not be flashed. Handlers map
+	// it to 400.
+	ErrInvalidFirmware = errors.New("invalid firmware image")
+	// ErrNoFirmwareMetadata is the "this is not an OpenWrt sysupgrade image"
+	// case: no metadata block was found in the header.
+	ErrNoFirmwareMetadata = errors.New("no OpenWrt firmware metadata block")
+	// ErrUnsupportedFirmware is a readable image for other hardware.
+	ErrUnsupportedFirmware = errors.New("firmware does not support this device")
+)
+
+// FirmwareMetadata is the OpenWrt metadata block that follows the kernel image
+// in a sysupgrade image. It is what `sysupgrade -l` and the build system read to
+// decide which boards an image may be flashed onto.
+type FirmwareMetadata struct {
+	// Model is the image's own model string, e.g. "Linksys EA8300".
+	Model string
+	// SupportedDevices is the image's supported_devices list, split on commas
+	// for display. Note that OpenWrt board names themselves contain a comma
+	// ("glinet,gl-mt3000"), so SupportedDevicesRaw is what device matching uses.
+	SupportedDevices []string
+	// SupportedDevicesRaw is the supported_devices value verbatim.
+	SupportedDevicesRaw string
+	// Version is the firmware version, e.g. "23.05.2".
+	Version string
+	// Distname is the distribution name, e.g. "OpenWrt".
+	Distname string
+	// CompatVersion is the metadata compat_version field.
+	CompatVersion uint32
+}
+
+const (
+	// firmwareMetadataMagic is the literal that opens the metadata payload,
+	// NUL padded to 10 bytes.
+	firmwareMetadataMagic = "metadata\x00\x00"
+	// firmwareMetadataVersion is the only metadata block version mkimage emits.
+	firmwareMetadataVersion = 1
+	// maxFirmwareMetadataScan bounds how far into the image the metadata block is
+	// searched. It sits directly after the (4-byte aligned) kernel image, so a
+	// few MiB is generous; the bound keeps a junk upload from being read whole.
+	maxFirmwareMetadataScan = 8 << 20
+	// firmwareMetadataReadChunk is the streaming read size.
+	firmwareMetadataReadChunk = 64 << 10
+)
+
+// ParseFirmwareMetadata reads the OpenWrt metadata block from the head of a
+// sysupgrade image and returns it.
+//
+// Layout (as written by tools/mkimage and read by scripts/json_overview_image_info.py):
+//
+//	uint32 block size   (big endian, counts everything below including these 8 bytes)
+//	uint32 version      (big endian, 1)
+//	char   magic[10]    "metadata\0\0"
+//	uint32 compat_version (big endian)
+//	char   pairs[]      NUL-terminated key/value strings, key\0value\0…
+func ParseFirmwareMetadata(r io.Reader) (FirmwareMetadata, error) {
+	block, err := scanFirmwareMetadataBlock(r)
+	if err != nil {
+		return FirmwareMetadata{}, err
+	}
+	return parseFirmwareMetadataBlock(block)
+}
+
+// scanFirmwareMetadataBlock streams the head of the image and returns the
+// complete metadata block, or ErrNoFirmwareMetadata.
+func scanFirmwareMetadataBlock(r io.Reader) ([]byte, error) {
+	magic := []byte(firmwareMetadataMagic)
+	// Keep this much context around the magic so the 8-byte prefix and the
+	// following fields are available even when the magic straddles a read.
+	keep := len(magic) + 8 + 4
+	buf := make([]byte, 0, firmwareMetadataReadChunk+keep)
+	chunk := make([]byte, firmwareMetadataReadChunk)
+	scanned := 0
+	for scanned < maxFirmwareMetadataScan {
+		n, err := r.Read(chunk)
+		if n > 0 {
+			scanned += n
+			buf = append(buf, chunk[:n]...)
+			if i := bytes.Index(buf, magic); i >= 8 {
+				start := i - 8
+				size := int(binary.BigEndian.Uint32(buf[start : start+4]))
+				if size >= 8+len(magic)+4 && size <= maxFirmwareMetadataScan {
+					need := start + size
+					for len(buf) < need {
+						n, rerr := r.Read(chunk)
+						if n > 0 {
+							buf = append(buf, chunk[:n]...)
+							continue
+						}
+						if errors.Is(rerr, io.EOF) {
+							break
+						}
+						if rerr != nil {
+							return nil, rerr
+						}
+					}
+					if len(buf) < need {
+						return nil, fmt.Errorf("%w: truncated metadata block", ErrNoFirmwareMetadata)
+					}
+					return buf[start:need], nil
+				}
+			}
+			// Keep the tail so a magic split across two reads is still found.
+			if len(buf) > keep {
+				buf = buf[len(buf)-keep:]
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("%w: no \"metadata\" block in the first %d bytes", ErrNoFirmwareMetadata, maxFirmwareMetadataScan)
+}
+
+// parseFirmwareMetadataBlock decodes one metadata block.
+func parseFirmwareMetadataBlock(block []byte) (FirmwareMetadata, error) {
+	if len(block) < 8+len(firmwareMetadataMagic)+4 {
+		return FirmwareMetadata{}, fmt.Errorf("%w: block is too short", ErrNoFirmwareMetadata)
+	}
+	if string(block[8:8+len(firmwareMetadataMagic)]) != firmwareMetadataMagic {
+		return FirmwareMetadata{}, fmt.Errorf("%w: bad block magic", ErrNoFirmwareMetadata)
+	}
+	if version := binary.BigEndian.Uint32(block[4:8]); version != firmwareMetadataVersion {
+		return FirmwareMetadata{}, fmt.Errorf("%w: unsupported metadata version %d", ErrNoFirmwareMetadata, version)
+	}
+	meta := FirmwareMetadata{CompatVersion: binary.BigEndian.Uint32(block[8+len(firmwareMetadataMagic):])}
+	rest := block[8+len(firmwareMetadataMagic)+4:]
+	for len(rest) > 0 {
+		key, remainder, ok := cutNUL(rest)
+		if !ok || key == "" {
+			break
+		}
+		value, remainder, ok := cutNUL(remainder)
+		if !ok {
+			break
+		}
+		switch key {
+		case "model":
+			meta.Model = value
+		case "version":
+			meta.Version = value
+		case "distname":
+			meta.Distname = value
+		case "supported_devices":
+			meta.SupportedDevicesRaw = value
+			for _, dev := range strings.Split(value, ",") {
+				if dev = strings.TrimSpace(dev); dev != "" {
+					meta.SupportedDevices = append(meta.SupportedDevices, dev)
+				}
+			}
+		}
+		rest = remainder
+	}
+	if meta.Model == "" {
+		return FirmwareMetadata{}, fmt.Errorf("%w: metadata block has no model", ErrNoFirmwareMetadata)
+	}
+	return meta, nil
+}
+
+func cutNUL(b []byte) (value string, rest []byte, ok bool) {
+	i := bytes.IndexByte(b, 0)
+	if i < 0 {
+		return "", nil, false
+	}
+	return string(b[:i]), b[i+1:], true
+}
+
+// SupportsDevice reports whether the image declares boardName (or any alias in
+// aliases) as a supported device.
+//
+// Names are compared case-insensitively with spaces/underscores folded to
+// dashes, because "GL.iNet GL-MT3000", "gl-mt3000" and "glinet,gl-mt3000" all
+// name one board.
+//
+// The comma is the load-bearing part. OpenWrt board names contain one
+// ("glinet,gl-mt3000") and the supported_devices list is itself comma
+// separated, so a list entry can only be told apart from a board name by
+// comparing WHOLE entries. Substring matching over the raw list is what
+// OpenWrt's own patsubstr() does, and it is unsafe here: board names are
+// prefixes of each other ("gl-mt3000" is a prefix of "gl-mt3000-nand"), so a
+// NAND-only image passes on a NOR router — a flash that leaves the device
+// unbootable with no serial console. Aliases are therefore matched for
+// equality, and the one deliberate exception is the device's own boardName
+// string, which OpenWrt may pack several models into ("glinet,gl-mt3000" for
+// an image that declares "glinet,gl-mt3000,gl-mt3000-nor"); it may match the
+// leading comma-delimited run of entries, still only on a comma boundary.
+func (m FirmwareMetadata) SupportsDevice(boardName string, aliases []string) bool {
+	list := normaliseBoardName(m.SupportedDevicesRaw)
+	if list == "" {
+		return false
+	}
+	if boardNameMatchesRun(list, normaliseBoardName(boardName)) {
+		return true
+	}
+	for _, a := range aliases {
+		if listHasDevice(list, normaliseBoardName(a)) {
+			return true
+		}
+	}
+	return false
+}
+
+// listHasDevice reports whether the normalised, comma-separated
+// supported_devices list contains name as a whole entry.
+func listHasDevice(list, name string) bool {
+	if list == "" || name == "" {
+		return false
+	}
+	for _, entry := range strings.Split(list, ",") {
+		if entry == name {
+			return true
+		}
+	}
+	return false
+}
+
+// boardNameMatchesRun reports whether the possibly multi-model board name heads
+// a whole run of comma-delimited entries in the list. It accepts an exact
+// whole-list match and a match followed by a comma; it never accepts a match
+// that runs into a longer entry, which is what keeps "gl-mt3000" from claiming
+// "gl-mt3000-nand".
+func boardNameMatchesRun(list, boardName string) bool {
+	if list == "" || boardName == "" {
+		return false
+	}
+	return list == boardName || strings.HasPrefix(list, boardName+",")
+}
+
+func normaliseBoardName(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.NewReplacer(" ", "-", "_", "-").Replace(s)
+	return s
+}
+
+// boardIdentity returns the strings this device may legitimately be named by in
+// an image's supported_devices list: the ubus board_name ("glinet,gl-mt3000"),
+// and the model ("GL.iNet GL-MT3000") together with its trailing model token.
+//
+// The comma-separated PARTS of board_name are deliberately not returned as
+// separate aliases. "glinet,gl-mt3000" is one board whose name is comma
+// separated, and its first part is a vendor prefix that every GL.iNet entry
+// carries: splitting the name hands out "glinet", which then matches the
+// vendor part of "glinet,gl-mt3000-nand" and re-admits a sibling board's
+// image — the exact flash this check must refuse. The whole name is matched as
+// one unit by SupportsDevice instead.
+func (s *SystemService) boardIdentity() (string, []string, error) {
+	board, err := s.ubus.Call("system", "board", nil)
+	if err != nil {
+		return "", nil, err
+	}
+	boardName, _ := board["board_name"].(string)
+	model, _ := board["model"].(string)
+	if boardName == "" && model == "" {
+		return "", nil, fmt.Errorf("ubus system board returned no board identity")
+	}
+	primary := boardName
+	if primary == "" {
+		primary = model
+	}
+	var aliases []string
+	if model != "" {
+		aliases = append(aliases, model)
+		// "GL.iNet GL-MT3000" → also try the trailing model token.
+		if fields := strings.Fields(model); len(fields) > 1 {
+			aliases = append(aliases, fields[len(fields)-1])
+		}
+	}
+	return primary, aliases, nil
+}
+
+// ValidateFirmwareImage parses the OpenWrt metadata of an uploaded image and
+// checks it against this board. It is exported so a handler can validate an
+// upload before staging it.
+func (s *SystemService) ValidateFirmwareImage(file io.Reader) (FirmwareMetadata, error) {
+	meta, err := ParseFirmwareMetadata(file)
+	if err != nil {
+		return FirmwareMetadata{}, fmt.Errorf("%w: %w", ErrInvalidFirmware, err)
+	}
+	boardName, aliases, err := s.boardIdentity()
+	if err != nil {
+		return meta, fmt.Errorf("%w: cannot determine this board's identity, refusing to flash: %w", ErrInvalidFirmware, err)
+	}
+	if len(meta.SupportedDevices) == 0 {
+		// Without the list nothing can be checked, and an unverifiable image on
+		// a router with no serial console is a coin flip with the device on the
+		// wrong side. sysupgrade would happily try.
+		return meta, fmt.Errorf("%w: image %q declares no supported_devices, so it cannot be verified for %s",
+			ErrInvalidFirmware, meta.Model, boardName)
+	}
+	if !meta.SupportsDevice(boardName, aliases) {
+		return meta, fmt.Errorf("%w: %w: image %q supports %v, this device is %s",
+			ErrInvalidFirmware, ErrUnsupportedFirmware, meta.Model, meta.SupportedDevicesRaw, boardName)
+	}
+	return meta, nil
+}
+
 // UpgradeFirmware saves the uploaded firmware image and flashes it via sysupgrade.
 // If keepSettings is true, current configuration is preserved (-v flag).
 // If keepSettings is false, settings are discarded (-n flag).
+//
+// The image is staged at a unique path, then its OpenWrt metadata is parsed and
+// checked against this board BEFORE the crash guard is written and long before
+// sysupgrade runs, so a junk or foreign image is a 400 and never reaches the
+// flash. The parsed metadata is returned so the caller can tell the operator
+// which image was flashed.
+//
 // The flash is asynchronous — it takes minutes and reboots the device — and
 // runs under a crash guard so a power cut mid-write is visible after reboot.
-func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error {
+func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) (FirmwareMetadata, error) {
 	firmwarePath, err := uniqueTempPath("/tmp", "firmware-*.bin")
 	if err != nil {
-		return err
+		return FirmwareMetadata{}, err
 	}
 	out, err := os.Create(firmwarePath)
 	if err != nil {
-		return fmt.Errorf("creating firmware file: %w", err)
+		return FirmwareMetadata{}, fmt.Errorf("creating firmware file: %w", err)
 	}
 	if _, err := io.Copy(out, file); err != nil {
 		_ = out.Close()
 		_ = os.Remove(firmwarePath)
-		return fmt.Errorf("saving firmware file: %w", err)
+		return FirmwareMetadata{}, fmt.Errorf("saving firmware file: %w", err)
 	}
 	_ = out.Close()
+
+	staged, err := os.Open(firmwarePath)
+	if err != nil {
+		_ = os.Remove(firmwarePath)
+		return FirmwareMetadata{}, fmt.Errorf("re-reading firmware file: %w", err)
+	}
+	meta, err := s.ValidateFirmwareImage(staged)
+	_ = staged.Close()
+	if err != nil {
+		_ = os.Remove(firmwarePath)
+		return meta, err
+	}
 
 	var args []string
 	if keepSettings {
@@ -708,10 +1190,10 @@ func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error
 		args = []string{"-n", firmwarePath}
 	}
 
-	reason := "sysupgrade " + strings.Join(args, " ")
+	reason := "sysupgrade " + strings.Join(args, " ") + " (" + meta.Model + ")"
 	if err := s.writeGuard(firmwareUpgradeGuardName, reason); err != nil {
 		_ = os.Remove(firmwarePath)
-		return err
+		return meta, err
 	}
 
 	// Run sysupgrade asynchronously — the device will reboot. The guard is
@@ -725,7 +1207,7 @@ func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) error
 		}
 	}()
 
-	return nil
+	return meta, nil
 }
 
 // FactoryReset erases the overlay partition and reboots, restoring factory

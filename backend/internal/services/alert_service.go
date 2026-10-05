@@ -26,6 +26,13 @@ func defaultAlertThresholds() models.AlertThresholds {
 	}
 }
 
+// currentCarrierChecker reads the carrier checker under the lock.
+func (a *AlertService) currentCarrierChecker() CarrierChecker {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.carrierChecker
+}
+
 // GetAlertThresholds reads thresholds from the config file, returning defaults if absent.
 func (a *AlertService) GetAlertThresholds() models.AlertThresholds {
 	data, err := os.ReadFile(a.thresholdsPath())
@@ -49,7 +56,10 @@ func (a *AlertService) SetAlertThresholds(t models.AlertThresholds) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	// Atomic: the 10s check loop reads this file on every tick, and
+	// os.WriteFile truncates before writing, so a save that overlapped a read
+	// made the whole alerting config fall back to defaults.
+	return writeFileAtomic(path, data, 0600)
 }
 
 // AlertChecker abstracts the system checks used by AlertService.
@@ -112,7 +122,14 @@ func (a *AlertService) thresholdsPath() string {
 
 // SetCarrierChecker enables ethernet carrier monitoring in the alert service.
 // Pass nil to disable (default).
+//
+// Takes the lock the 10s check loop reads it under. main.go sets it before
+// Start(), so this has never raced in practice, but the field is a plain
+// interface written without synchronisation: a future setter call (a per-route
+// toggle, a test) would be a data race the runtime detector reports at random.
 func (a *AlertService) SetCarrierChecker(cc CarrierChecker) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.carrierChecker = cc
 }
 
@@ -206,8 +223,8 @@ func (a *AlertService) checkConditions() {
 	}
 
 	// Ethernet carrier (WAN cable plug/unplug)
-	if a.carrierChecker != nil {
-		up, err := a.carrierChecker.IsCarrierUp("eth0")
+	if carrierChecker := a.currentCarrierChecker(); carrierChecker != nil {
+		up, err := carrierChecker.IsCarrierUp("eth0")
 		if err == nil {
 			if !up {
 				a.raiseCondition("eth_unplugged", "WAN ethernet cable is disconnected", "warning")

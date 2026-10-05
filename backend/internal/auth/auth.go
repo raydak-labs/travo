@@ -432,12 +432,47 @@ func (a *AuthService) rotateSessions() (ChangePasswordResult, error) {
 	return ChangePasswordResult{Token: token, ExpiresAt: expiry, RevokedSessions: revoked}, nil
 }
 
-// Middleware returns a Fiber middleware that checks for a valid Bearer token.
+// PublicPaths is the complete set of API paths reachable without a Bearer
+// token. Every other path under /api/ requires one.
+//
+// This is a path allowlist rather than a route-group middleware because Fiber v3
+// group middleware is scoped by PATH PREFIX, not by which router the route was
+// registered on: mounting the auth middleware on the /api/v1 group also
+// intercepted routes registered directly on the app (the WebSocket upgrade and
+// the public time-sync endpoint), breaking both.
+//
+// Safety now rests on two things together, not on this list alone:
+//   - fiber.Config.CaseSensitive is true, so a request whose path differs in
+//     case from the registered route matches no route at all and cannot reach a
+//     handler. That is what previously broke the prefix check below: Fiber routed
+//     on a lowercased copy while c.Path() returned the original, so
+//     /API/v1/system/reboot matched the registered route while failing the
+//     prefix test, and the whole admin API was reachable with no token.
+//   - TestAuthCoversEveryRoute in internal/api walks the live route table and
+//     asserts an unauthenticated request is rejected for every registered /api
+//     route not in this list, in both the canonical and a case-varied spelling.
+//     Adding a route without deciding whether it is public fails that test.
+//
+// /api/v1/ws is listed because it authenticates itself: ws.UpgradeMiddleware
+// validates the query token and the session before upgrading.
+var PublicPaths = map[string]bool{
+	"/api/health":              true,
+	"/api/openapi.json":        true,
+	"/api/v1/auth/login":       true,
+	"/api/v1/system/time-sync": true,
+	"/api/v1/ws":               true,
+}
+
+// IsPublicPath reports whether path is reachable without authentication.
+func IsPublicPath(path string) bool { return PublicPaths[path] }
+
 func (a *AuthService) Middleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		path := c.Path()
 
-		if !strings.HasPrefix(path, "/api/") || path == "/api/health" || path == "/api/openapi.json" || path == "/api/v1/auth/login" || path == "/api/v1/ws" || path == "/api/v1/system/time-sync" {
+		// Static files and the SPA are served without a token; only the API
+		// surface is guarded, and only the paths in PublicPaths are exempt.
+		if !strings.HasPrefix(path, "/api/") || IsPublicPath(path) {
 			return c.Next()
 		}
 

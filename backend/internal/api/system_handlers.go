@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -84,7 +85,7 @@ func SystemKernelLogsHandler(svc *services.SystemService) fiber.Handler {
 func SetHostnameHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetHostnameRequest
-		if err := c.Bind().Body(&req); err != nil {
+		if err := BindStrictBodyConfig(c, &req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if req.Hostname == "" {
@@ -141,7 +142,20 @@ func BackupHandler(svc *services.SystemService) fiber.Handler {
 	}
 }
 
+// maxRestoreUploadBytes bounds the uploaded restore archive. /tmp is a tmpfs
+// on the router, so an unbounded upload is a way to fill RAM.
+const maxRestoreUploadBytes = 32 << 20 // 32 MiB
+
 // RestoreHandler handles POST /api/v1/system/restore — uploads and restores config backup.
+//
+// The upload is saved to a UNIQUE temp path: the old fixed
+// /tmp/restore-upload.tar.gz let two concurrent restores overwrite each other's
+// payload in world-writable /tmp, so the archive sysupgrade restored was not
+// necessarily the one that was validated.
+//
+// svc.RestoreBackup validates the archive (member allowlist, no links, no
+// traversal, size caps) before sysupgrade runs and reports a rejection as
+// ErrInvalidBackupArchive, which answers 400 rather than 500.
 func RestoreHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		file, err := c.FormFile("backup")
@@ -153,13 +167,28 @@ func RestoreHandler(svc *services.SystemService) fiber.Handler {
 		if ct != "" && ct != "application/gzip" && ct != "application/x-gzip" && ct != "application/octet-stream" {
 			return RespondWithError(c, fiber.StatusBadRequest, "invalid file type, expected tar.gz")
 		}
-		// Save to temp path
-		tmpPath := "/tmp/restore-upload.tar.gz"
-		if err := c.SaveFile(file, tmpPath); err != nil {
-			return RespondWithError(c, fiber.StatusInternalServerError, "failed to save uploaded file")
+		if file.Size > maxRestoreUploadBytes {
+			return RespondWithError(c, fiber.StatusBadRequest,
+				fmt.Sprintf("backup file is too large (%d bytes, limit %d)", file.Size, maxRestoreUploadBytes))
+		}
+		// Unique path per upload: concurrent restores must not share a file.
+		f, err := os.CreateTemp("", "restore-upload-*.tar.gz")
+		if err != nil {
+			return RespondWithServerError(c, fmt.Errorf("creating temp file: %w", err))
+		}
+		tmpPath := f.Name()
+		if err := f.Close(); err != nil {
+			_ = os.Remove(tmpPath)
+			return RespondWithServerError(c, fmt.Errorf("creating temp file: %w", err))
 		}
 		defer os.Remove(tmpPath)
+		if err := c.SaveFile(file, tmpPath); err != nil {
+			return RespondWithServerError(c, fmt.Errorf("saving uploaded file: %w", err))
+		}
 		if err := svc.RestoreBackup(tmpPath); err != nil {
+			if errors.Is(err, services.ErrInvalidBackupArchive) {
+				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			}
 			return RespondWithServerError(c, err)
 		}
 		return c.JSON(fiber.Map{"status": "ok", "message": "Configuration restored. Reboot to apply changes."})
@@ -184,6 +213,12 @@ func FactoryResetHandler(svc *services.SystemService) fiber.Handler {
 }
 
 // FirmwareUpgradeHandler handles POST /api/v1/system/firmware/upgrade.
+//
+// A ".bin" extension is not validation. The image's OpenWrt metadata is parsed
+// and checked against this board BEFORE the flash is started, so a junk or
+// foreign image is a 400 that names the model, instead of a 200 followed by a
+// brick and no serial console. The parsed model is returned so the UI can show
+// what is about to be flashed.
 func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		file, err := c.FormFile("firmware")
@@ -200,10 +235,19 @@ func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
 			return RespondWithError(c, fiber.StatusInternalServerError, "failed to read uploaded file")
 		}
 		defer func() { _ = f.Close() }()
-		if err := svc.UpgradeFirmware(f, keepSettings); err != nil {
+		meta, err := svc.UpgradeFirmware(f, keepSettings)
+		if err != nil {
+			if errors.Is(err, services.ErrInvalidFirmware) {
+				return RespondWithError(c, fiber.StatusBadRequest, err.Error())
+			}
 			return RespondWithServerError(c, err)
 		}
-		return c.JSON(fiber.Map{"status": "ok", "message": "Firmware upgrade initiated. Device will reboot."})
+		return c.JSON(fiber.Map{
+			"status":            "ok",
+			"message":           "Firmware upgrade initiated. Device will reboot.",
+			"model":             meta.Model,
+			"supported_devices": meta.SupportedDevices,
+		})
 	}
 }
 
@@ -211,12 +255,19 @@ func FirmwareUpgradeHandler(svc *services.SystemService) fiber.Handler {
 func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetLEDRequest
-		if err := c.Bind().Body(&req); err != nil {
+		// Strict: the request is a single boolean that drives every LED. On the
+		// permissive binder a body naming "enabled" (which is what the spec
+		// used to document) decoded to stealth_mode=false and answered 200 with
+		// the LEDs unchanged — the opposite of what was asked, behind a success
+		// code. A 400 naming the field is the only honest answer.
+		if err := BindStrictBodyConfig(c, &req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetLEDStealthMode(req.StealthMode); err != nil {
 			return RespondWithServerError(c, err)
 		}
+		// The full LED status, not {"ok":…}: the caller needs the state that
+		// was actually applied.
 		return c.JSON(svc.GetLEDStatus())
 	}
 }
@@ -410,7 +461,10 @@ func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
 func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ButtonActionsRequest
-		if err := c.Bind().Body(&req); err != nil {
+		// Strict: this persists the whole button map. A body whose field names do
+		// not match would otherwise decode to "no buttons" and answer 200 after
+		// disabling every hardware button action.
+		if err := BindStrictBodyConfig(c, &req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetButtonActions(req.Buttons); err != nil {

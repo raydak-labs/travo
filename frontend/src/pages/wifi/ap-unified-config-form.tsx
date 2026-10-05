@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { QrCode, Radio } from 'lucide-react';
+import { toast } from 'sonner';
 import type { APConfig, APConfigUpdate } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { CardInset } from '@/components/ui/card-inset';
@@ -22,7 +23,18 @@ import {
   type UnifiedApCredentialsValues,
 } from '@/lib/schemas/wifi-forms';
 import { useSetAPConfig } from '@/hooks/use-wifi';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
+import { isWifiLockoutError } from '@/lib/wifi-lockout';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
+import {
+  ApApplyRollbackError,
+  describeApApplyRollback,
+  rollbackApSections,
+  snapshotApSections,
+  type ApSectionSnapshot,
+} from '@/lib/ap-section-apply';
 import { normalizeApEncryption } from './ap-config-normalize';
 import { ApRadioDisableDialog } from './ap-radio-disable-dialog';
 
@@ -53,6 +65,17 @@ function credentialsMatchAcross(aps: APConfig[]): boolean {
   );
 }
 
+/**
+ * Whether a failed apply left the router on the settings it had before.
+ *
+ * A restore that failed too means the router is holding a half-applied config,
+ * which the operator has to see spelled out instead of a dialog that promises
+ * nothing has changed yet.
+ */
+function rollbackIsComplete(error: unknown): boolean {
+  return !(error instanceof ApApplyRollbackError) || error.rollback.failed.length === 0;
+}
+
 type APUnifiedConfigFormProps = {
   apConfigs: APConfig[];
   enabledBySection: Record<string, boolean>;
@@ -67,10 +90,13 @@ export function APUnifiedConfigForm({
   onEnabledChange,
 }: APUnifiedConfigFormProps) {
   const setAP = useSetAPConfig();
+  const lockout = useWifiLockout();
   const [qrOpen, setQrOpen] = useState(false);
   const [qrPayload, setQrPayload] = useState<APConfig | null>(null);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [pendingApply, setPendingApply] = useState<(() => void) | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   const primary = useMemo(() => pickPrimaryAp(apConfigs), [apConfigs]);
   const mismatch = useMemo(() => !credentialsMatchAcross(apConfigs), [apConfigs]);
@@ -83,7 +109,7 @@ export function APUnifiedConfigForm({
     setValue,
     getValues,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<UnifiedApCredentialsValues>({
     resolver: zodResolver(unifiedApCredentialsSchema),
     defaultValues: {
@@ -91,19 +117,31 @@ export function APUnifiedConfigForm({
       encryption: normalizeApEncryption(primary.encryption),
       key: primary.key,
     },
-    mode: 'onChange',
+    // `onTouched`, not `onChange`: with a `min(8)` password schema, validating
+    // per keystroke showed a red error after the user's first character.
+    mode: 'onTouched',
   });
 
   const encryption = watch('encryption');
 
+  useUnsavedChanges(isDirty);
+
+  // Depend on the values, not on the array identity. `apConfigs` is a fresh
+  // array on every `['wifi', 'ap']` refetch, and four wifi mutations invalidate
+  // that key — so resetting on identity silently discarded whatever the user
+  // had typed. Skipping while dirty also protects against a genuine server-side
+  // change landing mid-edit.
+  const primarySsid = primary.ssid;
+  const primaryEncryption = primary.encryption;
+  const primaryKey = primary.key;
   useEffect(() => {
-    const p = pickPrimaryAp(apConfigs);
+    if (isDirty) return;
     reset({
-      ssid: p.ssid,
-      encryption: normalizeApEncryption(p.encryption),
-      key: p.key,
+      ssid: primarySsid,
+      encryption: normalizeApEncryption(primaryEncryption),
+      key: primaryKey,
     });
-  }, [apConfigs, reset]);
+  }, [primarySsid, primaryEncryption, primaryKey, isDirty, reset]);
 
   const buildSharedUpdate = (
     data: UnifiedApCredentialsValues,
@@ -113,22 +151,82 @@ export function APUnifiedConfigForm({
     key: data.encryption === 'none' ? '' : data.key,
   });
 
-  const applyAll = async (data: UnifiedApCredentialsValues) => {
+  // `snapshots` is taken by the caller before the first PUT and carried
+  // through the retry on purpose: a refetch after a successful section can hand
+  // this form an `apConfigs` prop in which an earlier band already shows the
+  // NEW name, and re-deriving "previous" from that would make the re-send's
+  // rollback restore the new values — a silent, permanent half-applied router.
+  const applyAll = async (
+    data: UnifiedApCredentialsValues,
+    acknowledge: boolean,
+    snapshots: readonly ApSectionSnapshot[],
+  ) => {
     const shared = buildSharedUpdate(data);
-    for (const ap of apConfigs) {
-      const enabled = enabledBySection[ap.section] ?? ap.enabled;
-      await setAP.mutateAsync({
-        section: ap.section,
-        config: { ...shared, enabled },
-      });
+    const written: ApSectionSnapshot[] = [];
+    setApplying(true);
+    setApplyError(null);
+    try {
+      for (const snapshot of snapshots) {
+        const enabled = enabledBySection[snapshot.section] ?? snapshot.config.enabled;
+        try {
+          await setAP.mutateAsync({
+            section: snapshot.section,
+            config: {
+              ...shared,
+              enabled,
+              ...(acknowledge ? { acknowledge_lockout: true } : {}),
+            },
+          });
+          written.push(snapshot);
+        } catch (error) {
+          // Earlier sections are already committed and confirmed on the device,
+          // so put them back before reporting; otherwise the bands end up with
+          // different names/keys and nothing in the UI explains how to undo it.
+          const rollback = await rollbackApSections(written, (previous) =>
+            setAP.mutateAsync({ section: previous.section, config: previous.config }),
+          );
+          throw new ApApplyRollbackError(snapshot, error, rollback);
+        }
+      }
+    } finally {
+      setApplying(false);
     }
   };
 
-  const onSubmit = (data: UnifiedApCredentialsValues) => {
+  const runApply = async (
+    data: UnifiedApCredentialsValues,
+    snapshots: readonly ApSectionSnapshot[],
+    acknowledge = false,
+  ) => {
+    try {
+      await applyAll(data, acknowledge, snapshots);
+      setApplyError(null);
+    } catch (error) {
+      const description = describeApApplyRollback(error);
+      setApplyError(description);
+      // Both conditions are load-bearing: the router refused THIS change for
+      // the lockout reason (not any other failure), and every band already
+      // written was put back, so the router still holds the previous settings
+      // and the dialog's "nothing has been changed yet" is true. The retry
+      // re-sends the WHOLE pending apply with the acknowledgement: it covers
+      // every band, not just the one the router refused.
+      const refusal = error instanceof ApApplyRollbackError ? error.cause : error;
+      if (!acknowledge && isWifiLockoutError(refusal) && rollbackIsComplete(error)) {
+        lockout.onLockout(refusal, () => void runApply(data, snapshots, true));
+        return;
+      }
+      toast.error('Failed to save WiFi settings', { description });
+    }
+  };
+
+  const onSubmit = async (data: UnifiedApCredentialsValues) => {
+    // Snapshotted here, while the prop still describes the device: everything
+    // below, including the acknowledged retry, rolls back to this.
+    const snapshots = snapshotApSections(apConfigs);
     if (activeEnabledCount < 1) {
       if (!apConfigs.some((ap) => ap.enabled)) return;
-      setPendingApply(() => () => {
-        void applyAll(data).finally(() => {
+      setPendingApply(() => {
+        void runApply(data, snapshots, false).finally(() => {
           setPendingApply(null);
           setDisableDialogOpen(false);
         });
@@ -137,7 +235,7 @@ export function APUnifiedConfigForm({
       return;
     }
 
-    void applyAll(data);
+    await runApply(data, snapshots, false);
   };
 
   const confirmDisable = () => {
@@ -169,107 +267,141 @@ export function APUnifiedConfigForm({
           </p>
         ) : null}
 
-        <CardInset className="space-y-3 p-4">
-          {apConfigs.map((ap) => (
-            <div
-              key={ap.section}
-              className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
-            >
-              <div className="flex items-center gap-2">
-                <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {ap.radio}
-                </span>
-                <Badge variant="outline">{bandLabel(ap.band)}</Badge>
-                <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
-              </div>
-              <Switch
-                id={`ap-unified-enabled-${ap.section}`}
-                label="Enabled"
-                checked={enabledBySection[ap.section] ?? ap.enabled}
-                onChange={(e) => onEnabledChange(ap.section, e.target.checked)}
-              />
-            </div>
-          ))}
-        </CardInset>
+        {applyError ? (
+          <p className="text-xs text-red-700 dark:text-red-300" role="alert">
+            {applyError}
+          </p>
+        ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor="ap-unified-ssid" className="flex items-center gap-1">
-            Network name (all bands)
-            <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
-          </Label>
-          <Input
-            id="ap-unified-ssid"
-            placeholder="SSID for all radios"
-            aria-invalid={errors.ssid ? 'true' : undefined}
-            {...register('ssid')}
-          />
-          {errors.ssid ? (
-            <p className="text-xs text-red-500" role="alert">
-              {errors.ssid.message}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="ap-unified-enc">Encryption</Label>
-          <Controller
-            name="encryption"
-            control={control}
-            render={({ field }) => (
-              <Select
-                value={field.value}
-                onValueChange={(val) => {
-                  field.onChange(val);
-                  if (val === 'none') {
-                    setValue('key', '', { shouldValidate: true });
-                  }
-                }}
+        <fieldset disabled={applying} className="space-y-4 disabled:opacity-60">
+          <CardInset className="space-y-3 p-4">
+            {apConfigs.map((ap) => (
+              <div
+                key={ap.section}
+                className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0"
               >
-                <SelectTrigger id="ap-unified-enc">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (Open)</SelectItem>
-                  <SelectItem value="psk2">WPA2-PSK</SelectItem>
-                  <SelectItem value="sae">WPA3-SAE</SelectItem>
-                  <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
+                <div className="flex items-center gap-2">
+                  <Radio className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {ap.radio}
+                  </span>
+                  <Badge variant="outline">{bandLabel(ap.band)}</Badge>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
+                </div>
+                <Switch
+                  id={`ap-unified-enabled-${ap.section}`}
+                  label="Enabled"
+                  checked={enabledBySection[ap.section] ?? ap.enabled}
+                  onChange={(e) => onEnabledChange(ap.section, e.target.checked)}
+                />
+              </div>
+            ))}
+          </CardInset>
 
-        {encryption !== 'none' && (
           <div className="space-y-2">
-            <Label htmlFor="ap-unified-key" className="flex items-center gap-1">
-              Password
-              <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
+            <Label htmlFor="ap-unified-ssid" className="flex items-center gap-1">
+              Network name (all bands)
+              <InfoTooltip text="The name of your WiFi network that devices see when scanning. Keep it descriptive but avoid including personal information." />
             </Label>
             <Input
-              id="ap-unified-key"
-              type="password"
-              placeholder="Minimum 8 characters"
-              aria-invalid={errors.key ? 'true' : undefined}
-              {...register('key')}
+              id="ap-unified-ssid"
+              placeholder="SSID for all radios"
+              aria-invalid={errors.ssid ? 'true' : undefined}
+              {...register('ssid')}
             />
-            {errors.key ? (
-              <p className="text-xs text-red-500" role="alert">
-                {errors.key.message}
+            {errors.ssid ? (
+              <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                {errors.ssid.message}
               </p>
             ) : null}
           </div>
-        )}
 
-        <div className="flex gap-2">
-          <Button type="submit" size="sm" disabled={setAP.isPending}>
-            {setAP.isPending ? 'Saving...' : 'Save'}
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={openQrFromForm}>
-            <QrCode className="mr-1 h-4 w-4" />
-            QR Code
-          </Button>
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="ap-unified-enc">Encryption</Label>
+            <Controller
+              name="encryption"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(val) => {
+                    field.onChange(val);
+                    if (val === 'none') {
+                      setValue('key', '', { shouldValidate: true });
+                    }
+                  }}
+                >
+                  <SelectTrigger id="ap-unified-enc">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (Open)</SelectItem>
+                    <SelectItem value="psk2">WPA2-PSK</SelectItem>
+                    <SelectItem value="sae">WPA3-SAE</SelectItem>
+                    <SelectItem value="psk-mixed">WPA2/WPA3 Mixed</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          {encryption !== 'none' && (
+            <div className="space-y-2">
+              <Label htmlFor="ap-unified-key" className="flex items-center gap-1">
+                Password
+                <InfoTooltip text="WiFi password (WPA key). Must be 8–63 characters for WPA2/WPA3. Avoid dictionary words — use a mix of letters, numbers, and symbols." />
+              </Label>
+              <Input
+                id="ap-unified-key"
+                type="password"
+                placeholder="Minimum 8 characters"
+                aria-invalid={errors.key ? 'true' : undefined}
+                {...register('key')}
+              />
+              {errors.key ? (
+                <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+                  {errors.key.message}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {/* Saving a new name or password disconnects every client on every
+              band — the most common surprise on this page. */}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Saving a new network name or password disconnects every device on every band; they must
+            reconnect using the new password.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" size="sm" disabled={applying || setAP.isPending}>
+              {applying ? 'Saving...' : 'Save'}
+            </Button>
+            {isDirty && (
+              <>
+                <span className="text-xs text-amber-700 dark:text-amber-300">Unsaved changes</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    reset({
+                      ssid: primary.ssid,
+                      encryption: normalizeApEncryption(primary.encryption),
+                      key: primary.key,
+                    })
+                  }
+                >
+                  Discard
+                </Button>
+              </>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={openQrFromForm}>
+              <QrCode className="h-4 w-4" />
+              QR Code
+            </Button>
+          </div>
+        </fieldset>
       </form>
 
       <WifiQRDialog
@@ -290,8 +422,16 @@ export function APUnifiedConfigForm({
           }
         }}
         isLastActive
+        action="save"
         onConfirm={confirmDisable}
-        confirmPending={setAP.isPending}
+        confirmPending={applying}
+      />
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={applying}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
       />
     </>
   );

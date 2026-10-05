@@ -653,3 +653,43 @@ func TestInstallWithLog_KeepsGuardOnFailure(t *testing.T) {
 		t.Errorf("crash guard must remain after a failed install: %v", err)
 	}
 }
+
+// ADR 0003 §1.2: a guard on disk means a previous install/remove died part-way.
+// Retrying it blindly is what the guard exists to prevent, so the next attempt
+// must refuse and point at the documented recovery path.
+func TestInstallRefusesWhileAnInstallGuardExists(t *testing.T) {
+	guardDir := t.TempDir()
+	guard := filepath.Join(guardDir, "pkg-install-in-progress")
+
+	// A failing install leaves the guard behind, as a power cut would.
+	failing := NewServiceManagerWith(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	failing.SetGuardDir(guardDir)
+	if err := failing.Install("tailscale"); err == nil {
+		t.Fatal("expected the seeded install to fail")
+	}
+	if _, err := os.Stat(guard); err != nil {
+		t.Fatalf("precondition: guard must remain after a failed install: %v", err)
+	}
+
+	pkg := NewMockPackageManager()
+	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm.SetGuardDir(guardDir)
+	err := sm.Install("tailscale")
+	if err == nil {
+		t.Fatal("expected the retry to be refused while the guard exists")
+	}
+	if !strings.Contains(err.Error(), "interrupted install/remove") {
+		t.Errorf("expected the refusal to name the interrupted operation, got %v", err)
+	}
+	if pkg.IsInstalled("tailscale") {
+		t.Error("a refused retry must not touch the package manager")
+	}
+
+	// Clearing the guard is the documented recovery path, and then it works.
+	if err := os.Remove(guard); err != nil {
+		t.Fatalf("remove guard: %v", err)
+	}
+	if err := sm.Install("tailscale"); err != nil {
+		t.Fatalf("install after clearing the guard: %v", err)
+	}
+}

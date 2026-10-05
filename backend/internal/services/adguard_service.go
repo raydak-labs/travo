@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
@@ -24,6 +26,12 @@ const (
 	adguardYAMLPathUCI     = "/etc/adguardhome/adguardhome.yaml"
 	adguardYAMLPathOpt     = "/opt/AdGuardHome/AdGuardHome.yaml"
 	adguardBundledTemplate = "/etc/travo/adguardhome.yaml"
+	// adguardDnsSnapshotPath is where releases before the shared dnsmasq layer
+	// stack wrote AdGuard's snapshot of dhcp.@dnsmasq[0].server/noresolv. It is
+	// read once as a migration source for the stack's base state and then
+	// removed: two files restoring the same two options is how the AdGuard and
+	// VPN paths ended up restoring over each other.
+	adguardDnsSnapshotPath = "/etc/trafo/adguard-dns-snapshot.json"
 )
 
 // AdGuardChecker abstracts filesystem/process checks for testability.
@@ -38,6 +46,8 @@ type AdGuardChecker interface {
 	ReadFile(path string) ([]byte, error)
 	// WriteFile writes contents to a file.
 	WriteFile(path string, data []byte, perm os.FileMode) error
+	// RemoveFile deletes a file. Returns nil when it is already gone.
+	RemoveFile(path string) error
 	// TCPProbe returns true if a TCP connection to addr (host:port) succeeds within timeout.
 	TCPProbe(addr string, timeout time.Duration) bool
 }
@@ -84,6 +94,13 @@ func (r *RealAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMod
 	return os.WriteFile(path, data, perm)
 }
 
+func (r *RealAdGuardChecker) RemoveFile(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 func (r *RealAdGuardChecker) TCPProbe(addr string, timeout time.Duration) bool {
 	conn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
@@ -94,11 +111,21 @@ func (r *RealAdGuardChecker) TCPProbe(addr string, timeout time.Duration) bool {
 }
 
 // AdGuardService provides status and statistics for AdGuard Home.
+//
+// mu guards httpAPIBase, yamlDNSPort and yamlSourcePath. refreshEndpointsFromYAML
+// rewrites all three on every status read, from five different callers, so
+// without it two concurrent requests can interleave and leave the service
+// pointing at a config path AdGuard is not reading.
 type AdGuardService struct {
 	checker        AdGuardChecker
+	mu             sync.RWMutex
 	httpAPIBase    string
 	yamlDNSPort    int
 	yamlSourcePath string
+	// dnsStackPath is the shared dnsmasq resolver layer record. It is a field
+	// rather than a bare constant so the stack lifecycle can be exercised
+	// without touching /etc/trafo.
+	dnsStackPath string
 }
 
 type adguardYAMLTop struct {
@@ -119,10 +146,22 @@ func normalizeAdGuardBindHost(h string) string {
 	}
 }
 
+// refreshEndpointsFromYAML re-reads the AdGuard YAML and publishes the derived
+// endpoints. The values are computed into a local struct and published together
+// under one write lock, so a reader never sees a base URL from one file with a
+// port from another.
 func (s *AdGuardService) refreshEndpointsFromYAML() {
-	s.httpAPIBase = ""
-	s.yamlDNSPort = 0
-	s.yamlSourcePath = ""
+	base, port, sourcePath := s.readEndpointsFromYAML()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.httpAPIBase = base
+	s.yamlDNSPort = port
+	s.yamlSourcePath = sourcePath
+}
+
+// readEndpointsFromYAML performs the file read and parsing with no locking. The
+// returned values are a consistent triple.
+func (s *AdGuardService) readEndpointsFromYAML() (base string, dnsPort int, sourcePath string) {
 	var data []byte
 	var usedPath string
 	for _, p := range []string{adguardYAMLPathUCI, adguardYAMLPathOpt} {
@@ -133,29 +172,39 @@ func (s *AdGuardService) refreshEndpointsFromYAML() {
 		}
 	}
 	if len(data) == 0 {
-		s.httpAPIBase = adguardAPIBaseDefault
-		return
+		return adguardAPIBaseDefault, 0, ""
 	}
 	var y adguardYAMLTop
 	if err := yaml.Unmarshal(data, &y); err != nil {
-		s.httpAPIBase = adguardAPIBaseDefault
-		s.yamlSourcePath = usedPath
-		return
+		return adguardAPIBaseDefault, 0, usedPath
 	}
 	webPort := y.BindPort
 	if webPort <= 0 {
 		webPort = 3000
 	}
 	host := normalizeAdGuardBindHost(y.BindHost)
-	s.httpAPIBase = fmt.Sprintf("http://%s:%d", host, webPort)
-	s.yamlSourcePath = usedPath
+	sourcePath = usedPath
 	if y.DNS.Port > 0 {
-		s.yamlDNSPort = y.DNS.Port
+		dnsPort = y.DNS.Port
 	}
+	return fmt.Sprintf("http://%s:%d", host, webPort), dnsPort, sourcePath
+}
+
+// configPathLocked returns the YAML path AdGuard is reading, or the default.
+func (s *AdGuardService) configPathLocked() string {
+	if s.yamlSourcePath != "" {
+		return s.yamlSourcePath
+	}
+	return adguardYAMLPathOpt
 }
 
 func (s *AdGuardService) apiBase() string {
-	if s != nil && s.httpAPIBase != "" {
+	if s == nil {
+		return adguardAPIBaseDefault
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.httpAPIBase != "" {
 		return s.httpAPIBase
 	}
 	return adguardAPIBaseDefault
@@ -163,14 +212,14 @@ func (s *AdGuardService) apiBase() string {
 
 // NewAdGuardService creates a new AdGuardService with a real checker.
 func NewAdGuardService() *AdGuardService {
-	s := &AdGuardService{checker: NewRealAdGuardChecker()}
+	s := &AdGuardService{checker: NewRealAdGuardChecker(), dnsStackPath: dnsmasqLayerStackPath}
 	s.refreshEndpointsFromYAML()
 	return s
 }
 
 // NewAdGuardServiceWithChecker creates a new AdGuardService with a custom checker (for tests).
 func NewAdGuardServiceWithChecker(c AdGuardChecker) *AdGuardService {
-	s := &AdGuardService{checker: c}
+	s := &AdGuardService{checker: c, dnsStackPath: dnsmasqLayerStackPath}
 	s.refreshEndpointsFromYAML()
 	return s
 }
@@ -237,7 +286,9 @@ func (s *AdGuardService) GetStatus() (models.AdGuardStatus, error) {
 	var result models.AdGuardStatus
 	s.refreshEndpointsFromYAML()
 	result.AdminURL = s.apiBase()
+	s.mu.RLock()
 	result.ConfigYAMLPath = s.yamlSourcePath
+	s.mu.RUnlock()
 
 	statusBody, err := s.checker.HTTPGet(s.apiBase() + "/control/status")
 	if err != nil {
@@ -278,8 +329,11 @@ type adguardDNSInfoResponse struct {
 // getDNSPort returns the DNS port AdGuard listens on, or the default.
 func (s *AdGuardService) getDNSPort() int {
 	s.refreshEndpointsFromYAML()
-	if s.yamlDNSPort > 0 {
-		return s.yamlDNSPort
+	s.mu.RLock()
+	port := s.yamlDNSPort
+	s.mu.RUnlock()
+	if port > 0 {
+		return port
 	}
 	body, err := s.checker.HTTPGet(s.apiBase() + "/control/dns_info")
 	if err != nil {
@@ -343,14 +397,21 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 // When enabling, it first verifies that AdGuard is running and its DNS listener
 // is reachable. If the pre-flight check fails, no dnsmasq changes are made and
 // the error is returned (safe: DNS resolution is never left in a broken state).
-// SetDNS points dnsmasq at AdGuard's resolver.
+// SetDNS stacks or unstacks AdGuard on the shared dnsmasq resolver layer stack
+// (see dnsmasqLayerStackFile in vpn_service.go).
+//
+// It used to `uci delete` the whole server list on both paths, which destroyed
+// split-DNS entries the operator added by hand in LuCI (server=/lan.example.com/...)
+// with nothing to put them back. The stack holds the pre-any-layer state instead
+// (ADR 0001 §3).
 //
 // Takes the `dhcp` lock. This writes dhcp.@dnsmasq[0].server and .noresolv — the
 // SAME section and options that the VPN's enableVpnDNSForwarding /
 // disableVpnDNSForwarding and CaptiveService's dnsmasq helpers mutate. Holding the
 // lock on the VPN side while this side does not achieves nothing: whichever
 // sequence commits last wins, and the loser's commit persists whatever the other
-// had staged.
+// had staged. The stack is also what stops one feature's restore from landing
+// on top of the other's: both consult the same record.
 //
 // withConfigLocks rather than mutateUCI: this shells out to `uci` and has no
 // uci.UCI handle to revert through, so a failure here leaves its staged delta for
@@ -359,11 +420,79 @@ func (s *AdGuardService) SetDNS(enabled bool) error {
 	return withConfigLocks([]string{"dhcp"}, func() error { return s.setDNSLocked(enabled) })
 }
 
-func (s *AdGuardService) setDNSLocked(enabled bool) error {
-	port := s.getDNSPort()
-	entry := dnsmasqServerEntry(port)
+// checkerDNS drives the shared dnsmasq stack through AdGuardService's
+// AdGuardChecker, so the two features share one record and one set of rules
+// while keeping their own file and process abstractions.
+type checkerDNS struct{ checker AdGuardChecker }
 
+func (k checkerDNS) getServers() ([]string, error) {
+	out, err := k.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].server")
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(strings.TrimSpace(out)), nil
+}
+
+func (k checkerDNS) getNoResolv() (string, error) {
+	out, err := k.checker.RunCommand("uci", "get", "dhcp.@dnsmasq[0].noresolv")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func (k checkerDNS) setServers(servers []string) error {
+	// Best-effort clear: `uci delete` exits 1 with "Entry not found" when the
+	// list is already empty, which is the normal state on a router that has
+	// never had forwarding configured.
+	_, _ = k.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
+	for _, srv := range servers {
+		if _, err := k.checker.RunCommand("uci", "add_list", "dhcp.@dnsmasq[0].server="+srv); err != nil {
+			return fmt.Errorf("failed to add dnsmasq server %q: %w", srv, err)
+		}
+	}
+	return nil
+}
+
+func (k checkerDNS) setNoResolv(value string) error {
+	if _, err := k.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv="+value); err != nil {
+		return fmt.Errorf("failed to set noresolv=%s: %w", value, err)
+	}
+	return nil
+}
+
+func (k checkerDNS) commitAndRestart() error {
+	if _, err := k.checker.RunCommand("uci", "commit", "dhcp"); err != nil {
+		return fmt.Errorf("failed to commit dhcp: %w", err)
+	}
+	if _, err := k.checker.RunCommand("/etc/init.d/dnsmasq", "restart"); err != nil {
+		return fmt.Errorf("failed to restart dnsmasq: %w", err)
+	}
+	return nil
+}
+
+func (k checkerDNS) readFile(path string) ([]byte, error) { return k.checker.ReadFile(path) }
+
+func (k checkerDNS) writeFile(path string, data []byte, perm os.FileMode) error {
+	return k.checker.WriteFile(path, data, perm)
+}
+
+func (k checkerDNS) removeFile(path string) error { return k.checker.RemoveFile(path) }
+
+// dnsmasqLayers returns this service's view of the shared stack.
+func (s *AdGuardService) dnsmasqLayers() *dnsmasqLayerStackFile {
+	return &dnsmasqLayerStackFile{
+		dns:        checkerDNS{checker: s.checker},
+		path:       s.dnsStackPath,
+		legacyPath: adguardDnsSnapshotPath,
+	}
+}
+
+func (s *AdGuardService) setDNSLocked(enabled bool) error {
 	if enabled {
+		port := s.getDNSPort()
+		entry := dnsmasqServerEntry(port)
+
 		// Pre-flight: AdGuard must be running.
 		if !s.IsRunning() {
 			return fmt.Errorf("AdGuard Home is not running — start it before enabling DNS forwarding")
@@ -372,31 +501,28 @@ func (s *AdGuardService) setDNSLocked(enabled bool) error {
 		if !s.probeAdGuardDNSListener(port) {
 			return fmt.Errorf("AdGuard Home DNS listener is not ready on 127.0.0.1:%d — verify AdGuard config", port)
 		}
-
-		// Apply dnsmasq changes.
-		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
-		if _, err := s.checker.RunCommand("uci", "add_list", fmt.Sprintf("dhcp.@dnsmasq[0].server=%s", entry)); err != nil {
-			return fmt.Errorf("failed to set dnsmasq server: %w", err)
-		}
-		if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=1"); err != nil {
-			// Rollback: delete the server entry we just added.
-			_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
-			return fmt.Errorf("failed to set noresolv: %w", err)
-		}
-	} else {
-		_, _ = s.checker.RunCommand("uci", "delete", "dhcp.@dnsmasq[0].server")
-		if _, err := s.checker.RunCommand("uci", "set", "dhcp.@dnsmasq[0].noresolv=0"); err != nil {
-			return fmt.Errorf("failed to unset noresolv: %w", err)
-		}
+		// The stack records the pre-any-layer state before dnsmasq is touched.
+		// Without it there would be nothing to restore, so a failure here aborts
+		// the enable instead of deleting the operator's resolver entries.
+		return s.dnsmasqLayers().EnableLayer(dnsLayerAdGuard, []string{entry})
 	}
 
-	if _, err := s.checker.RunCommand("uci", "commit", "dhcp"); err != nil {
-		return fmt.Errorf("failed to commit dhcp: %w", err)
+	// Disable: pop the AdGuard layer. When another layer is still stacked the
+	// stack leaves dnsmasq pointing at it untouched; only the last layer to go
+	// restores the pre-any-layer state and drops the record.
+	applied, err := s.dnsmasqLayers().RemoveLayer(dnsLayerAdGuard, false)
+	if err != nil {
+		return err
 	}
-	if _, err := s.checker.RunCommand("/etc/init.d/dnsmasq", "restart"); err != nil {
-		return fmt.Errorf("failed to restart dnsmasq: %w", err)
+	if applied {
+		return nil
 	}
-	return nil
+	// No record: this disable was never preceded by an enable through this
+	// service (or it predates the stack). The current server list is left
+	// untouched — it may be entirely the operator's own split-DNS entries, and
+	// deleting it is exactly the data loss the record exists to prevent.
+	// noresolv is still cleared so dnsmasq falls back to resolv.conf.
+	return s.dnsmasqLayers().ClearNoResolv()
 }
 
 // defaultAdGuardConfig is written on first install to give AdGuard sensible defaults:
@@ -430,9 +556,15 @@ log_file: ""
 verbose: false
 `
 
-// AutoConfigure writes a default AdGuardHome.yaml (if the file doesn't already exist),
-// starts the adguardhome service, and enables dnsmasq forwarding to AdGuard.
-// Called automatically after successful package install.
+// AutoConfigure writes a default AdGuardHome.yaml (if the file doesn't already exist)
+// and enables + starts the adguardhome service.
+// Registered as ServiceManager's post-install hook for "adguardhome" (main.go), so
+// it runs after a successful package install.
+//
+// It deliberately does NOT touch dnsmasq: forwarding is an operator decision made
+// through SetDNS, which records the pre-any-layer resolver list in the shared
+// dnsmasq layer record. An earlier comment here claimed it enabled forwarding;
+// it never did.
 func (s *AdGuardService) AutoConfigure() error {
 	if !s.checker.FileExists(adguardYAMLPathUCI) && !s.checker.FileExists(adguardYAMLPathOpt) {
 		_, _ = s.checker.RunCommand("mkdir", "-p", "/opt/AdGuardHome")
@@ -476,21 +608,104 @@ func (s *AdGuardService) GetConfig() (string, error) {
 	return "", fmt.Errorf("reading AdGuard config: %w", lastErr)
 }
 
+// adguardConfigVerifyTimeout bounds how long SetConfig waits for the DNS
+// listener to come back after a restart before rolling the config back.
+var adguardConfigVerifyTimeout = 8 * time.Second
+
+// adguardConfigVerifyPollDuration is the interval between listener probes.
+var adguardConfigVerifyPollDuration = 500 * time.Millisecond
+
 // SetConfig writes the AdGuard Home YAML configuration and restarts the service.
+//
+// This is the one place a single request body becomes the live resolver config,
+// and dnsmasq is already forwarding every LAN query to AdGuard (often with
+// noresolv=1), so one half-typed document previously killed name resolution for
+// the whole network with the previous config gone. Three things guard it now:
+//
+//  1. the body must parse as a YAML mapping, or it is rejected untouched;
+//  2. the current file is copied to a timestamped .bak before the write;
+//  3. after the restart the DNS listener is polled, and if it never comes up the
+//     backup is restored and AdGuard is restarted again.
+//
+// The verification is best-effort in the sense that a checker which cannot probe
+// (or reports failure) triggers the rollback rather than a silent success.
 func (s *AdGuardService) SetConfig(content string) error {
-	s.refreshEndpointsFromYAML()
-	path := adguardYAMLPathOpt
-	if s.yamlSourcePath != "" {
-		path = s.yamlSourcePath
+	// Validate before anything is written: an unparseable document must never
+	// reach the live config.
+	var probe map[string]any
+	if err := yaml.Unmarshal([]byte(content), &probe); err != nil {
+		return fmt.Errorf("AdGuard config is not valid YAML: %w", err)
 	}
+	if probe == nil {
+		return fmt.Errorf("AdGuard config is empty; refusing to replace the live configuration")
+	}
+
+	s.refreshEndpointsFromYAML()
+	s.mu.RLock()
+	path := s.configPathLocked()
+	s.mu.RUnlock()
+
+	// Back up the current config so a bad write can be undone.
+	previous, readErr := s.checker.ReadFile(path)
+	backupPath := adguardConfigBackupPath(path, time.Now())
+	if readErr == nil {
+		if err := s.checker.WriteFile(backupPath, previous, 0o600); err != nil {
+			return fmt.Errorf("backing up AdGuard config: %w", err)
+		}
+	}
+
 	if err := s.checker.WriteFile(path, []byte(content), 0600); err != nil {
 		return fmt.Errorf("writing AdGuard config: %w", err)
 	}
 	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {
+		s.rollbackAdGuardConfig(path, backupPath, previous, readErr)
 		return fmt.Errorf("restarting AdGuard: %w", err)
 	}
 	s.refreshEndpointsFromYAML()
-	return nil
+
+	if s.probeAdGuardDNSListener(s.getDNSPort()) {
+		// The change is good, so the backup has nothing left to protect. Keeping
+		// one per edit would accumulate unbounded small files on the overlayfs
+		// NAND, and each one is a copy of a file that holds bcrypt hashes.
+		_ = s.checker.RemoveFile(backupPath)
+		return nil
+	}
+	deadline := time.Now().Add(adguardConfigVerifyTimeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(adguardConfigVerifyPollDuration)
+		s.refreshEndpointsFromYAML()
+		if s.probeAdGuardDNSListener(s.getDNSPort()) {
+			_ = s.checker.RemoveFile(backupPath)
+			return nil
+		}
+	}
+	s.rollbackAdGuardConfig(path, backupPath, previous, readErr)
+	return fmt.Errorf("AdGuard DNS listener did not come back after the config change;" +
+		" the previous config was restored")
+}
+
+// adguardConfigBackupPath is the timestamped backup name for a config path.
+func adguardConfigBackupPath(path string, now time.Time) string {
+	return fmt.Sprintf("%s.%s.bak", path, now.UTC().Format("20060102T150405Z"))
+}
+
+// rollbackAdGuardConfig restores the pre-write config and restarts AdGuard. It
+// reports nothing: the caller is already returning the original failure and a
+// rollback failure must not replace it. The .bak is deliberately left on disk
+// on this path — the operator has a broken config to inspect.
+func (s *AdGuardService) rollbackAdGuardConfig(path, backupPath string,
+	previous []byte, readErr error,
+) {
+	if readErr == nil {
+		if err := s.checker.WriteFile(path, previous, 0600); err != nil {
+			log.Printf("adguard: restoring config from %s: %v", backupPath, err)
+			return
+		}
+	}
+	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {
+		log.Printf("adguard: restarting after config rollback: %v", err)
+	}
+	s.refreshEndpointsFromYAML()
 }
 
 // SetPassword hashes password with bcrypt (default cost) and writes it into the

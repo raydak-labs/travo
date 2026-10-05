@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -25,6 +26,7 @@ const (
 //     unless the same radio has an active STA (ath11k crash avoidance).
 //
 // UCI changes are committed when fixes are applied; no wifi command is run by this function.
+// Radios are never re-enabled while the WiFi schedule's current window is off.
 //
 // Returns: fixed (any UCI changes committed), needWifiUp (at least one AP was re-enabled).
 func (w *WifiService) EnsureAPRunning() (fixed bool, needWifiUp bool, err error) {
@@ -92,7 +94,21 @@ func (w *WifiService) ensureAPRunningLocked() (fixed bool, needWifiUp bool, err 
 
 	// Enable radios that have at least one enabled AP, so WiFi is actually visible.
 	// (UCI can have AP iface disabled=0 but radio disabled=1, which shows no networks.)
+	//
+	// NOT during a schedule off-window. The generated toggle helper turns WiFi off
+	// by setting wireless.@wifi-device[*].disabled=1 and leaves the AP ifaces at
+	// disabled=0, so this loop saw "AP enabled" and undid the schedule: a backend
+	// restart inside the off window committed the radios back on, and the next
+	// reboot or LuCI Save & Apply brought WiFi up against the operator's
+	// schedule. See wifiScheduleOffWindow.
+	scheduleOff := w.wifiScheduleOffWindow()
+	if scheduleOff {
+		log.Printf("wifi: schedule off-window active; leaving the radios as the schedule set them")
+	}
 	for name, opts := range sections {
+		if scheduleOff {
+			break
+		}
 		if opts["type"] == "" || opts["disabled"] != "1" {
 			continue
 		}

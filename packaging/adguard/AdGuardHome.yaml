@@ -4,9 +4,12 @@ http:
     enabled: false
   address: 0.0.0.0:3000
   session_ttl: 720h
-users:
-  - name: admin
-    password: $2a$10$Xn9ScJAC90tv4.03HUjbtOyG2ENRRRyw60waCVDamjuFbo3b6Vqsy
+# No default account is shipped. A committed hash means every device in the
+# field shares a published admin credential, and the plaintext is in the
+# README. With an empty list AdGuard Home shows its first-run setup, and
+# Travo's own "Settings -> AdGuard Password" creates the admin user through
+# the authenticated API (AdGuardService.SetPassword hashes it).
+users: []
 auth_attempts: 5
 block_auth_min: 15
 http_proxy: ''

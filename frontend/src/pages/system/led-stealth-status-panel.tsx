@@ -41,7 +41,7 @@ export function LedStealthStatusPanel({
             {ledStatus.leds.map((led) => (
               <div
                 key={led.name}
-                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-900"
+                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 dark:bg-gray-900/50"
               >
                 <span className="text-xs text-gray-700 dark:text-gray-300">{led.name}</span>
                 <Badge variant={led.brightness > 0 ? 'success' : 'secondary'}>

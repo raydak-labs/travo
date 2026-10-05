@@ -5,10 +5,12 @@ describe('shellTitleForPath', () => {
   const cases: Array<[string, string]> = [
     ['/dashboard', 'Dashboard'],
     ['/wifi', 'Connect'],
-    ['/wifi/advanced', 'Advanced'],
+    // Qualified: two pages both titled "Advanced" gave no way to tell the
+    // section you were in from the header alone.
+    ['/wifi/advanced', 'WiFi / Advanced'],
     ['/network', 'Status'],
     ['/network/configuration', 'Internet & LAN'],
-    ['/network/advanced', 'Advanced'],
+    ['/network/advanced', 'Network / Advanced'],
     ['/clients', 'Clients'],
     ['/vpn', 'VPN'],
     ['/services', 'Services'],

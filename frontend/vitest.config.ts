@@ -15,5 +15,9 @@ export default defineConfig({
     setupFiles: ['src/test/setup.ts'],
     globals: true,
     css: true,
+    // Declared rather than defaulted. shared/vitest.config.ts pins include for the
+    // same reason: the default glob is an unstated assumption that a rename can
+    // break silently.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 });

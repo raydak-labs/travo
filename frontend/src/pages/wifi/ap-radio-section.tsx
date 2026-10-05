@@ -3,7 +3,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CardInset } from '@/components/ui/card-inset';
 import { WifiQRDialog } from '@/components/wifi/wifi-qr-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
 import { useSetAPConfig } from '@/hooks/use-wifi';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
 import type { APConfig, APConfigUpdate } from '@shared/index';
 import { apRadioFormSchema, type APRadioFormValues } from '@/lib/schemas/wifi-forms';
 import { normalizeApEncryption } from './ap-config-normalize';
@@ -18,6 +20,7 @@ export type APRadioSectionProps = {
 
 export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRadioSectionProps) {
   const setAP = useSetAPConfig();
+  const lockout = useWifiLockout();
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrPayload, setQrPayload] = useState<APConfig | null>(null);
@@ -39,7 +42,7 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
       encryption: normalizeApEncryption(ap.encryption),
       key: ap.key,
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const enabled = watch('enabled');
@@ -73,14 +76,31 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
     setAP.mutate({ section: ap.section, config: buildConfig(data) });
   };
 
-  const confirmDisable = () => {
+  // Disabling an access point is the guarded request (ADR 0002 §5): when it is
+  // the last one and the operator is on WiFi, the router refuses and the
+  // acknowledgement dialog is raised instead of the change.
+  function submitDisable(acknowledge: boolean) {
     const data = getValues();
-    setAP.mutate({
-      section: ap.section,
-      config: { ...buildConfig(data), enabled: false },
-    });
+    setAP.mutate(
+      {
+        section: ap.section,
+        config: {
+          ...buildConfig(data),
+          enabled: false,
+          ...(acknowledge ? { acknowledge_lockout: true } : {}),
+        },
+      },
+      {
+        onError: (error) => {
+          if (acknowledge) return;
+          lockout.onLockout(error, () => submitDisable(true));
+        },
+      },
+    );
     setDisableDialogOpen(false);
-  };
+  }
+
+  const confirmDisable = () => submitDisable(false);
 
   const isLastActive = activeEnabledCount <= 1;
   const bandLabel = ap.band === '5g' ? '5 GHz' : ap.band === '2g' ? '2.4 GHz' : ap.band;
@@ -132,6 +152,13 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
         isLastActive={isLastActive}
         onConfirm={confirmDisable}
         confirmPending={setAP.isPending}
+      />
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={setAP.isPending}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
       />
     </>
   );

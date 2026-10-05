@@ -28,7 +28,7 @@ export function TailscaleLoggedInPanel({
 }: TailscaleLoggedInPanelProps) {
   return (
     <>
-      <div className="space-y-1 rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900">
+      <div className="space-y-1 text-sm dark:bg-gray-900">
         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
           <span className="text-gray-500 dark:text-gray-400">IP Address</span>
           <span className="font-mono text-gray-900 dark:text-white">{status.ip_address}</span>

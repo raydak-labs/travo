@@ -89,7 +89,7 @@ export function DiagnosticsCard() {
             </Button>
           </div>
           {errors.target ? (
-            <p id="diag-target-err" className="text-xs text-red-500" role="alert">
+            <p id="diag-target-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.target.message}
             </p>
           ) : null}

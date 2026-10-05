@@ -12,6 +12,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # workflow_dispatch makes a release possible from a branch that is not a tag.
+  # Nothing downstream noticed: VERSION came out empty, the artifacts were named
+  # travo__aarch64_cortex-a53.tar.gz, and the only layout check lives in ci.yml
+  # with its own hardcoded VERSION, so the release published a filename no
+  # install.sh can resolve. Fail here instead, before anything is built.
+  guard:
+    name: Verify the release ref
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require a vMAJOR.MINOR.PATCH tag
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "${REF_TYPE}" != "tag" ]; then
+            echo "::error::a release must be cut from a tag, not ${REF_TYPE} ${REF_NAME}"
+            exit 1
+          fi
+          if ! echo "${REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "::error::${REF_NAME} is not a v<semver> tag; the version is baked " \
+              "into the tarball name install.sh has to resolve"
+            exit 1
+          fi
+
   # A release must never ship from a red main: re-run the CI checks against the
   # exact tagged commit and fail the release when anything is red.
   #
@@ -28,7 +55,7 @@ jobs:
 
   build-and-release:
     name: Build (${{ matrix.arch }})
-    needs: [verify]
+    needs: [guard, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -104,6 +131,36 @@ jobs:
           ARCH: ${{ matrix.package_arch }}
         run: bash scripts/package-tarball.sh
 
+      # The layout check in ci.yml runs against its own VERSION=0.0.0 tarball,
+      # so on the release path it verified a different artifact from the one
+      # that ships. Check the real one: install.sh resolves it by name and
+      # unpacks it as /.
+      - name: Verify the release tarball is install.sh-resolvable
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          ARCH: ${{ matrix.package_arch }}
+        run: |
+          set -euo pipefail
+          tarball="dist/travo_${VERSION}_${ARCH}.tar.gz"
+          if [ ! -f "${tarball}" ]; then
+            echo "::error::package-tarball.sh produced no ${tarball}"; ls -l dist
+            exit 1
+          fi
+          listing="$(tar -tzf "${tarball}")"
+          for p in \
+            ./usr/bin/travo \
+            ./etc/init.d/travo \
+            ./etc/config/travo \
+            ./etc/uci-defaults/99-travel-gui-ports \
+            ./lib/upgrade/keep.d/travo \
+            ./www/travo/index.html ; do
+            echo "${listing}" | grep -qx "${p}" \
+              || { echo "::error::${tarball} is missing ${p}"; echo "${listing}"; exit 1; }
+          done
+          if echo "${listing}" | grep -qE '^\.\./'; then
+            echo "::error::${tarball} contains paths escaping /"; exit 1
+          fi
+
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
@@ -154,15 +211,20 @@ jobs:
           NOTES="$(cat <<EOF
           ## Quick Install (OpenWRT)
 
+          There is no default password: pass your own, or run the script from a
+          terminal to be prompted.
+
           \`\`\`sh
-          wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | sh
+          wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | \
+            sh -s -- --password 'your-strong-password'
           \`\`\`
 
           Or install a specific version:
 
           \`\`\`sh
           VERSION=${VERSION} \\
-            wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | sh
+            wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | \
+            sh -s -- --password 'your-strong-password'
           \`\`\`
 
           ## Downloads

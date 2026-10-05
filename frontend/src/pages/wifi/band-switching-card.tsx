@@ -35,7 +35,7 @@ export function BandSwitchingCard() {
           />
         </div>
         {bandSwitchData?.config.enabled && (
-          <div className="rounded-md bg-gray-50 p-3 text-xs dark:bg-gray-900 space-y-2">
+          <div className="text-xs dark:bg-gray-900 space-y-2">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
               <span>Preferred band</span>
               <span className="font-medium text-gray-900 dark:text-white">

@@ -27,9 +27,15 @@ func (f *failingSetUCI) Set(_, _, _, _ string) error {
 
 func TestGetConnectionMethod(t *testing.T) {
 	tests := []struct {
-		name           string
-		clientIP       string
-		ubusResponse   map[string]any
+		name         string
+		clientIP     string
+		ubusResponse map[string]any
+		// arp is the neighbour table the case runs against. A br-lan client
+		// cannot be classified from the dump alone — it needs a MAC, and then
+		// that MAC's association state. See client_classifier_test.go for the
+		// same cases run against the payload captured from the device.
+		arp            string
+		assoc          string
 		expectedMethod string
 		expectError    bool
 	}{
@@ -87,10 +93,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "wwan0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.20.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.20.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -107,10 +111,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"device":    "phy0-sta",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.30.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.30.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -119,7 +121,11 @@ func TestGetConnectionMethod(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:     "br-lan interface matches WiFi AP",
+			// The REAL netifd shape: a bare address plus a separate integer mask.
+			// The old fixture used an `ipv4-prefix` CIDR key that the device does
+			// not emit, so this case passed without ever exercising the code the
+			// router runs.
+			name:     "ipv4-address with an integer mask matches a WiFi AP client",
 			clientIP: "192.168.1.200",
 			ubusResponse: map[string]any{
 				"interface": []any{
@@ -127,19 +133,40 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.1.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.1", "mask": float64(24)},
 						},
 					},
 				},
 			},
+			arp:            "192.168.1.200  0x1  0x2  AA:BB:CC:11:22:33  *  br-lan",
+			assoc:          "AA:BB:CC:11:22:33",
 			expectedMethod: "wifi-ap",
 			expectError:    false,
 		},
 		{
-			name:     "lan interface matches WiFi AP",
+			name:     "a br-lan client with no association is Ethernet",
+			clientIP: "192.168.1.201",
+			ubusResponse: map[string]any{
+				"interface": []any{
+					map[string]any{
+						"interface": true,
+						"up":        true,
+						"l3_device": "br-lan",
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.1", "mask": float64(24)},
+						},
+					},
+				},
+			},
+			arp:            "192.168.1.201  0x1  0x2  9C:EB:E8:D3:F8:D1  *  br-lan",
+			expectedMethod: "ethernet",
+			expectError:    false,
+		},
+		{
+			// CIDR tolerance in `ipv4-prefix`, kept because some netifd builds
+			// emit it and the classifier must not regress on those.
+			name:     "lan interface with a CIDR ipv4-prefix",
 			clientIP: "192.168.2.50",
 			ubusResponse: map[string]any{
 				"interface": []any{
@@ -148,14 +175,13 @@ func TestGetConnectionMethod(t *testing.T) {
 						"up":        true,
 						"l3_device": "lan",
 						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.2.0/24",
-							},
+							map[string]any{"address": "192.168.2.0/24"},
 						},
 					},
 				},
 			},
-			expectedMethod: "wifi-ap",
+			arp:            "192.168.2.50  0x1  0x2  9C:EB:E8:D3:F8:D1  *  lan",
+			expectedMethod: "ethernet",
 			expectError:    false,
 		},
 		{
@@ -167,10 +193,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "10.0.0.0/8",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "10.0.0.0", "mask": float64(8)},
 						},
 					},
 				},
@@ -187,10 +211,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth1",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "172.16.0.0/12",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "172.16.0.0", "mask": float64(12)},
 						},
 					},
 				},
@@ -207,10 +229,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "some-unknown",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.100.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.100.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -227,10 +247,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": false,
 						"up":        false,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.1.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -247,10 +265,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "br-lan",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.1.0/24",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.1.0", "mask": float64(24)},
 						},
 					},
 				},
@@ -267,10 +283,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "192.168.0.0/23",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "192.168.0.0", "mask": float64(23)},
 						},
 					},
 				},
@@ -287,10 +301,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "10.0.0.0/16",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "10.0.0.0", "mask": float64(16)},
 						},
 					},
 				},
@@ -307,10 +319,8 @@ func TestGetConnectionMethod(t *testing.T) {
 						"interface": true,
 						"up":        true,
 						"l3_device": "eth0",
-						"ipv4-prefix": []any{
-							map[string]any{
-								"address": "172.16.0.0/19",
-							},
+						"ipv4-address": []any{
+							map[string]any{"address": "172.16.0.0", "mask": float64(19)},
 						},
 					},
 				},
@@ -328,7 +338,18 @@ func TestGetConnectionMethod(t *testing.T) {
 			}
 
 			u := uci.NewMockUCI()
-			svc := NewNetworkService(u, ub)
+			cmd := &MockCommandRunner{Err: fmt.Errorf("iw: not available")}
+			if tt.assoc != "" {
+				cmd = &MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {
+					if len(args) == 1 && args[0] == "dev" {
+						return []byte("phy#1\n\tInterface phy1-ap0\n\t\ttype AP\n"), nil
+					}
+					return []byte("Station " + tt.assoc + " (on phy1-ap0)\n"), nil
+				}}
+			}
+			svc := NewNetworkServiceWithRunner(u, ub, cmd)
+			svc.arpFile = writeTempFile(t, "arp",
+				"IP address  HW type  Flags  HW address  Mask  Device\n"+tt.arp)
 
 			result, err := svc.GetConnectionMethod(tt.clientIP)
 
@@ -2133,5 +2154,329 @@ func TestSetDDNSConfig_CreatesSectionWhenAbsent(t *testing.T) {
 	}
 	if !cfg.Enabled || cfg.Domain != "test.no-ip.org" {
 		t.Errorf("config not persisted correctly: %+v", cfg)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PUT /network/wan: every declared field must actually be written.
+// ---------------------------------------------------------------------------
+
+// The handler strictly validates MTU and every DNS server and the OpenAPI body
+// declares both, but the service dropped them on the floor and answered 200 —
+// so the documented "GET, change a field, PUT it back" client pattern reported
+// a successful save of nothing.
+func TestSetWanConfigWritesMTUAndDNSServers(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+
+	cfg := models.WanConfig{Type: "dhcp", MTU: 1400, DNSServers: []string{"1.1.1.1", "9.9.9.9"}}
+	if err := svc.SetWanConfig(cfg); err != nil {
+		t.Fatalf("SetWanConfig: %v", err)
+	}
+
+	got, err := svc.GetWanConfig()
+	if err != nil {
+		t.Fatalf("GetWanConfig: %v", err)
+	}
+	if got.MTU != 1400 {
+		t.Errorf("MTU must be persisted, got %d", got.MTU)
+	}
+	if len(got.DNSServers) != 2 || got.DNSServers[0] != "1.1.1.1" || got.DNSServers[1] != "9.9.9.9" {
+		t.Errorf("DNS servers must be persisted, got %v", got.DNSServers)
+	}
+	if peerdns, _ := u.Get("network", "wan", "peerdns"); peerdns != "0" {
+		t.Errorf("custom DNS servers must set peerdns=0, got %q", peerdns)
+	}
+}
+
+// An explicitly empty dns_servers list means "use the DHCP-provided resolvers
+// again"; an absent list must not touch them at all.
+func TestSetWanConfigDNSHandling(t *testing.T) {
+	t.Run("absent list leaves DNS alone", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		svc := NewNetworkService(u, ubus.NewMockUbus())
+		if err := svc.SetWanConfig(models.WanConfig{Type: "dhcp", MTU: 1500}); err != nil {
+			t.Fatalf("SetWanConfig: %v", err)
+		}
+		if dns, _ := u.Get("network", "wan", "dns"); dns == "" {
+			t.Error("an absent dns_servers list must not clear the configured DNS")
+		}
+	})
+
+	t.Run("empty list restores peer DNS", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		svc := NewNetworkService(u, ubus.NewMockUbus())
+		if err := svc.SetWanConfig(models.WanConfig{Type: "dhcp", DNSServers: []string{}}); err != nil {
+			t.Fatalf("SetWanConfig: %v", err)
+		}
+		if peerdns, _ := u.Get("network", "wan", "peerdns"); peerdns != "1" {
+			t.Errorf("an empty dns_servers list must set peerdns=1, got %q", peerdns)
+		}
+		if dns, _ := u.Get("network", "wan", "dns"); dns != "" {
+			t.Errorf("an empty dns_servers list must clear the static resolvers, got %q", dns)
+		}
+	})
+}
+
+// Switching modes must not leave the previous mode's options behind.
+func TestSetWanConfigSwitchesModesCleanly(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wan", "proto", "static")
+	_ = u.Set("network", "wan", "ip4addr", "203.0.113.5")
+	_ = u.Set("network", "wan", "netmask", "255.255.255.0")
+	_ = u.Set("network", "wan", "gateway", "203.0.113.1")
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+
+	if err := svc.SetWanConfig(models.WanConfig{Type: "dhcp"}); err != nil {
+		t.Fatalf("SetWanConfig: %v", err)
+	}
+	for _, option := range wanStaticOptions {
+		if value, _ := u.Get("network", "wan", option); value != "" {
+			t.Errorf("switching to dhcp must delete %s, got %q", option, value)
+		}
+	}
+	if proto, _ := u.Get("network", "wan", "proto"); proto != "dhcp" {
+		t.Errorf("proto = %q, want dhcp", proto)
+	}
+
+	// And back the other way: the static triple survives a no-op type write.
+	if err := svc.SetWanConfig(models.WanConfig{
+		Type: "static", IPAddress: "198.51.100.7", Netmask: "255.255.255.0", Gateway: "198.51.100.1",
+	}); err != nil {
+		t.Fatalf("SetWanConfig static: %v", err)
+	}
+	if value, _ := u.Get("network", "wan", "ip4addr"); value != "198.51.100.7" {
+		t.Errorf("ip4addr = %q, want 198.51.100.7", value)
+	}
+}
+
+// Writing proto=pppoe without credentials creates a WAN that can never
+// authenticate, so it must be refused rather than reported as a save.
+func TestSetWanConfigRejectsPPPoEWithoutCredentials(t *testing.T) {
+	t.Run("switching into pppoe", func(t *testing.T) {
+		u := uci.NewMockUCI() // proto dhcp, no credentials
+		svc := NewNetworkService(u, ubus.NewMockUbus())
+		err := svc.SetWanConfig(models.WanConfig{Type: "pppoe"})
+		if !errors.Is(err, errPPPoEUnsupported) {
+			t.Fatalf("expected errPPPoEUnsupported, got %v", err)
+		}
+		if proto, _ := u.Get("network", "wan", "proto"); proto != "dhcp" {
+			t.Errorf("a rejected save must not change the proto, got %q", proto)
+		}
+	})
+
+	t.Run("pppoe section without credentials", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		_ = u.Set("network", "wan", "proto", "pppoe")
+		svc := NewNetworkService(u, ubus.NewMockUbus())
+		err := svc.SetWanConfig(models.WanConfig{Type: "pppoe", MTU: 1400})
+		if !errors.Is(err, errPPPoEUnsupported) {
+			t.Fatalf("expected errPPPoEUnsupported, got %v", err)
+		}
+	})
+
+	t.Run("already configured pppoe stays editable", func(t *testing.T) {
+		u := uci.NewMockUCI()
+		_ = u.Set("network", "wan", "proto", "pppoe")
+		_ = u.Set("network", "wan", "username", "user@example.net")
+		_ = u.Set("network", "wan", "password", "secret")
+		svc := NewNetworkService(u, ubus.NewMockUbus())
+		if err := svc.SetWanConfig(models.WanConfig{Type: "pppoe", MTU: 1400}); err != nil {
+			t.Fatalf("editing a configured PPPoE WAN must be allowed: %v", err)
+		}
+		if mtu, _ := u.Get("network", "wan", "mtu"); mtu != "1400" {
+			t.Errorf("MTU must be written, got %q", mtu)
+		}
+	})
+}
+
+func TestSetWanConfigRejectsOutOfRangeMTU(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+	if err := svc.SetWanConfig(models.WanConfig{Type: "dhcp", MTU: 9001}); err == nil {
+		t.Fatal("expected an out-of-range MTU to be rejected")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /network/dns/entries/:section must not be able to eat the dnsmasq
+// section (uci.validSectionName deliberately admits @type[N] references).
+// ---------------------------------------------------------------------------
+
+func TestDeleteDNSEntryRejectsNonEntrySections(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.AddSection("dhcp", "dnsmasq", "dnsmasq")
+	_ = u.Set("dhcp", "dnsmasq", "start", "100")
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+
+	for _, section := range []string{"@dnsmasq[0]", "dnsmasq", "lan", "missing"} {
+		if err := svc.DeleteDNSEntry(section); err == nil {
+			t.Errorf("DeleteDNSEntry(%q) must be refused", section)
+		}
+	}
+	if _, err := u.Get("dhcp", "dnsmasq", "start"); err != nil {
+		t.Errorf("the dnsmasq section must survive: %v", err)
+	}
+	if _, err := u.Get("dhcp", "lan", "start"); err != nil {
+		t.Errorf("the lan dhcp section must survive: %v", err)
+	}
+}
+
+func TestDeleteDHCPReservationRejectsNonReservationSections(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.AddSection("dhcp", "dnsmasq", "dnsmasq")
+	_ = u.Set("dhcp", "dnsmasq", "limit", "150")
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+
+	for _, section := range []string{"@dnsmasq[0]", "dnsmasq", "missing"} {
+		if err := svc.DeleteDHCPReservation(section); err == nil {
+			t.Errorf("DeleteDHCPReservation(%q) must be refused", section)
+		}
+	}
+	if _, err := u.Get("dhcp", "dnsmasq", "limit"); err != nil {
+		t.Errorf("the dnsmasq section must survive: %v", err)
+	}
+}
+
+func TestDeleteDNSEntryStillDeletesNamedDomain(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+	if err := svc.AddDNSEntry(models.DNSEntry{Name: "nas.local", IP: "192.168.8.50"}); err != nil {
+		t.Fatalf("AddDNSEntry: %v", err)
+	}
+	if err := svc.DeleteDNSEntry("dns_nas_local"); err != nil {
+		t.Fatalf("DeleteDNSEntry: %v", err)
+	}
+	if _, err := u.GetAll("dhcp", "dns_nas_local"); err == nil {
+		t.Error("expected the named domain section to be deleted")
+	}
+}
+
+func TestDeleteDHCPReservationStillDeletesNamedHost(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+	if err := svc.AddDHCPReservation(models.DHCPReservation{
+		Name: "nas", MAC: "aa:bb:cc:dd:ee:ff", IP: "192.168.8.60",
+	}); err != nil {
+		t.Fatalf("AddDHCPReservation: %v", err)
+	}
+	if err := svc.DeleteDHCPReservation("host_nas"); err != nil {
+		t.Fatalf("DeleteDHCPReservation: %v", err)
+	}
+	if _, err := u.GetAll("dhcp", "host_nas"); err == nil {
+		t.Error("expected the named host section to be deleted")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics: the target is the last argv entry of a root-run command.
+// ---------------------------------------------------------------------------
+
+func TestRunDiagnosticsRejectsOptionLikeTargets(t *testing.T) {
+	var ran [][]string
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), &FuncCommandRunner{
+		RunFunc: func(name string, args ...string) ([]byte, error) {
+			ran = append(ran, append([]string{name}, args...))
+			return []byte("ok"), nil
+		},
+	})
+
+	for _, target := range []string{"-f", "--help", " -f", "", "1.1.1.1;reboot", "a b"} {
+		result := svc.RunDiagnostics(models.DiagnosticsRequest{Type: "ping", Target: target})
+		if result.Error == "" {
+			t.Errorf("target %q must be rejected", target)
+		}
+	}
+	if len(ran) != 0 {
+		t.Errorf("no diagnostic command may run for a rejected target, got %v", ran)
+	}
+
+	for _, target := range []string{"1.1.1.1", "example.com", "nas.local"} {
+		result := svc.RunDiagnostics(models.DiagnosticsRequest{Type: "ping", Target: target})
+		if result.Error != "" {
+			t.Errorf("target %q must be accepted, got %q", target, result.Error)
+		}
+	}
+	if len(ran) != 3 {
+		t.Errorf("expected 3 diagnostic runs, got %v", ran)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Block / Unblock: a failed firewall reload must not leave the committed
+// config and the running firewall disagreeing.
+// ---------------------------------------------------------------------------
+
+func TestBlockClientRollsBackWhenFirewallReloadFails(t *testing.T) {
+	u := uci.NewMockUCI()
+	svc := NewNetworkServiceWithRunner(u, ubus.NewMockUbus(), &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return nil, fmt.Errorf("firewall reload failed")
+		},
+	})
+
+	if err := svc.BlockClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected the block to be reported as failed")
+	}
+	blocked, err := svc.GetBlockedClients()
+	if err != nil {
+		t.Fatalf("GetBlockedClients: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Errorf("a block whose reload failed must be rolled back, got %v", blocked)
+	}
+}
+
+func TestUnblockClientRestoresRuleWhenFirewallReloadFails(t *testing.T) {
+	u := uci.NewMockUCI()
+	failing := &FuncCommandRunner{
+		RunFunc: func(_ string, _ ...string) ([]byte, error) {
+			return nil, fmt.Errorf("firewall reload failed")
+		},
+	}
+	svc := NewNetworkServiceWithRunner(u, ubus.NewMockUbus(), failing)
+
+	// Create the rule directly: the happy path cannot install one while the
+	// reload is broken.
+	section := "block_" + normalizeMACForSection("AA:BB:CC:DD:EE:FF")
+	if err := u.AddSection("firewall", section, "rule"); err != nil {
+		t.Fatalf("AddSection: %v", err)
+	}
+	for option, value := range map[string]string{
+		"name": "Block-AA:BB:CC:DD:EE:FF", "src": "lan",
+		"src_mac": "AA:BB:CC:DD:EE:FF", "target": "DROP",
+	} {
+		if err := u.Set("firewall", section, option, value); err != nil {
+			t.Fatalf("Set: %v", err)
+		}
+	}
+
+	if err := svc.UnblockClient("AA:BB:CC:DD:EE:FF"); err == nil {
+		t.Fatal("expected the unblock to be reported as failed")
+	}
+	blocked, err := svc.GetBlockedClients()
+	if err != nil {
+		t.Fatalf("GetBlockedClients: %v", err)
+	}
+	if len(blocked) != 1 {
+		t.Errorf("an unblock whose reload failed must put the rule back, got %v", blocked)
+	}
+}
+
+// `uci delete` on an option that is not set is itself an error, so a mode switch
+// must only clear the options that are actually there.
+func TestSetWanConfigModeSwitchToleratesMissingOptions(t *testing.T) {
+	u := uci.NewMockUCI()
+	_ = u.Set("network", "wan", "proto", "static")
+	_ = u.Set("network", "wan", "ip4addr", "203.0.113.5")
+	_ = u.DeleteOption("network", "wan", "netmask")
+	_ = u.DeleteOption("network", "wan", "gateway")
+	svc := NewNetworkService(u, ubus.NewMockUbus())
+
+	if err := svc.SetWanConfig(models.WanConfig{Type: "dhcp"}); err != nil {
+		t.Fatalf("SetWanConfig: %v", err)
+	}
+	if proto, _ := u.Get("network", "wan", "proto"); proto != "dhcp" {
+		t.Errorf("proto = %q, want dhcp", proto)
 	}
 }

@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 import { useWifiHealth, useRepeaterRadioReconcile } from '@/hooks/use-wifi';
 
 export function WifiRepeaterSameRadioBanner() {
   const { data: health } = useWifiHealth();
   const reconcile = useRepeaterRadioReconcile();
+  const [confirming, setConfirming] = useState(false);
 
   if (!health?.repeater_same_radio_ap_sta) {
     return null;
@@ -31,11 +35,32 @@ export function WifiRepeaterSameRadioBanner() {
         type="button"
         size="sm"
         disabled={reconcile.isPending}
-        onClick={() => reconcile.mutate()}
+        onClick={() => setConfirming(true)}
         className="shrink-0"
       >
         {reconcile.isPending ? 'Applying…' : 'Fix radio layout'}
       </Button>
+
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Move the uplink to the other radio?"
+        description="This moves the Wi-Fi uplink and downlink access point onto separate radios and restarts the wireless subsystem."
+        warningText="All Wi-Fi clients disconnect, including this device if you are managing the router over Wi-Fi. Keep this page open until it finishes."
+        confirmLabel="Apply"
+        isPending={reconcile.isPending}
+        onConfirm={() => {
+          setConfirming(false);
+          reconcile.mutate();
+        }}
+      />
+      {reconcile.isPending && (
+        <OperationProgressDialog
+          open
+          title="Re-applying radio separation"
+          description="Keep this page open until the wireless subsystem has restarted."
+        />
+      )}
     </div>
   );
 }

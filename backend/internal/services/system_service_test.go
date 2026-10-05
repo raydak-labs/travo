@@ -1,8 +1,14 @@
 package services
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -467,25 +473,84 @@ func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
 	}
 }
 
+// buildFirmwareImage returns a synthetic sysupgrade image: kernel padding
+// followed by an OpenWrt metadata block naming the given model and devices.
+// It mirrors what mkimage writes, so the parser is exercised against the real
+// layout rather than a convenient one.
+func buildFirmwareImage(model string, supportedDevices []string) []byte {
+	var pairs bytes.Buffer
+	writePair := func(k, v string) {
+		pairs.WriteString(k)
+		pairs.WriteByte(0)
+		pairs.WriteString(v)
+		pairs.WriteByte(0)
+	}
+	writePair("version", "23.05.2")
+	writePair("distname", "OpenWrt")
+	writePair("model", model)
+	writePair("supported_devices", strings.Join(supportedDevices, ","))
+
+	const magic = "metadata\x00\x00"
+	body := append([]byte(magic), 0, 0, 0, 1) // compat_version = 1
+	body = append(body, pairs.Bytes()...)
+	size := 8 + len(body)
+	block := make([]byte, 0, size)
+	block = binary.BigEndian.AppendUint32(block, uint32(size))
+	block = binary.BigEndian.AppendUint32(block, 1)
+	block = append(block, body...)
+
+	// 4 KiB of kernel padding in front, so the parser has to scan for the block.
+	out := make([]byte, 4096)
+	for i := range out {
+		out[i] = 0xff
+	}
+	return append(out, block...)
+}
+
+// mockBoardDevices are the supported_devices values the mock ubus answers for
+// ("glinet,gl-mt3000" / model "GL.iNet GL-MT3000").
+func mockBoardDevices() []string { return []string{"gl-mt3000", "glinet,gl-mt3000"} }
+
 func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
 	svc.SetGuardDir(t.TempDir())
+	// The flash goroutine must finish inside this test, or it would pick up a
+	// later test's PATH and record a call that has nothing to do with it.
+	marker := installFakeSysupgrade(t)
 
-	content := "fake firmware binary"
-	reader := strings.NewReader(content)
+	image := buildFirmwareImage("GL.iNet GL-MT3000", mockBoardDevices())
+	reader := bytes.NewReader(image)
 
-	err := svc.UpgradeFirmware(reader, true)
+	meta, err := svc.UpgradeFirmware(reader, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if meta.Model != "GL.iNet GL-MT3000" {
+		t.Errorf("parsed model = %q, want GL.iNet GL-MT3000", meta.Model)
+	}
+	waitForSysupgradeCall(t, marker)
 
 	// The staged image must exist somewhere under /tmp with the uploaded bytes.
-	data, err := findFirmwareImage(content)
+	data, err := findFirmwareImage(string(image))
 	if err != nil {
 		t.Fatalf("firmware file was not staged: %v", err)
 	}
 	_ = os.Remove(data)
+}
+
+// waitForSysupgradeCall blocks until the asynchronous flash has run, so the
+// goroutine cannot outlive the test that installed the stub.
+func waitForSysupgradeCall(t *testing.T, marker string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(marker); err == nil {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Errorf("sysupgrade was never invoked (%s missing)", marker)
 }
 
 // findFirmwareImage locates the staged /tmp/firmware-*.bin written by
@@ -502,6 +567,153 @@ func findFirmwareImage(want string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no /tmp/firmware-*.bin containing the uploaded content")
+}
+
+// A .bin for another board must be refused BEFORE sysupgrade runs. sysupgrade
+// only rejects it after this endpoint answered 200, by which point the operator
+// has already been told the flash started — and on a travel router with no
+// serial console the result is a brick.
+func TestUpgradeFirmware_RejectsForeignDevice(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	marker := installFakeSysupgrade(t)
+
+	image := buildFirmwareImage("Some Other Router", []string{"other,router-x1"})
+	_, err := svc.UpgradeFirmware(bytes.NewReader(image), true)
+	if err == nil {
+		t.Fatal("a firmware image for another board was accepted")
+	}
+	if !errors.Is(err, ErrUnsupportedFirmware) {
+		t.Errorf("error = %v, want ErrUnsupportedFirmware", err)
+	}
+	if !strings.Contains(err.Error(), "Some Other Router") {
+		t.Errorf("the error must name the image model, got %v", err)
+	}
+	assertNoSysupgradeCall(t, marker)
+	if _, err := os.Stat(filepath.Join(dir, firmwareUpgradeGuardName)); err == nil {
+		t.Error("a rejected image must not leave a crash guard: nothing was flashed")
+	}
+	assertNoStagedFirmware(t)
+}
+
+// A junk file with a .bin name has no metadata block at all — the textbook
+// brick. It must be a 400-equivalent error, not a flash attempt.
+func TestUpgradeFirmware_RejectsJunkBinary(t *testing.T) {
+	svc, _ := newGuardedSystemService(t)
+	marker := installFakeSysupgrade(t)
+
+	junk := make([]byte, 8192)
+	for i := range junk {
+		junk[i] = byte(i)
+	}
+	_, err := svc.UpgradeFirmware(bytes.NewReader(junk), true)
+	if err == nil {
+		t.Fatal("a junk .bin with no metadata block was accepted")
+	}
+	if !errors.Is(err, ErrNoFirmwareMetadata) {
+		t.Errorf("error = %v, want ErrNoFirmwareMetadata", err)
+	}
+	assertNoSysupgradeCall(t, marker)
+	assertNoStagedFirmware(t)
+}
+
+// An image that names no supported_devices cannot be verified at all. Flashing
+// it anyway is a coin flip with the device on the wrong side.
+func TestUpgradeFirmware_RejectsImageWithoutSupportedDevices(t *testing.T) {
+	svc, _ := newGuardedSystemService(t)
+	marker := installFakeSysupgrade(t)
+
+	image := buildFirmwareImage("GL.iNet GL-MT3000", nil)
+	if _, err := svc.UpgradeFirmware(bytes.NewReader(image), true); err == nil {
+		t.Fatal("an image without supported_devices was accepted")
+	}
+	assertNoSysupgradeCall(t, marker)
+}
+
+func TestParseFirmwareMetadata(t *testing.T) {
+	image := buildFirmwareImage("Linksys EA8300", []string{"linksys,ea8300", "linksys_e8300-ubi"})
+	meta, err := ParseFirmwareMetadata(bytes.NewReader(image))
+	if err != nil {
+		t.Fatalf("a well-formed image was rejected: %v", err)
+	}
+	if meta.Model != "Linksys EA8300" {
+		t.Errorf("model = %q", meta.Model)
+	}
+	if meta.Version != "23.05.2" || meta.Distname != "OpenWrt" {
+		t.Errorf("version/distname = %q/%q", meta.Version, meta.Distname)
+	}
+	if meta.CompatVersion != 1 {
+		t.Errorf("compat_version = %d, want 1", meta.CompatVersion)
+	}
+	if len(meta.SupportedDevices) != 3 || meta.SupportedDevicesRaw != "linksys,ea8300,linksys_e8300-ubi" {
+		t.Errorf("supported_devices = %v (raw %q)", meta.SupportedDevices, meta.SupportedDevicesRaw)
+	}
+	// The mock board answers "glinet,gl-mt3000" with model "GL.iNet GL-MT3000".
+	if meta.SupportsDevice("glinet,gl-mt3000", []string{"gl-mt3000", "GL.iNet GL-MT3000", "GL-MT3000"}) {
+		t.Error("an EA8300 image must not claim support for a GL-MT3000 board")
+	}
+	own := buildFirmwareImage("GL.iNet GL-MT3000", []string{"gl-mt3000"})
+	ownMeta, err := ParseFirmwareMetadata(bytes.NewReader(own))
+	if err != nil {
+		t.Fatalf("parsing the board's own image: %v", err)
+	}
+	if !ownMeta.SupportsDevice("glinet,gl-mt3000", []string{"gl-mt3000"}) {
+		t.Error("a GL-MT3000 image must be accepted for the GL-MT3000 board")
+	}
+	// An image listing the full "glinet,gl-mt3000" board name matches too.
+	full := buildFirmwareImage("GL.iNet GL-MT3000", []string{"glinet,gl-mt3000"})
+	fullMeta, err := ParseFirmwareMetadata(bytes.NewReader(full))
+	if err != nil {
+		t.Fatalf("parsing the full-name image: %v", err)
+	}
+	if !fullMeta.SupportsDevice("glinet,gl-mt3000", nil) {
+		t.Error("supported_devices=glinet,gl-mt3000 must match this board")
+	}
+}
+
+func TestParseFirmwareMetadata_RejectsJunk(t *testing.T) {
+	if _, err := ParseFirmwareMetadata(bytes.NewReader(make([]byte, 1024))); !errors.Is(err, ErrNoFirmwareMetadata) {
+		t.Errorf("junk image: error = %v, want ErrNoFirmwareMetadata", err)
+	}
+	truncated := buildFirmwareImage("GL.iNet GL-MT3000", mockBoardDevices())
+	truncated = truncated[:len(truncated)-8]
+	if _, err := ParseFirmwareMetadata(bytes.NewReader(truncated)); err == nil {
+		t.Error("a truncated metadata block was accepted")
+	}
+}
+
+// installFakeSysupgrade puts a stub sysupgrade first on PATH that records every
+// invocation, so a test can assert that a rejected image was never handed to it.
+// It returns the marker file the stub appends to.
+func installFakeSysupgrade(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "sysupgrade-calls")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + marker + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "sysupgrade"), []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake sysupgrade: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return marker
+}
+
+func assertNoSysupgradeCall(t *testing.T, marker string) {
+	t.Helper()
+	// The firmware flash sleeps 500ms before calling sysupgrade; the restore is
+	// synchronous, but give both a moment so the assertion is not a race.
+	time.Sleep(800 * time.Millisecond)
+	if _, err := os.Stat(marker); err == nil {
+		t.Errorf("sysupgrade was invoked (%s exists) despite the rejection", marker)
+	}
+}
+
+func assertNoStagedFirmware(t *testing.T) {
+	t.Helper()
+	matches, _ := filepath.Glob("/tmp/firmware-*.bin")
+	for _, m := range matches {
+		if b, err := os.ReadFile(m); err == nil && bytes.Equal(b, buildFirmwareImage("Some Other Router", []string{"other,router-x1"})) {
+			t.Errorf("a rejected image was left staged at %s", m)
+		}
+	}
 }
 
 func TestGetSetupComplete_NotComplete(t *testing.T) {
@@ -633,9 +845,12 @@ func newGuardedSystemService(t *testing.T) (*SystemService, string) {
 // leaves an unbootable device, and the marker is the only recovery hint.
 func TestUpgradeFirmware_WritesCrashGuard(t *testing.T) {
 	svc, dir := newGuardedSystemService(t)
-	if err := svc.UpgradeFirmware(strings.NewReader("FIRMWARE"), true); err != nil {
+	marker := installFakeSysupgrade(t)
+	image := buildFirmwareImage("GL.iNet GL-MT3000", mockBoardDevices())
+	if _, err := svc.UpgradeFirmware(bytes.NewReader(image), true); err != nil {
 		t.Fatalf("UpgradeFirmware: %v", err)
 	}
+	waitForSysupgradeCall(t, marker)
 	guard := filepath.Join(dir, firmwareUpgradeGuardName)
 	data, err := os.ReadFile(guard)
 	if err != nil {
@@ -644,6 +859,75 @@ func TestUpgradeFirmware_WritesCrashGuard(t *testing.T) {
 	if !strings.Contains(string(data), "sysupgrade") {
 		t.Errorf("guard should record what was running, got %q", data)
 	}
+	if !strings.Contains(string(data), "GL.iNet GL-MT3000") {
+		t.Errorf("guard should record the image model, got %q", data)
+	}
+}
+
+// tarGzArchive builds a gzip tar archive from the given headers. A member's
+// body is taken from bodies[name] when present, otherwise Size zero bytes are
+// written (archive/tar enforces that the declared size is actually written).
+func tarGzArchive(t *testing.T, headers []*tar.Header, bodies map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for _, h := range headers {
+		if body, ok := bodies[h.Name]; ok {
+			h.Size = int64(len(body))
+		}
+		if err := tw.WriteHeader(h); err != nil {
+			t.Fatalf("write tar header %q: %v", h.Name, err)
+		}
+		if h.Typeflag != tar.TypeReg || h.Size <= 0 {
+			continue
+		}
+		if body, ok := bodies[h.Name]; ok {
+			if _, err := io.WriteString(tw, body); err != nil {
+				t.Fatalf("write tar body %q: %v", h.Name, err)
+			}
+			continue
+		}
+		if _, err := io.CopyN(tw, zeroReader{}, h.Size); err != nil {
+			t.Fatalf("write tar filler %q: %v", h.Name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// zeroReader feeds archive/tar the declared member size without allocating it.
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	clear(p)
+	return len(p), nil
+}
+
+// genuineBackupArchive is what `sysupgrade -b` produces on a real device: the
+// UCI config directory, and nothing else.
+func genuineBackupArchive(t *testing.T) []byte {
+	t.Helper()
+	return tarGzArchive(t,
+		[]*tar.Header{
+			{Name: "etc", Typeflag: tar.TypeDir, Mode: 0o755},
+			{Name: "etc/config", Typeflag: tar.TypeDir, Mode: 0o755},
+			{Name: "etc/config/network", Typeflag: tar.TypeReg, Mode: 0o600, Size: 21},
+			{Name: "etc/config/wireless", Typeflag: tar.TypeReg, Mode: 0o600, Size: 27},
+			{Name: "etc/ppp", Typeflag: tar.TypeDir, Mode: 0o755},
+			{Name: "etc/ppp/chap-secrets", Typeflag: tar.TypeReg, Mode: 0o600, Size: 21},
+		},
+		map[string]string{
+			"etc/config/network":   "config network 'lan'\n",
+			"etc/config/wireless":  "config wifi-iface 'default'\n",
+			"etc/ppp/chap-secrets": "* * \"secret\" \"key\"\n",
+		},
+	)
 }
 
 // RestoreBackup rewrites /etc/config, so a crash guard must exist and must
@@ -655,11 +939,230 @@ func TestRestoreBackup_WritesAndKeepsGuardOnFailure(t *testing.T) {
 
 	// sysupgrade does not exist on the test host, so the restore fails; the
 	// guard must still be on disk afterwards.
-	_ = svc.RestoreBackup(filepath.Join(dir, "nonexistent-backup.tar.gz"))
+	path := filepath.Join(dir, "backup.tar.gz")
+	if err := os.WriteFile(path, genuineBackupArchive(t), 0o600); err != nil {
+		t.Fatalf("write backup: %v", err)
+	}
+	if err := svc.RestoreBackup(path); err == nil {
+		t.Fatal("RestoreBackup reported success although sysupgrade is absent")
+	}
 
 	if _, err := os.Stat(guard); err != nil {
 		t.Fatalf("expected a crash guard at %s after a failed restore: %v", guard, err)
 	}
+}
+
+// A genuine backup passes validation: the allowlist has to accept what
+// CreateBackup's counterpart (sysupgrade -b) actually produces, or restore is
+// simply broken.
+func TestValidateRestoreArchive_AcceptsGenuineBackup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "backup.tar.gz")
+	if err := os.WriteFile(path, genuineBackupArchive(t), 0o600); err != nil {
+		t.Fatalf("write backup: %v", err)
+	}
+	if err := ValidateRestoreArchive(path); err != nil {
+		t.Errorf("a genuine sysupgrade backup was rejected: %v", err)
+	}
+}
+
+// sysupgrade -r extracts the tarball at /, so every one of these members turns
+// "restore my configuration" into "run this as root".
+func TestValidateRestoreArchive_RejectsUnsafeMembers(t *testing.T) {
+	cases := []struct {
+		name    string
+		headers []*tar.Header
+		bodies  map[string]string
+		wantErr string
+	}{
+		{
+			name: "absolute path",
+			headers: []*tar.Header{
+				{Name: "/etc/config/network", Typeflag: tar.TypeReg, Size: 3},
+			},
+			bodies:  map[string]string{"/etc/config/network": "abc"},
+			wantErr: "not a relative path",
+		},
+		{
+			name: "parent traversal",
+			headers: []*tar.Header{
+				{Name: "etc/config/../../../etc/crontabs/root", Typeflag: tar.TypeReg, Size: 3},
+			},
+			bodies:  map[string]string{"etc/config/../../../etc/crontabs/root": "abc"},
+			wantErr: "escapes the archive root",
+		},
+		{
+			name: "symlink to a startup script",
+			headers: []*tar.Header{
+				{Name: "etc/config/rc.local", Typeflag: tar.TypeSymlink, Linkname: "/etc/init.d/travo", Size: 0},
+			},
+			wantErr: "only regular files are allowed",
+		},
+		{
+			name: "hardlink",
+			headers: []*tar.Header{
+				{Name: "etc/config/hard", Typeflag: tar.TypeLink, Linkname: "etc/config/network", Size: 0},
+			},
+			wantErr: "only regular files are allowed",
+		},
+		{
+			name: "device node",
+			headers: []*tar.Header{
+				{Name: "etc/config/dev", Typeflag: tar.TypeChar, Size: 0},
+			},
+			wantErr: "only regular files are allowed",
+		},
+		{
+			name: "not a configuration backup",
+			headers: []*tar.Header{
+				{Name: "etc/some-other/file", Typeflag: tar.TypeReg, Size: 3},
+			},
+			wantErr: "not a configuration backup",
+		},
+		{
+			name: "member larger than the cap",
+			headers: []*tar.Header{
+				{Name: "etc/config/network", Typeflag: tar.TypeReg, Size: maxRestoreMemberBytes + 1},
+			},
+			wantErr: "larger than",
+		},
+		{
+			name: "total uncompressed size over the cap",
+			headers: func() []*tar.Header {
+				var hs []*tar.Header
+				for i := 0; i < 16; i++ {
+					hs = append(hs, &tar.Header{
+						Name:     fmt.Sprintf("etc/config/big%d", i),
+						Typeflag: tar.TypeReg,
+						Size:     maxRestoreMemberBytes,
+					})
+				}
+				return hs
+			}(),
+			wantErr: "uncompressed size exceeds",
+		},
+		{
+			name: "too many members",
+			headers: func() []*tar.Header {
+				var hs []*tar.Header
+				for i := 0; i <= maxRestoreArchiveMembers; i++ {
+					hs = append(hs, &tar.Header{
+						Name:     fmt.Sprintf("etc/config/f%d", i),
+						Typeflag: tar.TypeReg,
+						Size:     1,
+					})
+				}
+				return hs
+			}(),
+			wantErr: "more than",
+		},
+		{
+			name:    "empty archive",
+			headers: nil,
+			wantErr: "archive is empty",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "evil.tar.gz")
+			if err := os.WriteFile(path, tarGzArchive(t, tc.headers, tc.bodies), 0o600); err != nil {
+				t.Fatalf("write archive: %v", err)
+			}
+			err := ValidateRestoreArchive(path)
+			if err == nil {
+				t.Fatalf("the archive was accepted; members: %v", memberNames(tc.headers))
+			}
+			if !errors.Is(err, ErrInvalidBackupArchive) {
+				t.Errorf("error = %v, want ErrInvalidBackupArchive", err)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("error = %q, want it to mention %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestValidateRestoreArchive_AcceptsFilesThisAppWrites is the regression guard
+// for the decision to drop the directory allowlist.
+//
+// `sysupgrade -b` archives the overlay upper layer, and this application itself
+// writes /etc/crontabs/root (LED and WiFi schedules),
+// /etc/dropbear/authorized_keys (POST /system/ssh-keys) and, after a password
+// change, /etc/shadow. An allowlist covering only etc/config and etc/ppp
+// therefore refused every genuine backup taken on this device. Authorization is
+// the boundary for restore (ADR 0007 section 2): the endpoint requires a token,
+// and an authenticated admin already holds root via POST /system/ssh-keys,
+// firmware flash and factory reset. Enumerating paths defended nothing and broke
+// the feature.
+func TestValidateRestoreArchive_AcceptsFilesThisAppWrites(t *testing.T) {
+	headers := []*tar.Header{
+		{Name: "etc/", Typeflag: tar.TypeDir, Size: 0},
+		{Name: "etc/config/network", Typeflag: tar.TypeReg, Size: 3},
+		{Name: "etc/crontabs/root", Typeflag: tar.TypeReg, Size: 19},
+		{Name: "etc/dropbear/authorized_keys", Typeflag: tar.TypeReg, Size: 3},
+		{Name: "etc/shadow", Typeflag: tar.TypeReg, Size: 3},
+		{Name: "etc/uci-defaults/99-payload", Typeflag: tar.TypeReg, Size: 3},
+		{Name: "etc/init.d/", Typeflag: tar.TypeDir, Size: 0},
+		{Name: "etc/ppp/chap-secrets", Typeflag: tar.TypeReg, Size: 3},
+	}
+	bodies := map[string]string{"etc/crontabs/root": "* * * * * /bin/sh -c id"}
+	path := filepath.Join(t.TempDir(), "backup.tar.gz")
+	if err := os.WriteFile(path, tarGzArchive(t, headers, bodies), 0o600); err != nil {
+		t.Fatalf("write archive: %v", err)
+	}
+
+	if err := ValidateRestoreArchive(path); err != nil {
+		t.Errorf("a genuine overlay backup was refused: %v", err)
+	}
+}
+
+func TestValidateRestoreArchive_RejectsNonGzip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "backup.tar.gz")
+	if err := os.WriteFile(path, []byte("not a gzip file at all"), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if err := ValidateRestoreArchive(path); !errors.Is(err, ErrInvalidBackupArchive) {
+		t.Errorf("error = %v, want ErrInvalidBackupArchive", err)
+	}
+	if err := ValidateRestoreArchive(filepath.Join(t.TempDir(), "missing.tar.gz")); !errors.Is(err, ErrInvalidBackupArchive) {
+		t.Errorf("missing file: error = %v, want ErrInvalidBackupArchive", err)
+	}
+}
+
+// A rejected archive must never reach sysupgrade — that call is what extracts
+// it at / — and it must not leave a crash guard behind either: nothing was
+// started, so a guard would tell the operator a restore is in flight.
+func TestRestoreBackup_RejectsArchiveBeforeSysupgrade(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	marker := installFakeSysupgrade(t)
+
+	path := filepath.Join(dir, "evil.tar.gz")
+	evil := tarGzArchive(t, []*tar.Header{
+		{Name: "etc/crontabs/root", Typeflag: tar.TypeReg, Size: 3},
+	}, map[string]string{"etc/crontabs/root": "abc"})
+	if err := os.WriteFile(path, evil, 0o600); err != nil {
+		t.Fatalf("write archive: %v", err)
+	}
+
+	err := svc.RestoreBackup(path)
+	if err == nil {
+		t.Fatal("an archive writing outside the allowlist was restored")
+	}
+	if !errors.Is(err, ErrInvalidBackupArchive) {
+		t.Errorf("error = %v, want ErrInvalidBackupArchive", err)
+	}
+	assertNoSysupgradeCall(t, marker)
+	if _, err := os.Stat(filepath.Join(dir, restoreGuardName)); err == nil {
+		t.Error("a rejected archive left a restore-in-progress guard behind")
+	}
+}
+
+func memberNames(headers []*tar.Header) []string {
+	var out []string
+	for _, h := range headers {
+		out = append(out, h.Name)
+	}
+	return out
 }
 
 // FactoryReset must refuse to start when the guard cannot be written, rather
@@ -896,5 +1399,132 @@ func TestLoadButtonActions_HandlesReorderedAndEscapedJSON(t *testing.T) {
 	}
 	if buttons[1].Name != "wps" || buttons[1].Action != models.ButtonActionLEDToggle {
 		t.Errorf("unexpected second button: %+v", buttons[1])
+	}
+}
+
+// Board names are prefixes of each other: "gl-mt3000" is a prefix of
+// "gl-mt3000-nand". Matching the supported_devices list with a substring test
+// therefore accepts a NAND-only image for a NOR router, and that flash is the
+// brick this whole check exists to prevent. Entries must be compared whole.
+func TestSupportsDevice_RequiresAWholeEntry(t *testing.T) {
+	cases := []struct {
+		name        string
+		supported   []string
+		boardName   string
+		aliases     []string
+		wantSupport bool
+	}{
+		{
+			name:        "nand-only image on a nor board",
+			supported:   []string{"glinet,gl-mt3000-nand"},
+			boardName:   "glinet,gl-mt3000",
+			aliases:     []string{"gl-mt3000", "GL.iNet GL-MT3000", "GL-MT3000"},
+			wantSupport: false,
+		},
+		{
+			name:        "nor-only image on a nand board",
+			supported:   []string{"glinet,gl-mt3000"},
+			boardName:   "glinet,gl-mt3000-nand",
+			aliases:     []string{"gl-mt3000-nand"},
+			wantSupport: false,
+		},
+		{
+			name:        "own image listed beside a sibling variant",
+			supported:   []string{"glinet,gl-mt3000", "glinet,gl-mt3000-nand"},
+			boardName:   "glinet,gl-mt3000",
+			aliases:     []string{"gl-mt3000", "GL.iNet GL-MT3000"},
+			wantSupport: true,
+		},
+		{
+			name:        "full multi-board name with no aliases",
+			supported:   []string{"linksys,ea8300,linksys_e8300-ubi"},
+			boardName:   "linksys,ea8300",
+			aliases:     nil,
+			wantSupport: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			meta, err := ParseFirmwareMetadata(bytes.NewReader(
+				buildFirmwareImage("GL.iNet GL-MT3000", tc.supported)))
+			if err != nil {
+				t.Fatalf("parsing image: %v", err)
+			}
+			if got := meta.SupportsDevice(tc.boardName, tc.aliases); got != tc.wantSupport {
+				t.Errorf("SupportsDevice(%q, %v) with supported_devices %q = %v, want %v",
+					tc.boardName, tc.aliases, meta.SupportedDevicesRaw, got, tc.wantSupport)
+			}
+		})
+	}
+}
+
+// The end-to-end consequence of the prefix bug: an image that only supports the
+// NAND variant must never reach sysupgrade on this NOR board.
+func TestUpgradeFirmware_RejectsSiblingVariantImage(t *testing.T) {
+	svc, dir := newGuardedSystemService(t)
+	marker := installFakeSysupgrade(t)
+
+	image := buildFirmwareImage("GL.iNet GL-MT3000 (NAND)", []string{"glinet,gl-mt3000-nand"})
+	_, err := svc.UpgradeFirmware(bytes.NewReader(image), true)
+	if err == nil {
+		t.Fatal("an image for the sibling NAND variant was accepted for this NOR board")
+	}
+	if !errors.Is(err, ErrUnsupportedFirmware) {
+		t.Errorf("error = %v, want ErrUnsupportedFirmware", err)
+	}
+	assertNoSysupgradeCall(t, marker)
+	if _, err := os.Stat(filepath.Join(dir, firmwareUpgradeGuardName)); err == nil {
+		t.Error("a rejected image must not leave a crash guard: nothing was flashed")
+	}
+	assertNoStagedFirmware(t)
+}
+
+// A DIRECTORY entry under etc/config is not evidence of anything: the
+// message claims a UCI config member, so the witness has to be a real file. An
+// archive that carries only directories below etc/config (note that
+// cleanRestoreName drops the trailing slash, so it is the subdirectories that
+// match the prefix) would otherwise pass.
+func TestValidateRestoreArchive_RejectsConfigDirectoryWithoutAFile(t *testing.T) {
+	headers := []*tar.Header{
+		{Name: "etc", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/config", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/config/network", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/config/dhcp/", Typeflag: tar.TypeDir, Mode: 0o755, Size: 0},
+		{Name: "etc/shadow", Typeflag: tar.TypeReg, Mode: 0o600, Size: 3},
+	}
+	archive := tarGzArchive(t, headers, map[string]string{"etc/shadow": "abc"})
+	path := filepath.Join(t.TempDir(), "empty-config.tar.gz")
+	if err := os.WriteFile(path, archive, 0o600); err != nil {
+		t.Fatalf("write archive: %v", err)
+	}
+	err := ValidateRestoreArchive(path)
+	if err == nil {
+		t.Fatal("an archive with only an etc/config directory was accepted as a backup")
+	}
+	if !errors.Is(err, ErrInvalidBackupArchive) {
+		t.Errorf("error = %v, want ErrInvalidBackupArchive", err)
+	}
+	if !strings.Contains(err.Error(), "not a configuration backup") {
+		t.Errorf("error = %q, want it to report the missing UCI config file", err)
+	}
+}
+
+// board_name is comma separated ("glinet,gl-mt3000"), but it names ONE board.
+// Handing its parts out as aliases hands out the vendor prefix "glinet", which
+// matches every GL.iNet entry in a supported_devices list and would let a
+// sibling board's image through.
+func TestBoardIdentityDoesNotSplitTheVendorPrefix(t *testing.T) {
+	svc, _ := newGuardedSystemService(t)
+	name, aliases, err := svc.boardIdentity()
+	if err != nil {
+		t.Fatalf("boardIdentity: %v", err)
+	}
+	if name != "glinet,gl-mt3000" {
+		t.Errorf("board name = %q, want the whole ubus value", name)
+	}
+	for _, a := range aliases {
+		if a == "glinet" {
+			t.Errorf("aliases %v must not contain the bare vendor prefix", aliases)
+		}
 	}
 }

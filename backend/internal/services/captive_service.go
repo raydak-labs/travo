@@ -94,6 +94,11 @@ type CaptiveService struct {
 	// test overrides (empty in production)
 	adguardAPIBaseOverride string
 	resolvConfAutoOverride string
+	// dnsStackPath is the shared dnsmasq resolver layer record this service
+	// stacks its bypass on. Empty means "next to the guard file", which is
+	// /etc/trafo in production (the same directory the record's own constant
+	// names) and a temp dir in tests.
+	dnsStackPath string
 	// stopCh cancels the startup auto-restore goroutine so a shutdown does not
 	// race with a DNS restore (the goroutine used to be untracked).
 	stopCh   chan struct{}
@@ -116,6 +121,12 @@ type dnsBackup struct {
 	DnsmasqNoResolv      string   `json:"dnsmasq_noresolv,omitempty"`
 	DnsmasqServers       []string `json:"dnsmasq_servers,omitempty"`
 	DnsmasqRebindProtect string   `json:"dnsmasq_rebind_protection,omitempty"`
+	// DnsmasqLayer records that this bypass pushed the `captive` layer onto the
+	// shared dnsmasq resolver stack, which makes the layer RECORD the owner of
+	// the pre-bypass resolver list. Without it a restore cannot tell a bypass
+	// that never touched the list from one whose record has been lost, and the
+	// second case restores nothing while the hotel resolver stays in force.
+	DnsmasqLayer bool `json:"dnsmasq_layer,omitempty"`
 	// AdGuardHome upstream DNS backup
 	AdGuardUpstream  []string `json:"adguard_upstream,omitempty"`
 	AdGuardBootstrap []string `json:"adguard_bootstrap,omitempty"`
@@ -130,7 +141,7 @@ func NewCaptiveService(prober HTTPProber) *CaptiveService {
 
 // NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
 func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *CaptiveService {
-	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: captiveDNSGuardFile, stopCh: make(chan struct{})}
+	svc := newCaptiveServiceWithGuard(prober, u, cmd, captiveDNSGuardFile)
 	// Auto-restore stale bypass on startup. Tracked by the app lifecycle: Stop()
 	// must be able to keep this goroutine from restoring DNS after the process
 	// has begun shutting down.
@@ -140,6 +151,19 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 		svc.autoRestoreStaleBypass()
 	}()
 	return svc
+}
+
+// NewCaptiveServiceWithGuard is NewCaptiveServiceWithUCI with the bypass state
+// in an explicit file. The guard file is what marks a bypass active, so a test
+// outside this package cannot exercise the restore path at all without choosing
+// where that state lives — and on a development machine the production path is
+// not writable.
+func NewCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, guardFile string) *CaptiveService {
+	return newCaptiveServiceWithGuard(prober, u, cmd, guardFile)
+}
+
+func newCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, guardFile string) *CaptiveService {
+	return &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: guardFile, stopCh: make(chan struct{})}
 }
 
 // Stop cancels the startup auto-restore goroutine and waits for it to finish.
@@ -280,7 +304,6 @@ func (c *CaptiveService) BypassDNS() error {
 
 		// Read dnsmasq config
 		noresolv := c.getDnsmasqOption("noresolv")
-		servers := c.getDnsmasqServers()
 		rebindProtect := c.getDnsmasqOption("rebind_protection")
 
 		// Read wan config for completeness
@@ -313,11 +336,16 @@ func (c *CaptiveService) BypassDNS() error {
 		agUpstream, agBootstrap, agFallback := c.readAdGuardUpstream()
 
 		// Save current state (including AdGuardHome config)
+		//
+		// noresolv is recorded because the bypass owns that flag on the layer
+		// path: it is what the layer writes (as 0). The resolver LIST is not
+		// recorded on any path that does not take it — on the peerdns / AdGuard
+		// paths the bypass leaves dnsmasq's server list alone, so a restore that
+		// "restores" it would delete entries nobody recorded.
 		backup := dnsBackup{
 			PeerDNS:              wanPeerdns,
 			DNS:                  wanDNS,
 			DnsmasqNoResolv:      noresolv,
-			DnsmasqServers:       servers,
 			DnsmasqRebindProtect: rebindProtect,
 			AdGuardUpstream:      agUpstream,
 			AdGuardBootstrap:     agBootstrap,
@@ -332,34 +360,57 @@ func (c *CaptiveService) BypassDNS() error {
 			return err
 		}
 
-		// --- Patch dnsmasq (only needed when noresolv=1 or rebind protection) ---
-		needsDnsmasqCommit := false
+		// --- Push the bypass onto the shared dnsmasq layer stack (ADR 0001 §4) ---
+		// The bypass is a layer, not a second writer of dhcp's server/noresolv.
+		// A snapshot outside the stack cannot see what is already stacked under
+		// it, so its restore replaces the VPN or AdGuard resolvers with whatever
+		// the bypass happened to find — and the next EnableLayer, finding no
+		// record, then adopts the bypass's own value as the "pre-any-layer"
+		// base. The stack records the real state below, so both survive.
+		//
+		// noresolv=0 is the point of the bypass: the upstream network's own
+		// resolver is wanted, and the layer must not keep cutting off the
+		// resolv.conf fallback the way a forwarding layer does.
+		//
+		// Only a dnsmasq that is actually blocking needs a layer. When dnsmasq
+		// has no custom resolvers (the AdGuard-only bypass) it already follows
+		// resolv.conf, which IS the hotel resolver, so a layer would rewrite
+		// working configuration to no effect.
+		//
+		// rebind protection is not a resolver option and has no layer: it is
+		// written here, and the stack's commit carries it when there is one.
 		if noresolv == "1" {
-			if err := c.setDnsmasqOption("noresolv", "0"); err != nil {
-				_ = os.Remove(c.guardFile)
-				return err
-			}
-			if err := c.deleteDnsmasqOption("server"); err != nil {
-				_ = os.Remove(c.guardFile)
-				return err
-			}
-			// Add hotel DNS as explicit dnsmasq upstream (belt-and-suspenders)
-			if hotelDNS != "" {
-				if err := c.addDnsmasqListItem("server", hotelDNS); err != nil {
+			if rebindProtect == "1" {
+				if err := c.setDnsmasqOption("rebind_protection", "0"); err != nil {
 					_ = os.Remove(c.guardFile)
 					return err
 				}
 			}
-			needsDnsmasqCommit = true
-		}
-		if rebindProtect == "1" {
+			if err := c.dnsmasqLayers().EnableLayerAs(dnsLayerCaptive, []string{hotelDNS}, "0"); err != nil {
+				if rebindProtect == "1" {
+					_ = c.setDnsmasqOption("rebind_protection", "1")
+					c.commitDhcp()
+				}
+				_ = os.Remove(c.guardFile)
+				return err
+			}
+			backup.DnsmasqLayer = true
+			// The guard is written BEFORE the layer is pushed (the record must not
+			// exist without a restore target for it), so the flag has to be
+			// written out again now that the layer is really stacked. Without it
+			// a lost layer record would be indistinguishable from a bypass that
+			// never owned the resolver list, and RestoreDNS would report success
+			// while the hotel resolver is still in force.
+			if err := c.rewriteGuard(backup); err != nil {
+				_, _ = c.dnsmasqLayers().RemoveLayer(dnsLayerCaptive, false)
+				_ = os.Remove(c.guardFile)
+				return err
+			}
+		} else if rebindProtect == "1" {
 			if err := c.setDnsmasqOption("rebind_protection", "0"); err != nil {
 				_ = os.Remove(c.guardFile)
 				return err
 			}
-			needsDnsmasqCommit = true
-		}
-		if needsDnsmasqCommit {
 			if err := c.commitDhcp(); err != nil {
 				_ = os.Remove(c.guardFile)
 				return err
@@ -397,15 +448,28 @@ func (c *CaptiveService) BypassDNS() error {
 			}
 		}
 
-		log.Printf("captive: DNS bypassed (noresolv=%s, servers=%v, hotelDNS=%s)", noresolv, servers, hotelDNS)
+		log.Printf("captive: DNS bypassed (noresolv=%s, hotelDNS=%s)", noresolv, hotelDNS)
 		return nil
 	})
+}
+
+// rewriteGuard re-writes an already-persisted guard file. BypassDNS writes it
+// before it mutates anything, so a field that is only known afterwards (the
+// `dnsmasq_layer` flag) is recorded by writing the whole backup again.
+func (c *CaptiveService) rewriteGuard(backup dnsBackup) error {
+	data, err := json.Marshal(backup)
+	if err != nil {
+		return err
+	}
+	return c.writeGuardFile(data)
 }
 
 // RestoreDNS restores the original DNS config from the guard file.
 // The guard file is removed ONLY when every step succeeded: it is the sole
 // record of the pre-bypass configuration, so deleting it after a partial
-// failure would make the original state unrecoverable.
+// failure would make the original state unrecoverable. The same rule covers a
+// restore that cannot determine the pre-bypass state at all — a bypass that is
+// still in force must never be reported as restored.
 func (c *CaptiveService) RestoreDNS() error {
 	return mutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
 		c.mu.Lock()
@@ -433,21 +497,63 @@ func (c *CaptiveService) RestoreDNS() error {
 
 		// Restore dnsmasq settings — always restore noresolv regardless of servers
 		needsDhcpCommit := false
-		if backup.DnsmasqNoResolv != "" {
-			if err := c.setDnsmasqOption("noresolv", backup.DnsmasqNoResolv); err != nil {
-				fail("restoring dnsmasq noresolv: %w", err)
+		// dnsmasq's resolver options belong to the layer stack (ADR 0001 §4).
+		// Popping the bypass layer puts back whatever was stacked under it — the
+		// VPN layer, the AdGuard layer, or the pre-any-layer base — which a
+		// snapshot in this guard file could never know.
+		layers := c.dnsmasqLayers()
+		applied, layerErr := layers.RemoveLayer(dnsLayerCaptive, false)
+		stacked, stackedErr := layers.hasAnyLayer()
+		switch {
+		case layerErr != nil || stackedErr != nil:
+			// An unreadable layer record means dnsmasq may be owned by something
+			// this guard knows nothing about. Fail closed: leave dnsmasq alone
+			// rather than write over an owner it cannot see.
+			fail("reading the dnsmasq layer record: %w", errors.Join(layerErr, stackedErr))
+		case !applied && !stacked:
+			// A guard file written before the stack existed (ADR 0001 §3.2): no
+			// layer record to pop, and the dnsmasq fields it actually carries are
+			// the only record of what to put back. With another layer stacked the
+			// bypass was never recorded there either, and applying these values
+			// would overwrite the layer that owns dnsmasq now.
+			//
+			// Every action below is gated on the field being present: the guard
+			// may describe a bypass (wan peerdns, AdGuard upstreams) that never
+			// touched dnsmasq's resolver list, and deleting a list it does not
+			// hold can never be undone.
+			if c.bypassOwnedResolvers(backup) && backup.DnsmasqServers == nil {
+				// The bypass pushed the hotel resolver onto the stack, the record
+				// that owned the pre-bypass list is gone, and the guard never held
+				// the list. dnsmasq is therefore still forwarding to the hotel
+				// resolver and nothing here can prove it is not. Writing only
+				// noresolv would leave all DNS pointed at the portal's resolver
+				// and then report success, so refuse: leave dnsmasq alone, keep the
+				// guard for retry, and let the operator see it (ADR 0001 §4).
+				fail("the dnsmasq layer record %s is gone, so the pre-bypass resolvers are unknown; "+
+					"the captive bypass is still in force and dnsmasq was left untouched", layers.path)
+				break
 			}
-			needsDhcpCommit = true
-		}
-		// Delete current servers first, then re-add original ones
-		if err := c.deleteDnsmasqOption("server"); err != nil {
-			fail("clearing dnsmasq server list: %w", err)
-		}
-		for _, srv := range backup.DnsmasqServers {
-			if err := c.addDnsmasqListItem("server", srv); err != nil {
-				fail("restoring dnsmasq server %s: %w", srv, err)
+			if backup.DnsmasqNoResolv != "" {
+				if err := c.setDnsmasqOption("noresolv", backup.DnsmasqNoResolv); err != nil {
+					fail("restoring dnsmasq noresolv: %w", err)
+				}
+				needsDhcpCommit = true
 			}
-			needsDhcpCommit = true
+			if backup.DnsmasqServers != nil {
+				if err := c.deleteDnsmasqOption("server"); err != nil {
+					fail("clearing dnsmasq server list: %w", err)
+				}
+				// A staged `uci delete` that is never committed is a landmine: the
+				// next unrelated writer of dhcp (a VPN toggle, an AdGuard apply)
+				// flushes it and the operator's resolvers vanish with no error.
+				needsDhcpCommit = true
+				for _, srv := range backup.DnsmasqServers {
+					if err := c.addDnsmasqListItem("server", srv); err != nil {
+						fail("restoring dnsmasq server %s: %w", srv, err)
+					}
+					needsDhcpCommit = true
+				}
+			}
 		}
 		if backup.DnsmasqRebindProtect == "1" {
 			if err := c.setDnsmasqOption("rebind_protection", "1"); err != nil {
@@ -460,7 +566,6 @@ func (c *CaptiveService) RestoreDNS() error {
 				fail("committing dnsmasq config: %w", err)
 			}
 		}
-
 		// Restore wan settings
 		if backup.PeerDNS != "" {
 			if err := c.uci.Set("network", "wan", "peerdns", backup.PeerDNS); err != nil {
@@ -540,6 +645,17 @@ func (c *CaptiveService) writeGuardFile(data []byte) error {
 		return err
 	}
 	return os.Rename(tmpName, c.guardFile)
+}
+
+// bypassOwnedResolvers reports whether this guard describes a bypass that put
+// dnsmasq's resolver list under its own control — i.e. one that pushed the
+// `captive` layer and therefore handed ownership of the list to the layer
+// record. A guard written before the stack existed carries no flag, so a
+// recorded noresolv=1 with no recorded list is the same shape and is treated
+// the same way: conservatively, as a bypass whose resolvers are unaccounted
+// for.
+func (c *CaptiveService) bypassOwnedResolvers(backup dnsBackup) bool {
+	return backup.DnsmasqLayer || backup.DnsmasqNoResolv == "1"
 }
 
 // resolvConfPath returns the path parsed for the DHCP-provided nameserver.
@@ -651,21 +767,16 @@ func (c *CaptiveService) setAdGuardUpstream(upstream, bootstrap, fallback []stri
 	return nil
 }
 
-// getDnsmasqServers returns the list of server entries for the dnsmasq section
-// by running `uci get dhcp.@dnsmasq[0].server` via CommandRunner.
-func (c *CaptiveService) getDnsmasqServers() []string {
-	if c.cmd == nil {
-		return nil
+// dnsmasqLayers returns this service's view of the shared stack.
+func (c *CaptiveService) dnsmasqLayers() *dnsmasqLayerStackFile {
+	path := c.dnsStackPath
+	if path == "" && c.guardFile != "" {
+		// /etc/trafo in production: the same file the VPN and AdGuard paths use,
+		// derived rather than hard-coded so a test service pointed at a temp
+		// guard file cannot reach the real record.
+		path = filepath.Join(filepath.Dir(c.guardFile), dnsmasqLayerStackFileName)
 	}
-	out, err := c.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")
-	if err != nil {
-		return nil
-	}
-	val := strings.TrimSpace(string(out))
-	if val == "" {
-		return nil
-	}
-	return strings.Fields(val)
+	return &dnsmasqLayerStackFile{dns: commandRunnerDNS{cmd: c.cmd}, path: path}
 }
 
 // getDnsmasqOption reads a single dnsmasq option via uci get.

@@ -44,7 +44,7 @@ export function FirmwareUpgradeFormFields({
           onChange={onFirmwareInputChange}
         />
         <Button type="button" variant="outline" size="sm" onClick={onSelectFirmwareClick}>
-          <Upload className="mr-2 h-4 w-4" />
+          <Upload className="h-4 w-4" />
           Select Firmware Image
         </Button>
         {firmwareFile instanceof File && (
@@ -53,7 +53,7 @@ export function FirmwareUpgradeFormFields({
           </p>
         )}
         {errors.firmware ? (
-          <p className="mt-1 text-xs text-red-500" role="alert">
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.firmware.message}
           </p>
         ) : null}
@@ -71,7 +71,7 @@ export function FirmwareUpgradeFormFields({
         disabled={flashDisabled}
         onClick={onOpenConfirmFlash}
       >
-        <Zap className="mr-2 h-4 w-4" />
+        <Zap className="h-4 w-4" />
         {flashPending ? 'Flashing…' : 'Upload & Flash'}
       </Button>
     </div>

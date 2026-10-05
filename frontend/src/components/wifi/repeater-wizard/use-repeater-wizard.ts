@@ -163,7 +163,7 @@ export function useRepeaterWizard(open: boolean) {
       }
       if (previousMode && previousMode !== 'repeater') {
         try {
-          await modeMutation.mutateAsync(previousMode);
+          await modeMutation.mutateAsync({ mode: previousMode });
         } catch {
           failures.push(`restore WiFi mode "${previousMode}"`);
         }
@@ -196,7 +196,7 @@ export function useRepeaterWizard(open: boolean) {
           allow_ap_on_sta_radio: allowApOnStaRadio,
         }),
       );
-      await step('repeater mode', () => modeMutation.mutateAsync('repeater'));
+      await step('repeater mode', () => modeMutation.mutateAsync({ mode: 'repeater' }));
       await step('upstream connection', () =>
         connectMutation.mutateAsync({
           ssid: upstream.ssid,

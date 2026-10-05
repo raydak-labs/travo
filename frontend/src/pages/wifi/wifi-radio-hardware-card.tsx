@@ -12,29 +12,82 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useRadios, useSetRadioRole } from '@/hooks/use-wifi';
+import { useRadios, useRepeaterOptions, useSetRadioRole } from '@/hooks/use-wifi';
 import { ConfirmRadioDisableDialog } from '@/components/wifi/confirm-radio-disable-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
+// Complementary to the lockout guard, not a replacement: `useWifiLockout` only
+// reacts once the router has already refused, whereas these warn before a
+// disruptive role change is even sent.
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
+import { InlineError } from '@/components/ui/inline-error';
+
+/**
+ * Why role "both" is refused on multi-radio hardware, and both ways out of it.
+ * ADR 0002 §2: an enabled access point and the uplink STA on the same PHY is
+ * enough to crash ath11k/IPQ6018, so allow_ap_on_sta_radio is the explicit
+ * opt-in. Wording mirrors the backend refusal so the two never disagree.
+ */
+const BOTH_ROLE_REFUSAL_HINT =
+  'Running an access point and the WiFi uplink on the same radio can crash the ' +
+  'ath11k chipset. Give the uplink STA its own radio and put the downlink access ' +
+  'point on the other one, or turn on "Allow Wi-Fi on uplink radio" under Wi-Fi > Advanced > Repeater.';
 
 export function WifiRadioHardwareCard() {
   const { data: radios, isLoading: radiosLoading } = useRadios();
+  const { data: repeaterOptions } = useRepeaterOptions();
   const setRadioRole = useSetRadioRole();
+  const lockout = useWifiLockout();
   const [pendingDisable, setPendingDisable] = useState<{
     name: string;
     currentRole: string;
   } | null>(null);
+  // Role changes other than "none" also disrupt: an AP role on the uplink radio
+  // disables that radio's STA sections, i.e. the uplink. Only the harmless
+  // transition was guarded before.
+  const [pendingRole, setPendingRole] = useState<{ name: string; role: string } | null>(null);
+
+  // The backend refuses role "both" whenever the router has more than one
+  // radio and allow_ap_on_sta_radio is off — see WifiService.rejectSameRadioAPSTA.
+  // Both inputs are already loaded here, so the option is disabled up front
+  // instead of letting the operator pick it and read a refusal afterwards.
+  const bothRoleRefused =
+    (radios?.length ?? 0) >= 2 && repeaterOptions?.allow_ap_on_sta_radio === false;
+  const roleError = setRadioRole.error instanceof Error ? setRadioRole.error.message : null;
+  const generatedKey = setRadioRole.data?.generated_key;
 
   function handleRoleChange(name: string, role: string, currentRole: string) {
-    if (role === 'none') {
-      setPendingDisable({ name, currentRole });
-    } else {
-      setRadioRole.mutate({ name, role });
-    }
+    setPendingDisable(role === 'none' ? { name, currentRole } : null);
+    if (role !== 'none') setPendingRole({ name, role });
+  }
+
+  // Switching the last access-point-carrying radio off is the guarded request
+  // (ADR 0002 §5): the router refuses when the operator is on WiFi and this
+  // would leave no access point, and the acknowledgement dialog re-sends it.
+  function submitDisable(name: string, acknowledge: boolean) {
+    setRadioRole.mutate(
+      { name, role: 'none', acknowledge_lockout: acknowledge },
+      {
+        onError: (error) => {
+          if (acknowledge) return;
+          lockout.onLockout(error, () => submitDisable(name, true));
+        },
+      },
+    );
+    setPendingDisable(null);
   }
 
   function handleConfirmDisable() {
     if (pendingDisable) {
-      setRadioRole.mutate({ name: pendingDisable.name, role: 'none' });
-      setPendingDisable(null);
+      submitDisable(pendingDisable.name, false);
+    }
+  }
+
+  function handleConfirmRole() {
+    if (pendingRole) {
+      setRadioRole.mutate(pendingRole);
+      setPendingRole(null);
     }
   }
 
@@ -84,15 +137,6 @@ export function WifiRadioHardwareCard() {
                           </Badge>
                         )}
 
-                        {pendingDisable && (
-                          <ConfirmRadioDisableDialog
-                            open={true}
-                            radioName={pendingDisable.name}
-                            isPending={setRadioRole.isPending}
-                            onOpenChange={(open) => !open && setPendingDisable(null)}
-                            onConfirm={handleConfirmDisable}
-                          />
-                        )}
                         <Badge
                           variant={radio.disabled ? 'destructive' : 'success'}
                           className="shrink-0"
@@ -119,16 +163,86 @@ export function WifiRadioHardwareCard() {
                     <SelectContent>
                       <SelectItem value="ap">AP only</SelectItem>
                       <SelectItem value="sta">STA only</SelectItem>
-                      <SelectItem value="both">Both (repeater)</SelectItem>
+                      <SelectItem value="both" disabled={bothRoleRefused}>
+                        Both (repeater)
+                      </SelectItem>
                       <SelectItem value="none">Disabled</SelectItem>
                     </SelectContent>
                   </Select>
                 </CardInset>
               );
             })}
+            {bothRoleRefused && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="font-medium">Both (repeater) is unavailable.</span>{' '}
+                {BOTH_ROLE_REFUSAL_HINT}
+              </p>
+            )}
+            {generatedKey && (
+              <div
+                role="status"
+                className="space-y-1 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200"
+              >
+                <p className="font-medium">
+                  Generated WiFi password for {setRadioRole.variables?.name} — it is shown only
+                  here, copy it now.
+                </p>
+                <p className="font-mono break-all">{generatedKey}</p>
+              </div>
+            )}
+            {roleError && (
+              <InlineError>
+                <p className="font-medium">Radio role was not changed.</p>
+                <p className="mt-1 text-xs">{roleError}</p>
+              </InlineError>
+            )}
           </div>
         )}
+        {pendingRole && (
+          <ConfirmDialog
+            open={true}
+            onOpenChange={(open) => !open && setPendingRole(null)}
+            title={`Change ${pendingRole.name} to ${pendingRole.role.toUpperCase()}?`}
+            description={`Applying this restarts the ${pendingRole.name} radio, which can take up to 30 seconds.`}
+            warningText={
+              pendingRole.role === 'ap'
+                ? 'If this radio carries the Wi-Fi uplink, its upstream connection is dropped.'
+                : 'Devices connected to access points on this radio will disconnect.'
+            }
+            confirmLabel="Change role"
+            isPending={setRadioRole.isPending}
+            onConfirm={handleConfirmRole}
+          />
+        )}
+        {setRadioRole.isPending && (
+          <OperationProgressDialog
+            open
+            title="Applying radio change"
+            description="Keep this page open until the change finishes."
+          />
+        )}
       </CardContent>
+
+      {/* Rendered once, outside the per-radio map: it depends only on
+          pendingDisable, and inside the loop a two-radio device mounted two
+          copies of the same dialog (same id, same content) on one click. */}
+      {pendingDisable && (
+        <ConfirmRadioDisableDialog
+          open={true}
+          radioName={pendingDisable.name}
+          radioCount={radios?.length ?? 1}
+          isPending={setRadioRole.isPending}
+          onOpenChange={(open) => !open && setPendingDisable(null)}
+          onConfirm={handleConfirmDisable}
+        />
+      )}
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={setRadioRole.isPending}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
+      />
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/cn';
-import { useInPageSection } from '@/components/ui/page-section';
+import { useInPageSection } from '@/components/ui/page-section-context';
+import { cardSurfaceVariants } from '@/components/ui/card-surface';
 
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {
@@ -9,7 +10,8 @@ const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
       <div
         ref={ref}
         className={cn(
-          'rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-white/10 dark:bg-gray-950',
+          cardSurfaceVariants(),
+          'transition-shadow hover:shadow-md',
           inPageSection && 'border-0 shadow-none hover:shadow-none',
           className,
         )}

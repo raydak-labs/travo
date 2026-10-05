@@ -1,17 +1,27 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useConnectionMethod } from '@/hooks/use-network';
 import { useWiFiSchedule, useSetWiFiSchedule } from '@/hooks/use-wifi';
 import { wifiScheduleFormSchema, type WifiScheduleFormValues } from '@/lib/schemas/wifi-forms';
+import {
+  describeScheduleLockout,
+  formatClock,
+  shouldWarnScheduleLockout,
+  type ScheduleTimes,
+} from '@/lib/wifi-schedule-lockout';
 import { WiFiScheduleFormFields } from '@/pages/wifi/wifi-schedule-form-fields';
 
 export function WiFiScheduleCard() {
   const { data: schedule, isLoading } = useWiFiSchedule();
   const setSchedule = useSetWiFiSchedule();
+  const { data: connectionMethod } = useConnectionMethod();
+  const [pendingSave, setPendingSave] = useState<WifiScheduleFormValues | null>(null);
 
   const {
     register,
@@ -26,10 +36,18 @@ export function WiFiScheduleCard() {
       on_time: '08:00',
       off_time: '22:00',
     },
-    mode: 'onChange',
+    mode: 'onTouched',
   });
 
   const enabled = watch('enabled');
+
+  const currentSchedule: ScheduleTimes | null = schedule
+    ? {
+        enabled: schedule.enabled,
+        onTime: schedule.on_time || '08:00',
+        offTime: schedule.off_time || '22:00',
+      }
+    : null;
 
   useEffect(() => {
     if (schedule) {
@@ -41,13 +59,45 @@ export function WiFiScheduleCard() {
     }
   }, [schedule, reset]);
 
-  const onSave = (data: WifiScheduleFormValues) => {
+  const save = (data: WifiScheduleFormValues) => {
     setSchedule.mutate({
       enabled: data.enabled,
       on_time: data.on_time,
       off_time: data.off_time,
     });
   };
+
+  const onSave = (data: WifiScheduleFormValues) => {
+    const next: ScheduleTimes = {
+      enabled: data.enabled,
+      onTime: data.on_time,
+      offTime: data.off_time,
+    };
+    // Enabling a schedule while this session reaches the router over WiFi is a
+    // lockout with no way back until the On time, so it needs an explicit
+    // confirm before the router is told anything. The method is passed through
+    // rather than narrowed to the client case: the toggle helper tears down
+    // every radio, so an AP-linked session is affected too and must be warned.
+    if (
+      shouldWarnScheduleLockout({
+        next,
+        current: currentSchedule,
+        connectionMethod: connectionMethod?.method,
+      })
+    ) {
+      setPendingSave(data);
+      return;
+    }
+    save(data);
+  };
+
+  const pendingLockout = pendingSave
+    ? describeScheduleLockout({
+        enabled: pendingSave.enabled,
+        onTime: pendingSave.on_time,
+        offTime: pendingSave.off_time,
+      })
+    : null;
 
   if (isLoading) {
     return (
@@ -82,6 +132,27 @@ export function WiFiScheduleCard() {
           </Button>
         </form>
       </CardContent>
+
+      <ConfirmDialog
+        open={pendingSave !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingSave(null);
+        }}
+        title="This schedule can disconnect you"
+        description={
+          pendingLockout
+            ? `You are reaching this router over WiFi. At ${formatClock(pendingLockout.offAt)} this router's WiFi turns off and you lose access to this page until ${formatClock(pendingLockout.onAt)}.`
+            : 'You are reaching this router over WiFi. Turning WiFi off on a schedule disconnects you from this page.'
+        }
+        warningText="Connect an Ethernet cable to a LAN port if you need to keep managing the router at that time, or set the Off time to a moment you are not using it."
+        confirmLabel="Save anyway"
+        isPending={setSchedule.isPending}
+        onConfirm={() => {
+          if (!pendingSave) return;
+          save(pendingSave);
+          setPendingSave(null);
+        }}
+      />
     </Card>
   );
 }

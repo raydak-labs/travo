@@ -27,23 +27,43 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
+        <caption className="sr-only">Network clients</caption>
         <thead>
           <tr className="border-b border-gray-200 dark:border-gray-700">
-            <th className="pb-2 text-left font-medium text-gray-500 dark:text-gray-400">Name</th>
-            <th className="pb-2 text-left font-medium text-gray-500 dark:text-gray-400">IP</th>
-            <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell">
+            <th scope="col" className="pb-2 text-left font-medium text-gray-500 dark:text-gray-400">
+              Name
+            </th>
+            <th scope="col" className="pb-2 text-left font-medium text-gray-500 dark:text-gray-400">
+              IP
+            </th>
+            <th
+              scope="col"
+              className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell"
+            >
               MAC
             </th>
-            <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 lg:table-cell">
+            <th
+              scope="col"
+              className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 lg:table-cell"
+            >
               Interface
             </th>
-            <th className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell">
+            <th
+              scope="col"
+              className="hidden pb-2 text-left font-medium text-gray-500 dark:text-gray-400 md:table-cell"
+            >
               Connected Since
             </th>
-            <th className="hidden pb-2 text-right font-medium text-gray-500 dark:text-gray-400 sm:table-cell">
+            <th
+              scope="col"
+              className="hidden pb-2 text-right font-medium text-gray-500 dark:text-gray-400 sm:table-cell"
+            >
               Traffic
             </th>
-            <th className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400">
+            <th
+              scope="col"
+              className="pb-2 text-right font-medium text-gray-500 dark:text-gray-400"
+            >
               Actions
             </th>
           </tr>
@@ -51,6 +71,7 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {visible.map((client) => {
             const isBlocked = blockedSet.has(client.mac_address.toUpperCase());
+            const clientLabel = client.alias || client.hostname || client.mac_address;
             return (
               <tr key={client.mac_address} className="group">
                 <td className="min-w-0 py-2">
@@ -80,6 +101,7 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
                       size="icon"
                       className="h-7 w-7"
                       title="Kick (disconnect)"
+                      aria-label={`Kick ${clientLabel}`}
                       onClick={() => kick.mutate(client.mac_address)}
                       disabled={kick.isPending}
                     >
@@ -91,6 +113,7 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
                         size="icon"
                         className="h-7 w-7 text-green-600"
                         title="Unblock"
+                        aria-label={`Unblock ${clientLabel}`}
                         onClick={() => unblock.mutate(client.mac_address)}
                         disabled={unblock.isPending}
                       >
@@ -102,6 +125,7 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
                         size="icon"
                         className="h-7 w-7 text-red-600"
                         title="Block"
+                        aria-label={`Block ${clientLabel}`}
                         onClick={() => block.mutate(client.mac_address)}
                         disabled={block.isPending}
                       >

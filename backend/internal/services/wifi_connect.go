@@ -26,6 +26,53 @@ var ErrEncryptionRequiredForNewSTA = errors.New("encryption is required when add
 //
 // For an existing saved profile, an empty Password leaves the stored UCI key unchanged
 // (one-tap reconnect from the saved list).
+// radioForNewSTA picks which radio a newly created uplink STA should use.
+//
+// Two properties matter, and the second one used to be missing entirely.
+//
+// It must be DETERMINISTIC. The previous implementation took the first radio
+// found by ranging over a map, so the same request landed on radio0 or radio1
+// depending on Go's randomised iteration order. Downstream that is not cosmetic:
+// the chosen radio decides whether the uplink ends up sharing a PHY with an access
+// point.
+//
+// So it must also PREFER a radio that is not currently running an enabled access
+// point, the same way preferredGuestRadio does for a guest AP. A stock config has
+// an access point on every radio, so whichever one is chosen,
+// splitAPOffUplinkRadio disables that radio's access point to keep the uplink
+// alone. On the NEXT connect, preferring the now-bare radio means the previously
+// disabled access point is simply left off and no second one has to be torn down.
+// Without the preference, a second connect could pick the radio that now holds
+// the only remaining access point and be refused for it, leaving the operator
+// unable to move their uplink without first re-enabling an access point by hand.
+func (w *WifiService) radioForNewSTA(sections map[string]map[string]string) (string, error) {
+	radios := make([]string, 0, len(sections))
+	for name, opts := range sections {
+		if opts["type"] != "" {
+			radios = append(radios, name)
+		}
+	}
+	if len(radios) == 0 {
+		return "", fmt.Errorf("no radio found in wireless config")
+	}
+	sort.Strings(radios) // stable choice: Go map order must not decide this
+
+	hasEnabledAP := func(radio string) bool {
+		for _, opts := range sections {
+			if opts["mode"] == "ap" && opts["disabled"] != "1" && opts["device"] == radio {
+				return true
+			}
+		}
+		return false
+	}
+	for _, radio := range radios {
+		if !hasEnabledAP(radio) {
+			return radio, nil
+		}
+	}
+	return radios[0], nil
+}
+
 func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
 		// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN
@@ -59,15 +106,9 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 			if err != nil {
 				return nil, fmt.Errorf("failed to get wireless sections: %w", err)
 			}
-			var firstRadio string
-			for name, opts := range sections {
-				if opts["type"] != "" {
-					firstRadio = name
-					break
-				}
-			}
-			if firstRadio == "" {
-				return nil, fmt.Errorf("no radio found in wireless config")
+			firstRadio, err := w.radioForNewSTA(sections)
+			if err != nil {
+				return nil, err
 			}
 			if err := w.uci.AddSection("wireless", section, "wifi-iface"); err != nil {
 				return nil, fmt.Errorf("creating STA section %s: %w", section, err)
@@ -103,6 +144,16 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 				return nil, fmt.Errorf("setting STA radio: %w", err)
 			}
 		}
+		// The radio the uplink STA will land on, resolved now: it is either the
+		// band-matched radio above or whatever the existing/new section already
+		// names. splitAPOffUplinkRadio keeps that radio from also running an
+		// access point (see its comment for why this cannot be left to
+		// reconcileRepeaterAPRadioLayout).
+		staOpts, err := w.uci.GetAll("wireless", section)
+		if err != nil {
+			return nil, fmt.Errorf("reading STA section %s: %w", section, err)
+		}
+		staRadio := staOpts["device"]
 		if err := w.uci.Set("wireless", section, "ssid", config.SSID); err != nil {
 			return nil, fmt.Errorf("setting STA ssid: %w", err)
 		}
@@ -136,6 +187,16 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 		}
 		// Disable all other saved STA profiles so only this one connects at runtime.
 		if err := w.disableOtherSTASections(section); err != nil {
+			return nil, err
+		}
+		// Keep the radio the uplink is about to take free of access points before
+		// the STA is enabled. Outside repeater mode nothing else did this: every
+		// stock config has an access point on each radio, so Connect could commit
+		// AP+STA on one PHY — the state ADR 0002 §2 says is enough to crash
+		// ath11k/IPQ6018 — with no check at all. Runs after
+		// disableOtherSTASections so the only enabled uplink is the one being
+		// connected, and before Commit so a refusal reaches no running config.
+		if err := w.splitAPOffUplinkRadio(staRadio); err != nil {
 			return nil, err
 		}
 		// Reconcile AP radio layout atomically with the STA activation: in repeater mode

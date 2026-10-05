@@ -14,8 +14,15 @@ Production installs use a **release `.tar.gz`** from GitHub Releases (see `scrip
 On the router:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | sh
+wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
+  sh -s -- --password 'your-root-password'
 ```
+
+There is **no default password**. This is the LuCI, SSH and Travo login for the
+whole device, on a router meant to be used on untrusted networks, so the
+installer refuses to run non-interactively without `--password` and enforces a
+minimum of 8 characters. Run it from a terminal without `--password` to be
+prompted instead.
 
 Non-interactive examples:
 
@@ -24,10 +31,10 @@ wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/instal
   sh -s -- --yes --version 1.0.0 --password 'your-root-password'
 
 wget -O- https://raw.githubusercontent.com/raydak-labs/travo/main/scripts/install.sh | \
-  sh -s -- --no-adguard
+  sh -s -- --no-adguard --password 'your-root-password'
 ```
 
-The script downloads `travo_<version>_<arch>.tar.gz`, extracts to `/`, moves LuCI off port 80 when configured, optionally installs AdGuard, sets root password, and enables `travo`.
+The script downloads `travo_<version>_<arch>.tar.gz`, extracts to `/`, moves LuCI off port 80 when configured, optionally installs AdGuard, sets root password, enables `travo`, and **verifies that travo actually answers on its configured port before reporting success** (dumping `logread` and failing if it does not).
 
 ## What gets installed
 

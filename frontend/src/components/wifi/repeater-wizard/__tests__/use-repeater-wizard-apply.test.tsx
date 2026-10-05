@@ -76,7 +76,8 @@ describe('useRepeaterWizard handleApply', () => {
     expect(result.current.applyError).toBeNull();
     // A second mode switch would open a second uci apply + confirm + rollback window.
     expect(mocks.setMode).toHaveBeenCalledTimes(1);
-    expect(mocks.setMode).toHaveBeenCalledWith('repeater');
+    // The mutation variable is now an object so it can carry acknowledge_lockout.
+    expect(mocks.setMode).toHaveBeenCalledWith({ mode: 'repeater' });
     expect(mocks.connect).toHaveBeenCalledTimes(1);
     expect(mocks.setAP).toHaveBeenCalledTimes(2);
   });
@@ -100,7 +101,7 @@ describe('useRepeaterWizard handleApply', () => {
     // put back; the upstream connection itself cannot be undone from the client.
     const apSections = mocks.setAP.mock.calls.map((c) => (c[0] as { section: string }).section);
     expect(apSections.filter((s) => s === 'default_radio0')).toHaveLength(2);
-    expect(mocks.setMode).toHaveBeenLastCalledWith('ap');
+    expect(mocks.setMode).toHaveBeenLastCalledWith({ mode: 'ap' });
     expect(mocks.setRepeaterOptions).toHaveBeenLastCalledWith({ allow_ap_on_sta_radio: false });
   });
 

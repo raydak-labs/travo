@@ -37,8 +37,9 @@ export function WoLCard() {
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
           <div className="space-y-1">
-            <Label>MAC Address</Label>
+            <Label htmlFor="wol-mac">MAC Address</Label>
             <Input
+              id="wol-mac"
               className="font-mono"
               placeholder="AA:BB:CC:DD:EE:FF"
               aria-invalid={errors.mac ? 'true' : undefined}
@@ -46,17 +47,17 @@ export function WoLCard() {
               {...register('mac')}
             />
             {errors.mac ? (
-              <p id="wol-mac-err" className="text-xs text-red-500" role="alert">
+              <p id="wol-mac-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
                 {errors.mac.message}
               </p>
             ) : null}
           </div>
           <div className="space-y-1">
-            <Label>Interface (optional)</Label>
-            <Input placeholder="br-lan" {...register('interface')} />
+            <Label htmlFor="wol-interface">Interface (optional)</Label>
+            <Input id="wol-interface" placeholder="br-lan" {...register('interface')} />
           </div>
           <Button type="submit" disabled={sendWoL.isPending}>
-            <Zap className="mr-1.5 h-3.5 w-3.5" />
+            <Zap className="h-3.5 w-3.5" />
             {sendWoL.isPending ? 'Sending…' : 'Send Magic Packet'}
           </Button>
         </form>

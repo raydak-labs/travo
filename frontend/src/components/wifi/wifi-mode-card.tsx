@@ -5,25 +5,72 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useWifiConnection, useWifiMode } from '@/hooks/use-wifi';
 import { cn } from '@/lib/cn';
 import type { WifiMode } from '@shared/index';
-import { isRecommendedWifiMode, WIFI_MODE_OPTIONS } from '@/components/wifi/wifi-mode-options';
+import {
+  isRecommendedWifiMode,
+  WIFI_MODE_OPTIONS,
+  getWifiModeLabel,
+} from '@/components/wifi/wifi-mode-options';
 import { WifiModeSwitchDialog } from '@/components/wifi/wifi-mode-switch-dialog';
+import { WifiLockoutDialog } from '@/components/wifi/wifi-lockout-dialog';
+import { useWifiLockout } from '@/hooks/use-wifi-lockout';
+import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
 
 export function WifiModeCard() {
   const { data: connection, isLoading } = useWifiConnection();
   const setMode = useWifiMode();
+  const lockout = useWifiLockout();
   const [pendingMode, setPendingMode] = useState<WifiMode | null>(null);
+  const [switchingLabel, setSwitchingLabel] = useState<string | null>(null);
 
-  const currentMode: WifiMode = connection?.mode ?? 'client';
+  // Defaulting to "client" when the connection query failed made the page claim
+  // Client mode on a repeater, and selecting Client then did nothing at all:
+  // the operator was told they were in a mode they were not, and could not
+  // change mode, with no error anywhere. An absent observation is not a mode.
+  // Until the query resolves the selection reads as unknown, so nothing is
+  // highlighted and no target mode is treated as already active.
+  const currentMode: WifiMode | undefined = connection?.mode;
+
+  // One place sends the request, with or without the acknowledgement, so the
+  // re-send after the dialog is the SAME request and not a rebuilt one that
+  // could differ in a field the operator never changed.
+  function submitMode(mode: WifiMode, acknowledge: boolean) {
+    setSwitchingLabel(getWifiModeLabel(mode));
+    setMode.mutate(
+      { mode, acknowledge_lockout: acknowledge },
+      {
+        onSettled: () => {
+          setPendingMode(null);
+          setSwitchingLabel(null);
+        },
+        onError: (error) => {
+          if (acknowledge) return;
+          lockout.onLockout(error, () => submitMode(mode, true));
+        },
+      },
+    );
+    setPendingMode(null);
+  }
 
   function handleConfirm() {
-    if (pendingMode) {
-      setMode.mutate(pendingMode);
-      setPendingMode(null);
-    }
+    if (!pendingMode) return;
+    submitMode(pendingMode, false);
   }
 
   return (
     <>
+      {/* finalizeWifiMutation blocks for up to 30s while it confirms the apply
+          token. Without this the click produced three greyed-out tiles and no
+          output at all, on the one page whose connectivity is about to drop. */}
+      <OperationProgressDialog
+        open={setMode.isPending}
+        title={`Switching to ${switchingLabel ?? 'new'} mode…`}
+        description="The router restarts its wireless subsystem and waits for the new settings to come up."
+        details={[
+          'This can take up to 30 seconds.',
+          'Keep this page open — your browser confirms the change while the old configuration is still active.',
+          'If the new mode does not come up, the router rolls back to the previous mode on its own.',
+        ]}
+      />
       <Card>
         <CardHeader>
           <CardTitle>WiFi Mode</CardTitle>
@@ -104,6 +151,13 @@ export function WifiModeCard() {
           if (!open) setPendingMode(null);
         }}
         onConfirm={handleConfirm}
+      />
+
+      <WifiLockoutDialog
+        open={lockout.open}
+        isPending={setMode.isPending}
+        onCancel={lockout.dismiss}
+        onConfirm={lockout.acknowledge}
       />
     </>
   );

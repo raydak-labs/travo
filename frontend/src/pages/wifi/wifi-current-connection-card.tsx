@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Wifi, WifiOff, Signal } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
@@ -13,6 +15,12 @@ import { useWifiConnection, useWifiDisconnect } from '@/hooks/use-wifi';
 export function WifiCurrentConnectionCard() {
   const { data: connection, isLoading: connectionLoading } = useWifiConnection();
   const disconnectMutation = useWifiDisconnect();
+  const [confirming, setConfirming] = useState(false);
+
+  function confirmDisconnect() {
+    setConfirming(false);
+    disconnectMutation.mutate();
+  }
 
   return (
     <Card className="flex h-full min-w-0 flex-col">
@@ -49,10 +57,14 @@ export function WifiCurrentConnectionCard() {
               <SecurityBadge encryption={connection.encryption} />
             </div>
             <div className="flex flex-wrap gap-2">
+              {/* One click used to drop the uplink outright. If auto-reconnect
+                  is on, the link silently returns and the action looks broken;
+                  if the operator is reaching the router over this WiFi, they
+                  lose the page entirely. */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => disconnectMutation.mutate()}
+                onClick={() => setConfirming(true)}
                 disabled={disconnectMutation.isPending}
               >
                 {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
@@ -70,6 +82,16 @@ export function WifiCurrentConnectionCard() {
             </div>
           </div>
         )}
+        <ConfirmDialog
+          open={confirming}
+          onOpenChange={setConfirming}
+          title="Disconnect from this network?"
+          description={`Stops using ${connection?.ssid ?? 'this network'} as the Wi-Fi uplink.`}
+          warningText="Internet stops working. If you are managing the router over this WiFi connection you will lose access. If auto-reconnect is on, the router will retry this network automatically."
+          confirmLabel="Disconnect"
+          isPending={disconnectMutation.isPending}
+          onConfirm={confirmDisconnect}
+        />
       </CardContent>
     </Card>
   );

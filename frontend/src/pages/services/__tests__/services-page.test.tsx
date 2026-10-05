@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -9,7 +11,9 @@ import {
   Outlet,
   createMemoryHistory,
 } from '@tanstack/react-router';
+import { API_ROUTES } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
+import { server } from '@/mocks/server';
 import { ServicesPage } from '../services-page';
 
 function renderServicesPage() {
@@ -81,9 +85,69 @@ describe('ServicesPage', () => {
     renderServicesPage();
 
     await waitFor(() => {
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
+      const removeButtons = screen.getAllByRole('button', { name: /Remove/ });
       expect(removeButtons.length).toBe(4); // All services
     });
+  });
+
+  // The log dialog fires the uninstall stream from its mount effect, so a Remove
+  // tap used to start uninstalling a package with no confirm at all.
+  it('asks for confirmation before any remove stream request is issued', async () => {
+    const user = userEvent.setup();
+    const removed: string[] = [];
+    server.use(
+      http.post(`${API_ROUTES.services.removeStream.replace(':id', ':id')}`, ({ params }) => {
+        removed.push(params.id as string);
+        return new HttpResponse(JSON.stringify({ type: 'done' }), {
+          headers: { 'Content-Type': 'application/x-ndjson' },
+        });
+      }),
+    );
+
+    renderServicesPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /Remove/ }).length).toBe(4);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove AdGuard Home' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('Remove AdGuard Home?');
+    expect(removed).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: 'Remove now' }));
+
+    await waitFor(() => {
+      expect(removed).toEqual(['adguardhome']);
+    });
+  });
+
+  it('cancels the confirmation without starting the uninstall', async () => {
+    const user = userEvent.setup();
+    const removed: string[] = [];
+    server.use(
+      http.post(`${API_ROUTES.services.removeStream.replace(':id', ':id')}`, ({ params }) => {
+        removed.push(params.id as string);
+        return new HttpResponse(JSON.stringify({ type: 'done' }), {
+          headers: { 'Content-Type': 'application/x-ndjson' },
+        });
+      }),
+    );
+
+    renderServicesPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /Remove/ }).length).toBe(4);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove AdGuard Home' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(removed).toEqual([]);
   });
 
   it('shows service descriptions', async () => {

@@ -129,16 +129,21 @@ var openAPISpec = map[string]any{
 		},
 		"/system/leds": map[string]any{
 			"get": endpoint("GetLEDs", "Get LED status and stealth mode state", true, nil, resp200("application/json", nil)),
-			"put": endpoint("SetLEDStealth", "Enable or disable stealth mode (all LEDs off)", true,
-				body("application/json", obj("enabled")),
-				resp200("application/json", obj("ok")),
+			// The request field is stealth_mode (models.SetLEDRequest) and the
+			// response is the full LED status, not {"ok":…}: documenting
+			// "enabled" made the documented request be accepted, ignored and
+			// answered 200 after doing the OPPOSITE of what was asked.
+			"put": endpoint("SetLEDStealth", "Enable or disable stealth mode (all LEDs off). Returns the resulting LED status.", true,
+				body("application/json", obj("stealth_mode")),
+				resp200("application/json", obj("stealth_mode", "led_count", "leds")),
 			),
 		},
 		"/system/leds/schedule": map[string]any{
 			"get": endpoint("GetLEDSchedule", "Get LED cron schedule", true, nil, resp200("application/json", nil)),
-			"put": endpoint("SetLEDSchedule", "Set LED on/off cron schedule", true,
+			// Returns the persisted schedule (models.LEDSchedule), not {"ok":…}.
+			"put": endpoint("SetLEDSchedule", "Set LED on/off cron schedule. Returns the stored schedule.", true,
 				body("application/json", obj("enabled", "on_time", "off_time")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("enabled", "on_time", "off_time")),
 			),
 		},
 		"/system/timezone": map[string]any{
@@ -151,16 +156,28 @@ var openAPISpec = map[string]any{
 		"/system/backup": map[string]any{
 			"get": endpoint("Backup", "Download UCI configuration archive", true, nil, resp200("application/octet-stream", nil)),
 		},
+		// Restore answers {"status","message"} (SystemHandlers.RestoreHandler),
+		// not {"ok":…}. The upload is validated before sysupgrade runs: every
+		// archive member must live under the config allowlist.
 		"/system/restore": map[string]any{
-			"post": endpoint("Restore", "Upload and restore a UCI configuration archive", true,
+			"post": endpoint("Restore", "Upload and restore a UCI configuration archive (multipart field: backup). Rejected with 400 unless every archive member lives under the config allowlist.", true,
 				body("multipart/form-data", nil),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status", "message")),
 			),
 		},
+		// Firmware answers {"status","message","model","supported_devices"}: the
+		// image's OpenWrt metadata is parsed and checked against this board
+		// before sysupgrade is started, and the parsed model is returned so the
+		// UI can show which image was flashed.
 		"/system/firmware/upgrade": map[string]any{
-			"post": endpoint("FirmwareUpgrade", "Upload and apply a sysupgrade image", true,
+			"post": endpoint("FirmwareUpgrade", "Upload and apply a sysupgrade image (multipart field: firmware). Rejected with 400 unless the image metadata declares this board as a supported device.", true,
 				body("multipart/form-data", nil),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", map[string]any{
+					"status":            "ok",
+					"message":           "",
+					"model":             "",
+					"supported_devices": []string{},
+				}),
 			),
 		},
 		"/system/ntp": map[string]any{
@@ -174,9 +191,14 @@ var openAPISpec = map[string]any{
 			"post": endpoint("NTPSync", "Trigger manual NTP synchronization", true, nil, resp200("application/json", obj("ok"))),
 		},
 		"/system/time-sync": map[string]any{
-			"post": endpoint("TimeSync", "Sync device clock from browser time. Unauthenticated only while the router clock is implausible (pre-login recovery, rate limited); authenticated callers may always sync.", false,
-				body("application/json", obj("timestamp")),
-				resp200("application/json", obj("ok")),
+			// client_time_ms is what the handler binds; "timestamp" was documented,
+			// which made the pre-login clock-recovery path unusable from a
+			// generated client (400 "client_time_ms is required"). The response
+			// is {"synced":true,"set_to":…} after a change, or
+			// {"synced":false,"reason":…} when the clock was already accurate.
+			"post": endpoint("TimeSync", "Sync device clock from browser time (client_time_ms = browser Date.now()). Unauthenticated only while the router clock is implausible (pre-login recovery, rate limited); authenticated callers may always sync.", false,
+				body("application/json", obj("client_time_ms")),
+				resp200("application/json", obj("synced", "reason", "set_to")),
 			),
 		},
 		"/system/setup-complete": map[string]any{
@@ -395,14 +417,19 @@ var openAPISpec = map[string]any{
 		"/wifi/scan": map[string]any{
 			"get": endpoint("WiFiScan", "Scan for available networks (SSID, signal, encryption, band)", true, nil, resp200("application/json", nil)),
 		},
+		// Every wireless mutator below answers the apply envelope produced by
+		// wifiMutationResponse (wifi_handlers.go): {"status":"ok","apply":{…}}
+		// where apply carries the pending token and the rollback timeout. They
+		// used to be documented as {"token","confirm_within_seconds"} or
+		// {"ok":…}, neither of which any handler returns.
 		"/wifi/connect": map[string]any{
 			"post": endpoint("WiFiConnect", "Connect to an upstream WiFi network", true,
 				body("application/json", obj("ssid", "password", "encryption", "band", "hidden")),
-				resp200("application/json", obj("token", "confirm_within_seconds")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/disconnect": map[string]any{
-			"post": endpoint("WiFiDisconnect", "Disconnect from the current upstream WiFi", true, nil, resp200("application/json", obj("ok"))),
+			"post": endpoint("WiFiDisconnect", "Disconnect from the current upstream WiFi", true, nil, resp200("application/json", wifiApplyEnvelope(nil))),
 		},
 		"/wifi/connection": map[string]any{
 			"get": endpoint("GetWiFiConnection", "Current upstream WiFi connection status", true, nil, resp200("application/json", nil)),
@@ -413,28 +440,31 @@ var openAPISpec = map[string]any{
 			),
 		},
 		"/wifi/mode": map[string]any{
+			// acknowledge_lockout is the opt-in for "do it anyway": switching to
+			// client mode removes every access point, so a caller on WiFi gets 409
+			// with code wifi_lockout_risk instead of the change.
 			"put": endpoint("SetWiFiMode", "Switch WiFi operating mode (ap/client/repeater)", true,
-				body("application/json", obj("mode")),
-				resp200("application/json", obj("ok")),
+				body("application/json", obj("mode", "acknowledge_lockout")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/saved": map[string]any{
 			"get": endpoint("GetSavedNetworks", "List saved WiFi profiles", true, nil, resp200("application/json", nil)),
 		},
 		"/wifi/saved/{section}": map[string]any{
-			"delete": endpoint("DeleteSavedNetwork", "Delete a saved WiFi profile", true, nil, resp200("application/json", obj("ok"))),
+			"delete": endpoint("DeleteSavedNetwork", "Delete a saved WiFi profile", true, nil, resp200("application/json", wifiApplyEnvelope(nil))),
 		},
 		"/wifi/saved/priority": map[string]any{
 			"put": endpoint("SetNetworkPriority", "Set priority ordering for saved networks", true,
 				body("application/json", obj("ssids")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/radio": map[string]any{
 			"get": endpoint("GetRadioStatus", "Get WiFi radio enabled state", true, nil, resp200("application/json", obj("enabled"))),
 			"put": endpoint("SetRadioEnabled", "Enable or disable all WiFi radios", true,
-				body("application/json", obj("enabled")),
-				resp200("application/json", obj("ok")),
+				body("application/json", obj("enabled", "acknowledge_lockout")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/radios": map[string]any{
@@ -445,24 +475,26 @@ var openAPISpec = map[string]any{
 		},
 		"/wifi/ap/{section}": map[string]any{
 			"put": endpoint("SetAPConfig", "Update AP configuration for a section", true,
-				body("application/json", obj("ssid", "key", "encryption")),
-				resp200("application/json", obj("token", "confirm_within_seconds")),
+				body("application/json", obj("ssid", "key", "encryption", "enabled", "acknowledge_lockout")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/repeater-options": map[string]any{
 			"get": endpoint("GetRepeaterOptions", "Repeater radio policy (allow AP on STA radio)", true, nil, resp200("application/json", nil)),
+			// The documented allow_ap_on_sta_radio escape hatch (ADR 0002 §2) is
+			// echoed back next to the apply envelope.
 			"put": endpoint("SetRepeaterOptions", "Set repeater radio policy", true,
 				body("application/json", obj("allow_ap_on_sta_radio")),
-				resp200("application/json", nil),
+				resp200("application/json", wifiApplyEnvelope(map[string]any{"allow_ap_on_sta_radio": true})),
 			),
 		},
 		"/wifi/repeater/reconcile": map[string]any{
-			"post": endpoint("ReconcileRepeaterAPLayout", "Re-apply repeater STA/AP per-radio separation", true, nil, resp200("application/json", obj("ok"))),
+			"post": endpoint("ReconcileRepeaterAPLayout", "Re-apply repeater STA/AP per-radio separation", true, nil, resp200("application/json", wifiApplyEnvelope(nil))),
 		},
 		"/wifi/radios/{name}/role": map[string]any{
 			"put": endpoint("SetRadioRole", "Assign the sta or ap role to a radio (only one active STA)", true,
-				body("application/json", obj("role")),
-				resp200("application/json", obj("status", "apply")),
+				body("application/json", obj("role", "acknowledge_lockout")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 				param("name", "Radio device name, e.g. radio0"),
 			),
 		},
@@ -472,7 +504,7 @@ var openAPISpec = map[string]any{
 			),
 			"put": endpoint("SetBandSwitching", "Configure automatic 2.4/5 GHz band switching thresholds and delays", true,
 				body("application/json", obj("enabled", "preferred_band", "check_interval_sec", "down_switch_threshold_dbm", "down_switch_delay_sec", "up_switch_threshold_dbm", "up_switch_delay_sec", "min_viable_signal_dbm")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		"/wifi/schedule": map[string]any{
@@ -481,44 +513,44 @@ var openAPISpec = map[string]any{
 			),
 			"put": endpoint("SetWiFiSchedule", "Set the WiFi on/off cron schedule (HH:MM, 24h)", true,
 				body("application/json", obj("enabled", "on_time", "off_time")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		"/wifi/mac-policies": map[string]any{
 			"get": endpoint("GetMACPolicies", "List per-SSID MAC address policies used when connecting", true, nil, resp200("application/json", obj("policies"))),
 			"put": endpoint("SetMACPolicies", "Replace the per-SSID MAC address policies", true,
 				body("application/json", obj("policies")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		"/wifi/mac": map[string]any{
 			"get": endpoint("GetMAC", "Get MAC addresses for all WiFi interfaces", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetMAC", "Set a custom MAC address on the STA interface", true,
 				body("application/json", obj("mac")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/mac/randomize": map[string]any{
-			"post": endpoint("RandomizeMAC", "Generate and apply a random MAC address", true, nil, resp200("application/json", obj("mac"))),
+			"post": endpoint("RandomizeMAC", "Generate and apply a random MAC address", true, nil, resp200("application/json", wifiApplyEnvelope(map[string]any{"mac": ""}))),
 		},
 		"/wifi/guest": map[string]any{
 			"get": endpoint("GetGuestWiFi", "Get guest network configuration", true, nil, resp200("application/json", nil)),
 			"put": endpoint("SetGuestWiFi", "Enable/disable guest network and set credentials", true,
-				body("application/json", obj("enabled", "ssid", "key")),
-				resp200("application/json", obj("ok")),
+				body("application/json", obj("enabled", "ssid", "key", "acknowledge_lockout")),
+				resp200("application/json", wifiApplyEnvelope(nil)),
 			),
 		},
 		"/wifi/autoreconnect": map[string]any{
 			"get": endpoint("GetAutoReconnect", "Get auto-reconnect configuration", true, nil, resp200("application/json", obj("enabled"))),
 			"put": endpoint("SetAutoReconnect", "Enable or disable auto-reconnect to saved networks", true,
 				body("application/json", obj("enabled")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		"/wifi/apply/confirm": map[string]any{
 			"post": endpoint("ConfirmWiFiApply", "Confirm a pending wireless apply (browser-proof rollback)", true,
 				body("application/json", obj("token")),
-				resp200("application/json", obj("ok")),
+				resp200("application/json", obj("status")),
 			),
 		},
 		// VPN
@@ -614,14 +646,16 @@ var openAPISpec = map[string]any{
 		"/services/{id}/install": map[string]any{
 			"post": endpoint("InstallService", "Install a service package", true, nil, resp200("application/json", obj("ok"))),
 		},
+		// The stream endpoints answer newline-delimited JSON (one {"type","data"}
+		// object per line) with Content-Type: application/x-ndjson, not SSE.
 		"/services/{id}/install/stream": map[string]any{
-			"post": endpoint("InstallServiceStream", "Install a service package with streaming log output", true, nil, resp200("text/event-stream", nil)),
+			"post": endpoint("InstallServiceStream", "Install a service package, streaming NDJSON log events", true, nil, resp200("application/x-ndjson", nil)),
 		},
 		"/services/{id}/remove": map[string]any{
 			"post": endpoint("RemoveService", "Remove a service package", true, nil, resp200("application/json", obj("ok"))),
 		},
 		"/services/{id}/remove/stream": map[string]any{
-			"post": endpoint("RemoveServiceStream", "Remove a service package with streaming log output", true, nil, resp200("text/event-stream", nil)),
+			"post": endpoint("RemoveServiceStream", "Remove a service package, streaming NDJSON log events", true, nil, resp200("application/x-ndjson", nil)),
 		},
 		"/services/{id}/start": map[string]any{
 			"post": endpoint("StartService", "Start a service via init.d", true, nil, resp200("application/json", obj("ok"))),
@@ -647,7 +681,7 @@ var openAPISpec = map[string]any{
 			),
 		},
 		"/adguard/config": map[string]any{
-			"get": endpoint("GetAdGuardConfig", "Read the AdGuardHome.yaml configuration file contents", true, nil, resp200("application/json", obj("content"))),
+			"get": endpoint("GetAdGuardConfig", "Read the AdGuardHome.yaml configuration file contents. The response contains SECRETS: the web UI bind password hash, query log and statistics credentials and TLS key material. Treat it as sensitive.", true, nil, resp200("application/json", obj("content"))),
 			"put": endpoint("SetAdGuardConfig", "Write the AdGuardHome.yaml configuration from the 'content' field and restart the service", true,
 				body("application/json", obj("content")),
 				resp200("application/json", obj("ok")),
@@ -751,6 +785,30 @@ func resp200(contentType string, example map[string]any) map[string]any {
 		content[contentType] = map[string]any{}
 	}
 	return map[string]any{"description": "OK", "content": content}
+}
+
+// wifiApplyEnvelope is the 200 body every wireless mutator answers, built by
+// wifiMutationResponse in wifi_handlers.go: {"status":"ok","apply":{…}} where
+// apply carries the pending token the browser must confirm and the rollback
+// timeout. probe_budget_seconds is how long ONE confirm call can block on the
+// device while it waits for the new interfaces to come up; a client that re-POSTs
+// confirm until the rollback deadline has to leave that much room, or a probe it
+// starts near the deadline is answered after rpcd has already rolled back. extra
+// adds the one endpoint-specific key a handler appends (allow_ap_on_sta_radio, mac).
+func wifiApplyEnvelope(extra map[string]any) map[string]any {
+	body := map[string]any{
+		"status": "ok",
+		"apply": map[string]any{
+			"pending":                  true,
+			"token":                    "",
+			"rollback_timeout_seconds": 90,
+			"probe_budget_seconds":     4,
+		},
+	}
+	for k, v := range extra {
+		body[k] = v
+	}
+	return body
 }
 
 // obj builds a simple string-keyed example object where all values are empty strings.

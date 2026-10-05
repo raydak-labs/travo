@@ -83,11 +83,16 @@ type APConfig struct {
 
 // APConfigUpdate is the request body for PUT /wifi/ap/:section.
 // When Enabled is nil, UCI disabled is left unchanged (repeater credential sync after radio split).
+// AcknowledgeLockout opts in to disabling the last access point while connected
+// over WiFi; without it the change is refused (see services.ErrLockoutRefused).
 type APConfigUpdate struct {
 	SSID       string `json:"ssid"`
 	Encryption string `json:"encryption"`
 	Key        string `json:"key"`
 	Enabled    *bool  `json:"enabled,omitempty"`
+	// AcknowledgeLockout is the explicit "yes, strand me" opt-in. It is a field
+	// rather than a header so it travels with the exact request it applies to.
+	AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty"`
 }
 
 // RepeaterOptions is stored in /etc/travo/repeater-options.json.
@@ -101,9 +106,13 @@ func BoolPtr(b bool) *bool { p := b; return &p }
 // GuestWifiConfig holds the guest WiFi network configuration.
 type GuestWifiConfig struct {
 	Enabled    bool   `json:"enabled"`
-	SSID       string `json:"ssid"`
-	Encryption string `json:"encryption"`
-	Key        string `json:"key"`
+	SSID       string `json:"ssid,omitempty"`
+	Encryption string `json:"encryption,omitempty"`
+	Key        string `json:"key,omitempty"`
+	// AcknowledgeLockout is the explicit "yes, strand me" opt-in for turning the
+	// guest access point off while it is the last one up and the operator is on
+	// WiFi. See services.ErrLockoutRefused.
+	AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty"`
 }
 
 // RadioInfo describes a WiFi radio hardware device.
@@ -121,4 +130,7 @@ type RadioInfo struct {
 // RadioRoleRequest is the request body for setting a radio's role.
 type RadioRoleRequest struct {
 	Role string `json:"role"`
+	// AcknowledgeLockout is the explicit "yes, strand me" opt-in for switching
+	// the last access point off. See services.ErrLockoutRefused.
+	AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty"`
 }

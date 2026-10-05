@@ -52,8 +52,13 @@ export function SystemPowerSection() {
         confirmLabel="Reboot Now"
         isPending={rebootMutation.isPending}
         onConfirm={() => {
-          rebootMutation.mutate();
-          setShowRebootDialog(false);
+          // Keep the dialog mounted until the mutation settles: closing first
+          // meant `isPending` could never render, so an irreversible action
+          // reported its outcome only as a transient toast with no persistent
+          // state to fall back on.
+          rebootMutation.mutate(undefined, {
+            onSettled: () => setShowRebootDialog(false),
+          });
         }}
       />
 
@@ -66,8 +71,13 @@ export function SystemPowerSection() {
         confirmLabel="Shut Down"
         isPending={shutdownMutation.isPending}
         onConfirm={() => {
-          shutdownMutation.mutate();
-          setShowShutdownDialog(false);
+          // Keep the dialog mounted until the mutation settles: closing first
+          // meant `isPending` could never render, so an irreversible action
+          // reported its outcome only as a transient toast with no persistent
+          // state to fall back on.
+          shutdownMutation.mutate(undefined, {
+            onSettled: () => setShowShutdownDialog(false),
+          });
         }}
       />
 
