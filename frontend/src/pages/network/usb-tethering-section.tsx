@@ -2,6 +2,7 @@ import { Smartphone, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/status-pill';
 import {
   useUSBTetherStatus,
   useConfigureUSBTether,
@@ -26,7 +27,7 @@ export function USBTetheringSection() {
         {status?.detected ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-[var(--status-ok-text)]" />
               <span className="text-sm font-medium">
                 {status.device_type === 'android'
                   ? 'Android'
@@ -38,11 +39,9 @@ export function USBTetheringSection() {
               <Badge variant="outline" className="font-mono text-xs">
                 {status.interface}
               </Badge>
-              {status.is_up ? (
-                <Badge variant="success">Up</Badge>
-              ) : (
-                <Badge variant="secondary">Down</Badge>
-              )}
+              <StatusPill tone={status.is_up ? 'ok' : 'neutral'} withDot>
+                {status.is_up ? 'Up' : 'Down'}
+              </StatusPill>
             </div>
             {status.ip_address && (
               <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">

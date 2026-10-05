@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Activity } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { statusDotToneClass } from '@/components/ui/status-pill';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { sortInterfaceNames } from './interface-traffic-utils';
 import { InterfaceTrafficChartCard } from './interface-traffic-chart-card';
@@ -22,7 +23,7 @@ export function InterfaceTrafficCharts() {
             <span
               aria-hidden="true"
               className={`h-2 w-2 rounded-full ${
-                connected ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-gray-400 dark:bg-gray-600'
+                connected ? statusDotToneClass.ok : statusDotToneClass.neutral
               }`}
             />
             <span className="sr-only">Live updates {connected ? 'connected' : 'disconnected'}</span>

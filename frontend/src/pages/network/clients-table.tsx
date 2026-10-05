@@ -111,7 +111,7 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-green-600"
+                        className="h-7 w-7 text-[var(--status-ok-text)]"
                         title="Unblock"
                         aria-label={`Unblock ${clientLabel}`}
                         onClick={() => unblock.mutate(client.mac_address)}
@@ -123,7 +123,7 @@ export function ClientsTable({ clients, blockedMacs = [], limit }: ClientsTableP
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-red-600"
+                        className="h-7 w-7 text-[var(--status-danger-text)]"
                         title="Block"
                         aria-label={`Block ${clientLabel}`}
                         onClick={() => block.mutate(client.mac_address)}

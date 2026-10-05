@@ -1,4 +1,5 @@
 import { PageSection } from '@/components/ui/page-section';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { DataUsageSection } from '@/pages/network/data-usage-section';
 import { DdnsCard } from '@/pages/network/ddns-card';
 import { DiagnosticsCard } from '@/pages/network/diagnostics-card';
@@ -20,9 +21,7 @@ export function NetworkPageAdvancedPanel() {
       <SpeedTestCard />
 
       <div>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-          Power tools
-        </h2>
+        <SectionHeading>Power tools</SectionHeading>
         <div className="space-y-3">
           <PageSection title="Dynamic DNS">
             <DdnsCard />

@@ -53,7 +53,7 @@ export function DhcpReservationsTable({
                   onClick={() => reservation.section && onDeleteSection(reservation.section)}
                   disabled={deletePending}
                 >
-                  <Trash2 className="h-4 w-4 text-red-500" />
+                  <Trash2 className="h-4 w-4 text-[var(--status-danger-text)]" />
                 </Button>
               </td>
             </tr>

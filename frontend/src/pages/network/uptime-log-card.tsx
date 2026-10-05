@@ -3,6 +3,9 @@ import { Cable } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
+import { QueryCard } from '@/components/ui/query-card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatusPill, statusDotToneClass } from '@/components/ui/status-pill';
 import { useUptimeLog } from '@/hooks/use-network';
 import type { UptimeEvent } from '@shared/index';
 
@@ -50,7 +53,7 @@ function summarize(events: readonly UptimeEvent[], now: number) {
 const VISIBLE_LIMIT = 10;
 
 export function UptimeLogCard() {
-  const { data: uptimeLog } = useUptimeLog();
+  const { data: uptimeLog, isLoading, isError, error, refetch } = useUptimeLog();
   const [showAll, setShowAll] = useState(false);
 
   // A ticking clock so the "for 12m" and "4m ago" figures stay honest, at 30s
@@ -68,57 +71,70 @@ export function UptimeLogCard() {
         <Cable className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {!uptimeLog || uptimeLog.length === 0 ? (
-          <EmptyState message="No connectivity events recorded yet" />
-        ) : (
-          <div className="space-y-3">
-            <UptimeSummary events={uptimeLog} now={now} />
-            <ol className="space-y-2">
-              {(showAll ? uptimeLog : uptimeLog.slice(0, VISIBLE_LIMIT)).map((event, i) => {
-                const isConnected = event.state === 'connected';
-                // The newest entry describes the *ongoing* state, so its
-                // duration is now - timestamp rather than null.
-                const next = uptimeLog[i + 1];
-                const durationMs = next ? event.timestamp - next.timestamp : now - event.timestamp;
-                return (
-                  <li key={event.timestamp} className="flex items-start gap-3 text-sm">
-                    <span
-                      aria-hidden="true"
-                      className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        isConnected
-                          ? 'bg-emerald-500 dark:bg-emerald-400'
-                          : 'bg-red-500 dark:bg-red-400'
-                      }`}
-                    />
-                    <div className="flex flex-col">
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          }
+        >
+          {!uptimeLog || uptimeLog.length === 0 ? (
+            <EmptyState message="No connectivity events recorded yet" />
+          ) : (
+            <div className="space-y-3">
+              <UptimeSummary events={uptimeLog} now={now} />
+              <ol className="space-y-2">
+                {(showAll ? uptimeLog : uptimeLog.slice(0, VISIBLE_LIMIT)).map((event, i) => {
+                  const isConnected = event.state === 'connected';
+                  // The newest entry describes the *ongoing* state, so its
+                  // duration is now - timestamp rather than null.
+                  const next = uptimeLog[i + 1];
+                  const durationMs = next
+                    ? event.timestamp - next.timestamp
+                    : now - event.timestamp;
+                  return (
+                    <li key={event.timestamp} className="flex items-start gap-3 text-sm">
                       <span
-                        className={
-                          isConnected
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : 'text-red-600 dark:text-red-400'
-                        }
-                      >
-                        {isConnected ? 'Connected' : 'Disconnected'}
-                        {!next && ' (current)'}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        <span title={new Date(event.timestamp).toLocaleString()}>
-                          {formatRelative(event.timestamp, now)}
+                        aria-hidden="true"
+                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                          isConnected ? statusDotToneClass.ok : statusDotToneClass.danger
+                        }`}
+                      />
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={
+                            isConnected
+                              ? 'text-[var(--status-ok-text)]'
+                              : 'text-[var(--status-danger-text)]'
+                          }
+                        >
+                          {isConnected ? 'Connected' : 'Disconnected'}
+                          {!next && ' (current)'}
                         </span>
-                        {durationMs > 0 && <> &mdash; lasted {formatDuration(durationMs)}</>}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-            {uptimeLog.length > VISIBLE_LIMIT && (
-              <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? 'Show recent only' : `Show all ${uptimeLog.length}`}
-              </Button>
-            )}
-          </div>
-        )}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span title={new Date(event.timestamp).toLocaleString()}>
+                            {formatRelative(event.timestamp, now)}
+                          </span>
+                          {durationMs > 0 && <> &mdash; lasted {formatDuration(durationMs)}</>}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+              {uptimeLog.length > VISIBLE_LIMIT && (
+                <Button variant="outline" size="sm" onClick={() => setShowAll((v) => !v)}>
+                  {showAll ? 'Show recent only' : `Show all ${uptimeLog.length}`}
+                </Button>
+              )}
+            </div>
+          )}
+        </QueryCard>
       </CardContent>
     </Card>
   );
@@ -127,20 +143,30 @@ export function UptimeLogCard() {
 function UptimeSummary({ events, now }: { events: readonly UptimeEvent[]; now: number }) {
   const { outages, availability } = summarize(events, now);
   const latest = events[0];
-  const currentState = latest?.state === 'connected' ? 'Connected now' : 'Disconnected now';
+  const connected = latest?.state === 'connected';
+  const currentState = connected ? 'Connected now' : 'Disconnected now';
   const currentFor = latest ? formatRelative(latest.timestamp, now) : null;
+  // Text on a tinted surface takes the matching text token, which already
+  // carries both themes.
+  const toneText = connected ? 'text-[var(--status-ok-text)]' : 'text-[var(--status-danger-text)]';
 
   return (
-    <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm dark:border-white/10 dark:bg-gray-900/50">
-      <p className="font-medium text-gray-900 dark:text-white">
-        {currentState}
-        {currentFor && (
-          <span className="ml-1 font-normal text-gray-500 dark:text-gray-400">
-            for {formatDuration(now - latest.timestamp)}
-          </span>
-        )}
-      </p>
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+    <div
+      className={`rounded-md border p-3 text-sm ${
+        connected
+          ? 'border-[var(--status-ok-border)] bg-[var(--status-ok-surface)]'
+          : 'border-[var(--status-danger-border)] bg-[var(--status-danger-surface)]'
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <StatusPill tone={connected ? 'ok' : 'danger'} withDot>
+          {currentState}
+        </StatusPill>
+        {currentFor ? (
+          <span className={toneText}>{`for ${formatDuration(now - latest.timestamp)}`}</span>
+        ) : null}
+      </div>
+      <p className={`mt-1 text-xs ${toneText}`}>
         Last 24 hours: {outages} outage{outages === 1 ? '' : 's'}
         {availability !== null && ` \u00b7 ${availability}% available`}
       </p>

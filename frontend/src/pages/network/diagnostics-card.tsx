@@ -8,6 +8,7 @@ import { InlineError } from '@/components/ui/inline-error';
 import { cn } from '@/lib/cn';
 import { useRunDiagnostics } from '@/hooks/use-network';
 import { diagnosticsFormSchema, type DiagnosticsFormValues } from '@/lib/schemas/network-forms';
+import { FieldError } from '@/components/ui/field-error';
 
 type DiagType = 'ping' | 'traceroute' | 'dns';
 
@@ -89,9 +90,7 @@ export function DiagnosticsCard() {
             </Button>
           </div>
           {errors.target ? (
-            <p id="diag-target-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-              {errors.target.message}
-            </p>
+            <FieldError id="diag-target-err">{errors.target.message}</FieldError>
           ) : null}
 
           {runDiagnostics.isPending && (

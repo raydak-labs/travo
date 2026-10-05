@@ -89,11 +89,11 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
       )}
       <div className="mt-1 flex justify-center gap-3 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1">
-          <ArrowDownToLine className="h-3 w-3 text-blue-500" />
+          <ArrowDownToLine className="h-3 w-3 text-[var(--chart-legend-rx)]" />
           {formatRate(latestRx)}
         </span>
         <span className="flex items-center gap-1">
-          <ArrowUpFromLine className="h-3 w-3 text-amber-500" />
+          <ArrowUpFromLine className="h-3 w-3 text-[var(--chart-legend-tx)]" />
           {formatRate(latestTx)}
         </span>
       </div>

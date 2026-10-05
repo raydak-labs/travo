@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { HardDrive } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useDHCPReservations,
@@ -16,7 +17,13 @@ import { DhcpReservationsTable } from './dhcp-reservations-table';
 import { DhcpReservationAddForm } from './dhcp-reservation-add-form';
 
 export function DhcpReservationsCard() {
-  const { data: dhcpReservations, isLoading: dhcpReservationsLoading } = useDHCPReservations();
+  const {
+    data: dhcpReservations,
+    isLoading: dhcpReservationsLoading,
+    isError: reservationsFailed,
+    error: reservationsError,
+    refetch: refetchReservations,
+  } = useDHCPReservations();
   const addDHCPReservation = useAddDHCPReservation();
   const deleteDHCPReservation = useDeleteDHCPReservation();
 
@@ -53,12 +60,18 @@ export function DhcpReservationsCard() {
         <HardDrive className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {dhcpReservationsLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : (
+        <QueryCard
+          isLoading={dhcpReservationsLoading}
+          isError={reservationsFailed}
+          error={reservationsError}
+          onRetry={() => void refetchReservations()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          }
+        >
           <div className="space-y-4">
             <DhcpReservationsTable
               reservations={list}
@@ -73,7 +86,7 @@ export function DhcpReservationsCard() {
               addPending={addDHCPReservation.isPending}
             />
           </div>
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

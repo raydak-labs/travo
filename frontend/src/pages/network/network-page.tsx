@@ -9,7 +9,10 @@ export function NetworkPage() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activeTab = networkPathnameToTab(pathname);
 
-  const { data: network, isLoading } = useNetworkStatus();
+  // The page owns the network-status query and hands the panel its outcome as
+  // well as its data, so a failed GET cannot reach a card that would render it
+  // as an empty router.
+  const { data: network, isLoading, isError, error, refetch } = useNetworkStatus();
   const { data: blockedClients } = useBlockedClients();
 
   return (
@@ -18,6 +21,9 @@ export function NetworkPage() {
         <NetworkPageStatusPanel
           network={network}
           isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
           blockedClients={blockedClients}
         />
       ) : null}

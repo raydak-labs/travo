@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InlineError } from '@/components/ui/inline-error';
+import { StatValue } from '@/components/ui/stat-value';
 import { useRunSpeedTest } from '@/hooks/use-system';
 
 export function SpeedTestCard() {
@@ -35,16 +36,9 @@ export function SpeedTestCard() {
         {speedTest.data && (
           <CardInset variant="muted">
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-gray-500 dark:text-gray-400">Download</span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {speedTest.data.download_mbps} Mbps
-              </span>
-              <span className="text-gray-500 dark:text-gray-400">Latency</span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {speedTest.data.ping_ms} ms
-              </span>
-              <span className="text-gray-500 dark:text-gray-400">Server</span>
-              <span className="text-gray-900 dark:text-white">{speedTest.data.server}</span>
+              <StatValue label="Download" value={`${speedTest.data.download_mbps} Mbps`} />
+              <StatValue label="Latency" value={`${speedTest.data.ping_ms} ms`} />
+              <StatValue label="Server" value={speedTest.data.server} />
             </div>
           </CardInset>
         )}
