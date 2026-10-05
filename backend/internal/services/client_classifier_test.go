@@ -14,8 +14,8 @@ import (
 // The two real client identities this classifier has to tell apart, both taken
 // from the live neighbour table on 192.168.1.1:
 //
-//	wired: 192.168.1.2  -> 9c:eb:e8:d3:f8:d1
-//	wifi:  192.168.1.151 -> 22:4e:76:6c:2d:62 (the iPhone, associated with
+//	wired: 192.168.1.2  -> 02:00:00:00:00:01
+//	wifi:  192.168.1.151 -> 02:00:00:00:00:02 (the iPhone, associated with
 //	                                   phy1-ap0 at the time)
 //
 // They sit in the SAME /24 on the SAME bridge. Nothing but "is this MAC
@@ -23,9 +23,9 @@ import (
 // client's subnet alone is not enough to answer the lockout guard.
 const (
 	deviceWiredClientIP  = "192.168.1.2"
-	deviceWiredClientMAC = "9c:eb:e8:d3:f8:d1"
+	deviceWiredClientMAC = "02:00:00:00:00:01"
 	deviceWiFiClientIP   = "192.168.1.151"
-	deviceWiFiClientMAC  = "22:4e:76:6c:2d:62"
+	deviceWiFiClientMAC  = "02:00:00:00:00:02"
 	// A client behind the uplink STA, from the same capture.
 	deviceUplinkClientIP = "10.0.1.146"
 )
@@ -48,7 +48,9 @@ func deviceInterfaceDump(t *testing.T) map[string]any {
 	return dump
 }
 
-// deviceNeighborTable is the verbatim /proc/net/arp from the test device.
+// deviceNeighborTable is /proc/net/arp from the test device, verbatim apart from
+// two client MACs redacted to the locally-administered 02:00:00:00:00:0x series
+// (see testdata/proc_net_arp.txt).
 func deviceNeighborTable(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "proc_net_arp.txt"))
@@ -82,9 +84,9 @@ func newClassifierService(t *testing.T) *NetworkService {
 // `iw dev phy1-ap0 station dump` answered "No such device". These two blocks
 // are therefore NOT a live capture: they use the exact `iw` output format taken
 // from the real `iw dev phy0-sta0 station dump` on the same device (see
-// testdata/iw_station_dump.txt), and the associated MAC is the real iPhone MAC
-// recorded in the neighbour table above. Everything is a real value; only the
-// association is reconstructed. Do not read these as proof of a capture.
+// testdata/iw_station_dump.txt), and the associated MAC is the redacted client MAC
+// from the neighbour table above. The format and every field shape are real; only
+// the association is reconstructed. Do not read these as proof of a capture.
 const associatedAPStations = `phy#0
 	Interface phy0-sta0
 		ifindex 23
@@ -107,7 +109,7 @@ phy#1
 
 // phy1ApStationDump is the iPhone as `iw` prints it on an AP interface. Same
 // field set as the captured station dump in testdata/iw_station_dump.txt.
-const phy1ApStationDump = `Station 22:4e:76:6c:2d:62 (on phy1-ap0)
+const phy1ApStationDump = `Station 02:00:00:00:00:02 (on phy1-ap0)
 	authorized:	yes
 	authenticated:	yes
 	associated:	yes

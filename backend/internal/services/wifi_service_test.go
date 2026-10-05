@@ -4353,7 +4353,7 @@ const goldenWirelessStatus = `	{
 	     "disabled": false,
 	     "encryption": "psk2",
 	     "key": "<redacted>",
-	     "ssid": "Cappuxinno-Travel",
+	     "ssid": "TravelTestNet",
 	     "radios": []
 	    },
 	    "ifname": "phy1-ap0",

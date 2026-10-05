@@ -90,7 +90,7 @@ peer and still reported `stations: []`).
 
 ### 3.2 An AP with no clients is genuinely up
 
-`phy1-ap0` (SSID `Cappuxinno-Travel`, channel 1) was beaconing, bridged to `br-lan`, with
+`phy1-ap0` (SSID `TravelTestNet`, channel 1) was beaconing, bridged to `br-lan`, with
 `network.device status` reporting `present/up/carrier` all true and a **completely empty**
 assoclist. An ath11k AP with zero stations reports up. The original worry was unfounded; the real
 defect is B1.
@@ -171,7 +171,7 @@ router with Wi-Fi off entirely.
 | - | ------ | -------- |
 | B.1 | Over Wi-Fi, change an AP SSID. | Applied and **confirmed**; no "rolled back" toast. |
 | B.2 | Same, with a deliberately broken config (11-character key, impossible channel). | Rolled back to the previous working config after ~30 s; the UI says so specifically. |
-| B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Requires the §5.1 precondition** — `GET /api/v1/network/connection-method` must return `wifi-ap` from the phone and `ethernet` from the wired console first. Then: **refused, 409 with `code: "wifi_lockout_risk"`, and nothing changes** until the operator ticks the lockout box. This is the lockout case the model exists for. **VERIFIED on device 2026-10-04** (GL.iNet GL-AXT1800, OpenWrt 25.12.3, iPhone `22:4e:76:6c:2d:62`): refused with 409 `wifi_lockout_risk`, the dialog required a ticked checkbox before Apply enabled, and afterwards `/etc/config/wireless` was byte-identical (md5 `ebf220fe…`), the AP stayed up and associated, and there were 0 apply sessions and 0 crash guards. |
+| B.3 | Switch to Client mode **while connected over Wi-Fi**. | **Requires the §5.1 precondition** — `GET /api/v1/network/connection-method` must return `wifi-ap` from the phone and `ethernet` from the wired console first. Then: **refused, 409 with `code: "wifi_lockout_risk"`, and nothing changes** until the operator ticks the lockout box. This is the lockout case the model exists for. **VERIFIED on device 2026-10-04** (GL.iNet GL-AXT1800, OpenWrt 25.12.3, iPhone `02:00:00:00:00:02`): refused with 409 `wifi_lockout_risk`, the dialog required a ticked checkbox before Apply enabled, and afterwards `/etc/config/wireless` was byte-identical (md5 `ebf220fe…`), the AP stayed up and associated, and there were 0 apply sessions and 0 crash guards. |
 | B.4 | Switch to Client mode over **Ethernet**. | Applies and confirms. |
 | B.5 | Connect to an upstream twice, no band pinned. | Both succeed. |
 | B.9 | Connect to an upstream that **does not exist**, or with a wrong password. | Must be **refused**: the uplink STA has no carrier, so it is not up. This is the only reliable way to make the uplink genuinely fail — an invalid channel is silently ignored and the access point stays up. |

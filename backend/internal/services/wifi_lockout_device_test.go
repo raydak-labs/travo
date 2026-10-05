@@ -19,8 +19,8 @@ import (
 // The three callers are the real ones, all reachable through br-lan or the
 // uplink on the same router:
 //
-//	192.168.1.2   -> 9c:eb:e8:d3:f8:d1  wired, not associated with any AP
-//	192.168.1.151 -> 22:4e:76:6c:2d:62  the iPhone, associated with phy1-ap0
+//	192.168.1.2   -> 02:00:00:00:00:01  wired, not associated with any AP
+//	192.168.1.151 -> 02:00:00:00:00:02  the iPhone, associated with phy1-ap0
 //	8.8.8.8                          outside every prefix: cannot be placed
 func newDeviceLockoutService(t *testing.T, stations map[string]string) (
 	*WifiService, *uci.MockUCI, *fakeWirelessApplier,

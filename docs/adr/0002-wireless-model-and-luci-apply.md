@@ -295,7 +295,7 @@ dump`), which is the mechanism the health path already uses. Associated →
 `wifi-ap`. Not associated → `ethernet`. The uplink STA still answers
 `wifi-client` from the interface name alone, because there the router itself is
 the WiFi client. Real identities from the test device: `192.168.1.2` /
-`9c:eb:e8:d3:f8:d1` (wired) and `192.168.1.151` / `22:4e:76:6c:2d:62` (the
+`02:00:00:00:00:01` (wired) and `192.168.1.151` / `02:00:00:00:00:02` (the
 iPhone, associated with `phy1-ap0`) — same bridge, same subnet.
 
 **It fails closed on `unknown`.** The guard refuses for every method except a
