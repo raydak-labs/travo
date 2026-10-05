@@ -1,5 +1,4 @@
 import { AlertTriangle, X } from 'lucide-react';
-import { cn } from '@/lib/cn';
 import type { Alert } from '@shared/index';
 import { adoptedSection, alertEpochMs, isRecentAlert } from './operator-edit-overwrite';
 
@@ -26,10 +25,7 @@ export function OperatorEditOverwriteWarning({ alert, onDismiss }: Props) {
   return (
     <div
       role="alert"
-      className={cn(
-        'flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3',
-        'text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200',
-      )}
+      className="flex items-start gap-2 rounded-md border border-[var(--status-warn-border)] bg-[var(--status-warn-surface)] p-3 text-sm text-[var(--status-warn-text)]"
     >
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1 space-y-1">
@@ -49,7 +45,7 @@ export function OperatorEditOverwriteWarning({ alert, onDismiss }: Props) {
         {section ? (
           <p>
             Check what is live with{' '}
-            <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">
+            <code className="rounded bg-[var(--status-warn-border)] px-1">
               uci show mwan3.{section}
             </code>{' '}
             and re-apply your tuning there. The next failover save replaces the same options again.
@@ -60,10 +56,7 @@ export function OperatorEditOverwriteWarning({ alert, onDismiss }: Props) {
         type="button"
         onClick={() => onDismiss(alert.id)}
         aria-label="Dismiss mwan3 section overwrite warning"
-        className={cn(
-          'shrink-0 rounded p-1 text-amber-900 hover:bg-amber-100',
-          'dark:text-amber-200 dark:hover:bg-amber-900',
-        )}
+        className="shrink-0 rounded p-1 text-[var(--status-warn-text)] hover:bg-[var(--status-warn-border)]"
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

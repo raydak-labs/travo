@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BarChart2, RefreshCw, Settings } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useDataUsage, useDataBudget, useSetDataBudget } from '@/hooks/use-data-usage';
@@ -10,39 +11,10 @@ import { DataUsageInterfaceCard } from './data-usage-interface-card';
 import { DataUsageBudgetEditor } from './data-usage-budget-editor';
 
 export function DataUsageSection() {
-  const { data: status, isLoading, refetch } = useDataUsage();
+  const { data: status, isLoading, isError, error, refetch } = useDataUsage();
   const { data: budgetConfig } = useDataBudget();
   const setBudgetMutation = useSetDataBudget();
   const [editingBudget, setEditingBudget] = useState<string | null>(null);
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Data Usage</CardTitle>
-          <BarChart2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!status?.available) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Data Usage</CardTitle>
-          <BarChart2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-        </CardHeader>
-        <CardContent>
-          <EmptyState message="Install the Data Usage (vnstat) service to track cumulative traffic per interface with budget warnings." />
-        </CardContent>
-      </Card>
-    );
-  }
 
   const findBudget = (name: string) => budgetConfig?.budgets.find((b) => b.interface === name);
 
@@ -71,32 +43,47 @@ export function DataUsageSection() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {status.interfaces.length === 0 ? (
-          <EmptyState message="No interfaces monitored yet" />
-        ) : (
-          status.interfaces.map((iface) => (
-            <div key={iface.name} className="space-y-2">
-              <DataUsageInterfaceCard iface={iface} budget={findBudget(iface.name)} />
-              {editingBudget === iface.name ? (
-                <DataUsageBudgetEditor
-                  ifaceName={iface.name}
-                  current={findBudget(iface.name)}
-                  onSave={handleBudgetSave}
-                />
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 gap-1 text-xs text-gray-500 dark:text-gray-400"
-                  onClick={() => setEditingBudget(iface.name)}
-                >
-                  <Settings className="h-3 w-3" />
-                  {findBudget(iface.name) ? 'Edit budget' : 'Set budget'}
-                </Button>
-              )}
-            </div>
-          ))
-        )}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <>
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </>
+          }
+        >
+          {!status?.available ? (
+            <EmptyState message="Install the Data Usage (vnstat) service to track cumulative traffic per interface with budget warnings." />
+          ) : status.interfaces.length === 0 ? (
+            <EmptyState message="No interfaces monitored yet" />
+          ) : (
+            status.interfaces.map((iface) => (
+              <div key={iface.name} className="space-y-2">
+                <DataUsageInterfaceCard iface={iface} budget={findBudget(iface.name)} />
+                {editingBudget === iface.name ? (
+                  <DataUsageBudgetEditor
+                    ifaceName={iface.name}
+                    current={findBudget(iface.name)}
+                    onSave={handleBudgetSave}
+                  />
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 text-xs text-gray-500 dark:text-gray-400"
+                    onClick={() => setEditingBudget(iface.name)}
+                  >
+                    <Settings className="h-3 w-3" />
+                    {findBudget(iface.name) ? 'Edit budget' : 'Set budget'}
+                  </Button>
+                )}
+              </div>
+            ))
+          )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

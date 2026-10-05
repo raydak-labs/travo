@@ -1,13 +1,14 @@
 import { Power } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Badge } from '@/components/ui/badge';
+import { QueryCard } from '@/components/ui/query-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatusPill } from '@/components/ui/status-pill';
 import { useNetworkStatus, useSetInterfaceState } from '@/hooks/use-network';
 
 export function InterfacesCard() {
-  const { data: network, isLoading } = useNetworkStatus();
+  const { data: network, isLoading, isError, error, refetch } = useNetworkStatus();
   const setInterfaceState = useSetInterfaceState();
 
   return (
@@ -17,44 +18,55 @@ export function InterfacesCard() {
         <Power className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : network?.interfaces && network.interfaces.length > 0 ? (
-          <div className="space-y-3">
-            {network.interfaces.map((iface) => (
-              <div key={iface.name} className="flex items-center justify-between dark:bg-gray-900">
-                <div className="flex items-center gap-3">
-                  <Badge variant={iface.is_up ? 'success' : 'secondary'}>
-                    {iface.is_up ? 'Up' : 'Down'}
-                  </Badge>
-                  <div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {iface.name.toUpperCase()}
-                    </span>
-                    {iface.ip_address && (
-                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                        {iface.ip_address}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <Button
-                  variant={iface.is_up ? 'destructive' : 'default'}
-                  size="sm"
-                  onClick={() => setInterfaceState.mutate({ name: iface.name, up: !iface.is_up })}
-                  disabled={setInterfaceState.isPending}
+        <QueryCard
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          onRetry={() => void refetch()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          }
+        >
+          {network?.interfaces && network.interfaces.length > 0 ? (
+            <div className="space-y-3">
+              {network.interfaces.map((iface) => (
+                <div
+                  key={iface.name}
+                  className="flex items-center justify-between dark:bg-gray-900"
                 >
-                  {iface.is_up ? 'Bring Down' : 'Bring Up'}
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState message="No interfaces found" />
-        )}
+                  <div className="flex items-center gap-3">
+                    <StatusPill tone={iface.is_up ? 'ok' : 'neutral'} withDot>
+                      {iface.is_up ? 'Up' : 'Down'}
+                    </StatusPill>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        {iface.name.toUpperCase()}
+                      </span>
+                      {iface.ip_address && (
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          {iface.ip_address}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant={iface.is_up ? 'destructive' : 'default'}
+                    size="sm"
+                    onClick={() => setInterfaceState.mutate({ name: iface.name, up: !iface.is_up })}
+                    disabled={setInterfaceState.isPending}
+                  >
+                    {iface.is_up ? 'Bring Down' : 'Bring Up'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState message="No interfaces found" />
+          )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

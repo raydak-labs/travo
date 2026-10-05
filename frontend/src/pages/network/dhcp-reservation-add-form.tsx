@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { DhcpReservationFormValues } from '@/lib/schemas/network-forms';
+import { FieldError } from '@/components/ui/field-error';
 
 type DhcpReservationAddFormProps = {
   register: UseFormRegister<DhcpReservationFormValues>;
@@ -34,11 +35,7 @@ export function DhcpReservationAddForm({
           aria-describedby={errors.name ? 'dhcp-name-err' : undefined}
           {...register('name')}
         />
-        {errors.name ? (
-          <p id="dhcp-name-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.name.message}
-          </p>
-        ) : null}
+        {errors.name ? <FieldError id="dhcp-name-err">{errors.name.message}</FieldError> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="dhcp-mac">MAC Address</Label>
@@ -50,11 +47,7 @@ export function DhcpReservationAddForm({
           aria-describedby={errors.mac ? 'dhcp-mac-err' : undefined}
           {...register('mac')}
         />
-        {errors.mac ? (
-          <p id="dhcp-mac-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.mac.message}
-          </p>
-        ) : null}
+        {errors.mac ? <FieldError id="dhcp-mac-err">{errors.mac.message}</FieldError> : null}
       </div>
       <div className="space-y-1">
         <Label htmlFor="dhcp-ip">IP Address</Label>
@@ -66,11 +59,7 @@ export function DhcpReservationAddForm({
           aria-describedby={errors.ip ? 'dhcp-ip-err' : undefined}
           {...register('ip')}
         />
-        {errors.ip ? (
-          <p id="dhcp-ip-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.ip.message}
-          </p>
-        ) : null}
+        {errors.ip ? <FieldError id="dhcp-ip-err">{errors.ip.message}</FieldError> : null}
       </div>
       <Button type="submit" disabled={addPending}>
         {addPending ? 'Adding…' : 'Add'}

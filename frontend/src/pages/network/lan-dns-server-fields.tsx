@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { Label } from '@/components/ui/label';
 import type { DnsConfigFormValues } from '@/lib/schemas/network-forms';
+import { FieldError } from '@/components/ui/field-error';
 
 type LanDnsServerFieldsProps = {
   register: UseFormRegister<DnsConfigFormValues>;
@@ -25,9 +26,7 @@ export function LanDnsServerFields({ register, errors }: LanDnsServerFieldsProps
           {...register('server1')}
         />
         {errors.server1 ? (
-          <p id="lan-dns-s1-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-            {errors.server1.message}
-          </p>
+          <FieldError id="lan-dns-s1-err">{errors.server1.message}</FieldError>
         ) : null}
       </div>
       <div className="space-y-1">

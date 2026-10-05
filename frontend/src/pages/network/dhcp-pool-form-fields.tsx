@@ -14,6 +14,7 @@ import {
   formatDhcpLeaseTimeHumanLabel,
   type DhcpPoolFormValues,
 } from '@/lib/schemas/network-forms';
+import { FieldError } from '@/components/ui/field-error';
 
 type DhcpPoolFormFieldsProps = {
   register: UseFormRegister<DhcpPoolFormValues>;
@@ -40,9 +41,7 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
             {...register('start', { valueAsNumber: true })}
           />
           {errors.start ? (
-            <p id="dhcp-start-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-              {errors.start.message}
-            </p>
+            <FieldError id="dhcp-start-err">{errors.start.message}</FieldError>
           ) : null}
         </div>
         <div className="space-y-1">
@@ -60,9 +59,7 @@ export function DhcpPoolFormFields({ register, control, errors }: DhcpPoolFormFi
             {...register('limit', { valueAsNumber: true })}
           />
           {errors.limit ? (
-            <p id="dhcp-limit-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-              {errors.limit.message}
-            </p>
+            <FieldError id="dhcp-limit-err">{errors.limit.message}</FieldError>
           ) : null}
         </div>
       </div>

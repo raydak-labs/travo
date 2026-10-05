@@ -1,11 +1,18 @@
 import { List } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDHCPLeases } from '@/hooks/use-network';
 
 export function DhcpLeasesCard() {
-  const { data: dhcpLeases, isLoading: dhcpLeasesLoading } = useDHCPLeases();
+  const {
+    data: dhcpLeases,
+    isLoading: dhcpLeasesLoading,
+    isError: leasesFailed,
+    error: leasesError,
+    refetch: refetchLeases,
+  } = useDHCPLeases();
 
   return (
     <Card>
@@ -14,48 +21,60 @@ export function DhcpLeasesCard() {
         <List className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {dhcpLeasesLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : dhcpLeases && dhcpLeases.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <caption className="sr-only">Active DHCP leases</caption>
-              <thead>
-                <tr className="border-b text-left text-gray-500 dark:text-gray-400">
-                  <th scope="col" className="pb-2 font-medium">
-                    Hostname
-                  </th>
-                  <th scope="col" className="pb-2 font-medium">
-                    IP Address
-                  </th>
-                  <th scope="col" className="pb-2 font-medium">
-                    MAC Address
-                  </th>
-                  <th scope="col" className="pb-2 font-medium">
-                    Expires
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {dhcpLeases.map((lease) => (
-                  <tr key={lease.mac} className="border-b last:border-0">
-                    <td className="py-2 text-gray-900 dark:text-white">{lease.hostname || '—'}</td>
-                    <td className="py-2 font-mono text-gray-900 dark:text-white">{lease.ip}</td>
-                    <td className="py-2 font-mono text-gray-500 dark:text-gray-400">{lease.mac}</td>
-                    <td className="py-2 text-gray-500 dark:text-gray-400">
-                      {new Date(lease.expiry * 1000).toLocaleString()}
-                    </td>
+        <QueryCard
+          isLoading={dhcpLeasesLoading}
+          isError={leasesFailed}
+          error={leasesError}
+          onRetry={() => void refetchLeases()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          }
+        >
+          {dhcpLeases && dhcpLeases.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Active DHCP leases</caption>
+                <thead>
+                  <tr className="border-b text-left text-gray-500 dark:text-gray-400">
+                    <th scope="col" className="pb-2 font-medium">
+                      Hostname
+                    </th>
+                    <th scope="col" className="pb-2 font-medium">
+                      IP Address
+                    </th>
+                    <th scope="col" className="pb-2 font-medium">
+                      MAC Address
+                    </th>
+                    <th scope="col" className="pb-2 font-medium">
+                      Expires
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState message="No active leases" />
-        )}
+                </thead>
+                <tbody>
+                  {dhcpLeases.map((lease) => (
+                    <tr key={lease.mac} className="border-b last:border-0">
+                      <td className="py-2 text-gray-900 dark:text-white">
+                        {lease.hostname || '—'}
+                      </td>
+                      <td className="py-2 font-mono text-gray-900 dark:text-white">{lease.ip}</td>
+                      <td className="py-2 font-mono text-gray-500 dark:text-gray-400">
+                        {lease.mac}
+                      </td>
+                      <td className="py-2 text-gray-500 dark:text-gray-400">
+                        {new Date(lease.expiry * 1000).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState message="No active leases" />
+          )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

@@ -4,13 +4,21 @@ import { MapPin, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
+import { FieldError } from '@/components/ui/field-error';
 import { useDNSEntries, useAddDNSEntry, useDeleteDNSEntry } from '@/hooks/use-network';
 import { dnsEntryFormSchema, type DnsEntryFormValues } from '@/lib/schemas/network-forms';
 
 export function DnsEntriesCard() {
-  const { data: dnsEntries, isLoading: dnsEntriesLoading } = useDNSEntries();
+  const {
+    data: dnsEntries,
+    isLoading: dnsEntriesLoading,
+    isError: entriesFailed,
+    error: entriesError,
+    refetch: refetchEntries,
+  } = useDNSEntries();
   const addDNSEntry = useAddDNSEntry();
   const deleteDNSEntry = useDeleteDNSEntry();
 
@@ -41,12 +49,18 @@ export function DnsEntriesCard() {
         <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {dnsEntriesLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : (
+        <QueryCard
+          isLoading={dnsEntriesLoading}
+          isError={entriesFailed}
+          error={entriesError}
+          onRetry={() => void refetchEntries()}
+          loading={
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          }
+        >
           <div className="space-y-4">
             {dnsEntries && dnsEntries.length > 0 && (
               <div className="overflow-x-auto">
@@ -72,7 +86,7 @@ export function DnsEntriesCard() {
                             onClick={() => entry.section && deleteDNSEntry.mutate(entry.section)}
                             disabled={deleteDNSEntry.isPending}
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4 text-[var(--status-danger-text)]" />
                           </Button>
                         </td>
                       </tr>
@@ -96,13 +110,7 @@ export function DnsEntriesCard() {
                   {...register('name')}
                 />
                 {errors.name ? (
-                  <p
-                    id="dns-entry-name-err"
-                    className="text-xs text-red-600 dark:text-red-400"
-                    role="alert"
-                  >
-                    {errors.name.message}
-                  </p>
+                  <FieldError id="dns-entry-name-err">{errors.name.message}</FieldError>
                 ) : null}
               </div>
               <div className="space-y-1">
@@ -116,13 +124,7 @@ export function DnsEntriesCard() {
                   {...register('ip')}
                 />
                 {errors.ip ? (
-                  <p
-                    id="dns-entry-ip-err"
-                    className="text-xs text-red-600 dark:text-red-400"
-                    role="alert"
-                  >
-                    {errors.ip.message}
-                  </p>
+                  <FieldError id="dns-entry-ip-err">{errors.ip.message}</FieldError>
                 ) : null}
               </div>
               <Button type="submit" disabled={addDNSEntry.isPending}>
@@ -130,7 +132,7 @@ export function DnsEntriesCard() {
               </Button>
             </form>
           </div>
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

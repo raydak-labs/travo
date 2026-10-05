@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSendWoL } from '@/hooks/use-network';
 import { wolFormSchema, type WolFormValues } from '@/lib/schemas/network-forms';
+import { FieldError } from '@/components/ui/field-error';
 
 export function WoLCard() {
   const sendWoL = useSendWoL();
@@ -46,11 +47,7 @@ export function WoLCard() {
               aria-describedby={errors.mac ? 'wol-mac-err' : undefined}
               {...register('mac')}
             />
-            {errors.mac ? (
-              <p id="wol-mac-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-                {errors.mac.message}
-              </p>
-            ) : null}
+            {errors.mac ? <FieldError id="wol-mac-err">{errors.mac.message}</FieldError> : null}
           </div>
           <div className="space-y-1">
             <Label htmlFor="wol-interface">Interface (optional)</Label>

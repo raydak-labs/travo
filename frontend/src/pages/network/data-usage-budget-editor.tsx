@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field-error';
 import { Input } from '@/components/ui/input';
 import type { DataBudget } from '@shared/index';
 import { dataBudgetFormSchema, type DataBudgetFormValues } from '@/lib/schemas/network-forms';
@@ -54,13 +55,9 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           {...register('limit_gb')}
         />
         {errors.limit_gb ? (
-          <span
-            id={`budget-limit-${ifaceName}`}
-            className="text-xs text-red-600 dark:text-red-400"
-            role="alert"
-          >
+          <FieldError id={`budget-limit-${ifaceName}`} className="mt-0">
             {errors.limit_gb.message}
-          </span>
+          </FieldError>
         ) : null}
       </div>
       <span className="pb-2 text-xs text-gray-500 dark:text-gray-400">GB/month, warn at</span>
@@ -73,13 +70,9 @@ export function DataUsageBudgetEditor({ ifaceName, current, onSave }: DataUsageB
           {...register('warning_threshold_pct')}
         />
         {errors.warning_threshold_pct ? (
-          <span
-            id={`budget-warn-${ifaceName}`}
-            className="text-xs text-red-600 dark:text-red-400"
-            role="alert"
-          >
+          <FieldError id={`budget-warn-${ifaceName}`} className="mt-0">
             {errors.warning_threshold_pct.message}
-          </span>
+          </FieldError>
         ) : null}
       </div>
       <span className="pb-2 text-xs text-gray-500 dark:text-gray-400">%</span>
