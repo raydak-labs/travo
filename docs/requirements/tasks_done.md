@@ -9,7 +9,7 @@ tags: [backlog, requirements, changelog]
 
 High-level **what shipped**, grouped by subsystem. For the old exhaustive checkbox export, see [`../_archive/requirements_done.md`](../_archive/requirements_done.md) (read-only).
 
-When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
+When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
 > **Last updated:** 2026-10-05 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
@@ -74,7 +74,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   unchanged and remains the formatter (oxlint does not format). Type-aware linting via
   `oxlint-tsgolint` was evaluated and deliberately NOT enabled — it remains in the dependency
   graph only as an auto-installed optional peer of oxlint, so no type-aware rule runs, behaviour
-  is unaffected, and CI does not depend on it. See [`docs/development.md`](../development.md).
+  is unaffected, and CI does not depend on it. See [`docs/guides/development.md`](../guides/development.md).
 
 ## Reliability And Operational Fixes
 

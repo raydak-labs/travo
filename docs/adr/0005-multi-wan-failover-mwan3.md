@@ -47,7 +47,7 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 
 ### 2. IPv4-only phase
 
-- Phase 1 emits mwan3 rules with **`family: ipv4`** only. **IPv6 failover is explicitly deferred** until validated on hardware (see `docs/plans/connection-failover.md` and `docs/architecture.md` §6.1).
+- Phase 1 emits mwan3 rules with **`family: ipv4`** only. **IPv6 failover is explicitly deferred** until validated on hardware (see `docs/plans/connection-failover.md` and `docs/architecture/overview.md` §6.1).
 
 ### 3. Safety guards and backup
 
@@ -62,7 +62,7 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 
 ### 5. Failback behavior
 
-- **30-second hold-down** (`failbackHoldDownDuration`) after failback to a higher-priority interface to reduce flapping (`docs/architecture.md` §6.1).
+- **30-second hold-down** (`failbackHoldDownDuration`) after failback to a higher-priority interface to reduce flapping (`docs/architecture/overview.md` §6.1).
 - The **active uplink is a fallback, not a winner.** `computeActiveInterface` walks the candidates in priority order and returns the first one that has been online past the hold-down; it only falls back to the uplink that is currently active when no candidate has cleared the hold-down. Evaluating "keep whatever is active now" first made the hold-down branch unreachable whenever the active uplink was merely online, so a higher-priority link that recovered never took the connection back — failback could not happen at all.
 
 ### 6. Test-double fidelity
@@ -82,5 +82,18 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 - `backend/internal/uci/mock.go` (test-double fidelity, §6)
 - `backend/internal/services/network_service.go` (explicit duplicate checks, §6)
 - `backend/internal/models/failover.go`
-- `docs/architecture.md` §6.1–6.2
+- `docs/architecture/overview.md` §6.1–6.2
 - `docs/plans/connection-failover.md`
+
+## Device findings: liveness probing
+
+WAN liveness is read from `ubus call network.interface.<name> status`, not from
+the kernel routing table and not from a ping. This keeps the check consistent
+with what mwan3 itself considers "the interface is up", which matters because a
+WAN-carrier check can read healthy on a link that no longer carries traffic.
+
+The kernel routing table is the right probe for a *different* question — whether
+the device has any way out at all — and it is the check the VPN disable path uses
+before reporting success ([ADR 0013](./0013-operational-invariants-and-device-findings.md)
+rule 1). netifd's interface status can report a default route the kernel does not
+have, so the two questions need two different sources.

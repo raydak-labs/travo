@@ -13,7 +13,7 @@ Provides an intuitive dashboard, WiFi management with hotel captive portal suppo
 ## Documentation
 
 - Contributor and agent doc map: [docs/README.md](docs/README.md)
-- Stable architecture decisions: [docs/architecture.md](docs/architecture.md)
+- Stable architecture decisions: [docs/architecture/overview.md](docs/architecture/overview.md)
 - Architecture decision records (normative detail by topic): [docs/adr/README.md](docs/adr/README.md)
 - Active backlog: [docs/requirements/tasks_open.md](docs/requirements/tasks_open.md)
 - Agent instructions and guardrails: [AGENTS.md](AGENTS.md)
@@ -32,7 +32,7 @@ for the whole device, so pass `--password` (min 8 characters) or run the script
 from a terminal to be prompted.
 
 This installs Travo on port 80, AdGuard Home on port 3000 (DNS on 5353 via dnsmasq forwarding),
-and moves LuCI to port 8080. See [docs/deployment.md](docs/deployment.md) for
+and moves LuCI to port 8080. See [docs/guides/deployment.md](docs/guides/deployment.md) for
 all options and manual install instructions.
 
 > **AdGuard credentials:** no default account is installed. Create one from
@@ -161,7 +161,7 @@ make build-prod
 make package
 ```
 
-See [docs/deployment.md](docs/deployment.md) for full details.
+See [docs/guides/deployment.md](docs/guides/deployment.md) for full details.
 
 ## Deployment
 
@@ -170,7 +170,7 @@ See [docs/deployment.md](docs/deployment.md) for full details.
 make deploy ROUTER_IP=192.168.8.1
 ```
 
-This copies the dev build to the router over SSH (default: binary + UI; use `DEPLOY_METHOD=release` for a full tree like the release tarball). Production installs use `scripts/install.sh` instead. See [docs/deployment.md](docs/deployment.md).
+This copies the dev build to the router over SSH (default: binary + UI; use `DEPLOY_METHOD=release` for a full tree like the release tarball). Production installs use `scripts/install.sh` instead. See [docs/guides/deployment.md](docs/guides/deployment.md).
 
 ## Project Structure
 

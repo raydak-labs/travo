@@ -15,7 +15,7 @@ import (
 // and TestNoGuardIsDeclaredUnderEtcTravo already enforce this for Go source, and
 // they cannot see markdown — which is where the drift kept coming back. The
 // 2026-10-04 review found AGENTS.md (the file agents are told is
-// authoritative), ADR 0001, ADR 0005, architecture.md and the on-device testing
+// authoritative), ADR 0001, ADR 0005, architecture/overview.md and the on-device testing
 // playbook all naming the pre-unification directory, while the code was already
 // correct.
 //

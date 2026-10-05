@@ -1,7 +1,7 @@
 ---
 title: Frontend UI and theming
 description: ThemeProvider, dark class, Tailwind tokens, chart variables, contrast rules.
-updated: 2026-10-04
+updated: 2026-10-05
 tags: [docs, frontend, theming, tailwind]
 ---
 
@@ -93,7 +93,7 @@ pair the dot with a visually hidden text node and `role="status"`.
 
 ## Status colours
 
-Normative rules are in [ADR 0012](./adr/0012-ui-consistency-and-status-language.md);
+Normative rules are in [ADR 0012](../adr/0012-ui-consistency-and-status-language.md);
 this is the token reference. Status colour comes from `--status-*` tokens in
 `index.css` and reaches the screen through **`StatusPill`**
 (`tone="ok|warn|danger|info|neutral|stale"`). Raw `bg-green-*` / `text-red-*`
@@ -153,11 +153,11 @@ Light mode keeps **`border-gray-200`** (and similar) on white/off-white surfaces
 
 ## Navigation patterns (sidebar vs in-page tabs)
 
-Normative IA: [`plans/2026-07-24-frontend-traveler-ia.md`](plans/2026-07-24-frontend-traveler-ia.md). Summary:
+Normative IA: [`plans/2026-07-24-frontend-traveler-ia.md`](../plans/2026-07-24-frontend-traveler-ia.md). Summary:
 
 | Pattern | Typical role |
 | --------|--------------|
-| **Sidebar** (group label → daily default; chevron toggles leaves) | *Where in the app am I?* Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](plans/2026-07-25-sidebar-defaults-lighter-disclosure.md). |
+| **Sidebar** (group label → daily default; chevron toggles leaves) | *Where in the app am I?* Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](../plans/2026-07-25-sidebar-defaults-lighter-disclosure.md). |
 | **In-page tabs** | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**). |
 | **Page sections** (collapsed boxes) | Only for rare / power / geek cards. Everyday cards stay visible. |
 

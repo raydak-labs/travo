@@ -23,11 +23,11 @@ Travo is a **pnpm monorepo**: React SPA, Go API, shared TypeScript contracts. It
 - **`frontend/`** — React + TypeScript + Vite + Tailwind SPA, served under `/www/travo` on device.
 - **`backend/`** — Go + Fiber: device orchestration, UCI, ubus, filesystem access.
 - **`shared/`** — Shared **types and API route constants** consumed by the frontend (and optionally tooling).
-- **`docs/plans/`** — historical design notes; **not** runtime truth for agents (use `docs/architecture.md` + ADRs + backlog).
+- **`docs/plans/`** — live and normative plans; **not** runtime truth for agents (use `docs/architecture/overview.md` + ADRs + backlog). A shipped plan is deleted once folded into an ADR (ADR 0013).
 
 ### 2. LuCI coexistence
 
-- LuCI remains available; packaging moves **uhttpd** listen ports when Travo owns port 80 (`docs/deployment.md`).
+- LuCI remains available; packaging moves **uhttpd** listen ports when Travo owns port 80 (`docs/guides/deployment.md`).
 - Travo mutations target the **same UCI and services** LuCI edits; operators can reconcile unexpected states via LuCI where appropriate.
 
 ### 3. Backend as mutator, frontend as driver
@@ -62,7 +62,7 @@ connection slot and a large legitimate upload is not rejected.
 
 ### 6. Footprint constraints
 
-- Backend ships as a **single static Go binary** (no CGO); frontend bundles are **tree-shaken** and route-code-split. Constraints in `docs/architecture.md` §8 remain in force.
+- Backend ships as a **single static Go binary** (no CGO); frontend bundles are **tree-shaken** and route-code-split. Constraints in `docs/architecture/overview.md` §8 remain in force.
 
 ## Consequences
 
@@ -72,10 +72,10 @@ connection slot and a large legitimate upload is not rejected.
 
 ## References
 
-- `docs/architecture.md` §1, §8
+- `docs/architecture/overview.md` §1, §8
 - `backend/internal/api/openapi_handler.go`
 - `backend/internal/api/openapi_drift_test.go` — the route↔spec drift gate
 - `backend/cmd/server/main.go` — Fiber config, timeouts, body limit, shutdown order
-- `docs/deployment.md`
+- `docs/guides/deployment.md`
 - [ADR 0007](./0007-authentication-and-access-control.md) — auth contract
 - `AGENTS.md` — API documentation endpoint section

@@ -16,8 +16,11 @@ import (
 // navigable sources of truth existed with no stated precedence — and a reader
 // routing through the index would not find the current work.
 //
-// A hand-maintained index of a 44-file directory that is wrong about 11 entries
-// is worse than no index, so the catalog is now checked mechanically.
+// A hand-maintained index of a directory that is wrong about its entries is
+// worse than no index, so the catalog is checked mechanically. The floor is low
+// on purpose: since ADR 0013, a shipped plan is deleted once its decisions are
+// folded into an ADR, so this directory only holds live and normative plans. A
+// sudden rise means plans are accumulating again and should be triaged.
 func TestPlansIndexListsEveryPlan(t *testing.T) {
 	const plansDir = "../../../docs/plans"
 	const indexPath = "../../../docs/plans/README.md"
@@ -45,8 +48,10 @@ func TestPlansIndexListsEveryPlan(t *testing.T) {
 				"catalog of every plan in this directory", name)
 		}
 	}
-	if listed < 40 {
-		t.Fatalf("only %d plans found — the directory walk is probably broken", listed)
+	if listed < 5 {
+		t.Fatalf("only %d plans found — the directory walk is probably broken, or live "+
+			"and normative plans were deleted without folding their decisions into an ADR "+
+			"(ADR 0013)", listed)
 	}
 }
 
@@ -184,7 +189,7 @@ func TestReviewReportIsPresentAndScoped(t *testing.T) {
 func TestPublishedInstallInstructionsAreRunnable(t *testing.T) {
 	published := []string{
 		"../../../README.md",
-		"../../../docs/deployment.md",
+		"../../../docs/guides/deployment.md",
 		"../../../.github/workflows/release.yml",
 	}
 	install, err := os.ReadFile("../../../scripts/install.sh")

@@ -45,7 +45,7 @@ Travel-router behavior depends on predictable **STA/WWAN**, **repeater** radio l
 
 - **`RealUCIApplyConfirm`** (`backend/internal/services/uci_apply.go`) implements rpcd session login, copies **`/etc/config/{wireless,network,system,firewall,dhcp}`** into the session tree, calls **`uci apply`** with **`rollback: true`** and **30s** timeout, then **`uci confirm`** only when invoked after success.
 - **`WifiService.stageWirelessApply`**: validates consistency → **`StartApply(uciApplyConfigs)`** → returns a **token** (session id) and rollback timeout for the client.
-- **`WifiService.ConfirmApply(token)`** calls **`Confirm`** after the browser proves reachability. The backend **must not** self-confirm immediately after `StartApply` without that proof (see `docs/architecture.md` §3).
+- **`WifiService.ConfirmApply(token)`** calls **`Confirm`** after the browser proves reachability. The backend **must not** self-confirm immediately after `StartApply` without that proof (see `docs/architecture/overview.md` §3).
 
 #### 5.0 The rollback is our own file-level snapshot, not rpcd's window
 
@@ -359,7 +359,7 @@ per-radio access-point section and the radio-hardware disable path.
 
 ### 6. Scripts, packaging, and `wifi` commands
 
-- **User-facing** wireless mutations go through the apply/confirm path above when `applier` is configured; they **must not** run **`wifi`**, **`wifi up`**, or **`wifi reload`** as part of apply (matches `docs/architecture.md` §3).
+- **User-facing** wireless mutations go through the apply/confirm path above when `applier` is configured; they **must not** run **`wifi`**, **`wifi up`**, or **`wifi reload`** as part of apply (matches `docs/architecture/overview.md` §3).
 - **Install / uci-defaults** flows write UCI only; the operator applies via LuCI **Save & Apply** or reboot.
 - **`applyWireless`** may use **`ApplyAndConfirm`** for **internal, synchronous** guarded paths when `applier` is set; when `applier` is nil (e.g. some tests), a **`Reloader`** path may exist—production device wiring uses the real applier.
 
@@ -446,7 +446,7 @@ enforced at the HTTP handler **and** re-checked inside `SetWiFiSchedule`.
 - `backend/internal/services/wifi_reconnect.go` — schedule cron file, bounded `wifi up` exception
 - `backend/internal/services/system_service.go` — button hotplug script
 - `backend/internal/services/validate.go` — `ValidateHHMM`, `ValidateButtonName`
-- `docs/architecture.md` §2–3
+- `docs/architecture/overview.md` §2–3
 - [ADR 0003](./0003-crash-guards-and-live-state.md) — guard contract
 
 ## Addendum: radio choice determinism and one definition of "the uplink radio"

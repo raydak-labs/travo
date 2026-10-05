@@ -127,4 +127,4 @@ namespace: `react/only-export-components`, not the old
 `react-refresh/only-export-components`.
 
 **Related:** [ADR 0006](./0006-application-platform-and-api-contract.md) (repo
-shape and tooling), `docs/development.md` (day-to-day commands).
+shape and tooling), `docs/guides/development.md` (day-to-day commands).

@@ -9,7 +9,7 @@ tags: [backlog, requirements, tasks]
 
 Working backlog only — no duplicate “priority queue”; each item appears once under its area.
 
-Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
+Stable rules: [`../architecture.md`](../architecture/overview.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
 > **Last updated:** 2026-10-04 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
@@ -82,7 +82,10 @@ Stable rules: [`../architecture.md`](../architecture.md). Shipped work: [`tasks_
 
 ## 14. Hardware Buttons
 
-- [ ] Custom button action scripting
+- [ ] Custom button action scripting. Any persisted button→action map must live under
+      `/etc/trafo/` with the rest of the ordinary state; the earlier plan text named
+      `/etc/openwrt-travel-gui/buttons.json`, which predates the path unification and
+      must not be recreated ([ADR 0013](../adr/0013-operational-invariants-and-device-findings.md) rule 6).
 - [ ] Long-press vs short-press differentiation. See [Hardware Buttons plan](../plans/hardware-buttons.md#phase-4--long-press-vs-short-press-future).
 
 ## 15. Follow-Ups From The 2026-09-26 Critical Review

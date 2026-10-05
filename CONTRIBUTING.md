@@ -51,7 +51,7 @@ Agent-facing instructions (workflow, guardrails, finish criteria) live in
 
 Anything that mutates live device state (UCI, firewall, routes, flash) must follow the
 crash-guard and rollback rules in [`AGENTS.md`](./AGENTS.md) and
-[`docs/architecture.md`](./docs/architecture.md). In particular: never run
+[`docs/architecture/overview.md`](docs/architecture/overview.md). In particular: never run
 `wifi` / `wifi up` / `wifi reload` from a script or SSH flow, and never introduce a
 background goroutine or scheduled task that changes live state without a crash guard.
 

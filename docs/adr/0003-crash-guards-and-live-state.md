@@ -120,7 +120,7 @@ it is stated in one place so it cannot be generalised:**
 
 ## References
 
-- `docs/architecture.md` §4, §6.2
+- `docs/architecture/overview.md` §4, §6.2
 - `backend/internal/services/system_service.go` — the four system guards, `LogStaleCrashGuards`
 - `backend/internal/services/wifi_toggle_script.go` — the generated toggle helper and its guard
 - `backend/internal/services/wifi_reconnect.go` — auto-reconnect guard + fail count

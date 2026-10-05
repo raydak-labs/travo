@@ -29,7 +29,7 @@ We need:
 
 - **Authoritative stores** for router DNS integration are **UCI** (`dhcp`, `network`, `firewall`, …) and, for AdGuard, its **YAML** under `/opt/AdGuardHome/` or `/etc/adguardhome/` as on the device.
 - Travo applies changes through the same knobs LuCI uses (`uci set` / `uci commit`, `init.d` service restarts where the codebase already does so). Operators may still use **LuCI** to inspect or repair configuration; Travo must tolerate UCI edits but cannot infer intent beyond what it reads at runtime.
-- **Wireless** continues to follow the stricter LuCI-style `uci apply` / rollback / confirm flow documented in `docs/architecture.md`. **DNS-related mutations** in this ADR use direct `uci commit` + `dnsmasq` restart patterns already implemented in services; that difference is intentional historical behavior, not an invitation to add new live paths without crash guards where they change connectivity broadly.
+- **Wireless** continues to follow the stricter LuCI-style `uci apply` / rollback / confirm flow documented in `docs/architecture/overview.md`. **DNS-related mutations** in this ADR use direct `uci commit` + `dnsmasq` restart patterns already implemented in services; that difference is intentional historical behavior, not an invitation to add new live paths without crash guards where they change connectivity broadly.
 
 ### 2. Resolver roles and configuration modes
 
@@ -365,4 +365,4 @@ new callers must not widen the condition.
 - `docs/examples/adguard.yml` — the documented example of the same file
 - `docs/plans/adguard-auto-configure.md` — historical plan: primary vs forwarding
 - `docs/plans/2026-03-26-vpn-disable-latency-and-dns-forwarding.md` — VPN DNS restore
-- `docs/deployment.md` — packaged AdGuard port and dnsmasq relationship
+- `docs/guides/deployment.md` — packaged AdGuard port and dnsmasq relationship

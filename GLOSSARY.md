@@ -9,7 +9,7 @@ tags: [glossary, domain]
 
 Terms used across this repository that mean something more specific than the
 word usually implies. Normative decisions live in
-[`docs/architecture.md`](docs/architecture.md) and the
+[`docs/architecture/overview.md`](docs/architecture/overview.md) and the
 [ADRs](docs/adr/README.md); this file only fixes the words.
 
 ## Card plane

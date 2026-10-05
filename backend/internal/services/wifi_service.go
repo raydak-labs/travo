@@ -401,7 +401,7 @@ func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 // ConfirmApply finalizes a staged wireless apply once the router has proven it
 // is still reachable on the new settings.
 //
-// The proof is made HERE, on the device, not in the caller: docs/architecture.md
+// The proof is made HERE, on the device, not in the caller: docs/architecture/overview.md
 // §3 and ADR 0002 §5 require confirm only after reachability is proven, and a
 // client that POSTs confirm a millisecond after the apply (the normal case for an
 // operator on Ethernet, where WiFi is exactly what is being reconfigured) would

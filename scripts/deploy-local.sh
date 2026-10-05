@@ -194,7 +194,7 @@ restart_service() {
   # lives in docs/adr/0003 section 2). The old list removed ap-health-in-progress,
   # which no Go code writes, and missed the failover / band-switch / captive
   # guards -- a stuck guard permanently disables those features, so the
-  # documented recovery path (architecture.md section 4, step 4) did not exist
+  # documented recovery path (architecture/overview.md section 4, step 4) did not exist
   # for them.
   #
   # ORDER MATTERS (ADR 0003 section 1.3): the guards are cleared only AFTER the

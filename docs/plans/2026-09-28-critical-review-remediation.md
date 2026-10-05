@@ -124,7 +124,7 @@ Documentation-as-code pass over the same diff. What changed in the docs:
   key-format validation boundary, why it is default-deny behind JWT auth). [ADR 0009](../adr/0009-persistent-store-bbolt.md) —
   the bbolt store at `/etc/travo/travo.db` (NAND/overlayfs write discipline, persisted vs
   in-memory, memory-only degradation, per-bucket retention). Both indexed in
-  [`docs/adr/README.md`](../adr/README.md) and linked from `docs/architecture.md`.
+  [`docs/adr/README.md`](../adr/README.md) and linked from `docs/architecture/overview.md`.
 - **ADR 0003 rewritten around an authoritative guard table** (path → owning file → what it
   protects), because the old partial list is what made the documented redeploy recovery
   path unverifiable. It also corrects §1.2: the failover guard-present skip is **silent**

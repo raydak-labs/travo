@@ -14,7 +14,7 @@ import (
 // commands are the classic ath11k/IPQ6018 driver-crash trigger. Instead the
 // helper flips `wireless.*.disabled`, commits, and goes through rpcd's
 // apply+confirm so a failed apply still rolls back. See ADR 0002 §6 and
-// docs/architecture.md §3.
+// docs/architecture/overview.md §3.
 const wirelessToggleScriptPath = "/usr/libexec/travo-wireless-toggle.sh"
 
 // rpcdLoginHelperPath is the root-only (0600) file holding the plaintext rpcd

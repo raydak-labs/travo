@@ -1,67 +1,42 @@
 ---
 title: Plans index
-description: Searchable catalog of all planning and historical design docs in this directory.
-updated: 2026-10-04
+description: Live and normative plans. Shipped plans are deleted once their decisions are folded into an ADR.
+updated: 2026-10-05
 tags: [plans, traceability, index]
 ---
 
 # Plans
 
-All historical and in-progress **design/plan** documents live here (single tree).  
-For product truth today use [`docs/architecture.md`](../architecture.md), [`docs/requirements/tasks_open.md`](../requirements/tasks_open.md), and [`docs/requirements/tasks_done.md`](../requirements/tasks_done.md).
+This directory holds **live and normative plans only**. A plan that has shipped
+is deleted, not archived: before it goes, its normative content moves into the
+ADR that owns the subsystem ([ADR 0013](../adr/0013-operational-invariants-and-device-findings.md)
+records the cross-cutting findings). Executed plans are history; the code, the
+ADR and `docs/requirements/tasks_done.md` are truth.
 
-YAML **frontmatter** on each plan file carries `title`, `description`, `updated`, and `tags` for search (Obsidian-style).
+For product truth today use [`docs/architecture/overview.md`](../architecture/overview.md),
+[`docs/requirements/tasks_open.md`](../requirements/tasks_open.md) and
+[`docs/requirements/tasks_done.md`](../requirements/tasks_done.md).
 
-| File | Summary | Tags |
-| ---- | ------- | ---- |
-| [`2026-03-26-live-state-refresh-and-wifi-saved-networks.md`](2026-03-26-live-state-refresh-and-wifi-saved-networks.md) | Live UI refresh + saved WiFi profiles | `wifi`, `state`, `ux` |
-| [`2026-03-26-vpn-disable-latency-and-dns-forwarding.md`](2026-03-26-vpn-disable-latency-and-dns-forwarding.md) | VPN off path, DNS restore | `vpn`, `dns` |
-| [`2026-03-26-wireguard-disable-breaks-internet.md`](2026-03-26-wireguard-disable-breaks-internet.md) | WireGuard disable / default route regression | `wireguard`, `vpn` |
-| [`2026-04-11-repeater-radio-policy-and-wifi-ux.md`](2026-04-11-repeater-radio-policy-and-wifi-ux.md) | Repeater radio policy, unified AP UX | `wifi`, `repeater` |
-| [`2026-07-08-auth-hardening.md`](2026-07-08-auth-hardening.md) | Auth follow-ups: blocklist persistence, WS token transport, token storage | `auth`, `security` |
-| [`2026-07-08-hardening-followups-and-persistence.md`](2026-07-08-hardening-followups-and-persistence.md) | Work log + queue: vpn sleeps, wifi split, WS-fed queries, bbolt persistence | `reliability`, `persistence`, `refactor` |
-| [`2026-07-20-ui-consistency.md`](2026-07-20-ui-consistency.md) | Unify page shell, cards, loading/empty/error, labels, status chrome | `frontend`, `ux`, `theming`, `consistency` |
-| [`2026-07-24-frontend-traveler-ia.md`](2026-07-24-frontend-traveler-ia.md) | Sidebar-only IA, collapse defaults, traveler labels (Connect/Setup/Apps) | `frontend`, `ux`, `ia` |
-| [`2026-07-24-frontend-traveler-ia-implementation.md`](2026-07-24-frontend-traveler-ia-implementation.md) | Task plan to ship traveler IA (tabs off, storage v2, PageSection) | `frontend`, `ux`, `ia`, `implementation` |
-| [`2026-07-25-sidebar-defaults-lighter-disclosure.md`](2026-07-25-sidebar-defaults-lighter-disclosure.md) | Group label→default route; arrow toggle; twin Advanced; fewer PageSections | `frontend`, `ux`, `ia` |
-| [`2026-07-20-nested-cards-approach-a.md`](2026-07-20-nested-cards-approach-a.md) | Flatten nested panels, equal-height WiFi cards, form chrome (shadcn-like) | `frontend`, `ux`, `cards` |
-| [`_primitive-usage-audit.md`](_primitive-usage-audit.md) | Call-site audit: Select h-9, form `sm` buttons, CardInset leftovers, Badge bypass | `frontend`, `ux`, `audit` |
-| [`_primitive-mop-report.md`](_primitive-mop-report.md) | Mop-up: Select h-10, form buttons, CardInset, Badge variants, docs | `frontend`, `ux` |
-| [`adguard-auto-configure.md`](adguard-auto-configure.md) | AdGuard install + dnsmasq integration | `adguard`, `dns`, `services` |
-| [`cicd-pipeline.md`](cicd-pipeline.md) | CI/CD for build/test/package | `cicd`, `deployment` |
-| [`connection-failover.md`](connection-failover.md) | Multi-WAN failover | `wan`, `failover`, `network` |
-| [`data-usage-tracking.md`](data-usage-tracking.md) | Per-interface data counters | `network`, `metrics` |
-| [`deployment-packaging-cicd-plan.md`](deployment-packaging-cicd-plan.md) | Packaging and release pipeline | `deployment` |
-| [`fix-all-issues-plan.md`](fix-all-issues-plan.md) | Broad bugfix sweep (historical) | `maintenance` |
-| [`fix-review-issues-plan.md`](fix-review-issues-plan.md) | Review follow-ups (historical) | `maintenance` |
-| [`hardware-buttons.md`](hardware-buttons.md) | Hotplug / button actions | `hardware`, `ux` |
-| [`implementation.md`](implementation.md) | Large cross-cutting implementation guide | `meta`, `guide` |
-| [`openwrt-travel-gui-phase-1-complete.md`](openwrt-travel-gui-phase-1-complete.md) | Phase 1 milestone snapshot | `meta` |
-| [`openwrt-travel-gui-plan.md`](openwrt-travel-gui-plan.md) | Early product plan | `meta` |
-| [`resilience-improvements.md`](resilience-improvements.md) | Recovery / robustness ideas | `reliability` |
-| [`tailscale-integration.md`](tailscale-integration.md) | Tailscale on router | `tailscale`, `vpn` |
-| [`usb-tethering.md`](usb-tethering.md) | USB WAN tethering | `usb`, `wan` |
-| [`ux-overhaul.md`](ux-overhaul.md) | Dashboard / network / system UX (**nav chrome superseded** by traveler IA) | `ux`, `frontend` |
-| [`wifi-dual-band-bundling.md`](wifi-dual-band-bundling.md) | Dual-band scan + band switch | `wifi` |
-| [`wireguard-adguard-oob-fix-plan.md`](wireguard-adguard-oob-fix-plan.md) | WG + AdGuard out-of-box correctness | `wireguard`, `adguard` |
-| [`wireguard-full-networking.md`](wireguard-full-networking.md) | WG zones, routes, split tunnel | `wireguard`, `firewall` |
-| [`wireguard_client_openwrt_25.12.md`](wireguard_client_openwrt_25.12.md) | OpenWrt 25.12 WG client notes | `wireguard`, `openwrt` |
-| [`2026-09-28-critical-review-remediation.md`](2026-09-28-critical-review-remediation.md) | Remediation of the 2026-09-26 critical review. **Its completion marks were found unreliable — see [`2026-10-04-deep-code-review.md`](../../2026-10-04-deep-code-review.md).** | `review`, `remediation` |
-| [`failover-gaps.md`](failover-gaps.md) | Known gaps in multi-WAN failover | `failover`, `mwan3` |
+YAML **frontmatter** on each plan file carries `title`, `description`, `updated`,
+`status` and `tags` for search (Obsidian-style).
 
-### Agent scratch reports
+| Plan | Status | Summary | Tags |
+| ---- | ------ | ------- | ---- |
+| [`2026-07-08-auth-hardening.md`](2026-07-08-auth-hardening.md) | active | Auth follow-ups: WebSocket token transport, HttpOnly cookie + CSRF migration (blocklist persistence shipped, see [ADR 0007](../adr/0007-authentication-and-access-control.md)) | `auth`, `security`, `sessions`, `websocket` |
+| [`2026-07-24-frontend-traveler-ia.md`](2026-07-24-frontend-traveler-ia.md) | normative | Information architecture for non-technical users: sidebar-only nav, tap budget, auto-expand precedence | `frontend`, `ux`, `ia` |
+| [`2026-07-25-sidebar-defaults-lighter-disclosure.md`](2026-07-25-sidebar-defaults-lighter-disclosure.md) | normative | Per-page disclosure table: which sections are visible by default and which are collapsed | `frontend`, `ux`, `ia` |
+| [`2026-09-28-critical-review-remediation.md`](2026-09-28-critical-review-remediation.md) | superseded | 2026-09-26 critical code review remediation. Open items carried in [`tasks_open.md` §15](../requirements/tasks_open.md) and §16; completion marks in this plan are unreliable | `review`, `remediation`, `traceability` |
+| [`hardware-buttons.md`](hardware-buttons.md) | active | Hardware button detection and custom actions. Detection reads devicetree, not `/etc/rc.button` ([ADR 0013](../adr/0013-operational-invariants-and-device-findings.md) rule 6) | `hardware`, `ux` |
+| [`wifi-dual-band-bundling.md`](wifi-dual-band-bundling.md) | active | Dual-band scan grouping and per-connection band choice | `wifi`, `bands`, `repeater` |
 
-Per-task working notes from the primitive-usage audit. No product truth and no owner: they
-are listed only so this directory is self-describing.
+## Rules
 
-| File | Summary |
-| ---- | ------- |
-| [`_approach-a-report.md`](_approach-a-report.md) | Per-task primitive-usage report |
-| [`_task-4-report.md`](_task-4-report.md) | Per-task primitive-usage report |
-| [`_task-5-report.md`](_task-5-report.md) | Per-task primitive-usage report |
-| [`_task-6-report.md`](_task-6-report.md) | Per-task primitive-usage report |
-| [`_task-7-report.md`](_task-7-report.md) | Per-task primitive-usage report |
-| [`_task-8-report.md`](_task-8-report.md) | Per-task primitive-usage report |
-| [`_task-9-report.md`](_task-9-report.md) | Per-task primitive-usage report |
-| [`_task-10-mop-report.md`](_task-10-mop-report.md) | Per-task primitive-usage report |
-| [`_verify-mop-report.md`](_verify-mop-report.md) | Per-task primitive-usage report |
+- A plan names work that has **not** shipped. If the work shipped, close it out:
+  fold the normative parts into the owning ADR, then delete the file.
+- A plan that becomes a standing specification rather than a unit of work (the two
+  IA plans) keeps a `status: normative` and says so here; it is not deleted,
+  because something links to it as the source of truth for a rule.
+- Do not edit plan bodies for drive-by cleanup. Editing a plan to match changed
+  behaviour destroys the record of why the change was made.
+- Every plan added here must appear in the table above: a Go test enforces it
+  (`TestPlansIndexListsEveryPlan` in `backend/internal/services/docs_index_test.go`).
