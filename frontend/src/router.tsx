@@ -7,6 +7,7 @@ import {
   Outlet,
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/layout/app-shell';
+import { ThemeProvider } from '@/components/layout/theme-provider';
 import { LazyPageBoundary } from '@/components/layout/lazy-page-boundary';
 import { shellTitleForPath } from '@/components/layout/shell-titles';
 import { LoginPage } from '@/pages/login/login-page';
@@ -30,6 +31,21 @@ import { TopProgressBar } from '@/components/layout/top-progress-bar';
 
 const rootRoute = createRootRoute({
   component: Outlet,
+  // TanStack resolves an unmatched path through `notFoundComponent`, not
+  // through a `path: '*'` child of a pathless parent — without this the router
+  // rendered its bare "Not Found" text and the styled page below was never
+  // reached.
+  //
+  // Wrapped in AppShell because root-level not-found renders outside the route
+  // shell, and a bare card floating on an empty page looks like a crash rather
+  // than a wrong address.
+  notFoundComponent: () => (
+    <ThemeProvider>
+      <AppShell title="Not Found">
+        <NotFoundPage />
+      </AppShell>
+    </ThemeProvider>
+  ),
 });
 
 const loginRoute = createRoute({
@@ -185,18 +201,6 @@ const logsRoute = createRoute({
   component: shellPage('/logs', LogsPage),
 });
 
-/**
- * Unknown URLs render a real 404 instead of silently redirecting to the
- * dashboard, so a mistyped or stale link is distinguishable from a working
- * page. It sits under `protectedRoute` so an unauthenticated bad URL still
- * goes through login first and comes back here afterwards.
- */
-const notFoundRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: '*',
-  component: shellPage('/not-found', () => <NotFoundPage />),
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -219,7 +223,6 @@ const routeTree = rootRoute.addChildren([
     speedtestRoute,
     systemRoute,
     logsRoute,
-    notFoundRoute,
   ]),
 ]);
 
