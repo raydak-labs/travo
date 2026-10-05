@@ -1,4 +1,5 @@
 import { PageSection } from '@/components/ui/page-section';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { NTPConfigCard } from './ntp-config-card';
 import { LEDControlCard } from './led-control-card';
 import { FirmwareUpgradeCard } from './firmware-upgrade-card';
@@ -19,9 +20,7 @@ export function SystemPage() {
       <SystemAtAGlanceSection />
 
       <div>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-          Configuration
-        </h2>
+        <SectionHeading>Configuration</SectionHeading>
         <div className="space-y-4">
           <SystemTimezoneCard />
           <NTPConfigCard />
@@ -37,9 +36,7 @@ export function SystemPage() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-          Maintenance
-        </h2>
+        <SectionHeading>Maintenance</SectionHeading>
         <div className="space-y-4">
           <PageSection title="Backup & Restore">
             <SystemBackupRestoreCard />

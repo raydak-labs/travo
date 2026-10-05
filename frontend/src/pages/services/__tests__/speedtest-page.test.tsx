@@ -165,21 +165,26 @@ describe('SpeedtestPage', () => {
     });
   });
 
+  // The failure now renders inside each card through QueryCard, so both cards
+  // state the failure and offer a retry instead of the page vanishing.
   it('shows error when status fails to load', async () => {
     mockUseSpeedtestServiceStatus.mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: true,
       error: new Error('Failed to load'),
-    } as ReturnType<typeof useSpeedtestServiceStatus>);
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useSpeedtestServiceStatus>);
 
     renderSpeedtestPage();
 
     await waitFor(() => {
-      const alert = screen.getByRole('alert');
-      expect(alert).toHaveTextContent(/Failed to load speedtest service/i);
-      expect(alert.className).toContain('border-red');
+      const alerts = screen.getAllByRole('alert');
+      expect(alerts.length).toBe(2);
+      expect(alerts[0]).toHaveTextContent(/Failed to load speedtest service/i);
+      expect(alerts[0].className).toContain('border-red');
     });
+    expect(screen.getAllByRole('button', { name: /Retry/ }).length).toBe(2);
   });
 
   it('shows empty state when status is missing after load', async () => {

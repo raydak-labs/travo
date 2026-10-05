@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { QueryCard } from '@/components/ui/query-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNTPConfig, useSetNTPConfig, useSyncNTP } from '@/hooks/use-system';
 import {
@@ -15,7 +16,13 @@ import { NtpConfigSummaryView } from './ntp-config-summary-view';
 import { NtpConfigEditForm } from './ntp-config-edit-form';
 
 export function NTPConfigCard() {
-  const { data: ntpConfig, isLoading: ntpLoading } = useNTPConfig();
+  const {
+    data: ntpConfig,
+    isLoading: ntpLoading,
+    isError: ntpError,
+    error: ntpErrorDetail,
+    refetch: refetchNtp,
+  } = useNTPConfig();
   const setNTPMutation = useSetNTPConfig();
   const syncNTPMutation = useSyncNTP();
 
@@ -102,9 +109,15 @@ export function NTPConfigCard() {
         <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent>
-        {ntpLoading ? (
-          <Skeleton className="h-4 w-1/2" />
-        ) : (
+        {/* Without an error state a failed read fell through to the form
+            defaults, which read as the router's real NTP configuration. */}
+        <QueryCard
+          isLoading={ntpLoading}
+          isError={ntpError}
+          error={ntpErrorDetail}
+          onRetry={() => void refetchNtp()}
+          loading={<Skeleton className="h-4 w-1/2" />}
+        >
           <div className="space-y-4">
             {!isEditing ? (
               <NtpConfigSummaryView
@@ -132,7 +145,7 @@ export function NTPConfigCard() {
               />
             )}
           </div>
-        )}
+        </QueryCard>
       </CardContent>
     </Card>
   );

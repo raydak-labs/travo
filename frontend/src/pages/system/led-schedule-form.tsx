@@ -1,6 +1,7 @@
 import type { FieldErrors, UseFormHandleSubmit, UseFormRegister } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { CardInset } from '@/components/ui/card-inset';
+import { FieldError } from '@/components/ui/field-error';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -58,9 +59,7 @@ export function LedScheduleForm({
               />
             </div>
             {errors.on_time ? (
-              <p id="led-on-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-                {errors.on_time.message}
-              </p>
+              <FieldError id="led-on-err">{errors.on_time.message}</FieldError>
             ) : null}
             <div className="flex items-center gap-3">
               <Label htmlFor="led-off-time" className="w-16">
@@ -76,9 +75,7 @@ export function LedScheduleForm({
               />
             </div>
             {errors.off_time ? (
-              <p id="led-off-err" className="text-xs text-red-600 dark:text-red-400" role="alert">
-                {errors.off_time.message}
-              </p>
+              <FieldError id="led-off-err">{errors.off_time.message}</FieldError>
             ) : null}
             <Button type="submit" disabled={savePending}>
               {savePending ? 'Saving...' : 'Save Schedule'}
