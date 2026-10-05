@@ -186,6 +186,12 @@ export const handlers = [
     return HttpResponse.json(mockNetworkStatus);
   }),
 
+  http.get(API_ROUTES.network.trafficHistory, () => {
+    // A real server holds ~10 minutes here; the mock keeps one point so the
+    // chart path is exercised without inventing a plausible-looking series.
+    return HttpResponse.json({ points: [], retained_seconds: 0 });
+  }),
+
   http.get(API_ROUTES.sqm.config, () => {
     return HttpResponse.json(mockSQMConfig);
   }),
