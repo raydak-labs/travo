@@ -71,7 +71,7 @@ travo/
 ├── shared/       # Shared TS types
 ├── scripts/      # dev, deploy, install helpers
 ├── test/integration/  # real-device integration runners (SSH + API)
-├── docs/         # Obsidian vault; hub [`+ Start here.md`](./+ Start here.md); ADRs in docs/adr/
+├── docs/         # Obsidian vault; hub [`+ Start here.md`](../+ Start here.md); ADRs in docs/adr/
 ├── packaging/    # OpenWrt staging files
 └── Makefile
 ```
