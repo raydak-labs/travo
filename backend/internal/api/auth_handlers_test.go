@@ -44,8 +44,6 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	autoReconnectPath := tmpDir + "/autoreconnect.json"
 	reconnectScriptPath := tmpDir + "/wifi-reconnect.sh"
 	bandSwitchConfigPath := tmpDir + "/band-switching.json"
-	authConfigPath := tmpDir + "/auth.json"
-	authStore := auth.NewFileAuthStore(authConfigPath)
 
 	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
 
@@ -61,7 +59,6 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 
 	deps := &Dependencies{
 		Auth:        authSvc,
-		AuthStore:   authStore,
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
 		System:      systemSvc,

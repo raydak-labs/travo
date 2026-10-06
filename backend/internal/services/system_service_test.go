@@ -1358,11 +1358,11 @@ func TestDeleteSSHKey_RejectsOutOfRangeIndex(t *testing.T) {
 
 // A malformed button-actions.json must not be reported as "no buttons
 // configured": the hotplug script on disk still runs the previous actions.
-func TestGetHardwareButtonsWithError_SurfacesParseFailure(t *testing.T) {
+func TestGetHardwareButtons_SurfacesParseFailure(t *testing.T) {
 	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 
 	// No file at all is not an error: nothing has been configured yet.
-	if _, err := svc.GetHardwareButtonsWithError(); err != nil {
+	if _, err := svc.GetHardwareButtons(); err != nil {
 		t.Errorf("a missing config file must not be an error, got %v", err)
 	}
 
@@ -1371,11 +1371,9 @@ func TestGetHardwareButtonsWithError_SurfacesParseFailure(t *testing.T) {
 	}
 	defer func() { _ = os.Remove(buttonActionsFile) }()
 
-	if _, err := svc.GetHardwareButtonsWithError(); err == nil {
+	if _, err := svc.GetHardwareButtons(); err == nil {
 		t.Error("a malformed config file must surface an error")
 	}
-	// The non-error-returning wrapper must still be safe to call.
-	_ = svc.GetHardwareButtons()
 }
 
 // encoding/json replaced a hand-rolled parser: names containing escapes and

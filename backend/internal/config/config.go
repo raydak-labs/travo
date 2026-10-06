@@ -123,10 +123,3 @@ func LoadConfig(args []string) (Config, bool, error) {
 
 	return cfg, *showVersion, nil
 }
-
-// LoadConfigFromEnv reads configuration from environment variables with defaults.
-// Deprecated: Use LoadConfig instead.
-func LoadConfigFromEnv() Config {
-	cfg, _, _ := LoadConfig([]string{})
-	return cfg
-}

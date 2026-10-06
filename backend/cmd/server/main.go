@@ -498,7 +498,6 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// API routes
 	deps := &api.Dependencies{
 		Auth:           authSvc,
-		AuthStore:      authStore,
 		Blocklist:      blocklist,
 		RateLimiter:    rateLimiter,
 		System:         systemSvc,

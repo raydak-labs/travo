@@ -621,7 +621,7 @@ func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
 	// Atomic: the 10s monitor reads this file, and os.WriteFile truncates before
 	// writing, so a save that overlapped a read gave the monitor a 500 and a
 	// power cut left a truncated file that fails to parse forever after.
-	return writeFileAtomic(s.configPath, data, 0600)
+	return writeFileAtomic(s.configPath, data)
 }
 
 // mayDeleteSection reports whether a save may DELETE an mwan3 section. This is
@@ -660,7 +660,7 @@ func mayDeleteSection(name string, opts map[string]string) bool {
 //
 // Adopting a section is therefore not "leave it alone": it means "keep it, and
 // be able to roll it back".
-func needsBackupSection(name string, opts map[string]string) bool {
+func needsBackupSection(name string) bool {
 	return strings.HasPrefix(name, failoverSectionPrefix)
 }
 
@@ -768,7 +768,7 @@ func (s *FailoverService) backupManagedSections() error {
 		// over from a removed candidate must still be restorable — and so must
 		// an operator-edited one the save is about to overwrite (needsBackupSection,
 		// which is wider than mayDeleteSection on purpose).
-		if needsBackupSection(name, opts) {
+		if needsBackupSection(name) {
 			managed[name] = opts
 		}
 	}
@@ -779,7 +779,7 @@ func (s *FailoverService) backupManagedSections() error {
 	// Atomic write: restoreManagedSections reads this on the rollback path, and
 	// a truncated backup makes the restore fail after the failure it was
 	// supposed to repair.
-	return writeFileAtomic(s.backupPath, data, 0600)
+	return writeFileAtomic(s.backupPath, data)
 }
 
 // restoreManagedSections puts the backed-up mwan3/network sections back and
@@ -975,7 +975,7 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 // loss of the operator's reliability/timeout/up/down tuning.
 func (s *FailoverService) adoptSection(section, stype string) error {
 	opts, err := s.uci.GetAll(mwan3ConfigName, section)
-	if err == nil && needsBackupSection(section, opts) && !ownedByTravo(opts) {
+	if err == nil && needsBackupSection(section) && !ownedByTravo(opts) {
 		log.Printf("failover: mwan3 section %s was edited outside Travo; this save "+
 			"replaces the options it owns with the saved failover settings", section)
 		if s.alertSvc != nil {

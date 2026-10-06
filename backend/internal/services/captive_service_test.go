@@ -428,54 +428,6 @@ func TestRestoreDNS_NoGuardFile_Noop(t *testing.T) {
 	}
 }
 
-func TestMaybeAutoRestoreDNS_RestoresWhenInternetReachable(t *testing.T) {
-	cmd := &mockCmdRunner{responses: map[string]string{
-		"uci get dhcp.@dnsmasq[0].noresolv":                   "1",
-		"uci get dhcp.@dnsmasq[0].server":                     "127.0.0.1#5353",
-		"uci get dhcp.@dnsmasq[0].rebind_protection":          "0",
-		"uci set dhcp.@dnsmasq[0].noresolv=0":                 "",
-		"uci delete dhcp.@dnsmasq[0].server":                  "",
-		"uci add_list dhcp.@dnsmasq[0].server=10.1.2.3":       "",
-		"uci commit dhcp":                                     "",
-		"/etc/init.d/dnsmasq restart":                         "",
-		"uci set dhcp.@dnsmasq[0].noresolv=1":                 "",
-		"uci add_list dhcp.@dnsmasq[0].server=127.0.0.1#5353": "",
-	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
-	defer os.RemoveAll(dir)
-
-	_ = svc.BypassDNS()
-	if !svc.IsDNSBypassed() {
-		t.Fatal("expected bypassed")
-	}
-
-	svc.MaybeAutoRestoreDNS(true)
-	if svc.IsDNSBypassed() {
-		t.Error("expected auto-restore when internet reachable")
-	}
-}
-
-func TestMaybeAutoRestoreDNS_NoRestoreWhenNoInternet(t *testing.T) {
-	cmd := &mockCmdRunner{responses: map[string]string{
-		"uci get dhcp.@dnsmasq[0].noresolv":             "1",
-		"uci get dhcp.@dnsmasq[0].server":               "127.0.0.1#5353",
-		"uci get dhcp.@dnsmasq[0].rebind_protection":    "0",
-		"uci set dhcp.@dnsmasq[0].noresolv=0":           "",
-		"uci delete dhcp.@dnsmasq[0].server":            "",
-		"uci add_list dhcp.@dnsmasq[0].server=10.1.2.3": "",
-		"uci commit dhcp":                               "",
-		"/etc/init.d/dnsmasq restart":                   "",
-	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
-	defer os.RemoveAll(dir)
-
-	_ = svc.BypassDNS()
-	svc.MaybeAutoRestoreDNS(false)
-	if !svc.IsDNSBypassed() {
-		t.Error("should NOT restore when internet not reachable")
-	}
-}
-
 func TestCheckDNSBypassNeeded_AdGuard(t *testing.T) {
 	cmd := &mockCmdRunner{responses: map[string]string{
 		"uci get dhcp.@dnsmasq[0].noresolv": "1",

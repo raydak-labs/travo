@@ -1,7 +1,7 @@
 ---
 title: Open tasks
 description: Active product and engineering backlog; link target for plans and architecture.
-updated: 2026-10-04
+updated: 2026-10-06
 tags: [backlog, requirements, tasks]
 ---
 
@@ -11,7 +11,7 @@ Working backlog only — no duplicate “priority queue”; each item appears on
 
 Stable rules: [`../architecture/overview.md`](../architecture/overview.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
-> **Last updated:** 2026-10-04 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-06 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## 1. WiFi Management
 
@@ -199,3 +199,38 @@ oxlint — see [`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
    2026-10-04 UI review found copy telling operators to enable a setting in a screen that does not
    exist. Not decided here because deleting working rollback logic and adding a new entry point are
    both beyond a UI-review remediation.
+
+## 19. Follow-Ups From The 2026-10-05 Dead Code Audit
+
+A repo-wide pass for files and symbols with no remaining callers. What was provably dead was
+removed on `chore/remove-dead-code`; these four need a decision rather than a deletion.
+
+- [ ] **The data-usage budget is writable but never enforced.**
+      `PUT /api/v1/network/data-usage/budget` persists a budget to
+      `/etc/travo/data_budget.json` and `GET` serves it back, but
+      `DataUsageService.CheckBudgetAlerts` — the only code that would compare a budget against
+      usage — has no production caller. An operator can set a cap and nothing ever warns them.
+      Decide: wire it into `AlertService`, or delete the write API rather than ship an endpoint
+      that silently does nothing.
+- [ ] **`GET /api/v1/services/adguardhome/status` is specced but uncalled.** It is in the
+      OpenAPI contract and registered in the router, but it is the one backend route absent
+      from `shared/src/api/routes.ts`, and no frontend, mock or document references it. Either
+      the client table is missing an entry or the route is legacy. A removal must delete the
+      `router.go` line and the `openapi_handler.go` entry together —
+      `internal/api/openapi_drift_test.go` fails on drift in both directions.
+- [ ] **`scripts/setup-local.sh` is undocumented.** Not dead: `deploy-local.sh` tells the
+      operator to run it for a first-time clean-router setup. But it is in no Makefile target,
+      no CI job and no guide, so the only thing that ever exercises it is `make shellcheck`.
+      Document it in `docs/guides/deployment.md`, or delete it and reword those two warnings.
+      It is also the only caller of `scripts/setup-wireless-ap.sh`, so deleting it orphans that.
+- [ ] **`TestStream_NoLineLossUnderSlowConsumer` failed once under load; its failure mode is
+      unknown.** It failed once during a full `go test ./...` (packages in parallel, CPU
+      contention) and passes in isolation on both this branch and `main` — 3 and 6 consecutive
+      runs respectively. It asserts no line loss under a deliberately slow consumer, and it can
+      fail either because `Stream` returns an error (including `execx.waitDelay` abandonment)
+      or because the line-count assertion fails; the reported run does not say which. Record the
+      failing output before attributing it to the timeout or changing it. Until then it will
+      intermittently redden CI and train people to re-run red builds.
+
+The same audit raised `RepeaterWizard`, which is already recorded as Open Question 7 above; it is
+not duplicated here.

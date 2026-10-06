@@ -60,24 +60,6 @@ export function useWanConfig() {
   });
 }
 
-export function useSetWanConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: WanConfig) =>
-      apiClient.put<{ success: boolean }>(API_ROUTES.network.wan, config),
-    onSuccess: () => {
-      toast.success('WAN configuration updated');
-      // Only the keys this change can actually alter — a broad `['network']`
-      // refetches DHCP leases, reservations and DNS on every WAN edit.
-      void queryClient.invalidateQueries({ queryKey: ['network', 'wan'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update WAN config', { description: error.message });
-    },
-  });
-}
-
 /**
  * The connected-client list rides along in `network_status`, which the
  * WebSocket already pushes on interface and client changes. Seeding this cache

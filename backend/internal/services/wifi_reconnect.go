@@ -118,16 +118,6 @@ func (w *WifiService) enableAutoReconnect() error {
 	return nil
 }
 
-// WriteReconnectScriptSafe writes the current safe reconnect script to disk if the
-// script file already exists. Call this on startup so devices that had auto-reconnect
-// enabled before a deploy get the safe "wifi up" script instead of the old "wifi reload".
-func (w *WifiService) WriteReconnectScriptSafe() {
-	if _, err := os.Stat(w.reconnectScript); err != nil {
-		return // script not present, nothing to fix
-	}
-	_ = writeGeneratedScript(w.reconnectScript, reconnectScriptContent, 0o750)
-}
-
 func (w *WifiService) disableAutoReconnect() error {
 	// Remove cron entry, under the same lock enableAutoReconnect takes: both
 	// rewrite /etc/crontabs/root in place.
@@ -322,7 +312,7 @@ func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) e
 		fmt.Sprintf("%s %s * * * %s up %s", onParts[1], onParts[0], helper, wifiCronTag),
 		fmt.Sprintf("%s %s * * * %s down %s", offParts[1], offParts[0], helper, wifiCronTag),
 		"")
-	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	// cron re-reads the crontab on mtime change, but an explicit restart makes
@@ -356,7 +346,7 @@ func (w *WifiService) removeWiFiScheduleCronLines() error {
 	// /etc/crontabs/root while it runs, and a truncating os.WriteFile can hand it
 	// a half-written file — which it then parses as the real crontab, dropping
 	// the auto-reconnect and LED entries it did not manage to read.
-	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")

@@ -40,21 +40,6 @@ export function useWireguardStatus() {
   });
 }
 
-export function useSetWireguardConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: WireguardConfig) =>
-      apiClient.put<{ success: boolean }>(API_ROUTES.vpn.wireguard.config, config),
-    onSuccess: () => {
-      toast.success('WireGuard configuration updated');
-      void queryClient.invalidateQueries({ queryKey: ['vpn'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update WireGuard config', { description: error.message });
-    },
-  });
-}
-
 export function useToggleWireguard() {
   const queryClient = useQueryClient();
   return useMutation({

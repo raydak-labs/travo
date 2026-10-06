@@ -59,7 +59,7 @@ func (a *AlertService) SetAlertThresholds(t models.AlertThresholds) error {
 	// Atomic: the 10s check loop reads this file on every tick, and
 	// os.WriteFile truncates before writing, so a save that overlapped a read
 	// made the whole alerting config fall back to defaults.
-	return writeFileAtomic(path, data, 0600)
+	return writeFileAtomic(path, data)
 }
 
 // AlertChecker abstracts the system checks used by AlertService.
@@ -203,21 +203,21 @@ func (a *AlertService) checkConditions() {
 
 	// Storage above threshold
 	if stats.Storage.UsagePercent > thresholds.StoragePercent {
-		a.raiseCondition("storage_low", fmt.Sprintf("Storage usage is above %.0f%%", thresholds.StoragePercent), "warning")
+		a.raiseCondition("storage_low", fmt.Sprintf("Storage usage is above %.0f%%", thresholds.StoragePercent))
 	} else {
 		a.clearCondition("storage_low")
 	}
 
 	// CPU above threshold
 	if stats.CPU.UsagePercent > thresholds.CPUPercent {
-		a.raiseCondition("high_cpu", fmt.Sprintf("CPU usage is above %.0f%%", thresholds.CPUPercent), "warning")
+		a.raiseCondition("high_cpu", fmt.Sprintf("CPU usage is above %.0f%%", thresholds.CPUPercent))
 	} else {
 		a.clearCondition("high_cpu")
 	}
 
 	// Memory above threshold
 	if stats.Memory.UsagePercent > thresholds.MemoryPercent {
-		a.raiseCondition("high_memory", fmt.Sprintf("Memory usage is above %.0f%%", thresholds.MemoryPercent), "warning")
+		a.raiseCondition("high_memory", fmt.Sprintf("Memory usage is above %.0f%%", thresholds.MemoryPercent))
 	} else {
 		a.clearCondition("high_memory")
 	}
@@ -227,7 +227,7 @@ func (a *AlertService) checkConditions() {
 		up, err := carrierChecker.IsCarrierUp("eth0")
 		if err == nil {
 			if !up {
-				a.raiseCondition("eth_unplugged", "WAN ethernet cable is disconnected", "warning")
+				a.raiseCondition("eth_unplugged", "WAN ethernet cable is disconnected")
 			} else {
 				a.clearCondition("eth_unplugged")
 			}
@@ -236,7 +236,7 @@ func (a *AlertService) checkConditions() {
 	}
 }
 
-func (a *AlertService) raiseCondition(alertType, message, severity string) {
+func (a *AlertService) raiseCondition(alertType, message string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -249,7 +249,7 @@ func (a *AlertService) raiseCondition(alertType, message, severity string) {
 		ID:        generateAlertID(),
 		Type:      alertType,
 		Message:   message,
-		Severity:  severity,
+		Severity:  "warning",
 		Timestamp: time.Now().UnixMilli(),
 	}
 	a.appendAlert(alert)
