@@ -41,7 +41,7 @@ func TestStream_NoLineLossUnderSlowConsumer(t *testing.T) {
 		}
 		mu.Unlock()
 		if n != 5000 || first != "line 0" || last != "line 4999" {
-			t.Fatalf("attempt %d: expected 20000 lines line 0..line 4999, got %d (%q..%q)", attempt, n, first, last)
+			t.Fatalf("attempt %d: expected 5000 lines line 0..line 4999, got %d (%q..%q)", attempt, n, first, last)
 		}
 	}
 }

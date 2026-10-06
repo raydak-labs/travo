@@ -223,12 +223,14 @@ removed on `chore/remove-dead-code`; these four need a decision rather than a de
       no CI job and no guide, so the only thing that ever exercises it is `make shellcheck`.
       Document it in `docs/guides/deployment.md`, or delete it and reword those two warnings.
       It is also the only caller of `scripts/setup-wireless-ap.sh`, so deleting it orphans that.
-- [ ] **`TestStream_NoLineLossUnderSlowConsumer` is timing-flaky under load.** It failed once
-      during a full `go test ./...` (packages in parallel, CPU contention) and passes in
-      isolation on both this branch and `main` — 3 and 6 consecutive runs respectively. It
-      asserts no line loss under a deliberately slow consumer, so its timeout is what is under
-      strain. Left alone rather than papered over with a longer sleep: until it is fixed it
-      will intermittently redden CI and train people to re-run red builds.
+- [ ] **`TestStream_NoLineLossUnderSlowConsumer` failed once under load; its failure mode is
+      unknown.** It failed once during a full `go test ./...` (packages in parallel, CPU
+      contention) and passes in isolation on both this branch and `main` — 3 and 6 consecutive
+      runs respectively. It asserts no line loss under a deliberately slow consumer, and it can
+      fail either because `Stream` returns an error (including `execx.waitDelay` abandonment)
+      or because the line-count assertion fails; the reported run does not say which. Record the
+      failing output before attributing it to the timeout or changing it. Until then it will
+      intermittently redden CI and train people to re-run red builds.
 
 The same audit raised `RepeaterWizard`, which is already recorded as Open Question 7 above; it is
 not duplicated here.
