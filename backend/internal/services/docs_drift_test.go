@@ -24,7 +24,6 @@ import (
 const (
 	docsDir   = "../../../docs"
 	agentsMD  = "../../../AGENTS.md"
-	claudeMD  = "../../../CLAUDE.md"
 	reviewDoc = "../../../docs/_archive/reviews/2026-10-04-deep-code-review.md"
 )
 
@@ -86,7 +85,7 @@ func TestDocsDoNotNameTheRetiredStateDirectory(t *testing.T) {
 func docsToScan(t *testing.T) []string {
 	t.Helper()
 	var files []string
-	for _, root := range []string{agentsMD, claudeMD} {
+	for _, root := range []string{agentsMD} {
 		if _, err := os.Stat(root); err != nil {
 			t.Fatalf("stat %s: %v", root, err)
 		}
