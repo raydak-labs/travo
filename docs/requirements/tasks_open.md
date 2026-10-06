@@ -231,6 +231,13 @@ removed on `chore/remove-dead-code`; these four need a decision rather than a de
       or because the line-count assertion fails; the reported run does not say which. Record the
       failing output before attributing it to the timeout or changing it. Until then it will
       intermittently redden CI and train people to re-run red builds.
+- [ ] **`TestReviewReportIsPresentAndScoped` passes on a floor it is far below.** It resolves the
+      backticked file citations in the 2026-10-04 review report against a 15-path root list that
+      omits `scripts/` and the `frontend/src/components/` subtrees. 36 citations are unresolved
+      today and the test is green only because 64 clears the floor of 60 — it could absorb four
+      more deletions unnoticed, which is the same false assurance that let `CLAUDE.md` be removed
+      while the docs gates still claimed to cover the repo root. Either add the missing subtrees to
+      `roots`, or drop the resolution half and keep only the section-presence checks.
 
 The same audit raised `RepeaterWizard`, which is already recorded as Open Question 7 above; it is
 not duplicated here.

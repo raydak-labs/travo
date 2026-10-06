@@ -22,10 +22,8 @@ import (
 // These tests close that gap. They read the documentation, not the code.
 
 const (
-	docsDir   = "../../../docs"
-	agentsMD  = "../../../AGENTS.md"
-	claudeMD  = "../../../CLAUDE.md"
-	reviewDoc = "../../../docs/_archive/reviews/2026-10-04-deep-code-review.md"
+	docsDir  = "../../../docs"
+	repoRoot = "../../.."
 )
 
 // guardNameRe matches a crash-guard path as written in prose, e.g.
@@ -81,26 +79,29 @@ func TestDocsDoNotNameTheRetiredStateDirectory(t *testing.T) {
 	}
 }
 
-// docsToScan walks the documentation files an agent or operator is likely to
-// read before touching a guard or the persistent store.
+// docsToScan returns every document that can hand an agent a wrong guard or
+// store path: the repo-root *.md files an agent is pointed at, plus every .md
+// under docs/.
+//
+// The root set is discovered, not listed. It was []string{agentsMD, claudeMD},
+// and PR #187 deleted CLAUDE.md: all three gates below then failed with
+// "stat ../../../CLAUDE.md: no such file or directory" — a setup error raised
+// before a single document was read, for a gate whose invariant is about *all*
+// documents. Enumerating the corpus means no rename can remove a document from
+// coverage. A missing AGENTS.md is still caught: the len floor below drops.
 func docsToScan(t *testing.T) []string {
 	t.Helper()
-	var files []string
-	for _, root := range []string{agentsMD, claudeMD} {
-		if _, err := os.Stat(root); err != nil {
-			t.Fatalf("stat %s: %v", root, err)
-		}
-		files = append(files, root)
+	roots, err := filepath.Glob(filepath.Join(repoRoot, "*.md"))
+	if err != nil {
+		t.Fatalf("glob repo-root docs: %v", err)
 	}
-	// The review report is deliberately NOT scanned: it quotes wrong paths on
-	// purpose, because reporting "seven documents say /etc/trafo/travo.db" is the
-	// whole point of it. Scanning it would mean every future mention of a fixed
-	// bug re-fails this gate. It is still required to exist.
-	if _, err := os.Stat(reviewDoc); err != nil {
-		t.Fatalf("the review report is missing; docs tests assume it exists: %v", err)
-	}
+	files := append([]string(nil), roots...)
+	// docs/_archive is excluded by the walk below, so the review report needs no
+	// exemption here: it is a frozen point-in-time artifact that quotes wrong
+	// paths on purpose. Its existence is enforced by
+	// TestReviewReportIsPresentAndScoped in docs_index_test.go.
 
-	err := filepath.Walk(docsDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(docsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
