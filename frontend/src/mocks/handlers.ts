@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES, MIN_PASSWORD_LENGTH } from '@shared/index';
 import {
   mockSystemInfo,
@@ -926,7 +926,7 @@ export const handlers = [
   }),
 
   // Routes below had no handler at all. Without them the dev server hit the
-  // network for real (main.tsx starts MSW with onUnhandledRequest "bypass") and
+  // network for real (main.tsx starts MSW with onUnhandledFrame "bypass") and
   // every test asserted against whatever the machine answered.
 
   http.get(API_ROUTES.system.speedtestService, () => {

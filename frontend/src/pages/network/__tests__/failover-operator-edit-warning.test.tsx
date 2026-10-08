@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES, type Alert } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { useAlertStore } from '@/stores/alert-store';

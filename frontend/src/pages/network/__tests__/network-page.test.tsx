@@ -10,7 +10,7 @@ import {
   Outlet,
   createMemoryHistory,
 } from '@tanstack/react-router';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES, type Client } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { mockNetworkStatus } from '@/mocks/data';

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { WifiRepeaterSameRadioBanner } from '../wifi-repeater-same-radio-banner';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { server } from '@/mocks/server';
 import { API_ROUTES } from '@shared/index';
 

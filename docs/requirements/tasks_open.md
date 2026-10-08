@@ -142,13 +142,9 @@ Consolidating the Renovate branches on 2026-10-02 surfaced three upgrades that c
 at the time. Each remaining one is pinned by an `allowedVersions` rule in
 `.github/renovate.json5` so Renovate stops proposing it; drop the matching rule once the
 blocker clears. The TypeScript 7 entry has since been cleared by moving off ESLint to
-oxlint — see [`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
+oxlint, and the MSW 3 entry by taking MSW 3.0.2 on Vitest 5.0.3 — see
+[`tasks_done.md`](./tasks_done.md) § "Frontend Toolchain".
 
-- [ ] **MSW 3 — blocked by Vitest 5.** Every `@vitest/mocker` 5.x release through `5.0.3`
-      peer-requires `msw ^2.4.9`, so Vitest 5 and MSW 3 are mutually exclusive. We chose
-      Vitest 5, so MSW stays on 2.x. Unblocking MSW 3 also needs the `onUnhandledRequest` →
-      `onUnhandledFrame` rename in `frontend/src/main.tsx` and `frontend/src/test/setup.ts`.
-      Watch: `peerDependencies.msw` on https://registry.npmjs.org/@vitest/mocker.
 - [ ] **jsdom 30.1 — blocked by Vitest 5.** Vitest 5's jsdom compat shim resolves jsdom's
       implementation symbol with `getOwnPropertySymbols(new Blob())[0]`, assuming the first
       own symbol is the impl symbol. jsdom 30.1.0 switched wrapper registration to

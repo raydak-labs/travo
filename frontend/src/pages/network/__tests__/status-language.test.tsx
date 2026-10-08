@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES, type FailoverConfig } from '@shared/index';
 import { renderWithProviders } from '@/test/test-utils';
 import { server } from '@/mocks/server';

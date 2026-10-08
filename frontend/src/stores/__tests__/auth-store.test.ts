@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { server } from '@/mocks/server';
 import { useAuthStore } from '@/stores/auth-store';
 import { getToken, setToken } from '@/lib/api-client';

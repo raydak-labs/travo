@@ -1,7 +1,7 @@
 ---
 title: Development guide
 description: Local prerequisites, install, dev servers, tests, lint, CI, MSW.
-updated: 2026-10-05
+updated: 2026-10-08
 tags: [docs, development, workflow]
 ---
 
@@ -134,7 +134,11 @@ git push origin v1.0.0
 
 ## MSW
 
-The dev frontend can use [MSW](https://mswjs.io/) against the real backend or mocks. Regenerate the worker if needed:
+The dev frontend can use [MSW](https://mswjs.io/) 3 against the real backend or mocks.
+Handlers import `http` and `HttpResponse` from `msw/http`. `setupServer` and
+`setupWorker` stay on `msw/node` and `msw/browser`. Unhandled frames use
+`onUnhandledFrame` (`bypass` in `main.tsx`, `error` in `src/test/setup.ts`).
+Regenerate the worker if needed:
 
 ```bash
 cd frontend && pnpm exec msw init public --save
