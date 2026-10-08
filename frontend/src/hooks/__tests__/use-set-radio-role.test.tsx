@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import type { ReactNode } from 'react';
 import { API_ROUTES } from '@shared/index';
 import { server } from '@/mocks/server';

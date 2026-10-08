@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { server } from '@/mocks/server';

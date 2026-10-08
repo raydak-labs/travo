@@ -10,7 +10,7 @@ import {
   Outlet,
   createMemoryHistory,
 } from '@tanstack/react-router';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { server } from '@/mocks/server';
 import { API_ROUTES } from '@shared/index';
 import { TimezoneAlert } from '../timezone-alert';

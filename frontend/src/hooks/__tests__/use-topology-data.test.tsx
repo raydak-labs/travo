@@ -6,7 +6,7 @@ import {
   focusManager,
   onlineManager,
 } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import type { ReactNode } from 'react';
 import { server } from '@/mocks/server';
 import { API_ROUTES } from '@shared/index';

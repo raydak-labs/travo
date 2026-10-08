@@ -7,7 +7,7 @@ async function enableMocking() {
   if (import.meta.env.DEV) {
     // Only load MSW in development
     const { worker } = await import('./mocks/browser');
-    return worker.start({ onUnhandledRequest: 'bypass' });
+    return worker.start({ onUnhandledFrame: 'bypass' });
   }
 }
 

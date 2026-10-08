@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-10-05
+updated: 2026-10-08
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture/overview.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-10-05 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-08 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## Milestone checklist (compact)
 
@@ -75,6 +75,15 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   `oxlint-tsgolint` was evaluated and deliberately NOT enabled — it remains in the dependency
   graph only as an auto-installed optional peer of oxlint, so no type-aware rule runs, behaviour
   is unaffected, and CI does not depend on it. See [`docs/guides/development.md`](../guides/development.md).
+- **MSW 3.0.2 alongside Vitest 5.0.3.** The §17 hold and the Renovate
+  `allowedVersions: "<3"` rule for `msw` are gone. Vitest 5.0.3 is still the latest
+  published release (no `@vitest/*` package is newer). `http` and `HttpResponse` import
+  from `msw/http`; `setupServer` / `setupWorker` stay on `msw/node` and `msw/browser`.
+  `server.listen` and `worker.start` take `onUnhandledFrame`. Published
+  `@vitest/mocker@5.0.3` still optional-peers `msw ^2.4.9`. Vitest main widened that to
+  `^2.4.9 || ^3.0.0` on 2026-10-05 (commit `fe025b2`) and has not published it. This
+  repo does not load the browser-mode mocker that imports MSW; node and jsdom tests
+  talk to MSW through `msw/node`, and that suite passes. jsdom 30.1 stays held.
 
 ## Reliability And Operational Fixes
 
