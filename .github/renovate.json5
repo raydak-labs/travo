@@ -24,6 +24,23 @@
 
   "packageRules": [
     {
+      // mise `go` and go.mod `go` are different managers/datasources. Without a
+      // shared group, patch automerge can bump .mise.toml alone (see #190) and
+      // leave go.mod behind — TestGoVersionPinsAgree then fails on main.
+      "description": "Keep Go toolchain pins (mise + go.mod + golang images) in one PR",
+      "matchManagers": ["mise", "gomod", "dockerfile", "docker-compose"],
+      "matchPackageNames": [
+        "go",
+        "golang",
+        "docker.io/library/golang",
+        "/^golang$/",
+      ],
+      "groupName": "go toolchain",
+      "groupSlug": "go-toolchain",
+      "automerge": true,
+      "automergeType": "pr",
+    },
+    {
       // TRACK: Vitest 5's jsdom compat shim resolves jsdom's implementation
       // symbol with `getOwnPropertySymbols(new Blob())[0]` — it assumes the
       // FIRST own symbol is the impl symbol. jsdom 30.1.0 switched wrapper
@@ -39,6 +56,8 @@
     {
       "description": "Group all patch/pin/digest updates together",
       "matchUpdateTypes": ["!major", "!minor"],
+      // Go pins handled by the dedicated go-toolchain group above.
+      "matchPackageNames": ["!go", "!golang", "!docker.io/library/golang"],
       "groupName": "all patch/pin/digest updates",
       "groupSlug": "all-patch-pin-digest",
       "automerge": true,

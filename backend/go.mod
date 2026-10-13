@@ -1,6 +1,6 @@
 module github.com/openwrt-travel-gui/backend
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/fasthttp/websocket v1.5.12
