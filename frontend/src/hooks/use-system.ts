@@ -1,441 +1,50 @@
-import { useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { apiClient, isTokenRemembered, setToken } from '@/lib/api-client';
-import { resetSetupStatusCache } from '@/lib/setup-status';
-import { routeWithSegment } from '@/lib/api-url';
-import { useWsSubscribe } from '@/lib/ws-context';
-import { useRefetchOnWsReconnect } from '@/hooks/use-refetch-on-ws-reconnect';
-import { API_ROUTES } from '@shared/index';
-import type {
-  SystemInfo,
-  SystemStats,
-  LogResponse,
-  ChangePasswordRequest,
-  ChangePasswordResponse,
-  SetHostnameRequest,
-  LEDStatus,
-  SetLEDRequest,
-  LEDSchedule,
-  TimezoneConfig,
-  NTPConfig,
-  HardwareButton,
-  ButtonActionsRequest,
-  SSHKeysResponse,
-  AddSSHKeyRequest,
-  SpeedTestResult,
-  AlertThresholds,
-} from '@shared/index';
-
-export function useSystemInfo() {
-  return useQuery({
-    queryKey: ['system', 'info'],
-    queryFn: () => apiClient.get<SystemInfo>(API_ROUTES.system.info),
-  });
-}
-
 /**
- * Polling cadence for system stats: the WebSocket hub already pushes
- * system_stats every 2s, so HTTP polling is only a fallback while the
- * socket is down. Exported for tests.
+ * System hooks, grouped by domain.
+ *
+ * The implementations live in focused sibling modules so that a change to one
+ * area of the system surface does not have to be read through the whole
+ * system surface. This module stays the single import path: every consumer
+ * keeps importing from '@/hooks/use-system'.
  */
-export function statsRefetchInterval(wsConnected: boolean): number | false {
-  return wsConnected ? false : 5_000;
-}
+export {
+  useSystemInfo,
+  useSystemStats,
+  statsRefetchInterval,
+  useSystemLogs,
+  useKernelLogs,
+  useRunSpeedTest,
+} from './use-system-stats';
 
-export function useSystemStats() {
-  const { connected, subscribe } = useWsSubscribe();
-  const queryClient = useQueryClient();
-  // Polling stops while connected, so a reconnect has to re-request whatever
-  // the socket missed while it was down.
-  useRefetchOnWsReconnect([['system', 'stats']]);
+export {
+  useReboot,
+  useShutdown,
+  useFactoryReset,
+  useFirmwareUpgrade,
+  useBackup,
+  useRestore,
+} from './use-system-power';
 
-  // Feed WebSocket pushes straight into the query cache — every consumer of
-  // this hook sees live data without duplicate HTTP requests to the router.
-  useEffect(() => {
-    return subscribe('system_stats', (raw) => {
-      queryClient.setQueryData(['system', 'stats'], raw as SystemStats);
-    });
-  }, [subscribe, queryClient]);
+export {
+  useSetHostname,
+  useTimezone,
+  useSetTimezone,
+  useNTPConfig,
+  useSyncNTP,
+  useSetNTPConfig,
+  useLEDStatus,
+  useSetLEDStealth,
+  useLEDSchedule,
+  useSetLEDSchedule,
+  useHardwareButtons,
+  useSetButtonActions,
+  useSSHKeys,
+  useAddSSHKey,
+  useDeleteSSHKey,
+} from './use-system-network';
 
-  return useQuery({
-    queryKey: ['system', 'stats'],
-    queryFn: () => apiClient.get<SystemStats>(API_ROUTES.system.stats),
-    refetchInterval: statsRefetchInterval(connected),
-  });
-}
-
-export function useReboot() {
-  return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.reboot),
-    onSuccess: () => {
-      toast.success('Reboot initiated', { description: 'The device is restarting…' });
-    },
-    onError: (error) => {
-      toast.error('Failed to reboot', { description: error.message });
-    },
-  });
-}
-
-export function useShutdown() {
-  return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.shutdown),
-    onSuccess: () => {
-      toast.success('Shutdown initiated', {
-        description:
-          'The device is powering off. You will need physical access to turn it back on.',
-      });
-    },
-    onError: (error) => {
-      toast.error('Failed to shut down', { description: error.message });
-    },
-  });
-}
-
-export function useFactoryReset() {
-  return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.factoryReset),
-    onSuccess: () => {
-      toast.success('Factory reset initiated', {
-        description: 'Device will restart with default settings.',
-      });
-    },
-    onError: (error) => {
-      toast.error('Factory reset failed', { description: error.message });
-    },
-  });
-}
-
-/**
- * `enabled` exists so the Logs page can fetch only the visible tab. Both log
- * queries used to be always-on, so opening the page ran `logread` *and*
- * `dmesg` and switching tabs refetched the one being left.
- */
-export function useSystemLogs(service?: string, level?: string, enabled = true) {
-  return useQuery({
-    queryKey: ['system', 'logs', service ?? '', level ?? ''],
-    enabled,
-    queryFn: ({ signal }) => {
-      const params = new URLSearchParams();
-      if (service) params.set('service', service);
-      if (level) params.set('level', level);
-      const qs = params.toString();
-      const url = qs ? `${API_ROUTES.system.logs}?${qs}` : API_ROUTES.system.logs;
-      return apiClient.get<LogResponse>(url, signal);
-    },
-  });
-}
-
-export function useKernelLogs(enabled = true) {
-  return useQuery({
-    queryKey: ['system', 'logs', 'kernel'],
-    enabled,
-    queryFn: ({ signal }) => apiClient.get<LogResponse>(API_ROUTES.system.kernelLogs, signal),
-  });
-}
-
-export function useChangePassword() {
-  return useMutation({
-    mutationFn: async (data: ChangePasswordRequest) => {
-      // A password change revokes every session, including this one, and the
-      // server issues a replacement token. Keep using the old token here and
-      // the very next request fails with 401 — the user is silently logged out
-      // right after a successful password change.
-      const res = await apiClient.put<ChangePasswordResponse>(API_ROUTES.auth.password, data);
-      // Keep the storage the user chose at login: a "don't remember me"
-      // session must not become a localStorage token because the token was
-      // replaced.
-      setToken(res.token, isTokenRemembered());
-      return res;
-    },
-    onSuccess: (res) => {
-      const otherSessions = Math.max(0, res.revoked_sessions - 1);
-      toast.success('Password changed successfully', {
-        description:
-          otherSessions > 0
-            ? `Signed out of ${otherSessions} other session${otherSessions === 1 ? '' : 's'}.`
-            : 'This is the only active session.',
-      });
-    },
-    onError: (error) => {
-      toast.error('Failed to change password', { description: error.message });
-    },
-  });
-}
-
-export function useSetHostname() {
-  return useMutation({
-    mutationFn: (data: SetHostnameRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.hostname, data),
-    onSuccess: () => {
-      toast.success('Hostname updated');
-    },
-    onError: (error) => {
-      toast.error('Failed to update hostname', { description: error.message });
-    },
-  });
-}
-
-export function useLEDStatus() {
-  return useQuery({
-    queryKey: ['system', 'leds'],
-    queryFn: () => apiClient.get<LEDStatus>(API_ROUTES.system.leds),
-  });
-}
-
-export function useSetLEDStealth() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: SetLEDRequest) => apiClient.put<LEDStatus>(API_ROUTES.system.leds, data),
-    onSuccess: () => {
-      toast.success('LED mode updated');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'leds'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update LED mode', { description: error.message });
-    },
-  });
-}
-
-export function useLEDSchedule() {
-  return useQuery({
-    queryKey: ['system', 'leds', 'schedule'],
-    queryFn: () => apiClient.get<LEDSchedule>(API_ROUTES.system.ledsSchedule),
-  });
-}
-
-export function useSetLEDSchedule() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: LEDSchedule) =>
-      apiClient.put<LEDSchedule>(API_ROUTES.system.ledsSchedule, data),
-    onSuccess: () => {
-      toast.success('LED schedule updated');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'leds', 'schedule'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update LED schedule', { description: error.message });
-    },
-  });
-}
-
-export function useTimezone() {
-  return useQuery({
-    queryKey: ['system', 'timezone'],
-    queryFn: () => apiClient.get<TimezoneConfig>(API_ROUTES.system.timezone),
-  });
-}
-
-export function useBackup() {
-  return useMutation({
-    mutationFn: async () => {
-      // Routed through the shared client so an expired session triggers the
-      // global 401 handling instead of a bare "Backup failed".
-      const blob = await apiClient.getBlob(API_ROUTES.system.backup);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'openwrt-backup.tar.gz';
-      a.click();
-      URL.revokeObjectURL(url);
-    },
-    onSuccess: () => {
-      toast.success('Backup downloaded');
-    },
-    onError: (error) => {
-      toast.error('Failed to create backup', { description: error.message });
-    },
-  });
-}
-
-export function useRestore() {
-  return useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('backup', file);
-      return apiClient.postForm<{ status?: string }>(API_ROUTES.system.restore, formData);
-    },
-    onSuccess: () => {
-      toast.success('Configuration restored. Reboot to apply changes.');
-    },
-    onError: (error) => {
-      toast.error('Failed to restore configuration', { description: error.message });
-    },
-  });
-}
-
-export function useSetTimezone() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: TimezoneConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.timezone, config),
-    onSuccess: () => {
-      toast.success('Timezone updated');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'timezone'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update timezone', { description: error.message });
-    },
-  });
-}
-
-export function useFirmwareUpgrade() {
-  return useMutation({
-    mutationFn: async ({ file, keepSettings }: { file: File; keepSettings: boolean }) => {
-      const formData = new FormData();
-      formData.append('firmware', file);
-      formData.append('keep_settings', String(keepSettings));
-      return apiClient.postForm<{ status?: string }>(API_ROUTES.system.firmwareUpgrade, formData);
-    },
-    onSuccess: () => {
-      toast.success('Firmware upgrade initiated', {
-        description: 'Device will reboot with the new firmware.',
-      });
-    },
-    onError: (error) => {
-      toast.error('Firmware upgrade failed', { description: error.message });
-    },
-  });
-}
-
-export function useNTPConfig() {
-  return useQuery({
-    queryKey: ['system', 'ntp'],
-    queryFn: () => apiClient.get<NTPConfig>(API_ROUTES.system.ntp),
-  });
-}
-
-export function useSyncNTP() {
-  return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.ntpSync),
-    onSuccess: () => {
-      toast.success('NTP sync complete', {
-        description: 'System clock synchronized with pool.ntp.org',
-      });
-    },
-    onError: (error) => {
-      toast.error('NTP sync failed', { description: error.message });
-    },
-  });
-}
-
-export function useSetNTPConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: { enabled: boolean; servers: string[] }) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.ntp, config),
-    onSuccess: () => {
-      toast.success('NTP configuration updated');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'ntp'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update NTP configuration', { description: error.message });
-    },
-  });
-}
-
-export function useHardwareButtons() {
-  return useQuery({
-    queryKey: ['system', 'buttons'],
-    queryFn: () => apiClient.get<HardwareButton[]>(API_ROUTES.system.buttons),
-  });
-}
-
-export function useSetButtonActions() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (req: ButtonActionsRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.buttonActions, req),
-    onSuccess: () => {
-      toast.success('Button actions saved');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'buttons'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to save button actions', { description: error.message });
-    },
-  });
-}
-
-export function useCompleteSetup() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.setupComplete),
-    onSuccess: () => {
-      // The route guard caches the setup answer; finishing setup must not
-      // redirect the user straight back to /setup.
-      resetSetupStatusCache();
-      void queryClient.invalidateQueries({ queryKey: ['system', 'setup-complete'] });
-    },
-  });
-}
-
-export function useSSHKeys() {
-  return useQuery({
-    queryKey: ['system', 'ssh-keys'],
-    queryFn: async () => {
-      const res = await apiClient.get<SSHKeysResponse>(API_ROUTES.system.sshKeys);
-      return res.keys;
-    },
-  });
-}
-
-export function useAddSSHKey() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (req: AddSSHKeyRequest) =>
-      apiClient.post<{ ok: boolean }>(API_ROUTES.system.sshKeys, req),
-    onSuccess: () => {
-      toast.success('SSH key added');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to add SSH key', { description: error.message });
-    },
-  });
-}
-
-export function useDeleteSSHKey() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (index: number) =>
-      apiClient.del<{ ok: boolean }>(routeWithSegment(API_ROUTES.system.sshKeys, index)),
-    onSuccess: () => {
-      toast.success('SSH key deleted');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to delete SSH key', { description: error.message });
-    },
-  });
-}
-
-export function useRunSpeedTest() {
-  return useMutation({
-    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.system.speedTest),
-    onError: (error) => {
-      toast.error('Speed test failed', { description: error.message });
-    },
-  });
-}
-
-export function useAlertThresholds() {
-  return useQuery({
-    queryKey: ['system', 'alert-thresholds'],
-    queryFn: () => apiClient.get<AlertThresholds>(API_ROUTES.system.alertThresholds),
-  });
-}
-
-export function useSetAlertThresholds() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (t: AlertThresholds) =>
-      apiClient.put<{ ok: boolean }>(API_ROUTES.system.alertThresholds, t),
-    onSuccess: () => {
-      toast.success('Alert thresholds saved');
-      void queryClient.invalidateQueries({ queryKey: ['system', 'alert-thresholds'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to save thresholds', { description: error.message });
-    },
-  });
-}
+export {
+  useChangePassword,
+  useAlertThresholds,
+  useSetAlertThresholds,
+  useCompleteSetup,
+} from './use-system-account';
