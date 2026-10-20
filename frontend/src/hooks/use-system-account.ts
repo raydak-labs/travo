@@ -7,11 +7,7 @@ import { toast } from 'sonner';
 import { apiClient, isTokenRemembered, setToken } from '@/lib/api-client';
 import { resetSetupStatusCache } from '@/lib/setup-status';
 import { API_ROUTES } from '@shared/index';
-import type {
-  ChangePasswordRequest,
-  ChangePasswordResponse,
-  AlertThresholds,
-} from '@shared/index';
+import type { ChangePasswordRequest, ChangePasswordResponse, AlertThresholds } from '@shared/index';
 
 export function useChangePassword() {
   return useMutation({
