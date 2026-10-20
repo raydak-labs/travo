@@ -218,3 +218,4 @@ export function useSetMACPolicies() {
       toast.error('Failed to save MAC policies', { description: error.message });
     },
   });
+}

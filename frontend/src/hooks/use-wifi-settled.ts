@@ -15,7 +15,10 @@ import { refreshRouterState } from '@/lib/router-state-refresh';
  * delayed passes on `refreshKeys`. Calling both in full fetched the listed keys
  * four times per mutation.
  */
-export function wifiMutationSettled(queryClient: QueryClient, refreshKeys: Array<readonly unknown[]>) {
+export function wifiMutationSettled(
+  queryClient: QueryClient,
+  refreshKeys: Array<readonly unknown[]>,
+) {
   void queryClient.invalidateQueries({ queryKey: ['wifi'] });
   for (const queryKey of refreshKeys) {
     void queryClient.invalidateQueries({ queryKey });
