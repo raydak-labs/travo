@@ -72,7 +72,11 @@ export function AppShell({ children, title }: AppShellProps) {
           id="main-content"
           tabIndex={-1}
           ref={mainRef}
-          className="flex-1 overflow-y-auto p-4 sm:p-6 focus:outline-none"
+          // `relative` is load-bearing: absolutely positioned descendants
+          // (`sr-only` spans, popovers) otherwise resolve their containing block
+          // to the viewport, escape this scroll container, and grow the document
+          // into a second scrollable area beside it.
+          className="relative flex-1 overflow-y-auto p-4 sm:p-6 focus:outline-none"
         >
           <div className="animate-page-fade-in">{children}</div>
         </main>
