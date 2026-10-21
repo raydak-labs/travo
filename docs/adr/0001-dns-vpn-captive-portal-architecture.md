@@ -174,7 +174,7 @@ valid in a state the operator had since left. There is therefore **one** record.
   the UCI interface, so they are invisible to an audit of “which configs does this
   write”; they hold the **`dhcp` config lock** (ADR 0010) and `dhcp` is in
   `vpnFlowConfigs` for exactly that reason.
-- **Ownership**: the record is implemented in `vpn_service.go` because `VpnService`
+- **Ownership**: the record is implemented in `dnsmasq_layer_stack.go` because `VpnService`
   also owns the read-path self-heal of §3.3; `AdGuardService` drives the same code
   through `AdGuardChecker`.
 - **Directory note**: the record is state, not a crash guard, yet it lives in
@@ -328,7 +328,7 @@ new callers must not widen the condition.
 | Upstream DHCP DNS | `resolv.conf.auto` | Captive bypass reads hotel DNS |
 | AdGuard | YAML + `init.d/adguardhome` | `AdGuardService`, captive upstream patch |
 | WireGuard DNS | `network.wg0.dns` | `VpnService` forwarding to dnsmasq, through the shared layer record |
-| Shared dnsmasq resolver state | one record, `/etc/trafo/dnsmasq-layers.json` | `vpn_service.go` (stack, self-heal), `adguard_service.go` (forwarding), `captive_service.go` (bypass layer) |
+| Shared dnsmasq resolver state | one record, `/etc/trafo/dnsmasq-layers.json` | `dnsmasq_layer_stack.go` (stack), `vpn_dns.go` (self-heal), `adguard_dns.go` (forwarding), `captive_dnsmasq.go` (bypass layer) |
 | VPN profiles / split tunnel | `/etc/travo/wireguard_profiles.json`, `/etc/travo/split-tunnel.json` | `VpnService` |
 
 ## Consequences
@@ -347,14 +347,17 @@ new callers must not widen the condition.
 
 ## References
 
-- `backend/internal/services/adguard_service.go` — forwarding via the layer stack,
-  `GetDNSMode`, auto-configure, `SetPassword`, bundled template
-  `/etc/travo/adguardhome.yaml`
-- `backend/internal/services/vpn_service.go` — `/etc/trafo/dnsmasq-layers.json`
-  (`dnsmasqLayerStackPath`), the legacy `/etc/travo/vpn-dns-snapshot.json`,
+- `backend/internal/services/adguard_dns.go` — forwarding via the layer stack
+- `backend/internal/services/adguard_service.go` — `GetDNSMode`, auto-configure,
+  `SetPassword`, bundled template `/etc/travo/adguardhome.yaml`
+- `backend/internal/services/dnsmasq_layer_stack.go` — the shared layer stack itself:
+  `/etc/trafo/dnsmasq-layers.json` (`dnsmasqLayerStackPath`), the legacy
+  `/etc/travo/vpn-dns-snapshot.json`, and the layer operations
+- `backend/internal/services/vpn_dns.go` — the VPN layer,
   `enableVpnDNSForwarding` / `disableVpnDNSForwarding`, `maybeSelfHealVpnDNS`
-- `backend/internal/services/captive_service.go` — bypass as the `captive` layer, guard
-  file, restore, timeouts
+- `backend/internal/services/captive_dnsmasq.go` — the bypass as the `captive` layer
+- `backend/internal/services/captive_service.go` — the bypass guard file, restore,
+  timeouts
 - `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
 - `backend/internal/services/network_service.go` — WAN custom DNS (`SetDNSConfig`)

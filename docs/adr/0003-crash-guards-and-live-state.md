@@ -53,19 +53,19 @@ feature (a stuck guard permanently disables it).
 
 | Guard path | Owning file | What it protects |
 | ---------- | ----------- | ---------------- |
-| `/etc/trafo/failover-in-progress` | `services/failover_service.go` (`:23`) | mwan3 policy generation + apply, the staged `StartApply` → verify → `Confirm` window, and the whole `SetConfig` sequence |
+| `/etc/trafo/failover-in-progress` | `services/failover_service.go` (`:161`) | mwan3 policy generation + apply, the staged `StartApply` → verify → `Confirm` window, and the whole `SetConfig` sequence |
 | `/etc/trafo/band-switch-in-progress` | `services/band_switching_service.go` (`:21`) | automated dual-band down/up switching of the client between radios |
-| `/etc/trafo/captive-dns-in-progress` | `services/captive_service.go` (`:25`) | the dnsmasq/AdGuard DNS bypass; doubles as the serialized pre-bypass backup **and** the “bypass active” marker (see ADR 0001) |
+| `/etc/trafo/captive-dns-in-progress` | `services/captive_service.go` (`:144`) | the dnsmasq/AdGuard DNS bypass; doubles as the serialized pre-bypass backup **and** the “bypass active” marker (see ADR 0001) |
 | `/etc/trafo/captive-wwan-bounce-in-progress` | `services/captive_autoaccept.go` (`:31`) | the `ifdown wwan` / `ifup wwan` DHCP-lease bounce; removed only after a fresh lease came back |
-| `/etc/trafo/vpn-in-progress` | `services/vpn_service.go` (`:618`) | WireGuard enable: tunnel commit, verify, `wg0` firewall zone + `lan→wg0` forwarding, dnsmasq VPN-resolver forwarding, and their rollback |
+| `/etc/trafo/vpn-in-progress` | `services/vpn_service.go` (`:99`) | WireGuard enable: tunnel commit, verify, `wg0` firewall zone + `lan→wg0` forwarding, dnsmasq VPN-resolver forwarding, and their rollback |
 | `/etc/trafo/usbtether-in-progress` | `services/usb_tethering_service.go` (`:25`) | the `network.usbtether` interface, its addition to the **`wan`** firewall zone, and the `ifup`/`ifdown` |
 | `/etc/trafo/wifi-toggle-in-progress` | the generated helper `services/wifi_toggle_script.go` (`:34`, written to `/usr/libexec/travo-wireless-toggle.sh`) | flipping `wireless.*.disabled` + rpcd `apply`/`confirm` for the WiFi schedule and the button toggle |
-| `/etc/trafo/mac-in-progress` | `services/wifi_service.go` (`defaultGuardDir` `:103`, `guardPath` `:602`, feature `mac`) | the custom STA MAC sequence: UCI `macaddr` write, staged apply, live `ip link` down/address/up |
-| `/etc/trafo/restore-in-progress` | `services/system_service.go` (`:94`) | restoring a backup tarball over `/` |
-| `/etc/trafo/firmware-upgrade-in-progress` | `services/system_service.go` (`:95`) | `sysupgrade` — **deliberately not removed**; the marker must survive the reboot so an interrupted flash is discoverable |
-| `/etc/trafo/factory-reset-in-progress` | `services/system_service.go` (`:96`) | `firstboot -y && reboot`; also not removed, because the device reboots before anyone could clear it |
-| `/etc/trafo/system-config-in-progress` | `services/system_service.go` (`:97`) | committing `/etc/config/system` (timezone, hostname, NTP servers); protects the **commit**, not an apply — these settings deliberately need a reboot to take effect |
-| `/etc/trafo/pkg-install-in-progress` | `services/service_manager.go` (`:264`) | package install/remove, which rewrites init scripts, `/etc/config` and kernel modules |
+| `/etc/trafo/mac-in-progress` | `services/wifi_mac.go` (`macGuardFeature` `:49`), written through `services/wifi_service.go` (`guardPath` `:1091`) | the custom STA MAC sequence: UCI `macaddr` write, staged apply, live `ip link` down/address/up |
+| `/etc/trafo/restore-in-progress` | `services/system_service.go` (`:96`) | restoring a backup tarball over `/` |
+| `/etc/trafo/firmware-upgrade-in-progress` | `services/system_service.go` (`:97`) | `sysupgrade` — **deliberately not removed**; the marker must survive the reboot so an interrupted flash is discoverable |
+| `/etc/trafo/factory-reset-in-progress` | `services/system_service.go` (`:98`) | `firstboot -y && reboot`; also not removed, because the device reboots before anyone could clear it |
+| `/etc/trafo/system-config-in-progress` | `services/system_service.go` (`:99`) | committing `/etc/config/system` (timezone, hostname, NTP servers); protects the **commit**, not an apply — these settings deliberately need a reboot to take effect |
+| `/etc/trafo/pkg-install-in-progress` | `services/service_manager.go` (`:270`) | package install/remove, which rewrites init scripts, `/etc/config` and kernel modules |
 | `/etc/trafo/autoreconnect-crash-guard` | generated auto-reconnect script, `services/wifi_reconnect.go` (`:64`) | the `wifi up` attempt in the bounded auto-reconnect path; survives a driver crash, so every later cron tick is a no-op |
 | `/etc/trafo/autoreconnect-failcount` | same script (`wifi_reconnect.go` `:65`) | **not a guard**: the `MAX_FAIL=5` retry counter for a broken saved network. A successful reconnect clears it. Deliberately **not** cleared by a redeploy. |
 
