@@ -175,8 +175,8 @@ valid in a state the operator had since left. There is therefore **one** record.
   write”; they hold the **`dhcp` config lock** (ADR 0010) and `dhcp` is in
   `vpnFlowConfigs` for exactly that reason.
 - **Ownership**: the record is implemented in `dnsmasq_layer_stack.go` because `VpnService`
-  also owns the read-path self-heal of §3.3; `AdGuardService` drives the same code
-  through `AdGuardChecker`.
+  also owns the read-path self-heal of §3.3 (`vpn_dns.go`); `AdGuardService` drives
+  the same code through `AdGuardChecker`.
 - **Directory note**: the record is state, not a crash guard, yet it lives in
   `/etc/trafo`, where ADR 0003 otherwise keeps only guards. This is a recorded
   deviation, not an oversight: `deploy-local.sh` removes guards **by name**, never by

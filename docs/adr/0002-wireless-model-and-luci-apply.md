@@ -445,7 +445,7 @@ enforced at the HTTP handler **and** re-checked inside `SetWiFiSchedule`.
 - `backend/internal/services/uci_apply.go` — rpcd apply/confirm, the file-level `Snapshot`/`Rollback` recovery path (§5.0)
 - `backend/internal/services/wifi_toggle_script.go` — the generated toggle helper
 - `backend/internal/services/wifi_reconnect.go` — schedule cron file, bounded `wifi up` exception
-- `backend/internal/services/system_service.go` — button hotplug script
+- `backend/internal/services/system_buttons.go` — button hotplug script
 - `backend/internal/services/validate.go` — `ValidateHHMM`, `ValidateButtonName`
 - `docs/architecture/overview.md` §2–3
 - [ADR 0003](./0003-crash-guards-and-live-state.md) — guard contract

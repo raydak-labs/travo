@@ -53,9 +53,9 @@ feature (a stuck guard permanently disables it).
 
 | Guard path | Owning file | What it protects |
 | ---------- | ----------- | ---------------- |
-| `/etc/trafo/failover-in-progress` | `services/failover_service.go` (`:161`) | mwan3 policy generation + apply, the staged `StartApply` → verify → `Confirm` window, and the whole `SetConfig` sequence |
+| `/etc/trafo/failover-in-progress` | `services/failover_service.go` (`:24`) | mwan3 policy generation + apply, the staged `StartApply` → verify → `Confirm` window, and the whole `SetConfig` sequence |
 | `/etc/trafo/band-switch-in-progress` | `services/band_switching_service.go` (`:21`) | automated dual-band down/up switching of the client between radios |
-| `/etc/trafo/captive-dns-in-progress` | `services/captive_service.go` (`:144`) | the dnsmasq/AdGuard DNS bypass; doubles as the serialized pre-bypass backup **and** the “bypass active” marker (see ADR 0001) |
+| `/etc/trafo/captive-dns-in-progress` | `services/captive_service.go` (`:23`) | the dnsmasq/AdGuard DNS bypass; doubles as the serialized pre-bypass backup **and** the “bypass active” marker (see ADR 0001) |
 | `/etc/trafo/captive-wwan-bounce-in-progress` | `services/captive_autoaccept.go` (`:31`) | the `ifdown wwan` / `ifup wwan` DHCP-lease bounce; removed only after a fresh lease came back |
 | `/etc/trafo/vpn-in-progress` | `services/vpn_service.go` (`:99`) | WireGuard enable: tunnel commit, verify, `wg0` firewall zone + `lan→wg0` forwarding, dnsmasq VPN-resolver forwarding, and their rollback |
 | `/etc/trafo/usbtether-in-progress` | `services/usb_tethering_service.go` (`:25`) | the `network.usbtether` interface, its addition to the **`wan`** firewall zone, and the `ifup`/`ifdown` |
@@ -88,7 +88,7 @@ logic consults them as **“abort if present”** signals.
 
 - **Wireless** safety is primarily **LuCI-style rollback** (ADR 0002), not the same as a crash guard, but overlaps philosophically.
 - **Autoreconnect** shell logic uses a crash guard **and** a fail-count file (§2, last two rows) — bounded recovery, documented in code comments.
-- **Startup AP repair** (`main.go` → `WifiService.EnsureAPRunning`) commits `wireless` fixes with **no guard**, deliberately: there is no browser in the loop to confirm an rpcd rollback, so the repair is committed and the operator applies via LuCI “Save & Apply” or a reboot. The reasoning lives in the code comment at the call site, not here.
+- **Startup AP repair** (`cmd/server/startup.go` → `WifiService.EnsureAPRunning`) commits `wireless` fixes with **no guard**, deliberately: there is no browser in the loop to confirm an rpcd rollback, so the repair is committed and the operator applies via LuCI “Save & Apply” or a reboot. The reasoning lives in the code comment at the call site, not here.
 - **Direct `uci commit` + reload** paths that bypass rpcd `apply`/`confirm` still need a guard: the WireGuard `wg0` zone and the USB-tether `wan` zone membership are committed and reloaded directly (see ADR 0004 §5).
 
 ### 3.1 Bounded recovery: `network reload` after a refused apply
