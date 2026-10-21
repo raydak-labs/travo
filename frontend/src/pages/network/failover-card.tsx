@@ -7,104 +7,26 @@ import { Input } from '@/components/ui/input';
 import { QueryCard } from '@/components/ui/query-card';
 import { FieldError } from '@/components/ui/field-error';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StatusPill, type StatusPillProps } from '@/components/ui/status-pill';
+import { StatusPill } from '@/components/ui/status-pill';
 import { Switch } from '@/components/ui/switch';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { useFailoverConfig, useSetFailoverConfig, useFailoverEvents } from '@/hooks/use-network';
 import { useAlertStore } from '@/stores/alert-store';
 import { OperatorEditOverwriteWarning } from './failover-operator-edit-warning';
+import { trackingLabel, trackingTone, operatorStateTone } from './failover-card-status';
+import {
+  cloneConfig,
+  moveCandidate,
+  summarizeTrackIPs,
+  HEALTH_FIELDS,
+} from './failover-card-draft';
 import {
   OPERATOR_EDIT_OVERWRITE_ALERT,
   dismissedOverwriteAlerts,
   rememberDismissedOverwriteAlert,
 } from './operator-edit-overwrite';
-import type { FailoverCandidate, FailoverConfig, FailoverTrackingState } from '@shared/index';
-
-/**
- * The tracking state as something a user can act on. `not_available` vs
- * `not_installed` is a distinction only the mwan3 author cares about, and
- * neither tells a user what to do.
- */
-const TRACKING_LABEL: Record<FailoverTrackingState, string> = {
-  online: 'Online',
-  offline: 'Offline',
-  disabled: 'Skipped',
-  not_installed: 'Service missing',
-  not_available: 'No device',
-  unknown: 'Unknown',
-};
-
-function trackingLabel(candidate: FailoverCandidate): string {
-  if (!candidate.enabled) return 'Skipped';
-  return TRACKING_LABEL[candidate.tracking_state] ?? candidate.tracking_state;
-}
-
-/**
- * A tracking state is a status, not a caption: it gets the shared pill so
- * "Online" in the order list is the same green as "Online" anywhere else. A
- * disabled candidate is the operator's own choice, so it reads as neutral
- * rather than as a problem.
- */
-function trackingTone(candidate: FailoverCandidate): StatusPillProps['tone'] {
-  if (!candidate.enabled) return 'neutral';
-  switch (candidate.tracking_state) {
-    case 'online':
-      return 'ok';
-    case 'offline':
-      return 'danger';
-    case 'not_installed':
-    case 'not_available':
-      return 'warn';
-    case 'disabled':
-      return 'neutral';
-    default:
-      return 'stale';
-  }
-}
-
-/** The mwan3 service state as one pill: missing service, on, or off. */
-function operatorStateTone(config: FailoverConfig): StatusPillProps['tone'] {
-  if (!config.service_installed) return 'warn';
-  return config.enabled ? 'ok' : 'neutral';
-}
-
-function cloneConfig(config: FailoverConfig): FailoverConfig {
-  return {
-    ...config,
-    candidates: config.candidates.map((candidate) => ({ ...candidate })),
-    health: {
-      ...config.health,
-      track_ips: [...config.health.track_ips],
-    },
-    last_failover_event: config.last_failover_event ? { ...config.last_failover_event } : undefined,
-  };
-}
-
-function moveCandidate(candidates: readonly FailoverCandidate[], index: number, direction: -1 | 1) {
-  const next = candidates.map((candidate) => ({ ...candidate }));
-  const target = index + direction;
-  if (target < 0 || target >= next.length) {
-    return next;
-  }
-  [next[index], next[target]] = [next[target], next[index]];
-  return next.map((candidate, candidateIndex) => ({
-    ...candidate,
-    priority: candidateIndex + 1,
-  }));
-}
-
-function summarizeTrackIPs(trackIPs: readonly string[]) {
-  if (trackIPs.length === 0) return '—';
-  if (trackIPs.length === 1) return trackIPs[0];
-  return `${trackIPs.length} addresses`;
-}
-
-const HEALTH_FIELDS = [
-  { field: 'interval', label: 'Interval (s)', min: 1 },
-  { field: 'down', label: 'Failures before down', min: 1 },
-  { field: 'up', label: 'Successes before recovery', min: 1 },
-] as const;
+import type { FailoverConfig } from '@shared/index';
 
 export function FailoverCard() {
   const {
