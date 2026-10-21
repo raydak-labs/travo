@@ -350,74 +350,10 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		wifiSvc = services.NewWifiService(u, ub, rootPassword) // uses apply+confirm instead of wifi up
 	}
 
-	// Fix wireless UCI on startup (country/channel, missing SSID/key on existing APs,
-	// enable radios when AP enabled). Do not auto-apply on startup: there is no
-	// browser in the loop to confirm rpcd rollback safely, so we commit the repair
-	// and require LuCI Save & Apply or reboot for runtime activation.
+	// The wireless configuration and its cron entries are reconciled on
+	// startup; see startWifiReconciliation for what each repair does.
 	if !cfg.MockMode {
-		lifecycle.Go(func(stop <-chan struct{}) {
-			if !sleepOrStop(stop, 30*time.Second) {
-				return
-			}
-			fixed, needApply, err := wifiSvc.EnsureAPRunning()
-			if err != nil {
-				log.Printf("WARNING: WiFi AP health check failed: %v", err)
-				return
-			}
-			if fixed && needApply {
-				log.Printf("WiFi AP health: UCI fixes committed. Runtime apply skipped on startup to preserve LuCI-style rollback safety; use LuCI Save & Apply or reboot.")
-			} else if fixed {
-				log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
-			}
-		})
-		// Ensure auto-reconnect script is present and up-to-date when enabled.
-		// Uses SetAutoReconnect to recreate a missing script (e.g. after a crash or
-		// accidental deletion) and to upgrade any old "wifi reload" script to the safe
-		// "wifi up" version. Safe to call idempotently: it rewrites the cron entry and
-		// script atomically, which is the same state SetAutoReconnect(true) produces.
-		lifecycle.Go(func(stop <-chan struct{}) {
-			if !sleepOrStop(stop, 5*time.Second) {
-				return
-			}
-			// Repair in BOTH directions, not just when the feature is on.
-			// A device carrying a pre-rename cron entry or script keeps running
-			// `wifi reload` / `wifi up` on a timer even though auto-reconnect is
-			// disabled, and `wifi reload` is the documented ath11k crash trigger.
-			// SetAutoReconnect rewrites the script and the cron entry to match the
-			// configured state, so calling it unconditionally converges the device
-			// onto the safe script in both cases.
-			enabled, _ := wifiSvc.GetAutoReconnect()
-			if err := wifiSvc.SetAutoReconnect(enabled); err != nil {
-				log.Printf("WARNING: could not reconcile auto-reconnect script: %v", err)
-			}
-		})
-		// Same for the WiFi on/off schedule: an existing /etc/cron.d entry still
-		// holds the pre-fix `/sbin/wifi up` / `/sbin/wifi down` lines until the
-		// user re-saves the schedule. Re-writing it from the stored config points
-		// the cron entries at the generated UCI toggle helper instead.
-		lifecycle.Go(func(stop <-chan struct{}) {
-			if !sleepOrStop(stop, 6*time.Second) {
-				return
-			}
-			sched, err := wifiSvc.GetWiFiSchedule()
-			if err != nil || !sched.Enabled || sched.OnTime == "" || sched.OffTime == "" {
-				return
-			}
-			if err := wifiSvc.SetWiFiSchedule(sched); err != nil {
-				log.Printf("WARNING: could not reconcile WiFi schedule cron entry: %v", err)
-			}
-		})
-		// Auto-discover radio hardware and persist config on first boot.
-		lifecycle.Go(func(stop <-chan struct{}) {
-			if !sleepOrStop(stop, 10*time.Second) {
-				return
-			}
-			if discovered, err := wifiSvc.DiscoverAndPersistRadios(); err != nil {
-				log.Printf("WARNING: radio discovery failed: %v", err)
-			} else if discovered {
-				log.Printf("Radio auto-discovery completed on first boot.")
-			}
-		})
+		startWifiReconciliation(lifecycle, wifiSvc)
 	}
 
 	vpnSvc := services.NewVpnService(u)
