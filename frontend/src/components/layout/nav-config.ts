@@ -182,10 +182,48 @@ export function isRouteActive(navTo: string, pathname: string): boolean {
   return path === navTo || path.startsWith(`${navTo}/`);
 }
 
+/**
+ * Which optional service pages have a backing package on this router.
+ *
+ * A page is hidden only when its absence is known. A failed or still-pending
+ * service query keeps the link, because "we could not ask" must not read as
+ * "not installed" — the page itself then explains what is missing.
+ */
+export interface OptionalServicePages {
+  readonly tailscale: boolean;
+  readonly speedtest: boolean;
+  readonly sqm: boolean;
+}
+
+/** Nav entries for the router's current set of installed optional services. */
+export function navEntriesForPages(pages: OptionalServicePages): readonly NavEntry[] {
+  return NAV_ENTRIES.map((entry) => {
+    if (entry.kind !== 'group' || entry.id !== 'services') return entry;
+
+    const items = entry.items.filter(
+      (item) =>
+        (item.to !== '/services/tailscale' || pages.tailscale) &&
+        (item.to !== '/services/speedtest' || pages.speedtest),
+    );
+    if (pages.sqm) {
+      const speedtestIndex = items.findIndex((item) => item.to === '/services/speedtest');
+      items.splice(speedtestIndex === -1 ? items.length : speedtestIndex, 0, {
+        to: '/services/sqm',
+        label: 'SQM',
+      });
+    }
+    return { ...entry, items };
+  });
+}
+
 /** Flat list of routes for collapsed icon rail (one icon per destination). */
-export function flattenNavRoutes(): { to: string; label: string; icon: LucideIcon }[] {
+export function flattenNavRoutes(pages: OptionalServicePages): {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+}[] {
   const out: { to: string; label: string; icon: LucideIcon }[] = [];
-  for (const entry of NAV_ENTRIES) {
+  for (const entry of navEntriesForPages(pages)) {
     if (entry.kind === 'leaf') {
       out.push({ to: entry.to, label: entry.label, icon: entry.icon });
     } else {
@@ -196,24 +234,4 @@ export function flattenNavRoutes(): { to: string; label: string; icon: LucideIco
     }
   }
   return out;
-}
-
-/** Collapsed sidebar rail: include SQM under Services only when the package is installed. */
-export function flattenNavRoutesWithSqm(sqmInstalled: boolean): {
-  to: string;
-  label: string;
-  icon: LucideIcon;
-}[] {
-  const base = flattenNavRoutes();
-  if (!sqmInstalled) return base;
-  const tailscaleIdx = base.findIndex((r) => r.to === '/services/tailscale');
-  const sqmEntry = {
-    to: '/services/sqm',
-    label: 'SQM',
-    icon: NAV_SUB_ICONS['/services/sqm'] ?? Monitor,
-  };
-  if (tailscaleIdx === -1) {
-    return [...base, sqmEntry];
-  }
-  return [...base.slice(0, tailscaleIdx + 1), sqmEntry, ...base.slice(tailscaleIdx + 1)];
 }

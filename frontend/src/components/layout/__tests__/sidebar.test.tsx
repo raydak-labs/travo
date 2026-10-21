@@ -14,6 +14,7 @@ import { ThemeProvider } from '../theme-provider';
 import { AppShell } from '../app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useServices } from '@/hooks/use-services';
+import { useSpeedtestServiceStatus } from '@/hooks/use-speedtest';
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(() => false),
@@ -37,8 +38,13 @@ vi.mock('@/hooks/use-services', async (importOriginal) => {
   };
 });
 
+vi.mock('@/hooks/use-speedtest', () => ({
+  useSpeedtestServiceStatus: vi.fn(),
+}));
+
 const mockUseIsMobile = vi.mocked(useIsMobile);
 const mockUseServices = vi.mocked(useServices);
+const mockUseSpeedtestServiceStatus = vi.mocked(useSpeedtestServiceStatus);
 
 const ROUTE_PATHS = [
   '/dashboard',
@@ -115,6 +121,11 @@ describe('Sidebar', () => {
       isLoading: false,
       isError: false,
     } as ReturnType<typeof useServices>);
+    // Unknown install state keeps optional links visible; individual tests
+    // override this to prove the hiding rule.
+    mockUseSpeedtestServiceStatus.mockReturnValue({
+      isSuccess: false,
+    } as ReturnType<typeof useSpeedtestServiceStatus>);
     localStorage.clear();
   });
 
@@ -288,6 +299,62 @@ describe('Sidebar', () => {
       expect(screen.getByText('SQM')).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Apps' })).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Tailscale' })).toBeInTheDocument();
+    });
+  });
+
+  it('hides Tailscale and Speedtest while their packages are absent', async () => {
+    const user = userEvent.setup();
+    mockUseServices.mockReturnValue({
+      data: [
+        {
+          id: 'tailscale',
+          name: 'Tailscale',
+          description: 'Zero-config mesh VPN',
+          state: 'not_installed',
+          auto_start: false,
+        },
+      ],
+      isLoading: false,
+      isSuccess: true,
+      isError: false,
+    } as ReturnType<typeof useServices>);
+    mockUseSpeedtestServiceStatus.mockReturnValue({
+      data: { installed: false, supported: true },
+      isSuccess: true,
+      isError: false,
+    } as ReturnType<typeof useSpeedtestServiceStatus>);
+    renderSidebar();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Services' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Toggle Services menu' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'Tailscale' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Speedtest' })).not.toBeInTheDocument();
+      expect(screen.queryByText('SQM')).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps optional service links when the install state could not be read', async () => {
+    const user = userEvent.setup();
+    mockUseServices.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isSuccess: false,
+      isError: true,
+    } as ReturnType<typeof useServices>);
+    mockUseSpeedtestServiceStatus.mockReturnValue({
+      isSuccess: false,
+      isError: true,
+    } as ReturnType<typeof useSpeedtestServiceStatus>);
+    renderSidebar();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Services' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: 'Toggle Services menu' }));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Tailscale' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Speedtest' })).toBeInTheDocument();
     });
   });
 
