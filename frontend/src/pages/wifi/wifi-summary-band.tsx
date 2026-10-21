@@ -1,5 +1,5 @@
 import { useNetworkStatus } from '@/hooks/use-network';
-import { useRadios, useWifiConnection, useWifiHealth } from '@/hooks/use-wifi';
+import { useWifiConnection } from '@/hooks/use-wifi';
 import { SummaryBand, SummaryTile } from '@/components/ui/summary-band';
 import { StatValue } from '@/components/ui/stat-value';
 import { getWifiModeLabel } from '@/components/wifi/wifi-mode-options';
@@ -20,8 +20,13 @@ function bandLabel(band: string): string {
 /**
  * Always-visible summary of the WiFi page.
  *
+ * Three tiles only: what the connection is, whether the internet answers, and
+ * how the router uses its radios. Radio details are configuration and belong
+ * to WiFi / Advanced; health problems already get the banner below, so a tile
+ * for them repeated the same warning and pushed the controls off the screen.
+ *
  * Every tile degrades on its own: one failed request must not cost the operator
- * the four other facts, and a failed request is never turned into a negative
+ * the other two facts, and a failed request is never turned into a negative
  * claim ("no internet") it cannot support.
  *
  * `stale` is deliberately not passed. With the default staleTime of 0 every
@@ -30,28 +35,15 @@ function bandLabel(band: string): string {
 export function WifiSummaryBand() {
   const connection = useWifiConnection();
   const network = useNetworkStatus();
-  const radios = useRadios();
-  const health = useWifiHealth();
 
   // `conn` is only the association the endpoint actually reported as up: a
   // stale SSID from a past session must never read as a live connection.
   const conn = connection.data?.connected === true ? connection.data : undefined;
   const connected = conn !== undefined;
   const reachable = network.data?.internet_reachable;
-  const radioList = radios.data ?? [];
-  const healthData = health.data;
-  const repeaterConflict = healthData?.repeater_same_radio_ap_sta === true;
-
-  const healthTone = !healthData
-    ? undefined
-    : repeaterConflict || healthData.status === 'error'
-      ? 'danger'
-      : healthData.status === 'warning'
-        ? 'warn'
-        : 'ok';
 
   return (
-    <SummaryBand label="WiFi status">
+    <SummaryBand label="WiFi status" className="lg:grid-cols-3">
       <SummaryTile
         title="Connection"
         tone={connected ? 'ok' : 'neutral'}
@@ -91,36 +83,6 @@ export function WifiSummaryBand() {
       </SummaryTile>
 
       <SummaryTile
-        title="Radios"
-        isLoading={radios.isLoading}
-        isError={radios.isError}
-        error={radios.error}
-        onRetry={() => void radios.refetch()}
-      >
-        <div className="space-y-2">
-          {radioList.length === 0 ? (
-            <StatValue label="Radios" value={null} />
-          ) : (
-            radioList.map((radio) => (
-              <StatValue
-                key={radio.name}
-                label={`${radio.name} (${radio.band})`}
-                value={`ch ${radio.channel} · ${radio.htmode}`}
-                hint={`role ${radio.role} · ${radio.disabled ? 'disabled' : 'enabled'}`}
-              />
-            ))
-          )}
-          {/* These facts are read out of UCI/CONFIG, so a channel here is the
-              configured one and can differ from what is on the air until the
-              next apply. Saying so keeps the tile from being read as live
-              radio state. */}
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Configured radios, not live radio state.
-          </p>
-        </div>
-      </SummaryTile>
-
-      <SummaryTile
         title="Mode"
         isLoading={connection.isLoading}
         isError={connection.isError}
@@ -132,45 +94,6 @@ export function WifiSummaryBand() {
           value={conn?.mode ? getWifiModeLabel(conn.mode) : null}
           hint="How this router uses Wi-Fi"
         />
-      </SummaryTile>
-
-      <SummaryTile
-        title="Health"
-        tone={healthTone}
-        isLoading={health.isLoading}
-        isError={health.isError}
-        error={health.error}
-        onRetry={() => void health.refetch()}
-      >
-        <div className="space-y-2">
-          <StatValue
-            label="wwan"
-            value={
-              healthData?.wwan
-                ? healthData.wwan.up
-                  ? `Up · ${healthData.wwan.device || 'device unknown'}`
-                  : 'Down'
-                : null
-            }
-          />
-          <StatValue
-            label="STA"
-            value={
-              healthData?.sta
-                ? healthData.sta.associated
-                  ? `Associated · ${healthData.sta.ssid}`
-                  : 'Not associated'
-                : null
-            }
-          />
-          {repeaterConflict ? (
-            <StatValue
-              label="Radio layout"
-              value="AP shares the STA radio"
-              hint="Fragile: reconcile or move the downlink"
-            />
-          ) : null}
-        </div>
       </SummaryTile>
     </SummaryBand>
   );

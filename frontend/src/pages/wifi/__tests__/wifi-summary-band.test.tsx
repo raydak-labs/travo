@@ -10,12 +10,12 @@ function band() {
   return screen.getByRole('region', { name: 'WiFi status' });
 }
 
-const TILE_TITLES = ['Connection', 'Internet', 'Radios', 'Mode', 'Health'];
+const TILE_TITLES = ['Connection', 'Internet', 'Mode'];
 
 // The band exists so the first glance of the page answers "is my Wi-Fi
-// working" without scrolling; these lock the five facts and their wording.
+// working" without scrolling; these lock the three facts and their wording.
 describe('WiFi summary band', () => {
-  it('renders all five tiles with a connected, reachable state', async () => {
+  it('renders the three status tiles with a connected, reachable state', async () => {
     renderWithProviders(<WifiWirelessPanel />);
 
     await waitFor(() => {
@@ -29,8 +29,10 @@ describe('WiFi summary band', () => {
     expect(within(band()).getByText('5 GHz · channel 36')).toBeInTheDocument();
     expect(within(band()).getByText('Reachable')).toBeInTheDocument();
     expect(within(band()).getByText('Client (STA)')).toBeInTheDocument();
-    expect(within(band()).getByText('radio0 (2g)')).toBeInTheDocument();
-    expect(within(band()).getByText('ch 6 · HE20')).toBeInTheDocument();
+    // Radio configuration and health live on WiFi / Advanced and in the health
+    // banner; repeating them here pushed the controls below the fold.
+    expect(within(band()).queryByText('Radios')).not.toBeInTheDocument();
+    expect(within(band()).queryByText('Health')).not.toBeInTheDocument();
   });
 
   it('reports the failure in one tile without blanking the others', async () => {
