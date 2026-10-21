@@ -72,7 +72,9 @@ describe('WifiPage', () => {
     renderWifiPage('/wifi/advanced');
 
     await waitFor(() => {
-      expect(screen.getByText('MAC Address Cloning')).toBeInTheDocument();
+      // Every advanced entry is the same collapsible section, so the title is
+      // the section trigger rather than a card heading.
+      expect(screen.getByRole('button', { name: 'MAC address cloning' })).toBeInTheDocument();
     });
     expect(screen.queryByText('Current Connection')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Radio hardware/i })).toBeInTheDocument();

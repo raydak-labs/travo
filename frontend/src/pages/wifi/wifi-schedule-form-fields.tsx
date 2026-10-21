@@ -30,7 +30,7 @@ export function WiFiScheduleFormFields({
         </div>
         <Switch
           id="wifi-schedule-toggle"
-          label="Enable schedule"
+          aria-label="Enable schedule"
           disabled={switchDisabled}
           {...register('enabled')}
         />
