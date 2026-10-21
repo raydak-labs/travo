@@ -33,18 +33,12 @@ const vpnReceiverType = "VpnService"
 // one that lives in another file, so scoping the walk to vpn_service.go would
 // let a file split hide a nested lock rather than reveal one.
 func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
-	fset := token.NewFileSet()
-	parsed, err := parser.ParseDir(fset, ".", nil, 0)
-	if err != nil {
-		t.Fatalf("parse services package: %v", err)
-	}
-
 	// Method name -> the names it calls as <recv>.foo(...).
 	calls := map[string][]string{}
 	// Method name -> true when it takes a config lock.
 	locks := map[string]bool{}
 
-	for _, file := range packageFiles(parsed) {
+	for _, file := range packageFiles(t) {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Recv == nil || fn.Body == nil {
@@ -128,7 +122,7 @@ func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
 	for _, deep := range []string{"enableWireguard", "disableWireguard", "setupWireGuardFirewall", "teardownWireGuardFirewall"} {
 		if !union[deep] {
 			t.Fatalf("the walk from the entry points never reaches %s "+
-				"(%d functions reached); the walker is probably not following %s.* calls", deep, len(union), recvNameOf(vpnReceiverType))
+				"(%d functions reached); the walker is probably not following %s.* calls", deep, len(union), recvNameOf(t, vpnReceiverType))
 		}
 	}
 
@@ -186,13 +180,9 @@ func receiverOf(fn *ast.FuncDecl) (typeName, varName string) {
 // recvNameOf returns the receiver variable name used by the methods of a
 // receiver type. The package uses one name per type, so the first method found
 // for the type is representative.
-func recvNameOf(typeName string) string {
-	fset := token.NewFileSet()
-	parsed, err := parser.ParseDir(fset, ".", nil, 0)
-	if err != nil {
-		return "?"
-	}
-	for _, file := range packageFiles(parsed) {
+func recvNameOf(t *testing.T, typeName string) string {
+	t.Helper()
+	for _, file := range packageFiles(t) {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok {
@@ -284,14 +274,32 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
-// packageFiles returns every parsed file in the package, whatever package name
-// the parser grouped them under.
-func packageFiles(parsed map[string]*ast.Package) []*ast.File {
+// packageFiles parses every non-test file in the services package.
+//
+// The files are read one by one rather than through parser.ParseDir: the
+// services package has no build-tagged files, and ParseDir is deprecated
+// precisely because it does not reason about build tags.
+func packageFiles(t *testing.T) []*ast.File {
+	t.Helper()
+	fset := token.NewFileSet()
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
 	var files []*ast.File
-	for _, pkg := range parsed {
-		for _, file := range pkg.Files {
-			files = append(files, file)
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
 		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		file, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		files = append(files, file)
 	}
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].Name.Name < files[j].Name.Name
@@ -304,12 +312,7 @@ func packageFiles(parsed map[string]*ast.Package) []*ast.File {
 // checks can see.
 func forEachPackageFile(t *testing.T, fn func(*ast.File)) {
 	t.Helper()
-	fset := token.NewFileSet()
-	parsed, err := parser.ParseDir(fset, ".", nil, 0)
-	if err != nil {
-		t.Fatalf("parse services package: %v", err)
-	}
-	for _, file := range packageFiles(parsed) {
+	for _, file := range packageFiles(t) {
 		fn(file)
 	}
 }
