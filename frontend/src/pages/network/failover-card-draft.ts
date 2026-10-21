@@ -1,10 +1,9 @@
-import type { FailoverCandidate, FailoverConfig } from '@shared/index';
-
 /**
  * The editable draft of the failover configuration: a deep copy the operator
  * can reorder and edit without touching the stored config, and the summary
  * the card renders for the tracked addresses.
  */
+import type { FailoverCandidate, FailoverConfig } from '@shared/index';
 export function cloneConfig(config: FailoverConfig): FailoverConfig {
   return {
     ...config,

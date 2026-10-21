@@ -87,7 +87,7 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 // is reachable. If the pre-flight check fails, no dnsmasq changes are made and
 // the error is returned (safe: DNS resolution is never left in a broken state).
 // SetDNS stacks or unstacks AdGuard on the shared dnsmasq resolver layer stack
-// (see dnsmasqLayerStackFile in vpn_service.go).
+// (see dnsmasqLayerStackFile in dnsmasq_layer_stack.go).
 //
 // It used to `uci delete` the whole server list on both paths, which destroyed
 // split-DNS entries the operator added by hand in LuCI (server=/lan.example.com/...)

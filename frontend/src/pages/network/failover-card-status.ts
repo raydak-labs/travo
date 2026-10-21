@@ -1,3 +1,7 @@
+/**
+ * The status of a failover candidate and of the mwan3 service, as the label
+ * and the pill tone the card shows.
+ */
 import type { StatusPillProps } from '@/components/ui/status-pill';
 import type { FailoverCandidate, FailoverConfig, FailoverTrackingState } from '@shared/index';
 

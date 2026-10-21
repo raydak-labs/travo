@@ -351,8 +351,10 @@ new callers must not widen the condition.
 - `backend/internal/services/adguard_service.go` — `GetDNSMode`, auto-configure,
   `SetPassword`, bundled template `/etc/travo/adguardhome.yaml`
 - `backend/internal/services/dnsmasq_layer_stack.go` — the shared layer stack itself:
-  `/etc/trafo/dnsmasq-layers.json` (`dnsmasqLayerStackPath`), the legacy
-  `/etc/travo/vpn-dns-snapshot.json`, and the layer operations
+  `/etc/trafo/dnsmasq-layers.json` (`dnsmasqLayerStackPath`) and the layer
+  operations, over the per-feature legacy snapshots (`legacyDnsmasqSnapshotPaths`)
+- `backend/internal/services/vpn_service.go` — the legacy
+  `/etc/travo/vpn-dns-snapshot.json` (`legacyVpnDnsSnapshotPath`)
 - `backend/internal/services/vpn_dns.go` — the VPN layer,
   `enableVpnDNSForwarding` / `disableVpnDNSForwarding`, `maybeSelfHealVpnDNS`
 - `backend/internal/services/captive_dnsmasq.go` — the bypass as the `captive` layer
@@ -360,7 +362,7 @@ new callers must not widen the condition.
   timeouts
 - `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
-- `backend/internal/services/network_service.go` — WAN custom DNS (`SetDNSConfig`)
+- `backend/internal/services/network_dns.go` — WAN custom DNS (`SetDNSConfig`)
 - `backend/internal/services/dns_docs_test.go` — the drift gate that keeps the paths
   above and this ADR in agreement
 - `docs/adr/0003-crash-guards-and-live-state.md` — guard directory contract (§2)
