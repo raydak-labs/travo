@@ -12,15 +12,15 @@ export const authHandlers = [
       });
     }
     return HttpResponse.json({ error: 'Invalid password' }, { status: 401 });
-  })
+  }),
 
   http.post(API_ROUTES.auth.logout, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.get(API_ROUTES.auth.session, () => {
     return HttpResponse.json({ valid: true, expires_in: 86400 });
-  })
+  }),
 
   http.put(API_ROUTES.auth.password, async ({ request }) => {
     const body = (await request.json()) as { current_password: string; new_password: string };

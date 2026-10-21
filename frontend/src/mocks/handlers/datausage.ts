@@ -22,7 +22,7 @@ export const datausageHandlers = [
         },
       ],
     });
-  })
+  }),
 
   http.get(API_ROUTES.network.dataUsageBudget, () => {
     return HttpResponse.json({
@@ -35,11 +35,11 @@ export const datausageHandlers = [
         },
       ],
     });
-  })
+  }),
 
   http.put(API_ROUTES.network.dataUsageBudget, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.post(API_ROUTES.network.dataUsageReset, () => {
     return HttpResponse.json({ status: 'ok' });

@@ -15,6 +15,9 @@ import {
 } from '../data';
 import type { ConnectionMethod, FailoverConfig, FailoverEvent } from '@shared/index';
 
+// Fixtures for routes that had no mock until now. They live here rather than in
+// mocks/data.ts because that file belongs to another lane's change set.
+
 const mockConnectionMethod: ConnectionMethod = {
   method: 'wifi-client',
   interface: 'wwan0',
@@ -75,98 +78,109 @@ const mockFailoverEvents: FailoverEvent[] = [
 export const networkHandlers = [
   http.get(API_ROUTES.network.status, () => {
     return HttpResponse.json(mockNetworkStatus);
-  })
+  }),
 
   http.get(API_ROUTES.network.trafficHistory, () => {
     // A real server holds ~10 minutes here; the mock keeps one point so the
     // chart path is exercised without inventing a plausible-looking series.
     return HttpResponse.json({ points: [], retained_seconds: 0 });
-  })
+  }),
 
   http.get(API_ROUTES.network.wan, () => {
     return HttpResponse.json(mockWanConfig);
-  })
+  }),
 
   http.get(API_ROUTES.network.wanDetect, () => {
     return HttpResponse.json({ detected_type: 'dhcp', current_type: 'dhcp' });
-  })
+  }),
 
   http.put(API_ROUTES.network.wan, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.get(API_ROUTES.network.clients, () => {
     return HttpResponse.json(mockClients);
-  })
+  }),
 
   http.put(API_ROUTES.network.clientAlias, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.network.dhcp, () => {
     return HttpResponse.json(mockDHCPConfig);
-  })
+  }),
+
   http.put(API_ROUTES.network.dhcp, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.network.dns, () => {
     return HttpResponse.json(mockDNSConfig);
-  })
+  }),
+
   http.put(API_ROUTES.network.dns, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.network.dnsEntries, () => {
     return HttpResponse.json(mockDNSEntries);
-  })
+  }),
+
   http.post(API_ROUTES.network.dnsEntries, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
+
   http.delete(`${API_ROUTES.network.dnsEntries}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.network.dhcpLeases, () => {
     return HttpResponse.json(mockDHCPLeases);
-  })
+  }),
 
   http.get(API_ROUTES.network.dhcpReservations, () => {
     return HttpResponse.json(mockDHCPReservations);
-  })
+  }),
+
   http.post(API_ROUTES.network.dhcpReservations, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
+
   http.delete(`${API_ROUTES.network.dhcpReservations}/:section`, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.post(API_ROUTES.network.clientKick, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
+
   http.post(API_ROUTES.network.clientBlock, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
+
   http.post(API_ROUTES.network.clientUnblock, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
+
   http.get(API_ROUTES.network.clientBlocked, () => {
     return HttpResponse.json(mockBlockedClients);
-  })
+  }),
 
   http.post(`${API_ROUTES.network.interfaceState.replace(':name', ':name')}`, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.network.ddns, () => {
     return HttpResponse.json(mockDDNSConfigResponse);
-  })
+  }),
+
   http.put(API_ROUTES.network.ddns, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
+
   http.get(API_ROUTES.network.ddnsStatus, () => {
     return HttpResponse.json(mockDDNSStatus);
-  })
+  }),
 
   http.get(API_ROUTES.network.uptimeLog, () => {
     const now = Date.now();
@@ -177,23 +191,23 @@ export const networkHandlers = [
       { timestamp: now - 1000 * 60 * 60 * 3, state: 'disconnected' },
       { timestamp: now - 1000 * 60 * 60 * 3 - 1000 * 60 * 15, state: 'connected' },
     ]);
-  })
+  }),
 
   http.get(API_ROUTES.network.firewallZones, () => {
     return HttpResponse.json({ zones: [] });
-  })
+  }),
 
   http.get(API_ROUTES.network.portForwards, () => {
     return HttpResponse.json({ rules: [] });
-  })
+  }),
 
   http.post(API_ROUTES.network.portForwards, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.delete(`${API_ROUTES.network.portForwards}/:id`, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.post(API_ROUTES.network.diagnostics, () => {
     return HttpResponse.json({
@@ -201,39 +215,39 @@ export const networkHandlers = [
       target: '8.8.8.8',
       output: 'PING 8.8.8.8: 3 packets',
     });
-  })
+  }),
 
   http.get(API_ROUTES.network.doh, () => {
     return HttpResponse.json({ enabled: false, provider: 'cloudflare', url: '' });
-  })
+  }),
 
   http.put(API_ROUTES.network.doh, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.get(API_ROUTES.network.ipv6, () => {
     return HttpResponse.json({ enabled: false, mode: 'disabled', address: '', prefix: '' });
-  })
+  }),
 
   http.put(API_ROUTES.network.ipv6, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.post(API_ROUTES.network.wol, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.get(API_ROUTES.network.connectionMethod, () => {
     return HttpResponse.json(mockConnectionMethod);
-  })
+  }),
 
   http.get(API_ROUTES.network.failover, () => {
     return HttpResponse.json(mockFailoverConfig);
-  })
+  }),
 
   http.put(API_ROUTES.network.failover, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.network.failoverEvents, () => {
     return HttpResponse.json(mockFailoverEvents);

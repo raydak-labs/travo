@@ -1,17 +1,15 @@
 import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES } from '@shared/index';
-import {
-  mockServices,
-} from '../data';
+import { mockServices } from '../data';
 
 export const servicesHandlers = [
   http.get(API_ROUTES.services.list, () => {
     return HttpResponse.json(mockServices);
-  })
+  }),
 
   http.post(API_ROUTES.services.install, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.post(`${API_ROUTES.services.installStream.replace(':id', ':id')}`, ({ params }) => {
     const id = params.id as string;
@@ -24,11 +22,11 @@ export const servicesHandlers = [
     return new HttpResponse(body, {
       headers: { 'Content-Type': 'application/x-ndjson' },
     });
-  })
+  }),
 
   http.post(API_ROUTES.services.remove, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.post(`${API_ROUTES.services.removeStream.replace(':id', ':id')}`, ({ params }) => {
     const id = params.id as string;
@@ -40,15 +38,15 @@ export const servicesHandlers = [
     return new HttpResponse(body, {
       headers: { 'Content-Type': 'application/x-ndjson' },
     });
-  })
+  }),
 
   http.post(API_ROUTES.services.start, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.post(API_ROUTES.services.stop, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.post(API_ROUTES.services.autostart, () => {
     return HttpResponse.json({ status: 'ok' });

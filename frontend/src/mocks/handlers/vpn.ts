@@ -12,27 +12,27 @@ import {
 export const vpnHandlers = [
   http.get(API_ROUTES.vpn.status, () => {
     return HttpResponse.json([mockVpnStatus]);
-  })
+  }),
 
   http.get(API_ROUTES.vpn.wireguard.config, () => {
     return HttpResponse.json(mockWireguardConfig);
-  })
+  }),
 
   http.put(API_ROUTES.vpn.wireguard.config, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.post(API_ROUTES.vpn.wireguard.toggle, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.wireguard.status, () => {
     return HttpResponse.json(mockWireguardStatus);
-  })
+  }),
 
   http.get(API_ROUTES.vpn.wireguard.profiles, () => {
     return HttpResponse.json(mockWireguardProfiles);
-  })
+  }),
 
   http.post(API_ROUTES.vpn.wireguard.profiles, async ({ request }) => {
     const body = (await request.json()) as { name: string; config: string };
@@ -46,39 +46,39 @@ export const vpnHandlers = [
       },
       { status: 201 },
     );
-  })
+  }),
 
   http.delete(`${API_ROUTES.vpn.wireguard.profiles}/:id`, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.post(`${API_ROUTES.vpn.wireguard.profiles}/:id/activate`, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.killswitch, () => {
     return HttpResponse.json(mockKillSwitchStatus);
-  })
+  }),
 
   http.put(API_ROUTES.vpn.killswitch, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.tailscale.status, () => {
     return HttpResponse.json(mockTailscaleStatus);
-  })
+  }),
 
   http.post(API_ROUTES.vpn.tailscale.toggle, () => {
     return HttpResponse.json({ success: true });
-  })
+  }),
 
   http.post(API_ROUTES.vpn.tailscale.auth, () => {
     return HttpResponse.json({ status: 'ok', auth_url: '' });
-  })
+  }),
 
   http.post(API_ROUTES.vpn.tailscale.exitNode, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.dnsLeakTest, () => {
     return HttpResponse.json({
@@ -87,7 +87,7 @@ export const vpnHandlers = [
       vpn_active: true,
       potentially_leaking: true,
     });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.wireguard.verify, () => {
     return HttpResponse.json({
@@ -98,23 +98,23 @@ export const vpnHandlers = [
       firewall_zone_ok: true,
       forwarding_ok: true,
     });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.tailscale.ssh, () => {
     return HttpResponse.json({ enabled: false });
-  })
+  }),
 
   http.put(API_ROUTES.vpn.tailscale.ssh, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.get(API_ROUTES.vpn.splitTunnel, () => {
     return HttpResponse.json({ enabled: false, routes: [] });
-  })
+  }),
 
   http.put(API_ROUTES.vpn.splitTunnel, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.post(API_ROUTES.vpn.wireguard.import, async ({ request }) => {
     const body = (await request.json()) as { name?: string; config?: string };

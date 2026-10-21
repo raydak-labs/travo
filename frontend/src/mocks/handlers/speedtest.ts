@@ -2,6 +2,9 @@ import { http, HttpResponse } from 'msw/http';
 import { API_ROUTES } from '@shared/index';
 import type { SpeedTestResult, SpeedtestServiceStatus } from '@shared/index';
 
+// Fixtures for routes that had no mock until now. They live here rather than in
+// mocks/data.ts because that file belongs to another lane's change set.
+
 const mockSpeedtestServiceStatus: SpeedtestServiceStatus = {
   installed: true,
   supported: true,
@@ -26,7 +29,7 @@ export const speedtestHandlers = [
       ping_ms: 15.0,
       server: 'test',
     });
-  })
+  }),
 
   // Routes below had no handler at all. Without them the dev server hit the
   // network for real (main.tsx starts MSW with onUnhandledFrame "bypass") and
@@ -34,19 +37,19 @@ export const speedtestHandlers = [
 
   http.get(API_ROUTES.system.speedtestService, () => {
     return HttpResponse.json(mockSpeedtestServiceStatus);
-  })
+  }),
 
   http.post(API_ROUTES.system.speedtestServiceInstall, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.post(API_ROUTES.system.speedtestServiceUninstall, () => {
     return HttpResponse.json({ ok: true });
-  })
+  }),
 
   http.post(API_ROUTES.system.speedtestServiceRun, () => {
     return HttpResponse.json(mockSpeedTestResult);
-  })
+  }),
 
   http.post(API_ROUTES.vpn.speedTest, () => {
     return HttpResponse.json(mockSpeedTestResult);

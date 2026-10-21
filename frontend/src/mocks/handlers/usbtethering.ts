@@ -11,11 +11,11 @@ export const usbtetheringHandlers = [
       ip_address: '',
       configured: false,
     });
-  })
+  }),
 
   http.post(API_ROUTES.network.usbTetheringConfigure, () => {
     return HttpResponse.json({ status: 'ok' });
-  })
+  }),
 
   http.post(API_ROUTES.network.usbTetheringUnconfigure, () => {
     return HttpResponse.json({ status: 'ok' });

@@ -1,22 +1,22 @@
-import { adguardHandlers } from './adguard';
 import { authHandlers } from './auth';
-import { captiveHandlers } from './captive';
-import { dataUsageHandlers } from './datausage';
-import { networkHandlers } from './network';
-import { servicesHandlers } from './services';
-import { speedtestHandlers } from './speedtest';
-import { sqmHandlers } from './sqm';
 import { systemHandlers } from './system';
-import { usbTetheringHandlers } from './usbtethering';
-import { vpnHandlers } from './vpn';
+import { networkHandlers } from './network';
+import { datausageHandlers } from './datausage';
+import { usbtetheringHandlers } from './usbtethering';
+import { sqmHandlers } from './sqm';
 import { wifiHandlers } from './wifi';
+import { vpnHandlers } from './vpn';
+import { servicesHandlers } from './services';
+import { captiveHandlers } from './captive';
+import { adguardHandlers } from './adguard';
+import { speedtestHandlers } from './speedtest';
 
 export const handlers = [
   ...authHandlers,
   ...systemHandlers,
   ...networkHandlers,
-  ...dataUsageHandlers,
-  ...usbTetheringHandlers,
+  ...datausageHandlers,
+  ...usbtetheringHandlers,
   ...sqmHandlers,
   ...wifiHandlers,
   ...vpnHandlers,
