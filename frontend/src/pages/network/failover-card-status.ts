@@ -2,10 +2,9 @@ import type { StatusPillProps } from '@/components/ui/status-pill';
 import type { FailoverCandidate, FailoverConfig, FailoverTrackingState } from '@shared/index';
 
 /**
- * The status of a failover candidate and of the mwan3 service, as the pill
- * tone the card shows. A tracking state is a status, not a caption: it gets
- * the shared pill so "Online" in the order list is the same green as
- * "Online" anywhere else.
+ * The tracking state as something a user can act on. `not_available` vs
+ * `not_installed` is a distinction only the mwan3 author cares about, and
+ * neither tells a user what to do.
  */
 export const TRACKING_LABEL: Record<FailoverTrackingState, string> = {
   online: 'Online',

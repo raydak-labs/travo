@@ -15,6 +15,10 @@ import type {
   DDNSStatus,
 } from '@shared/index';
 
+// Mirrors GET /api/v1/network/status as the router actually answers it:
+// `name` is the ubus network section and `type` is the medium/role
+// discriminator. In repeater mode the `wan` field carries the wwan (WiFi STA)
+// interface, because it is the effective uplink.
 export const mockNetworkStatus: NetworkStatus = {
   wan: {
     name: 'wwan',
