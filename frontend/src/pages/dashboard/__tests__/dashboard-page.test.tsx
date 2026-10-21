@@ -133,11 +133,16 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('renders network throughput chart section', async () => {
+  it('shows live download and upload rates instead of a throughput chart', async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText('Internet Throughput')).toBeInTheDocument();
+      expect(screen.getByText('Download')).toBeInTheDocument();
+      expect(screen.getByText('Upload')).toBeInTheDocument();
     });
+    // No sample has arrived in this test, so the rates must read as unknown
+    // rather than as a confident "0 B/s".
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Internet Throughput')).not.toBeInTheDocument();
   });
 
   it('stacks topology when narrow and shows line diagram from @xl card width', async () => {

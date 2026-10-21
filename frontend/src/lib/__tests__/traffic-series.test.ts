@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { InterfaceDataPoint } from '@/hooks/use-websocket';
 import type { TrafficHistoryPoint } from '@shared/index';
-import { interfaceNames, mergeInterfaceSeries } from '@/lib/traffic-series';
+import { interfaceNames, latestRate, mergeInterfaceSeries } from '@/lib/traffic-series';
 
 function hist(t: number, ifname = 'eth0', rx = 0): TrafficHistoryPoint {
   return { t, ifname, rx_bytes: rx, tx_bytes: 0 };
@@ -53,5 +53,26 @@ describe('interfaceNames', () => {
 
   it('tolerates missing history', () => {
     expect(interfaceNames(undefined, { eth0: [] })).toEqual(['eth0']);
+  });
+});
+
+describe('latestRate', () => {
+  it('returns null until two samples define an interval', () => {
+    expect(latestRate([])).toBeNull();
+    expect(latestRate([live(1000, 0)])).toBeNull();
+  });
+
+  it('reports the rate over the newest interval only', () => {
+    const series = [live(1000, 0), live(2000, 500), live(3000, 1500)];
+    expect(latestRate(series)).toEqual({ rx: 1000, tx: 0 });
+  });
+
+  it('clamps a counter reset to zero instead of a negative rate', () => {
+    const series = [live(1000, 5000), live(2000, 100)];
+    expect(latestRate(series)).toEqual({ rx: 0, tx: 0 });
+  });
+
+  it('returns null when the timestamps do not advance', () => {
+    expect(latestRate([live(2000, 0), live(2000, 100)])).toBeNull();
   });
 });
