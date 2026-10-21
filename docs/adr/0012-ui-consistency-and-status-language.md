@@ -3,7 +3,7 @@ title: "ADR 0012: UI consistency — card plane, status language, summary bands,
 description: One card plane, one status language, one group heading, one load/error contract, summary bands, and server-owned traffic history.
 status: Accepted
 date: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-21
 tags: [adr, frontend, ui, theming, consistency, status, wifi, dashboard]
 ---
 
@@ -64,8 +64,8 @@ component state.
    but the ~10 minutes before it are read from `GET
    /api/v1/network/traffic-history`. The backend samples every broadcast tick
    into a bounded in-memory ring regardless of connected clients, so a freshly
-   loaded dashboard has something to draw. History resets on restart; the UI
-   shows the short window it has rather than pretending to ten minutes.
+   loaded Network Status page has something to draw. History resets on restart;
+   the UI shows the short window it has rather than pretending to ten minutes.
 
 ## Why
 
@@ -97,11 +97,30 @@ is precisely the case that looked broken.
   loop must not grow the ring.
 - **`stale` never replaces a value with a blank.** Throwing away a fact that
   was true seconds ago is worse than showing it as possibly-outdated.
+- **One page scroll container.** `AppShell`'s `<main>` owns vertical scrolling
+  and is `relative`. An absolutely positioned descendant that resolves against
+  the viewport instead escapes the container and grows the document into a
+  second scrollbar beside it; this is why `sr-only` spans and popovers once made
+  long pages scroll in two places.
+- **Optional service pages leave the nav when absent.** Tailscale, Speedtest and
+  SQM are hidden while the router confirms the package is missing. An unreadable
+  install state keeps the link: a failed GET is not an absence claim. The pages
+  themselves say what to install when reached by a deep link.
+- **Live charts do not animate.** The WebSocket tail appends a point every two
+  seconds. Recharts animates from the previous shape by default, so every push
+  replayed the whole curve instead of extending it. The chart also states the
+  retained window it actually paints, because the ring is bounded and resets
+  when the router restarts.
+- **Dashboard rates are instantaneous.** The dashboard answers "what is
+  happening now" with the last sampling interval's RX/TX rate. The retained
+  history chart belongs to Network Status, where the window can be stated.
 
 ## Deliberate ceilings
 
 - History is ~10 minutes. Longer ranges need server-side downsampling and are
   out of scope until someone asks for them.
+- A dashboard rate is a two-second sample, not a smoothed average; a burst that
+  fits between samples is invisible by design.
 - Band tiles mix domains deliberately: WiFi reads `NetworkStatus` for
   reachability because "is my internet up" is the question a user asks on the
   WiFi page. The alternative (leaving it to Network) answers the question in the

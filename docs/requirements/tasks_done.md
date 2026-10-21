@@ -51,10 +51,17 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   wizard normalized), one status language (semantic tokens + `StatusPill`), one group heading
   (`SectionHeading`), one load/error contract (`QueryCard`) across system, services, network, logs,
   vpn and the shared component layer ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
-- WiFi summary band: always-visible connection / internet / radios / mode / health tiles with
-  per-tile degradation; the first page to use the band pattern.
-- Dashboard traffic history: `GET /api/v1/network/traffic-history` serves a bounded ~10-minute
-  in-memory ring so the throughput chart paints real history on page load instead of an empty axis.
+- WiFi summary band: always-visible connection / internet / mode tiles with per-tile degradation;
+  the first page to use the band pattern.
+- Network traffic history: `GET /api/v1/network/traffic-history` serves a bounded ~10-minute
+  in-memory ring so the interface chart paints real history on page load instead of an empty
+  axis.
+- UI clarity pass (2026-10-21, issue #195): the dashboard shows live down/up rates instead of a
+  throughput chart; the WiFi summary band is three tiles and WiFi / Advanced is one list of
+  collapsible sections with one button size; traffic charts stop replaying their animation and
+  state their retained window; the app shell owns the only page scroll container; Tailscale,
+  Speedtest and SQM leave the nav while their package is absent
+  ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
 - **Not verified on device:** the 2026-10-05 pass was completed without access to 192.168.1.1
   (host has no route to it), so light/dark rendering, the new band, and history accumulation on
   real hardware still need the standing device checks.
