@@ -51,7 +51,7 @@ describe('WifiPage', () => {
     renderWifiPage('/wifi');
 
     await waitFor(() => {
-      expect(screen.getByText('Current Connection')).toBeInTheDocument();
+      expect(screen.getByText('Current connection')).toBeInTheDocument();
     });
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(
@@ -63,7 +63,7 @@ describe('WifiPage', () => {
     renderWifiPage('/wifi');
 
     await waitFor(() => {
-      expect(screen.getByText('Current Connection')).toBeInTheDocument();
+      expect(screen.getByText('Current connection')).toBeInTheDocument();
     });
     expect(screen.queryByText('MAC Address Cloning')).not.toBeInTheDocument();
   });
@@ -76,7 +76,7 @@ describe('WifiPage', () => {
       // the section trigger rather than a card heading.
       expect(screen.getByRole('button', { name: 'MAC address cloning' })).toBeInTheDocument();
     });
-    expect(screen.queryByText('Current Connection')).not.toBeInTheDocument();
+    expect(screen.queryByText('Current connection')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Radio hardware/i })).toBeInTheDocument();
   });
 
@@ -84,7 +84,7 @@ describe('WifiPage', () => {
     renderWifiPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Current Connection')).toBeInTheDocument();
+      expect(screen.getByText('Current connection')).toBeInTheDocument();
     });
 
     await waitFor(() => {

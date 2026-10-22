@@ -1,4 +1,5 @@
 import { useWifiConnection } from '@/hooks/use-wifi';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CaptivePortalCard } from '@/components/wifi/captive-portal-card';
 import { WifiHealthBanner } from '@/components/wifi/wifi-health-banner';
 import { WifiModeCard } from '@/components/wifi/wifi-mode-card';
@@ -15,20 +16,28 @@ export function WifiWirelessPanel() {
 
   return (
     <div className="space-y-6">
-      <WifiSummaryBand />
-      <WifiHealthBanner />
+      {/* Actions that unblock connectivity come before the facts they explain:
+          a portal login or a down link is the first thing the operator needs. */}
       {!isPureAP && <CaptivePortalCard />}
+      <WifiHealthBanner />
+      <WifiSummaryBand />
       <WifiModeCard />
 
       {!isPureAP && (
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-          <div className="min-w-0 h-full md:col-span-1 lg:col-span-2 xl:col-span-2 2xl:col-span-2">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle>WiFi uplink</CardTitle>
+            <CardDescription>
+              The network this router uses for internet, and the profiles it can switch to.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <WifiCurrentConnectionCard />
-          </div>
-          <div className="min-w-0 h-full md:col-span-2 lg:col-span-3 xl:col-span-4 2xl:col-span-5">
-            <WifiSavedNetworksCard />
-          </div>
-        </div>
+            <div className="border-t border-gray-200 pt-4 dark:border-white/10">
+              <WifiSavedNetworksCard />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {!isPureSTA && (

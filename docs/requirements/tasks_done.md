@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-10-21
+updated: 2026-10-22
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture/overview.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-10-21 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-22 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## Milestone checklist (compact)
 
@@ -52,15 +52,18 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   (`SectionHeading`), one load/error contract (`QueryCard`) across system, services, network, logs,
   vpn and the shared component layer ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
 - WiFi summary band: always-visible connection / internet / mode tiles with per-tile degradation;
-  the first page to use the band pattern.
+  the first page to use the band pattern (the #195 pass later made it two tiles).
 - Network traffic history: `GET /api/v1/network/traffic-history` serves a bounded ~10-minute
   in-memory ring so the interface chart paints real history on page load instead of an empty
   axis.
-- UI clarity pass (2026-10-21, issue #195): the dashboard shows live down/up rates instead of a
-  throughput chart; the WiFi summary band is three tiles and WiFi / Advanced is one list of
-  collapsible sections with one button size; traffic charts stop replaying their animation and
-  state their retained window; the app shell owns the only page scroll container; Tailscale,
-  Speedtest and SQM leave the nav while their package is absent
+- UI clarity pass (2026-10-21, issue #195): the dashboard shows one compact bit-rate
+  field instead of separate down/up values, and the connected topology source carries the same
+  live rate; the WiFi summary band is two tiles (Connection and Internet) and WiFi / Advanced is
+  one list of collapsible sections with one button size; the WiFi mode options sit directly below
+  the band without an outer card, the current uplink and saved profiles share one card, and the
+  captive-portal warning only appears above the band when it has an action; traffic charts stop
+  replaying their animation and state their retained window; the app shell owns the only page
+  scroll container; Tailscale, Speedtest and SQM leave the nav while their package is absent
   ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
 - **Not verified on device:** the 2026-10-05 pass was completed without access to 192.168.1.1
   (host has no route to it), so light/dark rendering, the new band, and history accumulation on

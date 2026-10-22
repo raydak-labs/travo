@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Wifi, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { CardInset } from '@/components/ui/card-inset';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +33,7 @@ const SAVED_LIST_TOOLTIP =
 const AUTO_RECONNECT_HELP =
   'If Wi‑Fi drops, periodically runs a safe reconnect for the active profile. It does not automatically switch to another saved SSID for stronger signal.';
 
+/** Saved station profiles, rendered as the second section of the uplink card. */
 export function WifiSavedNetworksCard() {
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
   const { data: connection } = useWifiConnection();
@@ -70,18 +70,18 @@ export function WifiSavedNetworksCard() {
   }
 
   return (
-    <Card className="flex h-full min-w-0 flex-col">
-      <CardHeader className="space-y-1">
+    <section className="min-w-0">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <CardTitle>Saved networks</CardTitle>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white">Saved networks</h3>
           <InfoTooltip text={SAVED_LIST_TOOLTIP} />
         </div>
-        <CardDescription>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           In use = enabled profile; standby = saved but not active. <strong>Connect</strong> uses
           the stored password. Arrows set priority for automatic selection (see info).
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col space-y-4">
+        </p>
+      </div>
+      <div className="mt-4 space-y-4">
         <CardInset
           variant="muted"
           className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
@@ -272,7 +272,7 @@ export function WifiSavedNetworksCard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

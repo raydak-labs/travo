@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Wifi, WifiOff, Signal } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,10 @@ import { WifiScanDialog } from './wifi-scan-dialog';
 import { WifiHiddenNetworkDialog } from './wifi-hidden-network-dialog';
 import { useWifiConnection, useWifiDisconnect } from '@/hooks/use-wifi';
 
+/**
+ * The current station link, without its own card. It is the first section of
+ * the merged WiFi uplink card; the saved profiles follow below.
+ */
 export function WifiCurrentConnectionCard() {
   const { data: connection, isLoading: connectionLoading } = useWifiConnection();
   const disconnectMutation = useWifiDisconnect();
@@ -23,76 +26,74 @@ export function WifiCurrentConnectionCard() {
   }
 
   return (
-    <Card className="flex h-full min-w-0 flex-col">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle>Current Connection</CardTitle>
+    <div className="min-w-0">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Current connection</h3>
         {connection?.connected ? (
           <Wifi className="h-4 w-4 text-green-500" />
         ) : (
           <WifiOff className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         )}
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col">
-        {connectionLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
+      </div>
+      {connectionLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      ) : connection?.connected ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <SignalStrengthIcon signalPercent={connection.signal_percent} />
+            <span className="font-medium text-gray-900 dark:text-white">{connection.ssid}</span>
+            <Badge variant="success">Connected</Badge>
           </div>
-        ) : connection?.connected ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <SignalStrengthIcon signalPercent={connection.signal_percent} />
-              <span className="font-medium text-gray-900 dark:text-white">{connection.ssid}</span>
-              <Badge variant="success">Connected</Badge>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-1">
+              <Signal className="h-3.5 w-3.5" />
+              <span>
+                {connection.signal_percent}% ({connection.signal_dbm} dBm)
+              </span>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
-              <div className="flex items-center gap-1">
-                <Signal className="h-3.5 w-3.5" />
-                <span>
-                  {connection.signal_percent}% ({connection.signal_dbm} dBm)
-                </span>
-              </div>
-              <span>Mode: {connection.mode}</span>
-              <span>IP: {connection.ip_address}</span>
-              <SecurityBadge encryption={connection.encryption} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {/* One click used to drop the uplink outright. If auto-reconnect
-                  is on, the link silently returns and the action looks broken;
-                  if the operator is reaching the router over this WiFi, they
-                  lose the page entirely. */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setConfirming(true)}
-                disabled={disconnectMutation.isPending}
-              >
-                {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
-              </Button>
-              <WifiScanDialog />
-              <WifiHiddenNetworkDialog />
-            </div>
+            <span>Mode: {connection.mode}</span>
+            <span>IP: {connection.ip_address}</span>
+            <SecurityBadge encryption={connection.encryption} />
           </div>
-        ) : (
-          <div className="space-y-3">
-            <EmptyState message="Not connected to any WiFi network" />
-            <div className="flex flex-wrap gap-2">
-              <WifiScanDialog />
-              <WifiHiddenNetworkDialog />
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {/* One click used to drop the uplink outright. If auto-reconnect
+                is on, the link silently returns and the action looks broken;
+                if the operator is reaching the router over this WiFi, they
+                lose the page entirely. */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirming(true)}
+              disabled={disconnectMutation.isPending}
+            >
+              {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+            </Button>
+            <WifiScanDialog />
+            <WifiHiddenNetworkDialog />
           </div>
-        )}
-        <ConfirmDialog
-          open={confirming}
-          onOpenChange={setConfirming}
-          title="Disconnect from this network?"
-          description={`Stops using ${connection?.ssid ?? 'this network'} as the Wi-Fi uplink.`}
-          warningText="Internet stops working. If you are managing the router over this WiFi connection you will lose access. If auto-reconnect is on, the router will retry this network automatically."
-          confirmLabel="Disconnect"
-          isPending={disconnectMutation.isPending}
-          onConfirm={confirmDisconnect}
-        />
-      </CardContent>
-    </Card>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <EmptyState message="Not connected to any WiFi network" />
+          <div className="flex flex-wrap gap-2">
+            <WifiScanDialog />
+            <WifiHiddenNetworkDialog />
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="Disconnect from this network?"
+        description={`Stops using ${connection?.ssid ?? 'this network'} as the Wi-Fi uplink.`}
+        warningText="Internet stops working. If you are managing the router over this WiFi connection you will lose access. If auto-reconnect is on, the router will retry this network automatically."
+        confirmLabel="Disconnect"
+        isPending={disconnectMutation.isPending}
+        onConfirm={confirmDisconnect}
+      />
+    </div>
   );
 }

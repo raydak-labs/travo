@@ -3,7 +3,7 @@ title: "ADR 0012: UI consistency — card plane, status language, summary bands,
 description: One card plane, one status language, one group heading, one load/error contract, summary bands, and server-owned traffic history.
 status: Accepted
 date: 2026-10-05
-updated: 2026-10-21
+updated: 2026-10-22
 tags: [adr, frontend, ui, theming, consistency, status, wifi, dashboard]
 ---
 
@@ -88,7 +88,16 @@ is precisely the case that looked broken.
 - **A new status colour is a token addition, not a className.** Adding a raw
   status pair in a page reintroduces the defect.
 - **New pages start with a summary band** if they have more than one status
-  question; the WiFi band (`wifi-summary-band.tsx`) is the reference.
+  question; the WiFi band (`wifi-summary-band.tsx`) is the reference. The WiFi
+  band itself has two tiles, Connection and Internet; mode is a control, so its
+  three option boxes sit directly below the band without an outer card.
+- **The WiFi Internet tile uses the captive-portal probe.** `network_status`
+  reports a WAN lease, which stays true behind a login page. The tile prefers
+  `can_reach_internet` from the probe and falls back to `network_status` only
+  while the probe is unavailable. A warning card appears above the band only
+  while it has an action: portal login, DNS bypass still active, or a connected
+  link that cannot reach the internet. A healthy link is answered by the band
+  alone.
 - **Radio facts are labelled "configured".** `RadioInfo` is UCI-derived, not
   read from the air. A tile must not imply live channel, width or bitrate. A
   future `/api/v1/wifi/radios/status` may fill that gap without changing the
@@ -114,6 +123,15 @@ is precisely the case that looked broken.
 - **Dashboard rates are instantaneous.** The dashboard answers "what is
   happening now" with the last sampling interval's RX/TX rate. The retained
   history chart belongs to Network Status, where the window can be stated.
+- **Rates are bits with at most two integer digits.** Counters arrive in bytes,
+  but link rates are quoted in bits; the shared formatter turns 850 Kbit/s into
+  `0.9 Mbit/s` and switches to `0.1 Gbit/s` at 100 Mbit/s. The dashboard shows
+  one `Traffic` field with down/up arrows, and the topology annotates only the
+  connected source with the same compact rate.
+- **The WiFi uplink is one card.** The current station link and its saved
+  profiles answer one question ("which network is the uplink using"), so they
+  share one card with a divider instead of two cards competing for the same
+  width.
 
 ## Deliberate ceilings
 
@@ -121,10 +139,11 @@ is precisely the case that looked broken.
   out of scope until someone asks for them.
 - A dashboard rate is a two-second sample, not a smoothed average; a burst that
   fits between samples is invisible by design.
-- Band tiles mix domains deliberately: WiFi reads `NetworkStatus` for
-  reachability because "is my internet up" is the question a user asks on the
-  WiFi page. The alternative (leaving it to Network) answers the question in the
-  wrong place.
+- Band tiles mix domains deliberately: WiFi reads the captive-portal probe for
+  reachability because "is my internet up, or is a login page in the way" is the
+  question a user asks on the WiFi page. The alternative (leaving it to Network)
+  answers the question in the wrong place. When the probe is unavailable the
+  tile falls back to the carrier check and says so.
 
 ## Provenance: work folded in from executed plans
 
