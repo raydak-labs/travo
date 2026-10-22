@@ -25,11 +25,13 @@ export function InterfaceTrafficCharts() {
   // Say how much history is actually behind the left edge. The server keeps a
   // bounded ring and restarts empty, so "last 10 minutes" is a ceiling, not a
   // promise; the retained span is what the axis really shows.
-  const retainedLabel = history
-    ? history.retained_seconds >= 60
-      ? `last ${Math.round(history.retained_seconds / 60)} min`
-      : `last ${history.retained_seconds} s`
-    : null;
+  const retainedSeconds = history?.retained_seconds ?? 0;
+  const retainedLabel =
+    retainedSeconds > 0
+      ? retainedSeconds >= 60
+        ? `last ${Math.round(retainedSeconds / 60)} min`
+        : `last ${retainedSeconds} s`
+      : null;
 
   return (
     <Card>
