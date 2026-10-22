@@ -133,15 +133,16 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('shows live download and upload rates instead of a throughput chart', async () => {
+  it('shows one compact traffic field instead of a throughput chart', async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText('Download')).toBeInTheDocument();
-      expect(screen.getByText('Upload')).toBeInTheDocument();
+      expect(screen.getByText('Traffic')).toBeInTheDocument();
     });
-    // No sample has arrived in this test, so the rates must read as unknown
-    // rather than as a confident "0 B/s".
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Download')).not.toBeInTheDocument();
+    expect(screen.queryByText('Upload')).not.toBeInTheDocument();
+    // No sample has arrived in this test, so the rate must read as unknown
+    // rather than as a confident "0.0 Mbit/s".
+    expect(screen.getByLabelText('Traffic rate unknown')).toBeInTheDocument();
     expect(screen.queryByText('Internet Throughput')).not.toBeInTheDocument();
   });
 

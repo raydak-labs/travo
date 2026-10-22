@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useWebSocket } from '@/hooks/use-websocket';
-import { latestRate } from '@/lib/traffic-series';
+import { latestRate, type TransferRate } from '@/lib/traffic-series';
 import { uplinkInterfaceName } from '@/lib/uplink';
 
 export interface UplinkRates {
@@ -7,6 +8,8 @@ export interface UplinkRates {
   readonly rx: number | null;
   /** Bytes per second sent right now, or `null` before two samples exist. */
   readonly tx: number | null;
+  /** Newest interval for every interface the socket has sampled. */
+  readonly rates: Readonly<Record<string, TransferRate>>;
 }
 
 /**
@@ -15,10 +18,22 @@ export interface UplinkRates {
  * Uses only the WebSocket tail on purpose: the dashboard answers "what is
  * happening now". Deriving a rate from the retained history would show a
  * minutes-old figure as if it were current.
+ *
+ * The per-interface map exists so the topology can annotate the source that
+ * actually carries the traffic, not just the primary WAN name.
  */
 export function useUplinkRates(wanName: string | null): UplinkRates {
   const { interfaceDataPoints } = useWebSocket();
+  const rates = useMemo(() => {
+    const next: Record<string, TransferRate> = {};
+    for (const [name, points] of Object.entries(interfaceDataPoints)) {
+      const rate = latestRate(points);
+      if (rate) next[name] = rate;
+    }
+    return next;
+  }, [interfaceDataPoints]);
+
   const interfaceName = uplinkInterfaceName(Object.keys(interfaceDataPoints), wanName);
-  const rate = latestRate(interfaceName ? (interfaceDataPoints[interfaceName] ?? []) : []);
-  return { rx: rate?.rx ?? null, tx: rate?.tx ?? null };
+  const rate = interfaceName ? rates[interfaceName] : undefined;
+  return { rx: rate?.rx ?? null, tx: rate?.tx ?? null, rates };
 }

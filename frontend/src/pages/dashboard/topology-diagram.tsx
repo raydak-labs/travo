@@ -3,6 +3,7 @@
 
 import { Router, Wifi } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TrafficRate } from '@/components/traffic-rate';
 import type { SourceDef } from '@/hooks/use-topology-data';
 
 // Diagram colours come from the status tokens so the topology reads as one
@@ -71,6 +72,30 @@ function TopologyRouterCenter({
   );
 }
 
+function SourceIdentity({ source, truncate }: { source: SourceDef; truncate: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs font-medium leading-tight text-gray-900 dark:text-gray-200">
+        {source.label}
+      </div>
+      {source.detail && (
+        <div
+          className={`text-[10px] leading-tight text-gray-500 dark:text-gray-500 ${
+            truncate ? 'truncate' : 'break-words'
+          }`}
+        >
+          {source.detail}
+        </div>
+      )}
+      {source.connected && source.rate ? (
+        <div className="pt-0.5">
+          <TrafficRate rxBytesPerSec={source.rate.rx} txBytesPerSec={source.rate.tx} size="xs" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TopologyDiagram({
   sources,
   clients,
@@ -108,7 +133,7 @@ export function TopologyDiagram({
           {sources.map((src) => {
             const Icon = src.icon;
             return (
-              <div key={src.label} className="flex min-w-0 items-center gap-2">
+              <div key={src.key} className="flex min-w-0 items-center gap-2">
                 <div
                   className={`h-2 w-2 flex-shrink-0 rounded-full ${
                     src.connected ? connectedDotClass : idleDotClass
@@ -119,16 +144,7 @@ export function TopologyDiagram({
                     src.connected ? connectedIconClass : idleIconClass
                   }`}
                 />
-                <div className="min-w-0">
-                  <div className="text-xs font-medium leading-tight text-gray-900 dark:text-gray-200">
-                    {src.label}
-                  </div>
-                  {src.detail && (
-                    <div className="break-words text-[10px] leading-tight text-gray-500 dark:text-gray-500">
-                      {src.detail}
-                    </div>
-                  )}
-                </div>
+                <SourceIdentity source={src} truncate={false} />
               </div>
             );
           })}
@@ -180,7 +196,7 @@ export function TopologyDiagram({
               const y = sourceYs[i];
               return (
                 <div
-                  key={src.label}
+                  key={src.key}
                   className="absolute flex items-center gap-2"
                   style={{ top: y - ROW_H / 2, height: ROW_H, left: 0, right: 0 }}
                 >
@@ -194,16 +210,7 @@ export function TopologyDiagram({
                       src.connected ? connectedIconClass : idleIconClass
                     }`}
                   />
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium leading-tight text-gray-900 dark:text-gray-200">
-                      {src.label}
-                    </div>
-                    {src.detail && (
-                      <div className="truncate text-[10px] leading-tight text-gray-500 dark:text-gray-500">
-                        {src.detail}
-                      </div>
-                    )}
-                  </div>
+                  <SourceIdentity source={src} truncate />
                 </div>
               );
             })}
@@ -222,7 +229,7 @@ export function TopologyDiagram({
               const color = src.connected ? LINK_UP : LINK_IDLE;
               return (
                 <path
-                  key={src.label}
+                  key={src.key}
                   d={`M 0 ${y} C ${midX} ${y}, ${midX} ${routerCY}, 100 ${routerCY}`}
                   fill="none"
                   stroke={color}

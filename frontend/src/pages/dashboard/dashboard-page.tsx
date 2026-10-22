@@ -4,11 +4,12 @@ import { Cable, Wifi, Smartphone, Shield, Monitor } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TrafficRate } from '@/components/traffic-rate';
 import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { WanType } from '@shared/index';
 import { UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
-import { formatRate, formatUptime } from '@/lib/utils';
+import { formatUptime } from '@/lib/utils';
 import { QuickActions } from '@/pages/dashboard/quick-actions';
 import { TopologyDiagram } from '@/pages/dashboard/topology-diagram';
 import { SourceCard, DetailRow } from '@/pages/dashboard/source-card';
@@ -45,7 +46,13 @@ export function DashboardPage() {
     internetUp,
     allClients,
   } = useTopologyData();
-  const { rx, tx } = useUplinkRates(wan?.name ?? null);
+  const { rx, tx, rates } = useUplinkRates(wan?.name ?? null);
+  // Rates belong to the interface, not the source label. Attach them here so
+  // the graph never has to know how the uplink was resolved.
+  const sourcesWithRates = sources.map((source) => ({
+    ...source,
+    rate: source.connected && source.interfaceName ? (rates[source.interfaceName] ?? null) : null,
+  }));
 
   // The interface discriminator is the medium, not an address: prefer the
   // tethering service's own report and fall back to the USB WAN interface.
@@ -59,7 +66,7 @@ export function DashboardPage() {
       <TimezoneAlert />
 
       <TopologyDiagram
-        sources={sources}
+        sources={sourcesWithRates}
         clients={clients}
         hostname={router.hostname}
         model={router.model}
@@ -154,7 +161,6 @@ export function DashboardPage() {
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
             </div>
           ) : (
             <>
@@ -205,12 +211,10 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Download</span>
-                  <p className="mt-0.5 font-medium">{rx === null ? '—' : formatRate(rx)}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Upload</span>
-                  <p className="mt-0.5 font-medium">{tx === null ? '—' : formatRate(tx)}</p>
+                  <span className="text-gray-500 dark:text-gray-400">Traffic</span>
+                  <div className="mt-0.5">
+                    <TrafficRate rxBytesPerSec={rx} txBytesPerSec={tx} />
+                  </div>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Devices on your network</span>
