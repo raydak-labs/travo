@@ -9,17 +9,20 @@ type TrafficRateProps = {
   txBytesPerSec: number | null;
   /** `xs` is for the topology diagram; `sm` is for the dashboard quick status. */
   size?: 'sm' | 'xs';
+  /** Inline reads as one sentence; stacked keeps the topology hint narrow. */
+  layout?: 'inline' | 'stacked';
   className?: string;
 };
 
 /**
- * A compact two-direction link rate. Both directions share one unit when the
- * formatter picks the same one, so the common case reads `25.0 / 2.0 Mbit/s`.
+ * A compact two-direction link rate. Each direction keeps its own unit so the
+ * value never reads as if only the second number carries the unit.
  */
 export function TrafficRate({
   rxBytesPerSec,
   txBytesPerSec,
   size = 'sm',
+  layout = 'inline',
   className,
 }: TrafficRateProps) {
   const textSize = size === 'sm' ? 'text-sm' : 'text-[10px]';
@@ -39,41 +42,48 @@ export function TrafficRate({
 
   const down = formatBitRate(rxBytesPerSec * 8);
   const up = formatBitRate(txBytesPerSec * 8);
-  const [downValue, downUnit] = splitRate(down);
-  const [upValue, upUnit] = splitRate(up);
-  const sharedUnit = downUnit === upUnit;
   const label = `Download ${down}, upload ${up}`;
 
   return (
     <span
       className={cn(
-        'inline-flex min-w-0 flex-wrap items-center font-medium tabular-nums',
+        'inline-flex min-w-0 font-medium tabular-nums',
+        layout === 'inline' ? 'flex-wrap items-center gap-1' : 'flex-col items-start gap-0.5',
         textSize,
         'text-gray-700 dark:text-slate-300',
-        gap,
         className,
       )}
       title={label}
     >
       <span className="sr-only">{label}</span>
-      <span aria-hidden="true" className={cn('inline-flex items-center', gap)}>
-        <ArrowDown className={cn('shrink-0 text-gray-400 dark:text-slate-500', iconSize)} />
-        {downValue}
-        {sharedUnit ? null : <span className="text-gray-500 dark:text-slate-400">{downUnit}</span>}
-      </span>
-      <span aria-hidden="true" className="text-gray-300 dark:text-slate-600">
-        /
-      </span>
-      <span aria-hidden="true" className={cn('inline-flex items-center', gap)}>
-        <ArrowUp className={cn('shrink-0 text-gray-400 dark:text-slate-500', iconSize)} />
-        {upValue}
-        <span className="text-gray-500 dark:text-slate-400">{upUnit}</span>
-      </span>
+      <Direction icon={ArrowDown} rate={down} gap={gap} iconSize={iconSize} />
+      {layout === 'inline' ? (
+        <span aria-hidden="true" className="text-gray-300 dark:text-slate-600">
+          /
+        </span>
+      ) : null}
+      <Direction icon={ArrowUp} rate={up} gap={gap} iconSize={iconSize} />
     </span>
   );
 }
 
-function splitRate(rate: string): [string, string] {
+function Direction({
+  icon: Icon,
+  rate,
+  gap,
+  iconSize,
+}: {
+  icon: typeof ArrowDown;
+  rate: string;
+  gap: string;
+  iconSize: string;
+}) {
   const [value, unit] = rate.split(' ');
-  return [value, unit];
+  return (
+    <span aria-hidden="true" className={cn('inline-flex items-center', gap)}>
+      <Icon className={cn('shrink-0 text-gray-400 dark:text-slate-500', iconSize)} />
+      {value}
+      <span className="text-gray-500 dark:text-slate-400">{unit}</span>
+    </span>
+  );
 }

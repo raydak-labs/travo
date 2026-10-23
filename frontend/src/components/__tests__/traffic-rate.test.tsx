@@ -3,13 +3,13 @@ import { render, screen } from '@testing-library/react';
 import { TrafficRate } from '../traffic-rate';
 
 describe('TrafficRate', () => {
-  it('shares one unit when both directions use the same scale', () => {
+  it('keeps a unit on each direction even when the scale matches', () => {
     render(<TrafficRate rxBytesPerSec={3_125_000} txBytesPerSec={250_000} />);
 
     expect(screen.getByText('Download 25.0 Mbit/s, upload 2.0 Mbit/s')).toBeInTheDocument();
     expect(screen.getByText('25.0')).toBeInTheDocument();
     expect(screen.getByText('2.0')).toBeInTheDocument();
-    expect(screen.getAllByText('Mbit/s')).toHaveLength(1);
+    expect(screen.getAllByText('Mbit/s')).toHaveLength(2);
   });
 
   it('keeps a unit next to each direction when the scales differ', () => {

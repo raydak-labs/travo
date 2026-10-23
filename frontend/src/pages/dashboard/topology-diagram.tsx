@@ -89,7 +89,12 @@ function SourceIdentity({ source, truncate }: { source: SourceDef; truncate: boo
       )}
       {source.connected && source.rate ? (
         <div className="pt-0.5">
-          <TrafficRate rxBytesPerSec={source.rate.rx} txBytesPerSec={source.rate.tx} size="xs" />
+          <TrafficRate
+            rxBytesPerSec={source.rate.rx}
+            txBytesPerSec={source.rate.tx}
+            size="xs"
+            layout="stacked"
+          />
         </div>
       ) : null}
     </div>
