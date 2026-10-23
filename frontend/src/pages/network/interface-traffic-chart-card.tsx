@@ -32,6 +32,10 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
           Collecting data…
         </div>
       ) : (
+        // Live data appends a point every 2s. Recharts animates from the
+        // previous shape by default, so every push replayed the whole curve
+        // instead of extending it; the chart looked like it was redrawing from
+        // scratch. Animation is off for the same reason.
         <ResponsiveContainer width="100%" height={100}>
           <AreaChart data={chartData} margin={{ top: 2, right: 2, bottom: 0, left: -25 }}>
             <defs>
@@ -75,6 +79,7 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
               fill={`url(#${rxGradId})`}
               strokeWidth={1.5}
               name="Download"
+              isAnimationActive={false}
             />
             <Area
               type="monotone"
@@ -83,6 +88,7 @@ export function InterfaceTrafficChartCard({ name, points }: InterfaceTrafficChar
               fill={`url(#${txGradId})`}
               strokeWidth={1.5}
               name="Upload"
+              isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>

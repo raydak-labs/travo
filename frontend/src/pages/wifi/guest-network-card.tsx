@@ -82,7 +82,7 @@ export function GuestNetworkCard() {
                   Separate network (192.168.2.0/24) with client isolation
                 </p>
               </div>
-              <Switch id="guest-enabled" label="Enabled" {...register('enabled')} />
+              <Switch id="guest-enabled" aria-label="Enable guest WiFi" {...register('enabled')} />
             </div>
             {enabled && (
               <GuestWifiEnabledFields

@@ -44,3 +44,34 @@ export function interfaceNames(
   for (const point of history ?? []) names.add(point.ifname);
   return [...names];
 }
+
+export interface TransferRate {
+  /** Bytes received per second over the newest sampling interval. */
+  readonly rx: number;
+  /** Bytes sent per second over the newest sampling interval. */
+  readonly tx: number;
+}
+
+/**
+ * Per-second RX/TX rate for the newest sample, or `null` when the series has
+ * fewer than two points and no interval can be derived.
+ *
+ * A counter that went backwards means the interface or the router restarted;
+ * the rate is then unknown, not negative. The clamp to 0 matches the charts: a
+ * real idle interval also measures 0, and there is no third state to show.
+ */
+export function latestRate(series: readonly InterfaceDataPoint[]): TransferRate | null {
+  const last = series[series.length - 1];
+  const previous = series[series.length - 2];
+  if (!last || !previous) return null;
+
+  const dtSec = (last.timestamp - previous.timestamp) / 1000;
+  if (dtSec <= 0) return null;
+
+  const rxDiff = last.rxBytes - previous.rxBytes;
+  const txDiff = last.txBytes - previous.txBytes;
+  return {
+    rx: rxDiff > 0 ? rxDiff / dtSec : 0,
+    tx: txDiff > 0 ? txDiff / dtSec : 0,
+  };
+}

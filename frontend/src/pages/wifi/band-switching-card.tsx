@@ -1,4 +1,3 @@
-import { ChevronUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -10,9 +9,8 @@ export function BandSwitchingCard() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="pb-2">
         <CardTitle>Auto Band Switching</CardTitle>
-        <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between">
@@ -24,7 +22,7 @@ export function BandSwitchingCard() {
           </div>
           <Switch
             id="band-switching-toggle"
-            label="Enable"
+            aria-label="Enable automatic band switching"
             checked={bandSwitchData?.config.enabled ?? false}
             onChange={(e) => {
               if (bandSwitchData) {
@@ -35,7 +33,7 @@ export function BandSwitchingCard() {
           />
         </div>
         {bandSwitchData?.config.enabled && (
-          <div className="text-xs dark:bg-gray-900 space-y-2">
+          <div className="space-y-2 text-xs">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
               <span>Preferred band</span>
               <span className="font-medium text-gray-900 dark:text-white">

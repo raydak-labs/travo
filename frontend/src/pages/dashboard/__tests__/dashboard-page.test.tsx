@@ -133,11 +133,17 @@ describe('DashboardPage', () => {
     });
   });
 
-  it('renders network throughput chart section', async () => {
+  it('shows one compact traffic field instead of a throughput chart', async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(screen.getByText('Internet Throughput')).toBeInTheDocument();
+      expect(screen.getByText('Traffic')).toBeInTheDocument();
     });
+    expect(screen.queryByText('Download')).not.toBeInTheDocument();
+    expect(screen.queryByText('Upload')).not.toBeInTheDocument();
+    // No sample has arrived in this test, so the rate must read as unknown
+    // rather than as a confident "0.0 Mbit/s".
+    expect(screen.getByLabelText('Traffic rate unknown')).toBeInTheDocument();
+    expect(screen.queryByText('Internet Throughput')).not.toBeInTheDocument();
   });
 
   it('stacks topology when narrow and shows line diagram from @xl card width', async () => {

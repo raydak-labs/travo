@@ -149,8 +149,11 @@ export const systemHandlers = [
     });
   }),
 
+  // MSW is the development fixture for the normal, already-configured router.
+  // Reporting `false` here would route every dev session into the setup wizard
+  // and make the rest of the UI unreachable from the mock server.
   http.get(API_ROUTES.system.setupComplete, () => {
-    return HttpResponse.json({ complete: false });
+    return HttpResponse.json({ complete: true });
   }),
 
   http.post(API_ROUTES.system.setupComplete, () => {

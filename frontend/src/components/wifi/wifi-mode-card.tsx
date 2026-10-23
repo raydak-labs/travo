@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useWifiConnection, useWifiMode } from '@/hooks/use-wifi';
@@ -71,76 +70,73 @@ export function WifiModeCard() {
           'If the new mode does not come up, the router rolls back to the previous mode on its own.',
         ]}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>WiFi Mode</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-3">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : (
-            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 md:grid-cols-3">
-              {WIFI_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => {
-                const isActive = currentMode === mode;
-                const showRecommended = isRecommendedWifiMode(mode);
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={setMode.isPending}
-                    onClick={() => {
-                      if (!isActive) {
-                        setPendingMode(mode);
-                      }
-                    }}
+      {isLoading ? (
+        <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-3" aria-busy="true">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : (
+        <div
+          role="group"
+          aria-label="WiFi mode"
+          className="mx-auto grid max-w-5xl grid-cols-1 gap-3 md:grid-cols-3"
+        >
+          {WIFI_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => {
+            const isActive = currentMode === mode;
+            const showRecommended = isRecommendedWifiMode(mode);
+            return (
+              <button
+                key={mode}
+                type="button"
+                disabled={setMode.isPending}
+                onClick={() => {
+                  if (!isActive) {
+                    setPendingMode(mode);
+                  }
+                }}
+                className={cn(
+                  'flex min-w-0 flex-col items-start gap-2 overflow-visible rounded-lg border p-4 text-left transition-colors',
+                  isActive
+                    ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-gray-900',
+                  setMode.isPending && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'h-5 w-5 shrink-0',
+                    isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400',
+                  )}
+                />
+                <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
+                  <span
                     className={cn(
-                      'flex min-w-0 flex-col items-start gap-2 overflow-visible rounded-lg border p-4 text-left transition-colors',
+                      'min-w-0 text-sm font-medium',
                       isActive
-                        ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-gray-900',
-                      setMode.isPending && 'opacity-50 cursor-not-allowed',
+                        ? 'text-blue-900 dark:text-blue-100'
+                        : 'text-gray-900 dark:text-white',
                     )}
                   >
-                    <Icon
-                      className={cn(
-                        'h-5 w-5 shrink-0',
-                        isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400',
-                      )}
-                    />
-                    <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5">
-                      <span
-                        className={cn(
-                          'min-w-0 text-sm font-medium',
-                          isActive
-                            ? 'text-blue-900 dark:text-blue-100'
-                            : 'text-gray-900 dark:text-white',
-                        )}
-                      >
-                        {label}
-                      </span>
-                      {showRecommended && (
-                        <Badge variant="secondary" className="shrink-0 text-xs">
-                          Recommended
-                        </Badge>
-                      )}
-                      {isActive && (
-                        <Badge variant="default" className="shrink-0">
-                          Active
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    {label}
+                  </span>
+                  {showRecommended && (
+                    <Badge variant="secondary" className="shrink-0 text-xs">
+                      Recommended
+                    </Badge>
+                  )}
+                  {isActive && (
+                    <Badge variant="default" className="shrink-0">
+                      Active
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <WifiModeSwitchDialog
         open={pendingMode !== null}

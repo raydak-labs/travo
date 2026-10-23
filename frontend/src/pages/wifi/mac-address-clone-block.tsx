@@ -36,17 +36,17 @@ export function MacAddressCloneBlock({
 }: MacAddressCloneBlockProps) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">STA Interface</Badge>
         {mac.current_mac && (
-          <span className="text-sm font-mono text-gray-600 dark:text-gray-400">
+          <span className="break-all font-mono text-sm text-gray-600 dark:text-gray-400">
             Current: {mac.current_mac}
           </span>
         )}
       </div>
       {mac.custom_mac && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="break-all font-mono text-xs text-gray-600 dark:text-gray-400">
             Saved: {mac.custom_mac}
           </span>
           {mac.is_applied ? (
@@ -77,24 +77,31 @@ export function MacAddressCloneBlock({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={onRandomLocal}>
-          <Shuffle className="h-4 w-4" />
+        <Button type="button" size="sm" variant="secondary" onClick={onRandomLocal}>
+          <Shuffle className="h-3.5 w-3.5" />
           Random
         </Button>
         <Button
           type="button"
+          size="sm"
           variant="outline"
           disabled={randomizePending}
           onClick={onRandomizeApply}
         >
-          <Shuffle className="h-4 w-4" />
+          <Shuffle className="h-3.5 w-3.5" />
           {randomizePending ? 'Randomizing...' : 'Randomize & Apply'}
         </Button>
-        <Button type="submit" disabled={setMacPending}>
+        <Button type="submit" size="sm" disabled={setMacPending}>
           {setMacPending ? 'Applying...' : 'Apply'}
         </Button>
-        <Button type="button" variant="outline" disabled={setMacPending} onClick={onResetDefault}>
-          <RotateCcw className="h-4 w-4" />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={setMacPending}
+          onClick={onResetDefault}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
           Reset to Default
         </Button>
       </div>

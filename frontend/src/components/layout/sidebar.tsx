@@ -1,13 +1,14 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { cn } from '@/lib/cn';
 import {
-  NAV_ENTRIES,
-  flattenNavRoutesWithSqm,
+  flattenNavRoutes,
   isRouteActive,
+  navEntriesForPages,
 } from '@/components/layout/nav-config';
 import { SidebarNavGroup } from '@/components/layout/sidebar-nav-group';
 import { useSidebarGroups } from '@/components/layout/use-sidebar-groups';
 import { useServices } from '@/hooks/use-services';
+import { useSpeedtestServiceStatus } from '@/hooks/use-speedtest';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,9 +23,21 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const inDrawer = !!onNavClick;
   const { groupOpen, setGroup } = useSidebarGroups(pathname);
-  const { data: services } = useServices();
-  const sqmInstalled =
-    services?.some((s) => s.id === 'sqm' && s.state !== 'not_installed') ?? false;
+  const servicesQuery = useServices();
+  const speedtestQuery = useSpeedtestServiceStatus();
+  const services = servicesQuery.data;
+  const hasService = (id: string) =>
+    services?.some((service) => service.id === id && service.state !== 'not_installed') ?? false;
+
+  // Optional pages are hidden only when their absence is confirmed. A failed
+  // services request keeps these links visible; the pages themselves explain
+  // what is not installed instead of the nav silently losing an entry.
+  const pages = {
+    tailscale: !servicesQuery.isSuccess || hasService('tailscale'),
+    speedtest: !speedtestQuery.isSuccess || speedtestQuery.data?.installed === true,
+    sqm: !servicesQuery.isSuccess || hasService('sqm'),
+  };
+  const entries = navEntriesForPages(pages);
 
   const linkClass = (active: boolean, rail: boolean) =>
     cn(
@@ -37,7 +50,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
     );
 
   const collapsedRail = collapsed && !inDrawer;
-  const flat = flattenNavRoutesWithSqm(sqmInstalled);
+  const flat = flattenNavRoutes(pages);
 
   return (
     <aside
@@ -101,7 +114,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
           </>
         ) : (
           <>
-            {NAV_ENTRIES.map((entry) => {
+            {entries.map((entry) => {
               if (entry.kind === 'leaf') {
                 const active = isRouteActive(entry.to, pathname);
                 const Icon = entry.icon;
@@ -118,18 +131,10 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
                 );
               }
 
-              const group =
-                entry.id === 'services' && sqmInstalled
-                  ? {
-                      ...entry,
-                      items: [...entry.items, { to: '/services/sqm', label: 'SQM' }],
-                    }
-                  : entry;
-
               return (
                 <SidebarNavGroup
                   key={entry.id}
-                  group={group}
+                  group={entry}
                   pathname={pathname}
                   open={groupOpen[entry.id] ?? false}
                   onOpenChange={(o) => setGroup(entry.id, o)}

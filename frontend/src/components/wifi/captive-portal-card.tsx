@@ -1,4 +1,4 @@
-import { CheckCircle2, ExternalLink, Globe, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
+import { CheckCircle2, ExternalLink, RefreshCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -10,7 +10,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { clearPortalNotification, notifyPortalOnce } from '@/lib/captive-portal-notifier';
@@ -121,21 +120,6 @@ export function CaptivePortalCard() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Internet Access</CardTitle>
-          <Globe className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Skeleton className="h-5 w-1/3" />
-          <Skeleton className="h-4 w-3/4" />
-        </CardContent>
-      </Card>
-    );
-  }
-
   const internetOk = status?.can_reach_internet ?? false;
   const portalDetected = status?.detected ?? false;
   const dnsBypassed = status?.dns_bypassed ?? false;
@@ -143,10 +127,16 @@ export function CaptivePortalCard() {
   const portalUrl = status?.portal_url;
   const staConnected = status?.sta_connected ?? false;
 
+  // This card exists only to unblock a connection. A healthy link is already
+  // answered by the summary band, and an absent upstream by its Connection
+  // tile, so rendering a second "all good" box only pushed the controls down.
+  const needsAttention = dnsBypassed || (staConnected && !internetOk);
+  if (isLoading || !needsAttention) return null;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle>Internet Access</CardTitle>
+        <CardTitle>Internet access</CardTitle>
         <Button
           size="sm"
           variant="ghost"
@@ -172,21 +162,6 @@ export function CaptivePortalCard() {
             </div>
             <Badge variant="outline" className="ml-auto">
               Disconnected
-            </Badge>
-          </div>
-        )}
-
-        {staConnected && internetOk && !dnsBypassed && (
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--status-ok-text)]" />
-            <div>
-              <p className="text-sm font-medium leading-none">Connected</p>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                No captive portal detected
-              </p>
-            </div>
-            <Badge variant="success" className="ml-auto">
-              OK
             </Badge>
           </div>
         )}
@@ -299,8 +274,8 @@ export function CaptivePortalCard() {
           </div>
         )}
 
-        {/* Restore reminder when internet works but bypass still active */}
-        {staConnected && internetOk && dnsBypassed && (
+        {/* Restore reminder when internet works but bypass still active. */}
+        {dnsBypassed && (!staConnected || internetOk) && (
           <Button
             size="sm"
             variant="outline"

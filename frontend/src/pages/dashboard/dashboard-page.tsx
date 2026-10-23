@@ -4,15 +4,16 @@ import { Cable, Wifi, Smartphone, Shield, Monitor } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TrafficRate } from '@/components/traffic-rate';
 import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
 import type { WanType } from '@shared/index';
 import { UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
 import { formatUptime } from '@/lib/utils';
 import { QuickActions } from '@/pages/dashboard/quick-actions';
-import { NetworkChart } from '@/pages/dashboard/network-chart';
 import { TopologyDiagram } from '@/pages/dashboard/topology-diagram';
 import { SourceCard, DetailRow } from '@/pages/dashboard/source-card';
+import { useUplinkRates } from '@/pages/dashboard/use-uplink-rates';
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,13 @@ export function DashboardPage() {
     internetUp,
     allClients,
   } = useTopologyData();
+  const { rx, tx, rates } = useUplinkRates(wan?.name ?? null);
+  // Rates belong to the interface, not the source label. Attach them here so
+  // the graph never has to know how the uplink was resolved.
+  const sourcesWithRates = sources.map((source) => ({
+    ...source,
+    rate: source.connected && source.interfaceName ? (rates[source.interfaceName] ?? null) : null,
+  }));
 
   // The interface discriminator is the medium, not an address: prefer the
   // tethering service's own report and fall back to the USB WAN interface.
@@ -58,7 +66,7 @@ export function DashboardPage() {
       <TimezoneAlert />
 
       <TopologyDiagram
-        sources={sources}
+        sources={sourcesWithRates}
         clients={clients}
         hostname={router.hostname}
         model={router.model}
@@ -147,7 +155,8 @@ export function DashboardPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
@@ -155,7 +164,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   {/* `internet_reachable` is a WAN-carrier check, not a
                       reachability probe: a DHCP lease on a dead or
@@ -202,6 +211,12 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div>
+                  <span className="text-gray-500 dark:text-gray-400">Traffic</span>
+                  <div className="mt-0.5">
+                    <TrafficRate rxBytesPerSec={rx} txBytesPerSec={tx} />
+                  </div>
+                </div>
+                <div>
                   <span className="text-gray-500 dark:text-gray-400">Devices on your network</span>
                   <p className="mt-0.5 font-medium">{allClients.length}</p>
                 </div>
@@ -224,8 +239,6 @@ export function DashboardPage() {
       </Card>
 
       <QuickActions />
-
-      <NetworkChart />
     </div>
   );
 }
