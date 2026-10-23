@@ -57,13 +57,14 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   in-memory ring so the interface chart paints real history on page load instead of an empty
   axis.
 - UI clarity pass (2026-10-21, issue #195): the dashboard shows one compact bit-rate
-  field instead of separate down/up values, and the connected topology source carries the same
-  live rate; the WiFi summary band is two tiles (Connection and Internet) and WiFi / Advanced is
-  one list of collapsible sections with one button size; the WiFi mode options sit directly below
-  the band without an outer card, the current uplink and saved profiles share one card, and the
-  captive-portal warning only appears above the band when it has an action; traffic charts stop
-  replaying their animation and state their retained window; the app shell owns the only page
-  scroll container; Tailscale, Speedtest and SQM leave the nav while their package is absent
+  field with a unit per direction, and the connected topology source stacks the same
+  two rates; the WiFi summary band is two tiles (Connection and Internet) and WiFi / Advanced
+  is one list of collapsible sections with one button size; the WiFi mode options sit directly
+  below the band without an outer card; the current uplink is a flat status strip over one
+  saved-network table in the same card; and the captive-portal warning only appears above the
+  band when it has an action; traffic charts stop replaying their animation and state their
+  retained window; the app shell owns the only page scroll container; Tailscale, Speedtest and
+  SQM leave the nav while their package is absent
   ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
 - **Not verified on device:** the 2026-10-05 pass was completed without access to 192.168.1.1
   (host has no route to it), so light/dark rendering, the new band, and history accumulation on

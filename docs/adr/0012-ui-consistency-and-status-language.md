@@ -125,13 +125,17 @@ is precisely the case that looked broken.
   history chart belongs to Network Status, where the window can be stated.
 - **Rates are bits with at most two integer digits.** Counters arrive in bytes,
   but link rates are quoted in bits; the shared formatter turns 850 Kbit/s into
-  `0.9 Mbit/s` and switches to `0.1 Gbit/s` at 100 Mbit/s. The dashboard shows
-  one `Traffic` field with down/up arrows, and the topology annotates only the
-  connected source with the same compact rate.
+  `0.9 Mbit/s` and switches to `0.1 Gbit/s` at 100 Mbit/s. Each direction
+  carries its own unit so the second number does not look like the only one
+  measured. The dashboard shows one `Traffic` field with down/up arrows; the
+  topology annotates only the connected source and stacks the two directions
+  so the narrow source column still fits.
 - **The WiFi uplink is one card.** The current station link and its saved
   profiles answer one question ("which network is the uplink using"), so they
   share one card with a divider instead of two cards competing for the same
-  width.
+  width. Inside it, the active link is a flat status strip and the saved
+  profiles are one table; the table header names the status, priority and
+  action columns so each row reads as data rather than another card.
 
 ## Deliberate ceilings
 
