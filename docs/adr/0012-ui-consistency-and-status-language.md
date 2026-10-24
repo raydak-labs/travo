@@ -3,7 +3,7 @@ title: "ADR 0012: UI consistency — card plane, status language, summary bands,
 description: One card plane, one status language, one group heading, one load/error contract, summary bands, and server-owned traffic history.
 status: Accepted
 date: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-22
 tags: [adr, frontend, ui, theming, consistency, status, wifi, dashboard]
 ---
 
@@ -64,8 +64,8 @@ component state.
    but the ~10 minutes before it are read from `GET
    /api/v1/network/traffic-history`. The backend samples every broadcast tick
    into a bounded in-memory ring regardless of connected clients, so a freshly
-   loaded dashboard has something to draw. History resets on restart; the UI
-   shows the short window it has rather than pretending to ten minutes.
+   loaded Network Status page has something to draw. History resets on restart;
+   the UI shows the short window it has rather than pretending to ten minutes.
 
 ## Why
 
@@ -88,7 +88,16 @@ is precisely the case that looked broken.
 - **A new status colour is a token addition, not a className.** Adding a raw
   status pair in a page reintroduces the defect.
 - **New pages start with a summary band** if they have more than one status
-  question; the WiFi band (`wifi-summary-band.tsx`) is the reference.
+  question; the WiFi band (`wifi-summary-band.tsx`) is the reference. The WiFi
+  band itself has two tiles, Connection and Internet; mode is a control, so its
+  three option boxes sit directly below the band without an outer card.
+- **The WiFi Internet tile uses the captive-portal probe.** `network_status`
+  reports a WAN lease, which stays true behind a login page. The tile prefers
+  `can_reach_internet` from the probe and falls back to `network_status` only
+  while the probe is unavailable. A warning card appears above the band only
+  while it has an action: portal login, DNS bypass still active, or a connected
+  link that cannot reach the internet. A healthy link is answered by the band
+  alone.
 - **Radio facts are labelled "configured".** `RadioInfo` is UCI-derived, not
   read from the air. A tile must not imply live channel, width or bitrate. A
   future `/api/v1/wifi/radios/status` may fill that gap without changing the
@@ -97,15 +106,48 @@ is precisely the case that looked broken.
   loop must not grow the ring.
 - **`stale` never replaces a value with a blank.** Throwing away a fact that
   was true seconds ago is worse than showing it as possibly-outdated.
+- **One page scroll container.** `AppShell`'s `<main>` owns vertical scrolling
+  and is `relative`. An absolutely positioned descendant that resolves against
+  the viewport instead escapes the container and grows the document into a
+  second scrollbar beside it; this is why `sr-only` spans and popovers once made
+  long pages scroll in two places.
+- **Optional service pages leave the nav when absent.** Tailscale, Speedtest and
+  SQM are hidden while the router confirms the package is missing. An unreadable
+  install state keeps the link: a failed GET is not an absence claim. The pages
+  themselves say what to install when reached by a deep link.
+- **Live charts do not animate.** The WebSocket tail appends a point every two
+  seconds. Recharts animates from the previous shape by default, so every push
+  replayed the whole curve instead of extending it. The chart also states the
+  retained window it actually paints, because the ring is bounded and resets
+  when the router restarts.
+- **Dashboard rates are instantaneous.** The dashboard answers "what is
+  happening now" with the last sampling interval's RX/TX rate. The retained
+  history chart belongs to Network Status, where the window can be stated.
+- **Rates are bits with at most two integer digits.** Counters arrive in bytes,
+  but link rates are quoted in bits; the shared formatter turns 850 Kbit/s into
+  `0.9 Mbit/s` and switches to `0.1 Gbit/s` at 100 Mbit/s. Each direction
+  carries its own unit so the second number does not look like the only one
+  measured. The dashboard shows one `Traffic` field with down/up arrows; the
+  topology annotates only the connected source and stacks the two directions
+  so the narrow source column still fits.
+- **The WiFi uplink is one card.** The current station link and its saved
+  profiles answer one question ("which network is the uplink using"), so they
+  share one card with a divider instead of two cards competing for the same
+  width. Inside it, the active link is a flat status strip and the saved
+  profiles are one table; the table header names the status, priority and
+  action columns so each row reads as data rather than another card.
 
 ## Deliberate ceilings
 
 - History is ~10 minutes. Longer ranges need server-side downsampling and are
   out of scope until someone asks for them.
-- Band tiles mix domains deliberately: WiFi reads `NetworkStatus` for
-  reachability because "is my internet up" is the question a user asks on the
-  WiFi page. The alternative (leaving it to Network) answers the question in the
-  wrong place.
+- A dashboard rate is a two-second sample, not a smoothed average; a burst that
+  fits between samples is invisible by design.
+- Band tiles mix domains deliberately: WiFi reads the captive-portal probe for
+  reachability because "is my internet up, or is a login page in the way" is the
+  question a user asks on the WiFi page. The alternative (leaving it to Network)
+  answers the question in the wrong place. When the probe is unavailable the
+  tile falls back to the carrier check and says so.
 
 ## Provenance: work folded in from executed plans
 

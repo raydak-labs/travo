@@ -1,515 +1,61 @@
-import { useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { UseQueryOptions } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithParam, routeWithSegment } from '@/lib/api-url';
-import { useWsSubscribe } from '@/lib/ws-context';
-import { API_ROUTES } from '@shared/index';
-import type {
-  NetworkStatus,
-  WanConfig,
-  WanDetectResult,
-  Client,
-  DHCPConfig,
-  DNSConfig,
-  DHCPLease,
-  SetAliasRequest,
-  DNSEntry,
-  DHCPReservation,
-  DDNSConfig,
-  DDNSConfigResponse,
-  DDNSStatus,
-  UptimeEvent,
-  FailoverConfig,
-  FailoverEvent,
-  FirewallZone,
-  PortForwardRule,
-  AddPortForwardRequest,
-  WoLRequest,
-  DoHConfig,
-  IPv6Status,
-  DiagnosticsRequest,
-  DiagnosticsResult,
-  ConnectionMethod,
-} from '@shared/index';
-
-export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus>>) {
-  const queryClient = useQueryClient();
-  const { subscribe } = useWsSubscribe();
-
-  // The event watcher pushes network_status over WS on interface/client
-  // changes; feed it into the cache so every consumer sees live data.
-  useEffect(() => {
-    return subscribe('network_status', (raw) => {
-      queryClient.setQueryData<NetworkStatus>(['network', 'status'], raw as NetworkStatus);
-    });
-  }, [subscribe, queryClient]);
-
-  return useQuery({
-    queryKey: ['network', 'status'],
-    queryFn: ({ signal }) => apiClient.get<NetworkStatus>(API_ROUTES.network.status, signal),
-    ...options,
-  });
-}
-
-export function useWanConfig() {
-  return useQuery({
-    queryKey: ['network', 'wan'],
-    queryFn: ({ signal }) => apiClient.get<WanConfig>(API_ROUTES.network.wan, signal),
-  });
-}
-
 /**
- * The connected-client list rides along in `network_status`, which the
- * WebSocket already pushes on interface and client changes. Seeding this cache
- * from those pushes keeps the Clients page live instead of stale until the
- * window regains focus.
+ * Network hooks, grouped by domain.
+ *
+ * The implementations live in focused sibling modules so that a change to one
+ * area of the network surface does not have to be read through the whole
+ * network surface. This module stays the single import path: every consumer
+ * keeps importing from '@/hooks/use-network'.
  */
-export function useClients() {
-  const queryClient = useQueryClient();
-  const { subscribe } = useWsSubscribe();
+export {
+  useNetworkStatus,
+  useClients,
+  useSetClientAlias,
+  useKickClient,
+  useBlockClient,
+  useUnblockClient,
+  useBlockedClients,
+  useSetInterfaceState,
+} from './use-network-clients';
 
-  useEffect(() => {
-    return subscribe('network_status', (raw) => {
-      const status = raw as NetworkStatus;
-      if (status.clients) {
-        queryClient.setQueryData<Client[]>(['network', 'clients'], [...status.clients]);
-      }
-    });
-  }, [subscribe, queryClient]);
+export {
+  useDHCPConfig,
+  useDHCPLeases,
+  useSetDHCPConfig,
+  useDHCPReservations,
+  useAddDHCPReservation,
+  useDeleteDHCPReservation,
+} from './use-network-dhcp';
 
-  return useQuery({
-    queryKey: ['network', 'clients'],
-    queryFn: ({ signal }) => apiClient.get<Client[]>(API_ROUTES.network.clients, signal),
-  });
-}
+export {
+  useDNSConfig,
+  useSetDNSConfig,
+  useDNSEntries,
+  useAddDNSEntry,
+  useDeleteDNSEntry,
+  useDDNSConfig,
+  useDDNSStatus,
+  useSetDDNSConfig,
+} from './use-network-dns';
 
-export function useDHCPConfig() {
-  return useQuery({
-    queryKey: ['network', 'dhcp'],
-    queryFn: ({ signal }) => apiClient.get<DHCPConfig>(API_ROUTES.network.dhcp, signal),
-  });
-}
+export {
+  useFirewallZones,
+  usePortForwards,
+  useAddPortForward,
+  useDeletePortForward,
+  useRunDiagnostics,
+  useSendWoL,
+  useIPv6Status,
+  useSetIPv6Enabled,
+  useDoHConfig,
+  useSetDoHConfig,
+} from './use-network-firewall';
 
-export function useDHCPLeases() {
-  return useQuery({
-    queryKey: ['network', 'dhcpLeases'],
-    queryFn: ({ signal }) => apiClient.get<DHCPLease[]>(API_ROUTES.network.dhcpLeases, signal),
-    refetchInterval: 30000,
-  });
-}
-
-export function useDNSConfig() {
-  return useQuery({
-    queryKey: ['network', 'dns'],
-    queryFn: ({ signal }) => apiClient.get<DNSConfig>(API_ROUTES.network.dns, signal),
-  });
-}
-
-export function useSetDNSConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: DNSConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.dns, config),
-    onSuccess: () => {
-      toast.success('DNS configuration updated');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'dns'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update DNS config', { description: error.message });
-    },
-  });
-}
-
-export function useSetDHCPConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: DHCPConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.dhcp, config),
-    onSuccess: () => {
-      toast.success('DHCP configuration updated');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'dhcp'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update DHCP config', { description: error.message });
-    },
-  });
-}
-
-export function useSetClientAlias() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: SetAliasRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.clientAlias, data),
-    onSuccess: () => {
-      toast.success('Client alias updated');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update alias', { description: error.message });
-    },
-  });
-}
-
-export function useDNSEntries() {
-  return useQuery({
-    queryKey: ['network', 'dnsEntries'],
-    queryFn: ({ signal }) => apiClient.get<DNSEntry[]>(API_ROUTES.network.dnsEntries, signal),
-  });
-}
-
-export function useAddDNSEntry() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (entry: { name: string; ip: string }) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.dnsEntries, entry),
-    onSuccess: () => {
-      toast.success('DNS entry added');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to add DNS entry', { description: error.message });
-    },
-  });
-}
-
-export function useDeleteDNSEntry() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (section: string) =>
-      apiClient.del<{ status: string }>(routeWithSegment(API_ROUTES.network.dnsEntries, section)),
-    onSuccess: () => {
-      toast.success('DNS entry deleted');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to delete DNS entry', { description: error.message });
-    },
-  });
-}
-
-export function useDHCPReservations() {
-  return useQuery({
-    queryKey: ['network', 'dhcpReservations'],
-    queryFn: ({ signal }) =>
-      apiClient.get<DHCPReservation[]>(API_ROUTES.network.dhcpReservations, signal),
-  });
-}
-
-export function useAddDHCPReservation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (reservation: { name: string; mac: string; ip: string }) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.dhcpReservations, reservation),
-    onSuccess: () => {
-      toast.success('DHCP reservation added');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'dhcpReservations'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to add DHCP reservation', { description: error.message });
-    },
-  });
-}
-
-export function useDeleteDHCPReservation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (section: string) =>
-      apiClient.del<{ status: string }>(
-        routeWithSegment(API_ROUTES.network.dhcpReservations, section),
-      ),
-    onSuccess: () => {
-      toast.success('DHCP reservation deleted');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'dhcpReservations'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to delete DHCP reservation', { description: error.message });
-    },
-  });
-}
-
-export function useKickClient() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.clientKick, { mac }),
-    onSuccess: () => {
-      toast.success('Client disconnected');
-      // Without this the kicked device stays in the table until the next
-      // window focus refetch.
-      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to kick client', { description: error.message });
-    },
-  });
-}
-
-export function useBlockClient() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.clientBlock, { mac }),
-    onSuccess: () => {
-      toast.success('Client blocked');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to block client', { description: error.message });
-    },
-  });
-}
-
-export function useUnblockClient() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.clientUnblock, { mac }),
-    onSuccess: () => {
-      toast.success('Client unblocked');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to unblock client', { description: error.message });
-    },
-  });
-}
-
-export function useBlockedClients() {
-  return useQuery({
-    queryKey: ['network', 'blockedClients'],
-    queryFn: ({ signal }) => apiClient.get<string[]>(API_ROUTES.network.clientBlocked, signal),
-  });
-}
-
-export function useSetInterfaceState() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ name, up }: { name: string; up: boolean }) =>
-      apiClient.post<{ status: string }>(routeWithParam(API_ROUTES.network.interfaceState, name), {
-        up,
-      }),
-    onSuccess: (_data, variables) => {
-      toast.success(`Interface ${variables.name} ${variables.up ? 'brought up' : 'brought down'}`);
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to change interface state', { description: error.message });
-    },
-  });
-}
-
-export function useDetectWanType() {
-  return useMutation({
-    mutationFn: () => apiClient.get<WanDetectResult>(API_ROUTES.network.wanDetect),
-    onError: (error) => {
-      toast.error('WAN detection failed', { description: error.message });
-    },
-  });
-}
-
-export function useDDNSConfig() {
-  return useQuery({
-    queryKey: ['network', 'ddns'],
-    queryFn: ({ signal }) => apiClient.get<DDNSConfigResponse>(API_ROUTES.network.ddns, signal),
-  });
-}
-
-export function useDDNSStatus() {
-  return useQuery({
-    queryKey: ['network', 'ddnsStatus'],
-    queryFn: ({ signal }) => apiClient.get<DDNSStatus>(API_ROUTES.network.ddnsStatus, signal),
-    refetchInterval: 30000,
-  });
-}
-
-export function useUptimeLog() {
-  return useQuery({
-    queryKey: ['network', 'uptimeLog'],
-    queryFn: ({ signal }) => apiClient.get<UptimeEvent[]>(API_ROUTES.network.uptimeLog, signal),
-    refetchInterval: 60000,
-  });
-}
-
-export function useFailoverConfig() {
-  return useQuery({
-    queryKey: ['network', 'failover'],
-    queryFn: ({ signal }) => apiClient.get<FailoverConfig>(API_ROUTES.network.failover, signal),
-  });
-}
-
-export function useSetFailoverConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: FailoverConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.failover, config),
-    onSuccess: () => {
-      toast.success('Connection failover updated');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'failover'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'failoverEvents'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'status'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update connection failover', { description: error.message });
-    },
-  });
-}
-
-export function useFailoverEvents() {
-  return useQuery({
-    queryKey: ['network', 'failoverEvents'],
-    queryFn: ({ signal }) =>
-      apiClient.get<FailoverEvent[]>(API_ROUTES.network.failoverEvents, signal),
-    refetchInterval: 15000,
-  });
-}
-
-export function useSetDDNSConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (config: DDNSConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.ddns, config),
-    onSuccess: () => {
-      toast.success('DDNS configuration updated');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'ddns'] });
-      void queryClient.invalidateQueries({ queryKey: ['network', 'ddnsStatus'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to update DDNS config', { description: error.message });
-    },
-  });
-}
-
-export function useFirewallZones() {
-  return useQuery({
-    queryKey: ['network', 'firewallZones'],
-    queryFn: async () => {
-      const res = await apiClient.get<{ zones: FirewallZone[] }>(API_ROUTES.network.firewallZones);
-      return res.zones;
-    },
-  });
-}
-
-export function usePortForwards() {
-  return useQuery({
-    queryKey: ['network', 'portForwards'],
-    queryFn: async () => {
-      const res = await apiClient.get<{ rules: PortForwardRule[] }>(
-        API_ROUTES.network.portForwards,
-      );
-      return res.rules;
-    },
-  });
-}
-
-export function useAddPortForward() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (rule: AddPortForwardRequest) =>
-      apiClient.post<{ ok: boolean }>(API_ROUTES.network.portForwards, rule),
-    onSuccess: () => {
-      toast.success('Port forward added');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'portForwards'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to add port forward', { description: error.message });
-    },
-  });
-}
-
-export function useDeletePortForward() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.del<{ ok: boolean }>(routeWithSegment(API_ROUTES.network.portForwards, id)),
-    onSuccess: () => {
-      toast.success('Port forward deleted');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'portForwards'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to delete port forward', { description: error.message });
-    },
-  });
-}
-
-export function useRunDiagnostics() {
-  return useMutation({
-    mutationFn: (req: DiagnosticsRequest) =>
-      apiClient.post<DiagnosticsResult>(API_ROUTES.network.diagnostics, req),
-    onError: (error) => {
-      toast.error('Diagnostic failed', { description: error.message });
-    },
-  });
-}
-
-export function useDoHConfig() {
-  return useQuery({
-    queryKey: ['network', 'doh'],
-    queryFn: ({ signal }) => apiClient.get<DoHConfig>(API_ROUTES.network.doh, signal),
-  });
-}
-
-export function useSetDoHConfig() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (cfg: DoHConfig) => apiClient.put<{ ok: boolean }>(API_ROUTES.network.doh, cfg),
-    onSuccess: () => {
-      toast.success('DNS-over-HTTPS settings saved');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'doh'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to save DoH settings', { description: error.message });
-    },
-  });
-}
-
-export function useIPv6Status() {
-  return useQuery({
-    queryKey: ['network', 'ipv6'],
-    queryFn: ({ signal }) => apiClient.get<IPv6Status>(API_ROUTES.network.ipv6, signal),
-  });
-}
-
-export function useSetIPv6Enabled() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (enabled: boolean) =>
-      apiClient.put<{ ok: boolean }>(API_ROUTES.network.ipv6, { enabled }),
-    onSuccess: () => {
-      toast.success('IPv6 setting saved');
-      void queryClient.invalidateQueries({ queryKey: ['network', 'ipv6'] });
-    },
-    onError: (error) => {
-      toast.error('Failed to save IPv6 setting', { description: error.message });
-    },
-  });
-}
-
-export function useSendWoL() {
-  return useMutation({
-    mutationFn: (req: WoLRequest) => apiClient.post<{ ok: boolean }>(API_ROUTES.network.wol, req),
-    onSuccess: () => {
-      toast.success('Wake-on-LAN packet sent');
-    },
-    onError: (error) => {
-      toast.error('Failed to send WoL packet', { description: error.message });
-    },
-  });
-}
-
-export function useConnectionMethod() {
-  return useQuery({
-    queryKey: ['network', 'connectionMethod'],
-    queryFn: ({ signal }) =>
-      apiClient.get<ConnectionMethod>(API_ROUTES.network.connectionMethod, signal),
-    // Cache for 1 minute - connection method doesn't change rapidly
-    staleTime: 60000,
-  });
-}
+export {
+  useWanConfig,
+  useDetectWanType,
+  useConnectionMethod,
+  useFailoverConfig,
+  useSetFailoverConfig,
+  useFailoverEvents,
+  useUptimeLog,
+} from './use-network-wan';

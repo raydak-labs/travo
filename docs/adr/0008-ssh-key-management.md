@@ -31,7 +31,7 @@ control Travo enforces. A bug in it is a remote-root vulnerability, not a UI def
 ### 1. What the endpoint may write
 
 - The only file this feature touches is **`/etc/dropbear/authorized_keys`**
-  (`authorizedKeysFile`, `backend/internal/services/system_service.go`), i.e. dropbear's
+  (`authorizedKeysFile`, `backend/internal/services/system_ssh_keys.go`), i.e. dropbear's
   root key file. It writes **exactly one line per accepted call** and never rewrites,
   reorders, normalizes or de-duplicates the rest of the file.
 - The API surface is three operations (`backend/internal/api/router.go`):
@@ -136,11 +136,11 @@ working after Travo is uninstalled. Consequences accepted here:
 
 ## References
 
-- `backend/internal/services/system_service.go` — `AddSSHKey`, `DeleteSSHKey`,
+- `backend/internal/services/system_ssh_keys.go` — `AddSSHKey`, `DeleteSSHKey`,
   `GetSSHKeys`, `authorizedKeysFile`
 - `backend/internal/api/router.go` — route registration
-- `backend/internal/api/system_handlers.go` — handlers
-- `backend/internal/api/openapi_handler.go` — spec entries
+- `backend/internal/api/system_security_handlers.go` — handlers
+- `backend/internal/api/openapi_paths_system.go` — spec entries
 - `backend/internal/auth/auth.go` — default-deny `Middleware`
 - [ADR 0006](./0006-application-platform-and-api-contract.md) — OpenAPI drift gate
 - [ADR 0007](./0007-authentication-and-access-control.md) — auth and session rules

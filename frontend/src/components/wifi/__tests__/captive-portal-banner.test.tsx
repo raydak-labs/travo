@@ -37,12 +37,12 @@ describe('CaptivePortalCard', () => {
     });
   });
 
-  it('shows Connected when internet ok', async () => {
+  it('stays hidden when the internet is already working', async () => {
     renderCard();
 
     // Default mock returns detected: false, can_reach_internet: true, sta_connected: true
     await waitFor(() => {
-      expect(screen.getByText('Connected')).toBeInTheDocument();
+      expect(screen.queryByText('Internet access')).not.toBeInTheDocument();
     });
   });
 
@@ -92,7 +92,7 @@ describe('CaptivePortalCard', () => {
     });
   });
 
-  it('shows No Upstream when sta_connected is false', async () => {
+  it('stays hidden when there is no upstream', async () => {
     server.use(
       http.get('/api/v1/captive/status', () => {
         return HttpResponse.json({
@@ -108,8 +108,9 @@ describe('CaptivePortalCard', () => {
     renderCard();
 
     await waitFor(() => {
-      expect(screen.getByText('No Upstream')).toBeInTheDocument();
+      expect(screen.queryByText('Internet access')).not.toBeInTheDocument();
     });
+    expect(screen.queryByText('No Upstream')).not.toBeInTheDocument();
   });
 
   it('does NOT show Login Required when sta_connected is false', async () => {
@@ -129,9 +130,28 @@ describe('CaptivePortalCard', () => {
     renderCard();
 
     await waitFor(() => {
-      expect(screen.getByText('No Upstream')).toBeInTheDocument();
+      expect(screen.queryByText('Internet access')).not.toBeInTheDocument();
     });
-
     expect(screen.queryByText('Login Required')).not.toBeInTheDocument();
+  });
+
+  it('keeps the DNS restore action when the bypass outlives the uplink', async () => {
+    server.use(
+      http.get('/api/v1/captive/status', () => {
+        return HttpResponse.json({
+          detected: false,
+          can_reach_internet: false,
+          dns_bypassed: true,
+          dns_bypass_needed: false,
+          sta_connected: false,
+        });
+      }),
+    );
+
+    renderCard();
+
+    await waitFor(() => {
+      expect(screen.getByText('Restore DNS (AdGuard / dnsmasq)')).toBeInTheDocument();
+    });
   });
 });

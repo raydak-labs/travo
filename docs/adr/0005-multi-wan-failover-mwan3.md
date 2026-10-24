@@ -79,9 +79,9 @@ Travo implements **priority-based WAN failover** using OpenWrt’s **`mwan3`** p
 
 ## References
 
-- `backend/internal/services/failover_service.go` (`mayDeleteSection` §1.3, `needsBackupSection` §1.3, `adoptSection` §1.2)
+- `backend/internal/services/failover_mwan3.go` (`mayDeleteSection` §1.3, `needsBackupSection` §1.3, `adoptSection` §1.2)
 - `backend/internal/uci/mock.go` (test-double fidelity, §6)
-- `backend/internal/services/network_service.go` (explicit duplicate checks, §6)
+- `backend/internal/services/network_dhcp.go` (explicit duplicate checks, §6)
 - `backend/internal/models/failover.go`
 - `docs/architecture/overview.md` §6.1–6.2
 - `docs/architecture/overview.md` §6.1

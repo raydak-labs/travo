@@ -22,10 +22,28 @@ export function InterfaceTrafficCharts() {
   const seriesFor = (name: string) =>
     mergeInterfaceSeries(history?.points ?? [], interfaceDataPoints[name] ?? [], name);
 
+  // Say how much history is actually behind the left edge. The server keeps a
+  // bounded ring and restarts empty, so "last 10 minutes" is a ceiling, not a
+  // promise; the retained span is what the axis really shows.
+  const retainedSeconds = history?.retained_seconds ?? 0;
+  const retainedLabel =
+    retainedSeconds > 0
+      ? retainedSeconds >= 60
+        ? `last ${Math.round(retainedSeconds / 60)} min`
+        : `last ${retainedSeconds} s`
+      : null;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle>Interface Traffic</CardTitle>
+        <div className="space-y-1">
+          <CardTitle>Interface Traffic</CardTitle>
+          {retainedLabel ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {retainedLabel}, sampled every 2 s
+            </p>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           <span role="status" aria-live="polite" className="flex items-center gap-2">
             <span

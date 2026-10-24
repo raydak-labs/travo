@@ -5,10 +5,16 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 )
+
+// vpnReceiverType is the receiver type whose method calls the lock walk
+// follows. The walk matches the receiver TYPE rather than a receiver name, so
+// renaming a receiver cannot silently change which edges it follows.
+const vpnReceiverType = "VpnService"
 
 // A grep-style test, because the failure it guards against cannot be expressed
 // as a unit test: the config locks are NOT reentrant, so a VPN flow that took
@@ -21,43 +27,48 @@ import (
 // friends), and pointed every internal caller at the core. This test walks the
 // call graph from the five VPN entry points and fails if any function they can
 // reach takes a config lock itself.
+//
+// The walk covers the whole package rather than one file. A helper that lives
+// in the same file as its caller is just as capable of taking a lock twice as
+// one that lives in another file, so scoping the walk to vpn_service.go would
+// let a file split hide a nested lock rather than reveal one.
 func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "vpn_service.go", nil, 0)
-	if err != nil {
-		t.Fatalf("parse vpn_service.go: %v", err)
-	}
-
-	// Function name -> the names it calls as v.foo(...).
+	// Method name -> the names it calls as <recv>.foo(...).
 	calls := map[string][]string{}
-	// Function name -> true when it takes a config lock.
+	// Method name -> true when it takes a config lock.
 	locks := map[string]bool{}
 
-	for _, decl := range file.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Recv == nil || fn.Body == nil {
-			continue
-		}
-		name := fn.Name.Name
-		ast.Inspect(fn.Body, func(n ast.Node) bool {
-			x, ok := n.(*ast.CallExpr)
-			if !ok {
+	for _, file := range packageFiles(t) {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv == nil || fn.Body == nil {
+				continue
+			}
+			recvType, recvName := receiverOf(fn)
+			if recvType != vpnReceiverType {
+				continue
+			}
+			name := fn.Name.Name
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				x, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				// A direct call to a lock helper.
+				if id, ok := x.Fun.(*ast.Ident); ok {
+					if id.Name == "mutateUCI" || id.Name == "lockUCIConfigs" || id.Name == "mutateWireless" {
+						locks[name] = true
+					}
+				}
+				// A method call on the service: recv.helper(...)
+				if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
+					if id, ok := sel.X.(*ast.Ident); ok && id.Name == recvName {
+						calls[name] = append(calls[name], sel.Sel.Name)
+					}
+				}
 				return true
-			}
-			// A direct call to a lock helper.
-			if id, ok := x.Fun.(*ast.Ident); ok {
-				if id.Name == "mutateUCI" || id.Name == "lockUCIConfigs" || id.Name == "mutateWireless" {
-					locks[name] = true
-				}
-			}
-			// A method call on the service: v.helper(...)
-			if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
-				if recv, ok := sel.X.(*ast.Ident); ok && recv.Name == "v" {
-					calls[name] = append(calls[name], sel.Sel.Name)
-				}
-			}
-			return true
-		})
+			})
+		}
 	}
 
 	entries := []string{
@@ -111,7 +122,7 @@ func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
 	for _, deep := range []string{"enableWireguard", "disableWireguard", "setupWireGuardFirewall", "teardownWireGuardFirewall"} {
 		if !union[deep] {
 			t.Fatalf("the walk from the entry points never reaches %s "+
-				"(%d functions reached); the walker is probably not following v.* calls", deep, len(union))
+				"(%d functions reached); the walker is probably not following %s.* calls", deep, len(union), recvNameOf(t, vpnReceiverType))
 		}
 	}
 
@@ -142,6 +153,49 @@ func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
 	}
 }
 
+// receiverOf returns the receiver type name and the receiver variable name of
+// a method, e.g. ("VpnService", "v") for `func (v *VpnService) Foo()`.
+func receiverOf(fn *ast.FuncDecl) (typeName, varName string) {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return "", ""
+	}
+	field := fn.Recv.List[0]
+	if field.Type == nil {
+		return "", ""
+	}
+	switch t := field.Type.(type) {
+	case *ast.StarExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			typeName = id.Name
+		}
+	case *ast.Ident:
+		typeName = t.Name
+	}
+	if len(field.Names) > 0 {
+		varName = field.Names[0].Name
+	}
+	return typeName, varName
+}
+
+// recvNameOf returns the receiver variable name used by the methods of a
+// receiver type. The package uses one name per type, so the first method found
+// for the type is representative.
+func recvNameOf(t *testing.T, typeName string) string {
+	t.Helper()
+	for _, file := range packageFiles(t) {
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			if recvType, recvName := receiverOf(fn); recvType == typeName {
+				return recvName
+			}
+		}
+	}
+	return "?"
+}
+
 // The VPN transaction has to name every config the flow can reach — `dhcp`
 // included, which is the one that is easy to miss because
 // enableVpnDNSForwarding / disableVpnDNSForwarding shell out to `uci` directly
@@ -153,32 +207,28 @@ func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
 // occurrence satisfied: dropping "dhcp" from the transaction entirely left the
 // suite green, which is precisely the bug this test exists to catch.
 func TestVPNFlowConfigSetCoversShelledOutUCI(t *testing.T) {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "vpn_service.go", nil, 0)
-	if err != nil {
-		t.Fatalf("parse vpn_service.go: %v", err)
-	}
-
 	declared := map[string]bool{}
 	found := false
-	ast.Inspect(file, func(n ast.Node) bool {
-		vs, ok := n.(*ast.ValueSpec)
-		if !ok || len(vs.Names) != 1 || vs.Names[0].Name != "vpnFlowConfigs" {
-			return true
-		}
-		found = true
-		for _, elt := range vs.Values {
-			cl, ok := elt.(*ast.CompositeLit)
-			if !ok {
-				continue
+	forEachPackageFile(t, func(file *ast.File) {
+		ast.Inspect(file, func(n ast.Node) bool {
+			vs, ok := n.(*ast.ValueSpec)
+			if !ok || len(vs.Names) != 1 || vs.Names[0].Name != "vpnFlowConfigs" {
+				return true
 			}
-			for _, e := range cl.Elts {
-				if bl, ok := e.(*ast.BasicLit); ok {
-					declared[strings.Trim(bl.Value, `"`)] = true
+			found = true
+			for _, elt := range vs.Values {
+				cl, ok := elt.(*ast.CompositeLit)
+				if !ok {
+					continue
+				}
+				for _, e := range cl.Elts {
+					if bl, ok := e.(*ast.BasicLit); ok {
+						declared[strings.Trim(bl.Value, `"`)] = true
+					}
 				}
 			}
-		}
-		return true
+			return true
+		})
 	})
 	if !found {
 		t.Fatal("vpnFlowConfigs not found; this test would be vacuous")
@@ -196,11 +246,11 @@ func TestVPNFlowConfigSetCoversShelledOutUCI(t *testing.T) {
 // The shelled-out writes are the reason dhcp has to be in that set. If someone
 // converts them to the UCI interface this test should tell them to drop the
 // comment, and if they add another one it should make them think about the set.
+//
+// The scan covers every non-test file in the package: the shelled-out write is
+// a package-wide contract, not a property of one file.
 func TestShelledOutUCIWritesAreOnTheRecord(t *testing.T) {
-	src, err := readVPNSource(t)
-	if err != nil {
-		t.Fatal(err)
-	}
+	src := readPackageSource(t)
 	// Written as plain literals. An earlier version of this had "fmt.Sprintf("
 	// inside a raw string, so it was dead text rather than code, and the
 	// surrounding test still passed.
@@ -224,8 +274,68 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
-func readVPNSource(t *testing.T) (string, error) {
+// packageFiles parses every non-test file in the services package.
+//
+// The files are read one by one rather than through parser.ParseDir: the
+// services package has no build-tagged files, and ParseDir is deprecated
+// precisely because it does not reason about build tags.
+func packageFiles(t *testing.T) []*ast.File {
 	t.Helper()
-	b, err := os.ReadFile("vpn_service.go")
-	return string(b), err
+	fset := token.NewFileSet()
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	var files []*ast.File
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		file, err := parser.ParseFile(fset, path, src, parser.ParseComments)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		files = append(files, file)
+	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name.Name < files[j].Name.Name
+	})
+	return files
+}
+
+// forEachPackageFile parses every non-test file in the services package and
+// calls fn with it. A file split must not change what these package-wide
+// checks can see.
+func forEachPackageFile(t *testing.T, fn func(*ast.File)) {
+	t.Helper()
+	for _, file := range packageFiles(t) {
+		fn(file)
+	}
+}
+
+// readPackageSource concatenates the source of every non-test file in the
+// services package.
+func readPackageSource(t *testing.T) string {
+	t.Helper()
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	var b strings.Builder
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		b.Write(data)
+		b.WriteString("\n")
+	}
+	return b.String()
 }

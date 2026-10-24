@@ -8,14 +8,21 @@ import { useVpnStatus } from './use-vpn';
 import { useSystemInfo } from './use-system';
 import { useUSBTetherStatus } from './use-usb-tether';
 import { useRefetchOnWsReconnect } from './use-refetch-on-ws-reconnect';
-import { describeVpnStatus, UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
+import { describeVpnStatus, resolveUplinks, UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
+import type { TransferRate } from '@/lib/traffic-series';
 import { useWsSubscribe } from '@/lib/ws-context';
 
 export interface SourceDef {
+  /** Stable uplink key; also used to attach live rates to the right row. */
+  key: 'wan' | 'wwan' | 'usbtether';
   label: string;
   icon: LucideIcon;
   connected: boolean;
   detail?: string;
+  /** Interface carrying this source, when one is configured. */
+  interfaceName?: string;
+  /** Newest sampled rate, attached by the dashboard from the WebSocket. */
+  rate?: TransferRate | null;
 }
 
 export interface TopologyData {
@@ -93,6 +100,10 @@ export function useTopologyData(): TopologyData {
   const ipv6Enabled = ipv6Status?.enabled ?? false;
   const internetUp = network?.internet_reachable ?? false;
 
+  const resolvedUplinks = resolveUplinks(network?.interfaces ?? []);
+  const interfaceName = (key: 'wan' | 'wwan' | 'usbtether') =>
+    resolvedUplinks.find((source) => source.key === key)?.iface?.name;
+
   const allClients = network?.clients ?? [];
   const wlanClients = allClients.filter(
     (c) =>
@@ -112,23 +123,29 @@ export function useTopologyData(): TopologyData {
   return {
     sources: [
       {
+        key: 'wan',
         label: UPLINK_LABELS.wan,
         icon: Cable,
         connected: ethernetUp,
+        interfaceName: interfaceName('wan'),
         detail: ethernetUp ? (wan?.ip_address ?? undefined) : UPLINK_INACTIVE.wan,
       },
       {
+        key: 'wwan',
         label: UPLINK_LABELS.wwan,
         icon: Wifi,
         connected: repeaterUp,
+        interfaceName: interfaceName('wwan'),
         detail: repeaterUp
           ? (wifiConn?.ssid ?? wan?.ip_address ?? undefined)
           : UPLINK_INACTIVE.wwan,
       },
       {
+        key: 'usbtether',
         label: UPLINK_LABELS.usbtether,
         icon: Smartphone,
         connected: tetherUp,
+        interfaceName: interfaceName('usbtether'),
         detail: tetherUp
           ? usbTether?.device_type || wan?.ip_address || 'Connected'
           : UPLINK_INACTIVE.usbtether,

@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-10-08
+updated: 2026-10-22
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture/overview.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-10-08 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-22 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## Milestone checklist (compact)
 
@@ -51,13 +51,41 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   wizard normalized), one status language (semantic tokens + `StatusPill`), one group heading
   (`SectionHeading`), one load/error contract (`QueryCard`) across system, services, network, logs,
   vpn and the shared component layer ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
-- WiFi summary band: always-visible connection / internet / radios / mode / health tiles with
-  per-tile degradation; the first page to use the band pattern.
-- Dashboard traffic history: `GET /api/v1/network/traffic-history` serves a bounded ~10-minute
-  in-memory ring so the throughput chart paints real history on page load instead of an empty axis.
+- WiFi summary band: always-visible connection / internet / mode tiles with per-tile degradation;
+  the first page to use the band pattern (the #195 pass later made it two tiles).
+- Network traffic history: `GET /api/v1/network/traffic-history` serves a bounded ~10-minute
+  in-memory ring so the interface chart paints real history on page load instead of an empty
+  axis.
+- UI clarity pass (2026-10-21, issue #195): the dashboard shows one compact bit-rate
+  field with a unit per direction, and the connected topology source stacks the same
+  two rates; the WiFi summary band is two tiles (Connection and Internet) and WiFi / Advanced
+  is one list of collapsible sections with one button size; the WiFi mode options sit directly
+  below the band without an outer card; the current uplink is a flat status strip over one
+  saved-network table in the same card; and the captive-portal warning only appears above the
+  band when it has an action; traffic charts stop replaying their animation and state their
+  retained window; the app shell owns the only page scroll container; Tailscale, Speedtest and
+  SQM leave the nav while their package is absent
+  ([ADR 0012](../adr/0012-ui-consistency-and-status-language.md)).
 - **Not verified on device:** the 2026-10-05 pass was completed without access to 192.168.1.1
   (host has no route to it), so light/dark rendering, the new band, and history accumulation on
   real hardware still need the standing device checks.
+
+## Code Structure
+
+- **Oversized-file refactor (2026-10-20):** the largest files in the backend and the frontend
+  were split into per-domain sibling modules in the same package or directory. The backend's
+  `vpn_service.go` (2498 lines), `network_service.go` (2250), `system_service.go` (1653),
+  `wifi_service.go` (1425) and `failover_service.go` (1353) became focused files per feature
+  (WireGuard, Tailscale, split tunnel, profiles, the shared dnsmasq layer stack, the kill switch,
+  WAN, DHCP, DNS, clients, DDNS, port forwards, firmware, backup, SSH keys, buttons, LED, logs,
+  the mwan3 section management, the candidate discovery). The API handlers and the OpenAPI spec
+  split the same way; the frontend's `use-network.ts`, `use-wifi.ts`, `use-system.ts`, the
+  dashboard page, the failover card, the AP form and the MSW mocks split by domain, with the
+  original module kept as a re-export barrel so no importer changed.
+- The splits are pure moves: every moved declaration is byte-identical, and the served OpenAPI
+  spec is unchanged. The VPN lock test now walks the whole package instead of one file, so a
+  split can no longer hide a nested config lock, and a new docs gate resolves every `file:line`
+  reference in `docs/` so a split can no longer leave a stale pointer behind.
 
 ## Frontend Toolchain
 

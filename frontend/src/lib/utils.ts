@@ -23,6 +23,37 @@ export function formatRate(bytesPerSec: number): string {
 }
 
 /**
+ * Format a bit rate with at most two integer digits.
+ *
+ * Counters are sampled in bytes, but link speeds are quoted in bits. Keeping
+ * the integer part to two digits is what makes a rate fit next to a topology
+ * label: 850 Kbit/s reads as `0.9 Mbit/s`, and 100 Mbit/s moves to `0.1
+ * Gbit/s` instead of growing a third digit. One decimal is enough for a live
+ * sample that changes every two seconds.
+ */
+export function formatBitRate(bitsPerSec: number): string {
+  if (!Number.isFinite(bitsPerSec) || bitsPerSec <= 0) return '0.0 Mbit/s';
+
+  const mbit = bitsPerSec / 1_000_000;
+  if (mbit < 0.05) return '<0.1 Mbit/s';
+
+  const units = [
+    { divisor: 1_000_000, label: 'Mbit/s' },
+    { divisor: 1_000_000_000, label: 'Gbit/s' },
+    { divisor: 1_000_000_000_000, label: 'Tbit/s' },
+  ] as const;
+  for (let index = 0; index < units.length; index += 1) {
+    const unit = units[index]!;
+    const value = bitsPerSec / unit.divisor;
+    const rounded = Math.round(value * 10) / 10;
+    if (rounded < 100 || index === units.length - 1) {
+      return `${rounded.toFixed(1)} ${unit.label}`;
+    }
+  }
+  return '0.0 Mbit/s';
+}
+
+/**
  * Format seconds into "X days, Y hours, Z minutes".
  */
 export function formatUptime(seconds: number): string {

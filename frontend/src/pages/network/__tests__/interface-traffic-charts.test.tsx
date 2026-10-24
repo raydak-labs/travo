@@ -26,7 +26,11 @@ vi.mock('@/hooks/use-websocket', () => ({
 
 const historyState = {
   data: undefined as
-    { points: { t: number; ifname: string; rx_bytes: number; tx_bytes: number }[] } | undefined,
+    | {
+        points: { t: number; ifname: string; rx_bytes: number; tx_bytes: number }[];
+        retained_seconds: number;
+      }
+    | undefined,
 };
 
 vi.mock('@/hooks/use-data-usage', () => ({
@@ -43,6 +47,7 @@ describe('InterfaceTrafficCharts', () => {
         { t: 12, ifname: 'eth0', rx_bytes: 2000, tx_bytes: 0 },
         { t: 14, ifname: 'eth0', rx_bytes: 6000, tx_bytes: 0 },
       ],
+      retained_seconds: 120,
     };
 
     render(<InterfaceTrafficCharts />);
@@ -53,6 +58,20 @@ describe('InterfaceTrafficCharts', () => {
     expect(screen.getByText('eth0')).toBeInTheDocument();
     expect(screen.queryByText('Collecting data…')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('chart').length).toBeGreaterThan(0);
+    expect(screen.getByText('last 2 min, sampled every 2 s')).toBeInTheDocument();
+  });
+
+  it('hides the retained window before the server has a span to report', () => {
+    historyState.data = {
+      points: [{ t: 10, ifname: 'eth0', rx_bytes: 0, tx_bytes: 0 }],
+      retained_seconds: 0,
+    };
+
+    render(<InterfaceTrafficCharts />);
+
+    // A screenshot at first load showed "last 0 s", which reads as a broken
+    // chart rather than "no history yet".
+    expect(screen.queryByText(/sampled every 2 s/)).not.toBeInTheDocument();
   });
 
   it('shows the disconnected message when there is neither history nor live data', () => {

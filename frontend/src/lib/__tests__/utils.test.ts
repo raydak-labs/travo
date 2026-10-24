@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatUptime } from '../utils';
+import { formatBitRate, formatBytes, formatUptime } from '../utils';
 
 describe('formatBytes', () => {
   it('returns "0 B" for 0 bytes', () => {
@@ -34,6 +34,36 @@ describe('formatBytes', () => {
     // negative bytes should return a negative formatted value or handle gracefully
     const result = formatBytes(-1);
     expect(typeof result).toBe('string');
+  });
+});
+
+describe('formatBitRate', () => {
+  it('keeps a low bit rate in Mbit instead of growing a third digit', () => {
+    expect(formatBitRate(850_000)).toBe('0.9 Mbit/s');
+  });
+
+  it('formats a normal link rate with one decimal', () => {
+    expect(formatBitRate(25_000_000)).toBe('25.0 Mbit/s');
+  });
+
+  it('moves to Gbit at 100 Mbit so the integer part stays short', () => {
+    expect(formatBitRate(100_000_000)).toBe('0.1 Gbit/s');
+    expect(formatBitRate(940_000_000)).toBe('0.9 Gbit/s');
+    expect(formatBitRate(100_000_000_000)).toBe('0.1 Tbit/s');
+  });
+
+  it('rounds up across the unit boundary', () => {
+    expect(formatBitRate(99_960_000)).toBe('0.1 Gbit/s');
+  });
+
+  it('marks rates below the display precision', () => {
+    expect(formatBitRate(40_000)).toBe('<0.1 Mbit/s');
+    expect(formatBitRate(0)).toBe('0.0 Mbit/s');
+  });
+
+  it('rejects non-finite samples', () => {
+    expect(formatBitRate(Number.NaN)).toBe('0.0 Mbit/s');
+    expect(formatBitRate(Number.POSITIVE_INFINITY)).toBe('0.0 Mbit/s');
   });
 });
 

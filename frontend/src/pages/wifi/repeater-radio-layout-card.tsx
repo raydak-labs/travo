@@ -24,7 +24,12 @@ export function RepeaterRadioLayoutCard() {
           the router ended up with AP and STA on the same radio.
         </p>
         {isRepeater ? (
-          <Button type="button" disabled={reconcile.isPending} onClick={() => setConfirming(true)}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={reconcile.isPending}
+            onClick={() => setConfirming(true)}
+          >
             {reconcile.isPending ? 'Applying…' : 'Re-apply STA/AP separation'}
           </Button>
         ) : (

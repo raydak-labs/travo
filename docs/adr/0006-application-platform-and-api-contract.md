@@ -74,7 +74,8 @@ connection slot and a large legitimate upload is not rejected.
 ## References
 
 - `docs/architecture/overview.md` §1, §8
-- `backend/internal/api/openapi_handler.go`
+- `backend/internal/api/openapi_handler.go` — the spec header and the merge that assembles the paths
+- `backend/internal/api/openapi_paths_*.go` — the spec's path entries, one file per domain
 - `backend/internal/api/openapi_drift_test.go` — the route↔spec drift gate
 - `backend/cmd/server/main.go` — Fiber config, timeouts, body limit, shutdown order
 - `docs/guides/deployment.md`
