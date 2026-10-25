@@ -336,7 +336,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		// restore, factory reset) so the state is not silently forgotten.
 		systemSvc.LogStaleCrashGuards()
 	}
-	networkSvc := network.NewNetworkService(u, ub)
+	networkSvc := network.New(network.Deps{UCI: u, Ubus: ub})
 	sqmSvc := network.NewSQMService(u)
 
 	// Create event watcher (noop in mock mode to avoid running ubus on dev machines).
@@ -348,11 +348,11 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	}
 	lifecycle.netWatcher = netWatcher
 	lifecycle.Go(func(stop <-chan struct{}) { netWatcher.Start() })
-	var wifiSvc *wifi.WifiService
+	var wifiSvc *wifi.Service
 	if cfg.MockMode {
-		wifiSvc = wifi.NewWifiServiceWithReloader(u, ub, &wifi.NoopWifiReloader{})
+		wifiSvc = wifi.New(wifi.Deps{UCI: u, Ubus: ub, Reloader: &wifi.NoopWifiReloader{}})
 	} else {
-		wifiSvc = wifi.NewWifiService(u, ub, rootPassword) // uses apply+confirm instead of wifi up
+		wifiSvc = wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: platform.NewRealUCIApplyConfirm(ub, rootPassword)})
 	}
 
 	// The wireless configuration and its cron entries are reconciled on

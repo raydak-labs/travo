@@ -8,7 +8,7 @@ import (
 )
 
 // GetRadioStatusHandler handles GET /api/v1/wifi/radio.
-func GetRadioStatusHandler(svc *wifi.WifiService) fiber.Handler {
+func GetRadioStatusHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := svc.GetRadioStatus()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetRadioStatusHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetRadioEnabledHandler handles PUT /api/v1/wifi/radio.
-func SetRadioEnabledHandler(svc *wifi.WifiService) fiber.Handler {
+func SetRadioEnabledHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled            bool `json:"enabled"`
@@ -38,7 +38,7 @@ func SetRadioEnabledHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // GetAPConfigHandler handles GET /api/v1/wifi/ap.
-func GetAPConfigHandler(svc *wifi.WifiService) fiber.Handler {
+func GetAPConfigHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		configs, err := svc.GetAPConfigs()
 		if err != nil {
@@ -49,7 +49,7 @@ func GetAPConfigHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetAPConfigHandler handles PUT /api/v1/wifi/ap/:section.
-func SetAPConfigHandler(svc *wifi.WifiService) fiber.Handler {
+func SetAPConfigHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
@@ -77,7 +77,7 @@ func SetAPConfigHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // GetRadiosHandler handles GET /api/v1/wifi/radios.
-func GetRadiosHandler(svc *wifi.WifiService) fiber.Handler {
+func GetRadiosHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		radios, err := svc.GetRadios()
 		if err != nil {
@@ -88,7 +88,7 @@ func GetRadiosHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetRadioRoleHandler handles PUT /api/v1/wifi/radios/:name/role.
-func SetRadioRoleHandler(svc *wifi.WifiService) fiber.Handler {
+func SetRadioRoleHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		radioName := c.Params("name")
 		var req models.RadioRoleRequest

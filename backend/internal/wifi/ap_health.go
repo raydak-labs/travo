@@ -29,7 +29,7 @@ const (
 // Radios are never re-enabled while the WiFi schedule's current window is off.
 //
 // Returns: fixed (any UCI changes committed), needWifiUp (at least one AP was re-enabled).
-func (w *WifiService) EnsureAPRunning() (fixed bool, needWifiUp bool, err error) {
+func (w *Service) EnsureAPRunning() (fixed bool, needWifiUp bool, err error) {
 	// This commits `wireless`, so it takes the wireless write lock like any
 	// other mutator: it runs ~30s after start, exactly when an operator may be
 	// reconnecting.
@@ -46,7 +46,7 @@ func (w *WifiService) EnsureAPRunning() (fixed bool, needWifiUp bool, err error)
 
 // ensureAPRunningLocked is the lock-free core; see wifi_toggle_script.go for why
 // the split exists.
-func (w *WifiService) ensureAPRunningLocked() (fixed bool, needWifiUp bool, err error) {
+func (w *Service) ensureAPRunningLocked() (fixed bool, needWifiUp bool, err error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return false, false, fmt.Errorf("reading wireless sections: %w", err)
@@ -132,7 +132,7 @@ func (w *WifiService) ensureAPRunningLocked() (fixed bool, needWifiUp bool, err 
 // fixRadioSection applies defaults to a wifi-device: country=US when missing; channel default
 // when missing; and resets explicitly out-of-range 5 GHz channels (> 165) to Default5GChannel.
 // channel=auto is preserved — auto-selection produces valid channels under normal operation.
-func (w *WifiService) fixRadioSection(section string, opts map[string]string) (bool, error) {
+func (w *Service) fixRadioSection(section string, opts map[string]string) (bool, error) {
 	fixed := false
 	if opts["country"] == "" {
 		if setErr := w.uci.Set("wireless", section, "country", DefaultCountry); setErr != nil {
@@ -189,7 +189,7 @@ func radioHasEnabledAP(sections map[string]map[string]string, radio string) bool
 // fixAPSection checks and repairs a single AP section.
 // Uses band-specific default SSID (2.4 vs 5G). Ensures encryption and key are set (psk2 + travelrouter).
 // Returns: fixed (any UCI changes made), reEnabled (AP was changed from disabled to enabled).
-func (w *WifiService) fixAPSection(section string, opts map[string]string, sections map[string]map[string]string) (fixed bool, reEnabled bool, err error) {
+func (w *Service) fixAPSection(section string, opts map[string]string, sections map[string]map[string]string) (fixed bool, reEnabled bool, err error) {
 	if opts["disabled"] == "1" {
 		// Do not re-enable if the same radio has an active STA — that combination
 		// crashes the ath11k driver on IPQ6018 hardware.

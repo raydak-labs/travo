@@ -70,13 +70,13 @@ const lockoutStationDump = `Station AA:BB:CC:DD:EE:01 (on phy1-ap0)
 // newLockoutService wires a wifi service whose caller classification is
 // deterministic and whose apply sessions are recorded, so a refusal can be
 // asserted to have staged nothing at all.
-func newLockoutService(t *testing.T) (*WifiService, *uci.MockUCI, *fakeWirelessApplier) {
+func newLockoutService(t *testing.T) (*Service, *uci.MockUCI, *fakeWirelessApplier) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", lockoutDump())
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
-	svc := NewWifiServiceWithApplier(u, ub, applier)
+	svc := New(Deps{UCI: u, Ubus: ub, Applier: applier})
 	svc.guardDir = t.TempDir()
 	svc.arpFile = networktest.WriteTempFile(t, "arp", lockoutArp)
 	svc.cmd = &platform.MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {

@@ -17,8 +17,8 @@ import (
 // ErrUnknownInterface is returned for an interface name netifd does not know.
 var ErrUnknownInterface = errors.New("unknown interface")
 
-// NetworkService provides network status and configuration.
-type NetworkService struct {
+// Service provides network status and configuration.
+type Service struct {
 	uci       uci.UCI
 	ubus      ubus.Ubus
 	aliasFile string
@@ -72,32 +72,35 @@ func stringFromBytes(data []byte) string {
 	return strings.TrimSpace(string(data))
 }
 
-func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd platform.CommandRunner) *NetworkService {
-	return &NetworkService{
-		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd, arpFile: ProcNetARP,
+// Deps are the collaborators of a network Service. Zero values take the
+// production defaults.
+type Deps struct {
+	UCI  uci.UCI
+	Ubus ubus.Ubus
+	// Cmd runs shell commands; default platform.RealCommandRunner.
+	Cmd platform.CommandRunner
+	// AliasFile stores client aliases; default /etc/travo/aliases.json.
+	AliasFile string
+}
+
+// New creates a network Service.
+func New(d Deps) *Service {
+	if d.Cmd == nil {
+		d.Cmd = &platform.RealCommandRunner{}
+	}
+	if d.AliasFile == "" {
+		d.AliasFile = "/etc/travo/aliases.json"
+	}
+	return &Service{
+		uci: d.UCI, ubus: d.Ubus, aliasFile: d.AliasFile, cmd: d.Cmd, arpFile: ProcNetARP,
 		wifiMACsSeen:     make(map[string]time.Time),
 		portForwardsFile: defaultPortForwardsFile,
 		ddnsInitScript:   ddnsInitScriptPath,
 	}
 }
 
-// NewNetworkService creates a new NetworkService.
-func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return newNetworkService(u, ub, "/etc/travo/aliases.json", &platform.RealCommandRunner{})
-}
-
-// NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
-func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *NetworkService {
-	return newNetworkService(u, ub, aliasFile, &platform.RealCommandRunner{})
-}
-
-// NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
-func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd platform.CommandRunner) *NetworkService {
-	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
-}
-
 // uciSet is a helper for setting UCI values with consistent error wrapping.
-func (n *NetworkService) uciSet(config, section, option, value string) error {
+func (n *Service) uciSet(config, section, option, value string) error {
 	if err := n.uci.Set(config, section, option, value); err != nil {
 		return fmt.Errorf("set %s.%s.%s: %w", config, section, option, err)
 	}
@@ -105,7 +108,7 @@ func (n *NetworkService) uciSet(config, section, option, value string) error {
 }
 
 // uciCommit commits a UCI config with consistent error wrapping.
-func (n *NetworkService) uciCommit(config string) error {
+func (n *Service) uciCommit(config string) error {
 	if err := n.uci.Commit(config); err != nil {
 		return fmt.Errorf("commit %s: %w", config, err)
 	}
@@ -113,7 +116,7 @@ func (n *NetworkService) uciCommit(config string) error {
 }
 
 // restartService restarts an OpenWRT init.d service.
-func (n *NetworkService) restartService(service string) error {
+func (n *Service) restartService(service string) error {
 	_, err := n.cmd.Run(initdPath+service, "restart")
 	return err
 }
@@ -126,7 +129,7 @@ var allowedInterfaces = map[string]bool{
 }
 
 // SetInterfaceState brings a network interface up or down via ifup/ifdown.
-func (n *NetworkService) SetInterfaceState(iface string, up bool) error {
+func (n *Service) SetInterfaceState(iface string, up bool) error {
 	if !allowedInterfaces[iface] {
 		return fmt.Errorf("%w: %s", ErrUnknownInterface, iface)
 	}
@@ -150,7 +153,7 @@ func maskToNetmask(mask float64) string {
 }
 
 // GetNetworkStatus returns the overall network status.
-func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
+func (n *Service) GetNetworkStatus() (models.NetworkStatus, error) {
 	var status models.NetworkStatus
 
 	wanData, err := n.ubus.Call("network.interface.wan", "status", nil)
@@ -303,7 +306,7 @@ func parseInterface(name, device string, data map[string]any, ub ubus.Ubus) mode
 }
 
 // GetClients returns connected LAN clients with aliases merged.
-func (n *NetworkService) GetClients() ([]models.Client, error) {
+func (n *Service) GetClients() ([]models.Client, error) {
 	status, err := n.GetNetworkStatus()
 	if err != nil {
 		return nil, err
@@ -321,7 +324,7 @@ func (n *NetworkService) GetClients() ([]models.Client, error) {
 // KickClient disconnects a WiFi client by deauthentication.
 // It returns an error when no interface accepted the disassociate so the UI can
 // report the failure instead of pretending the client is gone.
-func (n *NetworkService) KickClient(mac string) error {
+func (n *Service) KickClient(mac string) error {
 	// Discover AP interfaces dynamically using iw dev
 	iwDevOutput, err := n.cmd.Run("iw", "dev")
 	if err != nil {
@@ -365,7 +368,7 @@ func (n *NetworkService) KickClient(mac string) error {
 // scripts/install.sh), and writing a guard here without those would be worse
 // than no guard: nothing would clear it, and blocking would stay dead until a
 // redeploy.
-func (n *NetworkService) BlockClient(mac string) error {
+func (n *Service) BlockClient(mac string) error {
 	return platform.MutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 		macUpper := strings.ToUpper(mac)
@@ -411,7 +414,7 @@ func (n *NetworkService) BlockClient(mac string) error {
 }
 
 // UnblockClient removes the firewall block rule for a MAC address.
-func (n *NetworkService) UnblockClient(mac string) error {
+func (n *Service) UnblockClient(mac string) error {
 	return platform.MutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 
@@ -437,7 +440,7 @@ func (n *NetworkService) UnblockClient(mac string) error {
 
 // undoFirewallSection restores a firewall section to a previous option set —
 // nil means the section must be gone — and commits the result.
-func (n *NetworkService) undoFirewallSection(section string, previous map[string]string) error {
+func (n *Service) undoFirewallSection(section string, previous map[string]string) error {
 	// An unblock has usually already deleted the section by this point, and a
 	// missing section IS the target state, so a failed delete is only an error
 	// when the section is in fact still there.
@@ -463,7 +466,7 @@ func (n *NetworkService) undoFirewallSection(section string, previous map[string
 }
 
 // GetBlockedClients returns a list of blocked MAC addresses.
-func (n *NetworkService) GetBlockedClients() ([]string, error) {
+func (n *Service) GetBlockedClients() ([]string, error) {
 	sections, err := n.uci.GetSections("firewall")
 	if err != nil {
 		// Never report "nothing is blocked" on a failed read: that silently
@@ -490,7 +493,7 @@ func (n *NetworkService) GetBlockedClients() ([]string, error) {
 // validated as a hostname or IP literal first: an unvalidated target of "-f"
 // turned `ping` into a root flood of the whole internet, and "-w1"/"-s" style
 // values rewrite its behaviour.
-func (n *NetworkService) RunDiagnostics(req models.DiagnosticsRequest) models.DiagnosticsResult {
+func (n *Service) RunDiagnostics(req models.DiagnosticsRequest) models.DiagnosticsResult {
 	result := models.DiagnosticsResult{Type: req.Type, Target: req.Target}
 	if err := validateDiagnosticTarget(req.Target); err != nil {
 		result.Error = err.Error()
@@ -544,7 +547,7 @@ func validateDiagnosticTarget(target string) error {
 }
 
 // SendWoL sends a Wake-on-LAN magic packet to the given MAC address.
-func (n *NetworkService) SendWoL(mac, iface string) error {
+func (n *Service) SendWoL(mac, iface string) error {
 	args := []string{mac}
 	if iface != "" {
 		args = append([]string{"-i", iface}, args...)
@@ -568,7 +571,7 @@ type ConnectionMethod struct {
 // client IP against network interface addresses. Uses ubus network interface
 // dump for accurate address detection. On error, logs details and returns
 // "unknown" to avoid breaking UI.
-func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
+func (n *Service) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
 	return ClassifyClientConnection(ClassifyDeps{
 		Ubus: n.ubus, Cmd: n.cmd, ARPFile: n.arpFile,
 	}, clientIP), nil

@@ -26,7 +26,7 @@ func TestFailoverServiceGetConfigDefaults(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
 
@@ -47,7 +47,7 @@ func TestFailoverServiceSetConfigWritesManagedSections(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
@@ -125,7 +125,7 @@ func TestFailoverServiceRejectsEnabledConfigWithoutCandidates(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
 
 	err := svc.SetConfig(models.FailoverConfig{
@@ -244,7 +244,7 @@ func TestFailbackHoldDown(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 
 	now := time.Now()
 	oldTime := now.Add(-time.Minute)
@@ -347,7 +347,7 @@ func TestFailbackImmediateFailover(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
 
@@ -389,7 +389,7 @@ func TestFailbackPriorityOrderingWithHoldDown(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 
 	now := time.Now()
 	oldTime := now.Add(-time.Minute)
@@ -473,7 +473,7 @@ func newComputeActiveService(t *testing.T) *FailoverService {
 	t.Helper()
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	return NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
 		&platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{},
 		filepath.Join(t.TempDir(), "failover.json"))
@@ -544,7 +544,7 @@ func newFailoverTestService(t *testing.T, mockUCI uci.UCI, applier platform.UCIA
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, applier, configPath)
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0755); err != nil {
@@ -1440,7 +1440,7 @@ func TestSetConfigConfigWriteFailureAppliesNothingAndLeavesNoGuard(t *testing.T)
 	applier := &recordingApplier{}
 	tmpDir := t.TempDir()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	// A directory where the config file belongs: every write of it fails, for
 	// any user, including root.
 	blocker := filepath.Join(tmpDir, "failover.json")
@@ -1482,7 +1482,7 @@ func TestReadTrackerStatesMapsNamespacedSections(t *testing.T) {
 	}}
 	tmpDir := t.TempDir()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	configPath := filepath.Join(tmpDir, "failover.json")
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, cmd,
 		&platform.NoopUCIApplyConfirm{}, configPath)

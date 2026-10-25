@@ -25,14 +25,14 @@ import (
 //	192.168.1.151 -> 02:00:00:00:00:02  the iPhone, associated with phy1-ap0
 //	8.8.8.8                          outside every prefix: cannot be placed
 func newDeviceLockoutService(t *testing.T, stations map[string]string) (
-	*WifiService, *uci.MockUCI, *fakeWirelessApplier,
+	*Service, *uci.MockUCI, *fakeWirelessApplier,
 ) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", networktest.DeviceInterfaceDump(t))
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
-	svc := NewWifiServiceWithApplier(u, ub, applier)
+	svc := New(Deps{UCI: u, Ubus: ub, Applier: applier})
 	svc.guardDir = t.TempDir()
 	svc.cmd = &platform.MockCommandRunner{RunFunc: networktest.FakeIw(stations)}
 	svc.arpFile = networktest.WriteTempFile(t, "arp", networktest.DeviceNeighborTable(t))

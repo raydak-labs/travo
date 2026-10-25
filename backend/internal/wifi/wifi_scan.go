@@ -14,7 +14,7 @@ import (
 // ensureSTASectionForScan creates a STA wifi-iface (sta0) if none exists (for Connect, not for Scan).
 // Uses network=wwan so the STA gets DHCP and is used as WAN when connected; ensures wwan exists.
 // Returns the STA section name and commits wireless if created.
-func (w *WifiService) ensureSTASectionForScan() (string, error) {
+func (w *Service) ensureSTASectionForScan() (string, error) {
 	if section, err := w.findSTASection(); err == nil {
 		return section, nil
 	}
@@ -159,7 +159,7 @@ func requestBandToUCI(band string) string {
 
 // getRadioForBand returns the UCI radio section name (e.g. "radio0") that has the given band.
 // band is the request band (2.4ghz, 5ghz, 6ghz) or UCI band (2g, 5g, 6g).
-func (w *WifiService) getRadioForBand(band string) (string, error) {
+func (w *Service) getRadioForBand(band string) (string, error) {
 	uciBand := requestBandToUCI(band)
 	if uciBand == "" {
 		uciBand = strings.ToLower(strings.TrimSpace(band))
@@ -181,7 +181,7 @@ func (w *WifiService) getRadioForBand(band string) (string, error) {
 }
 
 // Scan returns available WiFi networks by scanning each radio (LuCI-style). No STA required.
-func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
+func (w *Service) Scan() ([]models.WifiScanResult, error) {
 	radios, err := w.getWifiRadioNames()
 	if err != nil || len(radios) == 0 {
 		return []models.WifiScanResult{}, nil
@@ -231,7 +231,7 @@ func (w *WifiService) Scan() ([]models.WifiScanResult, error) {
 
 // GetSTASignalInfo returns the active STA connection signal, SSID, and radio device.
 // Returns (ssid="", signalDBM=0, radio="") when no STA is connected.
-func (w *WifiService) GetSTASignalInfo() (ssid string, signalDBM int, radio string, err error) {
+func (w *Service) GetSTASignalInfo() (ssid string, signalDBM int, radio string, err error) {
 	ifname, _, err := w.findSTADevice()
 	if err != nil || ifname == "" {
 		return "", 0, "", nil // not connected
@@ -255,7 +255,7 @@ func (w *WifiService) GetSTASignalInfo() (ssid string, signalDBM int, radio stri
 
 // ScanRadioForSSID scans the given radio and returns the best signal for the target SSID.
 // Returns (0, false, nil) when the SSID is not found on that radio.
-func (w *WifiService) ScanRadioForSSID(radioName, ssid string) (int, bool, error) {
+func (w *Service) ScanRadioForSSID(radioName, ssid string) (int, bool, error) {
 	resp, err := w.ubus.Call("iwinfo", "scan", map[string]any{"device": radioName})
 	if err != nil {
 		return 0, false, err
@@ -295,7 +295,7 @@ func (w *WifiService) ScanRadioForSSID(radioName, ssid string) (int, bool, error
 // enabled while never firing. splitAPOffUplinkRadio still refuses the one
 // layout where no split exists (the target runs the only access point), so the
 // invariant — never an enabled AP and the uplink on one PHY — is unchanged.
-func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
+func (w *Service) SwitchSTAToRadio(targetRadio string) error {
 	_, err := w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		// Before any write, like every other writer that would enable a STA on
 		// a radio: this either frees the radio or refuses, and never leaves the

@@ -7,9 +7,9 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-func newAPHealthTestService(u *uci.MockUCI) *WifiService {
+func newAPHealthTestService(u *uci.MockUCI) *Service {
 	ub := ubus.NewMockUbus()
-	return NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	return New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}})
 }
 
 func TestEnsureAPRunning_HealthyConfig(t *testing.T) {

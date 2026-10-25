@@ -13,14 +13,14 @@ import (
 // newClassifierService wires a NetworkService onto the captured payload: the
 // real interface dump, the real neighbour table, and an `iw` that answers with
 // the access points listed in associatedAPStations.
-func newClassifierService(t *testing.T) *NetworkService {
+func newClassifierService(t *testing.T) *Service {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", networktest.DeviceInterfaceDump(t))
-	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{
+	svc := New(Deps{UCI: u, Ubus: ub, Cmd: &platform.MockCommandRunner{
 		RunFunc: networktest.FakeIw(networktest.NoAssociatedAPs()),
-	})
+	}})
 	svc.arpFile = networktest.WriteTempFile(t, "arp", networktest.DeviceNeighborTable(t))
 	return svc
 }
@@ -48,9 +48,9 @@ func TestClassifyClient_AssociatedWiFiClientIsWifiAP(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", networktest.DeviceInterfaceDump(t))
-	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{
+	svc := New(Deps{UCI: u, Ubus: ub, Cmd: &platform.MockCommandRunner{
 		RunFunc: networktest.FakeIw(map[string]string{"phy1-ap0": networktest.Phy1APStationDump}),
-	})
+	}})
 	svc.arpFile = networktest.WriteTempFile(t, "arp", networktest.DeviceNeighborTable(t))
 
 	got, err := svc.GetConnectionMethod(networktest.DeviceWiFiClientIP)

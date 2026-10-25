@@ -68,7 +68,7 @@ func hasAP(left []string, section string) bool {
 // to-what-the-code-reads defect this branch keeps hitting: the runtime answer
 // and the config answer have to describe the same device, so this one is built
 // from the config rather than invented.
-func newLockoutServiceWithRuntime(t *testing.T) (*WifiService, *uci.MockUCI, *fakeWirelessApplier) {
+func newLockoutServiceWithRuntime(t *testing.T) (*Service, *uci.MockUCI, *fakeWirelessApplier) {
 	t.Helper()
 	svc, u, applier := newLockoutService(t)
 	sections, err := u.GetSections("wireless")

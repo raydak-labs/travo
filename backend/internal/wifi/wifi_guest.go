@@ -20,7 +20,7 @@ var ErrGuestSubnetOverlap = errors.New("refusing to create the guest network: it
 	"overlaps an existing network interface on this router")
 
 // GetGuestWifi returns the guest WiFi configuration.
-func (w *WifiService) GetGuestWifi() (*models.GuestWifiConfig, error) {
+func (w *Service) GetGuestWifi() (*models.GuestWifiConfig, error) {
 	opts, err := w.uci.GetAll("wireless", "guest")
 	if err != nil {
 		return &models.GuestWifiConfig{Enabled: false}, nil
@@ -34,7 +34,7 @@ func (w *WifiService) GetGuestWifi() (*models.GuestWifiConfig, error) {
 }
 
 // SetGuestWifi creates or updates the guest WiFi network with full isolation.
-func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig, req LockoutRequest) (*WirelessApplyResult, error) {
+func (w *Service) SetGuestWifi(cfg models.GuestWifiConfig, req LockoutRequest) (*WirelessApplyResult, error) {
 	// Disabling guest WiFi takes the guest access point down; enabling it puts
 	// one up.
 	if !cfg.Enabled {
@@ -204,7 +204,7 @@ func (w *WifiService) SetGuestWifi(cfg models.GuestWifiConfig, req LockoutReques
 // network interface already claims it. Two interfaces on one subnet is not a
 // cosmetic problem: the guest DHCP scope hands out addresses the LAN already
 // routes, and the guest firewall zone then applies to LAN traffic as well.
-func (w *WifiService) rejectGuestSubnetOverlap() error {
+func (w *Service) rejectGuestSubnetOverlap() error {
 	sections, err := w.uci.GetSections("network")
 	if err != nil {
 		return fmt.Errorf("reading network sections: %w", err)
@@ -256,7 +256,7 @@ func subnetsOverlap(a, b *net.IPNet) bool {
 // dhcp.guest and the four firewall.guest_* sections in place, so the
 // 192.168.2.0/24 interface, its DHCP scope and the guest zone stay up and
 // continue to route and answer on a network the operator switched off.
-func (w *WifiService) teardownGuestWifi() (*WirelessApplyResult, error) {
+func (w *Service) teardownGuestWifi() (*WirelessApplyResult, error) {
 	abort := func(err error) (*WirelessApplyResult, error) {
 		platform.RevertUCIConfig(w.uci, "wireless", "network", "dhcp", "firewall")
 		return nil, err
@@ -306,7 +306,7 @@ func (w *WifiService) teardownGuestWifi() (*WirelessApplyResult, error) {
 
 // deleteSectionIfPresent removes config/section when it exists. A section that
 // was never created is not an error: teardown must be idempotent.
-func (w *WifiService) deleteSectionIfPresent(config, section string) error {
+func (w *Service) deleteSectionIfPresent(config, section string) error {
 	if _, err := w.uci.GetAll(config, section); err != nil {
 		return nil
 	}

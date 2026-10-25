@@ -11,7 +11,7 @@ import (
 
 // Repeater options, mode switching, repeater/AP radio layout, and WiFi health.
 
-func (w *WifiService) loadRepeaterOptions() (models.RepeaterOptions, error) {
+func (w *Service) loadRepeaterOptions() (models.RepeaterOptions, error) {
 	if w.repeaterOptionsFile == "" {
 		return models.RepeaterOptions{}, nil
 	}
@@ -30,14 +30,14 @@ func (w *WifiService) loadRepeaterOptions() (models.RepeaterOptions, error) {
 }
 
 // GetRepeaterOptions returns persisted repeater preferences (missing file => allow_ap_on_sta_radio false).
-func (w *WifiService) GetRepeaterOptions() (models.RepeaterOptions, error) {
+func (w *Service) GetRepeaterOptions() (models.RepeaterOptions, error) {
 	return w.loadRepeaterOptions()
 }
 
 // SetRepeaterOptions persists repeater-options.json. When allow_ap_on_sta_radio
 // transitions from true to false in repeater mode on multi-radio hardware, it
 // re-applies STA/AP separation (same as ReconcileRepeaterAPLayout).
-func (w *WifiService) SetRepeaterOptions(o models.RepeaterOptions) (*WirelessApplyResult, error) {
+func (w *Service) SetRepeaterOptions(o models.RepeaterOptions) (*WirelessApplyResult, error) {
 	if w.repeaterOptionsFile == "" {
 		return nil, nil
 	}
@@ -76,7 +76,7 @@ func (w *WifiService) SetRepeaterOptions(o models.RepeaterOptions) (*WirelessApp
 	return w.ReconcileRepeaterAPLayout()
 }
 
-func (w *WifiService) repeaterAllowAPOnSTARadio(multiRadio bool) bool {
+func (w *Service) repeaterAllowAPOnSTARadio(multiRadio bool) bool {
 	if !multiRadio {
 		return true
 	}
@@ -90,7 +90,7 @@ func (w *WifiService) repeaterAllowAPOnSTARadio(multiRadio bool) bool {
 // applyRepeaterDownlinkAPPolicy enables/disables AP wifi-iface sections for repeater (and ap/client)
 // mode transitions. When apOnOtherRadio && !allowSTAAP, AP sections on staRadio are disabled so
 // downlink stays off the STA PHY.
-func (w *WifiService) applyRepeaterDownlinkAPPolicy(
+func (w *Service) applyRepeaterDownlinkAPPolicy(
 	apSections []string,
 	staRadio string,
 	apOnOtherRadio bool,
@@ -124,7 +124,7 @@ func (w *WifiService) applyRepeaterDownlinkAPPolicy(
 // A disabled section counts for neither: it hosts no downlink yet, so it cannot vouch for one.
 // Counting it is what let SetMode("repeater") keep an AP on the uplink radio just because a
 // disabled section happened to point somewhere else.
-func (w *WifiService) repeaterDownlinkLayout(
+func (w *Service) repeaterDownlinkLayout(
 	apSections []string,
 	staRadio string,
 	multiRadio bool,
@@ -159,7 +159,7 @@ func (w *WifiService) repeaterDownlinkLayout(
 //
 // Single-radio hardware and allow_ap_on_sta_radio are exempt: there is no split
 // to make, which SetMode("repeater") deliberately accepts.
-func (w *WifiService) repeaterSplitRefusal(apSections []string, staRadio string) error {
+func (w *Service) repeaterSplitRefusal(apSections []string, staRadio string) error {
 	radios, err := w.getWifiRadioNames()
 	if err != nil {
 		return err
@@ -181,7 +181,7 @@ func (w *WifiService) repeaterSplitRefusal(apSections []string, staRadio string)
 // uplink on: the active STA's radio, or — when no uplink profile exists yet —
 // the radio a new one would be created on. Read-only, so a refusal can be
 // decided before ensureSTASectionForScan writes that profile.
-func (w *WifiService) repeaterUplinkRadio() (string, error) {
+func (w *Service) repeaterUplinkRadio() (string, error) {
 	activeSTA, err := w.selectActiveSTA()
 	if err != nil {
 		return "", err
@@ -202,7 +202,7 @@ func (w *WifiService) repeaterUplinkRadio() (string, error) {
 
 // reconcileRepeaterAPRadioLayout re-applies STA/AP radio separation in repeater mode after AP
 // credential or enabled mutations (e.g. unified SSID save) so uplink PHY APs are not left on.
-func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
+func (w *Service) reconcileRepeaterAPRadioLayout() error {
 	if w.deriveWifiMode() != "repeater" {
 		return nil
 	}
@@ -236,7 +236,7 @@ func (w *WifiService) reconcileRepeaterAPRadioLayout() error {
 // The user's browser polls to confirm the router is still reachable; if confirm succeeds,
 // the rollback is cancelled. This prevents soft-brick scenarios without needing a separate
 // guard file (which is only required for background tasks that run without user oversight).
-func (w *WifiService) SetMode(mode string, req LockoutRequest) (*WirelessApplyResult, error) {
+func (w *Service) SetMode(mode string, req LockoutRequest) (*WirelessApplyResult, error) {
 	// Client mode disables every access point, so the resulting config has none
 	// by definition; the other two modes keep them enabled.
 	if err := w.guardLockout(req, mode != "client"); err != nil {
@@ -356,7 +356,7 @@ func (w *WifiService) SetMode(mode string, req LockoutRequest) (*WirelessApplyRe
 }
 
 // ReconcileRepeaterAPLayout re-applies STA/AP radio separation (repeater mode only).
-func (w *WifiService) ReconcileRepeaterAPLayout() (*WirelessApplyResult, error) {
+func (w *Service) ReconcileRepeaterAPLayout() (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		if w.deriveWifiMode() != "repeater" {
 			return nil, fmt.Errorf("repeater radio reconcile only applies in repeater mode")
@@ -373,7 +373,7 @@ func (w *WifiService) ReconcileRepeaterAPLayout() (*WirelessApplyResult, error) 
 
 // sameRadioRepeaterAPSTAConflict reports whether an enabled AP shares the STA radio while
 // repeater split policy would disable it (multi-radio, allow_ap_on_sta off).
-func (w *WifiService) sameRadioRepeaterAPSTAConflict() (bool, error) {
+func (w *Service) sameRadioRepeaterAPSTAConflict() (bool, error) {
 	if w.deriveWifiMode() != "repeater" {
 		return false, nil
 	}
@@ -428,7 +428,7 @@ func (w *WifiService) sameRadioRepeaterAPSTAConflict() (bool, error) {
 // client runs on the actually-connected STA and the router has no WAN. The
 // existing WifiConnection endpoint reports SSID from iwinfo and IP from wwan
 // separately, which is exactly why the broken state looked "connected".
-func (w *WifiService) GetHealth() (models.WifiHealth, error) {
+func (w *Service) GetHealth() (models.WifiHealth, error) {
 	h := models.WifiHealth{Status: "ok", Issues: []string{}}
 
 	// Skip if no STA section is enabled (pure AP mode).

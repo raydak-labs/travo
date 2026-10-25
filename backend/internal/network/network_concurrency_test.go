@@ -144,7 +144,7 @@ func TestConcurrentDHCPWritersDoNotCorruptEachOther(t *testing.T) {
 	const workers, perWorker = 8, 6
 
 	u := newRacyUCI()
-	svc := NewNetworkServiceWithRunner(u, nil, nil)
+	svc := New(Deps{UCI: u, Ubus: nil, Cmd: nil})
 
 	var wg sync.WaitGroup
 	errs := make(chan error, workers*perWorker*2)
@@ -195,7 +195,7 @@ func TestConcurrentPortForwardAddsAreNotLost(t *testing.T) {
 	dir := t.TempDir()
 	pfFile := filepath.Join(dir, "port-forwards.json")
 	u := newRacyUCI()
-	svc := NewNetworkServiceWithRunner(u, nil, nil)
+	svc := New(Deps{UCI: u, Ubus: nil, Cmd: nil})
 	svc.portForwardsFile = pfFile
 
 	var wg sync.WaitGroup

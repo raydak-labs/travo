@@ -15,7 +15,7 @@ import (
 // MAC address management (clone, randomize, policies).
 
 // GetMACAddresses returns the MAC address info for WiFi interfaces.
-func (w *WifiService) GetMACAddresses() ([]models.MACConfig, error) {
+func (w *Service) GetMACAddresses() ([]models.MACConfig, error) {
 	var configs []models.MACConfig
 
 	staSection, err := w.findSTASection()
@@ -80,7 +80,7 @@ func normalizeMAC(mac string) (string, error) {
 // the pending confirm decides is whether that value is kept. The browser is
 // never the witness that the live interface actually took the MAC; the link
 // step below is, and it is now error-checked.
-func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
+func (w *Service) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		targetMAC := ""
 		if strings.TrimSpace(mac) != "" {
@@ -151,7 +151,7 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 // router's own upstream link, so it silently disappears behind a successful HTTP
 // response and the operator loses connectivity with nothing to act on. Every
 // failure path therefore restores the link and returns the error.
-func (w *WifiService) applyMACImmediate(mac string) error {
+func (w *Service) applyMACImmediate(mac string) error {
 	if w.cmd == nil {
 		return nil
 	}
@@ -186,7 +186,7 @@ func (w *WifiService) applyMACImmediate(mac string) error {
 // state after a failed MAC change, so a rejected address cannot strand the STA
 // offline. Its own failure is only logged: the caller is already returning the
 // error that caused the interface to be down.
-func (w *WifiService) bringLinkUp(ifname string) {
+func (w *Service) bringLinkUp(ifname string) {
 	if w.cmd == nil {
 		return
 	}
@@ -197,7 +197,7 @@ func (w *WifiService) bringLinkUp(ifname string) {
 
 // readPhyHardwareMAC reads the permanent/hardware MAC address for a wireless
 // interface from its parent phy's sysfs address list.
-func (w *WifiService) readPhyHardwareMAC(ifname string) string {
+func (w *Service) readPhyHardwareMAC(ifname string) string {
 	// Resolve the phy name from the interface: /sys/class/net/<ifname>/phy80211/name
 	phyNameBytes, err := os.ReadFile("/sys/class/net/" + ifname + "/phy80211/name")
 	if err != nil {
@@ -218,7 +218,7 @@ func (w *WifiService) readPhyHardwareMAC(ifname string) string {
 
 // RandomizeMAC generates a random locally-administered unicast MAC address
 // and applies it to the STA WiFi interface. It returns the new MAC.
-func (w *WifiService) RandomizeMAC() (string, *WirelessApplyResult, error) {
+func (w *Service) RandomizeMAC() (string, *WirelessApplyResult, error) {
 	mac, err := generateRandomMAC()
 	if err != nil {
 		return "", nil, fmt.Errorf("generating random MAC: %w", err)
@@ -273,7 +273,7 @@ func generateRandomWPAKey() (string, error) {
 const macPoliciesPath = "/etc/travo/mac-policies.json"
 
 // GetMACPolicies returns the saved per-network MAC policies.
-func (w *WifiService) GetMACPolicies() (models.MACPolicies, error) {
+func (w *Service) GetMACPolicies() (models.MACPolicies, error) {
 	data, err := os.ReadFile(macPoliciesPath)
 	if err != nil {
 		return models.MACPolicies{Policies: []models.MACPolicy{}}, nil
@@ -286,7 +286,7 @@ func (w *WifiService) GetMACPolicies() (models.MACPolicies, error) {
 }
 
 // SetMACPolicies saves the per-network MAC policies.
-func (w *WifiService) SetMACPolicies(policies models.MACPolicies) error {
+func (w *Service) SetMACPolicies(policies models.MACPolicies) error {
 	data, err := json.Marshal(policies)
 	if err != nil {
 		return err

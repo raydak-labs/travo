@@ -24,7 +24,7 @@ func normalizeMACForSection(mac string) string {
 // dump results and returns a snapshot of MACs that were RECENTLY WiFi but are
 // not in the current wifiStats (i.e. they just disconnected). These must not be
 // counted as wired LAN clients while their ARP entry is still stale.
-func (n *NetworkService) updateKnownWifiMACs(wifiStats map[string]wifiClientStat) map[string]struct{} {
+func (n *Service) updateKnownWifiMACs(wifiStats map[string]wifiClientStat) map[string]struct{} {
 	now := time.Now()
 	n.wifiMACsMu.Lock()
 	defer n.wifiMACsMu.Unlock()
@@ -47,7 +47,7 @@ func (n *NetworkService) updateKnownWifiMACs(wifiStats map[string]wifiClientStat
 }
 
 // loadAliases reads the alias file and returns a mac->alias map.
-func (n *NetworkService) loadAliases() map[string]string {
+func (n *Service) loadAliases() map[string]string {
 	data, err := os.ReadFile(n.aliasFile)
 	if err != nil {
 		return map[string]string{}
@@ -60,7 +60,7 @@ func (n *NetworkService) loadAliases() map[string]string {
 }
 
 // saveAliases writes the alias map to the alias file.
-func (n *NetworkService) saveAliases(aliases map[string]string) error {
+func (n *Service) saveAliases(aliases map[string]string) error {
 	dir := filepath.Dir(n.aliasFile)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("creating alias directory: %w", err)
@@ -73,7 +73,7 @@ func (n *NetworkService) saveAliases(aliases map[string]string) error {
 }
 
 // SetAlias sets or removes (if empty) an alias for a MAC address.
-func (n *NetworkService) SetAlias(mac, alias string) error {
+func (n *Service) SetAlias(mac, alias string) error {
 	aliases := n.loadAliases()
 	upperMAC := strings.ToUpper(mac)
 	if alias == "" {
@@ -85,7 +85,7 @@ func (n *NetworkService) SetAlias(mac, alias string) error {
 }
 
 // dhcpLeaseTimeSeconds reads the DHCP lease time from UCI and returns it in seconds.
-func (n *NetworkService) dhcpLeaseTimeSeconds() float64 {
+func (n *Service) dhcpLeaseTimeSeconds() float64 {
 	const defaultLease = 43200.0 // 12h
 	opts, err := n.uci.GetAll("dhcp", "lan")
 	if err != nil {
@@ -404,7 +404,7 @@ func parseEtcHosts() map[string]string {
 //  4. knownWifiMACs (in-memory TTL set) → prevents a just-disconnected WiFi
 //     device from temporarily appearing as a wired LAN client while its ARP
 //     entry is still flagged 0x2 (REACHABLE).
-func (n *NetworkService) fetchDHCPClients() []models.Client {
+func (n *Service) fetchDHCPClients() []models.Client {
 	leaseTimeSec := n.dhcpLeaseTimeSeconds()
 
 	// ── 1. WiFi station dump ──────────────────────────────────────────────
@@ -591,7 +591,7 @@ type wifiClientStat struct {
 
 // getWifiClientStats returns per-client WiFi stats (traffic + AP interface name).
 // Clients are keyed by uppercase MAC address.
-func (n *NetworkService) getWifiClientStats() map[string]wifiClientStat {
+func (n *Service) getWifiClientStats() map[string]wifiClientStat {
 	result := make(map[string]wifiClientStat)
 	iwDevOutput, err := n.cmd.Run("iw", "dev")
 	if err != nil {

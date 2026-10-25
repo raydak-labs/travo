@@ -11,7 +11,7 @@ import (
 )
 
 // WifiScanHandler handles GET /api/v1/wifi/scan.
-func WifiScanHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiScanHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		results, err := svc.Scan()
 		if err != nil {
@@ -22,7 +22,7 @@ func WifiScanHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiConnectHandler handles POST /api/v1/wifi/connect.
-func WifiConnectHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiConnectHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WifiConfig
 		if err := c.Bind().Body(&config); err != nil {
@@ -52,7 +52,7 @@ func WifiConnectHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiDisconnectHandler handles POST /api/v1/wifi/disconnect.
-func WifiDisconnectHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiDisconnectHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		apply, err := svc.Disconnect()
 		if err != nil {
@@ -63,7 +63,7 @@ func WifiDisconnectHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiConnectionHandler handles GET /api/v1/wifi/connection.
-func WifiConnectionHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiConnectionHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		conn, err := svc.GetConnection()
 		if err != nil {
@@ -74,7 +74,7 @@ func WifiConnectionHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiHealthHandler handles GET /api/v1/wifi/health.
-func WifiHealthHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiHealthHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		health, err := svc.GetHealth()
 		if err != nil {
@@ -85,7 +85,7 @@ func WifiHealthHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiSetModeHandler handles PUT /api/v1/wifi/mode.
-func WifiSetModeHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiSetModeHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Mode               string `json:"mode"`
@@ -109,7 +109,7 @@ func WifiSetModeHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiSavedHandler handles GET /api/v1/wifi/saved.
-func WifiSavedHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiSavedHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		networks, err := svc.GetSavedNetworks()
 		if err != nil {
@@ -123,7 +123,7 @@ func WifiSavedHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiDeleteHandler handles DELETE /api/v1/wifi/saved/:section.
-func WifiDeleteHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiDeleteHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
@@ -138,7 +138,7 @@ func WifiDeleteHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // WifiSetPriorityHandler handles PUT /api/v1/wifi/saved/priority.
-func WifiSetPriorityHandler(svc *wifi.WifiService) fiber.Handler {
+func WifiSetPriorityHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			SSIDs []string `json:"ssids"`

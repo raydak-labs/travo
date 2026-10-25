@@ -10,7 +10,7 @@ import (
 )
 
 // GetDNSConfigHandler handles GET /api/v1/network/dns.
-func GetDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
+func GetDNSConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetDNSConfig()
 		if err != nil {
@@ -21,7 +21,7 @@ func GetDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetDNSConfigHandler handles PUT /api/v1/network/dns.
-func SetDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
+func SetDNSConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DNSConfig
 		if err := BindStrictBodyConfig(c, &config); err != nil {
@@ -45,7 +45,7 @@ func SetDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetDNSEntriesHandler handles GET /api/v1/network/dns/entries.
-func GetDNSEntriesHandler(svc *network.NetworkService) fiber.Handler {
+func GetDNSEntriesHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		entries, err := svc.GetDNSEntries()
 		if err != nil {
@@ -56,7 +56,7 @@ func GetDNSEntriesHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // AddDNSEntryHandler handles POST /api/v1/network/dns/entries.
-func AddDNSEntryHandler(svc *network.NetworkService) fiber.Handler {
+func AddDNSEntryHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var entry models.DNSEntry
 		if err := c.Bind().Body(&entry); err != nil {
@@ -82,7 +82,7 @@ func AddDNSEntryHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // DeleteDNSEntryHandler handles DELETE /api/v1/network/dns/entries/:section.
-func DeleteDNSEntryHandler(svc *network.NetworkService) fiber.Handler {
+func DeleteDNSEntryHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {

@@ -50,7 +50,7 @@ func activeIfaces(sections map[string]map[string]string, mode string) []string {
 // running "both": the API declared safe the state the guard had just refused.
 // ErrAPAndSTASameRadio exists because the PHY constraint is physical, so the
 // strict direction — more radios count as the uplink — is the safe one.
-func (w *WifiService) uplinkRadio() (string, error) {
+func (w *Service) uplinkRadio() (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "", err
@@ -82,7 +82,7 @@ func (w *WifiService) uplinkRadio() (string, error) {
 // When no alternative exists (single-radio hardware) the uplink radio is
 // returned anyway and rejectAPOnUplinkRadio decides whether coexistence stands —
 // the same trade-off SetMode("repeater") and SetRadioRole already accept.
-func (w *WifiService) preferredGuestRadio() (string, error) {
+func (w *Service) preferredGuestRadio() (string, error) {
 	radios, err := w.getWifiRadioNames()
 	if err != nil {
 		return "", err
@@ -114,7 +114,7 @@ func (w *WifiService) preferredGuestRadio() (string, error) {
 }
 
 // GetRadioStatus returns whether any WiFi radio is enabled.
-func (w *WifiService) GetRadioStatus() (bool, error) {
+func (w *Service) GetRadioStatus() (bool, error) {
 	radios, err := w.getWifiRadioNames()
 	if err != nil {
 		return false, err
@@ -129,7 +129,7 @@ func (w *WifiService) GetRadioStatus() (bool, error) {
 }
 
 // SetRadioEnabled enables or disables all WiFi radios.
-func (w *WifiService) SetRadioEnabled(enabled bool, req LockoutRequest) (*WirelessApplyResult, error) {
+func (w *Service) SetRadioEnabled(enabled bool, req LockoutRequest) (*WirelessApplyResult, error) {
 	// Switching the radios off removes every access point; switching them on
 	// leaves at least the ones already in the config.
 	if err := w.guardLockout(req, enabled); err != nil {
@@ -157,7 +157,7 @@ func (w *WifiService) SetRadioEnabled(enabled bool, req LockoutRequest) (*Wirele
 }
 
 // GetRadios returns information about all WiFi radio hardware.
-func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
+func (w *Service) GetRadios() ([]models.RadioInfo, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		// Reporting "no radios" on a failed read would tell the operator the
@@ -224,7 +224,7 @@ func (w *WifiService) GetRadios() ([]models.RadioInfo, error) {
 // Role "both" is refused with ErrAPAndSTASameRadio when it would put an access
 // point and the uplink STA on one radio and the repeater split policy forbids
 // it (see rejectSameRadioAPSTA).
-func (w *WifiService) SetRadioRole(radioName, role string, req LockoutRequest) (*WirelessApplyResult, error) {
+func (w *Service) SetRadioRole(radioName, role string, req LockoutRequest) (*WirelessApplyResult, error) {
 	// Roles that do not host an access point ("none", "sta") disable every AP on
 	// this radio; "ap" and "both" leave one enabled.
 	droppedRadio := ""
@@ -426,7 +426,7 @@ func (w *WifiService) SetRadioRole(radioName, role string, req LockoutRequest) (
 //
 // Single-radio hardware keeps coexistence: with one PHY there is no split to
 // make, which is the same trade-off SetMode("repeater") already accepts.
-func (w *WifiService) rejectSameRadioAPSTA(radioName string, enableAP, enableSTA bool) error {
+func (w *Service) rejectSameRadioAPSTA(radioName string, enableAP, enableSTA bool) error {
 	if !enableAP || !enableSTA {
 		return nil
 	}
@@ -461,7 +461,7 @@ func (w *WifiService) rejectSameRadioAPSTA(radioName string, enableAP, enableSTA
 //
 // reason names the request in the error (e.g. "guest access point enabled"), so
 // the operator can see which of their two radios is the problem.
-func (w *WifiService) rejectAPOnUplinkRadio(radioName, reason string) error {
+func (w *Service) rejectAPOnUplinkRadio(radioName, reason string) error {
 	uplinkRadio, err := w.uplinkRadio()
 	if err != nil {
 		return err
@@ -496,7 +496,7 @@ func (w *WifiService) rejectAPOnUplinkRadio(radioName, reason string) error {
 //     taking the router's WiFi away. allow_ap_on_sta_radio is the escape hatch.
 //
 // Single-radio hardware keeps coexistence: there is no split to make.
-func (w *WifiService) splitAPOffUplinkRadio(radioName string) error {
+func (w *Service) splitAPOffUplinkRadio(radioName string) error {
 	if radioName == "" {
 		return nil
 	}

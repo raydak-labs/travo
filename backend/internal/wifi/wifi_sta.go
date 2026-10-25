@@ -61,7 +61,7 @@ func enabledWwanSTAs(sections map[string]map[string]string) []string {
 
 // findSTADevice discovers the station (client) WiFi interface name by querying network.wireless status.
 // It looks for an interface with mode "sta" and returns its ifname (e.g., "phy0-sta0") and section name (e.g., "wifinet2").
-func (w *WifiService) findSTADevice() (ifname string, section string, err error) {
+func (w *Service) findSTADevice() (ifname string, section string, err error) {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get wireless status: %w", err)
@@ -100,7 +100,7 @@ func (w *WifiService) findSTADevice() (ifname string, section string, err error)
 
 // findSTASection discovers the STA section name from UCI config.
 // Unlike findSTADevice, this works even when the STA interface is disabled.
-func (w *WifiService) findSTASection() (string, error) {
+func (w *Service) findSTASection() (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "", fmt.Errorf("failed to get wireless sections: %w", err)
@@ -122,7 +122,7 @@ var ErrNoSTASection = errors.New("no STA section found")
 // findSTASectionBySSID returns the UCI section name of a saved STA profile
 // matching ssid. It returns an error wrapping ErrNoSTASection when there is no
 // match, and a plain error when the wireless config could not be read.
-func (w *WifiService) findSTASectionBySSID(ssid string) (string, error) {
+func (w *Service) findSTASectionBySSID(ssid string) (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "", fmt.Errorf("failed to get wireless sections: %w", err)
@@ -139,7 +139,7 @@ func (w *WifiService) findSTASectionBySSID(ssid string) (string, error) {
 // It returns an error when the section list cannot be read: falling back to a
 // fixed name would let the caller `uci set` over an existing section, which
 // silently rewrites that section's type and destroys a saved network.
-func (w *WifiService) nextSTASectionName() (string, error) {
+func (w *Service) nextSTASectionName() (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "", fmt.Errorf("failed to get wireless sections: %w", err)
@@ -160,7 +160,7 @@ func (w *WifiService) nextSTASectionName() (string, error) {
 //  3. Tiebreak by section name (deterministic).
 //
 // Returns "" if no STA section exists.
-func (w *WifiService) selectActiveSTA() (string, error) {
+func (w *Service) selectActiveSTA() (string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return "", fmt.Errorf("failed to get wireless sections: %w", err)
@@ -204,7 +204,7 @@ func (w *WifiService) selectActiveSTA() (string, error) {
 
 // disableOtherSTASections disables every STA wifi-iface except activeSection.
 // This ensures only one profile is connected at runtime while others remain saved.
-func (w *WifiService) disableOtherSTASections(activeSection string) error {
+func (w *Service) disableOtherSTASections(activeSection string) error {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return fmt.Errorf("failed to get wireless sections: %w", err)
@@ -221,7 +221,7 @@ func (w *WifiService) disableOtherSTASections(activeSection string) error {
 }
 
 // getWifiRadioNames returns UCI section names of all wifi-device (radio) sections.
-func (w *WifiService) getWifiRadioNames() ([]string, error) {
+func (w *Service) getWifiRadioNames() ([]string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return nil, err
@@ -236,7 +236,7 @@ func (w *WifiService) getWifiRadioNames() ([]string, error) {
 	return names, nil
 }
 
-func (w *WifiService) getWifiSectionsByMode(mode string) ([]string, error) {
+func (w *Service) getWifiSectionsByMode(mode string) ([]string, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func (w *WifiService) getWifiSectionsByMode(mode string) ([]string, error) {
 	return names, nil
 }
 
-func (w *WifiService) setIfaceDisabled(section string, disabled bool) error {
+func (w *Service) setIfaceDisabled(section string, disabled bool) error {
 	value := "0"
 	if disabled {
 		value = "1"
@@ -259,7 +259,7 @@ func (w *WifiService) setIfaceDisabled(section string, disabled bool) error {
 	return w.uci.Set("wireless", section, "disabled", value)
 }
 
-func (w *WifiService) ensureSectionRadioEnabled(section string) error {
+func (w *Service) ensureSectionRadioEnabled(section string) error {
 	opts, err := w.uci.GetAll("wireless", section)
 	if err != nil {
 		return err

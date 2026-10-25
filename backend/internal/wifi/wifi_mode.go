@@ -10,7 +10,7 @@ import (
 // persistedWifiMode reads the mode file and answers only the three modes the
 // product knows. An unreadable or unrecognised file is not an error: it just
 // means the mode has to come from the config.
-func (w *WifiService) persistedWifiMode() (string, bool) {
+func (w *Service) persistedWifiMode() (string, bool) {
 	if w.modeFile == "" {
 		return "", false
 	}
@@ -31,7 +31,7 @@ func (w *WifiService) persistedWifiMode() (string, bool) {
 // persisted mode. "client" requires no enabled access point, "ap" requires no
 // enabled STA, and "repeater" requires both — the same shape the UCI detection
 // below uses, so the two paths cannot disagree about what a mode looks like.
-func (w *WifiService) configMatchesWifiMode(mode string) bool {
+func (w *Service) configMatchesWifiMode(mode string) bool {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		// Cannot prove it matches; let UCI detection answer instead.
@@ -61,7 +61,7 @@ func (w *WifiService) configMatchesWifiMode(mode string) bool {
 	}
 }
 
-func (w *WifiService) deriveWifiMode() string {
+func (w *Service) deriveWifiMode() string {
 	// The persisted mode is preferred over UCI detection, but only when the live
 	// config is consistent with it. Client mode leaves NO access point enabled
 	// and repeater mode leaves one, so the two are distinguishable in UCI after
@@ -108,7 +108,7 @@ func (w *WifiService) deriveWifiMode() string {
 // ensureNamedSection makes sure config/section exists and carries the expected UCI
 // section type. A section that exists with the wrong type would make every later
 // Set write meaningless options, so the type is corrected explicitly.
-func (w *WifiService) ensureNamedSection(config, section, sectionType string) error {
+func (w *Service) ensureNamedSection(config, section, sectionType string) error {
 	// GetSections reports both existence and the section type (".type"), and
 	// unlike GetAll it distinguishes "not there" from "could not read" — a read
 	// failure must not be turned into a blind section creation.
@@ -148,7 +148,7 @@ func (w *WifiService) ensureNamedSection(config, section, sectionType string) er
 // ensureWwanNetwork creates the wwan network interface in UCI if missing (proto=dhcp).
 // WiFi client (STA) must use network=wwan so netifd brings it up and runs DHCP; wan is for Ethernet.
 // When creating wwan, also adds it to the firewall wan zone so STA gets NAT and internet.
-func (w *WifiService) ensureWwanNetwork() error {
+func (w *Service) ensureWwanNetwork() error {
 	if _, err := w.uci.GetAll("network", "wwan"); err == nil {
 		return w.ensureWwanFirewall()
 	}
@@ -168,7 +168,7 @@ func (w *WifiService) ensureWwanNetwork() error {
 }
 
 // ensureWwanFirewall adds wwan to the firewall wan zone's network list so STA gets internet.
-func (w *WifiService) ensureWwanFirewall() error {
+func (w *Service) ensureWwanFirewall() error {
 	sections, err := w.uci.GetSections("firewall")
 	if err != nil {
 		return err

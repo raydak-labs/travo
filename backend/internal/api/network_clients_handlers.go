@@ -8,7 +8,7 @@ import (
 )
 
 // GetClientsHandler handles GET /api/v1/network/clients.
-func GetClientsHandler(svc *network.NetworkService) fiber.Handler {
+func GetClientsHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		clients, err := svc.GetClients()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetClientsHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetClientAliasHandler handles PUT /api/v1/network/clients/alias.
-func SetClientAliasHandler(svc *network.NetworkService) fiber.Handler {
+func SetClientAliasHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetAliasRequest
 		// Strict: the alias is persisted per MAC, so a body that does not match
@@ -42,7 +42,7 @@ func SetClientAliasHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // KickClientHandler handles POST /api/v1/network/clients/kick.
-func KickClientHandler(svc *network.NetworkService) fiber.Handler {
+func KickClientHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -62,7 +62,7 @@ func KickClientHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // BlockClientHandler handles POST /api/v1/network/clients/block.
-func BlockClientHandler(svc *network.NetworkService) fiber.Handler {
+func BlockClientHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -82,7 +82,7 @@ func BlockClientHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // UnblockClientHandler handles POST /api/v1/network/clients/unblock.
-func UnblockClientHandler(svc *network.NetworkService) fiber.Handler {
+func UnblockClientHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ClientActionRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -102,7 +102,7 @@ func UnblockClientHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetBlockedClientsHandler handles GET /api/v1/network/clients/blocked.
-func GetBlockedClientsHandler(svc *network.NetworkService) fiber.Handler {
+func GetBlockedClientsHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		blocked, err := svc.GetBlockedClients()
 		if err != nil {

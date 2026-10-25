@@ -28,7 +28,7 @@ type RadioConfigEntry struct {
 // DiscoverAndPersistRadios runs radio discovery and writes the result to disk.
 // Only runs if the config file doesn't already exist (first boot).
 // Returns true if discovery was performed (first boot), false if already done.
-func (w *WifiService) DiscoverAndPersistRadios() (bool, error) {
+func (w *Service) DiscoverAndPersistRadios() (bool, error) {
 	configPath := defaultRadioConfigFile
 
 	// Skip if already discovered

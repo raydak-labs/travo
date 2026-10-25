@@ -11,7 +11,7 @@ import (
 )
 
 // GetMACHandler handles GET /api/v1/wifi/mac.
-func GetMACHandler(svc *wifi.WifiService) fiber.Handler {
+func GetMACHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		configs, err := svc.GetMACAddresses()
 		if err != nil {
@@ -22,7 +22,7 @@ func GetMACHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetMACHandler handles PUT /api/v1/wifi/mac.
-func SetMACHandler(svc *wifi.WifiService) fiber.Handler {
+func SetMACHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetMACRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -41,7 +41,7 @@ func SetMACHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // RandomizeMACHandler handles POST /api/v1/wifi/mac/randomize.
-func RandomizeMACHandler(svc *wifi.WifiService) fiber.Handler {
+func RandomizeMACHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		mac, apply, err := svc.RandomizeMAC()
 		if err != nil {
@@ -54,7 +54,7 @@ func RandomizeMACHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // GetGuestWifiHandler handles GET /api/v1/wifi/guest.
-func GetGuestWifiHandler(svc *wifi.WifiService) fiber.Handler {
+func GetGuestWifiHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetGuestWifi()
 		if err != nil {
@@ -65,7 +65,7 @@ func GetGuestWifiHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetGuestWifiHandler handles PUT /api/v1/wifi/guest.
-func SetGuestWifiHandler(svc *wifi.WifiService) fiber.Handler {
+func SetGuestWifiHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.GuestWifiConfig
 		if err := BindStrictBodyConfig(c, &cfg); err != nil {
@@ -91,7 +91,7 @@ func SetGuestWifiHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // GetWiFiScheduleHandler handles GET /api/v1/wifi/schedule.
-func GetWiFiScheduleHandler(svc *wifi.WifiService) fiber.Handler {
+func GetWiFiScheduleHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		schedule, err := svc.GetWiFiSchedule()
 		if err != nil {
@@ -102,7 +102,7 @@ func GetWiFiScheduleHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetWiFiScheduleHandler handles PUT /api/v1/wifi/schedule.
-func SetWiFiScheduleHandler(svc *wifi.WifiService) fiber.Handler {
+func SetWiFiScheduleHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var schedule models.WiFiSchedule
 		if err := BindStrictBodyConfig(c, &schedule); err != nil {
@@ -125,7 +125,7 @@ func SetWiFiScheduleHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // GetMACPoliciesHandler handles GET /api/v1/wifi/mac-policies.
-func GetMACPoliciesHandler(svc *wifi.WifiService) fiber.Handler {
+func GetMACPoliciesHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		policies, err := svc.GetMACPolicies()
 		if err != nil {
@@ -136,7 +136,7 @@ func GetMACPoliciesHandler(svc *wifi.WifiService) fiber.Handler {
 }
 
 // SetMACPoliciesHandler handles PUT /api/v1/wifi/mac-policies.
-func SetMACPoliciesHandler(svc *wifi.WifiService) fiber.Handler {
+func SetMACPoliciesHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var policies models.MACPolicies
 		if err := BindStrictBodyConfig(c, &policies); err != nil {

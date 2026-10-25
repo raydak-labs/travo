@@ -25,10 +25,10 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-func newTestWifiService() (*WifiService, *uci.MockUCI) {
+func newTestWifiService() (*Service, *uci.MockUCI) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}})
 	return svc, u
 }
 
@@ -371,7 +371,7 @@ func TestWifiDisconnectFallsBackToUCI(t *testing.T) {
 			"interfaces": []any{},
 		},
 	})
-	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}})
 
 	_, err := svc.Disconnect()
 	if err != nil {
@@ -393,7 +393,7 @@ func TestWifiConnectFallsBackToUCI(t *testing.T) {
 			"interfaces": []any{},
 		},
 	})
-	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}})
 
 	_, err := svc.Connect(models.WifiConfig{
 		SSID: "New-Network", Password: "newpass123", Encryption: "psk2",
@@ -794,7 +794,7 @@ func TestSetAPConfig_APModeSkipsRepeaterReconcile(t *testing.T) {
 // it, and the shared helper keeps the real command runner: on a dev machine
 // "ip link set phy0-sta0 down" fails because the interface does not exist,
 // which says nothing about the code under test.
-func newMACUnitTestService() (*WifiService, *uci.MockUCI) {
+func newMACUnitTestService() (*Service, *uci.MockUCI) {
 	svc, u := newTestWifiService()
 	svc.cmd = &platform.MockCommandRunner{}
 	return svc, u
@@ -1385,7 +1385,7 @@ func TestConfirmApply_RequiresToken(t *testing.T) {
 // `network.device status` is registered DOWN for these fixtures: they vary the
 // radio-level signal, and the per-interface fallback has its own tests. (The
 // mock cannot answer per ifname, so a mixed answer is not expressible here.)
-func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool) {
+func registerInterfaceStatus(t *testing.T, svc *Service, up map[string]bool) {
 	t.Helper()
 	sections, err := svc.uci.GetSections("wireless")
 	if err != nil {
@@ -1428,7 +1428,7 @@ func registerInterfaceStatus(t *testing.T, svc *WifiService, up map[string]bool)
 }
 
 // registerPayload installs a whole `network.wireless status` response.
-func registerPayload(t *testing.T, svc *WifiService, resp map[string]any) {
+func registerPayload(t *testing.T, svc *Service, resp map[string]any) {
 	t.Helper()
 	ub, ok := svc.ubus.(*ubus.MockUbus)
 	if !ok {
@@ -1441,7 +1441,7 @@ func registerPayload(t *testing.T, svc *WifiService, resp map[string]any) {
 // responses by path and method and ignores the requested device name, so the
 // answer applies to every ifname the probe asks about; the map exists so a test
 // says what it means.
-func registerDeviceStatus(t *testing.T, svc *WifiService, up map[string]bool) {
+func registerDeviceStatus(t *testing.T, svc *Service, up map[string]bool) {
 	t.Helper()
 	anyUp := false
 	for _, isUp := range up {
@@ -1461,7 +1461,7 @@ func registerDeviceStatus(t *testing.T, svc *WifiService, up map[string]bool) {
 
 // setRadioPending flips a radio-level liveness flag on the payload a preceding
 // registerInterfaceStatus installed.
-func setRadioPending(t *testing.T, svc *WifiService, radio string, pending bool) {
+func setRadioPending(t *testing.T, svc *Service, radio string, pending bool) {
 	t.Helper()
 	resp, err := svc.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
@@ -1875,7 +1875,7 @@ func TestWifiReorderNetworks(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpFile := t.TempDir() + "/priorities.json"
-	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: tmpFile})
 
 	err := svc.ReorderNetworks([]string{"Network-A", "Network-B", "Network-C"})
 	if err != nil {
@@ -1899,7 +1899,7 @@ func TestWifiGetSavedNetworksWithPriority(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpFile := t.TempDir() + "/priorities.json"
-	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: tmpFile})
 
 	// Set priority for Hotel-WiFi (the mock SSID)
 	err := svc.ReorderNetworks([]string{"Hotel-WiFi"})
@@ -1923,7 +1923,7 @@ func TestWifiReorderNetworks_Overwrite(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpFile := t.TempDir() + "/priorities.json"
-	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: tmpFile})
 
 	// First ordering
 	_ = svc.ReorderNetworks([]string{"A", "B", "C"})
@@ -1948,8 +1948,7 @@ func TestGetAutoReconnect_Default(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
-		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
 
 	enabled, err := svc.GetAutoReconnect()
 	if err != nil {
@@ -1964,8 +1963,7 @@ func TestSetAutoReconnect_Enable(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
-		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
 
 	err := svc.SetAutoReconnect(true)
 	if err != nil {
@@ -2003,8 +2001,7 @@ func TestReconnectScript_HasFailureCountGuard(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
-		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
 
 	if err := svc.SetAutoReconnect(true); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -2031,8 +2028,7 @@ func TestSetAutoReconnect_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
-		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
 
 	// Enable first, then disable
 	_ = svc.SetAutoReconnect(true)
@@ -2269,7 +2265,7 @@ func TestEnsureAPRunning_RadioDefaults(t *testing.T) {
 	// Set channel to empty so health check sets "auto"
 	_ = u.Set("wireless", "radio0", "channel", "")
 	ub := ubus.NewMockUbus()
-	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}})
 
 	fixed, _, err := svc.EnsureAPRunning()
 	if err != nil {
@@ -2299,7 +2295,7 @@ func (e *errGetSectionsUCI) GetSections(_ string) (map[string]map[string]string,
 
 func TestEnsureAPRunning_GetSectionsError(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewWifiServiceWithReloader(&errGetSectionsUCI{uci.NewMockUCI()}, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: &errGetSectionsUCI{uci.NewMockUCI()}, Ubus: ub, Reloader: &NoopWifiReloader{}})
 
 	fixed, needWifiUp, err := svc.EnsureAPRunning()
 	if err == nil {
@@ -2328,7 +2324,7 @@ func TestEnsureAPRunning_CommitError(t *testing.T) {
 	_ = base.Set("wireless", "default_radio0", "ssid", "")
 
 	ub := ubus.NewMockUbus()
-	svc := NewWifiServiceWithReloader(&errCommitUCI{base}, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: &errCommitUCI{base}, Ubus: ub, Reloader: &NoopWifiReloader{}})
 
 	fixed, needWifiUp, err := svc.EnsureAPRunning()
 	if err == nil {
@@ -2381,10 +2377,10 @@ func TestParseIwinfoEncryption(t *testing.T) {
 	}
 }
 
-func newTestWifiServiceWithModeFile(modeFile string) (*WifiService, *uci.MockUCI) {
+func newTestWifiServiceWithModeFile(modeFile string) (*Service, *uci.MockUCI) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewWifiServiceForTestingWithModeFile(u, ub, &NoopWifiReloader{}, &platform.RealCommandRunner{}, defaultPriorityFile, defaultAutoReconnectFile, defaultReconnectScript, modeFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.RealCommandRunner{}, PriorityFile: defaultPriorityFile, AutoReconnectFile: defaultAutoReconnectFile, ReconnectScript: defaultReconnectScript, ModeFile: modeFile})
 	return svc, u
 }
 
@@ -2640,7 +2636,7 @@ func TestSetModeRepeater_WithMultipleSavedSTAs_EnablesOnlyHighestPriority(t *tes
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpFile := t.TempDir() + "/priorities.json"
-	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: tmpFile})
 
 	// Two saved STA profiles, on different radios, both network=wwan, both initially disabled.
 	_ = u.Set("wireless", "sta0", "ssid", "LowPriority")
@@ -2676,7 +2672,7 @@ func TestSetModeClient_WithMultipleSavedSTAs_EnablesOnlyHighestPriority(t *testi
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpFile := t.TempDir() + "/priorities.json"
-	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: tmpFile})
 
 	_ = u.Set("wireless", "sta0", "ssid", "Backup")
 	_ = u.Set("wireless", "sta0", "disabled", "1")
@@ -2713,7 +2709,7 @@ func TestConnectThenSetModeRepeater_PreservesSingleActiveSTA(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpFile := t.TempDir() + "/priorities.json"
-	svc := NewWifiServiceWithPriorityFile(u, ub, &NoopWifiReloader{}, tmpFile)
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: tmpFile})
 
 	// Existing sta0 (Hotel-WiFi) is the mock default.
 	// Connect to a second network — Connect() creates sta1 and disables sta0.
@@ -2826,7 +2822,7 @@ func (d *dirtySTAUCI) GetSections(config string) (map[string]map[string]string, 
 
 func TestSetRadioRole_ValidatesBeforeCommit(t *testing.T) {
 	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
-	svc := NewWifiServiceWithReloader(&dirtySTAUCI{u.MockUCI}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: &dirtySTAUCI{u.MockUCI}, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	if _, err := svc.SetRadioRole("radio1", "sta", LockoutRequest{}); !errors.Is(err, ErrMultipleActiveSTA) {
 		t.Fatalf("expected ErrMultipleActiveSTA, got %v", err)
@@ -2892,10 +2888,10 @@ func TestSetRadioRole_NewAPGetsRandomKey(t *testing.T) {
 // repeaterModeService returns a service whose mock config is in repeater mode
 // (enabled STA plus enabled APs on both radios) with the given
 // allow_ap_on_sta_radio setting persisted.
-func repeaterModeService(t *testing.T, allowAPOnSTA bool) (*WifiService, *revertingUCI) {
+func repeaterModeService(t *testing.T, allowAPOnSTA bool) (*Service, *revertingUCI) {
 	t.Helper()
 	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
-	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 	svc.guardDir = t.TempDir()
 	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
 	opts, err := json.Marshal(models.RepeaterOptions{AllowAPOnSTARadio: allowAPOnSTA})
@@ -3031,7 +3027,7 @@ func TestSetRadioRole_SplitRolesStillWorkOnMultiRadio(t *testing.T) {
 // mode: the uplink STA sta0 is enabled and bound to network=wwan on radio0 — the
 // 2.4 GHz radio preferredGuestRadio picks, and the one a repeater or client STA
 // is normally on — with no access point enabled.
-func clientModeService(t *testing.T, allowAPOnSTA bool) (*WifiService, *revertingUCI) {
+func clientModeService(t *testing.T, allowAPOnSTA bool) (*Service, *revertingUCI) {
 	t.Helper()
 	svc, u := repeaterModeService(t, allowAPOnSTA)
 	for _, section := range []string{"default_radio0", "default_radio1"} {
@@ -3146,7 +3142,7 @@ func TestSetGuestWifi_AllowedWithAllowAPOnSTARadio(t *testing.T) {
 // file — so reconcileRepeaterAPRadioLayout is a no-op, exactly as it is on a
 // device whose operator never selected repeater mode — with the uplink STA on
 // radio0 and no access point enabled. Tests enable the access points they need.
-func clientModeWithAPService(t *testing.T) (*WifiService, *revertingUCI) {
+func clientModeWithAPService(t *testing.T) (*Service, *revertingUCI) {
 	t.Helper()
 	svc, u := clientModeService(t, false)
 	modeFile := filepath.Join(t.TempDir(), "wifi-mode")
@@ -3424,7 +3420,7 @@ func TestConnect_RevertsStagedWritesOnFailure(t *testing.T) {
 		}
 		return nil
 	}
-	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	if _, err := svc.Connect(models.WifiConfig{
 		SSID: "Hotel-WiFi", Password: "newpass123", Encryption: "psk2",
@@ -3441,7 +3437,7 @@ func TestConnect_RevertsStagedWritesOnFailure(t *testing.T) {
 
 func TestConnect_DoesNotRevertOnSuccess(t *testing.T) {
 	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
-	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	if _, err := svc.Connect(models.WifiConfig{
 		SSID: "Hotel-WiFi", Password: "newpass123", Encryption: "psk2",
@@ -3491,7 +3487,7 @@ func TestSetMACAddress_AcceptsValidVariants(t *testing.T) {
 
 // newMACTestService wires a service whose STA device resolves to phy0-sta0 and
 // records every command run, so apply order and crash-guard use can be asserted.
-func newMACTestService(t *testing.T, guardDir string, applier platform.UCIApplyConfirm, cmds *[]string) (*WifiService, *uci.MockUCI) {
+func newMACTestService(t *testing.T, guardDir string, applier platform.UCIApplyConfirm, cmds *[]string) (*Service, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
@@ -3510,7 +3506,7 @@ func newMACTestService(t *testing.T, guardDir string, applier platform.UCIApplyC
 		*cmds = append(*cmds, strings.Join(append([]string{name}, args...), " "))
 		return nil, nil
 	}}
-	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}})
 	svc.cmd = runner
 	svc.guardDir = guardDir
 	svc.applier = applier
@@ -3694,7 +3690,7 @@ func (g *guardCheckingApplier) Rollback(string) error { return nil }
 // Finding 1: a failed `uci show` must never look like an empty config in the
 // wireless read paths either.
 func TestGetRadios_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: &uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	radios, err := svc.GetRadios()
 	if err == nil {
@@ -3706,7 +3702,7 @@ func TestGetRadios_SurfacesGetSectionsError(t *testing.T) {
 }
 
 func TestGetSavedNetworks_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: &uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	networks, err := svc.GetSavedNetworks()
 	if err == nil {
@@ -3719,7 +3715,7 @@ func TestGetSavedNetworks_SurfacesGetSectionsError(t *testing.T) {
 
 // Finding 3: nextSTASectionName must not fall back to a name that may exist.
 func TestNextSTASectionName_PropagatesReadFailure(t *testing.T) {
-	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: &uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	name, err := svc.nextSTASectionName()
 	if err == nil {
@@ -3768,7 +3764,7 @@ func TestEnsureNamedSection_CreatesMissingSection(t *testing.T) {
 // A read failure must not be mistaken for a missing section.
 func TestEnsureNamedSection_PropagatesReadFailure(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: u}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := New(Deps{UCI: &uci.FailingSectionsUCI{MockUCI: u}, Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}})
 
 	if err := svc.ensureNamedSection("wireless", "guest", "wifi-iface"); err == nil {
 		t.Fatal("expected the read failure to surface instead of silently creating a section")
@@ -3815,7 +3811,7 @@ func TestFirewallWritersAreMutuallyExclusive(t *testing.T) {
 	svc.uci = blocker
 	svc.reloader = &NoopWifiReloader{}
 	svc.applier = &fakeWirelessApplier{}
-	net := network.NewNetworkServiceWithRunner(blocker, ubus.NewMockUbus(), &platform.MockCommandRunner{})
+	net := network.New(network.Deps{UCI: blocker, Ubus: ubus.NewMockUbus(), Cmd: &platform.MockCommandRunner{}})
 
 	// The guest-WiFi write is parked at its firewall commit, still holding the
 	// config lock and with a staged delta it may yet revert.
@@ -3864,7 +3860,7 @@ func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
 	if err := mockUCI.Set("wireless", "default_radio0", "mode", "ap"); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	net := network.NewNetworkServiceWithRunner(mockUCI, ubus.NewMockUbus(), &platform.MockCommandRunner{})
+	net := network.New(network.Deps{UCI: mockUCI, Ubus: ubus.NewMockUbus(), Cmd: &platform.MockCommandRunner{}})
 
 	enabled := true
 	mutators := map[string]func(){
@@ -4659,7 +4655,7 @@ func TestClientProbeSafetyMarginMatchesTheGoGate(t *testing.T) {
 // rpcd applier wired to temp config dirs, so the file-level snapshot/restore is
 // exercised end to end. Its wireless config enables one access point, which the
 // unreachable netifd makes unverifiable — that is the refused-confirm case.
-func newRollbackTestService(t *testing.T) (*WifiService, *platform.RealUCIApplyConfirm, string) {
+func newRollbackTestService(t *testing.T) (*Service, *platform.RealUCIApplyConfirm, string) {
 	t.Helper()
 	prev := wirelessRetrySleep
 	wirelessRetrySleep = func(time.Duration) {}
@@ -4686,7 +4682,7 @@ func newRollbackTestService(t *testing.T) (*WifiService, *platform.RealUCIApplyC
 	applier := platform.NewRealUCIApplyConfirm(fu, auth.NewRootPassword())
 	applier.EtcConfigDir = etcDir
 	applier.RPCDRunDir = filepath.Join(t.TempDir(), "rpcd")
-	svc := NewWifiServiceWithApplier(u, fu, applier)
+	svc := New(Deps{UCI: u, Ubus: fu, Applier: applier})
 	svc.guardDir = t.TempDir()
 	return svc, applier, cfg
 }
@@ -4766,7 +4762,7 @@ func TestMutateWireless_FailedMutationRestoresTheCommittedConfig(t *testing.T) {
 func TestMutateWireless_FailedMutationReportsAFailedRestore(t *testing.T) {
 	cause := errors.New("mutation failed after committing")
 	applier := &fakeWirelessApplier{rollbackErr: errors.New("snapshot unreadable")}
-	svc := NewWifiServiceWithApplier(uci.NewMockUCI(), ubus.NewMockUbus(), applier)
+	svc := New(Deps{UCI: uci.NewMockUCI(), Ubus: ubus.NewMockUbus(), Applier: applier})
 
 	_, err := svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		return nil, cause
@@ -4787,7 +4783,7 @@ func TestMutateWireless_FailedMutationReportsAFailedRestore(t *testing.T) {
 func TestMutateWireless_FailedMutationToleratesAnAlreadyRestoredSnapshot(t *testing.T) {
 	cause := errors.New("mutation failed after committing")
 	applier := &fakeWirelessApplier{rollbackErr: platform.ErrNoSnapshot}
-	svc := NewWifiServiceWithApplier(uci.NewMockUCI(), ubus.NewMockUbus(), applier)
+	svc := New(Deps{UCI: uci.NewMockUCI(), Ubus: ubus.NewMockUbus(), Applier: applier})
 
 	_, err := svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		return nil, cause

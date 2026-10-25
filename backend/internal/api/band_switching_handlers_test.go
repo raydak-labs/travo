@@ -182,8 +182,7 @@ func TestSetRadioRoleHandler_ReturnsApplyEnvelopeAndGeneratedKey(t *testing.T) {
 	if err := u.DeleteSection("wireless", "default_radio0"); err != nil {
 		t.Fatal(err)
 	}
-	svc := wifi.NewWifiServiceWithApplier(u, ubus.NewMockUbus(),
-		&stubApplier{token: "role-session-1"})
+	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ubus.NewMockUbus(), Applier: &stubApplier{token: "role-session-1"}})
 
 	app := fiber.New()
 	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))

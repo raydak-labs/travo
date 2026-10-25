@@ -200,12 +200,12 @@ exit 0
 // the callers without writing to /usr/libexec: on a non-root dev machine that
 // write fails with EPERM, which is why the schedule path could not be covered
 // end to end until now.
-func (w *WifiService) writeWirelessToggleScript() error {
+func (w *Service) writeWirelessToggleScript() error {
 	return WriteWirelessToggleScriptTo(w.toggleScriptPathOrDefault())
 }
 
 // toggleScriptPathOrDefault returns the toggle-helper destination in use.
-func (w *WifiService) toggleScriptPathOrDefault() string {
+func (w *Service) toggleScriptPathOrDefault() string {
 	if w.toggleScriptPath != "" {
 		return w.toggleScriptPath
 	}

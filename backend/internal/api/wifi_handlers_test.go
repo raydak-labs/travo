@@ -586,7 +586,7 @@ func TestRandomizeMACEndpoint(t *testing.T) {
 // mode: the STA section sta0 is enabled, bound to network=wwan and sitting on
 // radio0, and no access point is enabled. Anything that enables an AP on radio0
 // is the AP+STA-on-one-PHY state ADR 0002 §2 refuses.
-func uplinkSTAService(t *testing.T) (*wifi.WifiService, *uci.MockUCI) {
+func uplinkSTAService(t *testing.T) (*wifi.Service, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	for _, section := range []string{"default_radio0", "default_radio1"} {
@@ -604,7 +604,7 @@ func uplinkSTAService(t *testing.T) (*wifi.WifiService, *uci.MockUCI) {
 	// and leaves the radio-layout rule as the thing under test.
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("eth0"))
-	return wifi.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "s"}), u
+	return wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "s"}}), u
 }
 
 func putJSONRequest(

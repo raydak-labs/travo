@@ -11,7 +11,7 @@ import (
 )
 
 // GetWanConfig returns the WAN configuration.
-func (n *NetworkService) GetWanConfig() (models.WanConfig, error) {
+func (n *Service) GetWanConfig() (models.WanConfig, error) {
 	opts, err := n.uci.GetAll("network", "wan")
 	if err != nil {
 		return models.WanConfig{}, err
@@ -50,7 +50,7 @@ var errPPPoEUnsupported = errors.New(
 
 // SetWanConfig updates the WAN configuration. Every field the request declares
 // is written, so "GET, change a field, PUT it back" works for all of them.
-func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
+func (n *Service) SetWanConfig(config models.WanConfig) error {
 	return platform.MutateUCI(n.uci, []string{"network"}, func() error {
 		if config.MTU != 0 && (config.MTU < 68 || config.MTU > 9000) {
 			return fmt.Errorf("MTU must be between 68 and 9000, got %d", config.MTU)
@@ -124,7 +124,7 @@ func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 
 // DetectWanType auto-detects the WAN connection type and returns
 // both the detected type and the currently configured type.
-func (n *NetworkService) DetectWanType() (models.WanDetectResult, error) {
+func (n *Service) DetectWanType() (models.WanDetectResult, error) {
 	// Read current UCI configuration
 	currentType := "dhcp"
 	opts, err := n.uci.GetAll("network", "wan")

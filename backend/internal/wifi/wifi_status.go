@@ -26,7 +26,7 @@ import (
 //
 // It fails closed: an interface that cannot be observed counts as down. The
 // fallback's cost is budgeted by wirelessProbeMaxUbusCalls.
-func (w *WifiService) appliedWirelessUp(
+func (w *Service) appliedWirelessUp(
 	sections map[string]map[string]string, wantAPs, wantSTAs []string,
 ) error {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
@@ -203,7 +203,7 @@ func wirelessStatusRadios(resp map[string]any) (map[string]wirelessRadio, map[st
 // present+up without carrier; both count as down. A non-empty answer missing one
 // of the three flags is a shape problem, not a down interface, and is reported
 // as one.
-func (w *WifiService) wirelessDeviceUp(iface map[string]any) (bool, error) {
+func (w *Service) wirelessDeviceUp(iface map[string]any) (bool, error) {
 	ifname, _ := iface["ifname"].(string)
 	if ifname == "" {
 		return false, nil

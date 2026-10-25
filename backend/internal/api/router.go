@@ -19,9 +19,9 @@ type Dependencies struct {
 	Blocklist      *auth.TokenBlocklist
 	RateLimiter    *auth.RateLimiter
 	System         *system.SystemService
-	Network        *network.NetworkService
+	Network        *network.Service
 	SQM            *network.SQMService
-	Wifi           *wifi.WifiService
+	Wifi           *wifi.Service
 	Vpn            *uplink.VpnService
 	ServiceManager *system.ServiceManager
 	Captive        *uplink.CaptiveService

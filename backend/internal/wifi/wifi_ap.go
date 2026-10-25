@@ -27,7 +27,7 @@ const (
 )
 
 // GetAPConfigs returns the AP configuration for all radios.
-func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
+func (w *Service) GetAPConfigs() ([]models.APConfig, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (w *WifiService) GetAPConfigs() ([]models.APConfig, error) {
 
 // SetAPConfig updates AP configuration for a specific section.
 // When update.Enabled is nil, UCI disabled is not modified (for repeater credential sync).
-func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate, req LockoutRequest) (*WirelessApplyResult, error) {
+func (w *Service) SetAPConfig(section string, update models.APConfigUpdate, req LockoutRequest) (*WirelessApplyResult, error) {
 	// Only disabling removes the access point; every other field of this request
 	// (SSID, key, re-enabling) leaves it up and must not be policed.
 	if update.Enabled != nil && !*update.Enabled {

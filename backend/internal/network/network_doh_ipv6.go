@@ -13,7 +13,7 @@ import (
 const dohConfigFile = "/etc/travo/doh-config.json"
 
 // GetDoHConfig returns the current DNS-over-HTTPS configuration.
-func (n *NetworkService) GetDoHConfig() (models.DoHConfig, error) {
+func (n *Service) GetDoHConfig() (models.DoHConfig, error) {
 	data, err := os.ReadFile(dohConfigFile)
 	if err != nil {
 		return models.DoHConfig{Provider: "cloudflare"}, nil
@@ -26,7 +26,7 @@ func (n *NetworkService) GetDoHConfig() (models.DoHConfig, error) {
 }
 
 // SetDoHConfig saves the DNS-over-HTTPS config and restarts dnsmasq if enabled.
-func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
+func (n *Service) SetDoHConfig(cfg models.DoHConfig) error {
 	if err := os.MkdirAll(filepath.Dir(dohConfigFile), 0750); err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 }
 
 // GetIPv6Status returns whether IPv6 is enabled and current global addresses.
-func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
+func (n *Service) GetIPv6Status() (models.IPv6Status, error) {
 	var status models.IPv6Status
 	data, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/disable_ipv6")
 	if err == nil {
@@ -90,7 +90,7 @@ func (n *NetworkService) GetIPv6Status() (models.IPv6Status, error) {
 }
 
 // SetIPv6Enabled enables or disables IPv6 system-wide via sysctl.
-func (n *NetworkService) SetIPv6Enabled(enabled bool) error {
+func (n *Service) SetIPv6Enabled(enabled bool) error {
 	val := "1"
 	if enabled {
 		val = "0"

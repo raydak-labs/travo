@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/network"
 	"github.com/openwrt-travel-gui/backend/internal/platform"
@@ -51,7 +50,7 @@ type WifiReloader interface {
 // Lock order is always: uciWriteMu, then the config locks. Neither is
 // reentrant, so mutateWireless must not be nested and no fn passed to it may
 // take either lock itself. Callers that only read UCI should not use this.
-func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApplyResult, error)) (*WirelessApplyResult, error) {
+func (w *Service) mutateWireless(configs []string, fn func() (*WirelessApplyResult, error)) (*WirelessApplyResult, error) {
 	defer w.lockUCIWrite()()
 
 	if w.applier != nil {
@@ -85,7 +84,7 @@ func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApply
 // `ApplyAndConfirm` (SwitchSTAToRadio) snapshots, restores on its own failure and
 // discards on success — so there is nothing left to put back and turning that into
 // an error would report a failure that did not happen.
-func (w *WifiService) restoreAfterFailedMutation(cause error) error {
+func (w *Service) restoreAfterFailedMutation(cause error) error {
 	if w.applier == nil {
 		return cause
 	}
@@ -117,8 +116,8 @@ type WirelessApplyResult struct {
 	ProbeBudgetSeconds int
 }
 
-// WifiService provides WiFi scanning, connection, and configuration.
-type WifiService struct {
+// Service provides WiFi scanning, connection, and configuration.
+type Service struct {
 	uci                 uci.UCI
 	ubus                ubus.Ubus
 	reloader            WifiReloader
@@ -158,79 +157,55 @@ const defaultReconnectScript = "/etc/travo/wifi-reconnect.sh"
 const defaultWifiModeFile = "/etc/travo/wifi-mode"
 const defaultRepeaterOptionsFile = "/etc/travo/repeater-options.json"
 
-// NewWifiService creates a new WifiService. Uses apply+confirm when applier is set (production),
-// otherwise falls back to the (test-only) reloader.
-func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService {
-	return &WifiService{
-		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: platform.NewRealUCIApplyConfirm(ub, pw),
-		cmd: &platform.RealCommandRunner{}, priorityFile: defaultPriorityFile,
-		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
-		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		arpFile: network.ProcNetARP,
-	}
+// Deps are the collaborators and state files of a Service. Zero values take
+// the production defaults, except Applier: without it changes go through
+// Reloader, which is the test seam.
+type Deps struct {
+	UCI     uci.UCI
+	Ubus    ubus.Ubus
+	Applier platform.UCIApplyConfirm
+	// Reloader applies changes when Applier is nil (tests); default no-op.
+	Reloader WifiReloader
+	// Cmd runs shell commands; default platform.RealCommandRunner.
+	Cmd platform.CommandRunner
+
+	PriorityFile      string
+	AutoReconnectFile string
+	ReconnectScript   string
+	ModeFile          string
 }
 
-// NewWifiServiceWithApplier wires an explicit apply/confirm step into a
-// WifiService. Production uses NewWifiService (the real rpcd applier); this
-// constructor is the seam other packages' tests use to drive the wireless
-// mutation envelope (token, rollback timeout, generated key) that only exists
-// when an applier is configured.
-func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier platform.UCIApplyConfirm) *WifiService {
-	return &WifiService{
-		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: applier,
-		cmd: &platform.RealCommandRunner{}, priorityFile: defaultPriorityFile,
-		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
-		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		arpFile: network.ProcNetARP,
+// New creates a wifi Service.
+func New(d Deps) *Service {
+	or := func(v, def string) string {
+		if v == "" {
+			return def
+		}
+		return v
 	}
-}
-
-// NewWifiServiceWithReloader creates a WifiService with a custom reloader (for tests).
-// Applier is left nil so Reload() is used.
-func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiService {
-	return &WifiService{
-		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &platform.RealCommandRunner{},
-		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
-		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: network.ProcNetARP,
+	w := &Service{
+		uci: d.UCI, ubus: d.Ubus, applier: d.Applier, reloader: d.Reloader, cmd: d.Cmd,
+		priorityFile:        or(d.PriorityFile, defaultPriorityFile),
+		autoReconnectFile:   or(d.AutoReconnectFile, defaultAutoReconnectFile),
+		reconnectScript:     or(d.ReconnectScript, defaultReconnectScript),
+		modeFile:            or(d.ModeFile, defaultWifiModeFile),
+		repeaterOptionsFile: defaultRepeaterOptionsFile,
+		arpFile:             network.ProcNetARP,
 	}
-}
-
-// NewWifiServiceWithPriorityFile creates a WifiService with a custom priority file (for tests).
-func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf string) *WifiService {
-	return &WifiService{
-		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &platform.RealCommandRunner{},
-		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
-		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: network.ProcNetARP,
+	if w.reloader == nil {
+		w.reloader = &NoopWifiReloader{}
 	}
-}
-
-// NewWifiServiceForTesting creates a WifiService with all fields customizable (for tests).
-func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd platform.CommandRunner, pf, arFile, rsFile string) *WifiService {
-	return &WifiService{
-		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
-		priorityFile: pf, autoReconnectFile: arFile,
-		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: network.ProcNetARP,
+	if w.cmd == nil {
+		w.cmd = &platform.RealCommandRunner{}
 	}
-}
-
-// NewWifiServiceForTestingWithModeFile creates a WifiService with a custom mode file (for tests).
-func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd platform.CommandRunner, pf, arFile, rsFile, modeFile string) *WifiService {
-	return &WifiService{
-		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
-		priorityFile: pf, autoReconnectFile: arFile,
-		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: network.ProcNetARP,
-	}
+	return w
 }
 
 // validateWirelessConsistency enforces invariants that, if violated, leave the router
 // in a broken state that rpcd's rollback timer cannot fix (rollback restores the *previous*
 // config, which may itself be broken if the bug is in our own writer). Currently checks:
 //   - At most one enabled STA wifi-iface may be bound to network=wwan.
-func (w *WifiService) validateWirelessConsistency() error {
+func (w *Service) validateWirelessConsistency() error {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return fmt.Errorf("failed to get wireless sections: %w", err)
@@ -260,7 +235,7 @@ func (w *WifiService) validateWirelessConsistency() error {
 // is no session, so the only way back is the snapshot mutateWireless took before
 // the mutation: mutateWireless restores it for every fn failure, including this
 // one. Nothing extra to do here.
-func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
+func (w *Service) stageWirelessApply() (*WirelessApplyResult, error) {
 	if err := w.validateWirelessConsistency(); err != nil {
 		return nil, err
 	}
@@ -292,7 +267,7 @@ func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 // returns BEFORE applier.Confirm — and now rolls the previous config back by
 // hand, because leaving it to rpcd's window restored the ALREADY-COMMITTED
 // config instead (ADR 0002 §5).
-func (w *WifiService) ConfirmApply(token string) error {
+func (w *Service) ConfirmApply(token string) error {
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("apply token is required")
 	}
@@ -317,7 +292,7 @@ func (w *WifiService) ConfirmApply(token string) error {
 //
 // The apply session is deliberately NOT confirmed here: Rollback cancels rpcd's
 // window itself, so the window cannot fire later and overwrite the restore.
-func (w *WifiService) refuseAndRollback(token string, probeErr error) error {
+func (w *Service) refuseAndRollback(token string, probeErr error) error {
 	if err := w.applier.Rollback(token); err != nil {
 		return fmt.Errorf("%w (rolling back to the previous config also failed: %w)", probeErr, err)
 	}
@@ -396,7 +371,7 @@ func wirelessProbeBudgetSeconds() int {
 // band or key would otherwise confirm and cancel rpcd's rollback with no uplink
 // left. A config that enables neither has nothing to prove ("WiFi off" is
 // allowed, and the confirm request itself demonstrates reachability).
-func (w *WifiService) verifyAppliedWirelessUp() error {
+func (w *Service) verifyAppliedWirelessUp() error {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return fmt.Errorf("reading wireless sections: %w", err)
@@ -466,7 +441,7 @@ const (
 
 // applyWireless applies committed UCI using apply+confirm when applier is set (same as LuCI),
 // otherwise it uses the reloader seam (tests only). Use after Commit("wireless").
-func (w *WifiService) applyWireless() error {
+func (w *Service) applyWireless() error {
 	if w.applier != nil {
 		return w.applier.ApplyAndConfirm(uciApplyConfigs)
 	}
@@ -480,12 +455,12 @@ func (w *WifiService) applyWireless() error {
 // take this lock, so status and scan requests stay concurrent.
 //
 // The returned function releases the lock and must be deferred by the caller.
-func (w *WifiService) lockUCIWrite() func() {
+func (w *Service) lockUCIWrite() func() {
 	w.uciWriteMu.Lock()
 	return w.uciWriteMu.Unlock
 }
 
 // crashGuard returns the guard for feature in the service's guard dir.
-func (w *WifiService) crashGuard(feature string) guard.Guard {
+func (w *Service) crashGuard(feature string) guard.Guard {
 	return guard.In(w.guardDir, feature)
 }

@@ -118,7 +118,7 @@ func wifiCallerIP(deps network.ClassifyDeps, clientIP string) bool {
 // uses: work out what the config would look like after the change, then run the
 // one rule on it. Empty excludes mean "nothing is being removed", which is what
 // the endpoints that keep an access point enabled pass.
-func (w *WifiService) guardLockoutExcluding(
+func (w *Service) guardLockoutExcluding(
 	req LockoutRequest, excludeSection, excludeRadio string,
 ) error {
 	if req.AcknowledgeLockout || req.ClientIP == "" {
@@ -161,7 +161,7 @@ func (w *WifiService) guardLockoutExcluding(
 // they can read and undo, while allowing it strands them on a router that can no
 // longer be reached to explain itself. The acknowledged path is unchanged, so
 // the false positive is never more than a dialog. See ADR 0002 §5.2.
-func (w *WifiService) guardLockout(req LockoutRequest, enabledAPRemains bool) error {
+func (w *Service) guardLockout(req LockoutRequest, enabledAPRemains bool) error {
 	if req.AcknowledgeLockout || req.ClientIP == "" {
 		return nil
 	}
@@ -177,7 +177,7 @@ func (w *WifiService) guardLockout(req LockoutRequest, enabledAPRemains bool) er
 // classifyDeps builds the dependency set the shared classifier reads from, so
 // the guard classifies its caller through exactly the code the
 // GET /network/connection-method endpoint runs.
-func (w *WifiService) classifyDeps() network.ClassifyDeps {
+func (w *Service) classifyDeps() network.ClassifyDeps {
 	return network.ClassifyDeps{Ubus: w.ubus, Cmd: w.cmd, ARPFile: w.arpFile}
 }
 
@@ -189,7 +189,7 @@ func (w *WifiService) classifyDeps() network.ClassifyDeps {
 // A wifi-iface on a radio with disabled=1 counts for nothing: netifd will not
 // bring it up, so counting it would let the last usable access point look
 // available.
-func (w *WifiService) enabledAPRemains(excludeSection, excludeRadio string) (bool, error) {
+func (w *Service) enabledAPRemains(excludeSection, excludeRadio string) (bool, error) {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
 		return false, fmt.Errorf("lockout guard could not read the wireless config: %w", err)

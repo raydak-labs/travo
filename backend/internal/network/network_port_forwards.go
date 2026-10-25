@@ -16,7 +16,7 @@ import (
 )
 
 // GetFirewallZones returns a summary of all UCI firewall zones.
-func (n *NetworkService) GetFirewallZones() ([]models.FirewallZone, error) {
+func (n *Service) GetFirewallZones() ([]models.FirewallZone, error) {
 	sections, err := n.uci.GetSections("firewall")
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (n *NetworkService) GetFirewallZones() ([]models.FirewallZone, error) {
 const defaultPortForwardsFile = "/etc/travo/port-forwards.json"
 
 // portForwardsPath returns the port-forward store in use.
-func (n *NetworkService) portForwardsPath() string {
+func (n *Service) portForwardsPath() string {
 	if n.portForwardsFile != "" {
 		return n.portForwardsFile
 	}
@@ -66,7 +66,7 @@ func (n *NetworkService) portForwardsPath() string {
 }
 
 // GetPortForwards returns stored port-forward rules.
-func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
+func (n *Service) GetPortForwards() ([]models.PortForwardRule, error) {
 	data, err := os.ReadFile(n.portForwardsPath())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -107,7 +107,7 @@ func newPortForwardID(existing []models.PortForwardRule) string {
 var portForwardFallbackID atomic.Int64
 
 // AddPortForward adds a new port-forward rule.
-func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
+func (n *Service) AddPortForward(rule models.PortForwardRule) error {
 	n.portForwardsMu.Lock()
 	defer n.portForwardsMu.Unlock()
 
@@ -123,7 +123,7 @@ func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
 }
 
 // DeletePortForward removes a port-forward rule by ID.
-func (n *NetworkService) DeletePortForward(id string) error {
+func (n *Service) DeletePortForward(id string) error {
 	n.portForwardsMu.Lock()
 	defer n.portForwardsMu.Unlock()
 
@@ -140,7 +140,7 @@ func (n *NetworkService) DeletePortForward(id string) error {
 	return n.savePortForwards(filtered)
 }
 
-func (n *NetworkService) savePortForwards(rules []models.PortForwardRule) error {
+func (n *Service) savePortForwards(rules []models.PortForwardRule) error {
 	path := n.portForwardsPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return err

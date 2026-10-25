@@ -11,7 +11,7 @@ import (
 )
 
 // GetDDNSConfig reads the DDNS configuration from UCI (ddns.myddns).
-func (n *NetworkService) GetDDNSConfig() (models.DDNSConfig, error) {
+func (n *Service) GetDDNSConfig() (models.DDNSConfig, error) {
 	opts, err := n.uci.GetAll("ddns", "myddns")
 	if err != nil {
 		// No ddns config — return defaults (disabled)
@@ -48,7 +48,7 @@ const ddnsInitScriptPath = initdPath + "ddns"
 // SetDDNSInitScript overrides the ddns-scripts init script path (tests only).
 // Tests that exercise DDNS configuration need it to point at a file that exists,
 // otherwise every write correctly reports the package as missing.
-func (n *NetworkService) SetDDNSInitScript(path string) {
+func (n *Service) SetDDNSInitScript(path string) {
 	n.ddnsInitScript = path
 }
 
@@ -58,7 +58,7 @@ func (n *NetworkService) SetDDNSInitScript(path string) {
 // config is what the user is trying to create: on a device without the package
 // there is no config AND no way for the UI to install one (ddns is not in the
 // service catalog), so the only honest signal is the missing script.
-func (n *NetworkService) DDNSAvailable() bool {
+func (n *Service) DDNSAvailable() bool {
 	path := n.ddnsInitScript
 	if path == "" {
 		path = ddnsInitScriptPath
@@ -68,7 +68,7 @@ func (n *NetworkService) DDNSAvailable() bool {
 }
 
 // SetDDNSConfig writes the DDNS configuration to UCI and restarts ddns-scripts.
-func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
+func (n *Service) SetDDNSConfig(config models.DDNSConfig) error {
 	// Check the precondition BEFORE touching UCI. The old order wrote half the
 	// config and then failed, and on a device without the package every write
 	// failed with a bare `uci: Entry not found` 500 that said nothing about the
@@ -131,7 +131,7 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 }
 
 // GetDDNSStatus checks whether the ddns service is running and returns public IP info.
-func (n *NetworkService) GetDDNSStatus() (models.DDNSStatus, error) {
+func (n *Service) GetDDNSStatus() (models.DDNSStatus, error) {
 	var status models.DDNSStatus
 
 	// Check if ddns process is running

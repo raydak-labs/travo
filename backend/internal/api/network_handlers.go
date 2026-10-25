@@ -13,7 +13,7 @@ import (
 )
 
 // NetworkStatusHandler handles GET /api/v1/network/status.
-func NetworkStatusHandler(svc *network.NetworkService) fiber.Handler {
+func NetworkStatusHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetNetworkStatus()
 		if err != nil {
@@ -24,7 +24,7 @@ func NetworkStatusHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetWanConfigHandler handles GET /api/v1/network/wan.
-func GetWanConfigHandler(svc *network.NetworkService) fiber.Handler {
+func GetWanConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetWanConfig()
 		if err != nil {
@@ -35,7 +35,7 @@ func GetWanConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // DetectWanTypeHandler handles GET /api/v1/network/wan/detect.
-func DetectWanTypeHandler(svc *network.NetworkService) fiber.Handler {
+func DetectWanTypeHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result, err := svc.DetectWanType()
 		if err != nil {
@@ -46,7 +46,7 @@ func DetectWanTypeHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetWanConfigHandler handles PUT /api/v1/network/wan.
-func SetWanConfigHandler(svc *network.NetworkService) fiber.Handler {
+func SetWanConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WanConfig
 		if err := BindStrictBodyConfig(c, &config); err != nil {
@@ -91,7 +91,7 @@ func SetWanConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetInterfaceStateHandler handles POST /api/v1/network/interfaces/:name/state.
-func SetInterfaceStateHandler(svc *network.NetworkService) fiber.Handler {
+func SetInterfaceStateHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		name := c.Params("name")
 		if name == "" {
@@ -112,7 +112,7 @@ func SetInterfaceStateHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetDDNSConfigHandler handles GET /api/v1/network/ddns.
-func GetDDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
+func GetDDNSConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetDDNSConfig()
 		if err != nil {
@@ -131,7 +131,7 @@ func GetDDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetDDNSConfigHandler handles PUT /api/v1/network/ddns.
-func SetDDNSConfigHandler(svc *network.NetworkService) fiber.Handler {
+func SetDDNSConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DDNSConfig
 		// Strict: the handler persists the whole DDNS config, so an
@@ -178,7 +178,7 @@ func GetUptimeLogHandler(tracker *network.UptimeTracker) fiber.Handler {
 }
 
 // GetDDNSStatusHandler handles GET /api/v1/network/ddns/status.
-func GetDDNSStatusHandler(svc *network.NetworkService) fiber.Handler {
+func GetDDNSStatusHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetDDNSStatus()
 		if err != nil {
@@ -194,7 +194,7 @@ func GetDDNSStatusHandler(svc *network.NetworkService) fiber.Handler {
 // target that a diagnostic tool would read as an option (a leading dash) or
 // that is not a host at all must be a 400, not a 200 carrying the tool's
 // complaint in an "error" field.
-func RunDiagnosticsHandler(svc *network.NetworkService) fiber.Handler {
+func RunDiagnosticsHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.DiagnosticsRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -215,7 +215,7 @@ func RunDiagnosticsHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetDoHConfigHandler handles GET /api/v1/network/doh.
-func GetDoHConfigHandler(svc *network.NetworkService) fiber.Handler {
+func GetDoHConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetDoHConfig()
 		if err != nil {
@@ -226,7 +226,7 @@ func GetDoHConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetDoHConfigHandler handles PUT /api/v1/network/doh.
-func SetDoHConfigHandler(svc *network.NetworkService) fiber.Handler {
+func SetDoHConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.DoHConfig
 		// Strict: SetDoHConfig persists the whole config, so an unrecognised
@@ -242,7 +242,7 @@ func SetDoHConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetIPv6StatusHandler handles GET /api/v1/network/ipv6.
-func GetIPv6StatusHandler(svc *network.NetworkService) fiber.Handler {
+func GetIPv6StatusHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetIPv6Status()
 		if err != nil {
@@ -253,7 +253,7 @@ func GetIPv6StatusHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetIPv6EnabledHandler handles PUT /api/v1/network/ipv6.
-func SetIPv6EnabledHandler(svc *network.NetworkService) fiber.Handler {
+func SetIPv6EnabledHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
 			Enabled bool `json:"enabled"`
@@ -269,7 +269,7 @@ func SetIPv6EnabledHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SendWoLHandler handles POST /api/v1/network/wol.
-func SendWoLHandler(svc *network.NetworkService) fiber.Handler {
+func SendWoLHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.WoLRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -283,7 +283,7 @@ func SendWoLHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // ConnectionMethodHandler handles GET /api/v1/network/connection-method.
-func ConnectionMethodHandler(svc *network.NetworkService) fiber.Handler {
+func ConnectionMethodHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		clientIP := c.IP()
 		if clientIP == "" {

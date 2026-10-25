@@ -25,7 +25,7 @@ func TestNoopEventWatcher(t *testing.T) {
 func TestNetworkEventWatcher_EmitsOnEvent(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	networkSvc := NewNetworkService(u, ub)
+	networkSvc := New(Deps{UCI: u, Ubus: ub})
 
 	// fakeRunner feeds one watched event line then blocks forever
 	lines := make(chan string, 1)
@@ -72,7 +72,7 @@ func (r *chanRunner) Lines(stopCh <-chan struct{}) <-chan string {
 func TestEventWatcher_StopIsIdempotent(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	networkSvc := NewNetworkService(u, ub)
+	networkSvc := New(Deps{UCI: u, Ubus: ub})
 
 	lines := make(chan string)
 	w := newNetworkEventWatcherWithRunner(networkSvc, &chanRunner{lines: lines})
@@ -85,7 +85,7 @@ func TestEventWatcher_StopIsIdempotent(t *testing.T) {
 func TestNetworkEventWatcher_StartIsIdempotent(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	networkSvc := NewNetworkService(u, ub)
+	networkSvc := New(Deps{UCI: u, Ubus: ub})
 
 	lines := make(chan string)
 	w := newNetworkEventWatcherWithRunner(networkSvc, &chanRunner{lines: lines})

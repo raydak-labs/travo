@@ -29,7 +29,7 @@ var ErrEncryptionRequiredForNewSTA = errors.New("encryption is required when add
 // splitAPOffUplinkRadio disables the AP on whichever radio is chosen, so on the
 // next connect the now-bare radio is preferred and the remaining access point is
 // left alone instead of being refused for.
-func (w *WifiService) radioForNewSTA(sections map[string]map[string]string) (string, error) {
+func (w *Service) radioForNewSTA(sections map[string]map[string]string) (string, error) {
 	radios := make([]string, 0, len(sections))
 	for name, opts := range sections {
 		if opts["type"] != "" {
@@ -63,7 +63,7 @@ func (w *WifiService) radioForNewSTA(sections map[string]map[string]string) (str
 //
 // For an existing saved profile, an empty Password leaves the stored UCI key unchanged
 // (one-tap reconnect from the saved list).
-func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
+func (w *Service) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
 		// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN
 		if err := w.ensureWwanNetwork(); err != nil {
@@ -204,7 +204,7 @@ func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, e
 }
 
 // Disconnect disconnects from the current WiFi network.
-func (w *WifiService) Disconnect() (*WirelessApplyResult, error) {
+func (w *Service) Disconnect() (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		_, section, err := w.findSTADevice()
 		if err != nil {
@@ -225,7 +225,7 @@ func (w *WifiService) Disconnect() (*WirelessApplyResult, error) {
 }
 
 // GetConnection returns the current WiFi connection info.
-func (w *WifiService) GetConnection() (models.WifiConnection, error) {
+func (w *Service) GetConnection() (models.WifiConnection, error) {
 	ifname, _, err := w.findSTADevice()
 	if err != nil {
 		return models.WifiConnection{Mode: w.deriveWifiMode()}, nil
@@ -267,7 +267,7 @@ func (w *WifiService) GetConnection() (models.WifiConnection, error) {
 }
 
 // loadPriorities reads the priority file and returns an ssid->priority map.
-func (w *WifiService) loadPriorities() map[string]int {
+func (w *Service) loadPriorities() map[string]int {
 	data, err := os.ReadFile(w.priorityFile)
 	if err != nil {
 		return map[string]int{}
@@ -280,7 +280,7 @@ func (w *WifiService) loadPriorities() map[string]int {
 }
 
 // savePriorities writes the priority map to the priority file.
-func (w *WifiService) savePriorities(priorities map[string]int) error {
+func (w *Service) savePriorities(priorities map[string]int) error {
 	dir := filepath.Dir(w.priorityFile)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("creating priority directory: %w", err)
@@ -294,7 +294,7 @@ func (w *WifiService) savePriorities(priorities map[string]int) error {
 
 // ReorderNetworks sets priority order for saved networks based on an ordered list of SSIDs.
 // The first SSID in the list gets priority 1 (highest), second gets 2, etc.
-func (w *WifiService) ReorderNetworks(ssids []string) error {
+func (w *Service) ReorderNetworks(ssids []string) error {
 	priorities := make(map[string]int, len(ssids))
 	for i, ssid := range ssids {
 		priorities[ssid] = i + 1
@@ -303,7 +303,7 @@ func (w *WifiService) ReorderNetworks(ssids []string) error {
 }
 
 // GetSavedNetworks returns saved WiFi networks.
-func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
+func (w *Service) GetSavedNetworks() ([]models.SavedNetwork, error) {
 	priorities := w.loadPriorities()
 
 	var networks []models.SavedNetwork
@@ -358,7 +358,7 @@ func (w *WifiService) GetSavedNetworks() ([]models.SavedNetwork, error) {
 }
 
 // DeleteNetwork removes a saved WiFi network by its UCI section name.
-func (w *WifiService) DeleteNetwork(section string) (*WirelessApplyResult, error) {
+func (w *Service) DeleteNetwork(section string) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {
 		if section == "" {
 			return nil, fmt.Errorf("section name is required")

@@ -9,7 +9,7 @@ import (
 )
 
 // GetDNSConfig returns the custom DNS configuration.
-func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
+func (n *Service) GetDNSConfig() (models.DNSConfig, error) {
 	opts, err := n.uci.GetAll("network", "wan")
 	if err != nil {
 		return models.DNSConfig{}, err
@@ -32,7 +32,7 @@ func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
 // not. It was also the mirror image: its own `uci commit network` could commit the
 // VPN's half-written peer, leaving a wg0 peer with new allowed_ips and no matching
 // public_key.
-func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
+func (n *Service) SetDNSConfig(config models.DNSConfig) error {
 	return platform.MutateUCI(n.uci, []string{"network"}, func() error {
 		if config.UseCustomDNS {
 			if err := n.uciSet("network", "wan", "peerdns", "0"); err != nil {
@@ -55,7 +55,7 @@ func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
 }
 
 // GetDNSEntries returns all local DNS entries from dhcp config (domain sections).
-func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
+func (n *Service) GetDNSEntries() ([]models.DNSEntry, error) {
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
 		// A failed read is not "no entries": returning an empty list would make
@@ -80,7 +80,7 @@ func (n *NetworkService) GetDNSEntries() ([]models.DNSEntry, error) {
 }
 
 // AddDNSEntry adds a new local DNS entry as a named UCI section in dhcp config.
-func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
+func (n *Service) AddDNSEntry(entry models.DNSEntry) error {
 	// `dhcp` is locked, not just committed-and-hoped: the uci CLI keeps
 	// uncommitted changes in the process-global /tmp/.uci/dhcp/changes file, so
 	// an unlocked writer interleaves with AddDHCPReservation (which IS wrapped)
@@ -115,7 +115,7 @@ func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 }
 
 // DeleteDNSEntry removes a local DNS entry by its UCI section name.
-func (n *NetworkService) DeleteDNSEntry(section string) error {
+func (n *Service) DeleteDNSEntry(section string) error {
 	// Same lock as AddDNSEntry, and for the same reason: a delete that reverts
 	// or commits `dhcp` concurrently with an add silently discards the add.
 	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {

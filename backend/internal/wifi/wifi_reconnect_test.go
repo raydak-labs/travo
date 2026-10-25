@@ -36,7 +36,7 @@ func TestWiFiScheduleWritesToOpenWrtCrontab(t *testing.T) {
 		t.Fatalf("seed crontab: %v", err)
 	}
 
-	w := &WifiService{
+	w := &Service{
 		crontabFile:      crontab,
 		scheduleFile:     filepath.Join(dir, "wifi-schedule.json"),
 		toggleScriptPath: filepath.Join(dir, "travo-wireless-toggle.sh"),
@@ -96,7 +96,7 @@ func TestWiFiScheduleInvalidTimeChangesNothing(t *testing.T) {
 	_ = os.WriteFile(crontab, []byte("seed\n"), 0o600)
 	_ = os.WriteFile(jsonPath, []byte(`{"enabled":true,"on_time":"07:00","off_time":"23:00"}`), 0o644)
 
-	w := &WifiService{crontabFile: crontab, scheduleFile: jsonPath}
+	w := &Service{crontabFile: crontab, scheduleFile: jsonPath}
 	err := w.SetWiFiSchedule(models.WiFiSchedule{Enabled: true, OnTime: "99:99", OffTime: "23:00"})
 	if err == nil {
 		t.Fatal("expected an error for an out-of-range on_time")
@@ -126,10 +126,7 @@ func TestAutoReconnectWaitsForTheCrontabLock(t *testing.T) {
 		return nil, nil
 	}}
 
-	w := NewWifiServiceForTesting(uci.NewMockUCI(), ubus.NewMockUbus(), &NoopWifiReloader{}, cmd,
-		filepath.Join(dir, "priorities.json"),
-		filepath.Join(dir, "autoreconnect.json"),
-		filepath.Join(dir, "wifi-reconnect.sh"))
+	w := New(Deps{UCI: uci.NewMockUCI(), Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}, Cmd: cmd, PriorityFile: filepath.Join(dir, "priorities.json"), AutoReconnectFile: filepath.Join(dir, "autoreconnect.json"), ReconnectScript: filepath.Join(dir, "wifi-reconnect.sh")})
 	platform.
 
 		// Hold the lock the schedule writers take, then ask for a crontab rewrite.
@@ -302,7 +299,7 @@ func TestEnsureAPRunning_KeepsRadiosOffDuringScheduleOffWindow(t *testing.T) {
 	// One hour either side of now, so "now" is a full hour away from both
 	// boundaries and the assertion cannot depend on the minute it runs in.
 	now := time.Now()
-	writeSchedule := func(on, off string) *WifiService {
+	writeSchedule := func(on, off string) *Service {
 		path := filepath.Join(dir, "wifi-schedule.json")
 		data, err := json.Marshal(models.WiFiSchedule{Enabled: true, OnTime: on, OffTime: off})
 		if err != nil {
@@ -311,7 +308,7 @@ func TestEnsureAPRunning_KeepsRadiosOffDuringScheduleOffWindow(t *testing.T) {
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		return &WifiService{scheduleFile: path}
+		return &Service{scheduleFile: path}
 	}
 	hhmm := func(offset time.Duration) string {
 		return now.Add(offset).Format("15:04")
@@ -394,7 +391,7 @@ func TestRemoveWiFiScheduleCronLinesReplacesTheFileAtomically(t *testing.T) {
 		t.Fatalf("stat crontab: %v", err)
 	}
 
-	w := &WifiService{
+	w := &Service{
 		crontabFile:  crontab,
 		scheduleFile: filepath.Join(dir, "wifi-schedule.json"),
 	}

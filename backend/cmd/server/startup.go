@@ -14,7 +14,7 @@ import (
 // not serialise them. The wireless configuration is only ever WRITTEN here: the
 // runtime apply stays with the operator (ADR 0002), so a repair that needs a
 // reboot to take effect says so in the log.
-func startWifiReconciliation(lifecycle *appLifecycle, wifiSvc *wifi.WifiService) {
+func startWifiReconciliation(lifecycle *appLifecycle, wifiSvc *wifi.Service) {
 	// Fix wireless UCI on startup (country/channel, missing SSID/key on existing APs,
 	// enable radios when AP enabled). Do not auto-apply on startup: there is no
 	// browser in the loop to confirm rpcd rollback safely, so we commit the repair

@@ -593,9 +593,7 @@ func TestSetAutoReconnect_ReplacesScriptWithCorrectMode(t *testing.T) {
 		t.Fatalf("seed script: %v", err)
 	}
 
-	w := NewWifiServiceForTesting(uci.NewMockUCI(), ubus.NewMockUbus(), &NoopWifiReloader{},
-		&platform.MockCommandRunner{}, filepath.Join(dir, "priorities.json"),
-		filepath.Join(dir, "autoreconnect.json"), script)
+	w := New(Deps{UCI: uci.NewMockUCI(), Ubus: ubus.NewMockUbus(), Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: filepath.Join(dir, "priorities.json"), AutoReconnectFile: filepath.Join(dir, "autoreconnect.json"), ReconnectScript: script})
 	if err := w.SetAutoReconnect(true); err != nil {
 		t.Fatalf("SetAutoReconnect: %v", err)
 	}

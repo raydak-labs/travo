@@ -8,7 +8,7 @@ import (
 )
 
 // GetFirewallZonesHandler handles GET /api/v1/network/firewall/zones.
-func GetFirewallZonesHandler(svc *network.NetworkService) fiber.Handler {
+func GetFirewallZonesHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		zones, err := svc.GetFirewallZones()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetFirewallZonesHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetPortForwardsHandler handles GET /api/v1/network/firewall/port-forwards.
-func GetPortForwardsHandler(svc *network.NetworkService) fiber.Handler {
+func GetPortForwardsHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		rules, err := svc.GetPortForwards()
 		if err != nil {
@@ -30,7 +30,7 @@ func GetPortForwardsHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // AddPortForwardHandler handles POST /api/v1/network/firewall/port-forwards.
-func AddPortForwardHandler(svc *network.NetworkService) fiber.Handler {
+func AddPortForwardHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var rule models.PortForwardRule
 		if err := c.Bind().Body(&rule); err != nil {
@@ -44,7 +44,7 @@ func AddPortForwardHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // DeletePortForwardHandler handles DELETE /api/v1/network/firewall/port-forwards/:id.
-func DeletePortForwardHandler(svc *network.NetworkService) fiber.Handler {
+func DeletePortForwardHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := svc.DeletePortForward(id); err != nil {

@@ -27,7 +27,7 @@ func newRestoreTestService(t *testing.T) (*FailoverService, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := network.NewNetworkServiceWithRunner(u, mockUbus, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: u, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	svc := NewFailoverServiceWithRunner(u, mockUbus, networkSvc,
 		&platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{},
 		filepath.Join(t.TempDir(), "failover.json"))

@@ -315,7 +315,7 @@ func TestUplinkDefinition_AgreesWithGetRadiosRole(t *testing.T) {
 // assertNoRadioRunsBothAnAPAndTheUplink is the invariant the same-radio guards
 // exist for, asserted through the role the health API reports rather than
 // through the UCI options behind it.
-func assertNoRadioRunsBothAnAPAndTheUplink(t *testing.T, svc *WifiService) {
+func assertNoRadioRunsBothAnAPAndTheUplink(t *testing.T, svc *Service) {
 	t.Helper()
 	radios, err := svc.GetRadios()
 	if err != nil {
@@ -353,7 +353,7 @@ func assertAPEnabled(t *testing.T, u *uci.MockUCI, section string, want bool) {
 	}
 }
 
-func assertRadioRole(t *testing.T, svc *WifiService, radio, want string) {
+func assertRadioRole(t *testing.T, svc *Service, radio, want string) {
 	t.Helper()
 	radios, err := svc.GetRadios()
 	if err != nil {

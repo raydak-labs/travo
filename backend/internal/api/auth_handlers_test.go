@@ -51,7 +51,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 
 	systemSvc := system.NewSystemService(ub, u, &system.MockStorageProvider{})
 
-	networkSvc := network.NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: u, Ubus: ub, Cmd: &platform.MockCommandRunner{}})
 	// Pretend ddns-scripts is installed, so the DDNS endpoints exercise their
 	// normal path. TestSetDDNSConfig_MissingPackage_Returns503 covers the other
 	// case explicitly.
@@ -59,7 +59,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		t.Fatalf("write fake ddns init script: %v", err)
 	}
 	networkSvc.SetDDNSInitScript(tmpDir + "/init.d-ddns")
-	wifiSvc := wifi.NewWifiServiceForTesting(u, ub, &wifi.NoopWifiReloader{}, &platform.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
+	wifiSvc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Reloader: &wifi.NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: priorityPath, AutoReconnectFile: autoReconnectPath, ReconnectScript: reconnectScriptPath})
 
 	deps := &Dependencies{
 		Auth:        authSvc,

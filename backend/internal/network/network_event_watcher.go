@@ -82,7 +82,7 @@ func isWatched(line string) bool {
 
 // NetworkEventWatcher watches ubus events and emits NetworkStatus snapshots on change.
 type NetworkEventWatcher struct {
-	networkSvc *NetworkService
+	networkSvc *Service
 	runner     subprocessRunner
 	ch         chan models.NetworkStatus
 	stopCh     chan struct{}
@@ -90,11 +90,11 @@ type NetworkEventWatcher struct {
 	stopOnce   sync.Once
 }
 
-func NewNetworkEventWatcher(networkSvc *NetworkService) *NetworkEventWatcher {
+func NewNetworkEventWatcher(networkSvc *Service) *NetworkEventWatcher {
 	return newNetworkEventWatcherWithRunner(networkSvc, &realRunner{})
 }
 
-func newNetworkEventWatcherWithRunner(networkSvc *NetworkService, runner subprocessRunner) *NetworkEventWatcher {
+func newNetworkEventWatcherWithRunner(networkSvc *Service, runner subprocessRunner) *NetworkEventWatcher {
 	return &NetworkEventWatcher{
 		networkSvc: networkSvc,
 		runner:     runner,

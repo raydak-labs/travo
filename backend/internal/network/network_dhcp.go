@@ -11,7 +11,7 @@ import (
 )
 
 // GetDHCPConfig returns the DHCP configuration for the LAN.
-func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
+func (n *Service) GetDHCPConfig() (models.DHCPConfig, error) {
 	opts, err := n.uci.GetAll("dhcp", "lan")
 	if err != nil {
 		return models.DHCPConfig{}, err
@@ -39,7 +39,7 @@ func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
 // SetDHCPConfig updates the LAN DHCP pool. Locked for the same reason as
 // SetDNSConfig: `dhcp` is in the VPN transaction's revert set, and the VPN's
 // DNS-forwarding helpers delete and re-add this same dhcp.@dnsmasq[0] section.
-func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
+func (n *Service) SetDHCPConfig(config models.DHCPConfig) error {
 	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
 			return err
@@ -55,7 +55,7 @@ func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
 }
 
 // GetDHCPLeases reads active DHCP leases from /tmp/dhcp.leases.
-func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
+func (n *Service) GetDHCPLeases() []models.DHCPLease {
 	data, err := os.ReadFile("/tmp/dhcp.leases")
 	if err != nil {
 		return []models.DHCPLease{}
@@ -68,7 +68,7 @@ func (n *NetworkService) GetDHCPLeases() []models.DHCPLease {
 // It exists because real `uci set config.section=stype` CREATES OR UPDATES:
 // AddSection is not a duplicate check. Callers that relied on its error passed
 // under a stricter mock and silently UPSERTED on the device.
-func (n *NetworkService) uciSectionExists(config, section string) (bool, error) {
+func (n *Service) uciSectionExists(config, section string) (bool, error) {
 	sections, err := n.uci.GetSections(config)
 	if err != nil {
 		return false, fmt.Errorf("reading %s sections: %w", config, err)
@@ -87,7 +87,7 @@ func (n *NetworkService) uciSectionExists(config, section string) (bool, error) 
 // it: DHCP pool, lease time, DNS servers, DHCPv6 and RA all gone, with nothing
 // but a 200 to show for it. Both add paths only ever create named sections, so
 // no legitimate caller can produce an anonymous reference.
-func (n *NetworkService) requireNamedDHCPSection(section, wantType string) error {
+func (n *Service) requireNamedDHCPSection(section, wantType string) error {
 	if strings.HasPrefix(section, "@") {
 		return fmt.Errorf("refusing to delete anonymous dhcp section %s: "+
 			"it is part of the file, not one entry", section)
@@ -120,7 +120,7 @@ func sanitizeSectionName(name string) string {
 }
 
 // GetDHCPReservations returns all static DHCP reservations (host sections in dhcp config).
-func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error) {
+func (n *Service) GetDHCPReservations() ([]models.DHCPReservation, error) {
 	sections, err := n.uci.GetSections("dhcp")
 	if err != nil {
 		return nil, fmt.Errorf("reading dhcp sections: %w", err)
@@ -144,7 +144,7 @@ func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error)
 }
 
 // AddDHCPReservation adds a static DHCP reservation as a named UCI section in dhcp config.
-func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
+func (n *Service) AddDHCPReservation(reservation models.DHCPReservation) error {
 	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "host_" + sanitizeSectionName(reservation.Name)
 		// Explicit duplicate check, inside the lock: a same-named reservation
@@ -174,7 +174,7 @@ func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) 
 }
 
 // DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
-func (n *NetworkService) DeleteDHCPReservation(section string) error {
+func (n *Service) DeleteDHCPReservation(section string) error {
 	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		if err := n.requireNamedDHCPSection(section, "host"); err != nil {
 			return err

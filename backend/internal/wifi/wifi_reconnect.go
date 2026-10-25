@@ -17,7 +17,7 @@ import (
 // Auto-reconnect cron script and WiFi on/off schedule.
 
 // GetAutoReconnect returns whether auto-reconnect is enabled.
-func (w *WifiService) GetAutoReconnect() (bool, error) {
+func (w *Service) GetAutoReconnect() (bool, error) {
 	data, err := os.ReadFile(w.autoReconnectFile)
 	if err != nil {
 		return false, nil
@@ -34,7 +34,7 @@ func (w *WifiService) GetAutoReconnect() (bool, error) {
 // SetAutoReconnect enables or disables auto-reconnect to saved WiFi networks.
 // When enabled, it writes a reconnect script and adds a cron entry.
 // When disabled, it removes the cron entry and script.
-func (w *WifiService) SetAutoReconnect(enabled bool) error {
+func (w *Service) SetAutoReconnect(enabled bool) error {
 	dir := filepath.Dir(w.autoReconnectFile)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
@@ -97,7 +97,7 @@ const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networ
 	"    echo $((FAILCOUNT + 1)) > \"$FAILCOUNT_FILE\"\n" +
 	"fi\n"
 
-func (w *WifiService) enableAutoReconnect() error {
+func (w *Service) enableAutoReconnect() error {
 	scriptDir := filepath.Dir(w.reconnectScript)
 	if err := os.MkdirAll(scriptDir, 0750); err != nil {
 		return fmt.Errorf("creating script directory: %w", err)
@@ -121,7 +121,7 @@ func (w *WifiService) enableAutoReconnect() error {
 	return nil
 }
 
-func (w *WifiService) disableAutoReconnect() error {
+func (w *Service) disableAutoReconnect() error {
 	platform.
 		// Remove cron entry, under the same lock enableAutoReconnect takes: both
 		// rewrite /etc/crontabs/root in place.
@@ -158,7 +158,7 @@ const (
 )
 
 // crontabPath returns the crontab in use, honouring the test override.
-func (w *WifiService) crontabPath() string {
+func (w *Service) crontabPath() string {
 	if w.crontabFile != "" {
 		return w.crontabFile
 	}
@@ -167,7 +167,7 @@ func (w *WifiService) crontabPath() string {
 
 // wifiScheduleStatePath returns the persisted schedule JSON in use, honouring
 // the test override.
-func (w *WifiService) wifiScheduleStatePath() string {
+func (w *Service) wifiScheduleStatePath() string {
 	if w.scheduleFile != "" {
 		return w.scheduleFile
 	}
@@ -175,7 +175,7 @@ func (w *WifiService) wifiScheduleStatePath() string {
 }
 
 // GetWiFiSchedule returns the current cron-based WiFi on/off schedule.
-func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
+func (w *Service) GetWiFiSchedule() (models.WiFiSchedule, error) {
 	data, err := os.ReadFile(w.wifiScheduleStatePath())
 	if err != nil {
 		return models.WiFiSchedule{Enabled: false}, nil
@@ -188,7 +188,7 @@ func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
 }
 
 // SetWiFiSchedule saves the WiFi schedule and updates the crontab.
-func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
+func (w *Service) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 	// The times are formatted straight into a crontab line, so they must be
 	// strict HH:MM: a newline would inject a root cron entry. Validate before
 	// persisting, so a rejected request changes nothing.
@@ -236,7 +236,7 @@ func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 // An unreadable, disabled, incomplete or malformed schedule reports false, i.e.
 // the caller keeps its previous behaviour: a repair must not be switched off by
 // a config file that cannot be read.
-func (w *WifiService) wifiScheduleOffWindow() bool {
+func (w *Service) wifiScheduleOffWindow() bool {
 	schedule, err := w.GetWiFiSchedule()
 	if err != nil || !schedule.Enabled || schedule.OnTime == "" || schedule.OffTime == "" {
 		return false
@@ -268,7 +268,7 @@ func scheduleWindowIsOff(now time.Time, onTime, offTime string) bool {
 
 // writeWiFiScheduleCronLines replaces our tagged crontab lines with entries for
 // the given schedule, preserving every line it does not own.
-func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) error {
+func (w *Service) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) error {
 	// cron format: MM HH * * * command  (busybox crond, no user field)
 	onParts := strings.SplitN(schedule.OnTime, ":", 2)
 	offParts := strings.SplitN(schedule.OffTime, ":", 2)
@@ -308,7 +308,7 @@ func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) e
 
 // removeWiFiScheduleCronLines strips our tagged lines from the crontab,
 // preserving everything else (the stock LED and auto-reconnect entries).
-func (w *WifiService) removeWiFiScheduleCronLines() error {
+func (w *Service) removeWiFiScheduleCronLines() error {
 	platform.CrontabMu.
 		Lock()
 	defer platform.CrontabMu.Unlock()

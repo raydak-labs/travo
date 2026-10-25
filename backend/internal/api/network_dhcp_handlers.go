@@ -8,7 +8,7 @@ import (
 )
 
 // GetDHCPConfigHandler handles GET /api/v1/network/dhcp.
-func GetDHCPConfigHandler(svc *network.NetworkService) fiber.Handler {
+func GetDHCPConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetDHCPConfig()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetDHCPConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // SetDHCPConfigHandler handles PUT /api/v1/network/dhcp.
-func SetDHCPConfigHandler(svc *network.NetworkService) fiber.Handler {
+func SetDHCPConfigHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.DHCPConfig
 		if err := BindStrictBodyConfig(c, &config); err != nil {
@@ -48,7 +48,7 @@ func SetDHCPConfigHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetDHCPLeasesHandler handles GET /api/v1/network/dhcp/leases.
-func GetDHCPLeasesHandler(svc *network.NetworkService) fiber.Handler {
+func GetDHCPLeasesHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		leases := svc.GetDHCPLeases()
 		return c.JSON(leases)
@@ -56,7 +56,7 @@ func GetDHCPLeasesHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // GetDHCPReservationsHandler handles GET /api/v1/network/dhcp/reservations.
-func GetDHCPReservationsHandler(svc *network.NetworkService) fiber.Handler {
+func GetDHCPReservationsHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		reservations, err := svc.GetDHCPReservations()
 		if err != nil {
@@ -67,7 +67,7 @@ func GetDHCPReservationsHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // AddDHCPReservationHandler handles POST /api/v1/network/dhcp/reservations.
-func AddDHCPReservationHandler(svc *network.NetworkService) fiber.Handler {
+func AddDHCPReservationHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var reservation models.DHCPReservation
 		if err := c.Bind().Body(&reservation); err != nil {
@@ -99,7 +99,7 @@ func AddDHCPReservationHandler(svc *network.NetworkService) fiber.Handler {
 }
 
 // DeleteDHCPReservationHandler handles DELETE /api/v1/network/dhcp/reservations/:section.
-func DeleteDHCPReservationHandler(svc *network.NetworkService) fiber.Handler {
+func DeleteDHCPReservationHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {

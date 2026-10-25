@@ -50,12 +50,12 @@ func interfaceDump(l3Device string) map[string]any {
 	}
 }
 
-func lockoutService(t *testing.T, reachableBy string) *wifi.WifiService {
+func lockoutService(t *testing.T, reachableBy string) *wifi.Service {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump(reachableBy))
-	return wifi.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"})
+	return wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
 }
 
 func putFromIP(t *testing.T, app *fiber.App, path string, body any) (*http.Response, []byte) {
@@ -91,7 +91,7 @@ func TestSetMode_LockoutRefusalIs409WithACode(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("br-lan"))
-	svc := wifi.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"})
+	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
 	app.Put("/api/v1/wifi/mode", WifiSetModeHandler(svc))
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/mode", map[string]any{"mode": "client"})
@@ -384,7 +384,7 @@ func assertNotLockoutRefusal(t *testing.T, body []byte) {
 // of on the default mock's `wifinet2` profile, which is in no fixture.
 func serviceForFixture(
 	t *testing.T, reachableBy string, edit func(*testing.T, *uci.MockUCI),
-) (*wifi.WifiService, *uci.MockUCI) {
+) (*wifi.Service, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	if edit != nil {
@@ -393,7 +393,7 @@ func serviceForFixture(
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump(reachableBy))
 	ub.RegisterResponse("network.wireless.status", wirelessStatusFor(t, u))
-	return wifi.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"}), u
+	return wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}}), u
 }
 
 func wirelessStatusFor(t *testing.T, u *uci.MockUCI) map[string]any {
@@ -590,7 +590,7 @@ func TestSetRadioRole_SameRadioConflictIsNotReportedAsLockout(t *testing.T) {
 	}
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("br-lan"))
-	svc := wifi.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"})
+	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
 	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/radios/radio0/role",

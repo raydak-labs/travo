@@ -55,7 +55,7 @@ type BandSwitchStatus struct {
 
 // BandSwitchingService monitors STA signal and switches bands automatically.
 type BandSwitchingService struct {
-	wifi       *WifiService
+	wifi       *Service
 	configFile string
 	mu         sync.RWMutex
 	config     BandSwitchConfig
@@ -74,7 +74,7 @@ type BandSwitchingService struct {
 }
 
 // NewBandSwitchingService creates a new BandSwitchingService.
-func NewBandSwitchingService(wifi *WifiService, configFile string) *BandSwitchingService {
+func NewBandSwitchingService(wifi *Service, configFile string) *BandSwitchingService {
 	svc := &BandSwitchingService{
 		wifi:       wifi,
 		configFile: configFile,

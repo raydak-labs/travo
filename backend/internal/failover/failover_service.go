@@ -97,7 +97,7 @@ const rollbackGracePeriod = time.Duration(platform.ApplyRollbackTimeout)*time.Se
 type FailoverService struct {
 	uci        uci.UCI
 	ubus       ubus.Ubus
-	networkSvc *network.NetworkService
+	networkSvc *network.Service
 	cmd        platform.CommandRunner
 	applier    platform.UCIApplyConfirm
 
@@ -135,7 +135,7 @@ type FailoverService struct {
 	onlineSince          map[string]time.Time
 }
 
-func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *network.NetworkService, pw *auth.RootPassword) *FailoverService {
+func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *network.Service, pw *auth.RootPassword) *FailoverService {
 	return &FailoverService{
 		uci:         u,
 		ubus:        ub,
@@ -152,7 +152,7 @@ func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *network.NetworkServ
 	}
 }
 
-func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *network.NetworkService, cmd platform.CommandRunner, applier platform.UCIApplyConfirm, configPath string) *FailoverService {
+func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *network.Service, cmd platform.CommandRunner, applier platform.UCIApplyConfirm, configPath string) *FailoverService {
 	return &FailoverService{
 		uci:         u,
 		ubus:        ub,

@@ -83,7 +83,7 @@ func lockoutRequest(c fiber.Ctx, acknowledged bool) wifi.LockoutRequest {
 // this build could not read netifd's answer and nothing is known about the
 // change yet. The client keys on those two prefixes; renaming one without the
 // other turns a diagnostic into a false "the router rolled back" on screen.
-func ConfirmWifiApplyHandler(svc *wifi.WifiService) fiber.Handler {
+func ConfirmWifiApplyHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Token string `json:"token"`
