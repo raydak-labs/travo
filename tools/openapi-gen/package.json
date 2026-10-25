@@ -1,0 +1,13 @@
+{
+  "name": "@openwrt-travel-gui/openapi-gen",
+  "private": true,
+  "description": "Generates shared/src/generated/openapi.ts from shared/openapi.json",
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript ../../shared/openapi.json -o ../../shared/src/generated/openapi.ts --immutable && node aliases.mjs"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

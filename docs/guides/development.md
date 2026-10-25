@@ -1,7 +1,7 @@
 ---
 title: Development guide
 description: Local prerequisites, install, dev servers, tests, lint, CI, MSW.
-updated: 2026-10-08
+updated: 2026-10-25
 tags: [docs, development, workflow]
 ---
 
@@ -55,6 +55,7 @@ Same ports; Vite HMR + Air if configured in the image.
 | `make test` | `go test` (backend) + `pnpm test` (shared + frontend) |
 | `make lint` | `pnpm lint` (oxlint on frontend + shared) + `golangci-lint` (backend) |
 | `make format` | Prettier + goimports |
+| `make generate` | Regenerate `shared/openapi.json` and the TS API types from the backend handlers |
 | `make build-prod` / `make build-all` | Cross-compile `dist/travo` via `scripts/build.sh` |
 | `make package` / `make package-all` | Release tarballs `dist/travo_<version>_<arch>.tar.gz` |
 | `make deploy` | `deploy-local.sh` over SSH (`DEPLOY_METHOD=direct` default, `ROUTER_IP`) |
@@ -67,14 +68,34 @@ Same ports; Vite HMR + Air if configured in the image.
 ```
 travo/
 ├── frontend/     # React + Vite + Tailwind
-├── backend/      # Go + Fiber
-├── shared/       # Shared TS types
+├── backend/      # Go + Fiber, one package per domain
+├── shared/       # TS API types (partly generated, see below)
+├── tools/openapi-gen/  # openapi-typescript, isolated with its own TypeScript 5
 ├── scripts/      # dev, deploy, install helpers
 ├── test/integration/  # real-device integration runners (SSH + API)
 ├── docs/         # Obsidian vault; hub [`+ Start here.md`](../+ Start here.md); ADRs in docs/adr/
 ├── packaging/    # OpenWrt staging files
 └── Makefile
 ```
+
+## Changing the API
+
+The OpenAPI document is generated from the handler types (ADR 0006 §4), and the frontend's API
+types are generated from it:
+
+1. Change or add the operation in `backend/internal/api/*_api.go` (`get`, `post`, `put`, `del`)
+   and the Go types it uses. Narrow string fields with `enum:"a,b"` where the backend only ever
+   sends those values.
+2. Run `make generate`. It rewrites `shared/openapi.json`, `shared/src/generated/openapi.ts`
+   (`paths`, `components`) and `shared/src/generated/schemas.ts` (one alias per schema).
+3. Commit the generated files. CI's lint job fails when they are stale.
+
+`shared/src/api/*.ts` re-exports the generated types under their existing names. The types still
+written by hand there are UI-side unions and helpers the backend does not describe (or describes
+as an open string), such as `WifiMode` and `NetworkStatus`.
+
+The generator lives in `tools/openapi-gen` because openapi-typescript drives the TypeScript
+compiler API, which the repo's TypeScript 7 does not ship.
 
 ## Tests
 

@@ -63,6 +63,13 @@ type API struct {
 	errorRef *huma.Schema
 }
 
+func init() {
+	// Lists are documented as arrays, not "array or null": the frontend
+	// treats them as arrays, and a handler that can answer null for an empty
+	// list should answer [] instead.
+	huma.DefaultArrayNullable = false
+}
+
 // NewAPI creates the API on app and serves its OpenAPI document at OpenAPIPath.
 func NewAPI(app *fiber.App) *API {
 	registry := huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)

@@ -1,4 +1,4 @@
-.PHONY: dev build test lint format format-check shellcheck integration clean build-prod build-all package package-all deploy docker-dev install coverage
+.PHONY: dev build generate test lint format format-check shellcheck integration clean build-prod build-all package package-all deploy docker-dev install coverage
 
 # Run a command through mise's resolved toolchain (go, node, pnpm, golangci-lint),
 # so recipes are correct regardless of the caller shell's PATH/GOROOT/etc.
@@ -40,6 +40,12 @@ toolchain-versions:
 			gsub(/^v/, "", val); \
 			print "goimports=" val; \
 		}' .mise.toml
+
+# Regenerate the API contract and the frontend's API types from the backend
+# handlers (ADR 0006 §4). CI fails when the committed output is stale.
+generate:
+	cd backend && $(RUN) go run ./cmd/openapi > ../shared/openapi.json
+	cd tools/openapi-gen && $(RUN) pnpm run --silent generate
 
 # Build frontend and backend
 build:

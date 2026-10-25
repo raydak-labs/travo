@@ -38,7 +38,7 @@ type WifiHealth struct {
 type WifiConnection struct {
 	SSID          string `json:"ssid"`
 	BSSID         string `json:"bssid"`
-	Mode          string `json:"mode"`
+	Mode          string `json:"mode" enum:"client,ap,repeater"`
 	SignalDBM     int    `json:"signal_dbm"`
 	SignalPercent int    `json:"signal_percent"`
 	Channel       int    `json:"channel"`

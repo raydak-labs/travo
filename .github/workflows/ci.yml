@@ -147,6 +147,13 @@ jobs:
       - name: Oxlint
         run: pnpm lint:ci
 
+      # shared/openapi.json and shared/src/generated are generated from the Go
+      # handlers (ADR 0006 §4); a handler change without `make generate` fails here.
+      - name: Generated API types are current
+        run: |
+          make generate
+          git diff --exit-code -- shared/openapi.json shared/src/generated
+
   shellcheck:
     name: Shellcheck
     runs-on: ubuntu-latest

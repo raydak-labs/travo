@@ -39,11 +39,11 @@ type FailoverCandidate struct {
 	ID            string                `json:"id"`
 	Label         string                `json:"label"`
 	InterfaceName string                `json:"interface_name"`
-	Kind          FailoverCandidateKind `json:"kind"`
+	Kind          FailoverCandidateKind `json:"kind" enum:"ethernet,wifi,usb"`
 	Available     bool                  `json:"available"`
 	Enabled       bool                  `json:"enabled"`
 	Priority      int                   `json:"priority"`
-	TrackingState FailoverTrackingState `json:"tracking_state"`
+	TrackingState FailoverTrackingState `json:"tracking_state" enum:"online,offline,disabled,not_installed,not_available,unknown"`
 	IsUp          bool                  `json:"is_up"`
 }
 

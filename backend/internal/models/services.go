@@ -5,7 +5,7 @@ type ServiceInfo struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
-	State       string  `json:"state"`
+	State       string  `json:"state" enum:"not_installed,installed,running,stopped"`
 	Version     *string `json:"version,omitempty"`
 	AutoStart   bool    `json:"auto_start"`
 }

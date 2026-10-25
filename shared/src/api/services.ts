@@ -1,3 +1,6 @@
+// Generated from the backend's OpenAPI document (make generate).
+export type { AdGuardDNSStatus } from '../generated/schemas';
+
 /** Service operational state */
 export type ServiceState = 'not_installed' | 'installed' | 'running' | 'stopped' | 'error';
 
@@ -20,15 +23,6 @@ export interface AdGuardStatus {
   readonly avg_response_ms: number;
   readonly admin_url?: string;
   readonly config_yaml_path?: string;
-}
-
-/** AdGuard DNS forwarding status */
-export interface AdGuardDNSStatus {
-  readonly enabled: boolean;
-  readonly dns_port: number;
-  readonly adguard_listener_ready: boolean;
-  readonly dnsmasq_forward_target: string;
-  readonly resolver_probe_ok: boolean;
 }
 
 /** AdGuard Home configuration (raw YAML content) */

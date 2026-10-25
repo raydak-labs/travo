@@ -49,7 +49,12 @@ describe('wifi-apply', () => {
     const response = await finalizeWifiMutation(
       Promise.resolve({
         status: 'ok',
-        apply: { pending: true, token: 'token-3', rollback_timeout_seconds: 1 },
+        apply: {
+          pending: true,
+          token: 'token-3',
+          rollback_timeout_seconds: 1,
+          probe_budget_seconds: 0,
+        },
       }),
     );
 
@@ -303,7 +308,12 @@ describe('confirm probe budget', () => {
       finalizeWifiMutation(
         Promise.resolve({
           status: 'ok',
-          apply: { pending: true, token: 'token-10', rollback_timeout_seconds: 30 },
+          apply: {
+            pending: true,
+            token: 'token-10',
+            rollback_timeout_seconds: 30,
+            probe_budget_seconds: 0,
+          },
         }),
       ),
     ).resolves.toMatchObject({ status: 'ok' });
