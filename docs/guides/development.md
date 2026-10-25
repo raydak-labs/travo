@@ -11,7 +11,7 @@ Tooling versions are also pinned in [`.mise.toml`](../../.mise.toml) (use [mise]
 
 ## Prerequisites
 
-- **Node.js** >= 20 (CI uses 24)
+- **Node.js** >= 22.18 (orval's minimum; mise and CI use the version in `.mise.toml`)
 - **pnpm** 10.x (see `package.json` / lockfile)
 - **Go** >= 1.23 (`backend/go.mod`)
 - **Docker** + Docker Compose (optional)
