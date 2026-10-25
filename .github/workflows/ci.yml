@@ -362,7 +362,17 @@ jobs:
 
   check:
     if: always()
-    needs: [test-backend, test-race, test-frontend, lint, shellcheck, format-check, build-check, openwrt-package]
+    needs:
+      [
+        test-backend,
+        test-race,
+        test-frontend,
+        lint,
+        shellcheck,
+        format-check,
+        build-check,
+        openwrt-package,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
