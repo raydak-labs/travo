@@ -407,9 +407,12 @@ do_install() {
     info "Installing files..."
     tar -xzf "$_tarball" -C / || die "Failed to extract tarball"
     chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
-    if [ -f /etc/uci-defaults/99-travel-gui-ports ]; then
-        sh /etc/uci-defaults/99-travel-gui-ports && rm -f /etc/uci-defaults/99-travel-gui-ports
-    fi
+    # Run Travo's first-boot defaults now, as OpenWrt would on the next boot.
+    for _f in /etc/uci-defaults/98-travo-cron-loglevel /etc/uci-defaults/99-travel-gui-ports; do
+        if [ -f "$_f" ]; then
+            sh "$_f" && rm -f "$_f"
+        fi
+    done
     /etc/init.d/travo enable 2>/dev/null || true
 
     # Clear crash guards left by an interrupted mutation on a PREVIOUS run.
