@@ -23,7 +23,8 @@ For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks
 
 - Monorepo layout:
   - `frontend/` React + TypeScript + Vite SPA
-  - `backend/` Go + Fiber API and device orchestration
+  - `backend/` Go + Fiber API and device orchestration, one package per domain
+    ([`reference/backend-packages.md`](../reference/backend-packages.md))
   - `shared/` shared TypeScript API contracts
   - `docs/plans/` historical design notes (not runtime truth; see `docs/README.md`)
 - Travo coexists with LuCI instead of replacing it outright.

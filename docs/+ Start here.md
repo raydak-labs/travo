@@ -46,6 +46,7 @@ updated: 2026-10-05
 
 ## Reference (what things are)
 
+- [[reference/backend-packages|backend-packages]] — what each backend package owns
 - [[reference/ui-theming|ui-theming]] — frontend tokens and component contracts
 
 ## Plans (live and normative work)

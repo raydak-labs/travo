@@ -93,6 +93,10 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   is `log/slog` with levels. golangci-lint adds errcheck, errorlint, gocritic, unparam,
   bodyclose and others. The docs gates live in `internal/docsgate`, and docs cite symbols
   instead of `file:line`.
+- **Backend domain packages (2026-10-25):** `internal/services` splits into `network`, `wifi`,
+  `system`, `uplink` and `failover`, with shared plumbing in `platform` and the wiring in
+  `internal/app` ([backend packages](../reference/backend-packages.md)). Every service has one
+  constructor; tests sit next to the code they exercise.
 
 ## Frontend Toolchain
 
