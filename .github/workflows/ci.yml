@@ -359,3 +359,12 @@ jobs:
             echo "::error::tarball contains paths escaping /"; exit 1
           fi
           echo "openwrt-package: layout OK"
+
+  check:
+    if: always()
+    needs: [test-backend, test-race, test-frontend, lint, shellcheck, format-check, build-check, openwrt-package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
