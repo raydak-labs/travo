@@ -53,7 +53,9 @@ Pick the asset matching `uname -m` / OpenWrt arch (installer and `scripts/instal
 
 ```sh
 cd /tmp
-wget "https://github.com/raydak-labs/travo/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.tar.gz"
+# -O: BusyBox wget names the file after GitHub's redirect target otherwise
+wget -O travo_1.0.0_aarch64_cortex-a53.tar.gz \
+  "https://github.com/raydak-labs/travo/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.tar.gz"
 tar -xzf travo_1.0.0_aarch64_cortex-a53.tar.gz -C /
 chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
 # Run the pending uci-defaults (cron log level, LuCI port move), then:
@@ -61,8 +63,18 @@ for f in /etc/uci-defaults/98-travo-cron-loglevel /etc/uci-defaults/99-travel-gu
   [ -f "$f" ] && sh "$f" && rm -f "$f"
 done
 /etc/init.d/travo enable
-/etc/init.d/travo start
+/etc/init.d/travo restart   # not start: an upgrade must replace the running process
 ```
+
+On an upgrade, `start` leaves the running Travo alone, so it keeps serving from the replaced
+binary until the next reboot, and `/api/health` still answers. Check that the process runs the
+installed file; `/usr/bin/travo (deleted)` means the old version is still running:
+
+```sh
+readlink /proc/$(pgrep -f '^/usr/bin/travo')/exe   # expect /usr/bin/travo
+```
+
+`scripts/install.sh` restarts and runs this check itself.
 
 If you skip the install script, run `scripts/install-adguard.sh` yourself when you want AdGuard.
 
