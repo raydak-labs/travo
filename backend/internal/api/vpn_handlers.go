@@ -22,23 +22,13 @@ func respondVPNError(c fiber.Ctx, err error) error {
 	return RespondWithServerError(c, err)
 }
 
-// parseToggleEnabled extracts the boolean "enable/enabled" field from a request
-// body, handling the legacy "enable" key for backward-compatibility.
+// parseToggleEnabled extracts the boolean "enabled" field from a request body.
 func parseToggleEnabled(c fiber.Ctx) (bool, error) {
 	var body struct {
-		Enabled *bool `json:"enabled"`
-		Enable  *bool `json:"enable"` // backward-compat for older clients
+		Enabled bool `json:"enabled"`
 	}
-	if err := c.Bind().Body(&body); err != nil {
-		return false, err
-	}
-	if body.Enabled != nil {
-		return *body.Enabled, nil
-	}
-	if body.Enable != nil {
-		return *body.Enable, nil
-	}
-	return false, nil
+	err := c.Bind().Body(&body)
+	return body.Enabled, err
 }
 
 // VpnStatusHandler handles GET /api/v1/vpn/status.
@@ -154,17 +144,12 @@ func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
 func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
-			NodeIP   string `json:"node_ip"`
-			ExitNode string `json:"exit_node"` // legacy / alternate key from older clients
+			NodeIP string `json:"node_ip"`
 		}
 		if err := c.Bind().Body(&body); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
-		ip := body.NodeIP
-		if ip == "" {
-			ip = body.ExitNode
-		}
-		if err := svc.SetTailscaleExitNode(ip); err != nil {
+		if err := svc.SetTailscaleExitNode(body.NodeIP); err != nil {
 			return respondVPNError(c, err)
 		}
 		return RespondOK(c)

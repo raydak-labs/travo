@@ -75,7 +75,7 @@ func newLockoutService(t *testing.T) (*WifiService, *uci.MockUCI, *fakeWirelessA
 	ub.RegisterResponse("network.interface.dump", lockoutDump())
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
 	svc := NewWifiServiceWithApplier(u, ub, applier)
-	svc.guardDir = testGuardDir()
+	svc.guardDir = t.TempDir()
 	svc.arpFile = writeTempFile(t, "arp", lockoutArp)
 	svc.cmd = &MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {
 		if len(args) == 1 && args[0] == "dev" {

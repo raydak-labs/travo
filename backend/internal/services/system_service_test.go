@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
@@ -589,7 +591,7 @@ func TestUpgradeFirmware_RejectsForeignDevice(t *testing.T) {
 		t.Errorf("the error must name the image model, got %v", err)
 	}
 	assertNoSysupgradeCall(t, marker)
-	if _, err := os.Stat(filepath.Join(dir, firmwareUpgradeGuardName)); err == nil {
+	if _, err := os.Stat(guard.In(dir, firmwareUpgradeGuard).Path()); err == nil {
 		t.Error("a rejected image must not leave a crash guard: nothing was flashed")
 	}
 	assertNoStagedFirmware(t)
@@ -851,7 +853,7 @@ func TestUpgradeFirmware_WritesCrashGuard(t *testing.T) {
 		t.Fatalf("UpgradeFirmware: %v", err)
 	}
 	waitForSysupgradeCall(t, marker)
-	guard := filepath.Join(dir, firmwareUpgradeGuardName)
+	guard := guard.In(dir, firmwareUpgradeGuard).Path()
 	data, err := os.ReadFile(guard)
 	if err != nil {
 		t.Fatalf("expected a crash guard at %s: %v", guard, err)
@@ -935,7 +937,7 @@ func genuineBackupArchive(t *testing.T) []byte {
 // left in an unknown state.
 func TestRestoreBackup_WritesAndKeepsGuardOnFailure(t *testing.T) {
 	svc, dir := newGuardedSystemService(t)
-	guard := filepath.Join(dir, restoreGuardName)
+	guard := guard.In(dir, restoreGuard).Path()
 
 	// sysupgrade does not exist on the test host, so the restore fails; the
 	// guard must still be on disk afterwards.
@@ -1152,7 +1154,7 @@ func TestRestoreBackup_RejectsArchiveBeforeSysupgrade(t *testing.T) {
 		t.Errorf("error = %v, want ErrInvalidBackupArchive", err)
 	}
 	assertNoSysupgradeCall(t, marker)
-	if _, err := os.Stat(filepath.Join(dir, restoreGuardName)); err == nil {
+	if _, err := os.Stat(guard.In(dir, restoreGuard).Path()); err == nil {
 		t.Error("a rejected archive left a restore-in-progress guard behind")
 	}
 }
@@ -1175,7 +1177,7 @@ func TestFactoryReset_WritesCrashGuard(t *testing.T) {
 	if err := svc.FactoryReset(); err != nil {
 		t.Fatalf("FactoryReset: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, factoryResetGuardName)); err != nil {
+	if _, err := os.Stat(guard.In(dir, factoryResetGuard).Path()); err != nil {
 		t.Errorf("expected a crash guard for the factory reset: %v", err)
 	}
 }
@@ -1187,7 +1189,7 @@ func TestCommitSystemConfig_GuardLifecycle(t *testing.T) {
 	if err := svc.SetHostname("travel-router"); err != nil {
 		t.Fatalf("SetHostname: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, systemConfigGuardName)); !os.IsNotExist(err) {
+	if _, err := os.Stat(guard.In(dir, systemConfigGuard).Path()); !os.IsNotExist(err) {
 		t.Errorf("guard must be removed after a successful commit, stat err = %v", err)
 	}
 }
@@ -1471,7 +1473,7 @@ func TestUpgradeFirmware_RejectsSiblingVariantImage(t *testing.T) {
 		t.Errorf("error = %v, want ErrUnsupportedFirmware", err)
 	}
 	assertNoSysupgradeCall(t, marker)
-	if _, err := os.Stat(filepath.Join(dir, firmwareUpgradeGuardName)); err == nil {
+	if _, err := os.Stat(guard.In(dir, firmwareUpgradeGuard).Path()); err == nil {
 		t.Error("a rejected image must not leave a crash guard: nothing was flashed")
 	}
 	assertNoStagedFirmware(t)

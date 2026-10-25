@@ -1,10 +1,11 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"errors"
 	"net/url"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -268,21 +269,20 @@ const wwanLeaseStatus = `{"up":true,"ipv4-address":[{"address":"10.0.0.50","mask
 // shrinks the production sleeps so the bounce tests stay fast.
 func useTempBounceGuard(t *testing.T) string {
 	t.Helper()
-	origPath, origDown, origUp, origPoll := captiveWwanBounceGuardPath, captiveWwanDownSettle, captiveWwanUpSettle, captiveWwanPollInterval
-	path := filepath.Join(t.TempDir(), "captive-wwan-bounce-in-progress")
-	captiveWwanBounceGuardPath = path
+	origDown, origUp, origPoll := captiveWwanDownSettle, captiveWwanUpSettle, captiveWwanPollInterval
+	t.Cleanup(guard.SetDir(t.TempDir()))
+	path := guard.New("captive-wwan-bounce").Path()
 	captiveWwanDownSettle = time.Millisecond
 	captiveWwanUpSettle = 20 * time.Millisecond
 	captiveWwanPollInterval = time.Millisecond
 	t.Cleanup(func() {
-		captiveWwanBounceGuardPath = origPath
 		captiveWwanDownSettle, captiveWwanUpSettle, captiveWwanPollInterval = origDown, origUp, origPoll
 	})
 	return path
 }
 
 func newBounceCaptiveService(r CommandRunner) *CaptiveService {
-	return &CaptiveService{prober: &MockHTTPProber{}, cmd: r, guardFile: captiveDNSGuardFile}
+	return &CaptiveService{prober: &MockHTTPProber{}, cmd: r, dnsGuard: guard.New(captiveDNSGuardFeature)}
 }
 
 func TestUbusInterfaceDumpHasDefaultRoute(t *testing.T) {

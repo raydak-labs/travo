@@ -1,17 +1,12 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 )
-
-// captiveWwanBounceGuardPath is the crash guard for the wwan DHCP bounce. It is a
-// variable (not a constant) so tests can redirect it; production code must never
-// leave it set after a successful bounce (ADR 0003).
-var captiveWwanBounceGuardPath = crashGuardDir + "/captive-wwan-bounce-in-progress"
 
 // bounceActiveWwanDHCP renews the wwan DHCP lease, but only when wwan is the
 // active uplink. It is a live network mutation, so it writes a crash guard
@@ -28,7 +23,8 @@ func (c *CaptiveService) bounceActiveWwanDHCP() error {
 		// disturb an unrelated interface.
 		return nil
 	}
-	if err := writeCaptiveBounceGuard(captiveWwanBounceGuardPath); err != nil {
+	bounceGuard := guard.New("captive-wwan-bounce")
+	if err := bounceGuard.Mark(); err != nil {
 		return err
 	}
 	if _, err := c.cmd.Run(openwrtIfdownBin, "wwan"); err != nil {
@@ -41,7 +37,7 @@ func (c *CaptiveService) bounceActiveWwanDHCP() error {
 	if err := c.waitForWwanLease(captiveWwanUpSettle); err != nil {
 		return err
 	}
-	_ = os.Remove(captiveWwanBounceGuardPath)
+	_ = bounceGuard.Clear()
 	return nil
 }
 
@@ -121,15 +117,4 @@ func ubusInterfaceStatusHasAddress(out []byte) bool {
 	}
 	addrs, ok := raw["ipv4-address"].([]any)
 	return ok && len(addrs) > 0
-}
-
-// writeCaptiveBounceGuard creates the crash guard file for the wwan bounce.
-func writeCaptiveBounceGuard(path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
-		return fmt.Errorf("create wwan bounce guard dir: %w", err)
-	}
-	if err := os.WriteFile(path, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
-		return fmt.Errorf("write wwan bounce guard: %w", err)
-	}
-	return nil
 }

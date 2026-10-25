@@ -20,6 +20,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/api"
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/config"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/store"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -270,6 +271,8 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	if cfg.MockMode {
 		u = uci.NewMockUCI()
 		ub = ubus.NewMockUbus()
+		// Crash guards sit next to the other mock-mode state, never in /etc/trafo.
+		guard.SetDir(filepath.Join(filepath.Dir(cfg.AuthConfigPath), "guards"))
 	} else {
 		u = uci.NewRealUCI()
 		ub = ubus.NewRealUbus()

@@ -1,10 +1,9 @@
 package services
 
 import (
-	"errors"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
@@ -93,8 +92,8 @@ type ServiceManager struct {
 	// each other while leaving reads lock-free.
 	opMu             sync.Mutex
 	postInstallHooks map[string]func() error
-	// guardDir holds the crash-guard file for package installs (ADR 0003);
-	// empty means crashGuardDir (/etc/trafo). Tests point it at a temp dir.
+	// guardDir holds the package-install crash guard (ADR 0003); empty means
+	// guard.Dir().
 	guardDir string
 }
 
@@ -230,49 +229,14 @@ func (sm *ServiceManager) SetGuardDir(dir string) {
 	sm.guardDir = dir
 }
 
-// pkgInstallGuardFile is the crash guard for package installs. Installing a
-// package rewrites init scripts, /etc/config and kernel modules, so a power cut
-// mid-install leaves a half-configured system with no marker (ADR 0003).
-func (sm *ServiceManager) guardPath() string {
+// installGuard is the crash guard for package installs. Installing a package
+// rewrites init scripts, /etc/config and kernel modules, so a power cut
+// mid-install leaves a half-configured system (ADR 0003). It is created with
+// guard.Create: a guard left by an interrupted install is never retried over.
+func (sm *ServiceManager) installGuard() guard.Guard {
 	sm.mu.RLock()
-	dir := sm.guardDir
-	sm.mu.RUnlock()
-	if dir == "" {
-		dir = crashGuardDir
-	}
-	return filepath.Join(dir, "pkg-install-in-progress")
-}
-
-// writeInstallGuard records that a mutating package operation has started.
-//
-// It REFUSES when the guard already exists (ADR 0003 §1.2): a guard on disk
-// means a previous install or remove died part-way — init scripts rewritten,
-// the package database mid-update — and blindly retrying it is precisely what
-// the guard exists to prevent. The recovery path is deploy-local.sh or removing
-// the file by hand, both of which clear every guard listed in ADR 0003 §2.
-func (sm *ServiceManager) writeInstallGuard(reason string) error {
-	path := sm.guardPath()
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("pkg guard: %s exists from an interrupted install/remove; "+
-			"remove it or redeploy before retrying", path)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("pkg guard: stat %s: %w", path, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
-		return fmt.Errorf("pkg guard: mkdir: %w", err)
-	}
-	if err := os.WriteFile(path, []byte(reason+"\n"), 0600); err != nil {
-		return fmt.Errorf("pkg guard: write: %w", err)
-	}
-	return nil
-}
-
-// clearInstallGuard removes the guard after a fully successful operation.
-// clearInstallGuard removes the package-install crash guard. Best-effort by
-// design: the operation has already succeeded, and a stale guard only makes the
-// next install wait for a redeploy, so the removal error is deliberately dropped.
-func (sm *ServiceManager) clearInstallGuard() {
-	_ = os.Remove(sm.guardPath())
+	defer sm.mu.RUnlock()
+	return guard.In(sm.guardDir, "pkg-install")
 }
 
 // findDefUnlocked scans the immutable service catalog. sm.defs is assigned once
@@ -318,7 +282,7 @@ func (sm *ServiceManager) Install(serviceID string) error {
 	if err != nil {
 		return err
 	}
-	if err := sm.writeInstallGuard("install " + serviceID); err != nil {
+	if err := sm.installGuard().Create("install " + serviceID); err != nil {
 		return err
 	}
 	// Best-effort index refresh: a failure (e.g. offline) still leaves the
@@ -340,7 +304,7 @@ func (sm *ServiceManager) Install(serviceID string) error {
 			return fmt.Errorf("post-install configuration for %s failed: %w", serviceID, err)
 		}
 	}
-	sm.clearInstallGuard()
+	_ = sm.installGuard().Clear()
 	return nil
 }
 
@@ -353,7 +317,7 @@ func (sm *ServiceManager) Remove(serviceID string) error {
 	if err != nil {
 		return err
 	}
-	if err := sm.writeInstallGuard("remove " + serviceID); err != nil {
+	if err := sm.installGuard().Create("remove " + serviceID); err != nil {
 		return err
 	}
 	// Stop first if running
@@ -366,7 +330,7 @@ func (sm *ServiceManager) Remove(serviceID string) error {
 		}
 	}
 	sm.refreshOne(serviceID)
-	sm.clearInstallGuard()
+	_ = sm.installGuard().Clear()
 	return nil
 }
 
@@ -379,7 +343,7 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 	if err != nil {
 		return err
 	}
-	if err := sm.writeInstallGuard("install " + serviceID); err != nil {
+	if err := sm.installGuard().Create("install " + serviceID); err != nil {
 		logFn(fmt.Sprintf("Cannot start: %v", err))
 		return err
 	}
@@ -401,7 +365,7 @@ func (sm *ServiceManager) InstallWithLog(serviceID string, logFn func(string)) e
 		}
 		logFn("Post-install configuration complete.")
 	}
-	sm.clearInstallGuard()
+	_ = sm.installGuard().Clear()
 	return nil
 }
 
@@ -414,7 +378,7 @@ func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) er
 	if err != nil {
 		return err
 	}
-	if err := sm.writeInstallGuard("remove " + serviceID); err != nil {
+	if err := sm.installGuard().Create("remove " + serviceID); err != nil {
 		logFn(fmt.Sprintf("Cannot start: %v", err))
 		return err
 	}
@@ -430,7 +394,7 @@ func (sm *ServiceManager) RemoveWithLog(serviceID string, logFn func(string)) er
 		}
 	}
 	sm.refreshOne(serviceID)
-	sm.clearInstallGuard()
+	_ = sm.installGuard().Clear()
 	return nil
 }
 

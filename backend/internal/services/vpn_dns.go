@@ -9,9 +9,8 @@ import (
 // dnsmasqLayers returns this service's view of the shared stack.
 func (v *VpnService) dnsmasqLayers() *dnsmasqLayerStackFile {
 	return &dnsmasqLayerStackFile{
-		dns:        commandRunnerDNS{cmd: v.cmd},
-		path:       v.dnsStackPath,
-		legacyPath: v.legacyDnsSnapshotPath,
+		dns:  commandRunnerDNS{cmd: v.cmd},
+		path: v.dnsStackPath,
 	}
 }
 

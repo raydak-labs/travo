@@ -678,7 +678,7 @@ func TestInstallRefusesWhileAnInstallGuardExists(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected the retry to be refused while the guard exists")
 	}
-	if !strings.Contains(err.Error(), "interrupted install/remove") {
+	if !strings.Contains(err.Error(), "interrupted run (install tailscale)") {
 		t.Errorf("expected the refusal to name the interrupted operation, got %v", err)
 	}
 	if pkg.IsInstalled("tailscale") {

@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"fmt"
 	"os"
@@ -73,7 +75,7 @@ func (w *WifiService) SetAutoReconnect(enabled bool) error {
 // directory is therefore created first and the script exits non-zero when that
 // fails. Same shape as the toggle helper (wifi_toggle_script.go).
 const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networks\n# Managed by openwrt-travel-gui — do not edit manually\n\n" +
-	"GUARD_DIR=\"" + crashGuardDir + "\"\n" +
+	"GUARD_DIR=\"" + guard.DefaultDir + "\"\n" +
 	"GUARD=\"$GUARD_DIR/autoreconnect-crash-guard\"\n" +
 	"FAILCOUNT_FILE=\"$GUARD_DIR/autoreconnect-failcount\"\n" +
 	"MAX_FAIL=5\n\n" +

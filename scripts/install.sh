@@ -418,8 +418,7 @@ do_install() {
     # mid-mutation is exactly when a reinstall or upgrade follows. deploy-local.sh
     # already did this; the production install path did not, so a user following
     # the release notes had no way back. The authoritative list is in
-    # docs/adr/0003 section 2. /etc/travo is the legacy location (guards were
-    # unified on /etc/trafo), so both are cleared.
+    # docs/adr/0003 section 2.
     #
     # Two names are deliberately ABSENT, because ADR 0003 section 2 says they
     # must survive an install:
@@ -436,7 +435,7 @@ do_install() {
         # autoreconnect-failcount is deliberately NOT cleared either: it is the
         # bounded retry counter that stops a broken saved network being
         # replayed every minute.
-        rm -f "/etc/trafo/${_guard}" "/etc/travo/${_guard}" 2>/dev/null || true
+        rm -f "/etc/trafo/${_guard}" 2>/dev/null || true
     done
     success "Files installed"
 

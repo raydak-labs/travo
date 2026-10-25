@@ -1,12 +1,12 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"errors"
 	"fmt"
 	"log"
 	"math"
-	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -273,7 +273,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: crashGuardDir, arpFile: procNetARP,
+		arpFile: procNetARP,
 	}
 }
 
@@ -288,7 +288,7 @@ func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm)
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: crashGuardDir, arpFile: procNetARP,
+		arpFile: procNetARP,
 	}
 }
 
@@ -299,7 +299,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
 }
 
@@ -309,7 +309,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
 }
 
@@ -319,7 +319,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
 }
 
@@ -329,17 +329,8 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
-}
-
-// testGuardDir returns a private guard directory so tests never touch /etc/travo.
-func testGuardDir() string {
-	dir, err := os.MkdirTemp("", "travo-guard-*")
-	if err != nil {
-		return filepath.Join(os.TempDir(), "travo-guard")
-	}
-	return dir
 }
 
 // validateWirelessConsistency enforces invariants that, if violated, leave the router
@@ -666,71 +657,7 @@ func (w *WifiService) lockUCIWrite() func() {
 	return w.uciWriteMu.Unlock
 }
 
-// guardPath returns the crash-guard path for a feature inside the guard dir.
-func (w *WifiService) guardPath(feature string) string {
-	dir := w.guardDir
-	if dir == "" {
-		dir = crashGuardDir
-	}
-	return filepath.Join(dir, feature+"-in-progress")
-}
-
-// resolveGuardDir returns the guard directory to use, falling back to a temp
-// directory when the configured one is not writable (dev host, unit tests, or a
-// broken installation). The guard is never skipped: a missing durable marker is
-// exactly the case the operator has to hear about, so it is logged as an error.
-func (w *WifiService) resolveGuardDir() string {
-	dir := w.guardDir
-	if dir == "" {
-		dir = crashGuardDir
-	}
-	mkErr := os.MkdirAll(dir, 0o750)
-	if mkErr == nil {
-		return dir
-	}
-	fallback := filepath.Join(os.TempDir(), "travo-guards")
-	log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side power loss is NOT protected by a durable marker.", dir, mkErr, fallback)
-	_ = os.MkdirAll(fallback, 0o750)
-	return fallback
-}
-
-// writeCrashGuard creates /etc/travo/<feature>-in-progress before a dangerous
-// live-state change (ADR 0003). The marker is removed by the caller only after
-// the change completed successfully.
-func (w *WifiService) writeCrashGuard(feature string) error {
-	path := filepath.Join(w.resolveGuardDir(), feature+"-in-progress")
-	if err := os.WriteFile(path, []byte("travo: "+feature+" in progress\n"), 0o600); err != nil {
-		return fmt.Errorf("writing crash guard %s: %w", path, err)
-	}
-	return nil
-}
-
-// clearCrashGuard removes a crash guard after the operation succeeded.
-func (w *WifiService) clearCrashGuard(feature string) {
-	// Clear every directory the guard could have been written to. writeCrashGuard
-	// uses resolveGuardDir(), which falls back to a temp directory when the
-	// configured one is not writable; removing only the configured path left that
-	// fallback guard behind forever, and a stale guard means "skip".
-	// The configured dir is also removed on its own because the resolution can
-	// differ between the write and the clear (e.g. the directory became writable).
-	for _, dir := range w.guardDirs() {
-		if err := os.Remove(filepath.Join(dir, feature+"-in-progress")); err != nil && !os.IsNotExist(err) {
-			log.Printf("WARNING: removing crash guard %s/%s: %v", dir, feature, err)
-		}
-	}
-}
-
-// guardDirs returns the directories a crash guard for this service may live in,
-// most likely first: the resolved directory (configured dir, or the temp
-// fallback when it is not writable) and the configured directory itself.
-func (w *WifiService) guardDirs() []string {
-	configured := w.guardDir
-	if configured == "" {
-		configured = crashGuardDir
-	}
-	resolved := w.resolveGuardDir()
-	if resolved == configured {
-		return []string{configured}
-	}
-	return []string{resolved, configured}
+// crashGuard returns the guard for feature in the service's guard dir.
+func (w *WifiService) crashGuard(feature string) guard.Guard {
+	return guard.In(w.guardDir, feature)
 }

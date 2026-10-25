@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +23,6 @@ import (
 
 const (
 	failoverConfigPath       = "/etc/travo/failover.json"
-	failoverGuardPath        = crashGuardDir + "/failover-in-progress"
 	failoverBackupPath       = "/etc/travo/failover-mwan3-backup.json"
 	mwan3InitScriptPath      = "/etc/init.d/mwan3"
 	mwan3ConfigName          = "mwan3"
@@ -69,16 +70,16 @@ func (s *FailoverService) rollbackOrKeepGuard() {
 	rollbackPending := s.rollbackStillPending()
 	pendingSession := s.pendingApplySession
 	if err := s.restoreManagedSections(); err != nil {
-		log.Printf("failover: rollback failed, crash guard kept at %s: %v", s.guardPath, err)
+		log.Printf("failover: rollback failed, crash guard kept at %s: %v", s.crashGuard.Path(), err)
 		return
 	}
 	if rollbackPending {
 		log.Printf("failover: restored, but rpcd rollback %s was still armed; crash guard kept at %s",
-			pendingSession, s.guardPath)
+			pendingSession, s.crashGuard.Path())
 		return
 	}
-	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Printf("failover: remove crash guard %s: %v", s.guardPath, err)
+	if err := s.crashGuard.Clear(); err != nil {
+		log.Printf("failover: %v", err)
 	}
 }
 
@@ -100,7 +101,7 @@ type FailoverService struct {
 	applier    UCIApplyConfirm
 
 	configPath string
-	guardPath  string
+	crashGuard guard.Guard
 	backupPath string
 	initScript string
 	alertSvc   *AlertService
@@ -141,7 +142,7 @@ func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw 
 		cmd:         &RealCommandRunner{},
 		applier:     NewRealUCIApplyConfirm(ub, pw),
 		configPath:  failoverConfigPath,
-		guardPath:   failoverGuardPath,
+		crashGuard:  guard.New("failover"),
 		backupPath:  failoverBackupPath,
 		initScript:  mwan3InitScriptPath,
 		events:      make([]models.FailoverEvent, 0, 10),
@@ -158,7 +159,7 @@ func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkSe
 		cmd:         cmd,
 		applier:     applier,
 		configPath:  configPath,
-		guardPath:   filepath.Join(filepath.Dir(configPath), "failover-in-progress"),
+		crashGuard:  guard.In(filepath.Dir(configPath), "failover"),
 		backupPath:  filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
 		initScript:  mwan3InitScriptPath,
 		events:      make([]models.FailoverEvent, 0, 10),
@@ -178,12 +179,12 @@ func (s *FailoverService) Start() {
 	// A stuck guard disables failover with no other symptom, so say so once
 	// instead of silently skipping forever (band-switching logs the same case).
 	// ADR 0003 §1.2.
-	if _, err := os.Stat(s.guardPath); err == nil {
-		log.Printf("failover: crash guard found at %s — automatic switching is disabled; remove it or redeploy to re-enable", s.guardPath)
+	if s.crashGuard.Present() {
+		log.Printf("failover: crash guard found at %s — automatic switching is disabled; remove it or redeploy to re-enable", s.crashGuard.Path())
 	}
 
 	for {
-		if _, err := os.Stat(s.guardPath); err == nil {
+		if s.crashGuard.Present() {
 			select {
 			case <-ticker.C:
 				continue
@@ -272,8 +273,8 @@ func (s *FailoverService) setConfigLocked(cfg models.FailoverConfig) error {
 		// never started.
 		return err
 	}
-	if err := os.WriteFile(s.guardPath, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
-		return fmt.Errorf("write failover guard: %w", err)
+	if err := s.crashGuard.Mark(); err != nil {
+		return err
 	}
 	if err := s.applyManagedConfig(cfgFile); err != nil {
 		s.rollbackOrKeepGuard()
@@ -283,8 +284,8 @@ func (s *FailoverService) setConfigLocked(cfg models.FailoverConfig) error {
 		s.rollbackOrKeepGuard()
 		return err
 	}
-	if err := os.Remove(s.guardPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove failover guard: %w", err)
+	if err := s.crashGuard.Clear(); err != nil {
+		return err
 	}
 	return nil
 }

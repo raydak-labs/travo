@@ -1458,8 +1458,8 @@ func TestSetConfigConfigWriteFailureAppliesNothingAndLeavesNoGuard(t *testing.T)
 	if starts, confirms := applier.calls(); len(starts) != 0 || len(confirms) != 0 {
 		t.Errorf("no rpcd apply may happen for a change that never started: %v / %v", starts, confirms)
 	}
-	if _, err := os.Stat(svc.guardPath); err == nil {
-		t.Errorf("no crash guard may be written before the first mutation: %s", svc.guardPath)
+	if _, err := os.Stat(svc.crashGuard.Path()); err == nil {
+		t.Errorf("no crash guard may be written before the first mutation: %s", svc.crashGuard.Path())
 	}
 	if sections, _ := mockUCI.GetSections("mwan3"); len(sections) != 0 {
 		t.Errorf("mwan3 must be untouched when the save never started, got %v",
@@ -1739,7 +1739,7 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 	t.Parallel()
 
 	guardExists := func(svc *FailoverService) bool {
-		_, err := os.Stat(svc.guardPath)
+		_, err := os.Stat(svc.crashGuard.Path())
 		return err == nil
 	}
 	candidate := failoverTestConfig(models.FailoverCandidate{
@@ -1753,7 +1753,7 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 			t.Fatalf("SetConfig: %v", err)
 		}
 		if guardExists(svc) {
-			t.Errorf("a successful save must not leave %s behind", svc.guardPath)
+			t.Errorf("a successful save must not leave %s behind", svc.crashGuard.Path())
 		}
 	})
 
@@ -1796,14 +1796,14 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 		if err := svc.SetConfig(candidate); err != nil {
 			t.Fatalf("seed save: %v", err)
 		}
-		if err := os.WriteFile(svc.guardPath, []byte("marker"), 0o600); err != nil {
+		if err := os.WriteFile(svc.crashGuard.Path(), []byte("marker"), 0o600); err != nil {
 			t.Fatalf("seed guard: %v", err)
 		}
 
 		svc.rollbackOrKeepGuard()
 
 		if guardExists(svc) {
-			t.Errorf("a successful rollback must clear %s: the running config is known-good again", svc.guardPath)
+			t.Errorf("a successful rollback must clear %s: the running config is known-good again", svc.crashGuard.Path())
 		}
 	})
 
@@ -1826,7 +1826,7 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 		if armedSession == "" {
 			t.Fatal("an unconfirmed apply must stay recorded while its rollback window is open")
 		}
-		if err := os.WriteFile(svc.guardPath, []byte("marker"), 0o600); err != nil {
+		if err := os.WriteFile(svc.crashGuard.Path(), []byte("marker"), 0o600); err != nil {
 			t.Fatalf("seed guard: %v", err)
 		}
 
@@ -1852,7 +1852,7 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 			t.Fatal("expected the failed apply to be reported")
 		}
 		if !guardExists(svc) {
-			t.Errorf("a failed rollback must keep %s: the running config is unknown", svc.guardPath)
+			t.Errorf("a failed rollback must keep %s: the running config is unknown", svc.crashGuard.Path())
 		}
 	})
 }

@@ -221,7 +221,7 @@ func TestToggleWireguard_EnableField_BackwardCompat_TogglesOn(t *testing.T) {
 	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
 
-	body, _ := json.Marshal(map[string]bool{"enable": true})
+	body, _ := json.Marshal(map[string]bool{"enabled": true})
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/vpn/wireguard/toggle", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)

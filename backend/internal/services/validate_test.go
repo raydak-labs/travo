@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -420,7 +422,7 @@ func writeToggleScriptFixture(t *testing.T, ubusStub string) (binDir, calls, gua
 		}
 	}
 
-	script := strings.ReplaceAll(wirelessToggleScript, crashGuardDir, guardDir)
+	script := strings.ReplaceAll(wirelessToggleScript, guard.DefaultDir, guardDir)
 	script = strings.ReplaceAll(script, "RPCD_RUN_DIR=/var/run/rpcd", "RPCD_RUN_DIR="+filepath.Join(binDir, "run"))
 	script = strings.ReplaceAll(script, "RPCD_UCI_DIR=/etc/config", "RPCD_UCI_DIR="+filepath.Join(binDir, "config"))
 	script = strings.ReplaceAll(script, "RPCD_LOGIN_ARG_FILE="+rpcdLoginHelperPath, "RPCD_LOGIN_ARG_FILE="+rpcLoginArgPath(binDir))

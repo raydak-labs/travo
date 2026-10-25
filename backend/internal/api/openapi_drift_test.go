@@ -248,7 +248,7 @@ func TestOpenAPIResponseShapesMatchHandlers(t *testing.T) {
 			name:   "ChangePassword returns the replacement token",
 			method: "PUT", path: "/api/v1/auth/password",
 			body:     `{"current_password":"admin","new_password":"newpassword123"}`,
-			wantKeys: []string{"status", "token", "expires_at", "expires_in", "revoked_sessions"},
+			wantKeys: []string{"status", "token", "expires_in", "revoked_sessions"},
 		},
 		{
 			name:   "SetHostname reports reboot_required",

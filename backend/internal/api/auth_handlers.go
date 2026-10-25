@@ -24,7 +24,7 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
-		token, expiry, err := authSvc.Login(req.Password)
+		token, _, err := authSvc.Login(req.Password)
 		if err != nil {
 			// Record failed attempt
 			if rl != nil {
@@ -40,7 +40,6 @@ func LoginHandler(authSvc *auth.AuthService, rl *auth.RateLimiter) fiber.Handler
 
 		return c.JSON(models.LoginResponse{
 			Token:     token,
-			ExpiresAt: expiry.Format("2006-01-02T15:04:05Z"),
 			ExpiresIn: int64(authSvc.TokenTTL().Seconds()),
 		})
 	}
@@ -98,7 +97,6 @@ func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
 		return c.JSON(fiber.Map{
 			"status":           "ok",
 			"token":            res.Token,
-			"expires_at":       res.ExpiresAt.UTC().Format("2006-01-02T15:04:05Z"),
 			"expires_in":       int64(authSvc.TokenTTL().Seconds()),
 			"revoked_sessions": res.RevokedSessions,
 		})

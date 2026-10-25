@@ -31,7 +31,7 @@ func newDeviceLockoutService(t *testing.T, stations map[string]string) (
 	ub.RegisterResponse("network.interface.dump", deviceInterfaceDump(t))
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
 	svc := NewWifiServiceWithApplier(u, ub, applier)
-	svc.guardDir = testGuardDir()
+	svc.guardDir = t.TempDir()
 	svc.cmd = &MockCommandRunner{RunFunc: fakeIw(stations)}
 	svc.arpFile = writeTempFile(t, "arp", deviceNeighborTable(t))
 	return svc, u, applier

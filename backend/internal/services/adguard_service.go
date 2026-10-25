@@ -26,12 +26,6 @@ const (
 	adguardYAMLPathUCI     = "/etc/adguardhome/adguardhome.yaml"
 	adguardYAMLPathOpt     = "/opt/AdGuardHome/AdGuardHome.yaml"
 	adguardBundledTemplate = "/etc/travo/adguardhome.yaml"
-	// adguardDnsSnapshotPath is where releases before the shared dnsmasq layer
-	// stack wrote AdGuard's snapshot of dhcp.@dnsmasq[0].server/noresolv. It is
-	// read once as a migration source for the stack's base state and then
-	// removed: two files restoring the same two options is how the AdGuard and
-	// VPN paths ended up restoring over each other.
-	adguardDnsSnapshotPath = "/etc/trafo/adguard-dns-snapshot.json"
 )
 
 // AdGuardChecker abstracts filesystem/process checks for testability.

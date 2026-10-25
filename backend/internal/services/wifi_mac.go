@@ -98,14 +98,14 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 		}
 		// Crash guard first: from here on the sequence changes live state, and a
 		// crash mid-way must be recoverable on the next boot (ADR 0003).
-		if err := w.writeCrashGuard(macGuardFeature); err != nil {
+		if err := w.crashGuard(macGuardFeature).Write("travo: " + macGuardFeature + " in progress\n"); err != nil {
 			return nil, err
 		}
 		guardStays := true
 		defer func() {
 			if guardStays {
 				// The apply did not complete; leave the guard for recovery.
-				log.Printf("WARNING: %s MAC change incomplete, crash guard kept at %s", macGuardFeature, w.guardPath(macGuardFeature))
+				log.Printf("WARNING: %s MAC change incomplete, crash guard kept at %s", macGuardFeature, w.crashGuard(macGuardFeature).Path())
 			}
 		}()
 		if err := w.uci.Set("wireless", staSection, "macaddr", targetMAC); err != nil {
@@ -136,7 +136,9 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 			return nil, err
 		}
 		guardStays = false
-		w.clearCrashGuard(macGuardFeature)
+		if err := w.crashGuard(macGuardFeature).Clear(); err != nil {
+			log.Printf("WARNING: %v", err)
+		}
 		return apply, nil
 	})
 }

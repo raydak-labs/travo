@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,10 +23,6 @@ const (
 	defaultMinViableSignalDBm      = -80
 	bandSwitchCooldownSec          = 120
 )
-
-// bandSwitchGuardFile is a var, not a const, so tests can point the crash guard
-// at a temp directory instead of the real /etc/trafo.
-var bandSwitchGuardFile = crashGuardDir + "/band-switch-in-progress"
 
 // BandSwitchConfig holds user-configurable parameters for automatic band switching.
 type BandSwitchConfig struct {
@@ -72,6 +70,7 @@ type BandSwitchingService struct {
 	blockedRadio  string
 	stopCh        chan struct{}
 	stopOnce      sync.Once
+	crashGuard    guard.Guard
 }
 
 // NewBandSwitchingService creates a new BandSwitchingService.
@@ -82,6 +81,7 @@ func NewBandSwitchingService(wifi *WifiService, configFile string) *BandSwitchin
 		stopCh:     make(chan struct{}),
 		config:     defaultBandSwitchConfig(),
 		status:     BandSwitchStatus{State: "inactive"},
+		crashGuard: guard.New("band-switch"),
 	}
 	_ = svc.loadConfig()
 	return svc
@@ -184,8 +184,8 @@ func (b *BandSwitchingService) checkInterval() time.Duration {
 // Must be called once after service creation.
 func (b *BandSwitchingService) Start() {
 	// Safety: if a crash guard exists from a previous run, log and skip automatic switching.
-	if _, err := os.Stat(bandSwitchGuardFile); err == nil {
-		log.Printf("band-switching: crash guard found at %s — skipping auto switch; remove manually to re-enable", bandSwitchGuardFile)
+	if b.crashGuard.Present() {
+		log.Printf("band-switching: crash guard found at %s — skipping auto switch; remove manually to re-enable", b.crashGuard.Path())
 	}
 
 	go func() {
@@ -228,7 +228,7 @@ func (b *BandSwitchingService) Start() {
 				b.refreshBlocked()
 
 				// Safety: do not switch if crash guard is present.
-				if _, err := os.Stat(bandSwitchGuardFile); err == nil {
+				if b.crashGuard.Present() {
 					b.mu.Lock()
 					b.status.State = "inactive"
 					b.mu.Unlock()
@@ -447,11 +447,7 @@ func (b *BandSwitchingService) switchBlocked(targetRadio string) (bool, error) {
 }
 
 func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
-	// Write crash guard before touching wireless config.
-	if err := os.MkdirAll(filepath.Dir(bandSwitchGuardFile), 0750); err != nil {
-		return err
-	}
-	if err := os.WriteFile(bandSwitchGuardFile, []byte(reason), 0600); err != nil {
+	if err := b.crashGuard.Write(reason); err != nil {
 		return err
 	}
 
@@ -459,7 +455,7 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 
 	// Remove guard on success; on failure the guard remains to prevent retry loop.
 	if err == nil {
-		_ = os.Remove(bandSwitchGuardFile)
+		_ = b.crashGuard.Clear()
 		b.setBlocked("", "")
 		log.Printf("band-switching: %s", reason)
 		b.mu.Lock()
@@ -480,7 +476,7 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 		// AP on both radios), so what arrives here is a layout where no split
 		// is possible at all. Saying so is the difference between a feature the
 		// operator can see is stuck and one that silently never fires.
-		_ = os.Remove(bandSwitchGuardFile)
+		_ = b.crashGuard.Clear()
 		b.setBlocked(err.Error(), targetRadio)
 		log.Printf("band-switching: switch to %s blocked: %v — "+
 			"automatic band switching cannot make room on that radio", targetRadio, err)

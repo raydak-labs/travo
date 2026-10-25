@@ -219,7 +219,7 @@ func TestCaptivePortalStatusJSON(t *testing.T) {
 func TestLoginResponseJSON(t *testing.T) {
 	original := LoginResponse{
 		Token:     "jwt-token-here",
-		ExpiresAt: "2025-01-02T00:00:00Z",
+		ExpiresIn: 3600,
 	}
 
 	data, err := json.Marshal(original)
@@ -231,8 +231,8 @@ func TestLoginResponseJSON(t *testing.T) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("failed to unmarshal to map: %v", err)
 	}
-	if _, ok := raw["expires_at"]; !ok {
-		t.Error("expected JSON key 'expires_at' not found")
+	if _, ok := raw["expires_in"]; !ok {
+		t.Error("expected JSON key 'expires_in' not found")
 	}
 
 	var decoded LoginResponse

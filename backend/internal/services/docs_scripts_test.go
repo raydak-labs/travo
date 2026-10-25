@@ -161,7 +161,7 @@ func rmOperands(args []string) []string {
 }
 
 // isGuardPath reports whether p is a crash guard location. ADR 0003 keeps
-// /etc/trafo and legacy /etc/travo; a glob such as /etc/trafo/* counts too,
+// guards in /etc/trafo and state in /etc/travo; a glob such as /etc/trafo/* counts too,
 // since a wildcard over the directory still removes every guard in it.
 func isGuardPath(p string) bool {
 	for _, dir := range []string{"/etc/trafo/", "/etc/travo/"} {
@@ -417,21 +417,19 @@ func TestDeployLocalClearsExactlyTheADR0003GuardsOnSuccess(t *testing.T) {
 		"firmware-upgrade-in-progress": true,
 		"factory-reset-in-progress":    true,
 	}
-	for _, dir := range []string{"/etc/trafo", "/etc/travo"} {
-		for guard := range adrGuards {
-			path := dir + "/" + guard
-			if kept[guard] {
-				if cleared[path] {
-					t.Errorf("the recovery path clears %s, which ADR 0003 section 2 "+
-						"deliberately keeps", path)
-				}
-				continue
+	for guard := range adrGuards {
+		path := "/etc/trafo/" + guard
+		if kept[guard] {
+			if cleared[path] {
+				t.Errorf("the recovery path clears %s, which ADR 0003 section 2 "+
+					"deliberately keeps", path)
 			}
-			if !cleared[path] {
-				t.Errorf("the recovery path does not clear %s, so a stuck guard "+
-					"permanently disables the feature it protects (ADR 0003 section 2)",
-					path)
-			}
+			continue
+		}
+		if !cleared[path] {
+			t.Errorf("the recovery path does not clear %s, so a stuck guard "+
+				"permanently disables the feature it protects (ADR 0003 section 2)",
+				path)
 		}
 	}
 }

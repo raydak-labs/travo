@@ -1,6 +1,8 @@
 package api
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"fmt"
 	"io"
@@ -59,7 +61,7 @@ func TestCaptiveStatusGetDoesNotMutateState(t *testing.T) {
 	// 204 = internet reachable, which is exactly what used to trigger the
 	// auto-restore from the read path.
 	svc := services.NewCaptiveServiceWithGuard(&services.MockHTTPProber{StatusCode: 204},
-		uci.NewMockUCI(), runner, guardFile)
+		uci.NewMockUCI(), runner, guard.In(dir, "captive-dns"))
 	defer svc.Stop()
 
 	app := fiber.New()

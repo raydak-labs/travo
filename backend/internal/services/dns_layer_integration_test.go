@@ -1,7 +1,6 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,8 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -123,9 +122,8 @@ func newLayerTestVpn(t *testing.T, u uci.UCI, dev *fakeDevice, dir string) *VpnS
 		t.Fatalf("set wg0 dns: %v", err)
 	}
 	svc := NewVpnServiceWithRunner(u, dev)
-	svc.guardFile = ""
+	svc.crashGuard = guard.In(dir, "vpn")
 	svc.dnsStackPath = filepath.Join(dir, dnsmasqLayerStackFileName)
-	svc.legacyDnsSnapshotPath = filepath.Join(dir, "vpn-dns-snapshot.json")
 	return svc
 }
 
@@ -141,7 +139,7 @@ func newLayerTestCaptive(t *testing.T, u uci.UCI, dev *fakeDevice, dir string) *
 		prober:                 &MockHTTPProber{StatusCode: 204},
 		uci:                    u,
 		cmd:                    dev,
-		guardFile:              filepath.Join(dir, "captive-dns-in-progress"),
+		dnsGuard:               guard.In(dir, captiveDNSGuardFeature),
 		stopCh:                 make(chan struct{}),
 		dnsStackPath:           filepath.Join(dir, dnsmasqLayerStackFileName),
 		resolvConfAutoOverride: resolv,
@@ -300,58 +298,6 @@ func TestCaptiveRestoreKeepsOperatorResolversOnThePeerdnsBypassPath(t *testing.T
 	}
 }
 
-// A guard file written before the layer stack existed DOES carry the resolver
-// list it is responsible for restoring. That restore must still work, and the
-// staged delete it needs must be committed rather than left for the next
-// unrelated `uci commit dhcp` to flush.
-func TestPreStackGuardRestoresRecordedResolversAndCommits(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	dev := newFakeDevice()
-	dev.servers = []string{"10.1.2.3"}
-	dev.noresolv = "0"
-	u := uci.NewMockUCI()
-	captive := newLayerTestCaptive(t, u, dev, dir)
-
-	recorded := []string{"/corp.example.com/10.0.0.2", "192.0.2.53"}
-	data, err := json.Marshal(dnsBackup{
-		DnsmasqNoResolv: "0",
-		DnsmasqServers:  recorded,
-		Time:            time.Now().Unix(),
-	})
-	if err != nil {
-		t.Fatalf("marshal guard: %v", err)
-	}
-	if err := os.WriteFile(captive.guardFile, data, 0o600); err != nil {
-		t.Fatalf("write guard: %v", err)
-	}
-
-	if err := captive.RestoreDNS(); err != nil {
-		t.Fatalf("restore from a pre-stack guard: %v", err)
-	}
-	if servers, _ := dev.resolvers(t); !slices.Equal(servers, recorded) {
-		t.Errorf("dnsmasq = %v; want the recorded resolvers %v back", servers, recorded)
-	}
-
-	calls := dev.recordedCalls()
-	deleteAt, commitAt := -1, -1
-	for i, call := range calls {
-		if deleteAt < 0 && strings.HasPrefix(call, "uci delete dhcp.") {
-			deleteAt = i
-		}
-		if call == "uci commit dhcp" {
-			commitAt = i
-		}
-	}
-	if deleteAt < 0 || commitAt < 0 {
-		t.Fatalf("restore must replace the resolver list and commit it; calls = %v", calls)
-	}
-	if commitAt < deleteAt {
-		t.Errorf("the staged resolver delete was never committed; calls = %v", calls)
-	}
-}
-
 // An unreadable layer record is not an empty one. When the record that
 // describes who owns dnsmasq cannot be read, nothing may be written to
 // dnsmasq and the restore has to fail loudly with the guard file intact.
@@ -365,7 +311,7 @@ func TestCaptiveRestoreFailsClosedOnAnUnreadableLayerRecord(t *testing.T) {
 	u := uci.NewMockUCI()
 	captive := newLayerTestCaptive(t, u, dev, dir)
 
-	if err := os.WriteFile(captive.guardFile, []byte(`{"time":`), 0o600); err != nil {
+	if err := os.WriteFile(captive.dnsGuard.Path(), []byte(`{"time":`), 0o600); err != nil {
 		t.Fatalf("write guard: %v", err)
 	}
 	// A torn record: written, but not valid JSON.
@@ -379,7 +325,7 @@ func TestCaptiveRestoreFailsClosedOnAnUnreadableLayerRecord(t *testing.T) {
 	if servers, _ := dev.resolvers(t); !slices.Equal(servers, operatorServers) {
 		t.Errorf("dnsmasq = %v; an unreadable record must leave it untouched", servers)
 	}
-	if _, err := os.Stat(captive.guardFile); err != nil {
+	if _, err := os.Stat(captive.dnsGuard.Path()); err != nil {
 		t.Errorf("the guard file must survive a failed restore: %v", err)
 	}
 }
@@ -511,37 +457,6 @@ func TestLayerBaseIsRereadAfterTheHealLeftAnEmptyRecord(t *testing.T) {
 	}
 	if servers, _ := dev.resolvers(t); !slices.Equal(servers, []string{"192.0.2.53", "/corp.example.com/10.0.0.2"}) {
 		t.Errorf("dnsmasq = %v; want the operator's post-heal state, not the base recorded before it", servers)
-	}
-}
-
-// The record is the only restore target for the resolvers, so once it has
-// absorbed a pre-stack snapshot, every pre-stack snapshot has to go: two files
-// claiming the same restore target is the collision the stack removes. Only the
-// saving feature's own file used to be deleted, leaving the other's behind.
-func TestBothPreStackSnapshotsAreRemovedWithTheRecord(t *testing.T) {
-	dir := t.TempDir()
-	vpnSnap := filepath.Join(dir, "vpn-dns-snapshot.json")
-	agSnap := filepath.Join(dir, "adguard-dns-snapshot.json")
-	for _, p := range []string{vpnSnap, agSnap} {
-		if err := os.WriteFile(p, []byte(`{"noresolv":"0","servers":["192.0.2.53"]}`), 0o600); err != nil {
-			t.Fatalf("write %s: %v", p, err)
-		}
-	}
-	saved := slices.Clone(legacyDnsmasqSnapshotPaths)
-	legacyDnsmasqSnapshotPaths = []string{vpnSnap, agSnap}
-	defer func() { legacyDnsmasqSnapshotPaths = saved }()
-
-	dev := newFakeDevice()
-	u := uci.NewMockUCI()
-	vpn := newLayerTestVpn(t, u, dev, dir)
-	if err := vpn.ToggleWireguard(true); err != nil {
-		t.Fatalf("enable VPN: %v", err)
-	}
-
-	for _, p := range []string{vpnSnap, agSnap} {
-		if _, err := os.Stat(p); !os.IsNotExist(err) {
-			t.Errorf("%s must be removed once the shared record owns the base state", filepath.Base(p))
-		}
 	}
 }
 

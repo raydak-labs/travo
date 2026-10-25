@@ -171,9 +171,8 @@ func (k checkerDNS) removeFile(path string) error { return k.checker.RemoveFile(
 // dnsmasqLayers returns this service's view of the shared stack.
 func (s *AdGuardService) dnsmasqLayers() *dnsmasqLayerStackFile {
 	return &dnsmasqLayerStackFile{
-		dns:        checkerDNS{checker: s.checker},
-		path:       s.dnsStackPath,
-		legacyPath: adguardDnsSnapshotPath,
+		dns:  checkerDNS{checker: s.checker},
+		path: s.dnsStackPath,
 	}
 }
 

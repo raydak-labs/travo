@@ -1,14 +1,14 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -19,8 +19,9 @@ import (
 
 const captiveProbeURL = "http://connectivitycheck.gstatic.com/generate_204"
 
-// captiveDNSGuardFile stores original DNS config while bypass is active.
-const captiveDNSGuardFile = crashGuardDir + "/captive-dns-in-progress"
+// captiveDNSGuardFeature names the guard that stores the original DNS config
+// while the bypass is active.
+const captiveDNSGuardFeature = "captive-dns"
 
 // captiveDNSRestoreTimeout auto-restores DNS if bypass has been active too long.
 const captiveDNSRestoreTimeout = 5 * time.Minute
@@ -84,11 +85,11 @@ func (m *MockHTTPProber) Do(_ string) (int, string, string, error) {
 
 // CaptiveService checks for captive portal detection.
 type CaptiveService struct {
-	prober    HTTPProber
-	uci       uci.UCI
-	cmd       CommandRunner
-	mu        sync.Mutex
-	guardFile string
+	prober   HTTPProber
+	uci      uci.UCI
+	cmd      CommandRunner
+	mu       sync.Mutex
+	dnsGuard guard.Guard
 	// test overrides (empty in production)
 	adguardAPIBaseOverride string
 	resolvConfAutoOverride string
@@ -112,13 +113,12 @@ const resolvConfAuto = "/tmp/resolv.conf.d/resolv.conf.auto"
 
 // dnsBackup holds the original DNS settings for restoration.
 type dnsBackup struct {
-	// Legacy wan-level settings (kept for backward compat)
+	// wan-level DNS (the peerdns=0 blocking path)
 	PeerDNS string `json:"peerdns,omitempty"`
 	DNS     string `json:"dns,omitempty"`
-	// Dnsmasq-level settings (the actual blocking mechanism)
-	DnsmasqNoResolv      string   `json:"dnsmasq_noresolv,omitempty"`
-	DnsmasqServers       []string `json:"dnsmasq_servers,omitempty"`
-	DnsmasqRebindProtect string   `json:"dnsmasq_rebind_protection,omitempty"`
+	// dnsmasq-level settings (the noresolv blocking path)
+	DnsmasqNoResolv      string `json:"dnsmasq_noresolv,omitempty"`
+	DnsmasqRebindProtect string `json:"dnsmasq_rebind_protection,omitempty"`
 	// DnsmasqLayer records that this bypass pushed the `captive` layer onto the
 	// shared dnsmasq resolver stack, which makes the layer RECORD the owner of
 	// the pre-bypass resolver list. Without it a restore cannot tell a bypass
@@ -134,12 +134,12 @@ type dnsBackup struct {
 
 // NewCaptiveService creates a new CaptiveService with the given HTTP prober.
 func NewCaptiveService(prober HTTPProber) *CaptiveService {
-	return &CaptiveService{prober: prober, guardFile: captiveDNSGuardFile, stopCh: make(chan struct{})}
+	return &CaptiveService{prober: prober, dnsGuard: guard.New(captiveDNSGuardFeature), stopCh: make(chan struct{})}
 }
 
 // NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
 func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *CaptiveService {
-	svc := newCaptiveServiceWithGuard(prober, u, cmd, captiveDNSGuardFile)
+	svc := newCaptiveServiceWithGuard(prober, u, cmd, guard.New(captiveDNSGuardFeature))
 	// Auto-restore stale bypass on startup. Tracked by the app lifecycle: Stop()
 	// must be able to keep this goroutine from restoring DNS after the process
 	// has begun shutting down.
@@ -152,16 +152,13 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 }
 
 // NewCaptiveServiceWithGuard is NewCaptiveServiceWithUCI with the bypass state
-// in an explicit file. The guard file is what marks a bypass active, so a test
-// outside this package cannot exercise the restore path at all without choosing
-// where that state lives — and on a development machine the production path is
-// not writable.
-func NewCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, guardFile string) *CaptiveService {
-	return newCaptiveServiceWithGuard(prober, u, cmd, guardFile)
+// in an explicit guard and without the startup auto-restore.
+func NewCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, g guard.Guard) *CaptiveService {
+	return newCaptiveServiceWithGuard(prober, u, cmd, g)
 }
 
-func newCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, guardFile string) *CaptiveService {
-	return &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: guardFile, stopCh: make(chan struct{})}
+func newCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, g guard.Guard) *CaptiveService {
+	return &CaptiveService{prober: prober, uci: u, cmd: cmd, dnsGuard: g, stopCh: make(chan struct{})}
 }
 
 // Stop cancels the startup auto-restore goroutine and waits for it to finish.
@@ -278,8 +275,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 
 // IsDNSBypassed returns true if DNS bypass is currently active.
 func (c *CaptiveService) IsDNSBypassed() bool {
-	_, err := os.Stat(c.guardFile)
-	return err == nil
+	return c.dnsGuard.Present()
 }
 
 // BypassDNS temporarily switches DNS to the DHCP-provided gateway DNS so the
@@ -296,7 +292,7 @@ func (c *CaptiveService) BypassDNS() error {
 		}
 
 		// Already bypassed?
-		if _, err := os.Stat(c.guardFile); err == nil {
+		if c.dnsGuard.Present() {
 			return nil
 		}
 
@@ -354,7 +350,7 @@ func (c *CaptiveService) BypassDNS() error {
 		if err != nil {
 			return err
 		}
-		if err := c.writeGuardFile(data); err != nil {
+		if err := c.dnsGuard.Write(string(data)); err != nil {
 			return err
 		}
 
@@ -380,7 +376,7 @@ func (c *CaptiveService) BypassDNS() error {
 		if noresolv == "1" {
 			if rebindProtect == "1" {
 				if err := c.setDnsmasqOption("rebind_protection", "0"); err != nil {
-					_ = os.Remove(c.guardFile)
+					_ = c.dnsGuard.Clear()
 					return err
 				}
 			}
@@ -389,7 +385,7 @@ func (c *CaptiveService) BypassDNS() error {
 					_ = c.setDnsmasqOption("rebind_protection", "1")
 					c.commitDhcp()
 				}
-				_ = os.Remove(c.guardFile)
+				_ = c.dnsGuard.Clear()
 				return err
 			}
 			backup.DnsmasqLayer = true
@@ -401,16 +397,16 @@ func (c *CaptiveService) BypassDNS() error {
 			// while the hotel resolver is still in force.
 			if err := c.rewriteGuard(backup); err != nil {
 				_, _ = c.dnsmasqLayers().RemoveLayer(dnsLayerCaptive, false)
-				_ = os.Remove(c.guardFile)
+				_ = c.dnsGuard.Clear()
 				return err
 			}
 		} else if rebindProtect == "1" {
 			if err := c.setDnsmasqOption("rebind_protection", "0"); err != nil {
-				_ = os.Remove(c.guardFile)
+				_ = c.dnsGuard.Clear()
 				return err
 			}
 			if err := c.commitDhcp(); err != nil {
-				_ = os.Remove(c.guardFile)
+				_ = c.dnsGuard.Clear()
 				return err
 			}
 			if c.cmd != nil {
@@ -459,7 +455,7 @@ func (c *CaptiveService) rewriteGuard(backup dnsBackup) error {
 	if err != nil {
 		return err
 	}
-	return c.writeGuardFile(data)
+	return c.dnsGuard.Write(string(data))
 }
 
 // RestoreDNS restores the original DNS config from the guard file.
@@ -477,7 +473,7 @@ func (c *CaptiveService) RestoreDNS() error {
 			return nil
 		}
 
-		data, err := os.ReadFile(c.guardFile)
+		data, err := c.dnsGuard.Read()
 		if err != nil {
 			return nil // no guard file = nothing to restore
 		}
@@ -485,7 +481,7 @@ func (c *CaptiveService) RestoreDNS() error {
 		var backup dnsBackup
 		if err := json.Unmarshal(data, &backup); err != nil {
 			// Keep the file: it is the only copy of the pre-bypass state.
-			return fmt.Errorf("captive: guard file %s is unreadable, DNS not restored (remove it manually once recovered): %w", c.guardFile, err)
+			return fmt.Errorf("captive: guard file %s is unreadable, DNS not restored (remove it manually once recovered): %w", c.dnsGuard.Path(), err)
 		}
 
 		var errs []error
@@ -509,24 +505,12 @@ func (c *CaptiveService) RestoreDNS() error {
 			// rather than write over an owner it cannot see.
 			fail("reading the dnsmasq layer record: %w", errors.Join(layerErr, stackedErr))
 		case !applied && !stacked:
-			// A guard file written before the stack existed (ADR 0001 §3.2): no
-			// layer record to pop, and the dnsmasq fields it actually carries are
-			// the only record of what to put back. With another layer stacked the
-			// bypass was never recorded there either, and applying these values
-			// would overwrite the layer that owns dnsmasq now.
-			//
-			// Every action below is gated on the field being present: the guard
-			// may describe a bypass (wan peerdns, AdGuard upstreams) that never
-			// touched dnsmasq's resolver list, and deleting a list it does not
-			// hold can never be undone.
-			if c.bypassOwnedResolvers(backup) && backup.DnsmasqServers == nil {
-				// The bypass pushed the hotel resolver onto the stack, the record
-				// that owned the pre-bypass list is gone, and the guard never held
-				// the list. dnsmasq is therefore still forwarding to the hotel
-				// resolver and nothing here can prove it is not. Writing only
-				// noresolv would leave all DNS pointed at the portal's resolver
-				// and then report success, so refuse: leave dnsmasq alone, keep the
-				// guard for retry, and let the operator see it (ADR 0001 §4).
+			// No layer record to pop. Either the bypass never owned the
+			// resolver list (wan peerdns, AdGuard upstreams), or it did and the
+			// record is gone, in which case dnsmasq still forwards to the hotel
+			// resolver and nothing here can say what to put back: refuse, keep
+			// the guard for retry, and let the operator see it (ADR 0001 §4).
+			if c.bypassOwnedResolvers(backup) {
 				fail("the dnsmasq layer record %s is gone, so the pre-bypass resolvers are unknown; "+
 					"the captive bypass is still in force and dnsmasq was left untouched", layers.path)
 				break
@@ -536,21 +520,6 @@ func (c *CaptiveService) RestoreDNS() error {
 					fail("restoring dnsmasq noresolv: %w", err)
 				}
 				needsDhcpCommit = true
-			}
-			if backup.DnsmasqServers != nil {
-				if err := c.deleteDnsmasqOption("server"); err != nil {
-					fail("clearing dnsmasq server list: %w", err)
-				}
-				// A staged `uci delete` that is never committed is a landmine: the
-				// next unrelated writer of dhcp (a VPN toggle, an AdGuard apply)
-				// flushes it and the operator's resolvers vanish with no error.
-				needsDhcpCommit = true
-				for _, srv := range backup.DnsmasqServers {
-					if err := c.addDnsmasqListItem("server", srv); err != nil {
-						fail("restoring dnsmasq server %s: %w", srv, err)
-					}
-					needsDhcpCommit = true
-				}
 			}
 		}
 		if backup.DnsmasqRebindProtect == "1" {
@@ -600,11 +569,11 @@ func (c *CaptiveService) RestoreDNS() error {
 
 		if len(errs) > 0 {
 			return fmt.Errorf("captive: DNS restore incomplete (%d step(s) failed); %s kept for retry: %w",
-				len(errs), c.guardFile, errors.Join(errs...))
+				len(errs), c.dnsGuard.Path(), errors.Join(errs...))
 		}
 
-		if err := os.Remove(c.guardFile); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("captive: DNS restored but could not remove %s: %w", c.guardFile, err)
+		if err := c.dnsGuard.Clear(); err != nil {
+			return fmt.Errorf("captive: DNS restored but could not remove %s: %w", c.dnsGuard.Path(), err)
 		}
 
 		log.Printf("captive: DNS restored")
@@ -612,46 +581,10 @@ func (c *CaptiveService) RestoreDNS() error {
 	})
 }
 
-// writeGuardFile writes the DNS backup atomically (temp file + rename).
-// BypassDNS/RestoreDNS and refreshBypassTimestamp all target the same file
-// under c.mu; a truncating O_TRUNC-style write would let a concurrent reader
-// observe a half-written JSON document, which fails to unmarshal and used to
-// delete the only record of the pre-bypass state.
-func (c *CaptiveService) writeGuardFile(data []byte) error {
-	dir := filepath.Dir(c.guardFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, filepath.Base(c.guardFile)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }() // no-op after a successful rename
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Chmod(tmpName, 0600); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, c.guardFile)
-}
-
 // bypassOwnedResolvers reports whether this guard describes a bypass that put
-// dnsmasq's resolver list under its own control — i.e. one that pushed the
-// `captive` layer and therefore handed ownership of the list to the layer
-// record. A guard written before the stack existed carries no flag, so a
-// recorded noresolv=1 with no recorded list is the same shape and is treated
-// the same way: conservatively, as a bypass whose resolvers are unaccounted
-// for.
+// dnsmasq's resolver list under the `captive` layer. noresolv=1 without the
+// flag is the crash window between writing the guard and pushing the layer,
+// and is treated the same way.
 func (c *CaptiveService) bypassOwnedResolvers(backup dnsBackup) bool {
 	return backup.DnsmasqLayer || backup.DnsmasqNoResolv == "1"
 }
@@ -672,7 +605,7 @@ func (c *CaptiveService) autoRestoreStaleBypass() {
 	case <-c.stopCh:
 		return
 	}
-	data, err := os.ReadFile(c.guardFile)
+	data, err := c.dnsGuard.Read()
 	if err != nil {
 		return
 	}
@@ -680,7 +613,7 @@ func (c *CaptiveService) autoRestoreStaleBypass() {
 	if err := json.Unmarshal(data, &backup); err != nil {
 		// A corrupt guard file is the only record of the pre-bypass DNS config.
 		// Keep it (ADR 0003) instead of deleting it, and let an operator decide.
-		log.Printf("captive: guard file %s is unreadable (%v); leaving it in place for manual recovery", c.guardFile, err)
+		log.Printf("captive: guard file %s is unreadable (%v); leaving it in place for manual recovery", c.dnsGuard.Path(), err)
 		return
 	}
 	age := time.Since(time.Unix(backup.Time, 0))
@@ -698,13 +631,13 @@ func (c *CaptiveService) refreshBypassTimestamp() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	data, err := os.ReadFile(c.guardFile)
+	data, err := c.dnsGuard.Read()
 	if err != nil {
 		return
 	}
 	var backup dnsBackup
 	if err := json.Unmarshal(data, &backup); err != nil {
-		log.Printf("captive: cannot refresh bypass timestamp: %s unreadable: %v", c.guardFile, err)
+		log.Printf("captive: cannot refresh bypass timestamp: %s unreadable: %v", c.dnsGuard.Path(), err)
 		return
 	}
 	backup.Time = time.Now().Unix()
@@ -712,7 +645,7 @@ func (c *CaptiveService) refreshBypassTimestamp() {
 	if err != nil {
 		return
 	}
-	if err := c.writeGuardFile(newData); err != nil {
+	if err := c.dnsGuard.Write(string(newData)); err != nil {
 		log.Printf("captive: cannot refresh bypass timestamp: %v", err)
 	}
 }

@@ -27,8 +27,6 @@ func newTestWifiService() (*WifiService, *uci.MockUCI) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	svc := NewWifiServiceWithReloader(u, ub, &NoopWifiReloader{})
-	// Never let a test write crash guards to the real /etc/travo.
-	svc.guardDir = testGuardDir()
 	return svc, u
 }
 
@@ -2896,7 +2894,7 @@ func repeaterModeService(t *testing.T, allowAPOnSTA bool) (*WifiService, *revert
 	t.Helper()
 	u := &revertingUCI{MockUCI: uci.NewMockUCI()}
 	svc := NewWifiServiceWithReloader(u, ubus.NewMockUbus(), &NoopWifiReloader{})
-	svc.guardDir = testGuardDir()
+	svc.guardDir = t.TempDir()
 	svc.repeaterOptionsFile = filepath.Join(t.TempDir(), "repeater-options.json")
 	opts, err := json.Marshal(models.RepeaterOptions{AllowAPOnSTARadio: allowAPOnSTA})
 	if err != nil {
@@ -4691,7 +4689,7 @@ func newRollbackTestService(t *testing.T) (*WifiService, *RealUCIApplyConfirm, s
 	applier.etcConfigDir = etcDir
 	applier.rpcdRunDir = filepath.Join(t.TempDir(), "rpcd")
 	svc := NewWifiServiceWithApplier(u, fu, applier)
-	svc.guardDir = testGuardDir()
+	svc.guardDir = t.TempDir()
 	return svc, applier, cfg
 }
 

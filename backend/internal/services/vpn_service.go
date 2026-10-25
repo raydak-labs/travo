@@ -1,11 +1,12 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"errors"
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,23 +16,13 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-// CommandRunner abstracts command execution for testability.
 // VpnService provides VPN status and configuration.
 type VpnService struct {
 	uci          uci.UCI
 	cmd          CommandRunner
 	profilesPath string // Path to wireguard_profiles.json
-	// guardFile is the crash guard path for VPN live-state changes. Empty
-	// disables the guard (only the production constructor sets it).
-	guardFile string
-	// dnsStackPath and legacyDnsSnapshotPath are fields rather than bare
-	// constants so the layer-stack lifecycle can be exercised against a temp
-	// dir instead of /etc/trafo.
+	crashGuard   guard.Guard
 	dnsStackPath string
-	// legacyDnsSnapshotPath is the per-feature snapshot this service wrote
-	// before the shared dnsmasq layer stack existed. Read-only: it is consumed
-	// once as a migration source for the base state and then removed.
-	legacyDnsSnapshotPath string
 
 	// dnsHealMu guards the self-heal debounce below. GET /vpn/status is polled
 	// by several pages at once, so the counters are shared.
@@ -43,42 +34,36 @@ type VpnService struct {
 	dnsHealSince  time.Time
 }
 
-// legacyVpnDnsSnapshotPath is where releases before the guard-directory
-// unification wrote the per-feature snapshot. It is now only read, as a
-// migration source for the shared dnsmasq layer stack.
-const legacyVpnDnsSnapshotPath = "/etc/travo/vpn-dns-snapshot.json"
-
 // NewVpnService creates a new VpnService with a real command runner.
 func NewVpnService(u uci.UCI) *VpnService {
 	return &VpnService{
-		uci:                   u,
-		cmd:                   &RealCommandRunner{},
-		profilesPath:          "/etc/travo/wireguard_profiles.json",
-		guardFile:             vpnGuardPath,
-		dnsStackPath:          dnsmasqLayerStackPath,
-		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+		uci:          u,
+		cmd:          &RealCommandRunner{},
+		profilesPath: "/etc/travo/wireguard_profiles.json",
+		crashGuard:   guard.New("vpn"),
+		dnsStackPath: dnsmasqLayerStackPath,
 	}
 }
 
 // NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
 func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
 	return &VpnService{
-		uci:                   u,
-		cmd:                   cmd,
-		profilesPath:          "/etc/travo/wireguard_profiles.json",
-		dnsStackPath:          dnsmasqLayerStackPath,
-		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+		uci:          u,
+		cmd:          cmd,
+		profilesPath: "/etc/travo/wireguard_profiles.json",
+		crashGuard:   guard.New("vpn"),
+		dnsStackPath: dnsmasqLayerStackPath,
 	}
 }
 
 // NewVpnServiceWithProfilesPath creates a VpnService with a custom profiles path (for tests).
 func NewVpnServiceWithProfilesPath(u uci.UCI, cmd CommandRunner, profilesPath string) *VpnService {
 	return &VpnService{
-		uci:                   u,
-		cmd:                   cmd,
-		profilesPath:          profilesPath,
-		dnsStackPath:          dnsmasqLayerStackPath,
-		legacyDnsSnapshotPath: legacyVpnDnsSnapshotPath,
+		uci:          u,
+		cmd:          cmd,
+		profilesPath: profilesPath,
+		crashGuard:   guard.New("vpn"),
+		dnsStackPath: dnsmasqLayerStackPath,
 	}
 }
 
@@ -93,33 +78,6 @@ const (
 	wireGuardRetrySettle  = 400 * time.Millisecond
 )
 
-// vpnGuardPath is the crash guard for VPN live-state changes (ADR 0003). It is
-// set by the production constructor; test constructors leave it empty, which
-// disables the guard for tests.
-const vpnGuardPath = crashGuardDir + "/vpn-in-progress"
-
-// writeVpnGuard creates the VPN crash guard before touching live state.
-func (v *VpnService) writeVpnGuard() error {
-	if v.guardFile == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(v.guardFile), 0750); err != nil {
-		return fmt.Errorf("create vpn guard dir: %w", err)
-	}
-	if err := os.WriteFile(v.guardFile, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
-		return fmt.Errorf("write vpn guard: %w", err)
-	}
-	return nil
-}
-
-// clearVpnGuard removes the crash guard after the operation completed.
-func (v *VpnService) clearVpnGuard() {
-	if v.guardFile == "" {
-		return
-	}
-	_ = os.Remove(v.guardFile)
-}
-
 func (v *VpnService) enableWireguard() error {
 	if err := v.ensureWireGuardInterface(); err != nil {
 		return fmt.Errorf("normalizing wg0 interface: %w", err)
@@ -131,15 +89,15 @@ func (v *VpnService) enableWireguard() error {
 		return err
 	}
 	prevDisabled, _ := v.uci.Get("network", "wg0", "disabled")
-	if err := v.writeVpnGuard(); err != nil {
+	if err := v.crashGuard.Mark(); err != nil {
 		return err
 	}
 	if err := v.uci.Set("network", "wg0", "disabled", "0"); err != nil {
-		v.clearVpnGuard()
+		_ = v.crashGuard.Clear()
 		return err
 	}
 	if err := v.uci.Commit("network"); err != nil {
-		v.clearVpnGuard()
+		_ = v.crashGuard.Clear()
 		return err
 	}
 
@@ -148,9 +106,9 @@ func (v *VpnService) enableWireguard() error {
 		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
 			// The device is in an unknown state: keep the crash guard so no
 			// other flow mutates it before a human looks.
-			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w (rollback incomplete, crash guard %s kept: %v)", err, v.guardFile, rbErr)
+			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w (rollback incomplete, crash guard %s kept: %v)", err, v.crashGuard.Path(), rbErr)
 		}
-		v.clearVpnGuard()
+		_ = v.crashGuard.Clear()
 		return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 	}
 
@@ -162,9 +120,9 @@ func (v *VpnService) enableWireguard() error {
 
 	if err := v.setupWireGuardFirewall(); err != nil {
 		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
-			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %v)", err, v.guardFile, rbErr)
+			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %v)", err, v.crashGuard.Path(), rbErr)
 		}
-		v.clearVpnGuard()
+		_ = v.crashGuard.Clear()
 		return fmt.Errorf("setting up WireGuard firewall: %w", err)
 	}
 
@@ -175,7 +133,7 @@ func (v *VpnService) enableWireguard() error {
 		// down a working VPN over a DNS bookkeeping problem. Record it.
 		log.Printf("vpn: tunnel up but LAN DNS left unchanged: %v", err)
 	}
-	v.clearVpnGuard()
+	_ = v.crashGuard.Clear()
 	return nil
 }
 
@@ -206,7 +164,7 @@ func (v *VpnService) disableWireguard() error {
 	// resort). That is live state, so it needs the crash guard exactly like the
 	// enable path (ADR 0003). It used to be written only by enableWireguard, so
 	// an interrupted bounce left the uplink down with no marker at all.
-	if err := v.writeVpnGuard(); err != nil {
+	if err := v.crashGuard.Mark(); err != nil {
 		return err
 	}
 	// Every exit path tears the wg0 firewall plumbing down. Returning early on
@@ -224,7 +182,7 @@ func (v *VpnService) disableWireguard() error {
 			log.Printf("vpn: tearing down WireGuard firewall: %v", err)
 		}
 		if routeConfirmed {
-			v.clearVpnGuard()
+			_ = v.crashGuard.Clear()
 		}
 	}()
 
