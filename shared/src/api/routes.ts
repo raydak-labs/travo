@@ -47,6 +47,9 @@ export const API_ROUTES = {
     speedtestServiceRun: '/api/v1/system/speedtest-service/run',
     buttons: '/api/v1/system/buttons',
     buttonActions: '/api/v1/system/button-actions',
+    updates: '/api/v1/system/updates',
+    checkUpdates: '/api/v1/system/updates/check',
+    upgradePackagesStream: '/api/v1/system/updates/packages/upgrade',
   },
   network: {
     status: '/api/v1/network/status',

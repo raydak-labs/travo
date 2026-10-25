@@ -9,6 +9,8 @@ import { SidebarNavGroup } from '@/components/layout/sidebar-nav-group';
 import { useSidebarGroups } from '@/components/layout/use-sidebar-groups';
 import { useServices } from '@/hooks/use-services';
 import { useSpeedtestServiceStatus } from '@/hooks/use-speedtest';
+import { useUpdates } from '@/hooks/use-updates';
+import { summarizeUpdates } from '@/lib/updates';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,6 +27,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
   const { groupOpen, setGroup } = useSidebarGroups(pathname);
   const servicesQuery = useServices();
   const speedtestQuery = useSpeedtestServiceStatus();
+  const updates = summarizeUpdates(useUpdates().data);
   const services = servicesQuery.data;
   const hasService = (id: string) =>
     services?.some((service) => service.id === id && service.state !== 'not_installed') ?? false;
@@ -139,6 +142,11 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
                   open={groupOpen[entry.id] ?? false}
                   onOpenChange={(o) => setGroup(entry.id, o)}
                   onNavClick={onNavClick}
+                  indicator={
+                    entry.id === 'system' && updates.any
+                      ? `Updates available: ${updates.label}`
+                      : undefined
+                  }
                 />
               );
             })}

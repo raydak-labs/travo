@@ -68,7 +68,7 @@ does not exist for that feature.
 | `/etc/trafo/firmware-upgrade-in-progress` | `SystemService` firmware upgrade | `sysupgrade`; **never removed**, so an interrupted flash stays discoverable |
 | `/etc/trafo/factory-reset-in-progress` | `SystemService.FactoryReset` | `firstboot -y && reboot`; never removed, the device reboots first |
 | `/etc/trafo/system-config-in-progress` | `SystemService` system config commit | committing `/etc/config/system`; the commit, not an apply |
-| `/etc/trafo/pkg-install-in-progress` | `ServiceManager` install/remove | package operations that rewrite init scripts, `/etc/config` and modules |
+| `/etc/trafo/pkg-install-in-progress` | `ServiceManager` install/remove, `UpdateService.Upgrade` | package operations that rewrite init scripts, `/etc/config` and modules |
 | `/etc/trafo/autoreconnect-crash-guard` | generated script `reconnectScriptContent` | the bounded `wifi up` in auto-reconnect |
 | `/etc/trafo/autoreconnect-failcount` | same script | **not a guard**: the `MAX_FAIL=5` retry counter; never cleared by a redeploy |
 

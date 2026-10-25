@@ -7,7 +7,7 @@ vi.mock('@/lib/api-client', () => ({
   streamRequest,
 }));
 
-import { useInstallLogStream } from '../use-install-log-stream';
+import { useStreamLog } from '../use-stream-log';
 
 type StreamEventLike = { type: string; data?: string };
 type Call = {
@@ -33,11 +33,10 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function opts(overrides: Partial<Parameters<typeof useInstallLogStream>[0]> = {}) {
+function opts(overrides: Partial<Parameters<typeof useStreamLog>[0]> = {}) {
   return {
     open: true,
-    serviceId: 'tailscale',
-    action: 'install' as const,
+    route: '/api/v1/services/tailscale/install/stream',
     onComplete: vi.fn(),
     onOpenChange: vi.fn(),
     ...overrides,
@@ -49,12 +48,11 @@ beforeEach(() => {
   streamRequest.mockReturnValue(deferred().promise);
 });
 
-describe('useInstallLogStream', () => {
+describe('useStreamLog', () => {
   it('aborts the in-flight request when the dialog closes', async () => {
-    const { rerender } = renderHook(
-      ({ open }: { open: boolean }) => useInstallLogStream(opts({ open })),
-      { initialProps: { open: true } },
-    );
+    const { rerender } = renderHook(({ open }: { open: boolean }) => useStreamLog(opts({ open })), {
+      initialProps: { open: true },
+    });
 
     await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(1));
     const call = lastCall();
@@ -66,7 +64,7 @@ describe('useInstallLogStream', () => {
   });
 
   it('aborts on unmount', async () => {
-    const { unmount } = renderHook(() => useInstallLogStream(opts()));
+    const { unmount } = renderHook(() => useStreamLog(opts()));
     await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(1));
     const call = lastCall();
 
@@ -75,10 +73,9 @@ describe('useInstallLogStream', () => {
   });
 
   it('drops the previous stream when the dialog is reopened', async () => {
-    const { rerender } = renderHook(
-      ({ open }: { open: boolean }) => useInstallLogStream(opts({ open })),
-      { initialProps: { open: true } },
-    );
+    const { rerender } = renderHook(({ open }: { open: boolean }) => useStreamLog(opts({ open })), {
+      initialProps: { open: true },
+    });
 
     await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(1));
     const first = lastCall();
@@ -96,7 +93,7 @@ describe('useInstallLogStream', () => {
   it('shows an error line for a failed stream', async () => {
     const d = deferred();
     streamRequest.mockReturnValue(d.promise);
-    const { result } = renderHook(() => useInstallLogStream(opts()));
+    const { result } = renderHook(() => useStreamLog(opts()));
 
     await waitFor(() => expect(streamRequest).toHaveBeenCalledTimes(1));
     await act(async () => {
@@ -112,7 +109,7 @@ describe('useInstallLogStream', () => {
     const d = deferred();
     streamRequest.mockReturnValue(d.promise);
     const { result, rerender } = renderHook(
-      ({ open }: { open: boolean }) => useInstallLogStream(opts({ open })),
+      ({ open }: { open: boolean }) => useStreamLog(opts({ open })),
       { initialProps: { open: true } },
     );
 

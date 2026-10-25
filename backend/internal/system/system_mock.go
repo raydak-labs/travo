@@ -2,6 +2,8 @@ package system
 
 import (
 	"fmt"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 // MockStorageProvider returns realistic mock storage stats.
@@ -16,6 +18,7 @@ func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 // MockPackageManager tracks install/remove state in memory.
 type MockPackageManager struct {
 	installed   map[string]bool
+	upgraded    bool
 	UpdateCalls int
 	UpdateErr   error
 }
@@ -58,6 +61,32 @@ func (m *MockPackageManager) RemoveStream(pkg string, logFn func(string)) error 
 	delete(m.installed, pkg)
 	logFn("Package " + pkg + " removed successfully")
 	return nil
+}
+
+func (m *MockPackageManager) Name() string { return "apk" }
+
+// ListUpgradable reports two sample packages until UpgradeStream ran.
+func (m *MockPackageManager) ListUpgradable() ([]models.PackageUpgrade, error) {
+	if m.upgraded {
+		return []models.PackageUpgrade{}, nil
+	}
+	return []models.PackageUpgrade{
+		{Name: "dnsmasq", Current: "2.91-r2", Available: "2.93-r1"},
+		{Name: "curl", Current: "8.19.0-r1", Available: "8.23.0-r1"},
+	}, nil
+}
+
+func (m *MockPackageManager) UpgradeStream(pkgs []string, logFn func(string)) error {
+	for _, p := range pkgs {
+		logFn("Upgrading " + p + "...")
+	}
+	m.upgraded = true
+	return nil
+}
+
+// MockVersionsFeed stands in for downloads.openwrt.org/.versions.json.
+func MockVersionsFeed() ([]byte, error) {
+	return []byte(`{"stable_version":"25.12.6","versions_list":["25.12.6","24.10.8","23.05.6","23.05.2"]}`), nil
 }
 
 // MockSystemProbe tracks init.d state in memory.
@@ -117,6 +146,16 @@ func (n *NoopPackageManager) Remove(string) (string, error) {
 }
 
 func (n *NoopPackageManager) IsInstalled(string) bool { return false }
+
+func (n *NoopPackageManager) Name() string { return "none" }
+
+func (n *NoopPackageManager) ListUpgradable() ([]models.PackageUpgrade, error) {
+	return []models.PackageUpgrade{}, nil
+}
+
+func (n *NoopPackageManager) UpgradeStream([]string, func(string)) error {
+	return fmt.Errorf("no package manager available")
+}
 
 func (n *NoopPackageManager) InstallStream(string, func(string)) error {
 	return fmt.Errorf("no package manager available")

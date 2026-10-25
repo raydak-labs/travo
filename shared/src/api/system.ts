@@ -17,6 +17,7 @@ export type {
   MemoryStats,
   NTPConfig,
   NetworkInterfaceStats,
+  PackageUpgrade,
   SSHKey,
   SSHKeysResponse,
   SetHostnameRequest,
@@ -27,6 +28,7 @@ export type {
   SystemInfo,
   SystemStats,
   TimezoneConfig,
+  UpdateStatus,
 } from '../generated/model';
 
 /** Valid hardware button actions */

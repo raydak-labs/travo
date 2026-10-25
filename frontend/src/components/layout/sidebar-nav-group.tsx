@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { cn } from '@/lib/cn';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
+import { statusDotToneClass } from '@/components/ui/status-pill';
 import type { NavGroup } from '@/components/layout/nav-config';
 import { isRouteActive } from '@/components/layout/nav-config';
 
@@ -20,8 +21,11 @@ export function SidebarNavGroup({
   open,
   onOpenChange,
   onNavClick,
+  indicator,
 }: {
   group: NavGroup;
+  /** Shows a dot after the label; the text is its accessible name. */
+  indicator?: string;
   pathname: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -55,6 +59,14 @@ export function SidebarNavGroup({
         >
           <GroupIcon className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
           <span className="truncate">{group.label}</span>
+          {indicator && (
+            <span
+              className={cn('ml-auto h-2 w-2 shrink-0 rounded-full', statusDotToneClass.info)}
+              title={indicator}
+            >
+              <span className="sr-only">{indicator}</span>
+            </span>
+          )}
         </Link>
         <CollapsibleTrigger
           type="button"

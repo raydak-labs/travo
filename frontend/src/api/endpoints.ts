@@ -64,6 +64,7 @@ import type {
   MACPolicies,
   NTPConfig,
   NetworkStatus,
+  PackageUpgradeRequest,
   PortForwardRequest,
   PortForwardsResponse,
   PortalRequest,
@@ -105,6 +106,7 @@ import type {
   TimezoneConfig,
   TrafficHistoryResponse,
   USBTetherStatus,
+  UpdateStatus,
   UpgradeFirmwareBody,
   UptimeEvent,
   VPNVerifyResult,
@@ -3305,6 +3307,95 @@ return apiFetch<RebootRequired>(getSetTimezoneUrl(),
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(timezoneConfig)
+  }
+);}
+
+
+
+export const getGetUpdatesUrl = () => {
+
+
+
+
+  return `/api/v1/system/updates`
+}
+
+/**
+ * A check runs in the background shortly after start and daily; this does not contact the internet.
+ * @summary Result of the last update check
+ */
+export const getUpdates = async ( options?: Parameters<typeof apiFetch>[1]): Promise<UpdateStatus> => {
+
+  return apiFetch<UpdateStatus>(getGetUpdatesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCheckUpdatesUrl = () => {
+
+
+
+
+  return `/api/v1/system/updates/check`
+}
+
+/**
+ * Fetches the OpenWrt release list and refreshes the package index; takes a few seconds.
+ * @summary Check for OpenWrt and package updates now
+ */
+export const checkUpdates = async ( options?: Parameters<typeof apiFetch>[1]): Promise<UpdateStatus> => {
+
+  return apiFetch<UpdateStatus>(getCheckUpdatesUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export const getUpgradePackagesStreamUrl = () => {
+
+
+
+
+  return `/api/v1/system/updates/packages/upgrade`
+}
+
+/**
+ * Without a body, or with an empty list, every package of the last check is upgraded. Only names from that list are accepted.
+ * @summary Upgrade packages, streaming the package manager's output
+ */
+export const upgradePackagesStream = async (packageUpgradeRequest?: PackageUpgradeRequest, options?: Parameters<typeof apiFetch>[1]): Promise<APIError> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<APIError>(getUpgradePackagesStreamUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(packageUpgradeRequest)
   }
 );}
 

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 // newTestServiceManagerWithGuard builds a ServiceManager whose crash-guard
@@ -548,6 +550,12 @@ func (s *safePkgManager) RemoveStream(pkg string, logFn func(string)) error {
 	_, err := s.Remove(pkg)
 	return err
 }
+
+func (s *safePkgManager) Name() string { return "apk" }
+
+func (s *safePkgManager) ListUpgradable() ([]models.PackageUpgrade, error) { return nil, nil }
+
+func (s *safePkgManager) UpgradeStream([]string, func(string)) error { return nil }
 
 // Publishing the refreshed cache entry must be a real write-locked update.
 // refreshOne used to write sm.cache with no lock at all, so a concurrent

@@ -1,28 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { streamRequest, type StreamEvent } from '@/lib/api-client';
-import { routeWithParam } from '@/lib/api-url';
-import { API_ROUTES } from '@shared/index';
 
-export type InstallLogAction = 'install' | 'remove';
-export type InstallLogStatus = 'streaming' | 'done' | 'error';
+export type StreamLogStatus = 'streaming' | 'done' | 'error';
 
-type UseInstallLogStreamOptions = {
+type UseStreamLogOptions = {
   open: boolean;
-  serviceId: string;
-  action: InstallLogAction;
+  /** NDJSON endpoint POSTed once per opening (package install, upgrade, …). */
+  route: string;
   onComplete: () => void;
   onOpenChange: (open: boolean) => void;
 };
 
-export function useInstallLogStream({
-  open,
-  serviceId,
-  action,
-  onComplete,
-  onOpenChange,
-}: UseInstallLogStreamOptions) {
+/** Streams an NDJSON operation log while `open`, one request per opening. */
+export function useStreamLog({ open, route, onComplete, onOpenChange }: UseStreamLogOptions) {
   const [lines, setLines] = useState<string[]>([]);
-  const [status, setStatus] = useState<InstallLogStatus>('streaming');
+  const [status, setStatus] = useState<StreamLogStatus>('streaming');
   const logRef = useRef<HTMLPreElement>(null);
   const startedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -42,11 +34,6 @@ export function useInstallLogStream({
 
     const controller = new AbortController();
     abortRef.current = controller;
-
-    const route =
-      action === 'install'
-        ? routeWithParam(API_ROUTES.services.installStream, serviceId)
-        : routeWithParam(API_ROUTES.services.removeStream, serviceId);
 
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -79,7 +66,7 @@ export function useInstallLogStream({
       // same array.
       abortStream();
     };
-  }, [open, serviceId, action, appendLine, abortStream]);
+  }, [open, route, appendLine, abortStream]);
 
   useEffect(() => {
     if (logRef.current) {

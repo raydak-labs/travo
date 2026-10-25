@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
+	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 // PackageManager abstracts package install/remove operations.
@@ -19,6 +20,12 @@ type PackageManager interface {
 	IsInstalled(pkg string) bool
 	InstallStream(pkg string, logFn func(string)) error
 	RemoveStream(pkg string, logFn func(string)) error
+	// Name is "apk", "opkg" or "none".
+	Name() string
+	// ListUpgradable reads the installed packages with a newer version in the
+	// index; run Update first.
+	ListUpgradable() ([]models.PackageUpgrade, error)
+	UpgradeStream(pkgs []string, logFn func(string)) error
 }
 
 // SystemProbe abstracts init.d and process checks.
@@ -74,6 +81,20 @@ func (a *ApkPackageManager) RemoveStream(pkg string, logFn func(string)) error {
 	return execx.Stream(execx.Package, logFn, "apk", "del", pkg)
 }
 
+func (a *ApkPackageManager) Name() string { return "apk" }
+
+func (a *ApkPackageManager) ListUpgradable() ([]models.PackageUpgrade, error) {
+	out, err := execx.CombinedOutput(execx.Slow, "apk", "list", "--upgradable")
+	if err != nil {
+		return nil, err
+	}
+	return parseApkUpgradable(string(out)), nil
+}
+
+func (a *ApkPackageManager) UpgradeStream(pkgs []string, logFn func(string)) error {
+	return execx.Stream(execx.Package, logFn, "apk", append([]string{"upgrade"}, pkgs...)...)
+}
+
 // OpkgPackageManager uses opkg (OpenWrt <25).
 type OpkgPackageManager struct{}
 
@@ -103,6 +124,20 @@ func (o *OpkgPackageManager) InstallStream(pkg string, logFn func(string)) error
 
 func (o *OpkgPackageManager) RemoveStream(pkg string, logFn func(string)) error {
 	return execx.Stream(execx.Package, logFn, "opkg", "remove", pkg)
+}
+
+func (o *OpkgPackageManager) Name() string { return "opkg" }
+
+func (o *OpkgPackageManager) ListUpgradable() ([]models.PackageUpgrade, error) {
+	out, err := execx.CombinedOutput(execx.Slow, "opkg", "list-upgradable")
+	if err != nil {
+		return nil, err
+	}
+	return parseOpkgUpgradable(string(out)), nil
+}
+
+func (o *OpkgPackageManager) UpgradeStream(pkgs []string, logFn func(string)) error {
+	return execx.Stream(execx.Package, logFn, "opkg", append([]string{"upgrade"}, pkgs...)...)
 }
 
 // RealSystemProbe checks init.d scripts and running processes.

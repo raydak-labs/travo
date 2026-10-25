@@ -126,6 +126,10 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   The uplink connection reports its band from the frequency (iwinfo on 25.12 has none), the
   saved-network row says "Not connected" for an enabled profile that is out of range, and one
   band label helper replaces six copies.
+- **Update notifications (2026-10-25):** the header and the System menu show when an OpenWrt
+  release or package updates are available. System → Updates links a new release to LuCI's
+  Attended Sysupgrade and upgrades packages (apk or opkg) with a streamed log
+  ([ADR 0006 §2](../adr/0006-application-platform-and-api-contract.md)).
 
 ## Frontend Toolchain
 
