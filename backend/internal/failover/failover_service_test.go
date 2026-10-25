@@ -28,7 +28,7 @@ func TestFailoverServiceGetConfigDefaults(t *testing.T) {
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: configPath})
 
 	cfg, err := svc.GetConfig()
 	if err != nil {
@@ -50,7 +50,7 @@ func TestFailoverServiceSetConfigWritesManagedSections(t *testing.T) {
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: configPath})
 
 	cfg := models.FailoverConfig{
 		Enabled: true,
@@ -126,7 +126,7 @@ func TestFailoverServiceRejectsEnabledConfigWithoutCandidates(t *testing.T) {
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: filepath.Join(t.TempDir(), "failover.json")})
 
 	err := svc.SetConfig(models.FailoverConfig{
 		Enabled:    true,
@@ -331,7 +331,7 @@ func TestFailbackHoldDown(t *testing.T) {
 				}
 			}
 
-			testSvc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
+			testSvc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: filepath.Join(t.TempDir(), "failover.json")})
 			testSvc.onlineSince = tt.onlineSince
 
 			gotActive := testSvc.computeActiveInterface(testCandidates)
@@ -349,7 +349,7 @@ func TestFailbackImmediateFailover(t *testing.T) {
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: configPath})
 
 	now := time.Now()
 
@@ -425,7 +425,7 @@ func TestFailbackPriorityOrderingWithHoldDown(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
+			svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: filepath.Join(t.TempDir(), "failover.json")})
 			svc.onlineSince = tt.onlineSince
 
 			gotActive := svc.computeActiveInterface(tt.candidates)
@@ -469,14 +469,12 @@ func TestFailbackReturnsToTheHigherPriorityLinkAfterHoldDown(t *testing.T) {
 	}
 }
 
-func newComputeActiveService(t *testing.T) *FailoverService {
+func newComputeActiveService(t *testing.T) *Service {
 	t.Helper()
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
-	return NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
-		&platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{},
-		filepath.Join(t.TempDir(), "failover.json"))
+	return New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: filepath.Join(t.TempDir(), "failover.json")})
 }
 
 // recordingApplier captures the rpcd apply/confirm calls and detects overlap.
@@ -539,13 +537,13 @@ func (r *recordingApplier) calls() (starts [][]string, confirms []string) {
 }
 
 // newFailoverTestService builds a FailoverService with temp paths and mwan3 installed.
-func newFailoverTestService(t *testing.T, mockUCI uci.UCI, applier platform.UCIApplyConfirm) (*FailoverService, string) {
+func newFailoverTestService(t *testing.T, mockUCI uci.UCI, applier platform.UCIApplyConfirm) (*Service, string) {
 	t.Helper()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, applier, configPath)
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: applier, ConfigPath: configPath})
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0755); err != nil {
 		t.Fatalf("write init script: %v", err)
@@ -1447,8 +1445,7 @@ func TestSetConfigConfigWriteFailureAppliesNothingAndLeavesNoGuard(t *testing.T)
 	if err := os.Mkdir(blocker, 0o750); err != nil {
 		t.Fatalf("create blocking directory: %v", err)
 	}
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
-		&platform.MockCommandRunner{}, applier, blocker)
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: applier, ConfigPath: blocker})
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write init script: %v", err)
@@ -1484,8 +1481,7 @@ func TestReadTrackerStatesMapsNamespacedSections(t *testing.T) {
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: mockUCI, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
 	configPath := filepath.Join(tmpDir, "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, cmd,
-		&platform.NoopUCIApplyConfirm{}, configPath)
+	svc := New(Deps{UCI: mockUCI, Ubus: mockUbus, Network: networkSvc, Cmd: cmd, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: configPath})
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write init script: %v", err)
@@ -1741,7 +1737,7 @@ func TestStagedApplyMwan3_ResumesAfterTheRollbackWindowExpires(t *testing.T) {
 func TestSetConfigGuardLifecycle(t *testing.T) {
 	t.Parallel()
 
-	guardExists := func(svc *FailoverService) bool {
+	guardExists := func(svc *Service) bool {
 		_, err := os.Stat(svc.crashGuard.Path())
 		return err == nil
 	}

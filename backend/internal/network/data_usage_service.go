@@ -113,13 +113,11 @@ type DataUsageService struct {
 	runner DataUsageRunner
 }
 
-// NewDataUsageService creates a service backed by the real system.
-func NewDataUsageService() *DataUsageService {
-	return &DataUsageService{runner: &RealDataUsageRunner{}}
-}
-
-// NewDataUsageServiceWithRunner creates a service with an injected runner (for tests).
-func NewDataUsageServiceWithRunner(r DataUsageRunner) *DataUsageService {
+// NewDataUsageService creates a DataUsageService; a nil runner uses vnstat.
+func NewDataUsageService(r DataUsageRunner) *DataUsageService {
+	if r == nil {
+		r = &RealDataUsageRunner{}
+	}
 	return &DataUsageService{runner: r}
 }
 

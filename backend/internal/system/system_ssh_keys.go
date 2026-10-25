@@ -12,7 +12,7 @@ import (
 const authorizedKeysFile = "/etc/dropbear/authorized_keys"
 
 // GetSSHKeys returns all public keys from the authorized_keys file.
-func (s *SystemService) GetSSHKeys() (models.SSHKeysResponse, error) {
+func (s *Service) GetSSHKeys() (models.SSHKeysResponse, error) {
 	data, err := os.ReadFile(s.sshKeysPath())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -40,7 +40,7 @@ func (s *SystemService) GetSSHKeys() (models.SSHKeysResponse, error) {
 }
 
 // AddSSHKey appends a public key to the authorized_keys file.
-func (s *SystemService) AddSSHKey(key string) error {
+func (s *Service) AddSSHKey(key string) error {
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return fmt.Errorf("key must not be empty")
@@ -70,7 +70,7 @@ func (s *SystemService) AddSSHKey(key string) error {
 // the trimmed file content on "\n"), so the number a client saw always maps to
 // the same line. Negative and out-of-range indexes are rejected instead of
 // silently truncating the file.
-func (s *SystemService) DeleteSSHKey(index int) error {
+func (s *Service) DeleteSSHKey(index int) error {
 	path := s.sshKeysPath()
 	data, err := os.ReadFile(path)
 	if err != nil {

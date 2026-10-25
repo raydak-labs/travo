@@ -39,7 +39,7 @@ func mockRunWireGuardEnableOK(name string, args ...string) ([]byte, error) {
 
 func TestGetVpnStatus(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	statuses, err := svc.GetVpnStatus()
 	if err != nil {
@@ -66,7 +66,7 @@ func TestGetVpnStatus(t *testing.T) {
 
 func TestGetWireguardConfig(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	config, err := svc.GetWireguardConfig()
 	if err != nil {
@@ -86,7 +86,7 @@ func TestGetWireguardConfig(t *testing.T) {
 func TestToggleWireguard(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{RunFunc: mockRunWireGuardEnableOK}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(true)
 	if err != nil {
@@ -120,7 +120,7 @@ func TestToggleWireguard_Disable(t *testing.T) {
 		}
 		return nil, nil
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(false)
 	if err != nil {
@@ -173,7 +173,7 @@ func TestToggleWireguard_FailsWhenTunnelNotUp(t *testing.T) {
 			return nil, nil
 		}
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(true)
 	if err == nil {
@@ -193,7 +193,7 @@ func TestToggleWireguard_FailsPreflightWhenMissingPrivateKey(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(true)
 	if err == nil {
@@ -215,7 +215,7 @@ func TestToggleWireguard_FailsPreflightWhenMissingPeerPublicKey(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(true)
 	if err == nil {
@@ -236,7 +236,7 @@ func TestToggleWireguard_FailsPreflightWhenEndpointPortInvalid(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(true)
 	if err == nil {
@@ -257,7 +257,7 @@ func TestToggleWireguard_FailsPreflightWhenRouteAllowedIPsNotOne(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command during preflight failure: %s %v", name, args)
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	err := svc.ToggleWireguard(true)
 	if err == nil {
@@ -272,7 +272,7 @@ func TestToggleWireguard_FailsPreflightWhenRouteAllowedIPsNotOne(t *testing.T) {
 func TestToggleWireguard_SetsProtoWireguard(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{RunFunc: mockRunWireGuardEnableOK}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	if err := svc.ToggleWireguard(true); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -285,7 +285,7 @@ func TestToggleWireguard_SetsProtoWireguard(t *testing.T) {
 
 func TestImportWireguardConfig_NormalizesPeerSections(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	conf := `[Interface]
 PrivateKey = abc123
@@ -327,7 +327,7 @@ AllowedIPs = 0.0.0.0/0
 func TestWgRuntimeState_Disabled(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{Err: fmt.Errorf("exit status 1")}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 	state := svc.wgRuntimeState(false)
 	if state != "disabled" {
 		t.Errorf("expected 'disabled', got %q", state)
@@ -337,7 +337,7 @@ func TestWgRuntimeState_Disabled(t *testing.T) {
 func TestWgRuntimeState_EnabledNotUp(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{Err: fmt.Errorf("exit status 1")}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 	state := svc.wgRuntimeState(true)
 	if state != "enabled_not_up" {
 		t.Errorf("expected 'enabled_not_up', got %q", state)
@@ -349,7 +349,7 @@ func TestWgRuntimeState_Connected(t *testing.T) {
 	dump := "PRIV\tPUB\t51820\toff\n" +
 		"peerpub\t(none)\tvpn.example.com:51820\t0.0.0.0/0\t1740000000\t100\t200\t0\n"
 	cmd := &platform.MockCommandRunner{Output: []byte(dump)}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 	state := svc.wgRuntimeState(true)
 	if state != "connected" {
 		t.Errorf("expected 'connected', got %q", state)
@@ -364,7 +364,7 @@ func TestGetTailscaleStatus(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command %s", name)
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	status, err := svc.GetTailscaleStatus()
 	if err != nil {
@@ -387,7 +387,7 @@ func TestGetTailscaleStatus(t *testing.T) {
 
 func TestGetKillSwitch_DisabledByDefault(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 	ks, err := svc.GetKillSwitch()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -399,7 +399,7 @@ func TestGetKillSwitch_DisabledByDefault(t *testing.T) {
 
 func TestSetKillSwitch_Enable(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 	if err := svc.SetKillSwitch(true); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestSetKillSwitch_Enable(t *testing.T) {
 
 func TestSetKillSwitch_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 	// Enable first, then disable
 	_ = svc.SetKillSwitch(true)
 	if err := svc.SetKillSwitch(false); err != nil {
@@ -434,7 +434,7 @@ func TestGetWireGuardStatus_Success(t *testing.T) {
 	dump := "PRIVATE_KEY\tPUBLIC_KEY_IFACE\t51820\toff\n" +
 		"PEER_PUB_KEY\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t123456789\t987654321\toff\n"
 	cmd := &platform.MockCommandRunner{Output: []byte(dump)}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	status, err := svc.GetWireGuardStatus()
 	if err != nil {
@@ -499,7 +499,7 @@ func TestGetWireGuardStatus_EmptyOutput(t *testing.T) {
 func TestGetWireGuardStatus_CommandError(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{Err: fmt.Errorf("exit status 1")}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	status, err := svc.GetWireGuardStatus()
 	if err != nil {
@@ -534,7 +534,7 @@ func newTestVpnService(t *testing.T) (*VpnService, string) {
 	profilesPath := filepath.Join(dir, "wireguard_profiles.json")
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
-	svc := NewVpnServiceWithProfilesPath(u, cmd, profilesPath)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd, ProfilesPath: profilesPath})
 	return svc, profilesPath
 }
 
@@ -658,12 +658,12 @@ func TestProfilesPersistence(t *testing.T) {
 	u := uci.NewMockUCI()
 	cmd := &platform.MockCommandRunner{Output: []byte("PRIV\tPUB\t51820\toff\n")}
 
-	svc1 := NewVpnServiceWithProfilesPath(u, cmd, profilesPath)
+	svc1 := NewVpnService(VpnDeps{UCI: u, Cmd: cmd, ProfilesPath: profilesPath})
 	conf := "[Interface]\nPrivateKey = dGVzdHByaXZhdGVrZXkxMjM0NTY3ODkwMTIzNDU2\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = dGVzdHB1YmxpY2tleTEyMzQ1Njc4OTAxMjM0NTY=\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0\n"
 	_, _ = svc1.AddProfile("Persistent", conf)
 
 	// Create a new service instance pointing to the same file
-	svc2 := NewVpnServiceWithProfilesPath(u, cmd, profilesPath)
+	svc2 := NewVpnService(VpnDeps{UCI: u, Cmd: cmd, ProfilesPath: profilesPath})
 	profiles, err := svc2.GetProfiles()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -704,7 +704,7 @@ func TestRunDNSLeakTest_VPNActiveNoLeak(t *testing.T) {
 	_ = u.Set("network", "wg0", "disabled", "0")
 	_ = u.Set("network", "wg0", "dns", "10.66.0.1")
 
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	// Override resolv.conf path by writing a temporary resolv.conf and reading it
 	// via readResolvConfNameservers (tested indirectly by checking the helper).
@@ -719,7 +719,7 @@ func TestRunDNSLeakTest_PotentialLeak(t *testing.T) {
 	u := uci.NewMockUCI()
 	_ = u.Set("network", "wg0", "disabled", "0")
 	_ = u.Set("network", "wg0", "dns", "10.66.0.1")
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	result := svc.RunDNSLeakTest()
 	// On test system /etc/resolv.conf likely doesn't contain 10.66.0.1,
@@ -735,7 +735,7 @@ func TestRunDNSLeakTest_PotentialLeak(t *testing.T) {
 func TestRunDNSLeakTest_VPNDisabled(t *testing.T) {
 	u := uci.NewMockUCI()
 	// wg0 disabled=1 by default in mock
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 	result := svc.RunDNSLeakTest()
 	if result.VPNActive {
 		t.Error("expected VPNActive=false when disabled=1")
@@ -838,7 +838,7 @@ func TestRunDNSLeakTest_OpenWrtLoopbackDnsmasqMatchesVPN(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command")
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	// Simulate OpenWrt: resolv only lists local stub; upstream is dnsmasq server=.
 	old := readResolvConfNameservers
@@ -896,7 +896,7 @@ func TestRunDNSLeakTest_DnsmasqOnlyAdGuardWhileVPNDNSConfiguredLeaks(t *testing.
 		}
 		return nil, fmt.Errorf("unexpected command")
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	old := readResolvConfNameservers
 	readResolvConfNameservers = func() []string {
@@ -915,7 +915,7 @@ func TestRunDNSLeakTest_DnsmasqOnlyAdGuardWhileVPNDNSConfiguredLeaks(t *testing.
 
 func TestSetupWireGuardFirewall(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	if err := svc.setupWireGuardFirewall(); err != nil {
 		t.Fatalf("setupWireGuardFirewall: %v", err)
@@ -938,7 +938,7 @@ func TestSetupWireGuardFirewall(t *testing.T) {
 
 func TestTeardownWireGuardFirewall(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnService(u)
+	svc := NewVpnService(VpnDeps{UCI: u})
 
 	// Set up then tear down.
 	_ = svc.setupWireGuardFirewall()
@@ -967,7 +967,7 @@ func TestVerifyWireGuard(t *testing.T) {
 	// Command runner that simulates: wg0 is UP, handshake recent, route via wg0.
 	now := "1000000000" // some epoch
 	_ = now
-	svc := NewVpnServiceWithRunner(u, &stubVerifyRunner{})
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &stubVerifyRunner{}})
 
 	result := svc.VerifyWireGuard()
 
@@ -983,9 +983,9 @@ func TestVerifyWireGuard(t *testing.T) {
 
 func TestRunWireGuardSpeedTest_WireGuardDisabled(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnServiceWithRunner(u, &platform.FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected command: %s", name)
-	}})
+	}}})
 	_, err := svc.RunWireGuardSpeedTest()
 	if err == nil {
 		t.Fatal("expected error when wireguard disabled")
@@ -997,12 +997,12 @@ func TestRunWireGuardSpeedTest_InterfaceNotUp(t *testing.T) {
 	if err := u.Set("network", "wg0", "disabled", "0"); err != nil {
 		t.Fatal(err)
 	}
-	svc := NewVpnServiceWithRunner(u, &platform.FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		if name == "/sbin/ip" && len(args) >= 4 && args[0] == "link" {
 			return []byte(""), nil
 		}
 		return nil, fmt.Errorf("unexpected")
-	}})
+	}}})
 	_, err := svc.RunWireGuardSpeedTest()
 	if err == nil || !strings.Contains(err.Error(), "not up") {
 		t.Fatalf("expected not up error, got %v", err)
@@ -1014,7 +1014,7 @@ func TestRunWireGuardSpeedTest_Success(t *testing.T) {
 	if err := u.Set("network", "wg0", "disabled", "0"); err != nil {
 		t.Fatal(err)
 	}
-	svc := NewVpnServiceWithRunner(u, &platform.FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.FuncCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		switch name {
 		case "/sbin/ip":
 			if len(args) >= 4 && args[0] == "link" && args[1] == "show" {
@@ -1029,7 +1029,7 @@ func TestRunWireGuardSpeedTest_Success(t *testing.T) {
 			return []byte("---\n"), nil
 		}
 		return nil, fmt.Errorf("unexpected %s %v", name, args)
-	}})
+	}}})
 	res, err := svc.RunWireGuardSpeedTest()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
@@ -1076,7 +1076,7 @@ func TestApplyAndVerifyWireGuard_StopsWhenInterfaceIsUp(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
 	}}
-	svc := NewVpnServiceWithRunner(uci.NewMockUCI(), cmd)
+	svc := NewVpnService(VpnDeps{UCI: uci.NewMockUCI(), Cmd: cmd})
 
 	if err := svc.applyAndVerifyWireGuard(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1110,7 +1110,7 @@ func TestApplyAndVerifyWireGuard_RetriesThenFails(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unexpected command: %s %s", name, strings.Join(args, " "))
 	}}
-	svc := NewVpnServiceWithRunner(uci.NewMockUCI(), cmd)
+	svc := NewVpnService(VpnDeps{UCI: uci.NewMockUCI(), Cmd: cmd})
 
 	if err := svc.applyAndVerifyWireGuard(); err == nil {
 		t.Fatal("expected error when wg0 never comes up")
@@ -1170,7 +1170,7 @@ func (f *failingUCI) Commit(config string) error {
 // newGuardedVpnService returns a service whose VPN crash guard lives in a temp dir.
 func newGuardedVpnService(t *testing.T, u uci.UCI, cmd platform.CommandRunner) (*VpnService, string) {
 	t.Helper()
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 	svc.crashGuard = guard.In(t.TempDir(), "vpn")
 	return svc, svc.crashGuard.Path()
 }
@@ -1193,7 +1193,7 @@ func TestToggleWireguard_EnableVerifiesTunnelBeforeFirewallAndDNS(t *testing.T) 
 			return nil, nil
 		}
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	if err := svc.ToggleWireguard(true); err == nil {
 		t.Fatal("expected error when wg0 does not come up")
@@ -1251,7 +1251,7 @@ func TestToggleWireguard_EnableRollsBackAfterTunnelFailure(t *testing.T) {
 
 func TestToggleWireguard_EnableFailsWithoutCrashGuard(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnServiceWithRunner(u, &platform.MockCommandRunner{RunFunc: mockRunWireGuardEnableOK})
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{RunFunc: mockRunWireGuardEnableOK}})
 	// A regular file cannot be a parent directory, so the guard cannot be created.
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(blocker, []byte("x"), 0600); err != nil {
@@ -1286,7 +1286,7 @@ func TestToggleWireguard_EnableRemovesCrashGuardOnSuccess(t *testing.T) {
 func TestSetKillSwitch_PropagatesAddSectionError(t *testing.T) {
 	base := uci.NewMockUCI()
 	fu := &failingUCI{UCI: base, addSectionErr: errors.New("uci readonly")}
-	svc := NewVpnServiceWithRunner(fu, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: fu, Cmd: &platform.MockCommandRunner{}})
 
 	if err := svc.SetKillSwitch(true); err == nil {
 		t.Fatal("expected SetKillSwitch to fail when the rule cannot be created")
@@ -1301,7 +1301,7 @@ func TestSetKillSwitch_PropagatesSetErrorWithoutCommit(t *testing.T) {
 	fu := &failingUCI{UCI: base, setErr: map[string]error{
 		"firewall.vpn_killswitch.target": errors.New("uci set failed"),
 	}}
-	svc := NewVpnServiceWithRunner(fu, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: fu, Cmd: &platform.MockCommandRunner{}})
 
 	if err := svc.SetKillSwitch(true); err == nil {
 		t.Fatal("expected SetKillSwitch to fail when an option cannot be written")
@@ -1313,7 +1313,7 @@ func TestSetKillSwitch_PropagatesSetErrorWithoutCommit(t *testing.T) {
 
 func TestSetKillSwitch_MarksUserOwnership(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnServiceWithRunner(u, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{}})
 
 	if err := svc.SetKillSwitch(true); err != nil {
 		t.Fatalf("SetKillSwitch(true): %v", err)
@@ -1332,7 +1332,7 @@ func TestSetKillSwitch_MarksUserOwnership(t *testing.T) {
 
 func TestSetKillSwitch_DisableWithoutRuleIsNoop(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnServiceWithRunner(u, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{}})
 
 	if err := svc.SetKillSwitch(false); err != nil {
 		t.Fatalf("SetKillSwitch(false) on a clean router: %v", err)
@@ -1347,7 +1347,7 @@ func TestToggleWireguard_DisableKeepsUserKillSwitch(t *testing.T) {
 		}
 		return nil, nil
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	if err := svc.SetKillSwitch(true); err != nil {
 		t.Fatalf("SetKillSwitch(true): %v", err)
@@ -1373,7 +1373,7 @@ func TestToggleWireguard_DisableRemovesVPNOwnedKillSwitch(t *testing.T) {
 		}
 		return nil, nil
 	}}
-	svc := NewVpnServiceWithRunner(u, cmd)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 
 	if err := svc.ToggleWireguard(false); err != nil {
 		t.Fatalf("ToggleWireguard(false): %v", err)
@@ -1387,7 +1387,7 @@ func TestSetSplitTunnel_CustomWithoutRoutesIsRejected(t *testing.T) {
 	u := uci.NewMockUCI()
 	_ = u.AddSection("network", "wg0_peer0", "wireguard_wg0")
 	_ = u.Set("network", "wg0_peer0", "allowed_ips", "10.0.0.0/24")
-	svc := NewVpnServiceWithRunner(u, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{}})
 
 	err := svc.SetSplitTunnel(models.SplitTunnelConfig{Mode: "custom"})
 	if err == nil {
@@ -1401,7 +1401,7 @@ func TestSetSplitTunnel_CustomWithoutRoutesIsRejected(t *testing.T) {
 
 func TestSetSplitTunnel_UnknownModeIsRejected(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewVpnServiceWithRunner(u, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{}})
 	if err := svc.SetSplitTunnel(models.SplitTunnelConfig{Mode: "sideways"}); err == nil {
 		t.Fatal("expected a validation error for an unknown split tunnel mode")
 	}
@@ -1440,7 +1440,7 @@ func TestSetSplitTunnel_RevertsStagedDeltasOnWriteError(t *testing.T) {
 	fu := &failingUCI{UCI: base, addListErrOnce: map[string]error{
 		"network.wg0_peer1.allowed_ips": errors.New("uci add_list failed"),
 	}}
-	svc := NewVpnServiceWithRunner(fu, &platform.MockCommandRunner{})
+	svc := NewVpnService(VpnDeps{UCI: fu, Cmd: &platform.MockCommandRunner{}})
 
 	err := svc.SetSplitTunnel(models.SplitTunnelConfig{Mode: "custom", Routes: []string{"0.0.0.0/0"}})
 	if err == nil {

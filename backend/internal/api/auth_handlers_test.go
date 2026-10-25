@@ -49,7 +49,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	reconnectScriptPath := tmpDir + "/wifi-reconnect.sh"
 	bandSwitchConfigPath := tmpDir + "/band-switching.json"
 
-	systemSvc := system.NewSystemService(ub, u, &system.MockStorageProvider{})
+	systemSvc := system.New(ub, u, &system.MockStorageProvider{})
 
 	networkSvc := network.New(network.Deps{UCI: u, Ubus: ub, Cmd: &platform.MockCommandRunner{}})
 	// Pretend ddns-scripts is installed, so the DDNS endpoints exercise their
@@ -68,12 +68,12 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		System:      systemSvc,
 		Network:     networkSvc,
 		Wifi:        wifiSvc,
-		Vpn: uplink.NewVpnServiceWithProfilesPath(u, &platform.MockCommandRunner{
+		Vpn: uplink.NewVpnService(uplink.VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
-		}, profilesPath),
-		ServiceManager: system.NewServiceManager(),
-		Speedtest:      system.NewSpeedtestServiceWith(system.NewMockPackageManager()),
-		Captive:        uplink.NewCaptiveService(&platform.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
+		}, ProfilesPath: profilesPath}),
+		ServiceManager: system.NewServiceManager(nil, nil),
+		Speedtest:      system.NewSpeedtestService(system.NewMockPackageManager()),
+		Captive:        uplink.NewCaptiveService(uplink.CaptiveDeps{Prober: &platform.MockHTTPProber{StatusCode: 200, Body: "success\n"}}),
 		Alerts:         system.NewAlertService(systemSvc),
 		BandSwitching:  wifi.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
 		TrafficHistory: network.NewTrafficHistoryService(network.TrafficHistoryDefaultPoints),

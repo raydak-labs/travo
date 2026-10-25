@@ -12,7 +12,7 @@ import (
 )
 
 // SystemRebootHandler handles POST /api/v1/system/reboot.
-func SystemRebootHandler(svc *system.SystemService) fiber.Handler {
+func SystemRebootHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.Reboot(); err != nil {
 			return RespondWithServerError(c, err)
@@ -22,7 +22,7 @@ func SystemRebootHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // SystemShutdownHandler handles POST /api/v1/system/shutdown.
-func SystemShutdownHandler(svc *system.SystemService) fiber.Handler {
+func SystemShutdownHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.Shutdown(); err != nil {
 			return RespondWithServerError(c, err)
@@ -32,7 +32,7 @@ func SystemShutdownHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // BackupHandler handles GET /api/v1/system/backup — downloads config backup.
-func BackupHandler(svc *system.SystemService) fiber.Handler {
+func BackupHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		path, err := svc.CreateBackup()
 		if err != nil {
@@ -54,7 +54,7 @@ func BackupHandler(svc *system.SystemService) fiber.Handler {
 // svc.RestoreBackup validates the archive (member allowlist, no links, no
 // traversal, size caps) before sysupgrade runs and reports a rejection as
 // ErrInvalidBackupArchive, which answers 400 rather than 500.
-func RestoreHandler(svc *system.SystemService) fiber.Handler {
+func RestoreHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		file, err := c.FormFile("backup")
 		if err != nil {
@@ -94,7 +94,7 @@ func RestoreHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // FactoryResetHandler handles POST /api/v1/system/factory-reset.
-func FactoryResetHandler(svc *system.SystemService) fiber.Handler {
+func FactoryResetHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.FactoryReset(); err != nil {
 			return RespondWithServerError(c, err)
@@ -110,7 +110,7 @@ func FactoryResetHandler(svc *system.SystemService) fiber.Handler {
 // foreign image is a 400 that names the model, instead of a 200 followed by a
 // brick and no serial console. The parsed model is returned so the UI can show
 // what is about to be flashed.
-func FirmwareUpgradeHandler(svc *system.SystemService) fiber.Handler {
+func FirmwareUpgradeHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		file, err := c.FormFile("firmware")
 		if err != nil {

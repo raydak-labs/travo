@@ -107,15 +107,16 @@ func (sm *ServiceManager) SetPostInstallHook(serviceID string, hook func() error
 	sm.postInstallHooks[serviceID] = hook
 }
 
-// NewServiceManager creates a ServiceManager that detects real system state.
-func NewServiceManager() *ServiceManager {
-	sm := NewServiceManagerWith(detectPackageManager(), &RealSystemProbe{})
-	sm.RefreshCache()
-	return sm
-}
-
-// NewServiceManagerWith creates a ServiceManager with injected dependencies (for tests).
-func NewServiceManagerWith(pkg PackageManager, probe SystemProbe) *ServiceManager {
+// NewServiceManager creates a ServiceManager. A nil pkg detects the device's
+// package manager and a nil probe uses the real init system. Call
+// RefreshCache to populate the status cache.
+func NewServiceManager(pkg PackageManager, probe SystemProbe) *ServiceManager {
+	if pkg == nil {
+		pkg = detectPackageManager()
+	}
+	if probe == nil {
+		probe = &RealSystemProbe{}
+	}
 	return &ServiceManager{
 		defs:  knownServices,
 		pkg:   pkg,

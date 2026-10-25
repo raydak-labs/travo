@@ -10,7 +10,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/network"
 )
 
-func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus, cfgFile failoverConfigFile) []models.FailoverCandidate {
+func (s *Service) discoverCandidates(networkStatus models.NetworkStatus, cfgFile failoverConfigFile) []models.FailoverCandidate {
 	known := map[string]models.FailoverCandidate{}
 	trackerStates := s.readTrackerStates()
 	for _, iface := range networkStatus.Interfaces {
@@ -89,7 +89,7 @@ func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus,
 	return candidates
 }
 
-func (s *FailoverService) updateOnlineTimestamps() {
+func (s *Service) updateOnlineTimestamps() {
 	cfg, err := s.GetConfig()
 	if err != nil {
 		return
@@ -116,7 +116,7 @@ func (s *FailoverService) updateOnlineTimestamps() {
 // candidate online long enough to clear the hold-down, and only as a fallback the
 // uplink that is active right now. The order is what makes failback possible: a
 // higher-priority link that recovers must win over the sticky active one.
-func (s *FailoverService) computeActiveInterface(candidates []models.FailoverCandidate) string {
+func (s *Service) computeActiveInterface(candidates []models.FailoverCandidate) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -139,7 +139,7 @@ func (s *FailoverService) computeActiveInterface(candidates []models.FailoverCan
 	return sticky
 }
 
-func (s *FailoverService) hasWirelessStation() bool {
+func (s *Service) hasWirelessStation() bool {
 	sections, err := s.uci.GetSections("wireless")
 	if err != nil {
 		return false
@@ -152,7 +152,7 @@ func (s *FailoverService) hasWirelessStation() bool {
 	return false
 }
 
-func (s *FailoverService) readTrackerStates() map[string]models.FailoverTrackingState {
+func (s *Service) readTrackerStates() map[string]models.FailoverTrackingState {
 	states := map[string]models.FailoverTrackingState{}
 	generated := map[string]bool{}
 	if !s.serviceInstalled() {
@@ -203,7 +203,7 @@ func (s *FailoverService) readTrackerStates() map[string]models.FailoverTracking
 	return states
 }
 
-func (s *FailoverService) addDiscoveredUSBNetworkCandidates(known map[string]models.FailoverCandidate) {
+func (s *Service) addDiscoveredUSBNetworkCandidates(known map[string]models.FailoverCandidate) {
 	sections, err := s.uci.GetSections("network")
 	if err != nil {
 		return

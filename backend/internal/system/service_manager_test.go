@@ -15,7 +15,7 @@ import (
 // files land in a temp dir instead of /etc/travo.
 func newTestServiceManagerWithGuard(t *testing.T, pkg PackageManager, probe SystemProbe) *ServiceManager {
 	t.Helper()
-	sm := NewServiceManagerWith(pkg, probe)
+	sm := NewServiceManager(pkg, probe)
 	sm.SetGuardDir(t.TempDir())
 	return sm
 }
@@ -445,7 +445,7 @@ func TestInstall_DoesNotBlockReads(t *testing.T) {
 func TestInstall_WritesAndClearsCrashGuard(t *testing.T) {
 	guardDir := t.TempDir()
 	pkg := NewMockPackageManager()
-	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm := NewServiceManager(pkg, NewMockSystemProbe())
 	sm.SetGuardDir(guardDir)
 	guard := filepath.Join(guardDir, "pkg-install-in-progress")
 
@@ -457,7 +457,7 @@ func TestInstall_WritesAndClearsCrashGuard(t *testing.T) {
 	}
 
 	// A failing install must leave the marker behind.
-	sm2 := NewServiceManagerWith(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	sm2 := NewServiceManager(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
 	sm2.SetGuardDir(guardDir)
 	if err := sm2.Install("tailscale"); err == nil {
 		t.Fatal("expected install failure")
@@ -662,7 +662,7 @@ func TestInstallRefusesWhileAnInstallGuardExists(t *testing.T) {
 	guard := filepath.Join(guardDir, "pkg-install-in-progress")
 
 	// A failing install leaves the guard behind, as a power cut would.
-	failing := NewServiceManagerWith(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
+	failing := NewServiceManager(&failingPkgManager{NewMockPackageManager()}, NewMockSystemProbe())
 	failing.SetGuardDir(guardDir)
 	if err := failing.Install("tailscale"); err == nil {
 		t.Fatal("expected the seeded install to fail")
@@ -672,7 +672,7 @@ func TestInstallRefusesWhileAnInstallGuardExists(t *testing.T) {
 	}
 
 	pkg := NewMockPackageManager()
-	sm := NewServiceManagerWith(pkg, NewMockSystemProbe())
+	sm := NewServiceManager(pkg, NewMockSystemProbe())
 	sm.SetGuardDir(guardDir)
 	err := sm.Install("tailscale")
 	if err == nil {

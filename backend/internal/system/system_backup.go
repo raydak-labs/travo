@@ -16,7 +16,7 @@ import (
 // CreateBackup generates a configuration backup archive and returns its path.
 // The path is unique per call: the handler removes exactly what it created, so
 // two backups started in the same second must not share a filename.
-func (s *SystemService) CreateBackup() (string, error) {
+func (s *Service) CreateBackup() (string, error) {
 	path, err := uniqueTempPath("/tmp", "backup-*.tar.gz")
 	if err != nil {
 		return "", err
@@ -56,7 +56,7 @@ func uniqueTempPath(dir, pattern string) (string, error) {
 //
 // A guard is then written and only removed once sysupgrade returned
 // successfully: `sysupgrade -r` rewrites /etc/config (ADR 0003).
-func (s *SystemService) RestoreBackup(path string) error {
+func (s *Service) RestoreBackup(path string) error {
 	if err := ValidateRestoreArchive(path); err != nil {
 		return err
 	}

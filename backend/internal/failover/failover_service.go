@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/network"
@@ -64,7 +63,7 @@ var errApplyRollingBack = errors.New("an mwan3 apply from a previous save is sti
 // succeeds. That is the documented contract (ADR 0003): an unresolved rollback
 // is what a human or a redeploy should clear, and deploy-local.sh and
 // install.sh both clear it.
-func (s *FailoverService) rollbackOrKeepGuard() {
+func (s *Service) rollbackOrKeepGuard() {
 	// Capture the pending state BEFORE the restore runs. The restore issues its
 	// own rpcd apply and clears pendingApplySession on success, so evaluating it
 	// afterwards can never observe the window the failed apply left open — and
@@ -86,7 +85,7 @@ func (s *FailoverService) rollbackOrKeepGuard() {
 
 // rollbackStillPending reports whether an rpcd session is still armed to roll
 // the config back on its own timer.
-func (s *FailoverService) rollbackStillPending() bool {
+func (s *Service) rollbackStillPending() bool {
 	return s.pendingApplySession != "" && time.Now().Before(s.pendingApplyDeadline)
 }
 
@@ -94,7 +93,7 @@ func (s *FailoverService) rollbackStillPending() bool {
 // apply is still considered in flight.
 const rollbackGracePeriod = time.Duration(platform.ApplyRollbackTimeout)*time.Second + 2*time.Second
 
-type FailoverService struct {
+type Service struct {
 	uci        uci.UCI
 	ubus       ubus.Ubus
 	networkSvc *network.Service
@@ -135,13 +134,28 @@ type FailoverService struct {
 	onlineSince          map[string]time.Time
 }
 
-func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *network.Service, pw *auth.RootPassword) *FailoverService {
-	return &FailoverService{
-		uci:         u,
-		ubus:        ub,
-		networkSvc:  networkSvc,
-		cmd:         &platform.RealCommandRunner{},
-		applier:     platform.NewRealUCIApplyConfirm(ub, pw),
+// Deps are the collaborators of a failover Service.
+type Deps struct {
+	UCI     uci.UCI
+	Ubus    ubus.Ubus
+	Network *network.Service
+	Applier platform.UCIApplyConfirm
+	// Cmd runs shell commands; default platform.RealCommandRunner.
+	Cmd platform.CommandRunner
+	// ConfigPath stores the failover config; the crash guard and the mwan3
+	// backup sit next to it. Default: /etc/travo/failover.json with the guard
+	// in the guard dir.
+	ConfigPath string
+}
+
+// New creates a failover Service.
+func New(d Deps) *Service {
+	s := &Service{
+		uci:         d.UCI,
+		ubus:        d.Ubus,
+		networkSvc:  d.Network,
+		cmd:         d.Cmd,
+		applier:     d.Applier,
 		configPath:  failoverConfigPath,
 		crashGuard:  guard.New("failover"),
 		backupPath:  failoverBackupPath,
@@ -150,30 +164,23 @@ func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *network.Service, pw
 		stopCh:      make(chan struct{}),
 		onlineSince: make(map[string]time.Time),
 	}
-}
-
-func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *network.Service, cmd platform.CommandRunner, applier platform.UCIApplyConfirm, configPath string) *FailoverService {
-	return &FailoverService{
-		uci:         u,
-		ubus:        ub,
-		networkSvc:  networkSvc,
-		cmd:         cmd,
-		applier:     applier,
-		configPath:  configPath,
-		crashGuard:  guard.In(filepath.Dir(configPath), "failover"),
-		backupPath:  filepath.Join(filepath.Dir(configPath), "failover-mwan3-backup.json"),
-		initScript:  mwan3InitScriptPath,
-		events:      make([]models.FailoverEvent, 0, 10),
-		stopCh:      make(chan struct{}),
-		onlineSince: make(map[string]time.Time),
+	if s.cmd == nil {
+		s.cmd = &platform.RealCommandRunner{}
 	}
+	if d.ConfigPath != "" {
+		dir := filepath.Dir(d.ConfigPath)
+		s.configPath = d.ConfigPath
+		s.crashGuard = guard.In(dir, "failover")
+		s.backupPath = filepath.Join(dir, "failover-mwan3-backup.json")
+	}
+	return s
 }
 
-func (s *FailoverService) SetAlertService(alertSvc *system.AlertService) {
+func (s *Service) SetAlertService(alertSvc *system.AlertService) {
 	s.alertSvc = alertSvc
 }
 
-func (s *FailoverService) Start() {
+func (s *Service) Start() {
 	ticker := time.NewTicker(failoverTickerInterval)
 	defer ticker.Stop()
 
@@ -203,13 +210,13 @@ func (s *FailoverService) Start() {
 	}
 }
 
-func (s *FailoverService) Stop() {
+func (s *Service) Stop() {
 	s.stopOnce.Do(func() {
 		close(s.stopCh)
 	})
 }
 
-func (s *FailoverService) GetConfig() (models.FailoverConfig, error) {
+func (s *Service) GetConfig() (models.FailoverConfig, error) {
 	cfgFile, err := s.loadConfigFile()
 	if err != nil {
 		return models.FailoverConfig{}, err
@@ -221,7 +228,7 @@ func (s *FailoverService) GetConfig() (models.FailoverConfig, error) {
 	return cfg, nil
 }
 
-func (s *FailoverService) GetEvents() []models.FailoverEvent {
+func (s *Service) GetEvents() []models.FailoverEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]models.FailoverEvent, len(s.events))
@@ -239,7 +246,7 @@ func (s *FailoverService) GetEvents() []models.FailoverEvent {
 // including the rpcd apply, whose snapshot/reload races every other writer of
 // `network` — and the staged /tmp/.uci delta is dropped if anything fails
 // (ADR 0010). Reads inside (verifyApply) take no lock of their own.
-func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
+func (s *Service) SetConfig(cfg models.FailoverConfig) error {
 	if err := s.validateConfig(cfg); err != nil {
 		return err
 	}
@@ -253,7 +260,7 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 
 // setConfigLocked is SetConfig's body; the caller holds applyMu and the
 // `network` + `mwan3` config locks.
-func (s *FailoverService) setConfigLocked(cfg models.FailoverConfig) error {
+func (s *Service) setConfigLocked(cfg models.FailoverConfig) error {
 	if err := os.MkdirAll(filepath.Dir(s.configPath), 0750); err != nil {
 		return fmt.Errorf("create failover config dir: %w", err)
 	}
@@ -291,7 +298,7 @@ func (s *FailoverService) setConfigLocked(cfg models.FailoverConfig) error {
 	return nil
 }
 
-func (s *FailoverService) observeActiveChange() {
+func (s *Service) observeActiveChange() {
 	cfg, err := s.GetConfig()
 	if err != nil {
 		return
@@ -330,7 +337,7 @@ func (s *FailoverService) observeActiveChange() {
 	}
 }
 
-func (s *FailoverService) buildConfig(cfgFile failoverConfigFile) (models.FailoverConfig, error) {
+func (s *Service) buildConfig(cfgFile failoverConfigFile) (models.FailoverConfig, error) {
 	serviceInstalled := s.serviceInstalled()
 	networkStatus, err := s.networkSvc.GetNetworkStatus()
 	if err != nil {
@@ -359,7 +366,7 @@ func (s *FailoverService) buildConfig(cfgFile failoverConfigFile) (models.Failov
 	}, nil
 }
 
-func (s *FailoverService) validateConfig(cfg models.FailoverConfig) error {
+func (s *Service) validateConfig(cfg models.FailoverConfig) error {
 	if len(cfg.Candidates) == 0 {
 		return errors.New("at least one failover candidate is required")
 	}
@@ -425,7 +432,7 @@ func validateHealthConfig(health models.FailoverHealthConfig) error {
 	return nil
 }
 
-func (s *FailoverService) loadConfigFile() (failoverConfigFile, error) {
+func (s *Service) loadConfigFile() (failoverConfigFile, error) {
 	data, err := os.ReadFile(s.configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -441,7 +448,7 @@ func (s *FailoverService) loadConfigFile() (failoverConfigFile, error) {
 	return cfg, nil
 }
 
-func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
+func (s *Service) saveConfigFile(cfg failoverConfigFile) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal failover config: %w", err)

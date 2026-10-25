@@ -17,7 +17,7 @@ import (
 
 func TestNewHub(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	svc := system.New(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
 	alertSvc := system.NewAlertService(svc)
 	hub := NewHub(svc, alertSvc, nil, nil)
 
@@ -31,7 +31,7 @@ func TestNewHub(t *testing.T) {
 
 func TestHubStartStop(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	svc := system.New(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
 	alertSvc := system.NewAlertService(svc)
 	hub := NewHub(svc, alertSvc, nil, nil)
 	hub.BroadcastInterval = 10 * time.Millisecond
@@ -44,7 +44,7 @@ func TestHubStartStop(t *testing.T) {
 
 func TestHub_BroadcastsNetworkStatus(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	svc := system.New(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
 	alertSvc := system.NewAlertService(svc)
 
 	nsCh := make(chan models.NetworkStatus, 1)
@@ -141,7 +141,7 @@ func TestHub_StopIsIdempotent(t *testing.T) {
 
 func newTestHub() *Hub {
 	ub := ubus.NewMockUbus()
-	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	svc := system.New(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
 	return NewHub(svc, system.NewAlertService(svc), nil, nil)
 }
 
@@ -152,7 +152,7 @@ func newTestHub() *Hub {
 func TestHub_SamplesTrafficHistoryWithNoClients(t *testing.T) {
 	root := fixtureSysfsNet(t)
 	ub := ubus.NewMockUbus()
-	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	svc := system.New(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
 	history := network.NewTrafficHistoryService(10)
 	restore := system.SetSysfsNetRootForTesting(root)
 	defer restore()

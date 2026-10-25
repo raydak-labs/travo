@@ -18,7 +18,7 @@ type Dependencies struct {
 	Auth           *auth.AuthService
 	Blocklist      *auth.TokenBlocklist
 	RateLimiter    *auth.RateLimiter
-	System         *system.SystemService
+	System         *system.Service
 	Network        *network.Service
 	SQM            *network.SQMService
 	Wifi           *wifi.Service
@@ -31,7 +31,7 @@ type Dependencies struct {
 	DataUsage      *network.DataUsageService
 	USBTether      *network.USBTetheringService
 	BandSwitching  *wifi.BandSwitchingService
-	Failover       *failover.FailoverService
+	Failover       *failover.Service
 	StatsHistory   *system.StatsHistoryService
 	TrafficHistory *network.TrafficHistoryService
 	Speedtest      *system.SpeedtestService

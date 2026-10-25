@@ -23,14 +23,12 @@ import (
 // produces this, because RealUCI.GetAll normalises a printed list
 // ('a' 'b') into the comma-joined form a,b so callers can split on it, and the
 // restore writes that value back with Set.
-func newRestoreTestService(t *testing.T) (*FailoverService, *uci.MockUCI) {
+func newRestoreTestService(t *testing.T) (*Service, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
 	networkSvc := network.New(network.Deps{UCI: u, Ubus: mockUbus, Cmd: &platform.MockCommandRunner{}})
-	svc := NewFailoverServiceWithRunner(u, mockUbus, networkSvc,
-		&platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{},
-		filepath.Join(t.TempDir(), "failover.json"))
+	svc := New(Deps{UCI: u, Ubus: mockUbus, Network: networkSvc, Cmd: &platform.MockCommandRunner{}, Applier: &platform.NoopUCIApplyConfirm{}, ConfigPath: filepath.Join(t.TempDir(), "failover.json")})
 	svc.backupPath = filepath.Join(t.TempDir(), "mwan3-backup.json")
 	return svc, u
 }

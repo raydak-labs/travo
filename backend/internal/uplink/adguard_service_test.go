@@ -150,7 +150,7 @@ func (m *mockAdGuardChecker) TCPProbe(addr string, _ time.Duration) bool {
 func TestIsInstalled_True(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	mock.files["/opt/AdGuardHome/AdGuardHome"] = true
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if !svc.IsInstalled() {
 		t.Error("expected IsInstalled=true when binary exists")
@@ -159,7 +159,7 @@ func TestIsInstalled_True(t *testing.T) {
 
 func TestIsInstalled_False(t *testing.T) {
 	mock := newMockAdGuardChecker()
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if svc.IsInstalled() {
 		t.Error("expected IsInstalled=false when binary missing")
@@ -173,7 +173,7 @@ func TestIsRunning_True(t *testing.T) {
 		output string
 		err    error
 	}{"running", nil}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if !svc.IsRunning() {
 		t.Error("expected IsRunning=true when service reports running")
@@ -182,7 +182,7 @@ func TestIsRunning_True(t *testing.T) {
 
 func TestIsRunning_False_NoInitScript(t *testing.T) {
 	mock := newMockAdGuardChecker()
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if svc.IsRunning() {
 		t.Error("expected IsRunning=false when no init script")
@@ -196,7 +196,7 @@ func TestIsRunning_False_ServiceStopped(t *testing.T) {
 		output string
 		err    error
 	}{"", fmt.Errorf("exit status 1")}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if svc.IsRunning() {
 		t.Error("expected IsRunning=false when service not running")
@@ -210,7 +210,7 @@ func TestVersion_Present(t *testing.T) {
 		output string
 		err    error
 	}{"AdGuard Home, version v0.107.54", nil}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	v := svc.Version()
 	if v != "v0.107.54" {
@@ -220,7 +220,7 @@ func TestVersion_Present(t *testing.T) {
 
 func TestVersion_NotInstalled(t *testing.T) {
 	mock := newMockAdGuardChecker()
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if v := svc.Version(); v != "" {
 		t.Errorf("expected empty version, got %q", v)
@@ -241,7 +241,7 @@ func TestGetStatus_Success(t *testing.T) {
 	}{
 		body: []byte(`{"num_dns_queries":1000,"num_blocked_filtering":200,"num_replaced_safebrowsing":10,"num_replaced_parental":5,"avg_processing_time":0.025}`),
 	}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	status, err := svc.GetStatus()
 	if err != nil {
@@ -274,7 +274,7 @@ func TestGetStatus_APIUnreachable(t *testing.T) {
 	}{
 		err: fmt.Errorf("connection refused"),
 	}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	_, err := svc.GetStatus()
 	if err == nil {
@@ -294,7 +294,7 @@ func TestGetDNSStatus_Enabled(t *testing.T) {
 		output string
 		err    error
 	}{"127.0.0.1#5353", nil}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	status, err := svc.GetDNSStatus()
 	if err != nil {
@@ -320,7 +320,7 @@ func TestGetDNSStatus_Disabled(t *testing.T) {
 		output string
 		err    error
 	}{"", fmt.Errorf("uci: Entry not found")}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	status, err := svc.GetDNSStatus()
 	if err != nil {
@@ -343,7 +343,7 @@ func TestGetDNSStatus_DefaultPort(t *testing.T) {
 		output string
 		err    error
 	}{"", fmt.Errorf("uci: Entry not found")}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	status, err := svc.GetDNSStatus()
 	if err != nil {
@@ -391,7 +391,7 @@ func TestSetDNS_Enable(t *testing.T) {
 		output string
 		err    error
 	}{"", nil}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	err := svc.SetDNS(true)
 	if err != nil {
@@ -423,7 +423,7 @@ func TestSetDNS_Disable(t *testing.T) {
 		output string
 		err    error
 	}{"", nil}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	err := svc.SetDNS(false)
 	if err != nil {
@@ -447,7 +447,7 @@ func TestSetDNS_Enable_FailAddList(t *testing.T) {
 		output string
 		err    error
 	}{"", fmt.Errorf("uci error")}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	err := svc.SetDNS(true)
 	if err == nil {
@@ -458,7 +458,7 @@ func TestSetDNS_Enable_FailAddList(t *testing.T) {
 func TestGetConfig_FileNotFound(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	// Don't add the config file to the mock - it doesn't exist
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	content, err := svc.GetConfig()
 	if err == nil {
@@ -480,7 +480,7 @@ users:
   - name: admin
     password: test`
 	mock.fileContents["/opt/AdGuardHome/AdGuardHome.yaml"] = testContent
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	content, err := svc.GetConfig()
 	if err != nil {
@@ -499,7 +499,7 @@ func TestSetConfig_Success(t *testing.T) {
 	}{"", nil}
 	// The DNS listener must come back for the write to be accepted.
 	mock.tcpProbes["127.0.0.1:5353"] = true
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	testContent := `bind_host: 0.0.0.0
 bind_port: 3000`
@@ -524,7 +524,7 @@ func TestIsInstalled_ViaRunningProcess(t *testing.T) {
 	}{
 		body: []byte(`{"running":true}`),
 	}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 	if !svc.IsInstalled() {
 		t.Error("expected IsInstalled()=true when process is responding to API")
 	}
@@ -533,7 +533,7 @@ func TestIsInstalled_ViaRunningProcess(t *testing.T) {
 func TestIsInstalled_ViaInitScript(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	mock.files["/etc/init.d/adguardhome"] = true
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 	if !svc.IsInstalled() {
 		t.Error("expected IsInstalled()=true when init script exists")
 	}
@@ -548,7 +548,7 @@ func TestSetDNS_Enable_FailsWhenNotRunning(t *testing.T) {
 		body: []byte(`{"port":5353}`),
 	}
 	// AdGuard not running (no init script, no HTTP response)
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 	err := svc.SetDNS(true)
 	if err == nil {
 		t.Fatal("expected error when AdGuard not running")
@@ -570,7 +570,7 @@ func TestSetDNS_Enable_FailsWhenListenerNotReady(t *testing.T) {
 	}{"running", nil}
 	// TCP probe fails — DNS listener not ready.
 	mock.tcpProbes["127.0.0.1:5353"] = false
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 	err := svc.SetDNS(true)
 	if err == nil {
 		t.Fatal("expected error when DNS listener not ready")
@@ -594,7 +594,7 @@ func TestGetDNSStatus_HealthFields(t *testing.T) {
 		output string
 		err    error
 	}{"Address: 93.184.216.34", nil}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	status, err := svc.GetDNSStatus()
 	if err != nil {
@@ -614,7 +614,7 @@ func TestGetDNSStatus_HealthFields(t *testing.T) {
 func TestAutoConfigureWritesDefaultConfig(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	// No binary, no config file — fresh install.
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	// mkdir and AdGuard start commands must not fail.
 	mock.commands["mkdir -p /opt/AdGuardHome"] = struct {
@@ -644,7 +644,7 @@ func TestAutoConfigureSkipsExistingConfig(t *testing.T) {
 	// Config file already exists.
 	mock.files[adguardYAMLPathOpt] = true
 	mock.fileContents[adguardYAMLPathOpt] = "existing: config\n"
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	_ = svc.AutoConfigure()
 
@@ -693,7 +693,7 @@ func mockAdGuardDNSChecker(initialServers []string) *mockAdGuardChecker {
 // lives in the mock's own file map, so the stack lifecycle can be asserted.
 func newStackScopedAdGuard(t *testing.T, mock *mockAdGuardChecker) *AdGuardService {
 	t.Helper()
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 	svc.dnsStackPath = "dnsmasq-layers.json"
 	return svc
 }
@@ -772,7 +772,7 @@ func newSharedDNSHarness(t *testing.T) *sharedDNSHarness {
 		state:              state,
 		dir:                dir,
 	}
-	adguard := NewAdGuardServiceWithChecker(checker)
+	adguard := NewAdGuardService(checker)
 	// Relative: the checker resolves it under dir, which is the same file the
 	// VpnService is pointed at with an absolute path.
 	adguard.dnsStackPath = "dnsmasq-layers.json"
@@ -780,7 +780,7 @@ func newSharedDNSHarness(t *testing.T) *sharedDNSHarness {
 	u := uci.NewMockUCI()
 	_ = u.Set("network", "wg0", "dns", "10.8.0.1")
 	_ = u.Set("network", "wg0", "disabled", "0")
-	vpn := NewVpnServiceWithRunner(u, cmd)
+	vpn := NewVpnService(VpnDeps{UCI: u, Cmd: cmd})
 	vpn.dnsStackPath = stackPath
 
 	return &sharedDNSHarness{
@@ -1012,7 +1012,7 @@ func TestDNSLayerStack_VPNUnderAdGuardRestoresInOrder(t *testing.T) {
 func TestSetConfig_RejectsInvalidYAML(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	mock.fileContents[adguardYAMLPathOpt] = "bind_host: 0.0.0.0\nbind_port: 3000\n"
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	// Unterminated flow mapping: parses as neither a document nor a mapping.
 	err := svc.SetConfig("dns:\n  upstream_dns: [ \"1.1.1.1\"\n")
@@ -1030,7 +1030,7 @@ func TestSetConfig_RejectsInvalidYAML(t *testing.T) {
 func TestSetConfig_RejectsEmptyBody(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	mock.fileContents[adguardYAMLPathOpt] = "bind_port: 3000\n"
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if err := svc.SetConfig("   \n"); err == nil {
 		t.Fatal("expected SetConfig to reject an empty document")
@@ -1056,7 +1056,7 @@ func TestSetConfig_RestoresBackupWhenListenerNeverComesUp(t *testing.T) {
 	}{"", nil}
 	// Listener never comes back.
 	mock.tcpProbes["127.0.0.1:5353"] = false
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if err := svc.SetConfig("bind_host: 0.0.0.0\nbind_port: 9999\n"); err == nil {
 		t.Fatal("expected SetConfig to fail when the DNS listener never returns")
@@ -1094,7 +1094,7 @@ func TestSetConfig_SucceedsWhenListenerComesUpLate(t *testing.T) {
 	}{"", nil}
 	// Down on the first probe (the pre-flight read), up on the second.
 	mock.tcpProbeSeq["127.0.0.1:5353"] = []bool{false, true}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if err := svc.SetConfig("bind_host: 0.0.0.0\nbind_port: 3000\ndns:\n  port: 5353\n"); err != nil {
 		t.Fatalf("SetConfig: %v", err)
@@ -1118,7 +1118,7 @@ func TestAdGuardService_ConcurrentAccessIsRaceFree(t *testing.T) {
 		body []byte
 		err  error
 	}{body: []byte(`{"num_dns_queries":1}`)}
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	var wg sync.WaitGroup
 	for range 8 {
@@ -1146,7 +1146,7 @@ func TestSetConfig_RemovesBackupOnSuccess(t *testing.T) {
 		err    error
 	}{"", nil}
 	mock.tcpProbes["127.0.0.1:5353"] = true
-	svc := NewAdGuardServiceWithChecker(mock)
+	svc := NewAdGuardService(mock)
 
 	if err := svc.SetConfig("bind_host: 0.0.0.0\nbind_port: 3000\ndns:\n  port: 5353\n"); err != nil {
 		t.Fatalf("SetConfig: %v", err)

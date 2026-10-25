@@ -100,7 +100,7 @@ func sectionFingerprint(opts map[string]string) string {
 
 // markSectionOwned stamps the ownership marker. It runs after every other
 // option of the section is written, because the fingerprint covers them all.
-func (s *FailoverService) markSectionOwned(section string) error {
+func (s *Service) markSectionOwned(section string) error {
 	opts, err := s.uci.GetAll(mwan3ConfigName, section)
 	if err != nil {
 		return fmt.Errorf("read generated mwan3 section %s: %w", section, err)
@@ -149,7 +149,7 @@ func failoverInterfaceSection(interfaceName string) string {
 	return failoverInterfaceSectionPrefix + failoverSectionName(interfaceName)
 }
 
-func (s *FailoverService) backupManagedSections() error {
+func (s *Service) backupManagedSections() error {
 	sections, err := s.uci.GetSections(mwan3ConfigName)
 	if err != nil {
 		sections = map[string]map[string]string{}
@@ -183,7 +183,7 @@ func (s *FailoverService) backupManagedSections() error {
 // stagedApplyMwan3 enforces: it runs precisely while a session is pending, and
 // short-circuiting on errApplyRollingBack would leave the crash guard behind
 // after every failed save.
-func (s *FailoverService) restoreManagedSections() error {
+func (s *Service) restoreManagedSections() error {
 	data, err := os.ReadFile(s.backupPath)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func (s *FailoverService) restoreManagedSections() error {
 	return s.restoreApplyMwan3(func() error { return s.verifyManagedSections(sections) })
 }
 
-func (s *FailoverService) restoreListOption(section, option, value string) error {
+func (s *Service) restoreListOption(section, option, value string) error {
 	for _, item := range strings.Split(value, ",") {
 		item = strings.TrimSpace(item)
 		if item == "" {
@@ -242,7 +242,7 @@ func (s *FailoverService) restoreListOption(section, option, value string) error
 	return nil
 }
 
-func (s *FailoverService) deleteManagedSections() error {
+func (s *Service) deleteManagedSections() error {
 	sections, err := s.uci.GetSections(mwan3ConfigName)
 	if err != nil {
 		return nil
@@ -255,7 +255,7 @@ func (s *FailoverService) deleteManagedSections() error {
 	return s.uci.Commit(mwan3ConfigName)
 }
 
-func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
+func (s *Service) applyManagedConfig(cfg failoverConfigFile) error {
 	if err := s.deleteManagedSections(); err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 // verifyManagedSections requires the live config to match it exactly — but
 // reporting it is the difference between a documented take-over and a silent
 // loss of the operator's reliability/timeout/up/down tuning.
-func (s *FailoverService) adoptSection(section, stype string) error {
+func (s *Service) adoptSection(section, stype string) error {
 	opts, err := s.uci.GetAll(mwan3ConfigName, section)
 	if err == nil && needsBackupSection(section) && !ownedByTravo(opts) {
 		slog.Warn("failover: mwan3 section edited outside Travo; this save replaces the options Travo owns", "section", section)
@@ -352,7 +352,7 @@ func (s *FailoverService) adoptSection(section, stype string) error {
 	return s.uci.AddSection(mwan3ConfigName, section, stype)
 }
 
-func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandidate, health models.FailoverHealthConfig) error {
+func (s *Service) writeInterfaceSection(candidate models.FailoverCandidate, health models.FailoverHealthConfig) error {
 	// Namespaced (ADR 0005 §1): a generated section that shares its name with a
 	// hand-written one is indistinguishable from it on the next save, and the
 	// next save deletes it.
@@ -378,7 +378,7 @@ func (s *FailoverService) writeInterfaceSection(candidate models.FailoverCandida
 	return s.markSectionOwned(sectionName)
 }
 
-func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
+func (s *Service) verifyApply(cfg failoverConfigFile) error {
 	var expect map[string]map[string]string
 	if cfg.Enabled {
 		// Every generated section, with the options that bind them together —
@@ -412,7 +412,7 @@ func (s *FailoverService) verifyApply(cfg failoverConfigFile) error {
 // verifyManagedSections checks that the mwan3 config the service wrote is
 // readable. When expect is non-nil, the given sections must be present and
 // carry the option values in the map (an empty value is not checked).
-func (s *FailoverService) verifyManagedSections(expect map[string]map[string]string) error {
+func (s *Service) verifyManagedSections(expect map[string]map[string]string) error {
 	sections, err := s.uci.GetSections(mwan3ConfigName)
 	if err != nil {
 		return fmt.Errorf("verify mwan3 config: %w", err)
@@ -442,7 +442,7 @@ var mwan3UCIConfigs = []string{"network", "mwan3"}
 
 // stagedApplyMwan3 applies the mwan3 config for a user save, refusing to start
 // while an earlier apply is still rolling back.
-func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
+func (s *Service) stagedApplyMwan3(verify func() error) error {
 	if s.rollbackStillPending() {
 		// An earlier apply in this service is unconfirmed, so its rollback window
 		// is open and rpcd is restoring the pre-apply mwan3 config right now. A
@@ -464,7 +464,7 @@ func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
 // happen then. The stale session id is dropped first — rpcd has a single apply
 // slot, so carrying it into the restore's own apply would record the restore's
 // session under the old deadline if the restore then failed.
-func (s *FailoverService) restoreApplyMwan3(verify func() error) error {
+func (s *Service) restoreApplyMwan3(verify func() error) error {
 	s.pendingApplySession = ""
 	return s.applyMwan3(verify)
 }
@@ -474,7 +474,7 @@ func (s *FailoverService) restoreApplyMwan3(verify func() error) error {
 // still restorable, and only then is the change confirmed. An immediate
 // apply+confirm on a policy that re-routes the WAN would close the rollback
 // window before anything was checked.
-func (s *FailoverService) applyMwan3(verify func() error) error {
+func (s *Service) applyMwan3(verify func() error) error {
 	if !s.serviceInstalled() {
 		return nil
 	}
@@ -509,7 +509,7 @@ func (s *FailoverService) applyMwan3(verify func() error) error {
 }
 
 // reloadMwan3Script is the fallback for services without an rpcd applier.
-func (s *FailoverService) reloadMwan3Script() error {
+func (s *Service) reloadMwan3Script() error {
 	if _, err := s.cmd.Run(s.initScript, "reload"); err != nil {
 		if _, restartErr := s.cmd.Run(s.initScript, "restart"); restartErr != nil {
 			return fmt.Errorf("reload mwan3: %w", err)
@@ -518,7 +518,7 @@ func (s *FailoverService) reloadMwan3Script() error {
 	return nil
 }
 
-func (s *FailoverService) serviceInstalled() bool {
+func (s *Service) serviceInstalled() bool {
 	_, err := os.Stat(s.initScript)
 	return err == nil
 }

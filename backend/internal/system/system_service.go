@@ -45,8 +45,8 @@ func (r *RealStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 	return total, used, free, nil
 }
 
-// SystemService provides system information and statistics.
-type SystemService struct {
+// Service provides system information and statistics.
+type Service struct {
 	ubus    ubus.Ubus
 	uci     uci.UCI
 	storage StorageProvider
@@ -60,20 +60,20 @@ type SystemService struct {
 }
 
 // sshKeysPath returns the authorized_keys path in use.
-func (s *SystemService) sshKeysPath() string {
+func (s *Service) sshKeysPath() string {
 	if s.sshKeysFile != "" {
 		return s.sshKeysFile
 	}
 	return authorizedKeysFile
 }
 
-// NewSystemService creates a new SystemService.
-func NewSystemService(ub ubus.Ubus, u uci.UCI, storage StorageProvider) *SystemService {
-	return &SystemService{ubus: ub, uci: u, storage: storage}
+// New creates a new SystemService.
+func New(ub ubus.Ubus, u uci.UCI, storage StorageProvider) *Service {
+	return &Service{ubus: ub, uci: u, storage: storage}
 }
 
 // SetGuardDir overrides the directory used for crash-guard files (tests).
-func (s *SystemService) SetGuardDir(dir string) { s.guardDir = dir }
+func (s *Service) SetGuardDir(dir string) { s.guardDir = dir }
 
 // Crash guards. Each marks a live-state mutation that is unsafe to blindly
 // retry after a power cut (ADR 0003).
@@ -84,13 +84,13 @@ const (
 	systemConfigGuard    = "system-config"
 )
 
-func (s *SystemService) crashGuard(feature string) guard.Guard {
+func (s *Service) crashGuard(feature string) guard.Guard {
 	return guard.In(s.guardDir, feature)
 }
 
 // LogStaleCrashGuards warns about guards left behind by an interrupted run so
 // the operator can see (and clear) them after a power cut mid-flash.
-func (s *SystemService) LogStaleCrashGuards() {
+func (s *Service) LogStaleCrashGuards() {
 	for _, feature := range []string{restoreGuard, firmwareUpgradeGuard, factoryResetGuard, systemConfigGuard} {
 		g := s.crashGuard(feature)
 		data, err := g.Read()
@@ -102,7 +102,7 @@ func (s *SystemService) LogStaleCrashGuards() {
 }
 
 // GetSystemInfo returns system identification information.
-func (s *SystemService) GetSystemInfo() (models.SystemInfo, error) {
+func (s *Service) GetSystemInfo() (models.SystemInfo, error) {
 	board, err := s.ubus.Call("system", "board", nil)
 	if err != nil {
 		return models.SystemInfo{}, err
@@ -136,7 +136,7 @@ func (s *SystemService) GetSystemInfo() (models.SystemInfo, error) {
 }
 
 // GetSystemStats returns current system statistics.
-func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
+func (s *Service) GetSystemStats() (models.SystemStats, error) {
 	info, err := s.ubus.Call("system", "info", nil)
 	if err != nil {
 		return models.SystemStats{}, err
@@ -213,7 +213,7 @@ func (s *SystemService) GetSystemStats() (models.SystemStats, error) {
 // ReadNetworkStats returns only the per-interface byte counters, without the
 // ubus call and storage probe GetSystemStats also does. The WebSocket hub uses
 // it to keep the traffic history warm while no client is connected.
-func (s *SystemService) ReadNetworkStats() []models.NetworkInterfaceStats {
+func (s *Service) ReadNetworkStats() []models.NetworkInterfaceStats {
 	return readNetworkStats()
 }
 
@@ -264,7 +264,7 @@ func readSysfsCounter(iface, counter string) (int64, error) {
 
 // Reboot initiates a system reboot via ubus.
 // The reboot call is async so the HTTP response returns before the system goes down.
-func (s *SystemService) Reboot() error {
+func (s *Service) Reboot() error {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		_, _ = s.ubus.Call("system", "reboot", nil)
@@ -275,7 +275,7 @@ func (s *SystemService) Reboot() error {
 // Shutdown initiates a system poweroff.
 // The call is async so the HTTP response returns before the system goes down,
 // and it goes through execx so a hung poweroff cannot leak a process.
-func (s *SystemService) Shutdown() error {
+func (s *Service) Shutdown() error {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		if err := execx.Run(execx.Quick, "poweroff"); err != nil {
@@ -287,7 +287,7 @@ func (s *SystemService) Shutdown() error {
 
 // findSystemSection returns the UCI section name for the system-type section.
 // On real OpenWRT it's an anonymous section (e.g. cfg01e48a); in mocks it may be "system".
-func (s *SystemService) findSystemSection() (string, map[string]string, error) {
+func (s *Service) findSystemSection() (string, map[string]string, error) {
 	// Try the named section first (works in mocks and some configs)
 	if opts, err := s.uci.GetAll("system", "system"); err == nil {
 		return "system", opts, nil
@@ -306,7 +306,7 @@ func (s *SystemService) findSystemSection() (string, map[string]string, error) {
 }
 
 // GetTimezone returns the current timezone configuration.
-func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
+func (s *Service) GetTimezone() (models.TimezoneConfig, error) {
 	_, opts, err := s.findSystemSection()
 	if err != nil {
 		// Section may not exist — return empty default
@@ -333,7 +333,7 @@ func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
 // protects is the commit itself: a failure leaves a marker plus a half-written
 // /etc/config/system, which is exactly the state an operator must be told about
 // rather than silently overwritten by the next request.
-func (s *SystemService) commitSystemConfig(what string) error {
+func (s *Service) commitSystemConfig(what string) error {
 	if err := s.crashGuard(systemConfigGuard).Write(what); err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (s *SystemService) commitSystemConfig(what string) error {
 
 // SetTimezone updates the timezone configuration in /etc/config/system.
 // The change takes effect on the next reboot (see commitSystemConfig).
-func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
+func (s *Service) SetTimezone(config models.TimezoneConfig) error {
 	section, _, err := s.findSystemSection()
 	if err != nil {
 		return fmt.Errorf("finding system section: %w", err)
@@ -361,7 +361,7 @@ func (s *SystemService) SetTimezone(config models.TimezoneConfig) error {
 }
 
 // GetNTPConfig returns the NTP time synchronization configuration.
-func (s *SystemService) GetNTPConfig() (models.NTPConfig, error) {
+func (s *Service) GetNTPConfig() (models.NTPConfig, error) {
 	opts, err := s.uci.GetAll("system", "ntp")
 	if err != nil {
 		// Section may not exist — return defaults
@@ -382,7 +382,7 @@ func (s *SystemService) GetNTPConfig() (models.NTPConfig, error) {
 // SetNTPConfig updates the NTP time synchronization configuration.
 // The change takes effect on the next reboot (see commitSystemConfig); use
 // SyncNTP for an immediate one-shot resync.
-func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
+func (s *Service) SetNTPConfig(config models.NTPConfig) error {
 	enabled := "1"
 	if !config.Enabled {
 		enabled = "0"
@@ -397,7 +397,7 @@ func (s *SystemService) SetNTPConfig(config models.NTPConfig) error {
 }
 
 // SyncNTP forces a one-shot NTP sync using ntpd.
-func (s *SystemService) SyncNTP() error {
+func (s *Service) SyncNTP() error {
 	out, err := execx.CombinedOutput(execx.Slow, "ntpd", "-q", "-n", "-p", "pool.ntp.org")
 	if err != nil {
 		return fmt.Errorf("ntp sync failed: %w: %s", err, strings.TrimSpace(string(out)))
@@ -407,7 +407,7 @@ func (s *SystemService) SyncNTP() error {
 
 // SetHostname changes the device hostname in /etc/config/system.
 // The change takes effect on the next reboot (see commitSystemConfig).
-func (s *SystemService) SetHostname(hostname string) error {
+func (s *Service) SetHostname(hostname string) error {
 	section, _, err := s.findSystemSection()
 	if err != nil {
 		return fmt.Errorf("finding system section: %w", err)
@@ -496,7 +496,7 @@ const restoreArchiveNeedsUCIConfig = "etc/config/"
 // fasthttp, every other connection) for that long. Only the pre-flight
 // failures are reported synchronously; the guard file stays on disk because the
 // device reboots before anyone could clear it.
-func (s *SystemService) FactoryReset() error {
+func (s *Service) FactoryReset() error {
 	// Pre-flight only: a missing binary is a real, reportable failure. The
 	// long-running firstboot itself happens in the background below.
 	if _, err := exec.LookPath("firstboot"); err != nil {
@@ -520,13 +520,13 @@ func (s *SystemService) FactoryReset() error {
 const setupCompleteFlagPath = "/etc/travo/setup-complete"
 
 // GetSetupComplete checks whether the first-run setup has been completed.
-func (s *SystemService) GetSetupComplete() models.SetupStatus {
+func (s *Service) GetSetupComplete() models.SetupStatus {
 	_, err := os.Stat(setupCompleteFlagPath)
 	return models.SetupStatus{Complete: err == nil}
 }
 
 // SetSetupComplete marks the first-run setup as completed by creating the flag file.
-func (s *SystemService) SetSetupComplete() error {
+func (s *Service) SetSetupComplete() error {
 	dir := filepath.Dir(setupCompleteFlagPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create setup dir: %w", err)
@@ -549,7 +549,7 @@ const speedTestResultFile = "/tmp/openwrt-speed-test.json"
 
 // RunSpeedTest runs a basic speed test using wget and writes results.
 // On constrained hardware this performs a simple HTTP download measurement.
-func (s *SystemService) RunSpeedTest() (models.SpeedTestResult, error) {
+func (s *Service) RunSpeedTest() (models.SpeedTestResult, error) {
 	result := models.SpeedTestResult{Server: "tele2.net (wget)"}
 
 	// Measure download: fetch a 1MB test file and time it

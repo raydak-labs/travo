@@ -13,7 +13,7 @@ import (
 )
 
 // GetLEDStatus returns the current stealth mode state by checking LED brightness.
-func (s *SystemService) GetLEDStatus() models.LEDStatus {
+func (s *Service) GetLEDStatus() models.LEDStatus {
 	leds := listLEDs()
 	allOff := len(leds) > 0
 	var ledInfos []models.LEDInfo
@@ -40,7 +40,7 @@ func (s *SystemService) GetLEDStatus() models.LEDStatus {
 }
 
 // SetLEDStealthMode turns all LEDs off (stealth) or restores them.
-func (s *SystemService) SetLEDStealthMode(stealth bool) error {
+func (s *Service) SetLEDStealthMode(stealth bool) error {
 	leds := listLEDs()
 	for _, led := range leds {
 		path := filepath.Join("/sys/class/leds", led, "brightness")
@@ -75,7 +75,7 @@ const ledCronTag = "# openwrt-travel-gui-led-schedule"
 const ledCrontabPath = "/etc/crontabs/root"
 
 // GetLEDSchedule reads the LED stealth schedule from crontab.
-func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
+func (s *Service) GetLEDSchedule() models.LEDSchedule {
 	data, err := os.ReadFile("/etc/crontabs/root")
 	if err != nil {
 		return models.LEDSchedule{}
@@ -107,7 +107,7 @@ func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 // Shares crontabMu with the WiFi schedule: both rewrite /etc/crontabs/root
 // while preserving the lines they do not own, so a concurrent pair would drop
 // one another's entries.
-func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
+func (s *Service) SetLEDSchedule(schedule models.LEDSchedule) error {
 	platform.CrontabMu.
 		Lock()
 	defer platform.CrontabMu.Unlock()

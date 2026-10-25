@@ -41,22 +41,20 @@ type StatsHistoryService struct {
 	stopOnce   sync.Once
 }
 
-// NewStatsHistoryService creates a history service that samples every interval.
-func NewStatsHistoryService(checker AlertChecker, interval time.Duration, maxPoints int) *StatsHistoryService {
-	return &StatsHistoryService{
+// NewStatsHistoryService creates a history service. With a db the ring buffer
+// persists there, and previously flushed points (newest maxPoints) are restored.
+func NewStatsHistoryService(checker AlertChecker, interval time.Duration, maxPoints int, db *store.Store) *StatsHistoryService {
+	s := &StatsHistoryService{
 		points:   make([]StatsHistoryPoint, 0, maxPoints),
 		maxLen:   maxPoints,
 		interval: interval,
 		checker:  checker,
 		stopCh:   make(chan struct{}),
+		db:       db,
 	}
-}
-
-// NewStatsHistoryServiceWithStore creates a history service whose ring buffer
-// persists in db, restoring any previously flushed points (newest maxPoints).
-func NewStatsHistoryServiceWithStore(checker AlertChecker, interval time.Duration, maxPoints int, db *store.Store) *StatsHistoryService {
-	s := NewStatsHistoryService(checker, interval, maxPoints)
-	s.db = db
+	if db == nil {
+		return s
+	}
 	if data, err := db.Get(statsHistoryBucket, statsHistoryKey); err == nil && data != nil {
 		var restored []StatsHistoryPoint
 		if err := json.Unmarshal(data, &restored); err == nil {

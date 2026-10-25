@@ -29,11 +29,11 @@ type SQMService struct {
 	cmd platform.CommandRunner
 }
 
-func NewSQMService(u uci.UCI) *SQMService {
-	return &SQMService{uci: u, cmd: &platform.RealCommandRunner{}}
-}
-
-func NewSQMServiceWithRunner(u uci.UCI, cmd platform.CommandRunner) *SQMService {
+// NewSQMService creates an SQMService; a nil cmd runs real commands.
+func NewSQMService(u uci.UCI, cmd platform.CommandRunner) *SQMService {
+	if cmd == nil {
+		cmd = &platform.RealCommandRunner{}
+	}
 	return &SQMService{uci: u, cmd: cmd}
 }
 

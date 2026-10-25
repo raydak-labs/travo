@@ -25,16 +25,16 @@ import (
 
 // newSSHKeyTestService returns a SystemService whose authorized_keys path is a
 // temp file, so the index handling can be exercised off-device.
-func newSSHKeyTestService(t *testing.T, path string) *SystemService {
+func newSSHKeyTestService(t *testing.T, path string) *Service {
 	t.Helper()
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 	svc.sshKeysFile = path
 	return svc
 }
 
 func TestGetSystemInfo(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	info, err := svc.GetSystemInfo()
 	if err != nil {
@@ -59,7 +59,7 @@ func TestGetSystemInfo(t *testing.T) {
 
 func TestGetSystemStats(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -86,7 +86,7 @@ func TestGetSystemStats(t *testing.T) {
 
 func TestGetSystemInfo_StorageNotHardcoded(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -116,7 +116,7 @@ func TestGetSystemInfo_StorageNotHardcoded(t *testing.T) {
 
 func TestGetSystemInfo_CpuUsageReasonable(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -139,7 +139,7 @@ func TestGetSystemInfo_CpuUsageReasonable(t *testing.T) {
 func TestGetSystemStats_CustomStorageProvider(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	custom := &testStorageProvider{total: 1073741824, used: 536870912, free: 536870912}
-	svc := NewSystemService(ub, uci.NewMockUCI(), custom)
+	svc := New(ub, uci.NewMockUCI(), custom)
 
 	stats, err := svc.GetSystemStats()
 	if err != nil {
@@ -341,7 +341,7 @@ Tue Mar 11 09:17:53 2026 daemon.info dnsmasq[1234]: info msg`
 func TestSetHostname(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 	svc.SetGuardDir(t.TempDir())
 
 	if err := svc.SetHostname("MyRouter"); err != nil {
@@ -361,7 +361,7 @@ func TestSetHostname(t *testing.T) {
 func TestGetTimezone(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 
 	config, err := svc.GetTimezone()
 	if err != nil {
@@ -378,7 +378,7 @@ func TestGetTimezone(t *testing.T) {
 func TestSetTimezone(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 	svc.SetGuardDir(t.TempDir())
 
 	err := svc.SetTimezone(models.TimezoneConfig{
@@ -404,7 +404,7 @@ func TestSetTimezone(t *testing.T) {
 func TestGetNTPConfig(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 
 	config, err := svc.GetNTPConfig()
 	if err != nil {
@@ -424,7 +424,7 @@ func TestGetNTPConfig(t *testing.T) {
 func TestSetNTPConfig(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 	svc.SetGuardDir(t.TempDir())
 
 	err := svc.SetNTPConfig(models.NTPConfig{
@@ -460,7 +460,7 @@ func TestGetNTPConfig_DefaultsWhenMissing(t *testing.T) {
 	if err := u.DeleteSection("system", "ntp"); err != nil {
 		t.Fatalf("failed to delete ntp section: %v", err)
 	}
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 
 	config, err := svc.GetNTPConfig()
 	if err != nil {
@@ -514,7 +514,7 @@ func mockBoardDevices() []string { return []string{"gl-mt3000", "glinet,gl-mt300
 
 func TestUpgradeFirmware_SavesFile(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 	svc.SetGuardDir(t.TempDir())
 	// The flash goroutine must finish inside this test, or it would pick up a
 	// later test's PATH and record a call that has nothing to do with it.
@@ -719,7 +719,7 @@ func assertNoStagedFirmware(t *testing.T) {
 
 func TestGetSetupComplete_NotComplete(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 
 	status := svc.GetSetupComplete()
 	if status.Complete {
@@ -813,7 +813,7 @@ func TestBuildButtonActionsJSON_RoundTrip(t *testing.T) {
 func TestGetTimezone_MissingSection(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	u := uci.NewMockUCI()
-	svc := NewSystemService(ub, u, &MockStorageProvider{})
+	svc := New(ub, u, &MockStorageProvider{})
 
 	// Delete the system section to simulate it missing
 	err := u.DeleteSection("system", "system")
@@ -834,9 +834,9 @@ func TestGetTimezone_MissingSection(t *testing.T) {
 
 // --- Crash guards for device-mutating operations (ADR 0003) ---
 
-func newGuardedSystemService(t *testing.T) (*SystemService, string) {
+func newGuardedSystemService(t *testing.T) (*Service, string) {
 	t.Helper()
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 	dir := t.TempDir()
 	svc.SetGuardDir(dir)
 	return svc, dir
@@ -1225,7 +1225,7 @@ func TestUniqueTempPath_IsUniqueAndFree(t *testing.T) {
 // numbers overlap. A negative value is nonsense in the UI.
 func TestGetSystemStats_ClampsNegativeMemoryUsage(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := NewSystemService(ub, uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ub, uci.NewMockUCI(), &MockStorageProvider{})
 	ub.RegisterResponse("system.info", map[string]any{
 		"memory": map[string]any{
 			"total":    float64(1024),
@@ -1360,7 +1360,7 @@ func TestDeleteSSHKey_RejectsOutOfRangeIndex(t *testing.T) {
 // A malformed button-actions.json must not be reported as "no buttons
 // configured": the hotplug script on disk still runs the previous actions.
 func TestGetHardwareButtons_SurfacesParseFailure(t *testing.T) {
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 
 	// No file at all is not an error: nothing has been configured yet.
 	if _, err := svc.GetHardwareButtons(); err != nil {
@@ -1380,7 +1380,7 @@ func TestGetHardwareButtons_SurfacesParseFailure(t *testing.T) {
 // encoding/json replaced a hand-rolled parser: names containing escapes and
 // reordered keys must round-trip.
 func TestLoadButtonActions_HandlesReorderedAndEscapedJSON(t *testing.T) {
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 	if err := os.WriteFile(buttonActionsFile, []byte(`[{"action":"reboot","name":"reset"},{"name":"wps","action":"led_toggle"}]`), 0o600); err != nil {
 		t.Skipf("cannot write %s on this host: %v", buttonActionsFile, err)
 	}

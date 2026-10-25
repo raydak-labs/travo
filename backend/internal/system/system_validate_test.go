@@ -35,7 +35,7 @@ func TestValidateButtonName(t *testing.T) {
 }
 
 func TestAddSSHKeyRejectsMultilineAndGarbage(t *testing.T) {
-	s := NewSystemService(nil, nil, nil)
+	s := New(nil, nil, nil)
 	if err := s.AddSSHKey("ssh-ed25519 AAAA user@host\nssh-rsa AAAA evil@host"); err == nil {
 		t.Error("expected multi-line key to be rejected")
 	}

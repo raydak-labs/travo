@@ -43,7 +43,7 @@ func buildVnstatJSON(ifaces []vnstatInterface) []byte {
 }
 
 func TestGetDataStatus_NotInstalled(t *testing.T) {
-	svc := NewDataUsageServiceWithRunner(&mockDataUsageRunner{installed: false})
+	svc := NewDataUsageService(&mockDataUsageRunner{installed: false})
 	status, err := svc.GetStatus()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -89,7 +89,7 @@ func TestGetDataStatus_Installed_ParsesOutput(t *testing.T) {
 		installed:    true,
 		vnstatOutput: buildVnstatJSON([]vnstatInterface{iface}),
 	}
-	svc := NewDataUsageServiceWithRunner(runner)
+	svc := NewDataUsageService(runner)
 	status, err := svc.GetStatus()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -119,7 +119,7 @@ func TestGetDataStatus_Installed_ParsesOutput(t *testing.T) {
 }
 
 func TestGetBudget_NoFile(t *testing.T) {
-	svc := NewDataUsageServiceWithRunner(&mockDataUsageRunner{
+	svc := NewDataUsageService(&mockDataUsageRunner{
 		installed: true,
 		files:     map[string][]byte{},
 	})
@@ -134,7 +134,7 @@ func TestGetBudget_NoFile(t *testing.T) {
 
 func TestSetAndGetBudget(t *testing.T) {
 	runner := &mockDataUsageRunner{installed: true, files: map[string][]byte{}}
-	svc := NewDataUsageServiceWithRunner(runner)
+	svc := NewDataUsageService(runner)
 
 	input := models.DataBudgetConfig{
 		Budgets: []models.DataBudget{
@@ -189,7 +189,7 @@ func TestCheckBudgetAlerts_OverThreshold(t *testing.T) {
 		vnstatOutput: buildVnstatJSON([]vnstatInterface{iface}),
 		files:        map[string][]byte{dataBudgetConfigPath: []byte(budgetJSON)},
 	}
-	svc := NewDataUsageServiceWithRunner(runner)
+	svc := NewDataUsageService(runner)
 	alerts := svc.CheckBudgetAlerts()
 	if len(alerts) == 0 {
 		t.Fatal("expected at least one budget alert")
@@ -222,7 +222,7 @@ func TestCheckBudgetAlerts_UnderThreshold(t *testing.T) {
 		vnstatOutput: buildVnstatJSON([]vnstatInterface{iface}),
 		files:        map[string][]byte{dataBudgetConfigPath: []byte(budgetJSON)},
 	}
-	svc := NewDataUsageServiceWithRunner(runner)
+	svc := NewDataUsageService(runner)
 	alerts := svc.CheckBudgetAlerts()
 	if len(alerts) != 0 {
 		t.Errorf("expected no alerts under threshold, got: %v", alerts)

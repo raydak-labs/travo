@@ -44,7 +44,7 @@ func detectButtonNames() []string {
 // GetHardwareButtons returns the detected hardware buttons with their configured
 // actions. The config-parse error is surfaced so the caller can report it rather
 // than show "no buttons configured" without a hint.
-func (s *SystemService) GetHardwareButtons() ([]models.HardwareButton, error) {
+func (s *Service) GetHardwareButtons() ([]models.HardwareButton, error) {
 	names := detectButtonNames()
 	configured, err := s.loadButtonActions()
 	if err != nil {
@@ -66,7 +66,7 @@ func (s *SystemService) GetHardwareButtons() ([]models.HardwareButton, error) {
 }
 
 // SetButtonActions saves button action config and regenerates the hotplug script.
-func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error {
+func (s *Service) SetButtonActions(buttons []models.HardwareButton) error {
 	// Validate actions and names. Names become `case` labels in a root hotplug
 	// shell script, so anything outside the detected devicetree labels (and
 	// outside [A-Za-z0-9_-]) must be rejected before the script is written.
@@ -109,7 +109,7 @@ func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error 
 // A missing file is not an error (nothing configured yet); a malformed one is,
 // because silently reporting "no buttons configured" while the hotplug script
 // keeps firing the previous actions is a real misconfiguration.
-func (s *SystemService) loadButtonActions() ([]models.HardwareButton, error) {
+func (s *Service) loadButtonActions() ([]models.HardwareButton, error) {
 	data, err := os.ReadFile(buttonActionsFile)
 	if err != nil {
 		if os.IsNotExist(err) {

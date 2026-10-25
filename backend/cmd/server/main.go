@@ -124,7 +124,7 @@ type appLifecycle struct {
 	alertSvc        *system.AlertService
 	uptimeTracker   *network.UptimeTracker
 	bandSwitchSvc   *wifi.BandSwitchingService
-	failoverSvc     *failover.FailoverService
+	failoverSvc     *failover.Service
 	blocklist       *auth.TokenBlocklist
 	netWatcher      network.EventWatcher
 	rateLimiter     *auth.RateLimiter
@@ -330,14 +330,14 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		captiveProber = platform.NewRealHTTPProber()
 	}
 
-	systemSvc := system.NewSystemService(ub, u, storage)
+	systemSvc := system.New(ub, u, storage)
 	if !cfg.MockMode {
 		// Surface crash guards left behind by an interrupted run (flash,
 		// restore, factory reset) so the state is not silently forgotten.
 		systemSvc.LogStaleCrashGuards()
 	}
 	networkSvc := network.New(network.Deps{UCI: u, Ubus: ub})
-	sqmSvc := network.NewSQMService(u)
+	sqmSvc := network.NewSQMService(u, nil)
 
 	// Create event watcher (noop in mock mode to avoid running ubus on dev machines).
 	var netWatcher network.EventWatcher
@@ -361,14 +361,19 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		startWifiReconciliation(lifecycle, wifiSvc)
 	}
 
-	vpnSvc := uplink.NewVpnService(u)
-	svcManager := system.NewServiceManager()
-	captiveSvc := uplink.NewCaptiveServiceWithUCI(captiveProber, u, &platform.RealCommandRunner{})
-	adguardSvc := uplink.NewAdGuardService()
-	dataUsageSvc := network.NewDataUsageService()
-	usbTetherSvc := network.NewUSBTetheringService()
+	vpnSvc := uplink.NewVpnService(uplink.VpnDeps{UCI: u})
+	svcManager := system.NewServiceManager(nil, nil)
+	svcManager.RefreshCache()
+	captiveSvc := uplink.NewCaptiveService(uplink.CaptiveDeps{Prober: captiveProber, UCI: u, Cmd: &platform.RealCommandRunner{}})
+	captiveSvc.StartAutoRestore()
+	adguardSvc := uplink.NewAdGuardService(nil)
+	dataUsageSvc := network.NewDataUsageService(nil)
+	usbTetherSvc := network.NewUSBTetheringService(nil)
 	bandSwitchSvc := wifi.NewBandSwitchingService(wifiSvc, "/etc/travo/band-switching.json")
-	failoverSvc := failover.NewFailoverService(u, ub, networkSvc, rootPassword)
+	failoverSvc := failover.New(failover.Deps{
+		UCI: u, Ubus: ub, Network: networkSvc,
+		Applier: platform.NewRealUCIApplyConfirm(ub, rootPassword),
+	})
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
@@ -385,9 +390,9 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// Stats history: collect every 30s, keep 720 points (~6 hours)
 	var statsHistory *system.StatsHistoryService
 	if db != nil {
-		statsHistory = system.NewStatsHistoryServiceWithStore(systemSvc, 30*time.Second, 720, db)
+		statsHistory = system.NewStatsHistoryService(systemSvc, 30*time.Second, 720, db)
 	} else {
-		statsHistory = system.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
+		statsHistory = system.NewStatsHistoryService(systemSvc, 30*time.Second, 720, nil)
 	}
 	statsHistory.Start()
 
@@ -457,7 +462,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		Failover:       failoverSvc,
 		StatsHistory:   statsHistory,
 		TrafficHistory: trafficHistory,
-		Speedtest:      system.NewSpeedtestService(),
+		Speedtest:      system.NewSpeedtestService(nil),
 
 		TimeSyncMinPlausible: minPlausibleTime(),
 		TimeSyncLimiter:      timeSyncLimiter,

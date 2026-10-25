@@ -6,7 +6,7 @@ import (
 
 func TestInstallSpeedtestCLI_UsesPackageManager(t *testing.T) {
 	pkg := NewMockPackageManager()
-	svc := NewSpeedtestServiceWith(pkg)
+	svc := NewSpeedtestService(pkg)
 
 	if err := svc.InstallSpeedtestCLI(); err != nil {
 		t.Fatalf("install failed: %v", err)
@@ -22,7 +22,7 @@ func TestInstallSpeedtestCLI_UsesPackageManager(t *testing.T) {
 func TestInstallSpeedtestCLI_AlreadyInstalled(t *testing.T) {
 	pkg := NewMockPackageManager()
 	_, _ = pkg.Install("speedtest")
-	svc := NewSpeedtestServiceWith(pkg)
+	svc := NewSpeedtestService(pkg)
 
 	if err := svc.InstallSpeedtestCLI(); err == nil {
 		t.Error("expected error when already installed")
@@ -32,7 +32,7 @@ func TestInstallSpeedtestCLI_AlreadyInstalled(t *testing.T) {
 func TestUninstallSpeedtestCLI_UsesPackageManager(t *testing.T) {
 	pkg := NewMockPackageManager()
 	_, _ = pkg.Install("speedtest")
-	svc := NewSpeedtestServiceWith(pkg)
+	svc := NewSpeedtestService(pkg)
 
 	if err := svc.UninstallSpeedtestCLI(); err != nil {
 		t.Fatalf("uninstall failed: %v", err)
@@ -43,7 +43,7 @@ func TestUninstallSpeedtestCLI_UsesPackageManager(t *testing.T) {
 }
 
 func TestUninstallSpeedtestCLI_NotInstalled(t *testing.T) {
-	svc := NewSpeedtestServiceWith(NewMockPackageManager())
+	svc := NewSpeedtestService(NewMockPackageManager())
 	if err := svc.UninstallSpeedtestCLI(); err == nil {
 		t.Error("expected error when not installed")
 	}

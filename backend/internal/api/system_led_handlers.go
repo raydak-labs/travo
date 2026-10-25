@@ -9,14 +9,14 @@ import (
 )
 
 // GetLEDStatusHandler handles GET /api/v1/system/leds.
-func GetLEDStatusHandler(svc *system.SystemService) fiber.Handler {
+func GetLEDStatusHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetLEDStatus())
 	}
 }
 
 // SetLEDStealthHandler handles PUT /api/v1/system/leds.
-func SetLEDStealthHandler(svc *system.SystemService) fiber.Handler {
+func SetLEDStealthHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetLEDRequest
 		// Strict: a body naming the wrong field must be a 400, not a 200 that
@@ -34,14 +34,14 @@ func SetLEDStealthHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // GetLEDScheduleHandler handles GET /api/v1/system/leds/schedule.
-func GetLEDScheduleHandler(svc *system.SystemService) fiber.Handler {
+func GetLEDScheduleHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetLEDSchedule())
 	}
 }
 
 // SetLEDScheduleHandler handles PUT /api/v1/system/leds/schedule.
-func SetLEDScheduleHandler(svc *system.SystemService) fiber.Handler {
+func SetLEDScheduleHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.LEDSchedule
 		// Strict: this persists the whole schedule. On the permissive binder a

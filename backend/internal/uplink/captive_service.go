@@ -72,33 +72,33 @@ type dnsBackup struct {
 	Time             int64    `json:"time"`
 }
 
-// NewCaptiveService creates a new CaptiveService with the given HTTP prober.
-func NewCaptiveService(prober platform.HTTPProber) *CaptiveService {
-	return &CaptiveService{prober: prober, dnsGuard: guard.New(captiveDNSGuardFeature), stopCh: make(chan struct{})}
+// CaptiveDeps are the collaborators of a CaptiveService. Without UCI the DNS
+// bypass is a no-op (mock mode).
+type CaptiveDeps struct {
+	Prober platform.HTTPProber
+	UCI    uci.UCI
+	Cmd    platform.CommandRunner
+	// Guard holds the bypass state; default the captive-dns guard.
+	Guard guard.Guard
 }
 
-// NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
-func NewCaptiveServiceWithUCI(prober platform.HTTPProber, u uci.UCI, cmd platform.CommandRunner) *CaptiveService {
-	svc := newCaptiveServiceWithGuard(prober, u, cmd, guard.New(captiveDNSGuardFeature))
-	// Auto-restore stale bypass on startup. Tracked by the app lifecycle: Stop()
-	// must be able to keep this goroutine from restoring DNS after the process
-	// has begun shutting down.
-	svc.wg.Add(1)
+// NewCaptiveService creates a CaptiveService. Call StartAutoRestore to restore
+// a bypass left stale by a previous run.
+func NewCaptiveService(d CaptiveDeps) *CaptiveService {
+	if d.Guard == (guard.Guard{}) {
+		d.Guard = guard.New(captiveDNSGuardFeature)
+	}
+	return &CaptiveService{prober: d.Prober, uci: d.UCI, cmd: d.Cmd, dnsGuard: d.Guard, stopCh: make(chan struct{})}
+}
+
+// StartAutoRestore restores a stale bypass in the background. Stop() keeps
+// the goroutine from restoring DNS after shutdown has begun.
+func (c *CaptiveService) StartAutoRestore() {
+	c.wg.Add(1)
 	go func() {
-		defer svc.wg.Done()
-		svc.autoRestoreStaleBypass()
+		defer c.wg.Done()
+		c.autoRestoreStaleBypass()
 	}()
-	return svc
-}
-
-// NewCaptiveServiceWithGuard is NewCaptiveServiceWithUCI with the bypass state
-// in an explicit guard and without the startup auto-restore.
-func NewCaptiveServiceWithGuard(prober platform.HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
-	return newCaptiveServiceWithGuard(prober, u, cmd, g)
-}
-
-func newCaptiveServiceWithGuard(prober platform.HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
-	return &CaptiveService{prober: prober, uci: u, cmd: cmd, dnsGuard: g, stopCh: make(chan struct{})}
 }
 
 // Stop cancels the startup auto-restore goroutine and waits for it to finish.

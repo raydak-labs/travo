@@ -8,7 +8,7 @@ import (
 )
 
 // GetFailoverConfigHandler handles GET /api/v1/network/failover.
-func GetFailoverConfigHandler(svc *failover.FailoverService) fiber.Handler {
+func GetFailoverConfigHandler(svc *failover.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetConfig()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetFailoverConfigHandler(svc *failover.FailoverService) fiber.Handler {
 }
 
 // SetFailoverConfigHandler handles PUT /api/v1/network/failover.
-func SetFailoverConfigHandler(svc *failover.FailoverService) fiber.Handler {
+func SetFailoverConfigHandler(svc *failover.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.FailoverConfig
 		if err := BindStrictBodyConfig(c, &cfg); err != nil {
@@ -33,7 +33,7 @@ func SetFailoverConfigHandler(svc *failover.FailoverService) fiber.Handler {
 }
 
 // GetFailoverEventsHandler handles GET /api/v1/network/failover/events.
-func GetFailoverEventsHandler(svc *failover.FailoverService) fiber.Handler {
+func GetFailoverEventsHandler(svc *failover.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetEvents())
 	}

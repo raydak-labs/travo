@@ -98,13 +98,12 @@ type USBTetheringService struct {
 	crashGuard guard.Guard
 }
 
-// NewUSBTetheringService creates a service backed by the real system.
-func NewUSBTetheringService() *USBTetheringService {
-	return &USBTetheringService{runner: &RealUSBTetherRunner{}, crashGuard: guard.New("usbtether")}
-}
-
-// NewUSBTetheringServiceWithRunner creates a service with a custom runner (tests).
-func NewUSBTetheringServiceWithRunner(r USBTetherRunner) *USBTetheringService {
+// NewUSBTetheringService creates a USBTetheringService; a nil runner uses the
+// real system.
+func NewUSBTetheringService(r USBTetherRunner) *USBTetheringService {
+	if r == nil {
+		r = &RealUSBTetherRunner{}
+	}
 	return &USBTetheringService{runner: r, crashGuard: guard.New("usbtether")}
 }
 

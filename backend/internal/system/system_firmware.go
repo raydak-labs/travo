@@ -267,7 +267,7 @@ func normaliseBoardName(s string) string {
 // vendor part of "glinet,gl-mt3000-nand" and re-admits a sibling board's
 // image — the exact flash this check must refuse. The whole name is matched as
 // one unit by SupportsDevice instead.
-func (s *SystemService) boardIdentity() (string, []string, error) {
+func (s *Service) boardIdentity() (string, []string, error) {
 	board, err := s.ubus.Call("system", "board", nil)
 	if err != nil {
 		return "", nil, err
@@ -295,7 +295,7 @@ func (s *SystemService) boardIdentity() (string, []string, error) {
 // ValidateFirmwareImage parses the OpenWrt metadata of an uploaded image and
 // checks it against this board. It is exported so a handler can validate an
 // upload before staging it.
-func (s *SystemService) ValidateFirmwareImage(file io.Reader) (FirmwareMetadata, error) {
+func (s *Service) ValidateFirmwareImage(file io.Reader) (FirmwareMetadata, error) {
 	meta, err := ParseFirmwareMetadata(file)
 	if err != nil {
 		return FirmwareMetadata{}, fmt.Errorf("%w: %w", ErrInvalidFirmware, err)
@@ -330,7 +330,7 @@ func (s *SystemService) ValidateFirmwareImage(file io.Reader) (FirmwareMetadata,
 //
 // The flash is asynchronous — it takes minutes and reboots the device — and
 // runs under a crash guard so a power cut mid-write is visible after reboot.
-func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) (FirmwareMetadata, error) {
+func (s *Service) UpgradeFirmware(file io.Reader, keepSettings bool) (FirmwareMetadata, error) {
 	firmwarePath, err := uniqueTempPath("/tmp", "firmware-*.bin")
 	if err != nil {
 		return FirmwareMetadata{}, err

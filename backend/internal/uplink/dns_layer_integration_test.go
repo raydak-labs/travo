@@ -122,7 +122,7 @@ func newLayerTestVpn(t *testing.T, u uci.UCI, dev *fakeDevice, dir string) *VpnS
 	if err := u.Set("network", "wg0", "dns", "10.8.0.1"); err != nil {
 		t.Fatalf("set wg0 dns: %v", err)
 	}
-	svc := NewVpnServiceWithRunner(u, dev)
+	svc := NewVpnService(VpnDeps{UCI: u, Cmd: dev})
 	svc.crashGuard = guard.In(dir, "vpn")
 	svc.dnsStackPath = filepath.Join(dir, dnsmasqLayerStackFileName)
 	return svc

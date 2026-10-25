@@ -12,7 +12,7 @@ import (
 
 func TestSQMService_GetConfig_DefaultsWhenMissing(t *testing.T) {
 	u := uci.NewMockUCI()
-	s := NewSQMServiceWithRunner(u, &platform.MockCommandRunner{})
+	s := NewSQMService(u, &platform.MockCommandRunner{})
 
 	cfg, err := s.GetConfig()
 	if err != nil {
@@ -28,7 +28,7 @@ func TestSQMService_GetConfig_DefaultsWhenMissing(t *testing.T) {
 
 func TestSQMService_SetConfig_CreatesSectionAndCommits(t *testing.T) {
 	u := uci.NewMockUCI()
-	s := NewSQMServiceWithRunner(u, &platform.MockCommandRunner{})
+	s := NewSQMService(u, &platform.MockCommandRunner{})
 
 	err := s.SetConfig(models.SQMConfig{
 		Enabled:      true,
@@ -63,7 +63,7 @@ func TestSQMService_SetConfig_CreatesSectionAndCommits(t *testing.T) {
 
 func TestSQMService_SetConfig_Validates(t *testing.T) {
 	u := uci.NewMockUCI()
-	s := NewSQMServiceWithRunner(u, &platform.MockCommandRunner{})
+	s := NewSQMService(u, &platform.MockCommandRunner{})
 
 	if err := s.SetConfig(models.SQMConfig{Enabled: true}); err == nil {
 		t.Fatalf("expected validation error")
@@ -84,7 +84,7 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 			return []byte("ok"), nil
 		},
 	}
-	s := NewSQMServiceWithRunner(u, cmd)
+	s := NewSQMService(u, cmd)
 
 	out, err := s.Apply()
 	if err != nil {
@@ -117,7 +117,7 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 func TestSQMService_SetConfig_TakesTheSqmConfigLock(t *testing.T) {
 	t.Parallel()
 
-	s := NewSQMServiceWithRunner(uci.NewMockUCI(), &platform.MockCommandRunner{})
+	s := NewSQMService(uci.NewMockUCI(), &platform.MockCommandRunner{})
 	unlock := platform.LockUCIConfigs("sqm")
 	done := make(chan error, 1)
 	go func() {

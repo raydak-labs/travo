@@ -5,14 +5,14 @@ import (
 )
 
 func TestNewSpeedtestService(t *testing.T) {
-	svc := NewSpeedtestService()
+	svc := NewSpeedtestService(nil)
 	if svc == nil {
 		t.Fatal("NewSpeedtestService returned nil")
 	}
 }
 
 func TestGetSpeedtestServiceStatus(t *testing.T) {
-	svc := NewSpeedtestService()
+	svc := NewSpeedtestService(nil)
 	status, err := svc.GetSpeedtestServiceStatus()
 	if err != nil {
 		t.Fatalf("GetSpeedtestServiceStatus failed: %v", err)
@@ -26,7 +26,7 @@ func TestGetSpeedtestServiceStatus(t *testing.T) {
 }
 
 func TestCheckInstallation(t *testing.T) {
-	svc := NewSpeedtestService()
+	svc := NewSpeedtestService(nil)
 	installed, version := svc.checkInstallation()
 	if installed && version == "" {
 		t.Error("Version should not be empty when installed")

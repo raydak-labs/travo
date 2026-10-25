@@ -34,34 +34,29 @@ type VpnService struct {
 	dnsHealSince  time.Time
 }
 
-// NewVpnService creates a new VpnService with a real command runner.
-func NewVpnService(u uci.UCI) *VpnService {
-	return &VpnService{
-		uci:          u,
-		cmd:          &platform.RealCommandRunner{},
-		profilesPath: "/etc/travo/wireguard_profiles.json",
-		crashGuard:   guard.New("vpn"),
-		dnsStackPath: dnsmasqLayerStackPath,
-	}
+// VpnDeps are the collaborators of a VpnService. Zero values take the
+// production defaults.
+type VpnDeps struct {
+	UCI uci.UCI
+	// Cmd runs shell commands; default platform.RealCommandRunner.
+	Cmd platform.CommandRunner
+	// ProfilesPath stores WireGuard profiles; default
+	// /etc/travo/wireguard_profiles.json.
+	ProfilesPath string
 }
 
-// NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
-func NewVpnServiceWithRunner(u uci.UCI, cmd platform.CommandRunner) *VpnService {
-	return &VpnService{
-		uci:          u,
-		cmd:          cmd,
-		profilesPath: "/etc/travo/wireguard_profiles.json",
-		crashGuard:   guard.New("vpn"),
-		dnsStackPath: dnsmasqLayerStackPath,
+// NewVpnService creates a VpnService.
+func NewVpnService(d VpnDeps) *VpnService {
+	if d.Cmd == nil {
+		d.Cmd = &platform.RealCommandRunner{}
 	}
-}
-
-// NewVpnServiceWithProfilesPath creates a VpnService with a custom profiles path (for tests).
-func NewVpnServiceWithProfilesPath(u uci.UCI, cmd platform.CommandRunner, profilesPath string) *VpnService {
+	if d.ProfilesPath == "" {
+		d.ProfilesPath = "/etc/travo/wireguard_profiles.json"
+	}
 	return &VpnService{
-		uci:          u,
-		cmd:          cmd,
-		profilesPath: profilesPath,
+		uci:          d.UCI,
+		cmd:          d.Cmd,
+		profilesPath: d.ProfilesPath,
 		crashGuard:   guard.New("vpn"),
 		dnsStackPath: dnsmasqLayerStackPath,
 	}

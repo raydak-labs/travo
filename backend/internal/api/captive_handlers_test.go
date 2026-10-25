@@ -60,8 +60,7 @@ func TestCaptiveStatusGetDoesNotMutateState(t *testing.T) {
 	runner := &recordingRunner{}
 	// 204 = internet reachable, which is exactly what used to trigger the
 	// auto-restore from the read path.
-	svc := uplink.NewCaptiveServiceWithGuard(&platform.MockHTTPProber{StatusCode: 204},
-		uci.NewMockUCI(), runner, guard.In(dir, "captive-dns"))
+	svc := uplink.NewCaptiveService(uplink.CaptiveDeps{Prober: &platform.MockHTTPProber{StatusCode: 204}, UCI: uci.NewMockUCI(), Cmd: runner, Guard: guard.In(dir, "captive-dns")})
 	defer svc.Stop()
 
 	app := fiber.New()

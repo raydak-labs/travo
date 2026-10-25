@@ -18,13 +18,12 @@ type SpeedtestService struct {
 	pkg PackageManager
 }
 
-func NewSpeedtestService() *SpeedtestService {
-	return NewSpeedtestServiceWith(detectPackageManager())
-}
-
-// NewSpeedtestServiceWith creates a SpeedtestService with an injected package
-// manager (for tests).
-func NewSpeedtestServiceWith(pkg PackageManager) *SpeedtestService {
+// NewSpeedtestService creates a SpeedtestService; a nil pkg detects the
+// device's package manager.
+func NewSpeedtestService(pkg PackageManager) *SpeedtestService {
+	if pkg == nil {
+		pkg = detectPackageManager()
+	}
 	return &SpeedtestService{pkg: pkg}
 }
 

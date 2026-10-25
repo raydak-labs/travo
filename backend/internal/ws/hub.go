@@ -28,7 +28,7 @@ type Conn interface {
 type Hub struct {
 	clients           map[Conn]bool
 	mu                sync.RWMutex
-	systemSvc         *system.SystemService
+	systemSvc         *system.Service
 	alertSvc          *system.AlertService
 	trafficHistory    *network.TrafficHistoryService
 	networkStatusCh   <-chan models.NetworkStatus
@@ -40,7 +40,7 @@ type Hub struct {
 // NewHub creates a new WebSocket hub. trafficHistory may be nil, in which case
 // no traffic samples are retained.
 func NewHub(
-	systemSvc *system.SystemService,
+	systemSvc *system.Service,
 	alertSvc *system.AlertService,
 	networkStatusCh <-chan models.NetworkStatus,
 	trafficHistory *network.TrafficHistoryService,

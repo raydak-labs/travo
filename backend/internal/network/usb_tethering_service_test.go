@@ -97,14 +97,14 @@ func (m *mockUSBTetherRunner) RunCommand(name string, args ...string) (string, e
 // newTestUSBTetherService returns a service whose crash guard lives in a temp dir.
 func newTestUSBTetherService(t *testing.T, r *mockUSBTetherRunner) *USBTetheringService {
 	t.Helper()
-	svc := NewUSBTetheringServiceWithRunner(r)
+	svc := NewUSBTetheringService(r)
 	svc.crashGuard = guard.In(t.TempDir(), "usbtether")
 	return svc
 }
 
 func TestGetUSBTetherStatus_NoDevice(t *testing.T) {
 	runner := newMockUSBTetherRunner()
-	svc := NewUSBTetheringServiceWithRunner(runner)
+	svc := NewUSBTetheringService(runner)
 	status := svc.GetStatus()
 	if status.Detected {
 		t.Error("expected Detected=false when no USB iface")
@@ -116,7 +116,7 @@ func TestGetUSBTetherStatus_AndroidDetected(t *testing.T) {
 	runner.usbIfaces["usb0"] = true
 	runner.ifaceUp["usb0"] = true
 	runner.ifaceIP["usb0"] = "192.168.42.129"
-	svc := NewUSBTetheringServiceWithRunner(runner)
+	svc := NewUSBTetheringService(runner)
 	status := svc.GetStatus()
 	if !status.Detected {
 		t.Error("expected Detected=true for USB-backed usb0")

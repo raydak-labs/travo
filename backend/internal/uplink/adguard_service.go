@@ -205,15 +205,12 @@ func (s *AdGuardService) apiBase() string {
 	return adguardAPIBaseDefault
 }
 
-// NewAdGuardService creates a new AdGuardService with a real checker.
-func NewAdGuardService() *AdGuardService {
-	s := &AdGuardService{checker: NewRealAdGuardChecker(), dnsStackPath: dnsmasqLayerStackPath}
-	s.refreshEndpointsFromYAML()
-	return s
-}
-
-// NewAdGuardServiceWithChecker creates a new AdGuardService with a custom checker (for tests).
-func NewAdGuardServiceWithChecker(c AdGuardChecker) *AdGuardService {
+// NewAdGuardService creates an AdGuardService; a nil checker uses the real
+// system.
+func NewAdGuardService(c AdGuardChecker) *AdGuardService {
+	if c == nil {
+		c = NewRealAdGuardChecker()
+	}
 	s := &AdGuardService{checker: c, dnsStackPath: dnsmasqLayerStackPath}
 	s.refreshEndpointsFromYAML()
 	return s

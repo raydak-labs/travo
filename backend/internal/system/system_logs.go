@@ -11,7 +11,7 @@ import (
 // GetLogs retrieves system logs from logread.
 // If service is non-empty, only lines containing that service name (case-insensitive) are returned.
 // If level is non-empty, only lines at or above that severity are returned.
-func (s *SystemService) GetLogs(service, level string) (models.LogResponse, error) {
+func (s *Service) GetLogs(service, level string) (models.LogResponse, error) {
 	out, err := streamLogTail(execx.Quick, "logread")
 	if err != nil {
 		return models.LogResponse{}, err
@@ -20,7 +20,7 @@ func (s *SystemService) GetLogs(service, level string) (models.LogResponse, erro
 }
 
 // GetKernelLogs retrieves kernel logs from dmesg.
-func (s *SystemService) GetKernelLogs() (models.LogResponse, error) {
+func (s *Service) GetKernelLogs() (models.LogResponse, error) {
 	out, err := streamLogTail(execx.Quick, "dmesg")
 	if err != nil {
 		return models.LogResponse{}, err

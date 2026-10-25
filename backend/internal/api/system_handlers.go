@@ -8,7 +8,7 @@ import (
 )
 
 // SystemInfoHandler handles GET /api/v1/system/info.
-func SystemInfoHandler(svc *system.SystemService) fiber.Handler {
+func SystemInfoHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		info, err := svc.GetSystemInfo()
 		if err != nil {
@@ -19,7 +19,7 @@ func SystemInfoHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // SystemStatsHandler handles GET /api/v1/system/stats.
-func SystemStatsHandler(svc *system.SystemService) fiber.Handler {
+func SystemStatsHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		stats, err := svc.GetSystemStats()
 		if err != nil {
@@ -30,7 +30,7 @@ func SystemStatsHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // SystemLogsHandler handles GET /api/v1/system/logs.
-func SystemLogsHandler(svc *system.SystemService) fiber.Handler {
+func SystemLogsHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		service := c.Query("service")
 		level := c.Query("level")
@@ -43,7 +43,7 @@ func SystemLogsHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // SystemKernelLogsHandler handles GET /api/v1/system/logs/kernel.
-func SystemKernelLogsHandler(svc *system.SystemService) fiber.Handler {
+func SystemKernelLogsHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		logs, err := svc.GetKernelLogs()
 		if err != nil {
@@ -66,7 +66,7 @@ func SystemAlertsHandler(svc *system.AlertService) fiber.Handler {
 }
 
 // RunSpeedTestHandler handles POST /api/v1/system/speed-test.
-func RunSpeedTestHandler(svc *system.SystemService) fiber.Handler {
+func RunSpeedTestHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result, err := svc.RunSpeedTest()
 		if err != nil {

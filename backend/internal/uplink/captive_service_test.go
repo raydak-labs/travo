@@ -21,7 +21,7 @@ func TestCaptivePortal_NoRedirect_NoPortal(t *testing.T) {
 		StatusCode: 204,
 		Body:       "",
 	}
-	svc := NewCaptiveService(prober)
+	svc := NewCaptiveService(CaptiveDeps{Prober: prober})
 
 	status, err := svc.CheckCaptivePortal()
 	if err != nil {
@@ -44,7 +44,7 @@ func TestCaptivePortal_Redirect_PortalDetected(t *testing.T) {
 		Body:        "",
 		RedirectURL: "http://portal.hotel.com/login",
 	}
-	svc := NewCaptiveService(prober)
+	svc := NewCaptiveService(CaptiveDeps{Prober: prober})
 
 	status, err := svc.CheckCaptivePortal()
 	if err != nil {
@@ -68,7 +68,7 @@ func TestCaptivePortal_ConnectionFailed_NoInternet(t *testing.T) {
 	prober := &platform.MockHTTPProber{
 		Err: fmt.Errorf("dial tcp: connection refused"),
 	}
-	svc := NewCaptiveService(prober)
+	svc := NewCaptiveService(CaptiveDeps{Prober: prober})
 
 	status, err := svc.CheckCaptivePortal()
 	if err != nil {
@@ -87,7 +87,7 @@ func TestCaptivePortal_WrongBody_PortalDetected(t *testing.T) {
 		StatusCode: 200,
 		Body:       "<html><body>Please login to continue</body></html>",
 	}
-	svc := NewCaptiveService(prober)
+	svc := NewCaptiveService(CaptiveDeps{Prober: prober})
 
 	status, err := svc.CheckCaptivePortal()
 	if err != nil {
@@ -113,7 +113,7 @@ func TestCaptivePortal_301Redirect(t *testing.T) {
 		Body:        "",
 		RedirectURL: "http://captive.example.com",
 	}
-	svc := NewCaptiveService(prober)
+	svc := NewCaptiveService(CaptiveDeps{Prober: prober})
 
 	status, err := svc.CheckCaptivePortal()
 	if err != nil {
@@ -130,7 +130,7 @@ func TestCaptivePortal_307Redirect(t *testing.T) {
 		Body:        "",
 		RedirectURL: "http://captive.example.com",
 	}
-	svc := NewCaptiveService(prober)
+	svc := NewCaptiveService(CaptiveDeps{Prober: prober})
 
 	status, err := svc.CheckCaptivePortal()
 	if err != nil {
@@ -316,7 +316,8 @@ func TestRefreshBypassTimestamp_ConcurrentWithBypassIsAtomic(t *testing.T) {
 
 // Stop must cancel the startup auto-restore goroutine and be idempotent.
 func TestCaptiveService_StopIsIdempotentAndCancelsStartupGoroutine(t *testing.T) {
-	svc := NewCaptiveServiceWithUCI(&platform.MockHTTPProber{StatusCode: 204}, uci.NewMockUCI(), nil)
+	svc := NewCaptiveService(CaptiveDeps{Prober: &platform.MockHTTPProber{StatusCode: 204}, UCI: uci.NewMockUCI()})
+	svc.StartAutoRestore()
 	done := make(chan struct{})
 	go func() {
 		svc.Stop()
@@ -471,7 +472,7 @@ func TestDetectGatewayPortalURL_NoRoute(t *testing.T) {
 }
 
 func TestDetectGatewayPortalURL_NoCmd(t *testing.T) {
-	svc := NewCaptiveService(&platform.MockHTTPProber{StatusCode: 204})
+	svc := NewCaptiveService(CaptiveDeps{Prober: &platform.MockHTTPProber{StatusCode: 204}})
 
 	got := svc.detectGatewayPortalURL()
 	if got != "" {

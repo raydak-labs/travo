@@ -13,7 +13,7 @@ import (
 )
 
 // SetHostnameHandler handles PUT /api/v1/system/hostname.
-func SetHostnameHandler(svc *system.SystemService) fiber.Handler {
+func SetHostnameHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetHostnameRequest
 		if err := BindStrictBodyConfig(c, &req); err != nil {
@@ -30,7 +30,7 @@ func SetHostnameHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // GetTimezoneHandler handles GET /api/v1/system/timezone.
-func GetTimezoneHandler(svc *system.SystemService) fiber.Handler {
+func GetTimezoneHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetTimezone()
 		if err != nil {
@@ -41,7 +41,7 @@ func GetTimezoneHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // SetTimezoneHandler handles PUT /api/v1/system/timezone.
-func SetTimezoneHandler(svc *system.SystemService) fiber.Handler {
+func SetTimezoneHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.TimezoneConfig
 		if err := BindStrictBodyConfig(c, &config); err != nil {
@@ -61,7 +61,7 @@ func SetTimezoneHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // GetNTPConfigHandler handles GET /api/v1/system/ntp.
-func GetNTPConfigHandler(svc *system.SystemService) fiber.Handler {
+func GetNTPConfigHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetNTPConfig()
 		if err != nil {
@@ -72,7 +72,7 @@ func GetNTPConfigHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // SetNTPConfigHandler handles PUT /api/v1/system/ntp.
-func SetNTPConfigHandler(svc *system.SystemService) fiber.Handler {
+func SetNTPConfigHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.NTPConfig
 		if err := BindStrictBodyConfig(c, &config); err != nil {
@@ -86,7 +86,7 @@ func SetNTPConfigHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // NTPSyncHandler handles POST /api/v1/system/ntp/sync.
-func NTPSyncHandler(svc *system.SystemService) fiber.Handler {
+func NTPSyncHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.SyncNTP(); err != nil {
 			return RespondWithServerError(c, err)
@@ -96,14 +96,14 @@ func NTPSyncHandler(svc *system.SystemService) fiber.Handler {
 }
 
 // GetSetupCompleteHandler handles GET /api/v1/system/setup-complete.
-func GetSetupCompleteHandler(svc *system.SystemService) fiber.Handler {
+func GetSetupCompleteHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetSetupComplete())
 	}
 }
 
 // SetSetupCompleteHandler handles POST /api/v1/system/setup-complete.
-func SetSetupCompleteHandler(svc *system.SystemService) fiber.Handler {
+func SetSetupCompleteHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.SetSetupComplete(); err != nil {
 			return RespondWithServerError(c, err)

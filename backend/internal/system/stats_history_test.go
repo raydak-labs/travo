@@ -11,8 +11,8 @@ import (
 )
 
 func newTestStatsHistory(interval time.Duration) *StatsHistoryService {
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
-	return NewStatsHistoryService(svc, interval, 10)
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	return NewStatsHistoryService(svc, interval, 10, nil)
 }
 
 func TestStatsHistory_CollectsPoints(t *testing.T) {
@@ -63,14 +63,14 @@ func openStatsStore(t *testing.T, dir string) *store.Store {
 func TestStatsHistory_PersistsAcrossRestart(t *testing.T) {
 	dir := t.TempDir()
 	db := openStatsStore(t, dir)
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 
-	s := NewStatsHistoryServiceWithStore(svc, time.Minute, 10, db)
+	s := NewStatsHistoryService(svc, time.Minute, 10, db)
 	s.collect()
 	s.collect()
 	s.Flush()
 
-	s2 := NewStatsHistoryServiceWithStore(svc, time.Minute, 10, db)
+	s2 := NewStatsHistoryService(svc, time.Minute, 10, db)
 	if got := len(s2.GetHistory()); got != 2 {
 		t.Errorf("expected 2 restored points, got %d", got)
 	}
@@ -80,13 +80,13 @@ func TestStatsHistory_PersistsAcrossRestart(t *testing.T) {
 func TestStatsHistory_StopFlushes(t *testing.T) {
 	dir := t.TempDir()
 	db := openStatsStore(t, dir)
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 
-	s := NewStatsHistoryServiceWithStore(svc, time.Minute, 10, db)
+	s := NewStatsHistoryService(svc, time.Minute, 10, db)
 	s.collect()
 	s.Stop()
 
-	s2 := NewStatsHistoryServiceWithStore(svc, time.Minute, 10, db)
+	s2 := NewStatsHistoryService(svc, time.Minute, 10, db)
 	if got := len(s2.GetHistory()); got != 1 {
 		t.Errorf("expected 1 restored point after Stop, got %d", got)
 	}
@@ -96,15 +96,15 @@ func TestStatsHistory_StopFlushes(t *testing.T) {
 func TestStatsHistory_RestoreRespectsMaxLen(t *testing.T) {
 	dir := t.TempDir()
 	db := openStatsStore(t, dir)
-	svc := NewSystemService(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
+	svc := New(ubus.NewMockUbus(), uci.NewMockUCI(), &MockStorageProvider{})
 
-	s := NewStatsHistoryServiceWithStore(svc, time.Minute, 10, db)
+	s := NewStatsHistoryService(svc, time.Minute, 10, db)
 	for range 8 {
 		s.collect()
 	}
 	s.Flush()
 
-	s2 := NewStatsHistoryServiceWithStore(svc, time.Minute, 3, db)
+	s2 := NewStatsHistoryService(svc, time.Minute, 3, db)
 	if got := len(s2.GetHistory()); got != 3 {
 		t.Errorf("expected restore capped at maxLen=3, got %d", got)
 	}
@@ -119,7 +119,7 @@ func TestStatsHistory_FailedFlushKeepsPendingPoints(t *testing.T) {
 		t.Fatalf("open store: %v", err)
 	}
 	checker := newTestStatsHistory(time.Minute).checker
-	s := NewStatsHistoryServiceWithStore(checker, time.Minute, 10, db)
+	s := NewStatsHistoryService(checker, time.Minute, 10, db)
 
 	s.collect()
 	if s.sinceFlush != 1 {
