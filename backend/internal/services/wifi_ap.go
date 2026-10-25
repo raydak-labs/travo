@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // Radios, AP configuration, and guest WiFi.
@@ -103,7 +104,7 @@ func (w *WifiService) SetAPConfig(section string, update models.APConfigUpdate, 
 			}
 		}
 		if update.Enabled != nil {
-			disabled := boolToEnabled(!*update.Enabled)
+			disabled := platform.BoolToEnabled(!*update.Enabled)
 			if err := w.uci.Set("wireless", section, "disabled", disabled); err != nil {
 				return nil, fmt.Errorf("setting disabled: %w", err)
 			}

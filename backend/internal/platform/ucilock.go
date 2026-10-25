@@ -1,4 +1,4 @@
-package services
+package platform
 
 import (
 	"log/slog"
@@ -19,7 +19,7 @@ type uciReverter interface {
 // a writer of `dhcp` never block each other.
 var uciConfigLocks sync.Map // config name -> *sync.Mutex
 
-// lockUCIConfigs locks each named config and returns a single unlock func.
+// LockUCIConfigs locks each named config and returns a single unlock func.
 //
 // The names are sorted before locking, which makes the acquisition order GLOBAL
 // and identical on every path. That is what makes nesting safe: with a fixed
@@ -34,7 +34,7 @@ var uciConfigLocks sync.Map // config name -> *sync.Mutex
 // it again. Helpers called from inside a transaction therefore have a lock-free
 // core (…Locked) that the transaction calls, while the thin exported wrapper
 // takes the lock for callers that enter cold. See setupWireGuardFirewallLocked.
-func lockUCIConfigs(configs ...string) func() {
+func LockUCIConfigs(configs ...string) func() {
 	// Sorted + de-duplicated: acquiring the same mutex twice on one path would
 	// self-deadlock, and mutateUCI callers legitimately pass a set.
 	names := append([]string(nil), configs...)
@@ -58,7 +58,7 @@ func lockUCIConfigs(configs ...string) func() {
 	}
 }
 
-// revertUCIConfig drops the staged UCI delta for each config that has one.
+// RevertUCIConfig drops the staged UCI delta for each config that has one.
 //
 // The uci CLI keeps uncommitted changes in the process-global
 // /tmp/.uci/<config>/changes file, so a write sequence that fails half-way
@@ -67,7 +67,7 @@ func lockUCIConfigs(configs ...string) func() {
 //
 // The caller must already hold the config lock for every name it passes, since
 // the revert discards whatever *anyone* has staged for that config.
-func revertUCIConfig(u uci.UCI, configs ...string) {
+func RevertUCIConfig(u uci.UCI, configs ...string) {
 	reverter, ok := u.(uciReverter)
 	if !ok {
 		return
@@ -79,15 +79,39 @@ func revertUCIConfig(u uci.UCI, configs ...string) {
 	}
 }
 
-// mutateUCI is mutateWireless for the other services: it holds the named
+// MutateUCI is mutateWireless for the other services: it holds the named
 // configs' locks for the duration of fn and reverts all of them if fn fails.
 // Same one-list rule, same reason — see mutateWireless.
-func mutateUCI(u uci.UCI, configs []string, fn func() error) error {
-	defer lockUCIConfigs(configs...)()
+func MutateUCI(u uci.UCI, configs []string, fn func() error) error {
+	defer LockUCIConfigs(configs...)()
 
 	if err := fn(); err != nil {
-		revertUCIConfig(u, configs...)
+		RevertUCIConfig(u, configs...)
 		return err
 	}
 	return nil
+}
+
+// WithConfigLocks holds the named configs' locks for the duration of fn, in the
+// same globally ordered way, but does NOT revert on failure.
+//
+// For the writers that shell out to `uci` instead of going through the UCI
+// interface — AdGuardService and USBTetheringService do this — and therefore have
+// no uci.UCI to revert through. Taking the locks is still the point: without them
+// those writers interleave with the ones that DO revert, and the abandoned delta
+// gets committed by whoever commits next. The missing half is stated rather than
+// hidden: a failure in fn leaves its staged delta in place, and the next writer of
+// that config will commit it. Passing a uci.UCI and using mutateUCI where one is
+// available is preferred; this exists for the services that genuinely have none.
+func WithConfigLocks(configs []string, fn func() error) error {
+	defer LockUCIConfigs(configs...)()
+	return fn()
+}
+
+// BoolToEnabled converts a boolean to UCI enabled string ("1" or "0").
+func BoolToEnabled(enabled bool) string {
+	if enabled {
+		return "1"
+	}
+	return "0"
 }

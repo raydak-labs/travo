@@ -2,7 +2,9 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
@@ -52,10 +54,10 @@ func SetLEDScheduleHandler(svc *services.SystemService) fiber.Handler {
 		// Times are interpolated into a root crontab line; validate at the
 		// boundary so a bad value is a 400, not a 500 from the service layer.
 		if req.Enabled && req.OnTime != "" && req.OffTime != "" {
-			if err := services.ValidateHHMM(req.OnTime); err != nil {
+			if err := platform.ValidateHHMM(req.OnTime); err != nil {
 				return RespondWithError(c, fiber.StatusBadRequest, "on_time: "+err.Error())
 			}
-			if err := services.ValidateHHMM(req.OffTime); err != nil {
+			if err := platform.ValidateHHMM(req.OffTime); err != nil {
 				return RespondWithError(c, fiber.StatusBadRequest, "off_time: "+err.Error())
 			}
 		}

@@ -1,26 +1,25 @@
 package services
 
 import (
-	"log/slog"
-
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // VpnService provides VPN status and configuration.
 type VpnService struct {
 	uci          uci.UCI
-	cmd          CommandRunner
+	cmd          platform.CommandRunner
 	profilesPath string // Path to wireguard_profiles.json
 	crashGuard   guard.Guard
 	dnsStackPath string
@@ -39,7 +38,7 @@ type VpnService struct {
 func NewVpnService(u uci.UCI) *VpnService {
 	return &VpnService{
 		uci:          u,
-		cmd:          &RealCommandRunner{},
+		cmd:          &platform.RealCommandRunner{},
 		profilesPath: "/etc/travo/wireguard_profiles.json",
 		crashGuard:   guard.New("vpn"),
 		dnsStackPath: dnsmasqLayerStackPath,
@@ -47,7 +46,7 @@ func NewVpnService(u uci.UCI) *VpnService {
 }
 
 // NewVpnServiceWithRunner creates a new VpnService with a custom command runner (for tests).
-func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
+func NewVpnServiceWithRunner(u uci.UCI, cmd platform.CommandRunner) *VpnService {
 	return &VpnService{
 		uci:          u,
 		cmd:          cmd,
@@ -58,7 +57,7 @@ func NewVpnServiceWithRunner(u uci.UCI, cmd CommandRunner) *VpnService {
 }
 
 // NewVpnServiceWithProfilesPath creates a VpnService with a custom profiles path (for tests).
-func NewVpnServiceWithProfilesPath(u uci.UCI, cmd CommandRunner, profilesPath string) *VpnService {
+func NewVpnServiceWithProfilesPath(u uci.UCI, cmd platform.CommandRunner, profilesPath string) *VpnService {
 	return &VpnService{
 		uci:          u,
 		cmd:          cmd,
@@ -154,7 +153,7 @@ func (v *VpnService) rollbackWireguardEnable(prevDisabled string) error {
 	if err := v.uci.Commit("network"); err != nil {
 		errs = append(errs, fmt.Errorf("committing network: %w", err))
 	}
-	_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+	_, _ = v.cmd.Run(platform.IfdownBin, "wg0")
 	return errors.Join(errs...)
 }
 
@@ -189,7 +188,7 @@ func (v *VpnService) disableWireguard() error {
 	// Only a kill switch this service owns is removed: a kill switch the user
 	// set up as a standalone policy must survive a VPN toggle.
 	_ = v.removeVPNOwnedKillSwitch()
-	_, _ = v.cmd.Run(openwrtIfdownBin, "wg0")
+	_, _ = v.cmd.Run(platform.IfdownBin, "wg0")
 	v.disableVpnDNSForwarding()
 	// Netifd-managed recovery: routes/DNS should be recomputed without wg0. On some
 	// OpenWrt/netifd states, wg0 teardown can leave the kernel without any default
@@ -310,7 +309,7 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	result := models.VPNVerifyResult{}
 
 	// Check if wg0 interface is up.
-	out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0")
+	out, err := v.cmd.Run(platform.IPBin, "link", "show", "dev", "wg0")
 	if err == nil && wireGuardIfaceLooksUp(string(out)) {
 		result.InterfaceUp = true
 	}
@@ -333,8 +332,8 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	}
 
 	// Check default route via wg0.
-	routeOut, routeErr := v.cmd.Run(openwrtIPBin, "route", "show", "default")
-	route6Out, _ := v.cmd.Run(openwrtIPBin, "-6", "route", "show", "default")
+	routeOut, routeErr := v.cmd.Run(platform.IPBin, "route", "show", "default")
+	route6Out, _ := v.cmd.Run(platform.IPBin, "-6", "route", "show", "default")
 	combined := string(routeOut) + "\n" + string(route6Out)
 	if routeErr == nil && strings.Contains(combined, "wg0") {
 		result.RouteOk = true
@@ -355,7 +354,7 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 // applies the config, and verifies the tunnel comes up. It holds the UCI locks
 // for every config the VPN flow touches (vpnFlowConfigs).
 func (v *VpnService) ImportWireguardConfig(confContent string) error {
-	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+	return platform.MutateUCI(v.uci, vpnFlowConfigs, func() error {
 		return v.importWireguardConfigLocked(confContent)
 	})
 }
@@ -402,7 +401,7 @@ const wireGuardSpeedTestURL = "http://speedtest.tele2.net/1MB.zip"
 
 // wireGuardIPv4Address returns the first IPv4 address assigned to wg0 (from `ip -4 -o addr show`).
 func (v *VpnService) wireGuardIPv4Address() (string, error) {
-	out, err := v.cmd.Run(openwrtIPBin, "-4", "-o", "addr", "show", "dev", "wg0")
+	out, err := v.cmd.Run(platform.IPBin, "-4", "-o", "addr", "show", "dev", "wg0")
 	if err != nil {
 		return "", err
 	}
@@ -438,7 +437,7 @@ func (v *VpnService) RunWireGuardSpeedTest() (models.SpeedTestResult, error) {
 		return result, fmt.Errorf("wireguard is disabled — enable the tunnel before running a VPN speed test")
 	}
 
-	linkOut, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0")
+	linkOut, err := v.cmd.Run(platform.IPBin, "link", "show", "dev", "wg0")
 	if err != nil || !wireGuardIfaceLooksUp(string(linkOut)) {
 		return result, fmt.Errorf("wireguard interface wg0 is not up")
 	}

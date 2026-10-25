@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 const dohConfigFile = "/etc/travo/doh-config.json"
@@ -35,7 +36,7 @@ func (n *NetworkService) SetDoHConfig(cfg models.DoHConfig) error {
 	}
 	// Atomic: os.WriteFile truncates first, so a power cut or a concurrent read
 	// left a half-written file that silently falls back to the default provider.
-	if err := writeFileAtomic(dohConfigFile, data); err != nil {
+	if err := platform.WriteFileAtomic(dohConfigFile, data); err != nil {
 		return err
 	}
 	// Apply: configure dnsmasq to use a local DoH proxy if enabled.

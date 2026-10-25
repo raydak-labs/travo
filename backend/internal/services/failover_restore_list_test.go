@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-
 	"testing"
 
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -26,9 +26,9 @@ func newRestoreTestService(t *testing.T) (*FailoverService, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(u, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(u, mockUbus, &platform.MockCommandRunner{})
 	svc := NewFailoverServiceWithRunner(u, mockUbus, networkSvc,
-		&MockCommandRunner{}, &NoopUCIApplyConfirm{},
+		&platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{},
 		filepath.Join(t.TempDir(), "failover.json"))
 	svc.backupPath = filepath.Join(t.TempDir(), "mwan3-backup.json")
 	return svc, u

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -68,7 +69,7 @@ func newClassifierService(t *testing.T) *NetworkService {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", deviceInterfaceDump(t))
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{
 		RunFunc: fakeIw(noAssociatedAPs()),
 	})
 	svc.arpFile = writeTempFile(t, "arp", deviceNeighborTable(t))
@@ -205,7 +206,7 @@ func TestClassifyClient_AssociatedWiFiClientIsWifiAP(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", deviceInterfaceDump(t))
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{
 		RunFunc: fakeIw(map[string]string{"phy1-ap0": phy1ApStationDump}),
 	})
 	svc.arpFile = writeTempFile(t, "arp", deviceNeighborTable(t))

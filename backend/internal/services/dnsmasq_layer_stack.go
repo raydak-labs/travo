@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // ---------------------------------------------------------------------------
@@ -119,7 +121,7 @@ type dnsmasqDNS interface {
 // TestShelledOutUCIWritesAreOnTheRecord asserts that this file still names every
 // shelled-out `dhcp` write, which is what keeps `dhcp` in vpnFlowConfigs
 // (ADR 0010).
-type commandRunnerDNS struct{ cmd CommandRunner }
+type commandRunnerDNS struct{ cmd platform.CommandRunner }
 
 func (c commandRunnerDNS) getServers() ([]string, error) {
 	out, err := c.cmd.Run("uci", "get", "dhcp.@dnsmasq[0].server")

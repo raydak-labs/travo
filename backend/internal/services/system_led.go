@@ -9,6 +9,7 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // GetLEDStatus returns the current stealth mode state by checking LED brightness.
@@ -107,8 +108,9 @@ func (s *SystemService) GetLEDSchedule() models.LEDSchedule {
 // while preserving the lines they do not own, so a concurrent pair would drop
 // one another's entries.
 func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
-	crontabMu.Lock()
-	defer crontabMu.Unlock()
+	platform.CrontabMu.
+		Lock()
+	defer platform.CrontabMu.Unlock()
 
 	data, _ := os.ReadFile(ledCrontabPath)
 	var lines []string
@@ -121,10 +123,10 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 	if schedule.Enabled && schedule.OffTime != "" && schedule.OnTime != "" {
 		// Times are formatted into a root crontab line, so they must be strict
 		// HH:MM — a newline would inject a second attacker-controlled entry.
-		if err := ValidateHHMM(schedule.OffTime); err != nil {
+		if err := platform.ValidateHHMM(schedule.OffTime); err != nil {
 			return fmt.Errorf("off_time: %w", err)
 		}
-		if err := ValidateHHMM(schedule.OnTime); err != nil {
+		if err := platform.ValidateHHMM(schedule.OnTime); err != nil {
 			return fmt.Errorf("on_time: %w", err)
 		}
 		offParts := strings.SplitN(schedule.OffTime, ":", 2)
@@ -135,7 +137,7 @@ func (s *SystemService) SetLEDSchedule(schedule models.LEDSchedule) error {
 		lines = append(lines, offLine, onLine)
 	}
 	lines = append(lines, "")
-	if err := writeFileAtomic(ledCrontabPath, []byte(strings.Join(lines, "\n"))); err != nil {
+	if err := platform.WriteFileAtomic(ledCrontabPath, []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")

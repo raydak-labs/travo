@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // GetDHCPConfig returns the DHCP configuration for the LAN.
@@ -39,7 +40,7 @@ func (n *NetworkService) GetDHCPConfig() (models.DHCPConfig, error) {
 // SetDNSConfig: `dhcp` is in the VPN transaction's revert set, and the VPN's
 // DNS-forwarding helpers delete and re-add this same dhcp.@dnsmasq[0] section.
 func (n *NetworkService) SetDHCPConfig(config models.DHCPConfig) error {
-	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		if err := n.uciSet("dhcp", "lan", "start", strconv.Itoa(config.Start)); err != nil {
 			return err
 		}
@@ -144,7 +145,7 @@ func (n *NetworkService) GetDHCPReservations() ([]models.DHCPReservation, error)
 
 // AddDHCPReservation adds a static DHCP reservation as a named UCI section in dhcp config.
 func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) error {
-	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "host_" + sanitizeSectionName(reservation.Name)
 		// Explicit duplicate check, inside the lock: a same-named reservation
 		// would otherwise be overwritten in place, silently changing which MAC
@@ -174,7 +175,7 @@ func (n *NetworkService) AddDHCPReservation(reservation models.DHCPReservation) 
 
 // DeleteDHCPReservation removes a static DHCP reservation by its UCI section name.
 func (n *NetworkService) DeleteDHCPReservation(section string) error {
-	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		if err := n.requireNamedDHCPSection(section, "host"); err != nil {
 			return err
 		}

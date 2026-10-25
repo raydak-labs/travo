@@ -21,6 +21,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/config"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/store"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -358,7 +359,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 
 	vpnSvc := services.NewVpnService(u)
 	svcManager := services.NewServiceManager()
-	captiveSvc := services.NewCaptiveServiceWithUCI(captiveProber, u, &services.RealCommandRunner{})
+	captiveSvc := services.NewCaptiveServiceWithUCI(captiveProber, u, &platform.RealCommandRunner{})
 	adguardSvc := services.NewAdGuardService()
 	dataUsageSvc := services.NewDataUsageService()
 	usbTetherSvc := services.NewUSBTetheringService()

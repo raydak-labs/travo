@@ -11,6 +11,7 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -59,7 +60,7 @@ func (w *WifiService) mutateWireless(configs []string, fn func() (*WirelessApply
 	}
 
 	var res *WirelessApplyResult
-	err := mutateUCI(w.uci, configs, func() error {
+	err := platform.MutateUCI(w.uci, configs, func() error {
 		var err error
 		res, err = fn()
 		return err
@@ -88,26 +89,10 @@ func (w *WifiService) restoreAfterFailedMutation(cause error) error {
 		return cause
 	}
 	err := w.applier.Rollback("")
-	if err == nil || errors.Is(err, ErrNoSnapshot) {
+	if err == nil || errors.Is(err, platform.ErrNoSnapshot) {
 		return cause
 	}
 	return fmt.Errorf("%w (restoring the previous config also failed: %w)", cause, err)
-}
-
-// withConfigLocks holds the named configs' locks for the duration of fn, in the
-// same globally ordered way, but does NOT revert on failure.
-//
-// For the writers that shell out to `uci` instead of going through the UCI
-// interface — AdGuardService and USBTetheringService do this — and therefore have
-// no uci.UCI to revert through. Taking the locks is still the point: without them
-// those writers interleave with the ones that DO revert, and the abandoned delta
-// gets committed by whoever commits next. The missing half is stated rather than
-// hidden: a failure in fn leaves its staged delta in place, and the next writer of
-// that config will commit it. Passing a uci.UCI and using mutateUCI where one is
-// available is preferred; this exists for the services that genuinely have none.
-func withConfigLocks(configs []string, fn func() error) error {
-	defer lockUCIConfigs(configs...)()
-	return fn()
 }
 
 // WirelessApplyResult describes a staged rollback apply that still needs
@@ -136,8 +121,8 @@ type WifiService struct {
 	uci                 uci.UCI
 	ubus                ubus.Ubus
 	reloader            WifiReloader
-	applier             UCIApplyConfirm // optional; when set, use apply+confirm instead of any reload
-	cmd                 CommandRunner
+	applier             platform.UCIApplyConfirm // optional; when set, use apply+confirm instead of any reload
+	cmd                 platform.CommandRunner
 	priorityFile        string
 	autoReconnectFile   string
 	reconnectScript     string
@@ -176,8 +161,8 @@ const defaultRepeaterOptionsFile = "/etc/travo/repeater-options.json"
 // otherwise falls back to the (test-only) reloader.
 func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService {
 	return &WifiService{
-		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: NewRealUCIApplyConfirm(ub, pw),
-		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
+		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: platform.NewRealUCIApplyConfirm(ub, pw),
+		cmd: &platform.RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
 		arpFile: procNetARP,
@@ -189,10 +174,10 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 // constructor is the seam other packages' tests use to drive the wireless
 // mutation envelope (token, rollback timeout, generated key) that only exists
 // when an applier is configured.
-func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm) *WifiService {
+func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier platform.UCIApplyConfirm) *WifiService {
 	return &WifiService{
 		uci: u, ubus: ub, reloader: &NoopWifiReloader{}, applier: applier,
-		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
+		cmd: &platform.RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
 		arpFile: procNetARP,
@@ -203,7 +188,7 @@ func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm)
 // Applier is left nil so Reload() is used.
 func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiService {
 	return &WifiService{
-		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
+		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &platform.RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
 		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
@@ -213,7 +198,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 // NewWifiServiceWithPriorityFile creates a WifiService with a custom priority file (for tests).
 func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf string) *WifiService {
 	return &WifiService{
-		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
+		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &platform.RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
 		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
@@ -221,7 +206,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 }
 
 // NewWifiServiceForTesting creates a WifiService with all fields customizable (for tests).
-func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd CommandRunner, pf, arFile, rsFile string) *WifiService {
+func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd platform.CommandRunner, pf, arFile, rsFile string) *WifiService {
 	return &WifiService{
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
@@ -231,7 +216,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 }
 
 // NewWifiServiceForTestingWithModeFile creates a WifiService with a custom mode file (for tests).
-func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd CommandRunner, pf, arFile, rsFile, modeFile string) *WifiService {
+func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd platform.CommandRunner, pf, arFile, rsFile, modeFile string) *WifiService {
 	return &WifiService{
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
@@ -285,7 +270,7 @@ func (w *WifiService) stageWirelessApply() (*WirelessApplyResult, error) {
 		}
 		return &WirelessApplyResult{
 			Token:                  token,
-			RollbackTimeoutSeconds: uciApplyRollbackTimeout,
+			RollbackTimeoutSeconds: platform.ApplyRollbackTimeout,
 			ProbeBudgetSeconds:     wirelessProbeBudgetSeconds(),
 		}, nil
 	}

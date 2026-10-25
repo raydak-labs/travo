@@ -4,7 +4,9 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 )
 
@@ -108,10 +110,10 @@ func SetWiFiScheduleHandler(svc *services.WifiService) fiber.Handler {
 		}
 		// These land in a root crontab line; validate at the boundary.
 		if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
-			if err := services.ValidateHHMM(schedule.OnTime); err != nil {
+			if err := platform.ValidateHHMM(schedule.OnTime); err != nil {
 				return RespondWithError(c, fiber.StatusBadRequest, "on_time: "+err.Error())
 			}
-			if err := services.ValidateHHMM(schedule.OffTime); err != nil {
+			if err := platform.ValidateHHMM(schedule.OffTime); err != nil {
 				return RespondWithError(c, fiber.StatusBadRequest, "off_time: "+err.Error())
 			}
 		}

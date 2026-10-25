@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -25,14 +26,14 @@ const (
 // SQMService provides minimal SQM configuration and apply actions.
 type SQMService struct {
 	uci uci.UCI
-	cmd CommandRunner
+	cmd platform.CommandRunner
 }
 
 func NewSQMService(u uci.UCI) *SQMService {
-	return &SQMService{uci: u, cmd: &RealCommandRunner{}}
+	return &SQMService{uci: u, cmd: &platform.RealCommandRunner{}}
 }
 
-func NewSQMServiceWithRunner(u uci.UCI, cmd CommandRunner) *SQMService {
+func NewSQMServiceWithRunner(u uci.UCI, cmd platform.CommandRunner) *SQMService {
 	return &SQMService{uci: u, cmd: cmd}
 }
 
@@ -179,7 +180,7 @@ func (s *SQMService) SetConfig(cfg models.SQMConfig) error {
 		return err
 	}
 
-	return mutateUCI(s.uci, []string{sqmConfigName}, func() error {
+	return platform.MutateUCI(s.uci, []string{sqmConfigName}, func() error {
 		section, err := s.ensureQueueSection()
 		if err != nil {
 			return err

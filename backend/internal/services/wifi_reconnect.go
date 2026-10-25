@@ -1,18 +1,17 @@
 package services
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // Auto-reconnect cron script and WiFi on/off schedule.
@@ -106,12 +105,14 @@ func (w *WifiService) enableAutoReconnect() error {
 	if err := writeGeneratedScript(w.reconnectScript, reconnectScriptContent, 0o750); err != nil {
 		return fmt.Errorf("writing reconnect script: %w", err)
 	}
+	platform.
 
-	// Add cron entry (every minute). Under crontabMu: this is a read-modify-write
-	// of /etc/crontabs/root, the same file the WiFi/LED schedules rewrite, and
-	// an unlocked rewrite here drops their entries (and vice versa).
-	crontabMu.Lock()
-	defer crontabMu.Unlock()
+		// Add cron entry (every minute). Under crontabMu: this is a read-modify-write
+		// of /etc/crontabs/root, the same file the WiFi/LED schedules rewrite, and
+		// an unlocked rewrite here drops their entries (and vice versa).
+		CrontabMu.
+		Lock()
+	defer platform.CrontabMu.Unlock()
 	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s'; echo '* * * * * %s') | crontab -`,
 		w.reconnectScript, w.reconnectScript)
 	if _, err := w.cmd.Run("sh", "-c", cronCmd); err != nil {
@@ -121,10 +122,12 @@ func (w *WifiService) enableAutoReconnect() error {
 }
 
 func (w *WifiService) disableAutoReconnect() error {
-	// Remove cron entry, under the same lock enableAutoReconnect takes: both
-	// rewrite /etc/crontabs/root in place.
-	crontabMu.Lock()
-	defer crontabMu.Unlock()
+	platform.
+		// Remove cron entry, under the same lock enableAutoReconnect takes: both
+		// rewrite /etc/crontabs/root in place.
+		CrontabMu.
+		Lock()
+	defer platform.CrontabMu.Unlock()
 	cronCmd := fmt.Sprintf(`(crontab -l 2>/dev/null | grep -v '%s') | crontab -`, w.reconnectScript)
 	_, _ = w.cmd.Run("sh", "-c", cronCmd)
 
@@ -184,22 +187,16 @@ func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
 	return s, nil
 }
 
-// crontabMu serialises read-modify-write of /etc/crontabs/root. Every writer of
-// that file takes it: the WiFi schedule, the LED schedule and the auto-reconnect
-// entry, which all reconcile at boot within a second of each other. It is keyed
-// on the file, not on a UCI config.
-var crontabMu sync.Mutex
-
 // SetWiFiSchedule saves the WiFi schedule and updates the crontab.
 func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 	// The times are formatted straight into a crontab line, so they must be
 	// strict HH:MM: a newline would inject a root cron entry. Validate before
 	// persisting, so a rejected request changes nothing.
 	if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
-		if err := ValidateHHMM(schedule.OnTime); err != nil {
+		if err := platform.ValidateHHMM(schedule.OnTime); err != nil {
 			return fmt.Errorf("on_time: %w", err)
 		}
-		if err := ValidateHHMM(schedule.OffTime); err != nil {
+		if err := platform.ValidateHHMM(schedule.OffTime); err != nil {
 			return fmt.Errorf("off_time: %w", err)
 		}
 	}
@@ -281,9 +278,9 @@ func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) e
 	if err := w.writeWirelessToggleScript(); err != nil {
 		return err
 	}
-
-	crontabMu.Lock()
-	defer crontabMu.Unlock()
+	platform.CrontabMu.
+		Lock()
+	defer platform.CrontabMu.Unlock()
 
 	existing, _ := os.ReadFile(w.crontabPath())
 	var lines []string
@@ -300,7 +297,7 @@ func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) e
 		fmt.Sprintf("%s %s * * * %s up %s", onParts[1], onParts[0], helper, wifiCronTag),
 		fmt.Sprintf("%s %s * * * %s down %s", offParts[1], offParts[0], helper, wifiCronTag),
 		"")
-	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n"))); err != nil {
+	if err := platform.WriteFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	// cron re-reads the crontab on mtime change, but an explicit restart makes
@@ -312,8 +309,9 @@ func (w *WifiService) writeWiFiScheduleCronLines(schedule models.WiFiSchedule) e
 // removeWiFiScheduleCronLines strips our tagged lines from the crontab,
 // preserving everything else (the stock LED and auto-reconnect entries).
 func (w *WifiService) removeWiFiScheduleCronLines() error {
-	crontabMu.Lock()
-	defer crontabMu.Unlock()
+	platform.CrontabMu.
+		Lock()
+	defer platform.CrontabMu.Unlock()
 
 	existing, err := os.ReadFile(w.crontabPath())
 	if err != nil {
@@ -334,7 +332,7 @@ func (w *WifiService) removeWiFiScheduleCronLines() error {
 	// /etc/crontabs/root while it runs, and a truncating os.WriteFile can hand it
 	// a half-written file — which it then parses as the real crontab, dropping
 	// the auto-reconnect and LED entries it did not manage to read.
-	if err := writeFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n"))); err != nil {
+	if err := platform.WriteFileAtomic(w.crontabPath(), []byte(strings.Join(lines, "\n"))); err != nil {
 		return fmt.Errorf("writing crontab: %w", err)
 	}
 	_ = execx.Run(execx.Quick, "/etc/init.d/cron", "restart")

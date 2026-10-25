@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // The guest subnet is fixed, so enabling guest WiFi means claiming
@@ -257,7 +258,7 @@ func subnetsOverlap(a, b *net.IPNet) bool {
 // continue to route and answer on a network the operator switched off.
 func (w *WifiService) teardownGuestWifi() (*WirelessApplyResult, error) {
 	abort := func(err error) (*WirelessApplyResult, error) {
-		revertUCIConfig(w.uci, "wireless", "network", "dhcp", "firewall")
+		platform.RevertUCIConfig(w.uci, "wireless", "network", "dhcp", "firewall")
 		return nil, err
 	}
 	if _, err := w.uci.GetAll("wireless", "guest"); err != nil {

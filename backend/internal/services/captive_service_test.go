@@ -1,8 +1,6 @@
 package services
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -690,7 +690,7 @@ func TestRestoreDNS_ToleratesMissingServerList(t *testing.T) {
 
 // missingEntryRunner makes `uci delete dhcp.@dnsmasq[0].server` fail the way a
 // real device does when the option does not exist.
-type missingEntryRunner struct{ inner CommandRunner }
+type missingEntryRunner struct{ inner platform.CommandRunner }
 
 func (m *missingEntryRunner) Run(name string, args ...string) ([]byte, error) {
 	joined := strings.TrimSpace(name + " " + strings.Join(args, " "))

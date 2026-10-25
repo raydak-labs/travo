@@ -55,8 +55,12 @@ func TestVPNFlowsDoNotNestConfigLocks(t *testing.T) {
 					return true
 				}
 				// A direct call to a lock helper.
-				if id, ok := x.Fun.(*ast.Ident); ok {
-					if id.Name == "mutateUCI" || id.Name == "lockUCIConfigs" || id.Name == "mutateWireless" {
+				if id, ok := x.Fun.(*ast.Ident); ok && id.Name == "mutateWireless" {
+					locks[name] = true
+				}
+				if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
+					if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "platform" &&
+						(sel.Sel.Name == "MutateUCI" || sel.Sel.Name == "LockUCIConfigs" || sel.Sel.Name == "WithConfigLocks") {
 						locks[name] = true
 					}
 				}

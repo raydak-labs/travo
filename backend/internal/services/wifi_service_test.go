@@ -19,6 +19,7 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -794,7 +795,7 @@ func TestSetAPConfig_APModeSkipsRepeaterReconcile(t *testing.T) {
 // which says nothing about the code under test.
 func newMACUnitTestService() (*WifiService, *uci.MockUCI) {
 	svc, u := newTestWifiService()
-	svc.cmd = &MockCommandRunner{}
+	svc.cmd = &platform.MockCommandRunner{}
 	return svc, u
 }
 
@@ -1946,7 +1947,7 @@ func TestGetAutoReconnect_Default(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
 		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
 
 	enabled, err := svc.GetAutoReconnect()
@@ -1962,7 +1963,7 @@ func TestSetAutoReconnect_Enable(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
 		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
 
 	err := svc.SetAutoReconnect(true)
@@ -2001,7 +2002,7 @@ func TestReconnectScript_HasFailureCountGuard(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
 		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
 
 	if err := svc.SetAutoReconnect(true); err != nil {
@@ -2029,7 +2030,7 @@ func TestSetAutoReconnect_Disable(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	tmpDir := t.TempDir()
-	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &MockCommandRunner{},
+	svc := NewWifiServiceForTesting(u, ub, &NoopWifiReloader{}, &platform.MockCommandRunner{},
 		tmpDir+"/priorities.json", tmpDir+"/autoreconnect.json", tmpDir+"/wifi-reconnect.sh")
 
 	// Enable first, then disable
@@ -2382,7 +2383,7 @@ func TestParseIwinfoEncryption(t *testing.T) {
 func newTestWifiServiceWithModeFile(modeFile string) (*WifiService, *uci.MockUCI) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewWifiServiceForTestingWithModeFile(u, ub, &NoopWifiReloader{}, &RealCommandRunner{}, defaultPriorityFile, defaultAutoReconnectFile, defaultReconnectScript, modeFile)
+	svc := NewWifiServiceForTestingWithModeFile(u, ub, &NoopWifiReloader{}, &platform.RealCommandRunner{}, defaultPriorityFile, defaultAutoReconnectFile, defaultReconnectScript, modeFile)
 	return svc, u
 }
 
@@ -3489,7 +3490,7 @@ func TestSetMACAddress_AcceptsValidVariants(t *testing.T) {
 
 // newMACTestService wires a service whose STA device resolves to phy0-sta0 and
 // records every command run, so apply order and crash-guard use can be asserted.
-func newMACTestService(t *testing.T, guardDir string, applier UCIApplyConfirm, cmds *[]string) (*WifiService, *uci.MockUCI) {
+func newMACTestService(t *testing.T, guardDir string, applier platform.UCIApplyConfirm, cmds *[]string) (*WifiService, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
@@ -3504,7 +3505,7 @@ func newMACTestService(t *testing.T, guardDir string, applier UCIApplyConfirm, c
 			},
 		},
 	})
-	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	runner := &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		*cmds = append(*cmds, strings.Join(append([]string{name}, args...), " "))
 		return nil, nil
 	}}
@@ -3558,7 +3559,7 @@ func TestSetMACAddress_LinkFailureIsReturnedAndLinkBroughtBackUp(t *testing.T) {
 	guardDir := t.TempDir()
 	var cmds []string
 	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
-	svc.cmd = &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	svc.cmd = &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		cmds = append(cmds, strings.Join(append([]string{name}, args...), " "))
 		// The address change is what a busy driver rejects.
 		if slices.Contains(args, "address") {
@@ -3592,7 +3593,7 @@ func TestSetMACAddress_GuardSurvivesAFailedLinkChange(t *testing.T) {
 	guardDir := t.TempDir()
 	var cmds []string
 	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
-	svc.cmd = &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	svc.cmd = &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		if slices.Contains(args, "address") {
 			return nil, errors.New("RTNETLINK answers: Operation not supported")
 		}
@@ -3614,7 +3615,7 @@ func TestSetMACAddress_GuardSurvivesAFailedLinkDown(t *testing.T) {
 	guardDir := t.TempDir()
 	var cmds []string
 	svc, _ := newMACTestService(t, guardDir, &fakeWirelessApplier{startToken: "t1"}, &cmds)
-	svc.cmd = &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	svc.cmd = &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		cmds = append(cmds, strings.Join(append([]string{name}, args...), " "))
 		if slices.Contains(args, "down") {
 			return nil, errors.New("ip: cannot find device phy0-sta0")
@@ -3672,7 +3673,8 @@ func TestSetMACAddress_GuardWrittenBeforeUCIWrites(t *testing.T) {
 // guardCheckingApplier records whether the crash guard existed when the apply
 // was staged.
 type guardCheckingApplier struct {
-	UCIApplyConfirm
+	platform.UCIApplyConfirm
+
 	guardPath       string
 	guardMissing    func() bool
 	guardWasMissing bool
@@ -3812,7 +3814,7 @@ func TestFirewallWritersAreMutuallyExclusive(t *testing.T) {
 	svc.uci = blocker
 	svc.reloader = &NoopWifiReloader{}
 	svc.applier = &fakeWirelessApplier{}
-	net := NewNetworkServiceWithRunner(blocker, ubus.NewMockUbus(), &MockCommandRunner{})
+	net := NewNetworkServiceWithRunner(blocker, ubus.NewMockUbus(), &platform.MockCommandRunner{})
 
 	// The guest-WiFi write is parked at its firewall commit, still holding the
 	// config lock and with a staged delta it may yet revert.
@@ -3861,7 +3863,7 @@ func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
 	if err := mockUCI.Set("wireless", "default_radio0", "mode", "ap"); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	net := NewNetworkServiceWithRunner(mockUCI, ubus.NewMockUbus(), &MockCommandRunner{})
+	net := NewNetworkServiceWithRunner(mockUCI, ubus.NewMockUbus(), &platform.MockCommandRunner{})
 
 	enabled := true
 	mutators := map[string]func(){
@@ -3931,35 +3933,32 @@ func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
 // bug would be invisible to the deadlock test.
 //
 // A source grep is the right shape for this — a few lines, no parser. What
-// matters is that `lockUCIConfigs(` appears only where it is defined and used
-// by mutateUCI (uci_locks.go) and by mutateWireless (wifi_service.go).
+// matters is that `LockUCIConfigs(` appears only in platform/ucilock.go, where
+// MutateUCI and WithConfigLocks wrap it; mutateWireless goes through MutateUCI.
 func TestOnlyMutateWirelessTakesUCIConfigLocks(t *testing.T) {
 	t.Parallel()
 
-	matches := 0
-	paths, err := filepath.Glob("*.go")
+	var found []string
+	err := filepath.WalkDir("..", func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if bytes.Contains(src, []byte("LockUCIConfigs(")) {
+			found = append(found, filepath.Base(path))
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatalf("glob: %v", err)
+		t.Fatalf("walk: %v", err)
 	}
-	for _, path := range paths {
-		if strings.HasSuffix(path, "_test.go") {
-			continue
-		}
-		src, readErr := os.ReadFile(path)
-		if readErr != nil {
-			t.Fatalf("read %s: %v", path, readErr)
-		}
-		if !bytes.Contains(src, []byte("lockUCIConfigs(")) {
-			continue
-		}
-		if path != "uci_locks.go" && path != "wifi_service.go" {
-			t.Errorf("%s calls lockUCIConfigs directly; only mutateWireless/mutateUCI may, "+
-				"so the lock set and the revert set stay the same list", path)
-		}
-		matches++
-	}
-	if matches != 2 {
-		t.Errorf("expected exactly uci_locks.go and wifi_service.go to take UCI config locks, found %d files", matches)
+	slices.Sort(found)
+	if want := []string{"ucilock.go"}; !slices.Equal(found, want) {
+		t.Errorf("files taking UCI config locks directly = %v, want %v: only MutateUCI and "+
+			"WithConfigLocks may, so the lock set and the revert set stay the same list", found, want)
 	}
 }
 
@@ -4659,7 +4658,7 @@ func TestClientProbeSafetyMarginMatchesTheGoGate(t *testing.T) {
 // rpcd applier wired to temp config dirs, so the file-level snapshot/restore is
 // exercised end to end. Its wireless config enables one access point, which the
 // unreachable netifd makes unverifiable — that is the refused-confirm case.
-func newRollbackTestService(t *testing.T) (*WifiService, *RealUCIApplyConfirm, string) {
+func newRollbackTestService(t *testing.T) (*WifiService, *platform.RealUCIApplyConfirm, string) {
 	t.Helper()
 	prev := wirelessRetrySleep
 	wirelessRetrySleep = func(time.Duration) {}
@@ -4682,10 +4681,10 @@ func newRollbackTestService(t *testing.T) (*WifiService, *RealUCIApplyConfirm, s
 			t.Fatalf("seed AP %s: %v", k, err)
 		}
 	}
-	fu := &fakeUbusApply{loginSID: "sess-refused"}
-	applier := NewRealUCIApplyConfirm(fu, auth.NewRootPassword())
-	applier.etcConfigDir = etcDir
-	applier.rpcdRunDir = filepath.Join(t.TempDir(), "rpcd")
+	fu := &platform.FakeUbusApply{LoginSID: "sess-refused"}
+	applier := platform.NewRealUCIApplyConfirm(fu, auth.NewRootPassword())
+	applier.EtcConfigDir = etcDir
+	applier.RPCDRunDir = filepath.Join(t.TempDir(), "rpcd")
 	svc := NewWifiServiceWithApplier(u, fu, applier)
 	svc.guardDir = t.TempDir()
 	return svc, applier, cfg
@@ -4786,7 +4785,7 @@ func TestMutateWireless_FailedMutationReportsAFailedRestore(t *testing.T) {
 // (ApplyAndConfirm does exactly that). That is not a failed restore.
 func TestMutateWireless_FailedMutationToleratesAnAlreadyRestoredSnapshot(t *testing.T) {
 	cause := errors.New("mutation failed after committing")
-	applier := &fakeWirelessApplier{rollbackErr: ErrNoSnapshot}
+	applier := &fakeWirelessApplier{rollbackErr: platform.ErrNoSnapshot}
 	svc := NewWifiServiceWithApplier(uci.NewMockUCI(), ubus.NewMockUbus(), applier)
 
 	_, err := svc.mutateWireless([]string{"wireless"}, func() (*WirelessApplyResult, error) {

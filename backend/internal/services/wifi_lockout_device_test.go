@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -32,7 +33,7 @@ func newDeviceLockoutService(t *testing.T, stations map[string]string) (
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
 	svc := NewWifiServiceWithApplier(u, ub, applier)
 	svc.guardDir = t.TempDir()
-	svc.cmd = &MockCommandRunner{RunFunc: fakeIw(stations)}
+	svc.cmd = &platform.MockCommandRunner{RunFunc: fakeIw(stations)}
 	svc.arpFile = writeTempFile(t, "arp", deviceNeighborTable(t))
 	return svc, u, applier
 }

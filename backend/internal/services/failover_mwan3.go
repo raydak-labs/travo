@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // mayDeleteSection reports whether a save may DELETE an mwan3 section. This is
@@ -170,7 +171,7 @@ func (s *FailoverService) backupManagedSections() error {
 	// Atomic write: restoreManagedSections reads this on the rollback path, and
 	// a truncated backup makes the restore fail after the failure it was
 	// supposed to repair.
-	return writeFileAtomic(s.backupPath, data)
+	return platform.WriteFileAtomic(s.backupPath, data)
 }
 
 // restoreManagedSections is the rollback path: it puts the backed-up

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // normalizeMACForSection converts a MAC address to a UCI section-safe format
@@ -238,7 +239,7 @@ func parseStationMACs(output string) map[string]struct{} {
 // would have been on it then reads as "not associated", which is the one way
 // this answer can be wrong; the caller below narrows that by treating an
 // unreadable radio as unprovable rather than as wired.
-func apStationMACs(cmd CommandRunner) map[string]struct{} {
+func apStationMACs(cmd platform.CommandRunner) map[string]struct{} {
 	macs := make(map[string]struct{})
 	iwDev, err := cmd.Run("iw", "dev")
 	if err != nil {

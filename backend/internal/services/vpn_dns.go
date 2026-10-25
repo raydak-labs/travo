@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // dnsmasqLayers returns this service's view of the shared stack.
@@ -118,7 +120,7 @@ func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
 	slog.Info("vpn: tunnel down with the VPN resolver layer stacked; restoring the layer below", "state", tunnelDetail)
 	// The stack shells out to `uci` for dhcp, so it needs the same lock every
 	// other dhcp writer holds (ADR 0010).
-	if err := withConfigLocks([]string{"dhcp"}, func() error {
+	if err := platform.WithConfigLocks([]string{"dhcp"}, func() error {
 		// keepRecord: the heal must not drop the pre-any-layer state, or a
 		// later explicit disable has nothing to restore.
 		_, err := layers.RemoveLayer(dnsLayerVPN, true)

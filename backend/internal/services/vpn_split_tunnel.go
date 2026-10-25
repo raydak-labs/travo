@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 const splitTunnelPath = "/etc/travo/split-tunnel.json"
@@ -35,7 +36,7 @@ func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
 //
 // It holds the UCI locks for every config the VPN flow touches (vpnFlowConfigs).
 func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
-	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+	return platform.MutateUCI(v.uci, vpnFlowConfigs, func() error {
 		return v.setSplitTunnelLocked(cfg)
 	})
 }

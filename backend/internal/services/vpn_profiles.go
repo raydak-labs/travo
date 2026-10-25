@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // loadProfiles reads profiles from the JSON file.
@@ -87,7 +88,7 @@ func (v *VpnService) AddProfile(name, config string) (*models.WireGuardProfile, 
 
 // ActivateProfile is the entry point from the API; see ActivateProfileLocked.
 func (v *VpnService) ActivateProfile(id string) error {
-	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+	return platform.MutateUCI(v.uci, vpnFlowConfigs, func() error {
 		return v.ActivateProfileLocked(id)
 	})
 }

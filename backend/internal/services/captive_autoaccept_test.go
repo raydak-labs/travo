@@ -1,14 +1,15 @@
 package services
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"errors"
 	"net/http"
 	"net/url"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 func TestExtractCaptiveAcceptTargets(t *testing.T) {
@@ -282,7 +283,7 @@ func useTempBounceGuard(t *testing.T) string {
 	return path
 }
 
-func newBounceCaptiveService(r CommandRunner) *CaptiveService {
+func newBounceCaptiveService(r platform.CommandRunner) *CaptiveService {
 	return &CaptiveService{prober: &MockHTTPProber{}, cmd: r, dnsGuard: guard.New(captiveDNSGuardFeature)}
 }
 

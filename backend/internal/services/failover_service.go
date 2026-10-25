@@ -1,13 +1,10 @@
 package services
 
 import (
-	"log/slog"
-
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -17,7 +14,9 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -91,14 +90,14 @@ func (s *FailoverService) rollbackStillPending() bool {
 
 // rollbackGracePeriod is how long after the rpcd rollback timeout a pending
 // apply is still considered in flight.
-const rollbackGracePeriod = time.Duration(uciApplyRollbackTimeout)*time.Second + 2*time.Second
+const rollbackGracePeriod = time.Duration(platform.ApplyRollbackTimeout)*time.Second + 2*time.Second
 
 type FailoverService struct {
 	uci        uci.UCI
 	ubus       ubus.Ubus
 	networkSvc *NetworkService
-	cmd        CommandRunner
-	applier    UCIApplyConfirm
+	cmd        platform.CommandRunner
+	applier    platform.UCIApplyConfirm
 
 	configPath string
 	crashGuard guard.Guard
@@ -139,8 +138,8 @@ func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw 
 		uci:         u,
 		ubus:        ub,
 		networkSvc:  networkSvc,
-		cmd:         &RealCommandRunner{},
-		applier:     NewRealUCIApplyConfirm(ub, pw),
+		cmd:         &platform.RealCommandRunner{},
+		applier:     platform.NewRealUCIApplyConfirm(ub, pw),
 		configPath:  failoverConfigPath,
 		crashGuard:  guard.New("failover"),
 		backupPath:  failoverBackupPath,
@@ -151,7 +150,7 @@ func NewFailoverService(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, pw 
 	}
 }
 
-func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, cmd CommandRunner, applier UCIApplyConfirm, configPath string) *FailoverService {
+func NewFailoverServiceWithRunner(u uci.UCI, ub ubus.Ubus, networkSvc *NetworkService, cmd platform.CommandRunner, applier platform.UCIApplyConfirm, configPath string) *FailoverService {
 	return &FailoverService{
 		uci:         u,
 		ubus:        ub,
@@ -245,7 +244,7 @@ func (s *FailoverService) SetConfig(cfg models.FailoverConfig) error {
 	s.applyMu.Lock()
 	defer s.applyMu.Unlock()
 
-	return mutateUCI(s.uci, mwan3UCIConfigs, func() error {
+	return platform.MutateUCI(s.uci, mwan3UCIConfigs, func() error {
 		return s.setConfigLocked(cfg)
 	})
 }
@@ -448,7 +447,7 @@ func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
 	// Atomic: the 10s monitor reads this file, and os.WriteFile truncates before
 	// writing, so a save that overlapped a read gave the monitor a 500 and a
 	// power cut left a truncated file that fails to parse forever after.
-	return writeFileAtomic(s.configPath, data)
+	return platform.WriteFileAtomic(s.configPath, data)
 }
 
 // mwan3ListOptions are the options mwan3 reads as UCI lists. Restoring one with

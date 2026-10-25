@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // GetDNSConfig returns the custom DNS configuration.
@@ -32,7 +33,7 @@ func (n *NetworkService) GetDNSConfig() (models.DNSConfig, error) {
 // VPN's half-written peer, leaving a wg0 peer with new allowed_ips and no matching
 // public_key.
 func (n *NetworkService) SetDNSConfig(config models.DNSConfig) error {
-	return mutateUCI(n.uci, []string{"network"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"network"}, func() error {
 		if config.UseCustomDNS {
 			if err := n.uciSet("network", "wan", "peerdns", "0"); err != nil {
 				return err
@@ -88,7 +89,7 @@ func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 	// dhcp.dns_...name", i.e. each request's own section was clobbered by the
 	// other. This was a documented gap in the mutateUCI rollout; it is not a
 	// theoretical one.
-	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		section := "dns_" + sanitizeSectionName(entry.Name)
 		// Explicit duplicate check, inside the lock: real uci reuses the section
 		// instead of failing, so a second entry with the same name would silently
@@ -117,7 +118,7 @@ func (n *NetworkService) AddDNSEntry(entry models.DNSEntry) error {
 func (n *NetworkService) DeleteDNSEntry(section string) error {
 	// Same lock as AddDNSEntry, and for the same reason: a delete that reverts
 	// or commits `dhcp` concurrently with an add silently discards the add.
-	return mutateUCI(n.uci, []string{"dhcp"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"dhcp"}, func() error {
 		if err := n.requireNamedDHCPSection(section, "domain"); err != nil {
 			return err
 		}

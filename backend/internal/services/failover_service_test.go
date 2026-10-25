@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -23,9 +24,9 @@ func TestFailoverServiceGetConfigDefaults(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
 
 	cfg, err := svc.GetConfig()
 	if err != nil {
@@ -44,10 +45,10 @@ func TestFailoverServiceSetConfigWritesManagedSections(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
 
 	cfg := models.FailoverConfig{
 		Enabled: true,
@@ -122,8 +123,8 @@ func TestFailoverServiceRejectsEnabledConfigWithoutCandidates(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
 
 	err := svc.SetConfig(models.FailoverConfig{
 		Enabled:    true,
@@ -241,7 +242,7 @@ func TestFailbackHoldDown(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 
 	now := time.Now()
 	oldTime := now.Add(-time.Minute)
@@ -328,7 +329,7 @@ func TestFailbackHoldDown(t *testing.T) {
 				}
 			}
 
-			testSvc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
+			testSvc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
 			testSvc.onlineSince = tt.onlineSince
 
 			gotActive := testSvc.computeActiveInterface(testCandidates)
@@ -344,9 +345,9 @@ func TestFailbackImmediateFailover(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 	configPath := filepath.Join(t.TempDir(), "failover.json")
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, configPath)
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, configPath)
 
 	now := time.Now()
 
@@ -386,7 +387,7 @@ func TestFailbackPriorityOrderingWithHoldDown(t *testing.T) {
 
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 
 	now := time.Now()
 	oldTime := now.Add(-time.Minute)
@@ -422,7 +423,7 @@ func TestFailbackPriorityOrderingWithHoldDown(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, &NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
+			svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{}, filepath.Join(t.TempDir(), "failover.json"))
 			svc.onlineSince = tt.onlineSince
 
 			gotActive := svc.computeActiveInterface(tt.candidates)
@@ -470,9 +471,9 @@ func newComputeActiveService(t *testing.T) *FailoverService {
 	t.Helper()
 	mockUCI := uci.NewMockUCI()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 	return NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
-		&MockCommandRunner{}, &NoopUCIApplyConfirm{},
+		&platform.MockCommandRunner{}, &platform.NoopUCIApplyConfirm{},
 		filepath.Join(t.TempDir(), "failover.json"))
 }
 
@@ -536,13 +537,13 @@ func (r *recordingApplier) calls() (starts [][]string, confirms []string) {
 }
 
 // newFailoverTestService builds a FailoverService with temp paths and mwan3 installed.
-func newFailoverTestService(t *testing.T, mockUCI uci.UCI, applier UCIApplyConfirm) (*FailoverService, string) {
+func newFailoverTestService(t *testing.T, mockUCI uci.UCI, applier platform.UCIApplyConfirm) (*FailoverService, string) {
 	t.Helper()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "failover.json")
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
-	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &MockCommandRunner{}, applier, configPath)
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
+	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, &platform.MockCommandRunner{}, applier, configPath)
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0755); err != nil {
 		t.Fatalf("write init script: %v", err)
@@ -713,7 +714,7 @@ func TestVerifyApplyRequiresEveryEnabledCandidate(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 
 	// usb0 is enabled and available but has no runtime interface, so a config
 	// that "works" for wan/wwan must not verify clean.
@@ -738,7 +739,7 @@ func TestVerifyApplyAcceptsAllEnabledCandidatesPresent(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	candidates := []models.FailoverCandidate{
 		{InterfaceName: "wan", Available: true, Enabled: true, Priority: 1},
 		{InterfaceName: "wwan", Available: true, Enabled: true, Priority: 2},
@@ -808,7 +809,7 @@ func TestVerifyApplyRejectsStaleGeneratedSectionValues(t *testing.T) {
 	t.Run("member references a non-namespaced section", func(t *testing.T) {
 		t.Parallel()
 		mockUCI := uci.NewMockUCI()
-		svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+		svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 		seedGeneratedManagedSections(t, mockUCI, candidates)
 		if err := mockUCI.Set("mwan3", "travo_wan_p1", "interface", "wan"); err != nil {
 			t.Fatalf("Set member interface: %v", err)
@@ -826,7 +827,7 @@ func TestVerifyApplyRejectsStaleGeneratedSectionValues(t *testing.T) {
 	t.Run("generated interface section lost its family", func(t *testing.T) {
 		t.Parallel()
 		mockUCI := uci.NewMockUCI()
-		svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+		svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 		seedGeneratedManagedSections(t, mockUCI, candidates)
 		if err := mockUCI.DeleteOption("mwan3", failoverIfWan, "family"); err != nil {
 			t.Fatalf("DeleteOption: %v", err)
@@ -861,7 +862,7 @@ func TestSetConfigRemovesSectionsOfDroppedCandidates(t *testing.T) {
 	_ = mockUCI.AddSection("mwan3", "my_custom_policy", "policy")
 	_ = mockUCI.Set("mwan3", "my_custom_policy", "use_member", "travo_wan_p1")
 
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	cfg := failoverTestConfig(wanCandidate())
 	if err := svc.SetConfig(cfg); err != nil {
 		t.Fatalf("SetConfig: %v", err)
@@ -914,7 +915,7 @@ func TestSetConfigKeepsForeignInterfaceSections(t *testing.T) {
 	_ = mockUCI.Set("mwan3", "hotel", "metric", "10")
 	_ = mockUCI.Set("mwan3", "hotel", "track_ip", "1.1.1.1")
 
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	cfg := failoverTestConfig(wanCandidate())
 	if err := svc.SetConfig(cfg); err != nil {
 		t.Fatalf("SetConfig: %v", err)
@@ -1023,7 +1024,7 @@ func TestSetConfigKeepsHandWrittenStockWanSection(t *testing.T) {
 	mockUCI := uci.NewMockUCI()
 	seedHandWrittenStockExample(t, mockUCI, "wan")
 
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	if err := svc.SetConfig(failoverTestConfig(wanCandidate())); err != nil {
 		t.Fatalf("SetConfig: %v", err)
 	}
@@ -1078,7 +1079,7 @@ func TestSetConfigKeepsAnIdenticalNonNamespacedSection(t *testing.T) {
 		}
 	}
 
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	if err := svc.SetConfig(failoverTestConfig(wanCandidate())); err != nil {
 		t.Fatalf("SetConfig: %v", err)
 	}
@@ -1114,7 +1115,7 @@ func TestSetConfigKeepsAnOperatorEditedTravoSection(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
 		Available: true, Enabled: true, Priority: 2}
 	if err := svc.SetConfig(failoverTestConfig(wanCandidate(), wwan)); err != nil {
@@ -1145,7 +1146,7 @@ func TestSetConfigReusesAnOperatorEditedTravoSection(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
 		Available: true, Enabled: true, Priority: 2}
 	cfg := failoverTestConfig(wanCandidate(), wwan)
@@ -1223,7 +1224,7 @@ func TestSetConfigRestoresAnOperatorEditedTravoSectionAfterAFailedApply(t *testi
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	wwan := models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
 		Available: true, Enabled: true, Priority: 2}
 	cfg := failoverTestConfig(wanCandidate(), wwan)
@@ -1275,7 +1276,7 @@ func TestSetConfigAdoptsAnOperatorEditedTravoSectionOnSuccess(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	// Only Publish is exercised; the periodic checker is never started.
 	alerts := NewAlertService(nil)
 	svc.SetAlertService(alerts)
@@ -1362,7 +1363,7 @@ func TestSetConfigKeepsHandWrittenInterfaceSections(t *testing.T) {
 		Available: true, Enabled: true, Priority: 3,
 	}, failoverTestHealth())
 
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	cfg := failoverTestConfig(
 		wanCandidate(),
 		models.FailoverCandidate{InterfaceName: "wwan", Kind: models.FailoverCandidateKindWiFi,
@@ -1407,7 +1408,7 @@ func TestSetConfigKeepsALegacyGeneratedSectionOfACandidate(t *testing.T) {
 		Available: true, Enabled: true, Priority: 2}
 	seedLegacyGeneratedSection(t, mockUCI, wwan, failoverTestHealth())
 
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	cfg := failoverTestConfig(wanCandidate(), wwan)
 	if err := svc.SetConfig(cfg); err != nil {
 		t.Fatalf("SetConfig: %v", err)
@@ -1437,7 +1438,7 @@ func TestSetConfigConfigWriteFailureAppliesNothingAndLeavesNoGuard(t *testing.T)
 	applier := &recordingApplier{}
 	tmpDir := t.TempDir()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 	// A directory where the config file belongs: every write of it fails, for
 	// any user, including root.
 	blocker := filepath.Join(tmpDir, "failover.json")
@@ -1445,7 +1446,7 @@ func TestSetConfigConfigWriteFailureAppliesNothingAndLeavesNoGuard(t *testing.T)
 		t.Fatalf("create blocking directory: %v", err)
 	}
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc,
-		&MockCommandRunner{}, applier, blocker)
+		&platform.MockCommandRunner{}, applier, blocker)
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write init script: %v", err)
@@ -1471,7 +1472,7 @@ func TestReadTrackerStatesMapsNamespacedSections(t *testing.T) {
 	t.Parallel()
 
 	mockUCI := uci.NewMockUCI()
-	cmd := &MockCommandRunner{RunFunc: func(name string, _ ...string) ([]byte, error) {
+	cmd := &platform.MockCommandRunner{RunFunc: func(name string, _ ...string) ([]byte, error) {
 		if name == "mwan3" {
 			return []byte("interface travo_if_wan is online\ninterface hotel is offline\n"), nil
 		}
@@ -1479,10 +1480,10 @@ func TestReadTrackerStatesMapsNamespacedSections(t *testing.T) {
 	}}
 	tmpDir := t.TempDir()
 	mockUbus := ubus.NewMockUbus()
-	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &MockCommandRunner{})
+	networkSvc := NewNetworkServiceWithRunner(mockUCI, mockUbus, &platform.MockCommandRunner{})
 	configPath := filepath.Join(tmpDir, "failover.json")
 	svc := NewFailoverServiceWithRunner(mockUCI, mockUbus, networkSvc, cmd,
-		&NoopUCIApplyConfirm{}, configPath)
+		&platform.NoopUCIApplyConfirm{}, configPath)
 	svc.initScript = filepath.Join(tmpDir, "mwan3")
 	if err := os.WriteFile(svc.initScript, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write init script: %v", err)
@@ -1603,7 +1604,7 @@ func TestLoadConfigFilePreservesStoredZeroFailureInterval(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 	mockUCI := uci.NewMockUCI()
-	svc, _ := newFailoverTestService(t, mockUCI, &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, mockUCI, &platform.NoopUCIApplyConfirm{})
 	svc.configPath = configPath
 
 	cfg, err := svc.loadConfigFile()
@@ -1863,10 +1864,10 @@ func TestSetConfigGuardLifecycle(t *testing.T) {
 func TestSetConfigHoldsTheNetworkAndMwan3ConfigLocks(t *testing.T) {
 	t.Parallel()
 
-	svc, _ := newFailoverTestService(t, uci.NewMockUCI(), &NoopUCIApplyConfirm{})
+	svc, _ := newFailoverTestService(t, uci.NewMockUCI(), &platform.NoopUCIApplyConfirm{})
 	cfg := failoverTestConfig(wanCandidate())
 
-	unlock := lockUCIConfigs("network")
+	unlock := platform.LockUCIConfigs("network")
 	done := make(chan error, 1)
 	go func() { done <- svc.SetConfig(cfg) }()
 

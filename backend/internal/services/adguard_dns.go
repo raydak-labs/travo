@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // adguardDNSInfoResponse matches the JSON from /control/dns_info.
@@ -91,7 +92,7 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 // dhcp.@dnsmasq[0] options. withConfigLocks rather than mutateUCI, because this
 // shells out to `uci` and has no uci.UCI handle to revert through.
 func (s *AdGuardService) SetDNS(enabled bool) error {
-	return withConfigLocks([]string{"dhcp"}, func() error { return s.setDNSLocked(enabled) })
+	return platform.WithConfigLocks([]string{"dhcp"}, func() error { return s.setDNSLocked(enabled) })
 }
 
 // checkerDNS drives the shared dnsmasq stack through AdGuardService's

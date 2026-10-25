@@ -1,20 +1,19 @@
 package services
 
 import (
-	"log/slog"
-
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -75,7 +74,7 @@ func (p *RealHTTPProber) Do(url string) (int, string, string, error) {
 type CaptiveService struct {
 	prober   HTTPProber
 	uci      uci.UCI
-	cmd      CommandRunner
+	cmd      platform.CommandRunner
 	mu       sync.Mutex
 	dnsGuard guard.Guard
 	// test overrides (empty in production)
@@ -126,7 +125,7 @@ func NewCaptiveService(prober HTTPProber) *CaptiveService {
 }
 
 // NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
-func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *CaptiveService {
+func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd platform.CommandRunner) *CaptiveService {
 	svc := newCaptiveServiceWithGuard(prober, u, cmd, guard.New(captiveDNSGuardFeature))
 	// Auto-restore stale bypass on startup. Tracked by the app lifecycle: Stop()
 	// must be able to keep this goroutine from restoring DNS after the process
@@ -141,11 +140,11 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd CommandRunner) *
 
 // NewCaptiveServiceWithGuard is NewCaptiveServiceWithUCI with the bypass state
 // in an explicit guard and without the startup auto-restore.
-func NewCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, g guard.Guard) *CaptiveService {
+func NewCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
 	return newCaptiveServiceWithGuard(prober, u, cmd, g)
 }
 
-func newCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd CommandRunner, g guard.Guard) *CaptiveService {
+func newCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
 	return &CaptiveService{prober: prober, uci: u, cmd: cmd, dnsGuard: g, stopCh: make(chan struct{})}
 }
 
@@ -271,7 +270,7 @@ func (c *CaptiveService) IsDNSBypassed() bool {
 // local consumers) and AdGuardHome (which is the actual port-53 resolver for
 // LAN clients).  Original config is stored in the guard file for restoration.
 func (c *CaptiveService) BypassDNS() error {
-	return mutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
+	return platform.MutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
@@ -453,7 +452,7 @@ func (c *CaptiveService) rewriteGuard(backup dnsBackup) error {
 // restore that cannot determine the pre-bypass state at all — a bypass that is
 // still in force must never be reported as restored.
 func (c *CaptiveService) RestoreDNS() error {
-	return mutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
+	return platform.MutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 

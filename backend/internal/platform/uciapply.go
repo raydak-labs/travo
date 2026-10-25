@@ -1,4 +1,4 @@
-package services
+package platform
 
 import (
 	"errors"
@@ -43,9 +43,9 @@ type UCIApplyConfirm interface {
 }
 
 const (
-	uciApplyRollbackTimeout = 30
-	defaultEtcConfigDir     = "/etc/config"
-	defaultRpcdRunDir       = "/var/run/rpcd"
+	ApplyRollbackTimeout = 30
+	defaultEtcConfigDir  = "/etc/config"
+	defaultRpcdRunDir    = "/var/run/rpcd"
 
 	// Snapshot layout, all under the rpcd run dir (a tmpfs on OpenWrt, so it
 	// costs no flash and cannot survive a reboot, which is the intent: a
@@ -64,19 +64,19 @@ const (
 // associated with an apply.
 func (r *RealUCIApplyConfirm) snapshotDir(sessionID string) string {
 	if sessionID == "" {
-		return filepath.Join(r.rpcdRunDir, uciSnapshotPending)
+		return filepath.Join(r.RPCDRunDir, uciSnapshotPending)
 	}
-	return filepath.Join(r.rpcdRunDir, uciSnapshotPrefix+sessionID)
+	return filepath.Join(r.RPCDRunDir, uciSnapshotPrefix+sessionID)
 }
 
 // RealUCIApplyConfirm uses ubus session + rpcd uci apply/confirm.
 type RealUCIApplyConfirm struct {
 	ubus     ubus.Ubus
 	password *auth.RootPassword
-	// rpcdRunDir and etcConfigDir are struct fields (not constants) so the
+	// RPCDRunDir and etcConfigDir are struct fields (not constants) so the
 	// apply/confirm flow can be exercised in tests against a temp directory.
-	rpcdRunDir   string
-	etcConfigDir string
+	RPCDRunDir   string
+	EtcConfigDir string
 }
 
 // NewRealUCIApplyConfirm returns a real applier that uses the given ubus and password holder.
@@ -84,8 +84,8 @@ func NewRealUCIApplyConfirm(ub ubus.Ubus, pw *auth.RootPassword) *RealUCIApplyCo
 	return &RealUCIApplyConfirm{
 		ubus:         ub,
 		password:     pw,
-		rpcdRunDir:   defaultRpcdRunDir,
-		etcConfigDir: defaultEtcConfigDir,
+		RPCDRunDir:   defaultRpcdRunDir,
+		EtcConfigDir: defaultEtcConfigDir,
 	}
 }
 
@@ -120,7 +120,7 @@ func (r *RealUCIApplyConfirm) Snapshot(configs []string) error {
 			_ = os.RemoveAll(dir)
 			return fmt.Errorf("uci snapshot: %q is not a plain config file name", name)
 		}
-		src := filepath.Join(r.etcConfigDir, name)
+		src := filepath.Join(r.EtcConfigDir, name)
 		if _, err := os.Stat(src); err != nil {
 			if !os.IsNotExist(err) {
 				_ = os.RemoveAll(dir)
@@ -178,7 +178,7 @@ func (r *RealUCIApplyConfirm) Rollback(sessionID string) error {
 		if !ok || name == "" {
 			return fmt.Errorf("uci rollback: unreadable snapshot manifest line %q in %s", line, dir)
 		}
-		target := filepath.Join(r.etcConfigDir, name)
+		target := filepath.Join(r.EtcConfigDir, name)
 		if state == "absent" {
 			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("uci rollback: remove %s: %w", target, err)
@@ -237,7 +237,7 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	if err != nil || sid == "" {
 		return "", fmt.Errorf("uci apply: no session (login failed): %w", err)
 	}
-	sessionDir := filepath.Join(r.rpcdRunDir, "uci-"+sid)
+	sessionDir := filepath.Join(r.RPCDRunDir, "uci-"+sid)
 	if err := os.MkdirAll(sessionDir, 0700); err != nil {
 		return "", fmt.Errorf("uci apply: mkdir session dir: %w", err)
 	}
@@ -251,7 +251,7 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 		}
 	}()
 	for _, name := range configs {
-		src := filepath.Join(r.etcConfigDir, name)
+		src := filepath.Join(r.EtcConfigDir, name)
 		dst := filepath.Join(sessionDir, name)
 		if err := copyFile(src, dst); err != nil {
 			return "", fmt.Errorf("uci apply: copy %s: %w", name, err)
@@ -260,7 +260,7 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	applyArgs := map[string]any{
 		"ubus_rpc_session": sid,
 		"rollback":         true,
-		"timeout":          uciApplyRollbackTimeout,
+		"timeout":          ApplyRollbackTimeout,
 	}
 	if _, err := r.ubus.Call("uci", "apply", applyArgs); err != nil {
 		return "", fmt.Errorf("uci apply: %w", err)

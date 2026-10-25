@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -22,7 +22,7 @@ type NetworkService struct {
 	uci       uci.UCI
 	ubus      ubus.Ubus
 	aliasFile string
-	cmd       CommandRunner
+	cmd       platform.CommandRunner
 
 	// portForwardsFile overrides the const path (tests only), following the
 	// same pattern as aliasFile.
@@ -67,20 +67,12 @@ const wifiMACTTL = 5 * time.Minute
 // initdPath is the path to OpenWRT init.d scripts directory.
 const initdPath = "/etc/init.d/"
 
-// boolToEnabled converts a boolean to UCI enabled string ("1" or "0").
-func boolToEnabled(enabled bool) string {
-	if enabled {
-		return "1"
-	}
-	return "0"
-}
-
 // stringFromBytes converts a byte slice to a trimmed string.
 func stringFromBytes(data []byte) string {
 	return strings.TrimSpace(string(data))
 }
 
-func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRunner) *NetworkService {
+func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd platform.CommandRunner) *NetworkService {
 	return &NetworkService{
 		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd, arpFile: procNetARP,
 		wifiMACsSeen:     make(map[string]time.Time),
@@ -91,16 +83,16 @@ func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd CommandRun
 
 // NewNetworkService creates a new NetworkService.
 func NewNetworkService(u uci.UCI, ub ubus.Ubus) *NetworkService {
-	return newNetworkService(u, ub, "/etc/travo/aliases.json", &RealCommandRunner{})
+	return newNetworkService(u, ub, "/etc/travo/aliases.json", &platform.RealCommandRunner{})
 }
 
 // NewNetworkServiceWithAliasFile creates a NetworkService with a custom alias file path.
 func NewNetworkServiceWithAliasFile(u uci.UCI, ub ubus.Ubus, aliasFile string) *NetworkService {
-	return newNetworkService(u, ub, aliasFile, &RealCommandRunner{})
+	return newNetworkService(u, ub, aliasFile, &platform.RealCommandRunner{})
 }
 
 // NewNetworkServiceWithRunner creates a NetworkService with a custom command runner (for testing).
-func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd CommandRunner) *NetworkService {
+func NewNetworkServiceWithRunner(u uci.UCI, ub ubus.Ubus, cmd platform.CommandRunner) *NetworkService {
 	return newNetworkService(u, ub, "/etc/travo/aliases.json", cmd)
 }
 
@@ -374,7 +366,7 @@ func (n *NetworkService) KickClient(mac string) error {
 // than no guard: nothing would clear it, and blocking would stay dead until a
 // redeploy.
 func (n *NetworkService) BlockClient(mac string) error {
-	return mutateUCI(n.uci, []string{"firewall"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 		macUpper := strings.ToUpper(mac)
 
@@ -420,7 +412,7 @@ func (n *NetworkService) BlockClient(mac string) error {
 
 // UnblockClient removes the firewall block rule for a MAC address.
 func (n *NetworkService) UnblockClient(mac string) error {
-	return mutateUCI(n.uci, []string{"firewall"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"firewall"}, func() error {
 		section := "block_" + normalizeMACForSection(mac)
 
 		previous, _ := n.uci.GetAll("firewall", section)
@@ -588,7 +580,7 @@ func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod
 // where the command runner belongs.
 type classifyDeps struct {
 	ubus    ubus.Ubus
-	cmd     CommandRunner
+	cmd     platform.CommandRunner
 	arpFile string
 }
 
@@ -765,19 +757,4 @@ func arpMACForIP(arpFile, ip string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// writeFileAtomic writes via a sibling temp file and renames, so a concurrent
-// reader never observes a truncated file.
-//
-// os.WriteFile truncates before writing, and /etc/crontabs/root is read by a
-// running busybox crond. A reader that catches the window sees a partial
-// crontab and can stop scheduling — the same defect class that produced
-// "unexpected end of JSON input" on the port-forward store.
-func writeFileAtomic(path string, data []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }

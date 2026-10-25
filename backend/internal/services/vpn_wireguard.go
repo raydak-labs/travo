@@ -9,17 +9,12 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
-
-const openwrtIPBin = "/sbin/ip"
 
 const openwrtWgBin = "/usr/bin/wg"
 
 const openwrtUbusBin = "/sbin/ubus"
-
-const openwrtIfupBin = "/sbin/ifup"
-
-const openwrtIfdownBin = "/sbin/ifdown"
 
 var wireGuardVerifyTimeout = 12 * time.Second
 
@@ -191,7 +186,7 @@ func (v *VpnService) wireGuardRuntimeUp() bool {
 			}
 		}
 	}
-	if out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); err == nil {
+	if out, err := v.cmd.Run(platform.IPBin, "link", "show", "dev", "wg0"); err == nil {
 		return wireGuardIfaceLooksUp(string(out))
 	}
 	return false
@@ -206,7 +201,7 @@ func (v *VpnService) applyAndVerifyWireGuard() error {
 			_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 			time.Sleep(wireGuardReloadSettle)
 		}
-		_, _ = v.cmd.Run(openwrtIfupBin, "wg0")
+		_, _ = v.cmd.Run(platform.IfupBin, "wg0")
 		// Exit as soon as the interface is live instead of burning the
 		// remaining fixed-count retries.
 		if v.wireGuardRuntimeUp() {
@@ -217,7 +212,7 @@ func (v *VpnService) applyAndVerifyWireGuard() error {
 }
 
 func (v *VpnService) hasKernelDefaultRoute() bool {
-	out, err := v.cmd.Run(openwrtIPBin, "route", "show", "default")
+	out, err := v.cmd.Run(platform.IPBin, "route", "show", "default")
 	if err != nil {
 		return false
 	}
@@ -330,8 +325,8 @@ func (v *VpnService) restoreDefaultRouteAfterWireGuardDisable() {
 	// Phase 3: netifd helper scripts (ifup/ifdown) as last resort. On some systems
 	// this re-triggers proto handlers more reliably than ubus down/up alone.
 	for _, ifname := range uplinks {
-		_, _ = v.cmd.Run(openwrtIfdownBin, ifname)
-		_, _ = v.cmd.Run(openwrtIfupBin, ifname)
+		_, _ = v.cmd.Run(platform.IfdownBin, ifname)
+		_, _ = v.cmd.Run(platform.IfupBin, ifname)
 	}
 	_, _ = v.cmd.Run(openwrtUbusBin, "call", "network", "reload")
 	_ = v.waitForKernelDefaultRoute(8 * time.Second)
@@ -349,7 +344,7 @@ func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
 				}
 			}
 		}
-		if out, err := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); err == nil {
+		if out, err := v.cmd.Run(platform.IPBin, "link", "show", "dev", "wg0"); err == nil {
 			ls := string(out)
 			if wireGuardIfaceLooksUp(ls) {
 				return nil
@@ -359,9 +354,9 @@ func (v *VpnService) waitForWireGuardRuntime(timeout time.Duration) error {
 		time.Sleep(200 * time.Millisecond)
 	}
 	if lastIPOut != "" {
-		return fmt.Errorf("wg0 did not become ready in time (last %s: %s)", openwrtIPBin, lastIPOut)
+		return fmt.Errorf("wg0 did not become ready in time (last %s: %s)", platform.IPBin, lastIPOut)
 	}
-	return fmt.Errorf("wg0 did not become ready in time (%s and %s did not succeed)", openwrtWgBin, openwrtIPBin)
+	return fmt.Errorf("wg0 did not become ready in time (%s and %s did not succeed)", openwrtWgBin, platform.IPBin)
 }
 
 // wgRuntimeState returns a fine-grained status detail string for the wg0 interface.
@@ -387,7 +382,7 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 	// broken PROBE, not a broken tunnel: the debounced heal (ADR 0001 §3.3) would
 	// otherwise eventually pop the DNS layer of a working tunnel. An UP wg0
 	// outranks the missing tool.
-	if link, lerr := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); lerr == nil {
+	if link, lerr := v.cmd.Run(platform.IPBin, "link", "show", "dev", "wg0"); lerr == nil {
 		if wireGuardIfaceLooksUp(string(link)) {
 			return "up_no_handshake"
 		}
@@ -537,7 +532,7 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 // SetWireguardConfig updates the WireGuard configuration. It holds the UCI
 // locks for every config the VPN flow touches (vpnFlowConfigs).
 func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
-	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+	return platform.MutateUCI(v.uci, vpnFlowConfigs, func() error {
 		return v.setWireguardConfigLocked(config)
 	})
 }
@@ -589,7 +584,7 @@ func (v *VpnService) setWireguardConfigLocked(config models.WireguardConfig) err
 // a half-applied tunnel whose firewall zone and resolver list disagree with its
 // interface state.
 func (v *VpnService) ToggleWireguard(enable bool) error {
-	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
+	return platform.MutateUCI(v.uci, vpnFlowConfigs, func() error {
 		if enable {
 			return v.enableWireguard()
 		}

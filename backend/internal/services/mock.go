@@ -8,21 +8,6 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
-// MockCommandRunner implements CommandRunner for testing.
-type MockCommandRunner struct {
-	Output  []byte
-	Err     error
-	RunFunc func(name string, args ...string) ([]byte, error)
-}
-
-// Run returns the configured output and error.
-func (m *MockCommandRunner) Run(name string, args ...string) ([]byte, error) {
-	if m.RunFunc != nil {
-		return m.RunFunc(name, args...)
-	}
-	return m.Output, m.Err
-}
-
 // MockStorageProvider returns realistic mock storage stats.
 type MockStorageProvider struct{}
 
@@ -165,30 +150,6 @@ func (w *NoopEventWatcher) Stop() {
 
 func (w *NoopEventWatcher) Ch() <-chan models.NetworkStatus {
 	return w.ch
-}
-
-// Snapshot is a no-op for the no-op applier.
-func (NoopUCIApplyConfirm) Snapshot(_ []string) error { return nil }
-
-// Rollback is a no-op for the no-op applier.
-func (NoopUCIApplyConfirm) Rollback(_ string) error { return nil }
-
-// NoopUCIApplyConfirm does nothing (for tests).
-type NoopUCIApplyConfirm struct{}
-
-// StartApply is a no-op.
-func (NoopUCIApplyConfirm) StartApply(_ []string) (string, error) {
-	return "", nil
-}
-
-// Confirm is a no-op.
-func (NoopUCIApplyConfirm) Confirm(_ string) error {
-	return nil
-}
-
-// ApplyAndConfirm is a no-op.
-func (NoopUCIApplyConfirm) ApplyAndConfirm(_ []string) error {
-	return nil
 }
 
 // NoopPackageManager for systems without a package manager.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // GetKillSwitch checks whether the VPN kill switch firewall rule exists.
@@ -33,7 +34,7 @@ const (
 // Every write error is propagated: a partial rule would be committed with the
 // default target (ACCEPT), i.e. a "kill switch" that allows all traffic.
 func (v *VpnService) SetKillSwitch(enabled bool) error {
-	return mutateUCI(v.uci, vpnFirewallConfigs, func() error {
+	return platform.MutateUCI(v.uci, vpnFirewallConfigs, func() error {
 		if enabled {
 			// Create the firewall rule that blocks LAN→WAN when VPN is down.
 			if _, err := v.uci.GetAll("firewall", vpnKillSwitchSection); err != nil {

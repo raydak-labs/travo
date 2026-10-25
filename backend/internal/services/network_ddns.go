@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // GetDDNSConfig reads the DDNS configuration from UCI (ddns.myddns).
@@ -83,7 +84,7 @@ func (n *NetworkService) SetDDNSConfig(config models.DDNSConfig) error {
 
 	// `ddns` is locked like every other UCI mutator: the uci CLI keeps
 	// uncommitted changes in the process-global /tmp/.uci/ddns/changes file.
-	return mutateUCI(n.uci, []string{"ddns"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"ddns"}, func() error {
 		// The `myddns` section is created on demand. It does not exist on a
 		// router where DDNS was never configured, and `uci set` on a missing
 		// section fails outright, so without this the endpoint could only ever

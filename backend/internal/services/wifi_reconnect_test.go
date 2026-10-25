@@ -1,8 +1,6 @@
 package services
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -11,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -121,7 +121,7 @@ func TestAutoReconnectWaitsForTheCrontabLock(t *testing.T) {
 	dir := t.TempDir()
 
 	var ran bool
-	cmd := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	cmd := &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		ran = true
 		return nil, nil
 	}}
@@ -130,20 +130,24 @@ func TestAutoReconnectWaitsForTheCrontabLock(t *testing.T) {
 		filepath.Join(dir, "priorities.json"),
 		filepath.Join(dir, "autoreconnect.json"),
 		filepath.Join(dir, "wifi-reconnect.sh"))
+	platform.
 
-	// Hold the lock the schedule writers take, then ask for a crontab rewrite.
-	crontabMu.Lock()
+		// Hold the lock the schedule writers take, then ask for a crontab rewrite.
+		CrontabMu.
+		Lock()
 	done := make(chan error, 1)
 	go func() { done <- w.SetAutoReconnect(true) }()
 
 	select {
 	case <-done:
-		crontabMu.Unlock()
+		platform.CrontabMu.
+			Unlock()
 		t.Fatal("auto-reconnect rewrote the crontab while another writer held the lock")
 	case <-time.After(200 * time.Millisecond):
 		// Expected: the rewrite is waiting, not racing.
 	}
-	crontabMu.Unlock()
+	platform.CrontabMu.
+		Unlock()
 
 	select {
 	case err := <-done:

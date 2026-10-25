@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -338,9 +339,9 @@ func TestGetConnectionMethod(t *testing.T) {
 			}
 
 			u := uci.NewMockUCI()
-			cmd := &MockCommandRunner{Err: fmt.Errorf("iw: not available")}
+			cmd := &platform.MockCommandRunner{Err: fmt.Errorf("iw: not available")}
 			if tt.assoc != "" {
-				cmd = &MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {
+				cmd = &platform.MockCommandRunner{RunFunc: func(_ string, args ...string) ([]byte, error) {
 					if len(args) == 1 && args[0] == "dev" {
 						return []byte("phy#1\n\tInterface phy1-ap0\n\t\ttype AP\n"), nil
 					}
@@ -1042,7 +1043,7 @@ func TestAddDHCPReservation_DuplicateName(t *testing.T) {
 func TestBlockClient(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.BlockClient("AA:BB:CC:DD:EE:FF")
 	if err != nil {
@@ -1064,7 +1065,7 @@ func TestBlockClient(t *testing.T) {
 func TestUnblockClient(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	_ = svc.BlockClient("AA:BB:CC:DD:EE:FF")
 
@@ -1099,7 +1100,7 @@ func TestGetBlockedClients_Empty(t *testing.T) {
 func TestBlockMultipleClients(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	_ = svc.BlockClient("AA:BB:CC:DD:EE:01")
 	_ = svc.BlockClient("AA:BB:CC:DD:EE:02")
@@ -1116,7 +1117,7 @@ func TestBlockMultipleClients(t *testing.T) {
 func TestBlockClient_AlreadyBlocked(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	_ = svc.BlockClient("AA:BB:CC:DD:EE:FF")
 	err := svc.BlockClient("AA:BB:CC:DD:EE:FF")
@@ -1128,7 +1129,7 @@ func TestBlockClient_AlreadyBlocked(t *testing.T) {
 func TestUnblockClient_NotBlocked(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.UnblockClient("AA:BB:CC:DD:EE:FF")
 	if err == nil {
@@ -1140,7 +1141,7 @@ func TestKickClient_SucceedsWhenAPInterfaceAccepts(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	iwDev := "phy0\n\tInterface phy0-ap0\n\t\ttype AP\n\tInterface phy0-sta0\n\t\ttype managed\n"
-	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	runner := &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		if name == "iw" {
 			return []byte(iwDev), nil
 		}
@@ -1158,7 +1159,7 @@ func TestKickClient_SucceedsWhenAPInterfaceAccepts(t *testing.T) {
 func TestKickClient_ErrorsWhenNoAPInterfaceFound(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{Output: []byte("phy0\n")})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{Output: []byte("phy0\n")})
 
 	if err := svc.KickClient("AA:BB:CC:DD:EE:FF"); err == nil {
 		t.Error("expected an error when no AP interface exists")
@@ -1169,7 +1170,7 @@ func TestKickClient_ErrorsWhenAPInterfaceRejects(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	iwDev := "phy0\n\tInterface phy0-ap0\n\t\ttype AP\n"
-	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	runner := &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		if name == "iw" {
 			return []byte(iwDev), nil
 		}
@@ -1185,7 +1186,7 @@ func TestKickClient_ErrorsWhenAPInterfaceRejects(t *testing.T) {
 func TestBlockClient_CaseInsensitive(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.BlockClient("aa:bb:cc:dd:ee:ff")
 	if err != nil {
@@ -1204,7 +1205,7 @@ func TestBlockClient_CaseInsensitive(t *testing.T) {
 func TestSetInterfaceState_Up(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.SetInterfaceState("wan", true)
 	if err != nil {
@@ -1215,7 +1216,7 @@ func TestSetInterfaceState_Up(t *testing.T) {
 func TestSetInterfaceState_Down(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.SetInterfaceState("lan", false)
 	if err != nil {
@@ -1226,7 +1227,7 @@ func TestSetInterfaceState_Down(t *testing.T) {
 func TestSetInterfaceState_Wwan(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.SetInterfaceState("wwan", true)
 	if err != nil {
@@ -1237,7 +1238,7 @@ func TestSetInterfaceState_Wwan(t *testing.T) {
 func TestSetInterfaceState_UnknownInterface(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{})
 
 	err := svc.SetInterfaceState("invalid", true)
 	if err == nil {
@@ -1248,7 +1249,7 @@ func TestSetInterfaceState_UnknownInterface(t *testing.T) {
 func TestSetInterfaceState_CommandFailure(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	svc := NewNetworkServiceWithRunner(u, ub, &MockCommandRunner{Err: fmt.Errorf("command failed")})
+	svc := NewNetworkServiceWithRunner(u, ub, &platform.MockCommandRunner{Err: fmt.Errorf("command failed")})
 
 	err := svc.SetInterfaceState("wan", true)
 	if err == nil {
@@ -1299,7 +1300,7 @@ func TestDetectWanType_PPPoE(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	// pgrep succeeds on first call (checking pppd) → PPPoE detected
-	cmd := &MockCommandRunner{Output: []byte("1234\n")}
+	cmd := &platform.MockCommandRunner{Output: []byte("1234\n")}
 	svc := NewNetworkServiceWithRunner(u, ub, cmd)
 
 	result, err := svc.DetectWanType()
@@ -1320,7 +1321,7 @@ func TestDetectWanType_FallbackToCurrentConfig(t *testing.T) {
 	_ = u.Set("network", "wan", "proto", "static")
 	ub := ubus.NewMockUbus()
 	// All pgrep calls fail → falls back to current config
-	cmd := &MockCommandRunner{Err: fmt.Errorf("not found")}
+	cmd := &platform.MockCommandRunner{Err: fmt.Errorf("not found")}
 	svc := NewNetworkServiceWithRunner(u, ub, cmd)
 
 	result, err := svc.DetectWanType()
@@ -1426,15 +1427,6 @@ func TestParseIwDev_NoAP(t *testing.T) {
 	}
 }
 
-// FuncCommandRunner lets tests provide a function-based command runner.
-type FuncCommandRunner struct {
-	RunFunc func(name string, args ...string) ([]byte, error)
-}
-
-func (f *FuncCommandRunner) Run(name string, args ...string) ([]byte, error) {
-	return f.RunFunc(name, args...)
-}
-
 func TestGetClients_WithTrafficStats(t *testing.T) {
 	iwDevOutput := `phy#0
 	Interface phy0-ap0
@@ -1447,7 +1439,7 @@ Station AA:BB:CC:44:55:66 (on phy0-ap0)
 	rx bytes:	100000
 	tx bytes:	200000`
 
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(name string, args ...string) ([]byte, error) {
 			if name == "iw" && len(args) > 0 && args[0] == "dev" {
 				if len(args) == 1 {
@@ -1491,7 +1483,7 @@ Station AA:BB:CC:44:55:66 (on phy0-ap0)
 }
 
 func TestGetClients_NoIwCommand(t *testing.T) {
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return nil, fmt.Errorf("iw not found")
 		},
@@ -1610,7 +1602,7 @@ func fakeDDNSScript(t *testing.T, svc *NetworkService) string {
 func TestSetDDNSConfig(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return []byte("ok"), nil
 		},
@@ -1661,7 +1653,7 @@ func TestSetDDNSConfig(t *testing.T) {
 func TestSetDDNSConfig_CustomUpdateURL(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return []byte("ok"), nil
 		},
@@ -1708,7 +1700,7 @@ func TestSetDDNSConfig_CustomUpdateURL(t *testing.T) {
 func TestSetDDNSConfig_FromCustomToBuiltInClearsUpdateURL(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return []byte("ok"), nil
 		},
@@ -1759,7 +1751,7 @@ func TestSetDDNSConfig_FromCustomToBuiltInClearsUpdateURL(t *testing.T) {
 }
 
 func TestGetDDNSStatus(t *testing.T) {
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(cmd string, args ...string) ([]byte, error) {
 			if cmd == "pgrep" {
 				return []byte("123"), nil
@@ -1795,7 +1787,7 @@ func TestGetDDNSStatus(t *testing.T) {
 }
 
 func TestGetDDNSStatus_NotRunning(t *testing.T) {
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return nil, fmt.Errorf("not found")
 		},
@@ -1919,7 +1911,7 @@ func TestGetDHCPReservations_SurfacesGetSectionsError(t *testing.T) {
 
 func TestKickClient_NoInterfaceAcceptedReturnsError(t *testing.T) {
 	calls := 0
-	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	runner := &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		calls++
 		return nil, fmt.Errorf("no such interface")
 	}}
@@ -1934,7 +1926,7 @@ func TestKickClient_NoInterfaceAcceptedReturnsError(t *testing.T) {
 }
 
 func TestKickClient_SuccessWhenOneInterfaceAccepts(t *testing.T) {
-	runner := &MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
+	runner := &platform.MockCommandRunner{RunFunc: func(name string, args ...string) ([]byte, error) {
 		return []byte("Interface phy0-ap0\ntype AP\n"), nil
 	}}
 	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), runner)
@@ -2011,7 +2003,7 @@ func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsEpoch(t *testing.T) {
 			},
 		},
 	})
-	runner := &MockCommandRunner{Err: fmt.Errorf("iw not available")}
+	runner := &platform.MockCommandRunner{Err: fmt.Errorf("iw not available")}
 	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ub, runner)
 
 	clients := svc.fetchDHCPClients()
@@ -2040,7 +2032,7 @@ func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsRemainingDuration(t *test
 			},
 		},
 	})
-	runner := &MockCommandRunner{Err: fmt.Errorf("iw not available")}
+	runner := &platform.MockCommandRunner{Err: fmt.Errorf("iw not available")}
 	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ub, runner)
 
 	clients := svc.fetchDHCPClients()
@@ -2092,7 +2084,7 @@ func TestNewPortForwardID_AvoidsExistingIDs(t *testing.T) {
 func TestSetDDNSConfig_ReportsMissingPackageClearly(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) { return []byte("ok"), nil },
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
@@ -2129,7 +2121,7 @@ func TestSetDDNSConfig_ReportsMissingPackageClearly(t *testing.T) {
 func TestSetDDNSConfig_CreatesSectionWhenAbsent(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	cmdRunner := &FuncCommandRunner{
+	cmdRunner := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) { return []byte("ok"), nil },
 	}
 	svc := NewNetworkServiceWithRunner(u, ub, cmdRunner)
@@ -2374,7 +2366,7 @@ func TestDeleteDHCPReservationStillDeletesNamedHost(t *testing.T) {
 
 func TestRunDiagnosticsRejectsOptionLikeTargets(t *testing.T) {
 	var ran [][]string
-	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), &FuncCommandRunner{
+	svc := NewNetworkServiceWithRunner(uci.NewMockUCI(), ubus.NewMockUbus(), &platform.FuncCommandRunner{
 		RunFunc: func(name string, args ...string) ([]byte, error) {
 			ran = append(ran, append([]string{name}, args...))
 			return []byte("ok"), nil
@@ -2409,7 +2401,7 @@ func TestRunDiagnosticsRejectsOptionLikeTargets(t *testing.T) {
 
 func TestBlockClientRollsBackWhenFirewallReloadFails(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewNetworkServiceWithRunner(u, ubus.NewMockUbus(), &FuncCommandRunner{
+	svc := NewNetworkServiceWithRunner(u, ubus.NewMockUbus(), &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return nil, fmt.Errorf("firewall reload failed")
 		},
@@ -2429,7 +2421,7 @@ func TestBlockClientRollsBackWhenFirewallReloadFails(t *testing.T) {
 
 func TestUnblockClientRestoresRuleWhenFirewallReloadFails(t *testing.T) {
 	u := uci.NewMockUCI()
-	failing := &FuncCommandRunner{
+	failing := &platform.FuncCommandRunner{
 		RunFunc: func(_ string, _ ...string) ([]byte, error) {
 			return nil, fmt.Errorf("firewall reload failed")
 		},

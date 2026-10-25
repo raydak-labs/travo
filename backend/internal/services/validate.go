@@ -9,33 +9,12 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
-// hhmmRe matches a strict 24-hour "HH:MM" clock time.
-var hhmmRe = regexp.MustCompile(`^([01]\d|2[0-3]):([0-5]\d)$`)
-
 // buttonNameRe matches button labels safe to interpolate into a shell script.
 var buttonNameRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // sshKeyRe matches a single-line OpenSSH public key ("<type> <base64> [comment]").
 // Key types are limited to the algorithms dropbear accepts.
 var sshKeyRe = regexp.MustCompile(`^(?:ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+={0,3}(?: [^\r\n]*)?$`)
-
-// ValidateHHMM reports whether s is a strict 24-hour "HH:MM" time.
-//
-// These values are formatted into crontab lines, so anything containing a
-// newline, carriage return, whitespace or shell metacharacter must be
-// rejected. Both the HTTP handler boundary and the service layer call this.
-func ValidateHHMM(s string) error {
-	if s == "" {
-		return fmt.Errorf("time is required")
-	}
-	// hhmmRe is a full-string match, so it is strictly tighter than
-	// time.Parse("15:04", ...) — a second parse here could never reject anything
-	// the regex already accepted.
-	if !hhmmRe.MatchString(s) {
-		return fmt.Errorf("invalid time %q: expected HH:MM (00:00-23:59)", s)
-	}
-	return nil
-}
 
 // ValidateButtonName reports whether name is safe to write into the root
 // hotplug shell script as a case label.

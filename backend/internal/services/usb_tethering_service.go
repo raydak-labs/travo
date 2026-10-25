@@ -1,12 +1,9 @@
 package services
 
 import (
-	"log/slog"
-
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -14,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -253,7 +252,7 @@ func (s *USBTetheringService) isConfigured() bool {
 // the revert is done by shelling out (`uci revert`) on the failure path — see
 // abort. A failure keeps the crash guard.
 func (s *USBTetheringService) Configure(ifaceName string) error {
-	return withConfigLocks(usbTetherConfigs, func() error { return s.configureLocked(ifaceName) })
+	return platform.WithConfigLocks(usbTetherConfigs, func() error { return s.configureLocked(ifaceName) })
 }
 
 func (s *USBTetheringService) configureLocked(ifaceName string) error {
@@ -305,7 +304,7 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 // Unconfigure removes the interface and its firewall membership; see Configure
 // for why it is locked.
 func (s *USBTetheringService) Unconfigure() error {
-	return withConfigLocks(usbTetherConfigs, func() error { return s.unconfigureLocked() })
+	return platform.WithConfigLocks(usbTetherConfigs, func() error { return s.unconfigureLocked() })
 }
 
 func (s *USBTetheringService) unconfigureLocked() error {

@@ -1,11 +1,12 @@
 package services
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // bounceActiveWwanDHCP renews the wwan DHCP lease, but only when wwan is the
@@ -27,11 +28,11 @@ func (c *CaptiveService) bounceActiveWwanDHCP() error {
 	if err := bounceGuard.Mark(); err != nil {
 		return err
 	}
-	if _, err := c.cmd.Run(openwrtIfdownBin, "wwan"); err != nil {
+	if _, err := c.cmd.Run(platform.IfdownBin, "wwan"); err != nil {
 		return fmt.Errorf("ifdown wwan: %w", err)
 	}
 	time.Sleep(captiveWwanDownSettle)
-	if _, err := c.cmd.Run(openwrtIfupBin, "wwan"); err != nil {
+	if _, err := c.cmd.Run(platform.IfupBin, "wwan"); err != nil {
 		return fmt.Errorf("ifup wwan: %w", err)
 	}
 	if err := c.waitForWwanLease(captiveWwanUpSettle); err != nil {

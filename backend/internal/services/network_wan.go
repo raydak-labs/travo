@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // GetWanConfig returns the WAN configuration.
@@ -50,7 +51,7 @@ var errPPPoEUnsupported = errors.New(
 // SetWanConfig updates the WAN configuration. Every field the request declares
 // is written, so "GET, change a field, PUT it back" works for all of them.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
-	return mutateUCI(n.uci, []string{"network"}, func() error {
+	return platform.MutateUCI(n.uci, []string{"network"}, func() error {
 		if config.MTU != 0 && (config.MTU < 68 || config.MTU > 9000) {
 			return fmt.Errorf("MTU must be between 68 and 9000, got %d", config.MTU)
 		}

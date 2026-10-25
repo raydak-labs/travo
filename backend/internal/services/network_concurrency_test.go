@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 // A UCI backend that behaves like the real CLI's process-global staged-changes
@@ -270,7 +271,7 @@ func TestOverlappingUCIConfigLockSetsDoNotDeadlock(t *testing.T) {
 		go func(configs []string) {
 			defer func() { done <- struct{}{} }()
 			for range rounds {
-				unlock := lockUCIConfigs(configs...)
+				unlock := platform.LockUCIConfigs(configs...)
 				// Hold briefly so the other orders genuinely interleave.
 				runtime.Gosched()
 				unlock()
@@ -294,7 +295,7 @@ func TestLockUCIConfigsToleratesDuplicates(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		unlock := lockUCIConfigs(dup, dup, dup)
+		unlock := platform.LockUCIConfigs(dup, dup, dup)
 		unlock()
 	}()
 	select {

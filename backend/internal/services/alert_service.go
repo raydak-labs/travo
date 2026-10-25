@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 const maxAlerts = 50
@@ -59,7 +60,7 @@ func (a *AlertService) SetAlertThresholds(t models.AlertThresholds) error {
 	// Atomic: the 10s check loop reads this file on every tick, and
 	// os.WriteFile truncates before writing, so a save that overlapped a read
 	// made the whole alerting config fall back to defaults.
-	return writeFileAtomic(path, data)
+	return platform.WriteFileAtomic(path, data)
 }
 
 // AlertChecker abstracts the system checks used by AlertService.

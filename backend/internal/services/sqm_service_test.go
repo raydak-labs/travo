@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 func TestSQMService_GetConfig_DefaultsWhenMissing(t *testing.T) {
 	u := uci.NewMockUCI()
-	s := NewSQMServiceWithRunner(u, &MockCommandRunner{})
+	s := NewSQMServiceWithRunner(u, &platform.MockCommandRunner{})
 
 	cfg, err := s.GetConfig()
 	if err != nil {
@@ -27,7 +28,7 @@ func TestSQMService_GetConfig_DefaultsWhenMissing(t *testing.T) {
 
 func TestSQMService_SetConfig_CreatesSectionAndCommits(t *testing.T) {
 	u := uci.NewMockUCI()
-	s := NewSQMServiceWithRunner(u, &MockCommandRunner{})
+	s := NewSQMServiceWithRunner(u, &platform.MockCommandRunner{})
 
 	err := s.SetConfig(models.SQMConfig{
 		Enabled:      true,
@@ -62,7 +63,7 @@ func TestSQMService_SetConfig_CreatesSectionAndCommits(t *testing.T) {
 
 func TestSQMService_SetConfig_Validates(t *testing.T) {
 	u := uci.NewMockUCI()
-	s := NewSQMServiceWithRunner(u, &MockCommandRunner{})
+	s := NewSQMServiceWithRunner(u, &platform.MockCommandRunner{})
 
 	if err := s.SetConfig(models.SQMConfig{Enabled: true}); err == nil {
 		t.Fatalf("expected validation error")
@@ -73,7 +74,7 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 	u := uci.NewMockUCI()
 	var gotName string
 	var gotArgs []string
-	cmd := &MockCommandRunner{
+	cmd := &platform.MockCommandRunner{
 		RunFunc: func(name string, args ...string) ([]byte, error) {
 			gotName = name
 			gotArgs = args
@@ -116,8 +117,8 @@ func TestSQMService_Apply_RestartsInitScript(t *testing.T) {
 func TestSQMService_SetConfig_TakesTheSqmConfigLock(t *testing.T) {
 	t.Parallel()
 
-	s := NewSQMServiceWithRunner(uci.NewMockUCI(), &MockCommandRunner{})
-	unlock := lockUCIConfigs("sqm")
+	s := NewSQMServiceWithRunner(uci.NewMockUCI(), &platform.MockCommandRunner{})
+	unlock := platform.LockUCIConfigs("sqm")
 	done := make(chan error, 1)
 	go func() {
 		done <- s.SetConfig(models.SQMConfig{

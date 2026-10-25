@@ -1,4 +1,4 @@
-package services
+package platform
 
 import (
 	"errors"
@@ -87,60 +87,8 @@ func TestRootPassword_GetSet(t *testing.T) {
 	}
 }
 
-// fakeUbusApply records uci/session ubus calls for RealUCIApplyConfirm tests.
-type fakeUbusApply struct {
-	calls      []ubusCall
-	loginSID   string
-	loginErr   error
-	applyErr   error
-	confirmErr error
-}
-
-type ubusCall struct {
-	path   string
-	method string
-	args   map[string]any
-}
-
-func (f *fakeUbusApply) Call(path, method string, args map[string]any) (map[string]any, error) {
-	f.calls = append(f.calls, ubusCall{path: path, method: method, args: args})
-	switch path + "." + method {
-	case "session.login":
-		if f.loginErr != nil {
-			return nil, f.loginErr
-		}
-		sid := f.loginSID
-		if sid == "" {
-			sid = "sid-1"
-		}
-		return map[string]any{"ubus_rpc_session": sid, "timeout": float64(300)}, nil
-	case "uci.apply":
-		if f.applyErr != nil {
-			return nil, f.applyErr
-		}
-		return map[string]any{}, nil
-	case "uci.confirm":
-		if f.confirmErr != nil {
-			return nil, f.confirmErr
-		}
-		return map[string]any{}, nil
-	case "uci.reload_config", "network.reload":
-		return map[string]any{}, nil
-	}
-	return nil, errors.New("ubus: unexpected call " + path + "." + method)
-}
-
-func (f *fakeUbusApply) find(path, method string) *ubusCall {
-	for i := range f.calls {
-		if f.calls[i].path == path && f.calls[i].method == method {
-			return &f.calls[i]
-		}
-	}
-	return nil
-}
-
 // newTestUCIApply builds a RealUCIApplyConfirm wired to temp dirs and a fake ubus.
-func newTestUCIApply(t *testing.T, fu *fakeUbusApply) (*RealUCIApplyConfirm, string, string) {
+func newTestUCIApply(t *testing.T, fu *FakeUbusApply) (*RealUCIApplyConfirm, string, string) {
 	t.Helper()
 	root := t.TempDir()
 	etcDir := filepath.Join(root, "etc", "config")
@@ -151,15 +99,15 @@ func newTestUCIApply(t *testing.T, fu *fakeUbusApply) (*RealUCIApplyConfirm, str
 	pw := auth.NewRootPassword()
 	pw.Set("secret")
 	applier := NewRealUCIApplyConfirm(fu, pw)
-	applier.etcConfigDir = etcDir
-	applier.rpcdRunDir = runDir
+	applier.EtcConfigDir = etcDir
+	applier.RPCDRunDir = runDir
 	return applier, etcDir, runDir
 }
 
 func TestRealUCIApplyConfirm_StartApplyEmptyListIsNoop(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{}
+	fu := &FakeUbusApply{}
 	applier, _, _ := newTestUCIApply(t, fu)
 
 	sid, err := applier.StartApply(nil)
@@ -177,7 +125,7 @@ func TestRealUCIApplyConfirm_StartApplyEmptyListIsNoop(t *testing.T) {
 func TestRealUCIApplyConfirm_ApplyAndConfirmEmptyListIsNoop(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{}
+	fu := &FakeUbusApply{}
 	applier, _, _ := newTestUCIApply(t, fu)
 
 	if err := applier.ApplyAndConfirm([]string{}); err != nil {
@@ -191,7 +139,7 @@ func TestRealUCIApplyConfirm_ApplyAndConfirmEmptyListIsNoop(t *testing.T) {
 func TestRealUCIApplyConfirm_StartApplyStagesConfigsWithRollbackWindow(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-42"}
+	fu := &FakeUbusApply{LoginSID: "sess-42"}
 	applier, etcDir, runDir := newTestUCIApply(t, fu)
 
 	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config mwan3 'x'\n"), 0600); err != nil {
@@ -223,8 +171,8 @@ func TestRealUCIApplyConfirm_StartApplyStagesConfigsWithRollbackWindow(t *testin
 	if applyCall.args["rollback"] != true {
 		t.Errorf("rollback = %v, want true", applyCall.args["rollback"])
 	}
-	if applyCall.args["timeout"] != uciApplyRollbackTimeout {
-		t.Errorf("timeout = %v, want %d", applyCall.args["timeout"], uciApplyRollbackTimeout)
+	if applyCall.args["timeout"] != ApplyRollbackTimeout {
+		t.Errorf("timeout = %v, want %d", applyCall.args["timeout"], ApplyRollbackTimeout)
 	}
 	if applyCall.args["ubus_rpc_session"] != "sess-42" {
 		t.Errorf("ubus_rpc_session = %v, want sess-42", applyCall.args["ubus_rpc_session"])
@@ -237,7 +185,7 @@ func TestRealUCIApplyConfirm_StartApplyStagesConfigsWithRollbackWindow(t *testin
 func TestRealUCIApplyConfirm_StartApplySkipsMissingConfig(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{}
+	fu := &FakeUbusApply{}
 	applier, _, runDir := newTestUCIApply(t, fu)
 
 	sid, err := applier.StartApply([]string{"mwan3"})
@@ -252,7 +200,7 @@ func TestRealUCIApplyConfirm_StartApplySkipsMissingConfig(t *testing.T) {
 func TestRealUCIApplyConfirm_StartApplyCleansSessionDirOnApplyFailure(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-fail", applyErr: errors.New("apply boom")}
+	fu := &FakeUbusApply{LoginSID: "sess-fail", ApplyErr: errors.New("apply boom")}
 	applier, etcDir, runDir := newTestUCIApply(t, fu)
 
 	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config mwan3 'x'\n"), 0600); err != nil {
@@ -270,7 +218,7 @@ func TestRealUCIApplyConfirm_StartApplyCleansSessionDirOnApplyFailure(t *testing
 func TestRealUCIApplyConfirm_StartApplyCleansSessionDirOnCopyFailure(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-copy"}
+	fu := &FakeUbusApply{LoginSID: "sess-copy"}
 	applier, etcDir, runDir := newTestUCIApply(t, fu)
 
 	// A directory named like a config makes the staged copy fail.
@@ -292,7 +240,7 @@ func TestRealUCIApplyConfirm_StartApplyCleansSessionDirOnCopyFailure(t *testing.
 func TestRealUCIApplyConfirm_StartApplyFailsWithoutSession(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginErr: errors.New("login denied")}
+	fu := &FakeUbusApply{LoginErr: errors.New("login denied")}
 	applier, _, _ := newTestUCIApply(t, fu)
 
 	if _, err := applier.StartApply([]string{"network"}); err == nil {
@@ -306,7 +254,7 @@ func TestRealUCIApplyConfirm_StartApplyFailsWithoutSession(t *testing.T) {
 func TestRealUCIApplyConfirm_Confirm(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{}
+	fu := &FakeUbusApply{}
 	applier, _, _ := newTestUCIApply(t, fu)
 
 	if err := applier.Confirm(""); err == nil {
@@ -327,7 +275,7 @@ func TestRealUCIApplyConfirm_Confirm(t *testing.T) {
 func TestRealUCIApplyConfirm_ApplyAndConfirmRunsApplyThenConfirm(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-9"}
+	fu := &FakeUbusApply{LoginSID: "sess-9"}
 	applier, etcDir, _ := newTestUCIApply(t, fu)
 	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config mwan3 'x'\n"), 0600); err != nil {
 		t.Fatalf("write mwan3 config: %v", err)
@@ -356,23 +304,13 @@ func TestRealUCIApplyConfirm_ApplyAndConfirmRunsApplyThenConfirm(t *testing.T) {
 func TestRealUCIApplyConfirm_DefaultsToDevicePaths(t *testing.T) {
 	t.Parallel()
 
-	applier := NewRealUCIApplyConfirm(&fakeUbusApply{}, auth.NewRootPassword())
-	if applier.rpcdRunDir != "/var/run/rpcd" {
-		t.Errorf("rpcdRunDir = %q, want /var/run/rpcd", applier.rpcdRunDir)
+	applier := NewRealUCIApplyConfirm(&FakeUbusApply{}, auth.NewRootPassword())
+	if applier.RPCDRunDir != "/var/run/rpcd" {
+		t.Errorf("rpcdRunDir = %q, want /var/run/rpcd", applier.RPCDRunDir)
 	}
-	if applier.etcConfigDir != "/etc/config" {
-		t.Errorf("etcConfigDir = %q, want /etc/config", applier.etcConfigDir)
+	if applier.EtcConfigDir != "/etc/config" {
+		t.Errorf("etcConfigDir = %q, want /etc/config", applier.EtcConfigDir)
 	}
-}
-
-// indexOf returns the position of the first recorded call, or -1.
-func (f *fakeUbusApply) indexOf(path, method string) int {
-	for i, c := range f.calls {
-		if c.path == path && c.method == method {
-			return i
-		}
-	}
-	return -1
 }
 
 const snapshotWireless = "config wifi-device 'radio0'\n\tenabled '1'\n"
@@ -385,7 +323,7 @@ const snapshotWireless = "config wifi-device 'radio0'\n\tenabled '1'\n"
 func TestRealUCIApplyConfirm_RollbackRestoresACommittedConfig(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-rb"}
+	fu := &FakeUbusApply{LoginSID: "sess-rb"}
 	applier, etcDir, _ := newTestUCIApply(t, fu)
 	cfg := filepath.Join(etcDir, "wireless")
 	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
@@ -422,7 +360,7 @@ func TestRealUCIApplyConfirm_RollbackRestoresACommittedConfig(t *testing.T) {
 func TestRealUCIApplyConfirm_ConfirmDiscardsTheSnapshot(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-ok"}
+	fu := &FakeUbusApply{LoginSID: "sess-ok"}
 	applier, etcDir, _ := newTestUCIApply(t, fu)
 	cfg := filepath.Join(etcDir, "wireless")
 	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
@@ -461,7 +399,7 @@ func TestRealUCIApplyConfirm_ConfirmDiscardsTheSnapshot(t *testing.T) {
 func TestRealUCIApplyConfirm_RollbackWithoutASnapshotFails(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{}
+	fu := &FakeUbusApply{}
 	applier, etcDir, _ := newTestUCIApply(t, fu)
 	cfg := filepath.Join(etcDir, "wireless")
 	if err := os.WriteFile(cfg, []byte("changed\n"), 0600); err != nil {
@@ -489,7 +427,7 @@ func TestRealUCIApplyConfirm_RollbackWithoutASnapshotFails(t *testing.T) {
 func TestRealUCIApplyConfirm_RollbackReloadsUciAndNetworkAndNeverRunsWifi(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-load"}
+	fu := &FakeUbusApply{LoginSID: "sess-load"}
 	applier, etcDir, _ := newTestUCIApply(t, fu)
 	cfg := filepath.Join(etcDir, "wireless")
 	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
@@ -537,7 +475,7 @@ func TestRealUCIApplyConfirm_RollbackReloadsUciAndNetworkAndNeverRunsWifi(t *tes
 func TestRealUCIApplyConfirm_ApplyAndConfirmRestoresWhenConfirmFails(t *testing.T) {
 	t.Parallel()
 
-	fu := &fakeUbusApply{loginSID: "sess-aac", confirmErr: errors.New("confirm rejected")}
+	fu := &FakeUbusApply{LoginSID: "sess-aac", ConfirmErr: errors.New("confirm rejected")}
 	applier, etcDir, runDir := newTestUCIApply(t, fu)
 	cfg := filepath.Join(etcDir, "wireless")
 	if err := os.WriteFile(cfg, []byte(snapshotWireless), 0600); err != nil {
@@ -564,4 +502,22 @@ func TestRealUCIApplyConfirm_ApplyAndConfirmRestoresWhenConfirmFails(t *testing.
 	if string(got) != snapshotWireless {
 		t.Errorf("config after a failed ApplyAndConfirm = %q, want the pre-apply snapshot", got)
 	}
+}
+
+func (f *FakeUbusApply) find(path, method string) *ubusCall {
+	for i := range f.calls {
+		if f.calls[i].path == path && f.calls[i].method == method {
+			return &f.calls[i]
+		}
+	}
+	return nil
+}
+
+func (f *FakeUbusApply) indexOf(path, method string) int {
+	for i, c := range f.calls {
+		if c.path == path && c.method == method {
+			return i
+		}
+	}
+	return -1
 }
