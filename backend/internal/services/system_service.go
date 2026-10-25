@@ -38,8 +38,11 @@ func (r *RealStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 	if err := syscall.Statfs("/", &stat); err != nil {
 		return 0, 0, 0, err
 	}
-	total := int64(stat.Blocks) * int64(stat.Bsize)
-	free := int64(stat.Bavail) * int64(stat.Bsize)
+	// Bsize is int64 on linux and uint32 on darwin; uint64 is a real
+	// conversion on both, so neither build flags it as unnecessary.
+	bsize := int64(uint64(stat.Bsize))
+	total := int64(stat.Blocks) * bsize
+	free := int64(stat.Bavail) * bsize
 	used := total - free
 	return total, used, free, nil
 }
