@@ -133,6 +133,11 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   release or package updates are available. System → Updates links a new release to LuCI's
   Attended Sysupgrade and upgrades packages (apk or opkg) with a streamed log
   ([ADR 0006 §2](../adr/0006-application-platform-and-api-contract.md)).
+- **Upgrades replace the running Travo (2026-10-25):** installing v0.9.0 over a running v0.8
+  build left the old process serving from the deleted binary (`start` is a no-op for a running
+  procd service, and `/api/health` still answered). `install.sh` now restarts a running Travo and
+  fails unless the process runs the installed `/usr/bin/travo`; the deployment guide's manual
+  steps restart too. The Updates indicator now polls every 30 s until the first check has run.
 - **Travo version in the UI (2026-10-25):** the sidebar shows the running version, System →
   System Information links it to its GitHub release (or a development build's commit), and the
   update check reports a newer Travo release next to OpenWrt and packages.

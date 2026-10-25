@@ -1,8 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import type { UpdateStatus } from '@shared/index';
 import { checkUpdates, getUpdates } from '@/api/endpoints';
 
 const UPDATES_KEY = ['system', 'updates'] as const;
+
+/**
+ * Fast until the router's first check (2 minutes after it starts) has run,
+ * then slow: a later result only appears once a day.
+ */
+export function updatesRefetchInterval(status: Pick<UpdateStatus, 'checked_at'> | undefined) {
+  return status?.checked_at ? 10 * 60_000 : 30_000;
+}
 
 /**
  * The last update check. The router checks in the background (shortly after
@@ -12,7 +21,7 @@ export function useUpdates() {
   return useQuery({
     queryKey: UPDATES_KEY,
     queryFn: ({ signal }) => getUpdates({ signal }),
-    refetchInterval: 10 * 60_000,
+    refetchInterval: (query) => updatesRefetchInterval(query.state.data),
     staleTime: 60_000,
   });
 }
