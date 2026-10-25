@@ -90,9 +90,12 @@ types are generated from it:
    (`paths`, `components`) and `shared/src/generated/schemas.ts` (one alias per schema).
 3. Commit the generated files. CI's lint job fails when they are stale.
 
-`shared/src/api/*.ts` re-exports the generated types under their existing names. The types still
-written by hand there are UI-side unions and helpers the backend does not describe (or describes
-as an open string), such as `WifiMode` and `NetworkStatus`.
+`API_ROUTES` (`shared/src/api/routes.ts`) is checked against the generated `paths`: a route the
+backend does not serve fails to compile.
+
+`shared/src/api/*.ts` re-exports the generated types under their existing names. Unions such as
+`WifiMode` are derived from them; the few types still written by hand are UI-side (for example
+`GroupedScanNetwork`) or request values the backend does not describe as a fixed set.
 
 The generator lives in `tools/openapi-gen` because openapi-typescript drives the TypeScript
 compiler API, which the repo's TypeScript 7 does not ship. It uses TypeScript 6, the last release

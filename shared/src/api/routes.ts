@@ -1,4 +1,21 @@
-/** API route constants — kept in sync with backend/internal/api/router.go */
+import type { paths } from '../generated/openapi';
+
+/** `/a/{id}/b` → `/a/:id/b`, the form apiClient's route helpers fill in. */
+type ColonParams<P extends string> = P extends `${infer A}{${infer N}}${infer B}`
+  ? ColonParams<`${A}:${N}${B}`>
+  : P;
+
+/** Every path the backend serves, from the generated OpenAPI document. */
+export type ApiPath = ColonParams<Extract<keyof paths, string>>;
+
+interface RouteTree {
+  readonly [key: string]: ApiPath | RouteTree;
+}
+
+/**
+ * API route constants. Each one must be a path the backend serves: a route
+ * that is not in the OpenAPI document fails to compile at that property.
+ */
 export const API_ROUTES = {
   auth: {
     login: '/api/v1/auth/login',
@@ -146,4 +163,4 @@ export const API_ROUTES = {
     password: '/api/v1/adguard/password',
     dnsMode: '/api/v1/adguard/dns-mode',
   },
-} as const;
+} as const satisfies RouteTree;
