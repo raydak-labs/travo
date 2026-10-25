@@ -147,6 +147,18 @@ on the answer: disable is now a single bounded apply/confirm cycle with a bounde
 uplink recovery (rule 1) and returns success only once a default route exists. The
 question is retired, not answered.
 
+### 10. Preserve Travo's boot enablement across sysupgrade
+
+Sysupgrade must preserve `/etc/rc.d/S99travo` alongside the init script and binary. Preserving
+`/etc/init.d/travo` alone is insufficient: on GL-AXT1800 after upgrading from OpenWrt 25.12.3 to
+25.12.6, the binary still reported version 0.10.0 and the init script and enabled UCI config were
+present, but `/etc/rc.d/S99travo` was missing. procd reported the service inactive and no API
+process answered. Running `/etc/init.d/travo start` restored the service (`/api/health` returned
+`{"status":"ok"}`); running `enable` recreated both `S99travo` and `K10travo` links.
+
+The release keep list therefore includes `/etc/rc.d/S99travo`. This preserves the established
+boot-enabled state when firmware upgrade does not retain the generated enablement symlink.
+
 ## Why
 
 Hard to reverse: each of these cost a real device incident or a real design

@@ -43,6 +43,9 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 
 ## System, Dashboard, And UX
 
+- Sysupgrade preservation now retains Travo's boot-enable symlink so the service starts after
+  firmware upgrades ([ADR 0013 §10](../adr/0013-operational-invariants-and-device-findings.md)).
+
 - Dashboard: live stats, charts, quick actions, alerts, notification history, captive banners.
 - System: reboot, shutdown, firmware upgrade, factory reset, hostname, backup/restore, LED, timezone, NTP, password, hardware buttons.
 - Logs: system/kernel filters, search, export.
