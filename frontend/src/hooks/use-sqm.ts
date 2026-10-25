@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { SQMApplyResult, SQMConfig } from '@shared/index';
+import type { SQMConfig } from '@shared/index';
+import { applySQM, getSQMConfig, setSQMConfig } from '@/api/endpoints';
 
 export function useSQMConfig(enabled = true) {
   return useQuery({
     queryKey: ['sqm-config'],
-    queryFn: () => apiClient.get<SQMConfig>(API_ROUTES.sqm.config),
+    queryFn: () => getSQMConfig(),
     enabled,
   });
 }
@@ -15,7 +14,7 @@ export function useSQMConfig(enabled = true) {
 export function useSetSQMConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (cfg: SQMConfig) => apiClient.put<{ status: string }>(API_ROUTES.sqm.config, cfg),
+    mutationFn: (cfg: SQMConfig) => setSQMConfig(cfg),
     onSuccess: () => {
       toast.success('SQM configuration saved');
       void queryClient.invalidateQueries({ queryKey: ['sqm-config'] });
@@ -29,7 +28,7 @@ export function useSetSQMConfig() {
 export function useApplySQM() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<SQMApplyResult>(API_ROUTES.sqm.apply),
+    mutationFn: () => applySQM(),
     onSuccess: (res) => {
       if (res.ok) {
         toast.success('SQM applied');

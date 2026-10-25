@@ -1,17 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type {
-  CaptiveAutoAcceptResult,
-  CaptivePortalStatus,
-  DNSMode,
-  StatusMessage,
-} from '@shared/index';
+import {
+  captiveAutoAccept,
+  captiveDNSBypass,
+  captiveDNSRestore,
+  getAdGuardDNSMode,
+  getCaptiveStatus,
+} from '@/api/endpoints';
 
 export function useCaptivePortal() {
   const query = useQuery({
     queryKey: ['captive', 'status'],
-    queryFn: () => apiClient.get<CaptivePortalStatus>(API_ROUTES.captive.status),
+    queryFn: () => getCaptiveStatus(),
     // Poll faster when we know there's no internet (likely captive portal scenario).
     // Once internet is confirmed, back off to 30s to avoid hammering the probe endpoint.
     refetchInterval: (query) => {
@@ -28,8 +27,7 @@ export function useCaptivePortal() {
 export function useCaptiveAutoAccept() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { portal_url?: string } = {}) =>
-      apiClient.post<CaptiveAutoAcceptResult>(API_ROUTES.captive.autoAccept, body),
+    mutationFn: (body: { portal_url?: string } = {}) => captiveAutoAccept(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
     },
@@ -39,7 +37,7 @@ export function useCaptiveAutoAccept() {
 export function useCaptiveDNSBypass() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<StatusMessage>(API_ROUTES.captive.dnsBypass, {}),
+    mutationFn: () => captiveDNSBypass(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
     },
@@ -49,7 +47,7 @@ export function useCaptiveDNSBypass() {
 export function useCaptiveDNSRestore() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<StatusMessage>(API_ROUTES.captive.dnsRestore, {}),
+    mutationFn: () => captiveDNSRestore(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
     },
@@ -59,7 +57,7 @@ export function useCaptiveDNSRestore() {
 export function useDNSMode() {
   return useQuery({
     queryKey: ['adguard', 'dns-mode'],
-    queryFn: () => apiClient.get<DNSMode>(API_ROUTES.adguard.dnsMode),
+    queryFn: () => getAdGuardDNSMode(),
     refetchInterval: 30000,
   });
 }

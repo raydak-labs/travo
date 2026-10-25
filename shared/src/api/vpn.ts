@@ -1,4 +1,4 @@
-import type { EnabledResponse } from '../generated/schemas';
+import type { EnabledResponse } from '../generated/model';
 
 // Generated from the backend's OpenAPI document (make generate).
 export type {
@@ -14,7 +14,7 @@ export type {
   WireGuardStatus,
   WireguardConfig,
   WireguardPeer,
-} from '../generated/schemas';
+} from '../generated/model';
 
 /** Generated as EnabledResponse. */
 export type TailscaleSSHStatus = EnabledResponse;

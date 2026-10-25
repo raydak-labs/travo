@@ -4,15 +4,15 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient, isTokenRemembered, setToken } from '@/lib/api-client';
+import { isTokenRemembered, setToken } from '@/lib/api-client';
 import { resetSetupStatusCache } from '@/lib/setup-status';
-import { API_ROUTES } from '@shared/index';
-import type {
-  AlertThresholds,
-  ChangePasswordRequest,
-  ChangePasswordResponse,
-  Status,
-} from '@shared/index';
+import type { AlertThresholds, ChangePasswordRequest } from '@shared/index';
+import {
+  changePassword,
+  getAlertThresholds,
+  setAlertThresholds,
+  setSetupComplete,
+} from '@/api/endpoints';
 
 export function useChangePassword() {
   return useMutation({
@@ -21,7 +21,7 @@ export function useChangePassword() {
       // server issues a replacement token. Keep using the old token here and
       // the very next request fails with 401 — the user is silently logged out
       // right after a successful password change.
-      const res = await apiClient.put<ChangePasswordResponse>(API_ROUTES.auth.password, data);
+      const res = await changePassword(data);
       // Keep the storage the user chose at login: a "don't remember me"
       // session must not become a localStorage token because the token was
       // replaced.
@@ -46,14 +46,14 @@ export function useChangePassword() {
 export function useAlertThresholds() {
   return useQuery({
     queryKey: ['system', 'alert-thresholds'],
-    queryFn: () => apiClient.get<AlertThresholds>(API_ROUTES.system.alertThresholds),
+    queryFn: () => getAlertThresholds(),
   });
 }
 
 export function useSetAlertThresholds() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (t: AlertThresholds) => apiClient.put<Status>(API_ROUTES.system.alertThresholds, t),
+    mutationFn: (t: AlertThresholds) => setAlertThresholds(t),
     onSuccess: () => {
       toast.success('Alert thresholds saved');
       void queryClient.invalidateQueries({ queryKey: ['system', 'alert-thresholds'] });
@@ -67,7 +67,7 @@ export function useSetAlertThresholds() {
 export function useCompleteSetup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.setupComplete),
+    mutationFn: () => setSetupComplete(),
     onSuccess: () => {
       // The route guard caches the setup answer; finishing setup must not
       // redirect the user straight back to /setup.

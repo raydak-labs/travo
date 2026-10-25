@@ -278,7 +278,7 @@ func registerSystem(api *API, d *Dependencies) {
 	post(api, "/api/v1/system/firmware/upgrade", "UpgradeFirmware", "Flash a sysupgrade image",
 		func(ctx context.Context, _ *none) (*Body[FirmwareUpgradeResult], error) {
 			return upgradeFirmware(ctx, svc)
-		}, upload("firmware"),
+		}, upload("firmware"), formFlag("keep_settings", "keep the configuration across the flash", true),
 		describe("The image's OpenWrt metadata is checked against this board before the flash starts."))
 }
 

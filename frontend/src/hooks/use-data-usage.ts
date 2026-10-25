@@ -1,13 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { DataUsageStatus, DataBudgetConfig, TrafficHistoryResponse } from '@shared/index';
+import type { DataBudgetConfig } from '@shared/index';
+import {
+  getDataBudget,
+  getDataUsage,
+  getTrafficHistory,
+  resetDataUsage,
+  setDataBudget,
+} from '@/api/endpoints';
 
 export function useDataUsage() {
   return useQuery({
     queryKey: ['data-usage'],
-    queryFn: () => apiClient.get<DataUsageStatus>(API_ROUTES.network.dataUsage),
+    queryFn: () => getDataUsage(),
     refetchInterval: 60_000, // refresh every minute
   });
 }
@@ -20,8 +25,7 @@ export function useDataUsage() {
 export function useTrafficHistory() {
   return useQuery({
     queryKey: ['network', 'traffic-history'],
-    queryFn: ({ signal }) =>
-      apiClient.get<TrafficHistoryResponse>(API_ROUTES.network.trafficHistory, signal),
+    queryFn: ({ signal }) => getTrafficHistory({ signal }),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -31,15 +35,14 @@ export function useTrafficHistory() {
 export function useDataBudget() {
   return useQuery({
     queryKey: ['data-usage-budget'],
-    queryFn: () => apiClient.get<DataBudgetConfig>(API_ROUTES.network.dataUsageBudget),
+    queryFn: () => getDataBudget(),
   });
 }
 
 export function useSetDataBudget() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (cfg: DataBudgetConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.dataUsageBudget, cfg),
+    mutationFn: (cfg: DataBudgetConfig) => setDataBudget(cfg),
     onSuccess: () => {
       toast.success('Data budget saved');
       void queryClient.invalidateQueries({ queryKey: ['data-usage-budget'] });
@@ -54,7 +57,7 @@ export function useResetDataUsage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (ifaceName: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.dataUsageReset, {
+      resetDataUsage({
         interface: ifaceName,
       }),
     onSuccess: () => {

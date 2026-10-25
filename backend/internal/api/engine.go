@@ -143,6 +143,15 @@ func upload(field string) opt {
 	}
 }
 
+// formFlag adds an optional boolean field to an upload's multipart body.
+func formFlag(name, doc string, def bool) opt {
+	return func(op *huma.Operation) {
+		op.RequestBody.Content["multipart/form-data"].Schema.Properties[name] = &huma.Schema{
+			Type: "boolean", Description: doc, Default: def,
+		}
+	}
+}
+
 func get[I, O any](a *API, path, id, summary string, h func(context.Context, *I) (*O, error), opts ...opt) {
 	route(a, http.MethodGet, path, id, summary, h, opts)
 }

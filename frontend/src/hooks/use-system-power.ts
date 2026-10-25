@@ -4,12 +4,13 @@
  */
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
+import { getBlob } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
+import { factoryReset, reboot, restoreBackup, shutdown, upgradeFirmware } from '@/api/endpoints';
 
 export function useReboot() {
   return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.reboot),
+    mutationFn: () => reboot(),
     onSuccess: () => {
       toast.success('Reboot initiated', { description: 'The device is restarting…' });
     },
@@ -21,7 +22,7 @@ export function useReboot() {
 
 export function useShutdown() {
   return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.shutdown),
+    mutationFn: () => shutdown(),
     onSuccess: () => {
       toast.success('Shutdown initiated', {
         description:
@@ -36,7 +37,7 @@ export function useShutdown() {
 
 export function useFactoryReset() {
   return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.factoryReset),
+    mutationFn: () => factoryReset(),
     onSuccess: () => {
       toast.success('Factory reset initiated', {
         description: 'Device will restart with default settings.',
@@ -51,10 +52,7 @@ export function useFactoryReset() {
 export function useFirmwareUpgrade() {
   return useMutation({
     mutationFn: async ({ file, keepSettings }: { file: File; keepSettings: boolean }) => {
-      const formData = new FormData();
-      formData.append('firmware', file);
-      formData.append('keep_settings', String(keepSettings));
-      return apiClient.postForm<{ status?: string }>(API_ROUTES.system.firmwareUpgrade, formData);
+      return upgradeFirmware({ firmware: file, keep_settings: keepSettings });
     },
     onSuccess: () => {
       toast.success('Firmware upgrade initiated', {
@@ -72,7 +70,7 @@ export function useBackup() {
     mutationFn: async () => {
       // Routed through the shared client so an expired session triggers the
       // global 401 handling instead of a bare "Backup failed".
-      const blob = await apiClient.getBlob(API_ROUTES.system.backup);
+      const blob = await getBlob(API_ROUTES.system.backup);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -92,9 +90,7 @@ export function useBackup() {
 export function useRestore() {
   return useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('backup', file);
-      return apiClient.postForm<{ status?: string }>(API_ROUTES.system.restore, formData);
+      return restoreBackup({ backup: file });
     },
     onSuccess: () => {
       toast.success('Configuration restored. Reboot to apply changes.');

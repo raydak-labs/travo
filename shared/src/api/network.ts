@@ -1,4 +1,4 @@
-import type { NetworkInterface, PortForwardRule } from '../generated/schemas';
+import type { NetworkInterface, PortForwardRequest } from '../generated/model';
 
 // Generated from the backend's OpenAPI document (make generate).
 export type {
@@ -35,7 +35,7 @@ export type {
   WanConfig,
   WanDetectResult,
   WoLRequest,
-} from '../generated/schemas';
+} from '../generated/model';
 
 export * from './failover';
 
@@ -82,5 +82,5 @@ function mediumFromName(name: string): NetworkMedium {
   return 'unknown';
 }
 
-/** Request to add a port-forward rule */
-export type AddPortForwardRequest = Omit<PortForwardRule, 'id'>;
+/** Generated as PortForwardRequest. */
+export type AddPortForwardRequest = PortForwardRequest;

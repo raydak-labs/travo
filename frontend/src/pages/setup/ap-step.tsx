@@ -5,13 +5,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { APConfigUpdate } from '@shared/index';
-import { API_ROUTES } from '@shared/index';
-import type { WifiMutationResponse } from '@shared/index';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAPConfigs } from '@/hooks/use-wifi';
-import { apiClient } from '@/lib/api-client';
-import { routeWithSegment } from '@/lib/api-url';
 import {
   ApApplyRollbackError,
   describeApApplyRollback,
@@ -23,6 +19,7 @@ import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { APStepCredentialsFields } from '@/pages/setup/ap-step-credentials-fields';
 import { APStepIntro } from '@/pages/setup/ap-step-intro';
 import { setupApFormSchema, type SetupApFormValues } from '@/pages/setup/setup-schema';
+import { setAPConfig } from '@/api/endpoints';
 
 export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const queryClient = useQueryClient();
@@ -47,23 +44,13 @@ export function APStep({ onNext, onBack }: { onNext: () => void; onBack: () => v
           enabled: snapshot.config.enabled,
         };
         try {
-          await finalizeWifiMutation(
-            apiClient.put<WifiMutationResponse>(
-              routeWithSegment(API_ROUTES.wifi.ap, snapshot.section),
-              config,
-            ),
-          );
+          await finalizeWifiMutation(setAPConfig(snapshot.section, config));
           written.push(snapshot);
         } catch (error) {
           // The bands already written are committed on the device; undo them so
           // first-run setup cannot leave the router with two different SSIDs.
           const rollback = await rollbackApSections(written, (previous) =>
-            finalizeWifiMutation(
-              apiClient.put<WifiMutationResponse>(
-                routeWithSegment(API_ROUTES.wifi.ap, previous.section),
-                previous.config,
-              ),
-            ),
+            finalizeWifiMutation(setAPConfig(previous.section, previous.config)),
           );
           throw new ApApplyRollbackError(snapshot, error, rollback);
         }

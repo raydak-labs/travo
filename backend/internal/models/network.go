@@ -189,7 +189,7 @@ type FirewallZone struct {
 type PortForwardRule struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Protocol string `json:"protocol"`  // tcp, udp, tcp+udp
+	Protocol string `json:"protocol"`  // tcp, udp, "tcp udp"
 	SrcDPort string `json:"src_dport"` // external port/range
 	DestIP   string `json:"dest_ip"`
 	DestPort string `json:"dest_port"` // internal port (empty = same)

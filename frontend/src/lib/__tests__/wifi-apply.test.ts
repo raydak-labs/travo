@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { apiClient, ApiError } from '../api-client';
+import { confirmWiFiApply } from '@/api/endpoints';
+import { ApiError } from '../api-client';
 import {
   confirmDeadlineMs,
   confirmWifiApply,
@@ -13,9 +14,13 @@ import {
   WifiApplyUnverifiedError,
 } from '../wifi-apply';
 
+vi.mock('@/api/endpoints', () => ({ confirmWiFiApply: vi.fn() }));
+const confirmRequest = vi.mocked(confirmWiFiApply);
+
 describe('wifi-apply', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    confirmRequest.mockReset();
   });
 
   afterEach(() => {
@@ -23,7 +28,7 @@ describe('wifi-apply', () => {
   });
 
   it('confirms immediately when the router is reachable', async () => {
-    const spy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ status: 'ok' });
+    const spy = confirmRequest.mockResolvedValueOnce({ status: 'ok' });
 
     await expect(confirmWifiApply('token-1', 1, 0)).resolves.toBeUndefined();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -31,8 +36,7 @@ describe('wifi-apply', () => {
 
   it('retries confirmation until it succeeds', async () => {
     vi.useFakeTimers();
-    const spy = vi
-      .spyOn(apiClient, 'post')
+    const spy = confirmRequest
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce({ status: 'ok' });
 
@@ -44,7 +48,7 @@ describe('wifi-apply', () => {
   });
 
   it('finalizes pending wifi mutations by confirming their apply token', async () => {
-    const confirmSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ status: 'ok' });
+    const confirmSpy = confirmRequest.mockResolvedValueOnce({ status: 'ok' });
 
     const response = await finalizeWifiMutation(
       Promise.resolve({
@@ -59,7 +63,7 @@ describe('wifi-apply', () => {
     );
 
     expect(response.status).toBe('ok');
-    expect(confirmSpy).toHaveBeenCalledWith('/api/v1/wifi/apply/confirm', { token: 'token-3' });
+    expect(confirmSpy).toHaveBeenCalledWith({ token: 'token-3' });
   });
 
   // A 401 used to be retried ~20 times over 30s, clearing the session token
@@ -67,9 +71,9 @@ describe('wifi-apply', () => {
   it.each([400, 401, 403, 404, 409, 422])(
     'stops immediately on a terminal %i and surfaces the device error',
     async (status) => {
-      const spy = vi
-        .spyOn(apiClient, 'post')
-        .mockRejectedValue(new ApiError(status, `Request failed with status ${status}`));
+      const spy = confirmRequest.mockRejectedValue(
+        new ApiError(status, `Request failed with status ${status}`),
+      );
 
       await expect(confirmWifiApply('token-4', 30, 1)).rejects.toThrow(
         `Request failed with status ${status}`,
@@ -80,8 +84,7 @@ describe('wifi-apply', () => {
 
   it.each([408, 429, 500, 502, 503])('keeps retrying a transient %i', async (status) => {
     vi.useFakeTimers();
-    const spy = vi
-      .spyOn(apiClient, 'post')
+    const spy = confirmRequest
       .mockRejectedValueOnce(new ApiError(status, 'temporary'))
       .mockResolvedValueOnce({ status: 'ok' });
 
@@ -106,14 +109,12 @@ describe('wifi-apply', () => {
   // polling for the full 30s and then report a generic rollback timeout instead
   // of telling the operator the router already reverted the change.
   it('stops retrying when the router reports the wireless apply was not verified', async () => {
-    const spy = vi
-      .spyOn(apiClient, 'post')
-      .mockRejectedValue(
-        new ApiError(
-          500,
-          'wireless apply not verified: enabled access point(s) did not come up: default_radio1',
-        ),
-      );
+    const spy = confirmRequest.mockRejectedValue(
+      new ApiError(
+        500,
+        'wireless apply not verified: enabled access point(s) did not come up: default_radio1',
+      ),
+    );
 
     await expect(confirmWifiApply('token-6', 30, 1)).rejects.toBeInstanceOf(
       WifiApplyRolledBackError,
@@ -140,7 +141,7 @@ describe('wifi-apply', () => {
     'wireless apply could not be verified: network.wireless status could not be read: ' +
       'radio radio0 reports no "up" flag',
   ])('separates an unreadable device answer (%s) from a confirmed rollback', async (message) => {
-    vi.spyOn(apiClient, 'post').mockRejectedValue(new ApiError(500, message));
+    confirmRequest.mockRejectedValue(new ApiError(500, message));
 
     const assertion = expect(confirmWifiApply('token-shape', 30, 1)).rejects.toBeInstanceOf(
       WifiApplyUnverifiedError,
@@ -164,7 +165,7 @@ describe('wifi-apply', () => {
 
   it('still reports a plain rollback timeout when the router never answers', async () => {
     vi.useFakeTimers();
-    vi.spyOn(apiClient, 'post').mockRejectedValue(new Error('network down'));
+    confirmRequest.mockRejectedValue(new Error('network down'));
 
     const assertion = expect(confirmWifiApply('token-7', 1, 10)).rejects.toThrow(
       /rollback timeout/,
@@ -242,7 +243,7 @@ describe('confirm probe budget', () => {
     const probeMs = 4_000;
     const probeStarted: number[] = [];
 
-    vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+    confirmRequest.mockImplementation(async () => {
       probeStarted.push(Date.now());
       await new Promise((resolve) => setTimeout(resolve, probeMs));
       throw new Error('network down');
@@ -268,7 +269,7 @@ describe('confirm probe budget', () => {
     // Last confirm probe issued, as milliseconds since the apply was answered.
     const lastProbeAfterApply = async (probeBudgetSeconds: number): Promise<number> => {
       const starts: number[] = [];
-      vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+      confirmRequest.mockImplementation(async () => {
         starts.push(Date.now());
         throw new Error('network down');
       });
@@ -302,7 +303,7 @@ describe('confirm probe budget', () => {
   // The envelope field is optional on the wire: an older backend must still be
   // confirmable instead of failing before a single probe is sent.
   it('confirms normally when the response omits probe_budget_seconds', async () => {
-    const spy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ status: 'ok' });
+    const spy = confirmRequest.mockResolvedValueOnce({ status: 'ok' });
 
     await expect(
       finalizeWifiMutation(

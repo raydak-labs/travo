@@ -1,5 +1,5 @@
 // Generated from the backend's OpenAPI document (make generate).
-export type { SQMApplyResult, SQMConfig } from '../generated/schemas';
+export type { SQMApplyResult, SQMConfig } from '../generated/model';
 
 export type SQMQdisc = 'cake' | 'fq_codel';
 

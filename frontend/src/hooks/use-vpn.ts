@@ -1,42 +1,49 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithSegment } from '@/lib/api-url';
 import { refreshRouterState } from '@/lib/router-state-refresh';
-import { API_ROUTES } from '@shared/index';
-import type {
-  DNSLeakResult,
-  KillSwitchStatus,
-  SpeedTestResult,
-  SplitTunnelConfig,
-  Status,
-  TailscaleSSHStatus,
-  TailscaleStatus,
-  VPNVerifyResult,
-  VpnStatus,
-  WireGuardProfile,
-  WireGuardStatus,
-  WireguardConfig,
-} from '@shared/index';
+import type { SplitTunnelConfig } from '@shared/index';
+import {
+  activateWireguardProfile,
+  addWireguardProfile,
+  dNSLeakTest,
+  deleteWireguardProfile,
+  getKillSwitch,
+  getSplitTunnel,
+  getTailscale,
+  getTailscaleSSH,
+  getVpnStatus,
+  getWireguard,
+  getWireguardProfiles,
+  getWireguardStatus,
+  runWireGuardSpeedTest,
+  setKillSwitch,
+  setSplitTunnel,
+  setTailscaleExitNode,
+  setTailscaleSSH,
+  tailscaleAuth,
+  toggleTailscale,
+  toggleWireguard,
+  verifyWireguard,
+} from '@/api/endpoints';
 
 export function useVpnStatus() {
   return useQuery({
     queryKey: ['vpn', 'status'],
-    queryFn: () => apiClient.get<VpnStatus[]>(API_ROUTES.vpn.status),
+    queryFn: () => getVpnStatus(),
   });
 }
 
 export function useWireguardConfig() {
   return useQuery({
     queryKey: ['vpn', 'wireguard'],
-    queryFn: () => apiClient.get<WireguardConfig>(API_ROUTES.vpn.wireguard.config),
+    queryFn: () => getWireguard(),
   });
 }
 
 export function useWireguardStatus() {
   return useQuery({
     queryKey: ['vpn', 'wireguard', 'status'],
-    queryFn: () => apiClient.get<WireGuardStatus>(API_ROUTES.vpn.wireguard.status),
+    queryFn: () => getWireguardStatus(),
     refetchInterval: 10000, // refresh every 10 seconds for live stats
   });
 }
@@ -44,8 +51,7 @@ export function useWireguardStatus() {
 export function useToggleWireguard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enable: boolean) =>
-      apiClient.post<Status>(API_ROUTES.vpn.wireguard.toggle, { enabled: enable }),
+    mutationFn: (enable: boolean) => toggleWireguard({ enabled: enable }),
     onSuccess: (_data, enable) => {
       toast.success(`WireGuard ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -65,15 +71,14 @@ export function useToggleWireguard() {
 export function useTailscaleStatus() {
   return useQuery({
     queryKey: ['vpn', 'tailscale'],
-    queryFn: () => apiClient.get<TailscaleStatus>(API_ROUTES.vpn.tailscale.status),
+    queryFn: () => getTailscale(),
   });
 }
 
 export function useToggleTailscale() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enable: boolean) =>
-      apiClient.post<Status>(API_ROUTES.vpn.tailscale.toggle, { enabled: enable }),
+    mutationFn: (enable: boolean) => toggleTailscale({ enabled: enable }),
     onSuccess: (_data, enable) => {
       toast.success(`Tailscale ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -92,15 +97,14 @@ export function useToggleTailscale() {
 export function useWireguardProfiles() {
   return useQuery({
     queryKey: ['vpn', 'wireguard', 'profiles'],
-    queryFn: () => apiClient.get<WireGuardProfile[]>(API_ROUTES.vpn.wireguard.profiles),
+    queryFn: () => getWireguardProfiles(),
   });
 }
 
 export function useAddWireguardProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; config: string }) =>
-      apiClient.post<WireGuardProfile>(API_ROUTES.vpn.wireguard.profiles, data),
+    mutationFn: (data: { name: string; config: string }) => addWireguardProfile(data),
     onSuccess: () => {
       toast.success('WireGuard profile saved');
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'wireguard', 'profiles'] });
@@ -114,8 +118,7 @@ export function useAddWireguardProfile() {
 export function useDeleteWireguardProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.del<{ status: string }>(routeWithSegment(API_ROUTES.vpn.wireguard.profiles, id)),
+    mutationFn: (id: string) => deleteWireguardProfile(id),
     onSuccess: () => {
       toast.success('WireGuard profile deleted');
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'wireguard', 'profiles'] });
@@ -129,10 +132,7 @@ export function useDeleteWireguardProfile() {
 export function useActivateWireguardProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<{ status: string }>(
-        `${routeWithSegment(API_ROUTES.vpn.wireguard.profiles, id)}/activate`,
-      ),
+    mutationFn: (id: string) => activateWireguardProfile(id),
     onSuccess: () => {
       toast.success('WireGuard profile activated');
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -151,13 +151,13 @@ export function useActivateWireguardProfile() {
 export function useKillSwitch() {
   return useQuery({
     queryKey: ['vpn', 'killswitch'],
-    queryFn: () => apiClient.get<KillSwitchStatus>(API_ROUTES.vpn.killswitch),
+    queryFn: () => getKillSwitch(),
   });
 }
 
 export function useDNSLeakTest() {
   return useMutation({
-    mutationFn: () => apiClient.get<DNSLeakResult>(API_ROUTES.vpn.dnsLeakTest),
+    mutationFn: () => dNSLeakTest(),
     onError: (error) => {
       toast.error('DNS leak test failed', { description: error.message });
     },
@@ -167,7 +167,7 @@ export function useDNSLeakTest() {
 /** Speed test with download + ping bound to WireGuard (wg0); requires tunnel enabled and up. */
 export function useRunWireGuardSpeedTest() {
   return useMutation({
-    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.vpn.speedTest),
+    mutationFn: () => runWireGuardSpeedTest(),
     onError: (error) => {
       toast.error('VPN speed test failed', { description: error.message });
     },
@@ -176,7 +176,7 @@ export function useRunWireGuardSpeedTest() {
 
 export function useVerifyWireGuard() {
   return useMutation({
-    mutationFn: () => apiClient.get<VPNVerifyResult>(API_ROUTES.vpn.wireguard.verify),
+    mutationFn: () => verifyWireguard(),
     onError: (error) => {
       toast.error('VPN verification failed', { description: error.message });
     },
@@ -186,8 +186,7 @@ export function useVerifyWireGuard() {
 export function useSetKillSwitch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) =>
-      apiClient.put<{ status: string }>(API_ROUTES.vpn.killswitch, { enabled }),
+    mutationFn: (enabled: boolean) => setKillSwitch({ enabled }),
     onSuccess: (_data, enabled) => {
       toast.success(`VPN kill switch ${enabled ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'killswitch'] });
@@ -202,7 +201,7 @@ export function useTailscaleAuth() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (authKey?: string) =>
-      apiClient.post<{ auth_url?: string; status: string }>(API_ROUTES.vpn.tailscale.auth, {
+      tailscaleAuth({
         auth_key: authKey ?? '',
       }),
     onSuccess: () => {
@@ -217,8 +216,7 @@ export function useTailscaleAuth() {
 export function useSetTailscaleExitNode() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (nodeIP: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.vpn.tailscale.exitNode, { node_ip: nodeIP }),
+    mutationFn: (nodeIP: string) => setTailscaleExitNode({ node_ip: nodeIP }),
     onSuccess: () => {
       toast.success('Exit node updated');
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -238,15 +236,14 @@ export function useSetTailscaleExitNode() {
 export function useSplitTunnel() {
   return useQuery({
     queryKey: ['vpn', 'splitTunnel'],
-    queryFn: () => apiClient.get<SplitTunnelConfig>(API_ROUTES.vpn.splitTunnel),
+    queryFn: () => getSplitTunnel(),
   });
 }
 
 export function useSetSplitTunnel() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (cfg: SplitTunnelConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.vpn.splitTunnel, cfg),
+    mutationFn: (cfg: SplitTunnelConfig) => setSplitTunnel(cfg),
     onSuccess: () => {
       toast.success('Split tunnel config saved');
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'splitTunnel'] });
@@ -260,15 +257,14 @@ export function useSetSplitTunnel() {
 export function useTailscaleSSH() {
   return useQuery({
     queryKey: ['vpn', 'tailscale', 'ssh'],
-    queryFn: () => apiClient.get<TailscaleSSHStatus>(API_ROUTES.vpn.tailscale.ssh),
+    queryFn: () => getTailscaleSSH(),
   });
 }
 
 export function useSetTailscaleSSH() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) =>
-      apiClient.put<Status>(API_ROUTES.vpn.tailscale.ssh, { enabled }),
+    mutationFn: (enabled: boolean) => setTailscaleSSH({ enabled }),
     onSuccess: () => {
       toast.success('Tailscale SSH setting updated');
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale', 'ssh'] });

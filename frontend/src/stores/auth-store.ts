@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-import { apiClient, setToken, getToken, clearToken } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { LoginResponse } from '@shared/index';
+import { setToken, getToken, clearToken } from '@/lib/api-client';
+import { login, logout, syncTime } from '@/api/endpoints';
 
 interface AuthState {
   token: string | null;
@@ -17,22 +16,22 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (password: string, rememberMe = true) => {
     try {
-      await apiClient.post(API_ROUTES.system.timeSync, { client_time_ms: Date.now() });
+      await syncTime({ client_time_ms: Date.now() });
     } catch {
       // best-effort clock sync — don't fail login if this fails
     }
-    const response = await apiClient.post<LoginResponse>(API_ROUTES.auth.login, { password });
+    const response = await login({ password });
     setToken(response.token, rememberMe);
     set({ token: response.token, isAuthenticated: true });
   },
 
   logout: () => {
-    // Revoke the session server-side. `apiClient` reads the token
+    // Revoke the session server-side. `apiFetch` reads the token
     // synchronously, so the Authorization header is still attached even
     // though local state is cleared immediately afterwards. Local state is
     // cleared unconditionally: a failed revocation must not trap the user in
     // the app with a token the server has already forgotten.
-    void apiClient.post(API_ROUTES.auth.logout).catch(() => {
+    void logout().catch(() => {
       // best-effort — the local session is gone either way
     });
     clearToken();

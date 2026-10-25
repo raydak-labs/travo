@@ -147,12 +147,13 @@ jobs:
       - name: Oxlint
         run: pnpm lint:ci
 
-      # shared/openapi.json and shared/src/generated are generated from the Go
+      # shared/openapi.json, shared/src/generated and frontend/src/api are generated from the Go
       # handlers (ADR 0006 §4); a handler change without `make generate` fails here.
       - name: Generated API types are current
         run: |
           make generate
-          git diff --exit-code -- shared/openapi.json shared/src/generated
+          git diff --exit-code -- shared/openapi.json shared/src/generated frontend/src/api
+          test -z "$(git status --porcelain -- shared/src/generated frontend/src/api)"
 
   shellcheck:
     name: Shellcheck

@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { Alert, AlertsResponse } from '@shared/index';
+import type { Alert } from '@shared/index';
 import { useAlertStore } from '@/stores/alert-store';
 import { useWsSubscribe } from '@/lib/ws-context';
+import { getAlerts } from '@/api/endpoints';
 
 const severityLabels: Record<string, string> = {
   info: 'Info',
@@ -41,7 +40,7 @@ export function useAlerts() {
   // Fetch history on mount; poll only while the WebSocket is down.
   const { data, refetch } = useQuery({
     queryKey: ['system', 'alerts'],
-    queryFn: ({ signal }) => apiClient.get<AlertsResponse>(API_ROUTES.system.alerts, signal),
+    queryFn: ({ signal }) => getAlerts({ signal }),
     refetchInterval: alertsRefetchInterval(connected),
   });
 

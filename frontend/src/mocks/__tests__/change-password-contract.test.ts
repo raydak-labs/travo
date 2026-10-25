@@ -15,11 +15,8 @@ describe('change-password mock contract', () => {
   });
 
   async function changePassword(current_password: string, new_password: string) {
-    const { apiClient } = await import('@/lib/api-client');
-    return apiClient.put<Record<string, unknown>>('/api/v1/auth/password', {
-      current_password,
-      new_password,
-    });
+    const endpoints = await import('@/api/endpoints');
+    return endpoints.changePassword({ current_password, new_password });
   }
 
   it('returns a usable token, because the client stores it', async () => {
@@ -29,7 +26,7 @@ describe('change-password mock contract', () => {
     // replacement; the client does setToken(res.token). A response without a
     // token therefore stores the string "undefined" as the session token.
     expect(typeof res.token).toBe('string');
-    expect((res.token as string).length).toBeGreaterThan(0);
+    expect(res.token.length).toBeGreaterThan(0);
     expect(res.status).toBe('ok');
     expect(typeof res.revoked_sessions).toBe('number');
   });

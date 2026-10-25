@@ -3,29 +3,29 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithSegment } from '@/lib/api-url';
-import { API_ROUTES } from '@shared/index';
-import type {
-  DNSConfig,
-  DNSEntry,
-  DDNSConfig,
-  DDNSConfigResponse,
-  DDNSStatus,
-} from '@shared/index';
+import type { DNSConfig, DDNSConfig } from '@shared/index';
+import {
+  addDNSEntry,
+  deleteDNSEntry,
+  getDDNSConfig,
+  getDDNSStatus,
+  getDNSConfig,
+  getDNSEntries,
+  setDDNSConfig,
+  setDNSConfig,
+} from '@/api/endpoints';
 
 export function useDNSConfig() {
   return useQuery({
     queryKey: ['network', 'dns'],
-    queryFn: ({ signal }) => apiClient.get<DNSConfig>(API_ROUTES.network.dns, signal),
+    queryFn: ({ signal }) => getDNSConfig({ signal }),
   });
 }
 
 export function useSetDNSConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (config: DNSConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.dns, config),
+    mutationFn: (config: DNSConfig) => setDNSConfig(config),
     onSuccess: () => {
       toast.success('DNS configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['network', 'dns'] });
@@ -39,15 +39,14 @@ export function useSetDNSConfig() {
 export function useDNSEntries() {
   return useQuery({
     queryKey: ['network', 'dnsEntries'],
-    queryFn: ({ signal }) => apiClient.get<DNSEntry[]>(API_ROUTES.network.dnsEntries, signal),
+    queryFn: ({ signal }) => getDNSEntries({ signal }),
   });
 }
 
 export function useAddDNSEntry() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (entry: { name: string; ip: string }) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.dnsEntries, entry),
+    mutationFn: (entry: { name: string; ip: string }) => addDNSEntry(entry),
     onSuccess: () => {
       toast.success('DNS entry added');
       void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
@@ -61,8 +60,7 @@ export function useAddDNSEntry() {
 export function useDeleteDNSEntry() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (section: string) =>
-      apiClient.del<{ status: string }>(routeWithSegment(API_ROUTES.network.dnsEntries, section)),
+    mutationFn: (section: string) => deleteDNSEntry(section),
     onSuccess: () => {
       toast.success('DNS entry deleted');
       void queryClient.invalidateQueries({ queryKey: ['network', 'dnsEntries'] });
@@ -76,14 +74,14 @@ export function useDeleteDNSEntry() {
 export function useDDNSConfig() {
   return useQuery({
     queryKey: ['network', 'ddns'],
-    queryFn: ({ signal }) => apiClient.get<DDNSConfigResponse>(API_ROUTES.network.ddns, signal),
+    queryFn: ({ signal }) => getDDNSConfig({ signal }),
   });
 }
 
 export function useDDNSStatus() {
   return useQuery({
     queryKey: ['network', 'ddnsStatus'],
-    queryFn: ({ signal }) => apiClient.get<DDNSStatus>(API_ROUTES.network.ddnsStatus, signal),
+    queryFn: ({ signal }) => getDDNSStatus({ signal }),
     refetchInterval: 30000,
   });
 }
@@ -91,8 +89,7 @@ export function useDDNSStatus() {
 export function useSetDDNSConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (config: DDNSConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.ddns, config),
+    mutationFn: (config: DDNSConfig) => setDDNSConfig(config),
     onSuccess: () => {
       toast.success('DDNS configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['network', 'ddns'] });

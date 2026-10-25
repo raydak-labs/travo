@@ -4,27 +4,35 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithSegment } from '@/lib/api-url';
-import { API_ROUTES } from '@shared/index';
 import type {
   AddSSHKeyRequest,
   ButtonActionsRequest,
-  HardwareButton,
   LEDSchedule,
-  LEDStatus,
-  NTPConfig,
-  SSHKeysResponse,
   SetHostnameRequest,
   SetLEDRequest,
-  Status,
   TimezoneConfig,
 } from '@shared/index';
+import {
+  addSSHKey,
+  deleteSSHKey,
+  getButtons,
+  getLEDSchedule,
+  getLEDStatus,
+  getNTPConfig,
+  getSSHKeys,
+  getTimezone,
+  setButtonActions,
+  setHostname,
+  setLEDSchedule,
+  setLEDStealth,
+  setNTPConfig,
+  setTimezone,
+  syncNTP,
+} from '@/api/endpoints';
 
 export function useSetHostname() {
   return useMutation({
-    mutationFn: (data: SetHostnameRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.hostname, data),
+    mutationFn: (data: SetHostnameRequest) => setHostname(data),
     onSuccess: () => {
       toast.success('Hostname updated');
     },
@@ -37,15 +45,14 @@ export function useSetHostname() {
 export function useTimezone() {
   return useQuery({
     queryKey: ['system', 'timezone'],
-    queryFn: () => apiClient.get<TimezoneConfig>(API_ROUTES.system.timezone),
+    queryFn: () => getTimezone(),
   });
 }
 
 export function useSetTimezone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (config: TimezoneConfig) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.timezone, config),
+    mutationFn: (config: TimezoneConfig) => setTimezone(config),
     onSuccess: () => {
       toast.success('Timezone updated');
       void queryClient.invalidateQueries({ queryKey: ['system', 'timezone'] });
@@ -59,13 +66,13 @@ export function useSetTimezone() {
 export function useNTPConfig() {
   return useQuery({
     queryKey: ['system', 'ntp'],
-    queryFn: () => apiClient.get<NTPConfig>(API_ROUTES.system.ntp),
+    queryFn: () => getNTPConfig(),
   });
 }
 
 export function useSyncNTP() {
   return useMutation({
-    mutationFn: () => apiClient.post<{ status: string }>(API_ROUTES.system.ntpSync),
+    mutationFn: () => syncNTP(),
     onSuccess: () => {
       toast.success('NTP sync complete', {
         description: 'System clock synchronized with pool.ntp.org',
@@ -80,8 +87,7 @@ export function useSyncNTP() {
 export function useSetNTPConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (config: { enabled: boolean; servers: string[] }) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.ntp, config),
+    mutationFn: (config: { enabled: boolean; servers: string[] }) => setNTPConfig(config),
     onSuccess: () => {
       toast.success('NTP configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['system', 'ntp'] });
@@ -95,14 +101,14 @@ export function useSetNTPConfig() {
 export function useLEDStatus() {
   return useQuery({
     queryKey: ['system', 'leds'],
-    queryFn: () => apiClient.get<LEDStatus>(API_ROUTES.system.leds),
+    queryFn: () => getLEDStatus(),
   });
 }
 
 export function useSetLEDStealth() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: SetLEDRequest) => apiClient.put<LEDStatus>(API_ROUTES.system.leds, data),
+    mutationFn: (data: SetLEDRequest) => setLEDStealth(data),
     onSuccess: () => {
       toast.success('LED mode updated');
       void queryClient.invalidateQueries({ queryKey: ['system', 'leds'] });
@@ -116,15 +122,14 @@ export function useSetLEDStealth() {
 export function useLEDSchedule() {
   return useQuery({
     queryKey: ['system', 'leds', 'schedule'],
-    queryFn: () => apiClient.get<LEDSchedule>(API_ROUTES.system.ledsSchedule),
+    queryFn: () => getLEDSchedule(),
   });
 }
 
 export function useSetLEDSchedule() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: LEDSchedule) =>
-      apiClient.put<LEDSchedule>(API_ROUTES.system.ledsSchedule, data),
+    mutationFn: (data: LEDSchedule) => setLEDSchedule(data),
     onSuccess: () => {
       toast.success('LED schedule updated');
       void queryClient.invalidateQueries({ queryKey: ['system', 'leds', 'schedule'] });
@@ -138,15 +143,14 @@ export function useSetLEDSchedule() {
 export function useHardwareButtons() {
   return useQuery({
     queryKey: ['system', 'buttons'],
-    queryFn: () => apiClient.get<HardwareButton[]>(API_ROUTES.system.buttons),
+    queryFn: () => getButtons(),
   });
 }
 
 export function useSetButtonActions() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: ButtonActionsRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.system.buttonActions, req),
+    mutationFn: (req: ButtonActionsRequest) => setButtonActions(req),
     onSuccess: () => {
       toast.success('Button actions saved');
       void queryClient.invalidateQueries({ queryKey: ['system', 'buttons'] });
@@ -161,7 +165,7 @@ export function useSSHKeys() {
   return useQuery({
     queryKey: ['system', 'ssh-keys'],
     queryFn: async () => {
-      const res = await apiClient.get<SSHKeysResponse>(API_ROUTES.system.sshKeys);
+      const res = await getSSHKeys();
       return res.keys;
     },
   });
@@ -170,7 +174,7 @@ export function useSSHKeys() {
 export function useAddSSHKey() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: AddSSHKeyRequest) => apiClient.post<Status>(API_ROUTES.system.sshKeys, req),
+    mutationFn: (req: AddSSHKeyRequest) => addSSHKey(req),
     onSuccess: () => {
       toast.success('SSH key added');
       void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
@@ -184,8 +188,7 @@ export function useAddSSHKey() {
 export function useDeleteSSHKey() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (index: number) =>
-      apiClient.del<Status>(routeWithSegment(API_ROUTES.system.sshKeys, index)),
+    mutationFn: (index: number) => deleteSSHKey(String(index)),
     onSuccess: () => {
       toast.success('SSH key deleted');
       void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });

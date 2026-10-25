@@ -117,39 +117,20 @@ export async function errorMessageFromResponse(
   return (await errorFromResponse(response, fallback)).message;
 }
 
-function buildHeaders(body: unknown): Record<string, string> {
-  const headers: Record<string, string> = {};
-  // FormData must set its own multipart boundary, and bodyless requests
-  // (every GET/DELETE) must not claim a JSON content type at all.
-  if (body !== undefined && !(typeof FormData !== 'undefined' && body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-  const token = getToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
-
-function bodyToRequestBody(body: unknown): BodyInit | undefined {
-  if (body === undefined) return undefined;
-  if (typeof FormData !== 'undefined' && body instanceof FormData) return body;
-  return JSON.stringify(body);
-}
-
 /**
- * Performs a request and normalises failures: a 401 (except on the login
- * endpoint) clears the session, and every non-2xx becomes an `ApiError` whose
- * message survives a non-JSON body.
+ * Performs a request with the session token and normalises failures: a 401
+ * (except on the login endpoint) clears the session, and every non-2xx becomes
+ * an `ApiError` whose message survives a non-JSON body.
+ *
+ * Pass `init.signal` on reads so React Query can cancel them; a fetch left
+ * running costs RAM on a 128 MB router.
  */
-async function send(path: string, method: string, body?: unknown, signal?: AbortSignal) {
-  const response = await fetch(path, {
-    method,
-    headers: buildHeaders(body),
-    body: bodyToRequestBody(body),
-    signal,
-  });
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
 
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     if (response.status === 401 && !path.endsWith('/auth/login')) {
       handleUnauthorized();
@@ -160,50 +141,23 @@ async function send(path: string, method: string, body?: unknown, signal?: Abort
     );
     throw new ApiError(response.status, message, code);
   }
-
   return response;
 }
 
-function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-  signal?: AbortSignal,
-): Promise<T> {
-  return send(path, method, body, signal).then((response) => response.json() as Promise<T>);
+/**
+ * The HTTP client behind the generated request functions (`@/api/endpoints`,
+ * see orval.config.mjs): a JSON body in, the decoded JSON body out.
+ */
+export async function apiFetch<T>(url: string, init: RequestInit): Promise<T> {
+  const response = await send(url, init);
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
 }
 
 /** GET that returns a binary body (e.g. a backup archive). */
-function requestBlob(path: string, signal?: AbortSignal): Promise<Blob> {
-  return send(path, 'GET', undefined, signal).then((response) => response.blob());
+export function getBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  return send(path, { signal }).then((response) => response.blob());
 }
-
-/**
- * `signal` is threaded through every read so React Query can cancel in-flight
- * requests. Without it, changing a log filter or leaving a page leaves the
- * previous fetch running on a router with 128 MB of RAM.
- */
-export const apiClient = {
-  get<T>(path: string, signal?: AbortSignal): Promise<T> {
-    return request<T>('GET', path, undefined, signal);
-  },
-  getBlob(path: string, signal?: AbortSignal): Promise<Blob> {
-    return requestBlob(path, signal);
-  },
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>('POST', path, body);
-  },
-  /** POST with a `multipart/form-data` body (backup restore, firmware upload). */
-  postForm<T>(path: string, formData: FormData): Promise<T> {
-    return request<T>('POST', path, formData);
-  },
-  put<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>('PUT', path, body);
-  },
-  del<T>(path: string): Promise<T> {
-    return request<T>('DELETE', path);
-  },
-};
 
 /** NDJSON stream event from the backend. */
 export interface StreamEvent {
@@ -223,7 +177,7 @@ export async function streamRequest(
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await send(path, 'POST', undefined, signal);
+  const response = await send(path, { method: 'POST', signal });
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('No response body');

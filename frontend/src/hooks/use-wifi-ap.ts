@@ -4,18 +4,23 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithParam, routeWithSegment } from '@/lib/api-url';
 import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { refreshRouterState } from '@/lib/router-state-refresh';
-import { API_ROUTES } from '@shared/index';
-import type { APConfig, APConfigUpdate, RadioInfo, WifiMutationResponse } from '@shared/index';
+import type { APConfigUpdate } from '@shared/index';
 import { wifiMutationSettled } from './use-wifi-settled';
+import {
+  getAPConfig,
+  getRadioStatus,
+  getRadios,
+  setAPConfig,
+  setRadioEnabled,
+  setRadioRole,
+} from '@/api/endpoints';
 
 export function useAPConfigs() {
   return useQuery({
     queryKey: ['wifi', 'ap'],
-    queryFn: () => apiClient.get<APConfig[]>(API_ROUTES.wifi.ap),
+    queryFn: () => getAPConfig(),
   });
 }
 
@@ -23,9 +28,7 @@ export function useSetAPConfig() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ section, config }: { section: string; config: APConfigUpdate }) =>
-      finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(routeWithSegment(API_ROUTES.wifi.ap, section), config),
-      ),
+      finalizeWifiMutation(setAPConfig(section, config)),
     onSuccess: () => {
       toast.success('AP configuration updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'ap'] });
@@ -44,26 +47,16 @@ export function useSetAPConfig() {
 export function useRadioStatus() {
   return useQuery({
     queryKey: ['wifi', 'radio'],
-    queryFn: () => apiClient.get<{ enabled: boolean }>(API_ROUTES.wifi.radio),
+    queryFn: () => getRadioStatus(),
   });
 }
 
 export function useRadios() {
   return useQuery({
     queryKey: ['wifi', 'radios'],
-    queryFn: () => apiClient.get<RadioInfo[]>(API_ROUTES.wifi.radios),
+    queryFn: () => getRadios(),
   });
 }
-
-/**
- * Response of the radio-role endpoint: the shared envelope plus, when the
- * service had to invent a WPA passphrase for a default AP it created,
- * generated_key. The passphrase is returned exactly once and is unrecoverable
- * afterwards, so callers must surface it.
- */
-type RadioRoleMutationResponse = WifiMutationResponse & {
-  readonly generated_key?: string;
-};
 
 export function useSetRadioRole() {
   const queryClient = useQueryClient();
@@ -80,7 +73,7 @@ export function useSetRadioRole() {
       acknowledge_lockout?: boolean;
     }) =>
       finalizeWifiMutation(
-        apiClient.put<RadioRoleMutationResponse>(routeWithParam(API_ROUTES.wifi.radioRole, name), {
+        setRadioRole(name, {
           role,
           ...(acknowledge ? { acknowledge_lockout: true } : {}),
         }),
@@ -115,8 +108,7 @@ export function useSetRadioRole() {
 export function useSetRadioEnabled() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) =>
-      finalizeWifiMutation(apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.radio, { enabled })),
+    mutationFn: (enabled: boolean) => finalizeWifiMutation(setRadioEnabled({ enabled })),
     onSuccess: () => {
       toast.success('WiFi radio updated');
       wifiMutationSettled(queryClient, [

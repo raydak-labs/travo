@@ -3,21 +3,23 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
-vi.mock('@/lib/api-client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), del: vi.fn() },
+vi.mock('@/api/endpoints', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/endpoints')>()),
+  getNetworkStatus: vi.fn(),
 }));
 vi.mock('@/lib/ws-context', () => ({
   useWsSubscribe: vi.fn(),
 }));
 
-import { apiClient } from '@/lib/api-client';
+import { getNetworkStatus } from '@/api/endpoints';
 import { useWsSubscribe } from '@/lib/ws-context';
 import { useNetworkStatus } from '../use-network';
+import { mockNetworkStatus } from '@/mocks/data-network';
 
-const mockedGet = vi.mocked(apiClient.get);
+const mockedGet = vi.mocked(getNetworkStatus);
 const mockedUseWsSubscribe = vi.mocked(useWsSubscribe);
 
-const httpStatus = { internet_reachable: false, wan: null, clients: [] };
+const httpStatus = { ...mockNetworkStatus, internet_reachable: false, wan: null, clients: [] };
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

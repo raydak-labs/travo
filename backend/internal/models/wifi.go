@@ -51,11 +51,11 @@ type WifiConnection struct {
 // WifiConfig is the configuration for connecting to a WiFi network.
 type WifiConfig struct {
 	SSID       string `json:"ssid"`
-	Password   string `json:"password"`
-	Encryption string `json:"encryption"`
-	Mode       string `json:"mode"`
-	Band       string `json:"band"`
-	Hidden     bool   `json:"hidden"`
+	Password   string `json:"password,omitempty"`
+	Encryption string `json:"encryption,omitempty"`
+	Mode       string `json:"mode,omitempty"`
+	Band       string `json:"band,omitempty"`
+	Hidden     bool   `json:"hidden,omitempty"`
 	Channel    *int   `json:"channel,omitempty"`
 }
 

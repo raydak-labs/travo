@@ -1,22 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithParam } from '@/lib/api-url';
-import { API_ROUTES } from '@shared/index';
-import type { AdGuardConfig, AdGuardDNSStatus, ServiceInfo, Status } from '@shared/index';
+import {
+  getAdGuardConfig,
+  getAdGuardDNS,
+  installService,
+  listServices,
+  removeService,
+  setAdGuardConfig,
+  setAdGuardDNS,
+  setAdGuardPassword,
+  setServiceAutoStart,
+  startService,
+  stopService,
+} from '@/api/endpoints';
 
 export function useServices() {
   return useQuery({
     queryKey: ['services'],
-    queryFn: () => apiClient.get<ServiceInfo[]>(API_ROUTES.services.list),
+    queryFn: () => listServices(),
   });
 }
 
 export function useInstallService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<Status>(routeWithParam(API_ROUTES.services.install, id)),
+    mutationFn: (id: string) => installService(id),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" installed`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -30,8 +38,7 @@ export function useInstallService() {
 export function useRemoveService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<Status>(routeWithParam(API_ROUTES.services.remove, id)),
+    mutationFn: (id: string) => removeService(id),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" removed`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -45,8 +52,7 @@ export function useRemoveService() {
 export function useStartService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<Status>(routeWithParam(API_ROUTES.services.start, id)),
+    mutationFn: (id: string) => startService(id),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" started`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -60,8 +66,7 @@ export function useStartService() {
 export function useStopService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      apiClient.post<Status>(routeWithParam(API_ROUTES.services.stop, id)),
+    mutationFn: (id: string) => stopService(id),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" stopped`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -76,7 +81,7 @@ export function useSetAutoStart() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      apiClient.post<{ status: string }>(routeWithParam(API_ROUTES.services.autostart, id), {
+      setServiceAutoStart(id, {
         enabled,
       }),
     onSuccess: () => {
@@ -92,15 +97,14 @@ export function useSetAutoStart() {
 export function useAdGuardDNS() {
   return useQuery({
     queryKey: ['adguard-dns'],
-    queryFn: () => apiClient.get<AdGuardDNSStatus>(API_ROUTES.adguard.dns),
+    queryFn: () => getAdGuardDNS(),
   });
 }
 
 export function useSetAdGuardDNS() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) =>
-      apiClient.put<{ status: string }>(API_ROUTES.adguard.dns, { enabled }),
+    mutationFn: (enabled: boolean) => setAdGuardDNS({ enabled }),
     onSuccess: (_data, enabled) => {
       toast.success(enabled ? 'AdGuard DNS enabled' : 'AdGuard DNS disabled');
       void queryClient.invalidateQueries({ queryKey: ['adguard-dns'] });
@@ -114,7 +118,7 @@ export function useSetAdGuardDNS() {
 export function useAdGuardConfig() {
   return useQuery({
     queryKey: ['adguard-config'],
-    queryFn: () => apiClient.get<AdGuardConfig>(API_ROUTES.adguard.config),
+    queryFn: () => getAdGuardConfig(),
     enabled: false, // Only fetch on demand
   });
 }
@@ -122,8 +126,7 @@ export function useAdGuardConfig() {
 export function useSetAdGuardConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (content: string) =>
-      apiClient.put<{ status: string }>(API_ROUTES.adguard.config, { content }),
+    mutationFn: (content: string) => setAdGuardConfig({ content }),
     onSuccess: () => {
       toast.success('AdGuard configuration saved and service restarted');
       void queryClient.invalidateQueries({ queryKey: ['adguard-config'] });
@@ -137,7 +140,7 @@ export function useSetAdGuardConfig() {
 export function useChangeAdGuardPassword() {
   return useMutation({
     mutationFn: ({ username, password }: { username?: string; password: string }) =>
-      apiClient.put<{ status: string }>(API_ROUTES.adguard.password, { username, password }),
+      setAdGuardPassword({ username, password }),
     onSuccess: () => {
       toast.success('AdGuard password updated');
     },

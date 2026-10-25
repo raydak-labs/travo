@@ -109,8 +109,12 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   only ever fills from a fixed set carry `enum` tags, so the generated unions are exact.
 - **API follow-ups (2026-10-25):** every shared API type is now generated or derived from a
   generated one; unused type guards and their tests are gone. Acknowledgements are always
-  `{"status":"ok"}`. `API_ROUTES` is type-checked against the generated `paths`. The generator
-  runs on TypeScript 6.
+  `{"status":"ok"}`. `API_ROUTES` is type-checked against the generated `paths`.
+- **Generated API client (2026-10-25):** the generator is now orval, which needs no TypeScript
+  compiler API, so TypeScript 6 is gone from the repo. Every hook calls a generated request
+  function; `apiClient` is removed. The port-forward request no longer requires an `id`, the
+  WiFi connect request no longer requires `mode`, and the firmware upload documents
+  `keep_settings`.
 
 ## Frontend Toolchain
 

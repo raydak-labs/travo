@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw/http';
 import { server } from '@/mocks/server';
+import { login, restoreBackup } from '@/api/endpoints';
 import {
-  apiClient,
+  apiFetch,
+  getBlob,
   setToken,
   getToken,
   clearToken,
@@ -14,9 +16,9 @@ beforeEach(() => {
   clearToken();
 });
 
-describe('apiClient', () => {
+describe('apiFetch', () => {
   it('formats GET request correctly', async () => {
-    const data = await apiClient.get<{ hostname: string }>('/api/v1/system/info');
+    const data = await apiFetch<{ hostname: string }>('/api/v1/system/info', {});
     expect(data).toHaveProperty('hostname');
     expect(data.hostname).toBe('GL-MT3000');
   });
@@ -26,14 +28,12 @@ describe('apiClient', () => {
     expect(getToken()).toBe('test-token-123');
 
     // The request should succeed since MSW doesn't check auth
-    const data = await apiClient.get<{ hostname: string }>('/api/v1/system/info');
+    const data = await apiFetch<{ hostname: string }>('/api/v1/system/info', {});
     expect(data).toHaveProperty('hostname');
   });
 
   it('throws on non-2xx response', async () => {
-    await expect(apiClient.post('/api/v1/auth/login', { password: 'wrong' })).rejects.toThrow(
-      'Invalid password',
-    );
+    await expect(login({ password: 'wrong' })).rejects.toThrow('Invalid password');
   });
 
   it('clears token on 401 response (non-login endpoint)', async () => {
@@ -46,7 +46,7 @@ describe('apiClient', () => {
       }),
     );
 
-    await expect(apiClient.get('/api/v1/system/info')).rejects.toThrow('Unauthorized');
+    await expect(apiFetch('/api/v1/system/info', {})).rejects.toThrow('Unauthorized');
     // handleUnauthorized clears the token and attempts redirect to /login
     expect(getToken()).toBeNull();
   });
@@ -54,9 +54,7 @@ describe('apiClient', () => {
   it('does not clear token on 401 for login endpoint', async () => {
     setToken('existing-token');
 
-    await expect(apiClient.post('/api/v1/auth/login', { password: 'wrong' })).rejects.toThrow(
-      'Invalid password',
-    );
+    await expect(login({ password: 'wrong' })).rejects.toThrow('Invalid password');
     // Login 401s should not trigger handleUnauthorized
     expect(getToken()).toBe('existing-token');
   });
@@ -70,7 +68,7 @@ describe('apiClient', () => {
       }),
     );
 
-    await apiClient.get('/api/v1/system/info');
+    await apiFetch('/api/v1/system/info', {});
     expect(seenContentType).toBeNull();
   });
 
@@ -81,7 +79,7 @@ describe('apiClient', () => {
       ),
     );
 
-    await expect(apiClient.get('/api/v1/system/info')).rejects.toThrow(
+    await expect(apiFetch('/api/v1/system/info', {})).rejects.toThrow(
       'Request failed with status 502',
     );
   });
@@ -94,28 +92,26 @@ describe('apiClient', () => {
       ),
     );
 
-    await expect(apiClient.getBlob('/api/v1/system/backup')).rejects.toThrow('nope');
+    await expect(getBlob('/api/v1/system/backup')).rejects.toThrow('nope');
     expect(getToken()).toBeNull();
   });
 
-  it('uploads FormData without forcing a JSON content type', async () => {
+  // The browser must set the multipart boundary itself, so neither the
+  // generated function nor the client may add a Content-Type.
+  it('uploads FormData without forcing a content type', async () => {
     setToken('tok');
-    let contentType: string | null = 'unset';
-    let bodyText = '';
-    server.use(
-      http.post('/api/v1/system/restore', async ({ request }) => {
-        contentType = request.headers.get('content-type');
-        bodyText = await request.text();
-        return HttpResponse.json({ status: 'ok' });
-      }),
-    );
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ status: 'ok' }));
+    vi.stubGlobal('fetch', fetchMock);
 
-    const form = new FormData();
-    form.append('keep_settings', 'true');
-    await apiClient.postForm('/api/v1/system/restore', form);
+    await restoreBackup({ backup: new File(['archive'], 'backup.tar.gz') });
 
-    expect(contentType).toMatch(/^multipart\/form-data; boundary=/);
-    expect(bodyText).toContain('keep_settings');
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).has('backup')).toBe(true);
+    expect(headers.get('content-type')).toBeNull();
+    expect(headers.get('authorization')).toBe('Bearer tok');
+    vi.unstubAllGlobals();
   });
 });
 
