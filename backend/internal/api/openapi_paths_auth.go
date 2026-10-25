@@ -10,7 +10,7 @@ var openAPIPathsAuth = map[string]any{
 	"/auth/login": map[string]any{
 		"post": endpoint("Login", "Authenticate as the hard-coded root user and receive a JWT token (expires_in is the relative session lifetime in seconds)", false,
 			body("application/json", obj("password")),
-			resp200("application/json", obj("token", "expires_at", "expires_in")),
+			resp200("application/json", obj("token", "expires_in")),
 		),
 	},
 	"/auth/logout": map[string]any{
@@ -25,7 +25,7 @@ var openAPIPathsAuth = map[string]any{
 		// using the token it sent is logged out on its very next request.
 		"put": endpoint("ChangePassword", "Change the admin password. Revokes all sessions and returns a replacement token for the caller.", true,
 			body("application/json", obj("current_password", "new_password")),
-			resp200("application/json", obj("status", "token", "expires_at", "expires_in", "revoked_sessions")),
+			resp200("application/json", obj("status", "token", "expires_in", "revoked_sessions")),
 		),
 	},
 	// System

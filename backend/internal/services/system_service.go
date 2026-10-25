@@ -1,10 +1,13 @@
 package services
 
 import (
+	"log/slog"
+
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -12,7 +15,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -36,19 +38,13 @@ func (r *RealStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 	if err := syscall.Statfs("/", &stat); err != nil {
 		return 0, 0, 0, err
 	}
-	total := int64(stat.Blocks) * int64(stat.Bsize)
-	free := int64(stat.Bavail) * int64(stat.Bsize)
+	// Bsize is int64 on linux and uint32 on darwin; uint64 is a real
+	// conversion on both, so neither build flags it as unnecessary.
+	bsize := int64(uint64(stat.Bsize))
+	total := int64(stat.Blocks) * bsize
+	free := int64(stat.Bavail) * bsize
 	used := total - free
 	return total, used, free, nil
-}
-
-// MockStorageProvider returns realistic mock storage stats.
-type MockStorageProvider struct{}
-
-// GetRootStorage returns mock storage stats.
-func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
-	// 256MB total, 96MB used, 160MB free — realistic for a travel router
-	return 268435456, 100663296, 167772160, nil
 }
 
 // SystemService provides system information and statistics.
@@ -56,12 +52,8 @@ type SystemService struct {
 	ubus    ubus.Ubus
 	uci     uci.UCI
 	storage StorageProvider
-	// guardDir holds the crash-guard files (ADR 0003). Empty means
-	// /etc/trafo; tests point it at a temp dir.
-	guardDir     string
-	guardDirOnce sync.Once
-	// guardResolved caches the resolved guard directory.
-	guardResolved string
+	// guardDir holds the crash-guard files (ADR 0003); empty means guard.Dir().
+	guardDir string
 	// sshKeysFile overrides authorizedKeysFile (tests only).
 	sshKeysFile string
 	// toggleScriptPath overrides where the generated wireless toggle helper is
@@ -83,73 +75,31 @@ func NewSystemService(ub ubus.Ubus, u uci.UCI, storage StorageProvider) *SystemS
 }
 
 // SetGuardDir overrides the directory used for crash-guard files (tests).
-func (s *SystemService) SetGuardDir(dir string) {
-	s.guardDir = dir
-	s.guardResolved = ""
-	s.guardDirOnce = sync.Once{}
-}
+func (s *SystemService) SetGuardDir(dir string) { s.guardDir = dir }
 
-// Crash-guard file names. Each marks a live-state mutation that is unsafe to
-// blindly retry after a power cut; the guard is removed only once the whole
-// operation succeeded (AGENTS.md, ADR 0003).
+// Crash guards. Each marks a live-state mutation that is unsafe to blindly
+// retry after a power cut (ADR 0003).
 const (
-	restoreGuardName         = "restore-in-progress"
-	firmwareUpgradeGuardName = "firmware-upgrade-in-progress"
-	factoryResetGuardName    = "factory-reset-in-progress"
-	systemConfigGuardName    = "system-config-in-progress"
+	restoreGuard         = "restore"
+	firmwareUpgradeGuard = "firmware-upgrade"
+	factoryResetGuard    = "factory-reset"
+	systemConfigGuard    = "system-config"
 )
 
-func (s *SystemService) guardDirOrDefault() string {
-	if s.guardDir != "" {
-		return s.guardDir
-	}
-	s.guardDirOnce.Do(func() {
-		const prod = crashGuardDir
-		mkErr := os.MkdirAll(prod, 0o750)
-		if mkErr == nil {
-			s.guardResolved = prod
-			return
-		}
-		// Not running in the normal deployment (dev host, unit tests) or the
-		// installation is broken. Do not skip the guard: fall back to a temp
-		// directory and say so loudly.
-		fallback := filepath.Join(os.TempDir(), "travo-guards")
-		log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side flash or reset is NOT protected by a durable marker.", prod, mkErr, fallback)
-		_ = os.MkdirAll(fallback, 0o750)
-		s.guardResolved = fallback
-	})
-	return s.guardResolved
-}
-
-// writeGuard records that a dangerous operation has started. name is the
-// file name, e.g. "firmware-upgrade-in-progress".
-func (s *SystemService) writeGuard(name, reason string) error {
-	dir := s.guardDirOrDefault()
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("crash guard: mkdir %s: %w", dir, err)
-	}
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(reason+"\n"), 0o600); err != nil {
-		return fmt.Errorf("crash guard: write %s: %w", path, err)
-	}
-	return nil
-}
-
-// clearGuard removes the crash guard after a successful operation.
-func (s *SystemService) clearGuard(name string) {
-	_ = os.Remove(filepath.Join(s.guardDirOrDefault(), name))
+func (s *SystemService) crashGuard(feature string) guard.Guard {
+	return guard.In(s.guardDir, feature)
 }
 
 // LogStaleCrashGuards warns about guards left behind by an interrupted run so
 // the operator can see (and clear) them after a power cut mid-flash.
 func (s *SystemService) LogStaleCrashGuards() {
-	for _, name := range []string{restoreGuardName, firmwareUpgradeGuardName, factoryResetGuardName, systemConfigGuardName} {
-		path := filepath.Join(s.guardDirOrDefault(), name)
-		data, err := os.ReadFile(path)
+	for _, feature := range []string{restoreGuard, firmwareUpgradeGuard, factoryResetGuard, systemConfigGuard} {
+		g := s.crashGuard(feature)
+		data, err := g.Read()
 		if err != nil {
 			continue
 		}
-		log.Printf("WARNING: crash guard present: %s (%s). The previous operation did not finish; clear it manually if the system looks healthy.", path, strings.TrimSpace(string(data)))
+		slog.Warn("crash guard present: the previous operation did not finish; clear it manually if the system looks healthy", "path", g.Path(), "reason", strings.TrimSpace(string(data)))
 	}
 }
 
@@ -331,7 +281,7 @@ func (s *SystemService) Shutdown() error {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		if err := execx.Run(execx.Quick, "poweroff"); err != nil {
-			log.Printf("ERROR: poweroff failed: %v", err)
+			slog.Error("poweroff failed", "err", err)
 		}
 	}()
 	return nil
@@ -386,13 +336,13 @@ func (s *SystemService) GetTimezone() (models.TimezoneConfig, error) {
 // /etc/config/system, which is exactly the state an operator must be told about
 // rather than silently overwritten by the next request.
 func (s *SystemService) commitSystemConfig(what string) error {
-	if err := s.writeGuard(systemConfigGuardName, what); err != nil {
+	if err := s.crashGuard(systemConfigGuard).Write(what); err != nil {
 		return err
 	}
 	if err := s.uci.Commit("system"); err != nil {
-		return fmt.Errorf("committing system config for %s (crash guard %s kept, /etc/config/system may be incomplete): %w", what, systemConfigGuardName, err)
+		return fmt.Errorf("committing system config for %s (crash guard %s kept, /etc/config/system may be incomplete): %w", what, s.crashGuard(systemConfigGuard).Path(), err)
 	}
-	s.clearGuard(systemConfigGuardName)
+	_ = s.crashGuard(systemConfigGuard).Clear()
 	return nil
 }
 
@@ -497,7 +447,7 @@ func streamLogTail(timeout time.Duration, name string, args ...string) (string, 
 		return "", err
 	}
 	if truncated > 0 {
-		log.Printf("WARNING: %s output truncated to the last %d lines (%d older lines dropped)", name, maxLogLines, truncated)
+		slog.Warn("command output truncated", "command", name, "kept_lines", maxLogLines, "dropped_lines", truncated)
 	}
 	return strings.Join(lines, "\n"), nil
 }
@@ -554,16 +504,16 @@ func (s *SystemService) FactoryReset() error {
 	if _, err := exec.LookPath("firstboot"); err != nil {
 		return fmt.Errorf("factory reset unavailable: %w", err)
 	}
-	if err := s.writeGuard(factoryResetGuardName, "firstboot -y && reboot"); err != nil {
+	if err := s.crashGuard(factoryResetGuard).Write("firstboot -y && reboot"); err != nil {
 		return err
 	}
 	go func() {
 		if err := execx.Run(execx.Package, "firstboot", "-y"); err != nil {
-			log.Printf("ERROR: firstboot failed: %v (crash guard %s kept; device not reset)", err, factoryResetGuardName)
+			slog.Error("firstboot failed; device not reset, crash guard kept", "err", err, "guard", s.crashGuard(factoryResetGuard).Path())
 			return
 		}
 		if err := execx.Run(execx.Quick, "reboot"); err != nil {
-			log.Printf("ERROR: reboot after firstboot failed: %v", err)
+			slog.Error("reboot after firstboot failed", "err", err)
 		}
 	}()
 	return nil

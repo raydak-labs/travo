@@ -2,7 +2,7 @@ package services
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -97,11 +97,11 @@ func (s *StatsHistoryService) Flush() {
 	data, err := json.Marshal(s.points)
 	s.mu.RUnlock()
 	if err != nil {
-		log.Printf("WARNING: stats history: marshal: %v", err)
+		slog.Warn("stats history: marshal", "err", err)
 		return
 	}
 	if err := s.db.Put(statsHistoryBucket, statsHistoryKey, data); err != nil {
-		log.Printf("WARNING: stats history: flush %d points failed: %v", len(data), err)
+		slog.Warn("stats history: flush failed", "points", len(data), "err", err)
 		return
 	}
 	s.mu.Lock()

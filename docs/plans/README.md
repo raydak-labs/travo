@@ -39,4 +39,4 @@ YAML **frontmatter** on each plan file carries `title`, `description`, `updated`
 - Do not edit plan bodies for drive-by cleanup. Editing a plan to match changed
   behaviour destroys the record of why the change was made.
 - Every plan added here must appear in the table above: a Go test enforces it
-  (`TestPlansIndexListsEveryPlan` in `backend/internal/services/docs_index_test.go`).
+  (`TestPlansIndexListsEveryPlan` in `backend/internal/docsgate/docs_index_test.go`).

@@ -60,15 +60,15 @@ func (s *SystemService) RestoreBackup(path string) error {
 	if err := ValidateRestoreArchive(path); err != nil {
 		return err
 	}
-	if err := s.writeGuard(restoreGuardName, "restore backup "+path); err != nil {
+	if err := s.crashGuard(restoreGuard).Write("restore backup " + path); err != nil {
 		return err
 	}
 	out, err := execx.CombinedOutput(execx.Slow, "sysupgrade", "-r", path)
 	if err != nil {
 		// Guard stays: the restore may have left /etc/config half-written.
-		return fmt.Errorf("restoring backup (guard %s kept): %w: %s", restoreGuardName, err, string(out))
+		return fmt.Errorf("restoring backup (guard %s kept): %w: %s", s.crashGuard(restoreGuard).Path(), err, string(out))
 	}
-	s.clearGuard(restoreGuardName)
+	_ = s.crashGuard(restoreGuard).Clear()
 	return nil
 }
 

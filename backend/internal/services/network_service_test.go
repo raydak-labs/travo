@@ -2061,7 +2061,7 @@ func TestFetchDHCPClients_ConnectedSinceTreatsExpiresAsRemainingDuration(t *test
 func TestNewPortForwardID_UniqueWithinTheSameMillisecond(t *testing.T) {
 	var rules []models.PortForwardRule
 	seen := make(map[string]bool, 64)
-	for i := 0; i < 64; i++ {
+	for range 64 {
 		id := newPortForwardID(rules)
 		if id == "" {
 			t.Fatal("empty ID")

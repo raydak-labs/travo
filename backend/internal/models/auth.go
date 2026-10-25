@@ -5,12 +5,10 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// LoginResponse is returned after successful authentication.
-// ExpiresIn is relative (seconds) so clients never compare server wall-clock
-// timestamps against their own clock; ExpiresAt is kept for compatibility.
+// LoginResponse is returned after successful authentication. ExpiresIn is
+// relative (seconds) so clients never compare server and client wall clocks.
 type LoginResponse struct {
 	Token     string `json:"token"`
-	ExpiresAt string `json:"expires_at"`
 	ExpiresIn int64  `json:"expires_in"`
 }
 

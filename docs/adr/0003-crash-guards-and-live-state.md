@@ -3,7 +3,7 @@ title: "ADR 0003: Crash guards and automated live-state changes"
 description: The crash-guard contract for automated live-state changes: what is guarded in /etc/trafo, where ordinary state lives, and how a guard is cleared.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-04
+updated: 2026-10-25
 tags: [adr, safety, travo, guards, operations]
 ---
 
@@ -15,120 +15,105 @@ Accepted.
 
 ## Context
 
-The router runs Travo as a **long-lived process**. Automated jobs (failover apply, background WiFi recovery, band switching, firmware flash, …) can **commit UCI**, **restart services**, or **change routes** while the process could crash mid-flight. Without a durable marker, the next boot might repeat a half-finished operation or leave the system in an ambiguous state.
+The router runs Travo as a **long-lived process**. Automated jobs (failover apply, background
+WiFi recovery, band switching, firmware flash, …) commit UCI, restart services or change routes,
+and the process can die mid-flight. Without a durable marker the next run may repeat a
+half-finished operation or leave the device in an ambiguous state.
 
-This ADR is distinct from **transaction snapshots** (e.g. VPN DNS JSON, captive DNS JSON) which store *configuration deltas* for restore. Crash guards answer: **“Should this feature refuse to start because a previous run died?”**
+Crash guards are distinct from **snapshots** (the dnsmasq layer record, the failover mwan3
+backup), which store configuration to restore. A guard answers one question: *should this
+feature refuse to run because a previous run died?*
 
 ## Decision
 
-### 1. Guard file contract
+### 1. Guard contract
 
-Any automated action that **materially changes live system state** and is **unsafe to blindly retry** after a crash must:
+Any automated action that **materially changes live system state** and is **unsafe to blindly
+retry** after a crash:
 
-1. **Write** a guard file under **`/etc/trafo/<feature>-in-progress`** (or a clearly named variant) **before** the dangerous segment.
-2. On **startup** (or on the next run of the guarded operation), if the guard exists, **skip** repeating the operation until an operator clears it.
-3. **Remove** the guard file **only after** the operation completes successfully end-to-end.
-4. Treat **`deploy-local.sh`** / manual redeploy as the **explicit recovery** path that may clear stuck guards — see the authoritative list in §2.
+1. **Writes** `/etc/trafo/<feature>-in-progress` **before** the dangerous segment.
+2. On startup, or on the next run of the guarded operation, **skips** the operation while the
+   guard exists. Package installs refuse outright (`guard.Guard.Create`).
+3. **Removes** the guard **only after** the operation completed end-to-end.
+4. Treats `scripts/deploy-local.sh` and `scripts/install.sh` as the **explicit recovery** path:
+   both clear the guards listed in §2.
 
-Notes on step 2, as implemented:
+All Go code goes through `backend/internal/guard`. `guard.In(dir, feature)` names a guard,
+`Write`/`Mark` create it atomically (temp file + rename, `0600`), `Present`/`Read` inspect it and
+`Clear` removes it. The directory is `guard.DefaultDir` (`/etc/trafo`); mock mode and tests
+redirect it with `guard.SetDir`, so no test can touch the real directory. There is no silent
+fallback: a guard that cannot be written fails the operation it was meant to protect.
 
-- Failover and band switching both log the skip once at startup
-  (`failover: crash guard found at … — automatic switching is disabled`,
-  `band-switching: crash guard found at … — skipping auto switch`). `SystemService.LogStaleCrashGuards`
-  warns for the four system guards, and the generated wireless toggle helper logs through
-  `logger -t travo-wifi-toggle`. Failover used to skip silently, which made "failover never fires"
-  undiagnosable; it now logs. **Do not assume a visible log line exists** — a guard written after
-  startup is still silent — so check the filesystem.
-- Where the guard directory is not writable (dev host, unit tests, broken install),
-  the guard is **not skipped**: it is written to a temp fallback directory and an
-  `ERROR:` line is logged saying that a device-side power loss is *not* protected
-  (`WifiService.resolveGuardDir`, `SystemService.guardDirOrDefault`).
+Failover and band switching log a stuck guard once at startup, and
+`SystemService.LogStaleCrashGuards` warns for the system guards. A guard written after startup is
+still silent, so check the filesystem first when a feature "never runs".
 
 ### 2. Authoritative guard list
 
-This table is the source of truth for which files exist on the device and what each one protects.
-`scripts/deploy-local.sh` clears the guards listed here, so adding a row here means adding it to that
-script; leaving a guard out of the script means the documented recovery path does not exist for that
-feature (a stuck guard permanently disables it).
+This table is the source of truth for the guard files on the device. Both recovery scripts clear
+the guards listed here; adding a row means adding it to them, or the documented recovery path
+does not exist for that feature.
 
-| Guard path | Owning file | What it protects |
-| ---------- | ----------- | ---------------- |
-| `/etc/trafo/failover-in-progress` | `services/failover_service.go` (`:24`) | mwan3 policy generation + apply, the staged `StartApply` → verify → `Confirm` window, and the whole `SetConfig` sequence |
-| `/etc/trafo/band-switch-in-progress` | `services/band_switching_service.go` (`:21`) | automated dual-band down/up switching of the client between radios |
-| `/etc/trafo/captive-dns-in-progress` | `services/captive_service.go` (`:23`) | the dnsmasq/AdGuard DNS bypass; doubles as the serialized pre-bypass backup **and** the “bypass active” marker (see ADR 0001) |
-| `/etc/trafo/captive-wwan-bounce-in-progress` | `services/captive_wwan_bounce.go` (`:14`) | the `ifdown wwan` / `ifup wwan` DHCP-lease bounce; removed only after a fresh lease came back |
-| `/etc/trafo/vpn-in-progress` | `services/vpn_service.go` (`:99`) | WireGuard enable: tunnel commit, verify, `wg0` firewall zone + `lan→wg0` forwarding, dnsmasq VPN-resolver forwarding, and their rollback |
-| `/etc/trafo/usbtether-in-progress` | `services/usb_tethering_service.go` (`:25`) | the `network.usbtether` interface, its addition to the **`wan`** firewall zone, and the `ifup`/`ifdown` |
-| `/etc/trafo/wifi-toggle-in-progress` | the generated helper `services/wifi_toggle_script.go` (`:34`, written to `/usr/libexec/travo-wireless-toggle.sh`) | flipping `wireless.*.disabled` + rpcd `apply`/`confirm` for the WiFi schedule and the button toggle |
-| `/etc/trafo/mac-in-progress` | `services/wifi_mac.go` (`macGuardFeature` `:49`), written through `services/wifi_service.go` (`guardPath` `:670`) | the custom STA MAC sequence: UCI `macaddr` write, staged apply, live `ip link` down/address/up |
-| `/etc/trafo/restore-in-progress` | `services/system_service.go` (`:96`) | restoring a backup tarball over `/` |
-| `/etc/trafo/firmware-upgrade-in-progress` | `services/system_service.go` (`:97`) | `sysupgrade` — **deliberately not removed**; the marker must survive the reboot so an interrupted flash is discoverable |
-| `/etc/trafo/factory-reset-in-progress` | `services/system_service.go` (`:98`) | `firstboot -y && reboot`; also not removed, because the device reboots before anyone could clear it |
-| `/etc/trafo/system-config-in-progress` | `services/system_service.go` (`:99`) | committing `/etc/config/system` (timezone, hostname, NTP servers); protects the **commit**, not an apply — these settings deliberately need a reboot to take effect |
-| `/etc/trafo/pkg-install-in-progress` | `services/service_manager.go` (`:243`) | package install/remove, which rewrites init scripts, `/etc/config` and kernel modules |
-| `/etc/trafo/autoreconnect-crash-guard` | generated auto-reconnect script, `services/wifi_reconnect.go` (`:64`) | the `wifi up` attempt in the bounded auto-reconnect path; survives a driver crash, so every later cron tick is a no-op |
-| `/etc/trafo/autoreconnect-failcount` | same script (`wifi_reconnect.go` `:65`) | **not a guard**: the `MAX_FAIL=5` retry counter for a broken saved network. A successful reconnect clears it. Deliberately **not** cleared by a redeploy. |
+| Guard path | Owner | What it protects |
+| ---------- | ----- | ---------------- |
+| `/etc/trafo/failover-in-progress` | `FailoverService.SetConfig` | mwan3 generation + apply, the staged apply → verify → confirm window |
+| `/etc/trafo/band-switch-in-progress` | `BandSwitchingService.doSwitch` | automated move of the client between radios |
+| `/etc/trafo/captive-dns-in-progress` | `CaptiveService.BypassDNS` | the DNS bypass; doubles as the pre-bypass backup and the "bypass active" marker (ADR 0001) |
+| `/etc/trafo/captive-wwan-bounce-in-progress` | `CaptiveService.bounceActiveWwanDHCP` | the `ifdown`/`ifup wwan` lease bounce |
+| `/etc/trafo/vpn-in-progress` | `VpnService.ToggleWireguard` | WireGuard enable/disable: tunnel, `wg0` zone, DNS layer, rollback |
+| `/etc/trafo/usbtether-in-progress` | `USBTetheringService` | the `usbtether` interface, its `wan` zone membership, `ifup`/`ifdown` |
+| `/etc/trafo/wifi-toggle-in-progress` | generated helper `wirelessToggleScript` | flipping `wireless.*.disabled` + rpcd apply/confirm for schedule and button |
+| `/etc/trafo/mac-in-progress` | `WifiService.SetMACAddress` | UCI `macaddr`, staged apply, live `ip link` down/address/up |
+| `/etc/trafo/restore-in-progress` | `SystemService.RestoreBackup` | restoring a backup tarball over `/` |
+| `/etc/trafo/firmware-upgrade-in-progress` | `SystemService` firmware upgrade | `sysupgrade`; **never removed**, so an interrupted flash stays discoverable |
+| `/etc/trafo/factory-reset-in-progress` | `SystemService.FactoryReset` | `firstboot -y && reboot`; never removed, the device reboots first |
+| `/etc/trafo/system-config-in-progress` | `SystemService` system config commit | committing `/etc/config/system`; the commit, not an apply |
+| `/etc/trafo/pkg-install-in-progress` | `ServiceManager` install/remove | package operations that rewrite init scripts, `/etc/config` and modules |
+| `/etc/trafo/autoreconnect-crash-guard` | generated script `reconnectScriptContent` | the bounded `wifi up` in auto-reconnect |
+| `/etc/trafo/autoreconnect-failcount` | same script | **not a guard**: the `MAX_FAIL=5` retry counter; never cleared by a redeploy |
 
-**One directory (resolved 2026-09-28).** Guards used to be split across `/etc/trafo/` and
-`/etc/travo/` — and even a single feature straddled both (`captive-dns-in-progress` in one,
-`captive-wwan-bounce-in-progress` in the other). A guard written to one directory was invisible
-to a check that only looked at the other, and `deploy-local.sh` could not clear all of them, so
-a stale guard permanently disabled a feature with no log line. **Every crash guard is now
-written to `/etc/trafo/`**; `internal/services/guards_test.go` scans the service
-sources and fails if a `-in-progress` / `-crash-guard` / `-failcount` path reappears under
-`/etc/travo/`. Non-guard state (aliases, WiFi priorities, repeater options, the bbolt store)
-stays in `/etc/travo/` — moving it would lose user data on upgrade. `deploy-local.sh` clears
-both directories so a device upgraded from an older build still recovers.
-
-Other `/etc/trafo/*.json` files store **config** or **snapshots** (VPN DNS, failover backup, port forwards,
-MAC policies, split tunnel, …) without necessarily being crash guards — distinguish by whether startup
-logic consults them as **“abort if present”** signals.
+Non-guard state (aliases, WiFi priorities, repeater options, the bbolt store) lives in
+`/etc/travo/`. `internal/services/guards_test.go` fails if a guard-shaped path is declared there.
 
 ### 3. Related patterns
 
-- **Wireless** safety is primarily **LuCI-style rollback** (ADR 0002), not the same as a crash guard, but overlaps philosophically.
-- **Autoreconnect** shell logic uses a crash guard **and** a fail-count file (§2, last two rows) — bounded recovery, documented in code comments.
-- **Startup AP repair** (`cmd/server/startup.go` → `WifiService.EnsureAPRunning`) commits `wireless` fixes with **no guard**, deliberately: there is no browser in the loop to confirm an rpcd rollback, so the repair is committed and the operator applies via LuCI “Save & Apply” or a reboot. The reasoning lives in the code comment at the call site, not here.
-- **Direct `uci commit` + reload** paths that bypass rpcd `apply`/`confirm` still need a guard: the WireGuard `wg0` zone and the USB-tether `wan` zone membership are committed and reloaded directly (see ADR 0004 §5).
+- **Wireless** safety is primarily LuCI-style rollback (ADR 0002), not a crash guard.
+- **Startup AP repair** (`WifiService.EnsureAPRunning`) commits with **no guard**, deliberately:
+  no browser can confirm an rpcd rollback at boot, so the repair is committed and applied by the
+  operator via LuCI or a reboot.
+- **Direct `uci commit` + reload** paths that bypass rpcd still need a guard: the `wg0` zone and
+  the USB-tether `wan` membership (ADR 0004 §5).
 
 ### 3.1 Bounded recovery: `network reload` after a refused apply
 
-The rule everywhere else is that **applying a user's wireless changes must not run `wifi`,
-`wifi up` or `wifi reload`** — they are the classic ath11k/IPQ6018 driver-crash trigger and
-an automated one has no rollback. **Recovery is the single, explicitly bounded exception, and
-it is stated in one place so it cannot be generalised:**
+Applying a user's wireless change must not run `wifi`, `wifi up` or `wifi reload`; they are the
+ath11k/IPQ6018 driver-crash trigger. Recovery is the single bounded exception: when
+`WifiService.ConfirmApply`'s probe refuses an apply (ADR 0002 §5), `UCIApplyConfirm.Rollback`
+restores the pre-mutation file snapshot, cancels rpcd's rollback window, and issues
+`ubus call uci reload_config` and `ubus call network reload`. That is a netifd configuration
+reload, not a driver reload. Both signatures were verified on the device with
+`ubus -v list uci` and `ubus -v list network`.
 
-- **What it is.** When `WifiService.ConfirmApply`'s probe refuses the apply (ADR 0002 §5),
-  `UCIApplyConfirm.Rollback` restores the file-level snapshot taken before the mutation
-  committed, cancels rpcd's rollback window, and then issues **`ubus call uci reload_config`**
-  (rpcd re-reads `/etc/config`) followed by **`ubus call network reload`** (netifd re-reads
-  `/etc/config/network` **and** `/etc/config/wireless`).
-- **What it is not.** `network reload` is a netifd configuration reload, **not** a driver
-  reload: it never calls `wifi`, `wifi up` or `wifi reload`. Those three remain forbidden on
-  this path, and on every other one.
-- **Why here and only here.** There is no browser left to confirm and no operator watching:
-  the config on disk is one that Travo itself has just proved cannot work. Leaving the device
-  running it would strand the operator off their router, which is the exact outcome a crash
-  guard exists to prevent — so this is recovery, and recovery is guarded by making the
-  previous config real again rather than by doing nothing.
-- Both ubus objects and their zero-argument signatures were verified on the device with
-  `ubus -v list uci` (`reload_config`) and `ubus -v list network` (`reload`).
+## Why
 
-## Consequences
+- A marker on disk survives the crash it describes; in-memory state does not.
+- One package means one directory, one write path and one place to redirect in tests. Guards
+  were once split across `/etc/trafo` and `/etc/travo`, and a guard in one was invisible to a
+  check in the other, so a stale guard disabled a feature with no log line.
+- Refusing rather than retrying keeps a human in the loop for exactly the cases automation
+  already got wrong once.
 
-- New **goroutines**, **cron hooks**, or **init**-triggered Travo paths that mutate connectivity must either use this guard pattern or be proven safe to retry idempotently without user intervention.
-- Documentation and on-call playbooks should list **known guard paths** (§2) when debugging “feature won’t run” reports. “Feature won’t run, no log line” should make `ls /etc/trafo` the first check (plus `/etc/travo` on a device upgraded from a build that predates the unification).
+## Consequences and invariants
 
-## References
+- New goroutines, cron hooks or init paths that mutate connectivity use a guard, or are proven
+  safe to retry idempotently.
+- "Feature won't run, no log line" makes `ls /etc/trafo` the first check.
+- A guard that cannot be written aborts the change; it never degrades to "unguarded".
 
-- `docs/architecture/overview.md` §4, §6.2
-- `backend/internal/services/system_service.go` — the four system guards, `LogStaleCrashGuards`
-- `backend/internal/services/wifi_toggle_script.go` — the generated toggle helper and its guard
-- `backend/internal/services/wifi_reconnect.go` — auto-reconnect guard + fail count
-- `backend/internal/services/wifi_service.go`, `service_manager.go` — guard paths (now `/etc/trafo/`)
-- `backend/internal/services/uci_apply.go` — `Snapshot`/`Rollback`, the bounded-recovery `network reload` (§3.1)
-- [ADR 0002](./0002-wireless-model-and-luci-apply.md) — apply/confirm and the file-level rollback (§5, §5.0)
-- `backend/internal/services/failover_service.go`, `band_switching_service.go`,
-  `captive_service.go`, `captive_autoaccept.go`, `vpn_service.go`,
-  `usb_tethering_service.go` — guard paths
-- `scripts/deploy-local.sh` — the redeploy recovery path
+## Deliberate ceilings
+
+- Guards are per feature, not per operation instance: two different operations of one feature
+  share a marker.
+- Nothing clears a guard automatically; recovery is a redeploy, a reinstall or `rm`.
+- Shell helpers spell the directory out (they cannot import Go); `TestShellHelpersUseTheGuardDir`
+  pins it.

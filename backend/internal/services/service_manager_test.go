@@ -558,7 +558,7 @@ func TestInstall_ConcurrentReadsDoNotRaceWithCachePublish(t *testing.T) {
 
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -580,7 +580,7 @@ func TestInstall_ConcurrentReadsDoNotRaceWithCachePublish(t *testing.T) {
 		}()
 	}
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		if err := sm.Install("wireguard"); err != nil {
 			t.Errorf("install %d: %v", i, err)
 			break
@@ -678,7 +678,7 @@ func TestInstallRefusesWhileAnInstallGuardExists(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected the retry to be refused while the guard exists")
 	}
-	if !strings.Contains(err.Error(), "interrupted install/remove") {
+	if !strings.Contains(err.Error(), "interrupted run (install tailscale)") {
 		t.Errorf("expected the refusal to name the interrupted operation, got %v", err)
 	}
 	if pkg.IsInstalled("tailscale") {

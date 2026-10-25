@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -92,7 +92,7 @@ func sectionFingerprint(opts map[string]string) string {
 	slices.Sort(keys)
 	digest := sha256.New()
 	for _, key := range keys {
-		fmt.Fprintf(digest, "%s=%s\n", key, normaliseOptionValue(opts[key]))
+		_, _ = fmt.Fprintf(digest, "%s=%s\n", key, normaliseOptionValue(opts[key]))
 	}
 	return hex.EncodeToString(digest.Sum(nil))[:16]
 }
@@ -173,8 +173,15 @@ func (s *FailoverService) backupManagedSections() error {
 	return writeFileAtomic(s.backupPath, data)
 }
 
-// RestoreManagedSections is the rollback path: it must put the operator's
-// pre-save config back, not a lossy version of it.
+// restoreManagedSections is the rollback path: it puts the backed-up
+// mwan3/network sections back, unchanged, and re-applies them, so the running
+// mwan3 does not keep a broken partial policy while the user is told the save
+// failed.
+//
+// The re-apply deliberately BYPASSES the pending-rollback-window check that
+// stagedApplyMwan3 enforces: it runs precisely while a session is pending, and
+// short-circuiting on errApplyRollingBack would leave the crash guard behind
+// after every failed save.
 func (s *FailoverService) restoreManagedSections() error {
 	data, err := os.ReadFile(s.backupPath)
 	if err != nil {
@@ -208,10 +215,7 @@ func (s *FailoverService) restoreManagedSections() error {
 				continue
 			}
 			if strings.Contains(value, ",") && !mwan3ScalarMayContainComma[option] {
-				log.Printf("WARNING: restoring mwan3.%s.%s as a scalar, but it holds a "+
-					"joined value %q — if it is a list option, add it to "+
-					"mwan3ListOptions or it will be restored as one invalid element",
-					name, option, value)
+				slog.Warn("failover: restoring a joined value as a scalar; add the option to mwan3ListOptions if it is a list", "section", name, "option", option, "value", value)
 			}
 			if err := s.uci.Set(mwan3ConfigName, name, option, value); err != nil {
 				return err
@@ -336,8 +340,7 @@ func (s *FailoverService) applyManagedConfig(cfg failoverConfigFile) error {
 func (s *FailoverService) adoptSection(section, stype string) error {
 	opts, err := s.uci.GetAll(mwan3ConfigName, section)
 	if err == nil && needsBackupSection(section) && !ownedByTravo(opts) {
-		log.Printf("failover: mwan3 section %s was edited outside Travo; this save "+
-			"replaces the options it owns with the saved failover settings", section)
+		slog.Warn("failover: mwan3 section edited outside Travo; this save replaces the options Travo owns", "section", section)
 		if s.alertSvc != nil {
 			s.alertSvc.Publish(operatorEditsOverwrittenAlert, fmt.Sprintf(
 				"Failover adopted mwan3 section %s: options Travo owns were replaced by the saved "+
@@ -446,7 +449,7 @@ func (s *FailoverService) stagedApplyMwan3(verify func() error) error {
 		// caller deleted the guard and answered 200 while rpcd's timer was about
 		// to restore the config from *before* the earlier save — silently
 		// discarding both the failed config and this acknowledged one.
-		log.Printf("failover: an mwan3 apply is already rolling back (session %s); skipping this apply", s.pendingApplySession)
+		slog.Info("failover: an mwan3 apply is already rolling back; skipping this apply", "session", s.pendingApplySession)
 		return errApplyRollingBack
 	}
 	// The window expired and rpcd rolled the session back; nothing confirms

@@ -19,8 +19,7 @@ Pick by question, not by habit:
 
 ## Documentation
 
-Structure, enforced in parts by tests in `backend/internal/services/*_docs_test.go` and
-`*_index_test.go`.
+Structure, enforced in parts by the tests in `backend/internal/docsgate/`.
 
 ### Where a fact goes
 
@@ -77,7 +76,7 @@ wrong within a month.
 
 In the same change: update the owning ADR or guide, update
 `docs/requirements/tasks_open.md` / `tasks_done.md`, and run
-`cd backend && go test ./internal/services/` — the docs gates fail on unlinked
+`cd backend && go test ./internal/docsgate/` — the docs gates fail on unlinked
 playbooks, ADR index drift, crash-guard paths outside `/etc/trafo/`, persistent-store
 paths outside `/etc/travo/`, and a plans catalog that omits a plan.
 
@@ -110,7 +109,7 @@ The rules above are the source of truth. Operationally:
 - `docs/architecture/overview.md` stays a short overview that links deeper — never a second copy of an ADR.
 - New normative cross-cutting decision → new numbered ADR + index entry + hub wikilink, in the same commit.
 - Shipped plan → fold into an ADR, move to `tasks_done.md`, delete the plan.
-- Before finishing: `cd backend && go test ./internal/services/` and a link check for anything you moved.
+- Before finishing: `cd backend && go test ./internal/docsgate/` and a link check for anything you moved.
 
 ## Documentation retrieval (Obsidian CLI)
 

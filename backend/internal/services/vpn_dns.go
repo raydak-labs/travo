@@ -1,7 +1,7 @@
 package services
 
 import (
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -9,9 +9,8 @@ import (
 // dnsmasqLayers returns this service's view of the shared stack.
 func (v *VpnService) dnsmasqLayers() *dnsmasqLayerStackFile {
 	return &dnsmasqLayerStackFile{
-		dns:        commandRunnerDNS{cmd: v.cmd},
-		path:       v.dnsStackPath,
-		legacyPath: v.legacyDnsSnapshotPath,
+		dns:  commandRunnerDNS{cmd: v.cmd},
+		path: v.dnsStackPath,
 	}
 }
 
@@ -62,7 +61,7 @@ func (v *VpnService) enableVpnDNSForwarding() error {
 // last one. It is best-effort and reports nothing.
 func (v *VpnService) disableVpnDNSForwarding() {
 	if _, err := v.dnsmasqLayers().RemoveLayer(dnsLayerVPN, false); err != nil {
-		log.Printf("vpn: restoring dnsmasq from the layer stack: %v", err)
+		slog.Error("vpn: restoring dnsmasq from the layer stack", "err", err)
 	}
 }
 
@@ -89,12 +88,10 @@ func (v *VpnService) observeTunnelDown(tunnelDetail string) bool {
 // maybeSelfHealVpnDNS pops the VPN layer when the tunnel that justified it can
 // no longer carry DNS: wg0 is absent for good, or the tunnel is disabled in UCI.
 //
-// It heals only on TERMINAL states. `configured` (no peers yet) and
-// `up_no_handshake` (peers, tunnel up, no handshake yet) both mean the tunnel
-// is on its way up, and burning the restore on them is what a reboot into an
-// unreachable upstream used to do. `enabled_not_up` is the one ambiguous state
-// — it is also what a single failed `wg show` looks like — so it is debounced
-// (see observeTunnelDown) instead of trusted.
+// It heals only on TERMINAL states. `configured` and `up_no_handshake` mean the
+// tunnel is on its way up (a reboot into a slow upstream). `enabled_not_up` is
+// ambiguous, since a single failed `wg show` looks the same, so it is debounced
+// (observeTunnelDown) instead of trusted.
 //
 // tunnelDetail is the already-computed wgRuntimeState detail, so this costs no
 // extra shell-out. Returns true when a restore happened.
@@ -118,8 +115,7 @@ func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
 		// No layer stacked: dnsmasq was never pointed at the tunnel.
 		return false
 	}
-	log.Printf("vpn: tunnel state %q with the VPN resolver layer stacked;"+
-		" restoring the dnsmasq layer below it", tunnelDetail)
+	slog.Info("vpn: tunnel down with the VPN resolver layer stacked; restoring the layer below", "state", tunnelDetail)
 	// The stack shells out to `uci` for dhcp, so it needs the same lock every
 	// other dhcp writer holds (ADR 0010).
 	if err := withConfigLocks([]string{"dhcp"}, func() error {
@@ -128,7 +124,7 @@ func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
 		_, err := layers.RemoveLayer(dnsLayerVPN, true)
 		return err
 	}); err != nil {
-		log.Printf("vpn: healing dnsmasq after tunnel state %q: %v", tunnelDetail, err)
+		slog.Error("vpn: healing dnsmasq", "state", tunnelDetail, "err", err)
 		return false
 	}
 	return true

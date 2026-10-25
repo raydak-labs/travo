@@ -32,7 +32,7 @@ import (
 const (
 	// dnsmasqLayerStackPath holds the base dnsmasq resolver state plus the
 	// layers currently stacked, bottom first. It is a state file, not a crash
-	// guard, so it keeps its own literal rather than deriving from crashGuardDir.
+	// guard, so it keeps its own literal rather than deriving from guard.DefaultDir.
 	dnsmasqLayerStackPath = "/etc/trafo/dnsmasq-layers.json"
 
 	// dnsmasqLayerStackFileName is the record's file name on its own, so a
@@ -49,14 +49,6 @@ const (
 	// lands on top of a state it never observed.
 	dnsLayerCaptive = "captive"
 )
-
-// legacyDnsmasqSnapshotPaths are the per-feature snapshots releases before the
-// shared stack wrote. They hold a restore target for the SAME two UCI options
-// the record now owns, so a record that has absorbed one must delete all of
-// them (ADR 0001 §3.2) — leaving the other behind gives the device a second,
-// stale restore target that no code path consults but every reader has to
-// reason about.
-var legacyDnsmasqSnapshotPaths = []string{legacyVpnDnsSnapshotPath, adguardDnsSnapshotPath}
 
 // dnsmasqResolverState is a dnsmasq resolver list plus its noresolv flag. It is
 // the shape the per-feature snapshots wrote, kept so a device that is upgraded
@@ -226,16 +218,10 @@ func (c commandRunnerDNS) removeFile(path string) error {
 	return nil
 }
 
-// dnsmasqLayerStackFile is the shared record together with the per-feature
-// snapshot that predates it.
+// dnsmasqLayerStackFile is the shared record of dnsmasq resolver layers.
 type dnsmasqLayerStackFile struct {
 	dns  dnsmasqDNS
 	path string
-	// legacyPath is the snapshot this feature wrote when it owned dnsmasq's
-	// resolvers alone. It is read once, as the migration source for the base
-	// state, and then removed: two files holding a restore target for the same
-	// two options is how the two features ended up restoring over each other.
-	legacyPath string
 }
 
 // load reads the persisted stack. A missing record is not an error — it is how
@@ -260,49 +246,13 @@ func (f *dnsmasqLayerStackFile) save(st *dnsmasqLayerStack) error {
 	if err != nil {
 		return err
 	}
-	if err := f.dns.writeFile(f.path, data, 0o600); err != nil {
-		return err
-	}
-	// The shared record now owns the base state, so every pre-stack snapshot
-	// goes: each of them is a second, stale restore target for the same two
-	// options. Removing only this feature's own file left the other feature's
-	// snapshot behind for the whole life of the record. The feature's configured
-	// path is included because a test or a future caller can point it somewhere
-	// the shared list does not know about.
-	for _, legacy := range append([]string{f.legacyPath}, legacyDnsmasqSnapshotPaths...) {
-		if legacy == "" {
-			continue
-		}
-		if err := f.dns.removeFile(legacy); err != nil {
-			return err
-		}
-	}
-	return nil
+	return f.dns.writeFile(f.path, data, 0o600)
 }
 
 // removeRecord drops the shared record. Called only once the base state has
 // been applied to dnsmasq.
 func (f *dnsmasqLayerStackFile) removeRecord() error {
 	return f.dns.removeFile(f.path)
-}
-
-// loadLegacy reads the pre-stack snapshot. A missing one is not an error.
-func (f *dnsmasqLayerStackFile) loadLegacy() (*dnsmasqResolverState, error) {
-	if f.legacyPath == "" {
-		return nil, nil
-	}
-	data, err := f.dns.readFile(f.legacyPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	var state dnsmasqResolverState
-	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, fmt.Errorf("parsing the legacy dnsmasq snapshot %s: %w", f.legacyPath, err)
-	}
-	return &state, nil
 }
 
 // liveState reads dnsmasq's current resolver options. A missing option is
@@ -318,32 +268,10 @@ func (f *dnsmasqLayerStackFile) liveState() dnsmasqResolverState {
 	return state
 }
 
-// baseState returns dnsmasq's resolvers as they were before ANY layer was
-// enabled: the legacy snapshot if a pre-stack release left one, else the live
-// state.
-func (f *dnsmasqLayerStackFile) baseState() (dnsmasqResolverState, error) {
-	legacy, err := f.loadLegacy()
-	if err != nil {
-		return dnsmasqResolverState{}, err
-	}
-	if legacy != nil {
-		return *legacy, nil
-	}
-	return f.liveState(), nil
-}
-
-// hasLayer reports whether layer is stacked and dnsmasq is currently pointed at
-// it. A legacy snapshot counts: it is this feature's own record of that.
+// hasLayer reports whether layer is stacked.
 func (f *dnsmasqLayerStackFile) hasLayer(layer string) bool {
 	st, err := f.load()
-	if err != nil {
-		return false
-	}
-	if st == nil {
-		legacy, lerr := f.loadLegacy()
-		return lerr == nil && legacy != nil
-	}
-	return st.indexOf(layer) >= 0
+	return err == nil && st != nil && st.indexOf(layer) >= 0
 }
 
 // apply writes a resolver list and its noresolv flag, then commits and
@@ -408,10 +336,7 @@ func (f *dnsmasqLayerStackFile) EnableLayerAs(layer string, servers []string, no
 		return err
 	}
 	if st == nil {
-		base, bErr := f.baseState()
-		if bErr != nil {
-			return bErr
-		}
+		base := f.liveState()
 		st = &dnsmasqLayerStack{NoResolv: base.NoResolv, Servers: base.Servers}
 	} else if len(st.Layers) == 0 {
 		// A record with no layer left is not holding anything: the read-path
@@ -456,7 +381,7 @@ func (f *dnsmasqLayerStackFile) RemoveLayer(layer string, keepRecord bool) (bool
 		return false, err
 	}
 	if st == nil {
-		return f.removeLegacyLayer(keepRecord)
+		return false, nil
 	}
 	if i := st.indexOf(layer); i >= 0 {
 		st.Layers = slices.Delete(st.Layers, i, i+1)
@@ -471,27 +396,6 @@ func (f *dnsmasqLayerStackFile) RemoveLayer(layer string, keepRecord bool) (bool
 	}
 	if len(st.Layers) > 0 || keepRecord {
 		return true, f.save(st)
-	}
-	return true, f.removeRecord()
-}
-
-// removeLegacyLayer handles a device whose only record predates the stack. Such
-// a snapshot belongs to exactly one feature, so it needs no layer name.
-func (f *dnsmasqLayerStackFile) removeLegacyLayer(keepRecord bool) (bool, error) {
-	legacy, err := f.loadLegacy()
-	if err != nil || legacy == nil {
-		return false, err
-	}
-	if err := f.apply(*legacy); err != nil {
-		return false, err
-	}
-	if keepRecord {
-		// The heal path leaves the snapshot alone: it is still the only record
-		// of the pre-layer state.
-		return true, nil
-	}
-	if err := f.dns.removeFile(f.legacyPath); err != nil {
-		return true, err
 	}
 	return true, f.removeRecord()
 }

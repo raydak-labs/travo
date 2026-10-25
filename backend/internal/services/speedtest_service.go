@@ -165,6 +165,6 @@ func parseSpeedtestOutput(output string) (models.SpeedTestResult, error) {
 
 func parseFloat(s string) float64 {
 	var f float64
-	fmt.Sscanf(s, "%f", &f)
+	_, _ = fmt.Sscanf(s, "%f", &f)
 	return f
 }

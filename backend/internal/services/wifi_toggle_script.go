@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,7 +55,7 @@ RPCD_UCI_DIR=/etc/config
 RPCD_LOGIN_ARG_FILE=` + rpcdLoginHelperPath + `
 SESSION=""
 APPLY_STARTED=0
-GUARD=` + crashGuardDir + `/wifi-toggle-in-progress
+GUARD=` + guard.DefaultDir + `/wifi-toggle-in-progress
 # Pre-change copy of /etc/config/wireless, beside the guard. "uci revert" only
 # drops the uncommitted delta in /tmp/.uci, so after "uci commit wireless" it
 # cannot undo anything: without this file the fail() path would leave the

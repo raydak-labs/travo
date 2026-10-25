@@ -220,23 +220,15 @@ restart_service() {
       # firstboot stays discoverable after the reboot. A redeploy restarts the
       # service but must not erase the record of a device mid-recovery.
       #
-      # One ssh call, not one per guard per directory: 12 guards x 2 directories
-      # is 24 round-trips, and a device that accepts TCP but then hangs costs
-      # ConnectTimeout seconds on each of them before the restart even starts.
-      # The paths are expanded here rather than with a remote brace expansion,
-      # which BusyBox ash does not support.
-      #
-      # /etc/travo is the legacy location: guards were split across both
-      # directories before they were unified on /etc/trafo, so a device
-      # upgraded from an older build can still carry a guard there. Clear both.
+      # One ssh call, not one per guard: a device that accepts TCP but then
+      # hangs costs ConnectTimeout seconds per round-trip. The paths are
+      # expanded here because BusyBox ash has no brace expansion.
       local guard_paths=()
       for guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
         captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
         wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
         system-config-in-progress autoreconnect-crash-guard; do
-        for dir in /etc/trafo /etc/travo; do
-          guard_paths+=("${dir}/${guard}")
-        done
+        guard_paths+=("/etc/trafo/${guard}")
       done
       ssh_cmd "rm -f ${guard_paths[*]}" >/dev/null 2>&1 || true
       return 0

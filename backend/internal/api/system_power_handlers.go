@@ -37,7 +37,7 @@ func BackupHandler(svc *services.SystemService) fiber.Handler {
 		if err != nil {
 			return RespondWithServerError(c, err)
 		}
-		defer os.Remove(path)
+		defer func() { _ = os.Remove(path) }()
 		c.Set("Content-Disposition", "attachment; filename=openwrt-backup.tar.gz")
 		return c.SendFile(path)
 	}
@@ -78,7 +78,7 @@ func RestoreHandler(svc *services.SystemService) fiber.Handler {
 			_ = os.Remove(tmpPath)
 			return RespondWithServerError(c, fmt.Errorf("creating temp file: %w", err))
 		}
-		defer os.Remove(tmpPath)
+		defer func() { _ = os.Remove(tmpPath) }()
 		if err := c.SaveFile(file, tmpPath); err != nil {
 			return RespondWithServerError(c, fmt.Errorf("saving uploaded file: %w", err))
 		}

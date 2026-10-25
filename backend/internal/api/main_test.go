@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 )
 
 // Every test case in this package builds a fresh AuthService and then logs in,
@@ -18,10 +19,17 @@ import (
 // the suite deterministic in time.
 //
 // The cost is set here, before any test runs, because SetBcryptCostForTesting
-// writes an unsynchronised package variable.
+// writes an unsynchronised package variable. Crash guards go to a temp dir so
+// no handler test can touch /etc/trafo.
 func TestMain(m *testing.M) {
 	restore := auth.SetBcryptCostForTesting(bcrypt.MinCost)
+	dir, err := os.MkdirTemp("", "travo-guards-*")
+	if err != nil {
+		panic(err)
+	}
+	guard.SetDir(dir)
 	code := m.Run()
 	restore()
+	_ = os.RemoveAll(dir)
 	os.Exit(code)
 }

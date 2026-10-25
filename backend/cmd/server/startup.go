@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/services"
@@ -25,13 +25,13 @@ func startWifiReconciliation(lifecycle *appLifecycle, wifiSvc *services.WifiServ
 		}
 		fixed, needApply, err := wifiSvc.EnsureAPRunning()
 		if err != nil {
-			log.Printf("WARNING: WiFi AP health check failed: %v", err)
+			slog.Warn("wifi: AP health check failed", "err", err)
 			return
 		}
 		if fixed && needApply {
-			log.Printf("WiFi AP health: UCI fixes committed. Runtime apply skipped on startup to preserve LuCI-style rollback safety; use LuCI Save & Apply or reboot.")
+			slog.Info("wifi: AP health fixes committed; runtime apply skipped at startup, use LuCI Save & Apply or reboot")
 		} else if fixed {
-			log.Printf("WiFi AP health: UCI fixes committed (SSID/key only, no apply needed).")
+			slog.Info("wifi: AP health fixes committed (SSID/key only, no apply needed)")
 		}
 	})
 	// Ensure auto-reconnect script is present and up-to-date when enabled.
@@ -52,7 +52,7 @@ func startWifiReconciliation(lifecycle *appLifecycle, wifiSvc *services.WifiServ
 		// onto the safe script in both cases.
 		enabled, _ := wifiSvc.GetAutoReconnect()
 		if err := wifiSvc.SetAutoReconnect(enabled); err != nil {
-			log.Printf("WARNING: could not reconcile auto-reconnect script: %v", err)
+			slog.Warn("wifi: could not reconcile the auto-reconnect script", "err", err)
 		}
 	})
 	// Same for the WiFi on/off schedule: an existing /etc/cron.d entry still
@@ -68,7 +68,7 @@ func startWifiReconciliation(lifecycle *appLifecycle, wifiSvc *services.WifiServ
 			return
 		}
 		if err := wifiSvc.SetWiFiSchedule(sched); err != nil {
-			log.Printf("WARNING: could not reconcile WiFi schedule cron entry: %v", err)
+			slog.Warn("wifi: could not reconcile the schedule cron entry", "err", err)
 		}
 	})
 	// Auto-discover radio hardware and persist config on first boot.
@@ -77,9 +77,9 @@ func startWifiReconciliation(lifecycle *appLifecycle, wifiSvc *services.WifiServ
 			return
 		}
 		if discovered, err := wifiSvc.DiscoverAndPersistRadios(); err != nil {
-			log.Printf("WARNING: radio discovery failed: %v", err)
+			slog.Warn("radio discovery failed", "err", err)
 		} else if discovered {
-			log.Printf("Radio auto-discovery completed on first boot.")
+			slog.Info("radio discovery completed on first boot")
 		}
 	})
 }

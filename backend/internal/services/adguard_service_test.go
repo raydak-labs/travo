@@ -782,7 +782,6 @@ func newSharedDNSHarness(t *testing.T) *sharedDNSHarness {
 	_ = u.Set("network", "wg0", "disabled", "0")
 	vpn := NewVpnServiceWithRunner(u, cmd)
 	vpn.dnsStackPath = stackPath
-	vpn.legacyDnsSnapshotPath = filepath.Join(dir, "vpn-dns-snapshot.json")
 
 	return &sharedDNSHarness{
 		t:         t,
@@ -915,29 +914,6 @@ func TestSetDNS_DisableWithoutSnapshotKeepsServerList(t *testing.T) {
 	}
 	if !slices.Contains(mock.recordedCalls(), "uci set dhcp.@dnsmasq[0].noresolv=0") {
 		t.Error("disable without a record must still clear noresolv")
-	}
-}
-
-// A device upgraded while AdGuard forwarding was on has only the pre-stack
-// snapshot. The enable must adopt it as the base and then drop it, so there is
-// one restore target for dnsmasq's resolver options instead of two.
-func TestSetDNS_EnableAdoptsAndRemovesTheLegacySnapshot(t *testing.T) {
-	const splitEntry = "server=/lan.example.com/192.168.9.5"
-	mock := mockAdGuardDNSChecker([]string{"127.0.0.1#5353"})
-	mock.addListRecorder = func(string) {}
-	mock.fileContents[adguardDnsSnapshotPath] = `{"noresolv":"0","servers":["` + splitEntry + `"]}`
-	mock.files[adguardDnsSnapshotPath] = true
-	svc := newStackScopedAdGuard(t, mock)
-
-	if err := svc.SetDNS(true); err != nil {
-		t.Fatalf("SetDNS(true): %v", err)
-	}
-	if _, ok := mock.fileContents[adguardDnsSnapshotPath]; ok {
-		t.Error("the legacy snapshot must be dropped once the stack owns the base")
-	}
-	st := readAdGuardLayerStack(t, svc)
-	if len(st.Servers) != 1 || st.Servers[0] != splitEntry {
-		t.Fatalf("the legacy snapshot must become the stack base, got %v", st.Servers)
 	}
 }
 

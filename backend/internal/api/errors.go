@@ -48,19 +48,11 @@ func RespondOK(c fiber.Ctx) error {
 var ErrUnknownField = errors.New("unknown field")
 
 // BindStrictBodyConfig decodes a configuration request body and REJECTS unknown
-// fields, unlike c.Bind().Body() which silently ignores them.
+// fields, unlike c.Bind().Body() which ignores them.
 //
-// Use it on every endpoint that persists a whole configuration object from the
-// bound struct. With the permissive binder, a body that does not match the shape
-// — a client that mirrors the GET response, a typo, a stale frontend — decodes to
-// the zero value and the handler answers 200 after overwriting the user's
-// settings with zeros. That is not hypothetical: PUT /wifi/band-switching returns
-// {config, status} from GET but binds the bare struct, so a client that reads the
-// documented GET shape and PUTs it back silently wipes every band-switching
-// setting.
-//
-// A 400 saying which field is unknown is strictly better than a silent wipe, and
-// it cannot break a correct client.
+// Use it on every endpoint that persists a whole configuration object: with the
+// permissive binder a mismatched body (a client echoing the GET shape, a typo)
+// decodes to zero values and overwrites the user's settings behind a 200.
 func BindStrictBodyConfig(c fiber.Ctx, dst any) error {
 	return decodeStrictJSON(c.Body(), dst, "")
 }

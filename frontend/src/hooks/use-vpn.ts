@@ -44,7 +44,7 @@ export function useToggleWireguard() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enable: boolean) =>
-      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.wireguard.toggle, { enable }),
+      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.wireguard.toggle, { enabled: enable }),
     onSuccess: (_data, enable) => {
       toast.success(`WireGuard ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -72,7 +72,7 @@ export function useToggleTailscale() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enable: boolean) =>
-      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.tailscale.toggle, { enable }),
+      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.tailscale.toggle, { enabled: enable }),
     onSuccess: (_data, enable) => {
       toast.success(`Tailscale ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });

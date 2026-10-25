@@ -1,15 +1,17 @@
 package services
 
 import (
+	"log/slog"
+
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -20,11 +22,6 @@ import (
 var usbCandidateInterfaces = []string{"usb0", "usb1", "eth1", "eth2"}
 
 const usbTetherUCIName = "usbtether"
-
-// usbTetherGuardPath is the crash guard for USB tether (re)configuration.
-// It must exist while the live network/firewall state is being changed and is
-// removed only after the change completed successfully (ADR 0003).
-const usbTetherGuardPath = crashGuardDir + "/usbtether-in-progress"
 
 // usbTetherConfigs is every UCI config this service mutates.
 var usbTetherConfigs = []string{"firewall", "network"}
@@ -98,38 +95,18 @@ func (r *RealUSBTetherRunner) RunCommand(name string, args ...string) (string, e
 
 // USBTetheringService detects and configures USB-tethered devices.
 type USBTetheringService struct {
-	runner USBTetherRunner
-	// guardFile is the crash-guard path (overridable in tests).
-	guardFile string
+	runner     USBTetherRunner
+	crashGuard guard.Guard
 }
 
 // NewUSBTetheringService creates a service backed by the real system.
 func NewUSBTetheringService() *USBTetheringService {
-	return &USBTetheringService{runner: &RealUSBTetherRunner{}, guardFile: usbTetherGuardPath}
+	return &USBTetheringService{runner: &RealUSBTetherRunner{}, crashGuard: guard.New("usbtether")}
 }
 
 // NewUSBTetheringServiceWithRunner creates a service with a custom runner (tests).
 func NewUSBTetheringServiceWithRunner(r USBTetherRunner) *USBTetheringService {
-	return &USBTetheringService{runner: r, guardFile: usbTetherGuardPath}
-}
-
-// writeGuard creates the crash guard file before mutating live state.
-func (s *USBTetheringService) writeGuard() error {
-	if err := os.MkdirAll(filepath.Dir(s.guardFile), 0750); err != nil {
-		return fmt.Errorf("create usb tether guard dir: %w", err)
-	}
-	if err := os.WriteFile(s.guardFile, []byte(time.Now().Format(time.RFC3339Nano)), 0600); err != nil {
-		return fmt.Errorf("write usb tether guard: %w", err)
-	}
-	return nil
-}
-
-// clearGuard removes the crash guard after a successful change.
-func (s *USBTetheringService) clearGuard() {
-	if s.guardFile == "" {
-		return
-	}
-	_ = os.Remove(s.guardFile)
+	return &USBTetheringService{runner: r, crashGuard: guard.New("usbtether")}
 }
 
 // abort is the single exit for every failed Configure/Unconfigure.
@@ -150,7 +127,7 @@ func (s *USBTetheringService) clearGuard() {
 func (s *USBTetheringService) abort(err error) error {
 	for _, cfg := range usbTetherConfigs {
 		if _, revertErr := s.runner.RunCommand("uci", "revert", cfg); revertErr != nil {
-			log.Printf("usbtether: uci revert %s after failed change: %v", cfg, revertErr)
+			slog.Warn("usbtether: uci revert after failed change", "config", cfg, "err", revertErr)
 		}
 	}
 	return err
@@ -283,7 +260,7 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 	if strings.TrimSpace(ifaceName) == "" {
 		return errors.New("usb tethering interface name is required")
 	}
-	if err := s.writeGuard(); err != nil {
+	if err := s.crashGuard.Mark(); err != nil {
 		return err
 	}
 	cmds := [][]string{
@@ -320,7 +297,7 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 	// netifd retries on its own, so a transient ifup failure is not fatal.
 	_, _ = s.runner.RunCommand("ifup", usbTetherUCIName)
 
-	s.clearGuard()
+	_ = s.crashGuard.Clear()
 	return nil
 }
 
@@ -332,7 +309,7 @@ func (s *USBTetheringService) Unconfigure() error {
 }
 
 func (s *USBTetheringService) unconfigureLocked() error {
-	if err := s.writeGuard(); err != nil {
+	if err := s.crashGuard.Mark(); err != nil {
 		return err
 	}
 	_, _ = s.runner.RunCommand("ifdown", usbTetherUCIName)
@@ -358,6 +335,6 @@ func (s *USBTetheringService) unconfigureLocked() error {
 	if _, err := s.runner.RunCommand("uci", "commit", "network"); err != nil {
 		return s.abort(fmt.Errorf("uci commit network: %w", err))
 	}
-	s.clearGuard()
+	_ = s.crashGuard.Clear()
 	return nil
 }

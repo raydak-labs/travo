@@ -8,12 +8,30 @@ import (
 	"strings"
 )
 
+// appliedWirelessUp cross-checks netifd's view of the wireless interfaces
+// against what the applied config enables. A section counts as up only when BOTH
+// hold:
+//
+//  1. netifd LISTS it under a radio's "interfaces", and
+//  2. either the owning radio is up and settled (not pending, not
+//     retry_setup_failed) AND carries no other expected interface, or the
+//     interface itself answers `network.device status` with present && up &&
+//     carrier.
+//
+// netifd reports liveness per RADIO (OpenWrt 25.12.3, netifd 2026.02.26-r1); a
+// per-interface entry has no "up". A radio hosting two wanted interfaces (guest
+// beside main AP) is settled by the first one, so the per-device answer is the
+// authority there. stations[] and iwinfo assoclist are not liveness signals
+// (ADR 0002 §5).
+//
+// It fails closed: an interface that cannot be observed counts as down. The
+// fallback's cost is budgeted by wirelessProbeMaxUbusCalls.
 func (w *WifiService) appliedWirelessUp(
 	sections map[string]map[string]string, wantAPs, wantSTAs []string,
 ) error {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
-		return fmt.Errorf("%w: %w: %v", ErrWirelessUnverifiable, errWirelessStatusUnread, err)
+		return fmt.Errorf("%w: %w: %w", ErrWirelessUnverifiable, errWirelessStatusUnread, err)
 	}
 	radios, unreadable, shapeErr := wirelessStatusRadios(resp)
 	// section name -> what the config expects it to be, so one pass over the
@@ -117,15 +135,10 @@ type wirelessRadio struct {
 }
 
 // wirelessStatusRadios splits a `network.wireless status` payload per radio and
-// records whether each radio is settled. An entry the probe cannot read is
-// skipped and REPORTED, never a silent skip: its interfaces are not listed, so
-// anything the config expects on it stays unproven and the proof fails closed.
-//
-// Reading it aborts the whole payload (as this used to), so one malformed radio
-// the apply has nothing to do with turned a transient netifd hiccup into a
-// failure that was never retried, even when every interface the change is about
-// read fine. The returned set names the radios that were skipped, so the caller
-// can still tell "I cannot read this radio" from "the access point is down".
+// records whether each radio is settled. An unreadable radio entry is skipped
+// and REPORTED in the returned set: its interfaces stay unproven, so the proof
+// fails closed, while one malformed radio the apply has nothing to do with does
+// not fail the whole read.
 func wirelessStatusRadios(resp map[string]any) (map[string]wirelessRadio, map[string]bool, error) {
 	out := make(map[string]wirelessRadio, len(resp))
 	unreadable := map[string]bool{}

@@ -81,7 +81,6 @@ func (n *NetworkService) GetPortForwards() ([]models.PortForwardRule, error) {
 	return rules, nil
 }
 
-// AddPortForward adds a new port-forward rule.
 // newPortForwardID returns an ID that cannot collide with an existing rule.
 // The millisecond prefix keeps IDs roughly ordered and human-readable; the
 // random suffix is what makes a same-millisecond collision impossible.
@@ -107,6 +106,7 @@ func newPortForwardID(existing []models.PortForwardRule) string {
 // portForwardFallbackID only advances if crypto/rand is unavailable.
 var portForwardFallbackID atomic.Int64
 
+// AddPortForward adds a new port-forward rule.
 func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
 	n.portForwardsMu.Lock()
 	defer n.portForwardsMu.Unlock()
@@ -115,9 +115,8 @@ func (n *NetworkService) AddPortForward(rule models.PortForwardRule) error {
 	if err != nil {
 		return err
 	}
-	// Two rules created in the same millisecond used to share an ID, and
-	// DeletePortForward removes every rule matching the ID — so one delete took
-	// out both. A random suffix makes the ID unique per call.
+	// IDs must be unique per call: DeletePortForward removes every rule with
+	// the ID.
 	rule.ID = newPortForwardID(rules)
 	rules = append(rules, rule)
 	return n.savePortForwards(rules)

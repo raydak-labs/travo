@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -1169,9 +1170,8 @@ func (f *failingUCI) Commit(config string) error {
 func newGuardedVpnService(t *testing.T, u uci.UCI, cmd CommandRunner) (*VpnService, string) {
 	t.Helper()
 	svc := NewVpnServiceWithRunner(u, cmd)
-	guard := filepath.Join(t.TempDir(), "vpn-in-progress")
-	svc.guardFile = guard
-	return svc, guard
+	svc.crashGuard = guard.In(t.TempDir(), "vpn")
+	return svc, svc.crashGuard.Path()
 }
 
 func TestToggleWireguard_EnableVerifiesTunnelBeforeFirewallAndDNS(t *testing.T) {
@@ -1256,7 +1256,7 @@ func TestToggleWireguard_EnableFailsWithoutCrashGuard(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0600); err != nil {
 		t.Fatalf("write blocker file: %v", err)
 	}
-	svc.guardFile = filepath.Join(blocker, "vpn-in-progress")
+	svc.crashGuard = guard.In(blocker, "vpn")
 
 	if err := svc.ToggleWireguard(true); err == nil {
 		t.Fatal("expected enable to fail when the crash guard cannot be written")
@@ -1468,7 +1468,6 @@ func newSnapshotScopedVpnService(t *testing.T, u uci.UCI, cmd CommandRunner) (*V
 	svc, guard := newGuardedVpnService(t, u, cmd)
 	dir := t.TempDir()
 	svc.dnsStackPath = filepath.Join(dir, "dnsmasq-layers.json")
-	svc.legacyDnsSnapshotPath = filepath.Join(dir, "legacy-vpn-dns-snapshot.json")
 	return svc, guard
 }
 
@@ -1487,19 +1486,6 @@ func seedVpnLayerStack(t *testing.T, svc *VpnService, baseServers ...string) {
 	}
 	if err := os.WriteFile(svc.dnsStackPath, data, 0o600); err != nil {
 		t.Fatalf("seeding the layer stack: %v", err)
-	}
-}
-
-// writeVpnLegacySnapshot writes a pre-stack snapshot, the shape a device that
-// was upgraded while the VPN was enabled still has on disk.
-func writeVpnLegacySnapshot(t *testing.T, svc *VpnService, servers ...string) {
-	t.Helper()
-	data, err := json.Marshal(dnsmasqResolverState{Servers: servers})
-	if err != nil {
-		t.Fatalf("encoding the legacy snapshot: %v", err)
-	}
-	if err := os.WriteFile(svc.legacyDnsSnapshotPath, data, 0o600); err != nil {
-		t.Fatalf("seeding the legacy snapshot: %v", err)
 	}
 }
 
@@ -1930,61 +1916,6 @@ func TestGetVpnStatus_HealsImmediatelyWhenTheTunnelIsDisabled(t *testing.T) {
 	if !slices.Equal(state.servers, []string{"127.0.0.1#5353"}) || state.noresolv != "0" {
 		t.Fatalf("a disabled tunnel must heal on the first read, got %v noresolv=%q",
 			state.servers, state.noresolv)
-	}
-}
-
-// A device upgraded while the VPN was enabled has only the pre-stack snapshot.
-// Enabling must adopt it as the base rather than re-reading dnsmasq, which by
-// then already points at the tunnel, and then drop it: two restore targets for
-// the same two options is the collision the stack removes.
-func TestEnableVpnDNSForwarding_AdoptsAndRemovesTheLegacySnapshot(t *testing.T) {
-	u := uci.NewMockUCI()
-	_ = u.Set("network", "wg0", "dns", "10.8.0.1")
-	cmd, state := newDnsmasqRunner([]string{"10.8.0.1"}, true)
-	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
-	state.noresolv = "1"
-	writeVpnLegacySnapshot(t, svc, "server=/lan.example.com/192.168.9.5")
-
-	if err := svc.enableVpnDNSForwarding(); err != nil {
-		t.Fatalf("enable: %v", err)
-	}
-	if _, err := os.Stat(svc.legacyDnsSnapshotPath); !os.IsNotExist(err) {
-		t.Fatalf("the legacy snapshot must be dropped once the stack owns the base, err = %v", err)
-	}
-	st := readVpnLayerStack(t, svc)
-	if len(st.Servers) != 1 || !strings.Contains(st.Servers[0], "lan.example.com") {
-		t.Fatalf("the legacy snapshot must become the stack base, got %v", st.Servers)
-	}
-	// And the disable restores the operator's entry rather than the tunnel's.
-	svc.disableVpnDNSForwarding()
-	if len(state.servers) != 1 || !strings.Contains(state.servers[0], "lan.example.com") {
-		t.Fatalf("disable must restore the legacy base, got %v", state.servers)
-	}
-	if state.noresolv != "0" {
-		t.Errorf("noresolv must be restored to the legacy value (unset -> 0), got %q", state.noresolv)
-	}
-}
-
-// The heal path leaves the legacy snapshot in place for the same reason it
-// leaves the shared record: it is still the only record of the pre-layer state.
-func TestGetVpnStatus_HealKeepsTheLegacySnapshot(t *testing.T) {
-	compressVpnDNSHealWindow(t, 1, 0)
-	u := uci.NewMockUCI()
-	_ = u.Set("network", "wg0", "disabled", "0")
-	cmd, state := newDnsmasqRunner([]string{"10.8.0.1"}, false)
-	svc, _ := newSnapshotScopedVpnService(t, u, cmd)
-	state.noresolv = "1"
-	writeVpnLegacySnapshot(t, svc, "1.1.1.1")
-
-	if _, err := svc.GetVpnStatus(); err != nil {
-		t.Fatalf("GetVpnStatus: %v", err)
-	}
-	if !slices.Equal(state.servers, []string{"1.1.1.1"}) || state.noresolv != "0" {
-		t.Fatalf("the heal must restore the legacy snapshot, got %v noresolv=%q",
-			state.servers, state.noresolv)
-	}
-	if _, err := os.Stat(svc.legacyDnsSnapshotPath); err != nil {
-		t.Errorf("the heal must not delete the only pre-layer record: %v", err)
 	}
 }
 

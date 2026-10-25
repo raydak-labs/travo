@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,6 +20,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/api"
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/config"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/store"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
@@ -141,9 +142,7 @@ func newAppLifecycle() *appLifecycle {
 
 // Go runs fn as a tracked background goroutine. fn receives a channel that is
 // closed when Stop() begins, so work that waits (startup delays, retries) can
-// bail out instead of committing UCI changes after SIGTERM. Untracked
-// goroutines are the reason a detached worker used to be able to flash or
-// reconfigure the device after the HTTP server was already gone.
+// bail out instead of committing UCI changes after SIGTERM.
 func (l *appLifecycle) Go(fn func(stop <-chan struct{})) {
 	l.wg.Add(1)
 	l.live.Add(1)
@@ -200,7 +199,7 @@ func (l *appLifecycle) Stop() {
 		select {
 		case <-drained:
 		case <-time.After(goroutineDrainTimeout):
-			log.Printf("WARNING: %d background goroutine(s) still running after %v; continuing shutdown", l.live.Load(), goroutineDrainTimeout)
+			slog.Warn("background goroutines still running after the drain timeout; continuing shutdown", "count", l.live.Load(), "timeout", goroutineDrainTimeout)
 		}
 
 		if l.db != nil {
@@ -250,18 +249,17 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// dependency is wired), and it is exactly what a contract test that exercises
 	// every documented endpoint will stumble into.
 	app.Use(recover.New(recover.Config{EnableStackTrace: true}))
-	log.Printf("Panic recovery enabled: a handler panic returns 500 instead of killing the process")
 
 	// CORS middleware
 	app.Use(cors.New(corsConfig(cfg.CorsOrigins)))
 
 	nets, err := auth.ParseCIDRList(cfg.AllowedAdminCIDRs)
 	if err != nil {
-		log.Fatalf("invalid ALLOWED_ADMIN_CIDRS: %v", err)
+		fatal("invalid ALLOWED_ADMIN_CIDRS", err)
 	}
 	if len(nets) > 0 {
 		app.Use(auth.IPAllowlistMiddleware(nets))
-		log.Printf("Admin IP allowlist enabled (%d CIDR(s))", len(nets))
+		slog.Info("admin IP allowlist enabled", "cidrs", len(nets))
 	}
 
 	// Create UCI and Ubus backends
@@ -270,6 +268,8 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	if cfg.MockMode {
 		u = uci.NewMockUCI()
 		ub = ubus.NewMockUbus()
+		// Crash guards sit next to the other mock-mode state, never in /etc/trafo.
+		guard.SetDir(filepath.Join(filepath.Dir(cfg.AuthConfigPath), "guards"))
 	} else {
 		u = uci.NewRealUCI()
 		ub = ubus.NewRealUbus()
@@ -281,7 +281,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	if s, err := store.Open(filepath.Join(filepath.Dir(cfg.AuthConfigPath), "travo.db")); err == nil {
 		db = s
 	} else {
-		log.Printf("WARNING: persistent store unavailable (%v); running memory-only", err)
+		slog.Warn("persistent store unavailable; running memory-only", "err", err)
 	}
 
 	// Create shared root password holder (written by auth after login, read by UCI apply).
@@ -291,7 +291,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	authStore := auth.NewFileAuthStore(cfg.AuthConfigPath)
 	authCfg, err := authStore.LoadOrInit()
 	if err != nil {
-		log.Fatalf("failed to load auth config: %v", err)
+		fatal("failed to load auth config", err)
 	}
 	if !cfg.MockMode {
 		if p := auth.LoadSealedRPCDPassword(cfg.AuthConfigPath, authCfg.JWTSecret); p != "" {
@@ -302,7 +302,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 			// it every scheduled or button-driven toggle falls back to an empty
 			// password that rpcd rejects.
 			if err := auth.SaveRPCDLoginHelper(cfg.AuthConfigPath, p); err != nil {
-				log.Printf("WARNING: could not refresh rpcd-login helper file: %v", err)
+				slog.Warn("could not refresh rpcd-login helper file", "err", err)
 			}
 		}
 	}
@@ -498,11 +498,25 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	return app, lifecycle
 }
 
+// fatal logs err and exits; startup cannot continue.
+func fatal(msg string, err error) {
+	slog.Error(msg, "err", err)
+	os.Exit(1)
+}
+
 func main() {
-	log.SetOutput(os.Stdout)
+	// procd forwards stdout to logread, which adds its own timestamp.
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
 	cfg, showVersion, err := config.LoadConfig(os.Args[1:])
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		fatal("failed to load config", err)
 	}
 
 	if showVersion {
@@ -518,39 +532,39 @@ func main() {
 
 	go func() {
 		<-quit
-		log.Println("Shutting down server...")
+		slog.Info("shutting down")
 		// Order matters: stop accepting requests and let in-flight handlers
 		// finish BEFORE the services (and the store) are torn down. Doing it the
 		// other way round made every in-flight DB read fail against a closed
 		// bbolt handle, with the error swallowed inside the store.
 		if err := app.ShutdownWithTimeout(shutdownTimeout); err != nil {
-			log.Printf("Error during shutdown: %v", err)
+			slog.Error("shutdown", "err", err)
 		}
 		lifecycle.Stop()
-		log.Println("Server stopped")
+		slog.Info("server stopped")
 	}()
 
 	// If TLS is enabled, start HTTPS listener concurrently.
 	if cfg.TLSEnabled {
 		if err := config.EnsureTLSCert(cfg.TLSCertFile, cfg.TLSKeyFile); err != nil {
-			log.Printf("WARNING: could not generate TLS certificate: %v", err)
+			slog.Warn("could not generate TLS certificate", "err", err)
 		} else {
 			tlsAddr := fmt.Sprintf(":%d", cfg.TLSPort)
-			log.Printf("Starting HTTPS listener on %s", tlsAddr)
+			slog.Info("starting HTTPS listener", "addr", tlsAddr)
 			go func() {
 				if err := app.Listen(tlsAddr, fiber.ListenConfig{
 					CertFile:    cfg.TLSCertFile,
 					CertKeyFile: cfg.TLSKeyFile,
 				}); err != nil {
-					log.Printf("HTTPS listener stopped: %v", err)
+					slog.Warn("HTTPS listener stopped", "err", err)
 				}
 			}()
 		}
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("Starting travo backend on %s (mock=%v, tls=%v)", addr, cfg.MockMode, cfg.TLSEnabled)
+	slog.Info("starting travo backend", "addr", addr, "mock", cfg.MockMode, "tls", cfg.TLSEnabled)
 	if err := app.Listen(addr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		fatal("failed to start server", err)
 	}
 }

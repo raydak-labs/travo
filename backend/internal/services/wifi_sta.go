@@ -8,14 +8,11 @@ import (
 
 // enabledAPSections returns the wifi-iface sections the given wireless config
 // says should be running as access points: mode=ap, not disabled, on a radio
-// that is not disabled. An AP on a radio the config switches off is
-// deliberately down.
+// that is not disabled.
 //
-// An enabled AP section with no device is an ERROR, not an absence: netifd has
-// no interface to report for it, so the section is unprovable. Skipping it (as
-// this used to) could empty the list and turn "the AP never came up" into
-// "nothing to prove", which cancels the rollback of a config that was never
-// working.
+// An enabled AP section with no device is an ERROR, not an absence: skipping it
+// could empty the list and turn "the AP never came up" into "nothing to prove",
+// which would cancel the rollback of a broken config.
 func enabledAPSections(sections map[string]map[string]string) ([]string, error) {
 	var names []string
 	for name, opts := range sections {

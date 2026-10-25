@@ -1,4 +1,4 @@
-package services
+package docsgate
 
 import (
 	"go/ast"
@@ -254,12 +254,12 @@ func readDoc(t *testing.T, path string) string {
 func TestDnsResolverStatePathsAreNamedInAdr0001(t *testing.T) {
 	adr := readDoc(t, adr0001)
 	owners := map[string]bool{}
-	for _, name := range resolverStateOwners(t, ".") {
+	for _, name := range resolverStateOwners(t, servicesDir) {
 		owners[name] = true
 	}
 
 	var problems []string
-	for _, ref := range packageStatePathRefs(t, ".") {
+	for _, ref := range packageStatePathRefs(t, servicesDir) {
 		if !owners[ref.file] || ref.guard {
 			continue
 		}
@@ -300,7 +300,7 @@ func TestEtcTrafoStatePathsAreNamedInAnAdr(t *testing.T) {
 	adrs := all.String()
 
 	var problems []string
-	for _, ref := range packageStatePathRefs(t, ".") {
+	for _, ref := range packageStatePathRefs(t, servicesDir) {
 		if ref.guard || !ref.inGuardDir {
 			continue
 		}

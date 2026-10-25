@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -191,7 +193,7 @@ func writeReconnectScriptFixture(t *testing.T, guardDir string) (dir, script, ma
 		}
 	}
 
-	script = strings.ReplaceAll(reconnectScriptContent, crashGuardDir, guardDir)
+	script = strings.ReplaceAll(reconnectScriptContent, guard.DefaultDir, guardDir)
 	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write reconnect script: %v", err)
 	}

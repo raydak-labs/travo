@@ -3,7 +3,6 @@ package api
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -103,8 +102,9 @@ type streamLogEvent struct {
 // writeStreamEvent writes an NDJSON event line and flushes.
 func writeStreamEvent(w *bufio.Writer, evt streamLogEvent) {
 	data, _ := json.Marshal(evt)
-	fmt.Fprintf(w, "%s\n", data)
-	w.Flush()
+	// A write error means the client went away; the stream ends with it.
+	_, _ = w.Write(append(data, '\n'))
+	_ = w.Flush()
 }
 
 // streamLogBuffer is how many log lines may be pending for a slow client.

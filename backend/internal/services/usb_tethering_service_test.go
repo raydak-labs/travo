@@ -1,9 +1,10 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"errors"
 	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -97,7 +98,7 @@ func (m *mockUSBTetherRunner) RunCommand(name string, args ...string) (string, e
 func newTestUSBTetherService(t *testing.T, r *mockUSBTetherRunner) *USBTetheringService {
 	t.Helper()
 	svc := NewUSBTetheringServiceWithRunner(r)
-	svc.guardFile = filepath.Join(t.TempDir(), "usbtether-in-progress")
+	svc.crashGuard = guard.In(t.TempDir(), "usbtether")
 	return svc
 }
 
@@ -165,7 +166,7 @@ func TestConfigure_SetsUCIAndBringsUpInterface(t *testing.T) {
 	if !seen["ifup usbtether"] {
 		t.Error("expected ifup usbtether")
 	}
-	if _, err := os.Stat(svc.guardFile); !os.IsNotExist(err) {
+	if _, err := os.Stat(svc.crashGuard.Path()); !os.IsNotExist(err) {
 		t.Errorf("expected crash guard removed after success, stat err = %v", err)
 	}
 }
@@ -216,7 +217,7 @@ func TestConfigure_PropagatesAddListError(t *testing.T) {
 	}
 	// ADR 0003 §1.3: a failure keeps the guard — it is the only marker that the
 	// device was left mid-flight.
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed Configure, stat err = %v", err)
 	}
 	seen := map[string]bool{}
@@ -239,7 +240,7 @@ func TestConfigure_KeepsGuardWhenUciSetFails(t *testing.T) {
 	if err := svc.Configure("usb0"); err == nil {
 		t.Fatal("expected Configure to fail when a uci set fails")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed uci set, stat err = %v", err)
 	}
 }
@@ -255,7 +256,7 @@ func TestConfigure_KeepsGuardWhenWanZoneLookupFails(t *testing.T) {
 	if err := svc.Configure("usb0"); err == nil {
 		t.Fatal("expected Configure to fail when the wan zone cannot be resolved")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed wan-zone lookup, stat err = %v", err)
 	}
 }
@@ -271,7 +272,7 @@ func TestConfigure_KeepsGuardWhenNetworkCommitFails(t *testing.T) {
 	if err := svc.Configure("usb0"); err == nil {
 		t.Fatal("expected Configure to fail when the network commit fails")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed network commit, stat err = %v", err)
 	}
 }
@@ -289,7 +290,7 @@ func TestConfigure_PropagatesFirewallCommitError(t *testing.T) {
 	}
 	// The worst case: network is already committed (a live DHCP interface) while
 	// the firewall membership is not. The guard must survive.
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed firewall commit, stat err = %v", err)
 	}
 	seen := map[string]bool{}
@@ -312,7 +313,7 @@ func TestConfigure_FailsWhenWanZoneMissing(t *testing.T) {
 	if err := svc.Configure("usb0"); err == nil {
 		t.Fatal("expected Configure to fail when no wan zone exists")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a missing wan zone, stat err = %v", err)
 	}
 }
@@ -364,7 +365,7 @@ func TestUnconfigure_DeletesAndCommits(t *testing.T) {
 	if !seen["uci commit network"] {
 		t.Error("expected uci commit network")
 	}
-	if _, err := os.Stat(svc.guardFile); !os.IsNotExist(err) {
+	if _, err := os.Stat(svc.crashGuard.Path()); !os.IsNotExist(err) {
 		t.Errorf("expected crash guard removed after success, stat err = %v", err)
 	}
 }
@@ -419,7 +420,7 @@ firewall.@zone[1].network='usbtether'
 			t.Error("must not delete the network interface while the firewall still references it")
 		}
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed Unconfigure, stat err = %v", err)
 	}
 }
@@ -442,7 +443,7 @@ firewall.@zone[1].network='usbtether'
 	if err := svc.Unconfigure(); err == nil {
 		t.Fatal("expected Unconfigure to fail when the firewall commit fails")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed firewall commit, stat err = %v", err)
 	}
 }
@@ -458,7 +459,7 @@ func TestUnconfigure_KeepsGuardWhenNetworkCommitFails(t *testing.T) {
 	if err := svc.Unconfigure(); err == nil {
 		t.Fatal("expected Unconfigure to fail when the network commit fails")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed network commit, stat err = %v", err)
 	}
 	seen := map[string]bool{}
@@ -481,7 +482,7 @@ func TestUnconfigure_KeepsGuardWhenWanZoneLookupFails(t *testing.T) {
 	if err := svc.Unconfigure(); err == nil {
 		t.Fatal("expected Unconfigure to fail when the wan zone cannot be resolved")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.crashGuard.Path()); err != nil {
 		t.Errorf("crash guard must survive a failed wan-zone lookup, stat err = %v", err)
 	}
 }

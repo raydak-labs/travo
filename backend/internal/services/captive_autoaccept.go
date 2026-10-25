@@ -425,7 +425,7 @@ func (c *CaptiveService) doSubmitForm(client *http.Client, ua string, referer *u
 	var req *http.Request
 	var err error
 
-	if form.Method == "GET" {
+	if form.Method == http.MethodGet {
 		u, perr := url.Parse(form.Action)
 		if perr != nil {
 			return "", nil, perr

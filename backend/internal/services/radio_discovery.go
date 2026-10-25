@@ -2,7 +2,7 @@ package services
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -58,7 +58,7 @@ func (w *WifiService) DiscoverAndPersistRadios() (bool, error) {
 		return false, err
 	}
 
-	log.Printf("radio: discovered %d radio(s), config persisted to %s", len(radios), configPath)
+	slog.Info("radio discovery: config persisted", "radios", len(radios), "path", configPath)
 	return true, nil
 }
 

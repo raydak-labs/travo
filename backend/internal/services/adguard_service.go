@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -26,12 +26,6 @@ const (
 	adguardYAMLPathUCI     = "/etc/adguardhome/adguardhome.yaml"
 	adguardYAMLPathOpt     = "/opt/AdGuardHome/AdGuardHome.yaml"
 	adguardBundledTemplate = "/etc/travo/adguardhome.yaml"
-	// adguardDnsSnapshotPath is where releases before the shared dnsmasq layer
-	// stack wrote AdGuard's snapshot of dhcp.@dnsmasq[0].server/noresolv. It is
-	// read once as a migration source for the stack's base state and then
-	// removed: two files restoring the same two options is how the AdGuard and
-	// VPN paths ended up restoring over each other.
-	adguardDnsSnapshotPath = "/etc/trafo/adguard-dns-snapshot.json"
 )
 
 // AdGuardChecker abstracts filesystem/process checks for testability.
@@ -79,7 +73,7 @@ func (r *RealAdGuardChecker) HTTPGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
 	}
@@ -106,7 +100,7 @@ func (r *RealAdGuardChecker) TCPProbe(addr string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 
@@ -413,18 +407,14 @@ var adguardConfigVerifyPollDuration = 500 * time.Millisecond
 
 // SetConfig writes the AdGuard Home YAML configuration and restarts the service.
 //
-// This is the one place a single request body becomes the live resolver config,
-// and dnsmasq is already forwarding every LAN query to AdGuard (often with
-// noresolv=1), so one half-typed document previously killed name resolution for
-// the whole network with the previous config gone. Three things guard it now:
+// dnsmasq forwards every LAN query to AdGuard, so a broken document would kill
+// name resolution for the whole network. Three things guard it:
 //
 //  1. the body must parse as a YAML mapping, or it is rejected untouched;
 //  2. the current file is copied to a timestamped .bak before the write;
-//  3. after the restart the DNS listener is polled, and if it never comes up the
-//     backup is restored and AdGuard is restarted again.
-//
-// The verification is best-effort in the sense that a checker which cannot probe
-// (or reports failure) triggers the rollback rather than a silent success.
+//  3. after the restart the DNS listener is polled; if it never comes up the
+//     backup is restored and AdGuard restarted again. A checker that cannot
+//     probe triggers the rollback rather than a silent success.
 func (s *AdGuardService) SetConfig(content string) error {
 	// Validate before anything is written: an unparseable document must never
 	// reach the live config.
@@ -494,12 +484,12 @@ func (s *AdGuardService) rollbackAdGuardConfig(path, backupPath string,
 ) {
 	if readErr == nil {
 		if err := s.checker.WriteFile(path, previous, 0600); err != nil {
-			log.Printf("adguard: restoring config from %s: %v", backupPath, err)
+			slog.Error("adguard: restoring config", "backup", backupPath, "err", err)
 			return
 		}
 	}
 	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {
-		log.Printf("adguard: restarting after config rollback: %v", err)
+		slog.Error("adguard: restarting after config rollback", "err", err)
 	}
 	s.refreshEndpointsFromYAML()
 }

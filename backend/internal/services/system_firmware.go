@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -366,7 +366,7 @@ func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) (Firm
 	}
 
 	reason := "sysupgrade " + strings.Join(args, " ") + " (" + meta.Model + ")"
-	if err := s.writeGuard(firmwareUpgradeGuardName, reason); err != nil {
+	if err := s.crashGuard(firmwareUpgradeGuard).Write(reason); err != nil {
 		_ = os.Remove(firmwarePath)
 		return meta, err
 	}
@@ -378,7 +378,7 @@ func (s *SystemService) UpgradeFirmware(file io.Reader, keepSettings bool) (Firm
 		time.Sleep(500 * time.Millisecond)
 		// Firmware writes to the MTD partition take minutes on a router.
 		if err := execx.Run(execx.Package, "sysupgrade", args...); err != nil {
-			log.Printf("ERROR: sysupgrade %s failed: %v (crash guard %s kept)", firmwarePath, err, firmwareUpgradeGuardName)
+			slog.Error("sysupgrade failed; crash guard kept", "image", firmwarePath, "err", err, "guard", s.crashGuard(firmwareUpgradeGuard).Path())
 		}
 	}()
 

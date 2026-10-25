@@ -17,11 +17,8 @@ func GetLEDStatusHandler(svc *services.SystemService) fiber.Handler {
 func SetLEDStealthHandler(svc *services.SystemService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.SetLEDRequest
-		// Strict: the request is a single boolean that drives every LED. On the
-		// permissive binder a body naming "enabled" (which is what the spec
-		// used to document) decoded to stealth_mode=false and answered 200 with
-		// the LEDs unchanged — the opposite of what was asked, behind a success
-		// code. A 400 naming the field is the only honest answer.
+		// Strict: a body naming the wrong field must be a 400, not a 200 that
+		// leaves the LEDs unchanged.
 		if err := BindStrictBodyConfig(c, &req); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}

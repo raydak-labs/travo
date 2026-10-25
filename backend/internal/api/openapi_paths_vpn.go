@@ -63,7 +63,7 @@ var openAPIPathsVpn = map[string]any{
 	},
 	"/vpn/tailscale/exit-node": map[string]any{
 		"post": endpoint("SetTailscaleExitNode", "Select (or clear) the Tailscale exit node by node IP", true,
-			body("application/json", obj("node_ip", "exit_node")),
+			body("application/json", obj("node_ip")),
 			resp200("application/json", obj("ok")),
 		),
 	},

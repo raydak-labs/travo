@@ -1,6 +1,8 @@
 package services
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -167,8 +169,7 @@ func (m *mockCmdRunner) Run(name string, args ...string) ([]byte, error) {
 func newTestCaptiveServiceWithUCI(t *testing.T, prober HTTPProber, cmd *mockCmdRunner) (*CaptiveService, string) {
 	u := uci.NewMockUCI()
 	guardDir, _ := os.MkdirTemp("", "captive-test-*")
-	guardFile := filepath.Join(guardDir, "dns-bypass-in-progress")
-	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, guardFile: guardFile, stopCh: make(chan struct{})}
+	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, dnsGuard: guard.In(guardDir, captiveDNSGuardFeature), stopCh: make(chan struct{})}
 	// Bypass refuses to run without a DHCP-provided nameserver, so every test
 	// gets a resolv.conf.auto containing one (same as a leased WAN uplink).
 	svc.resolvConfAutoOverride = writeResolvAuto(t, guardDir, "10.1.2.3")
@@ -251,14 +252,14 @@ func TestRestoreDNS_KeepsGuardFileOnFailure(t *testing.T) {
 func TestRestoreDNS_CorruptGuardFileIsKept(t *testing.T) {
 	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
 	defer os.RemoveAll(dir)
-	if err := os.WriteFile(svc.guardFile, []byte("{not json"), 0o600); err != nil {
+	if err := os.WriteFile(svc.dnsGuard.Path(), []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := svc.RestoreDNS(); err == nil {
 		t.Fatal("expected an error for an unreadable guard file")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.dnsGuard.Path()); err != nil {
 		t.Errorf("corrupt guard file must not be deleted: %v", err)
 	}
 }
@@ -295,7 +296,7 @@ func TestRefreshBypassTimestamp_ConcurrentWithBypassIsAtomic(t *testing.T) {
 				return
 			default:
 			}
-			data, err := os.ReadFile(svc.guardFile)
+			data, err := os.ReadFile(svc.dnsGuard.Path())
 			if err != nil {
 				continue
 			}
@@ -306,7 +307,7 @@ func TestRefreshBypassTimestamp_ConcurrentWithBypassIsAtomic(t *testing.T) {
 			}
 		}
 	}()
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		svc.refreshBypassTimestamp()
 	}
 	close(stop)
@@ -503,8 +504,7 @@ func newTestCaptiveServiceWithAdGuard(t *testing.T, cmd *mockCmdRunner, agServer
 	t.Helper()
 	u := uci.NewMockUCI()
 	guardDir, _ := os.MkdirTemp("", "captive-test-*")
-	guardFile := filepath.Join(guardDir, "dns-bypass-in-progress")
-	svc := &CaptiveService{prober: &MockHTTPProber{StatusCode: 204}, uci: u, cmd: cmd, guardFile: guardFile, stopCh: make(chan struct{})}
+	svc := &CaptiveService{prober: &MockHTTPProber{StatusCode: 204}, uci: u, cmd: cmd, dnsGuard: guard.In(guardDir, captiveDNSGuardFeature), stopCh: make(chan struct{})}
 	svc.resolvConfAutoOverride = writeResolvAuto(t, guardDir, "10.1.2.3")
 	if agServer != nil {
 		// Patch the package-level constant via a subfield isn't possible directly,
@@ -644,7 +644,7 @@ func TestBypassDNS_KeepsGuardWhenNetworkWriteFails(t *testing.T) {
 	if err := svc.BypassDNS(); err == nil {
 		t.Fatal("expected the bypass to fail on the network write")
 	}
-	if _, err := os.Stat(svc.guardFile); err != nil {
+	if _, err := os.Stat(svc.dnsGuard.Path()); err != nil {
 		t.Fatalf("the crash guard must survive a failure after the bypass is committed: %v", err)
 	}
 }

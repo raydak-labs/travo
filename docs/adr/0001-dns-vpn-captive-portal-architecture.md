@@ -3,7 +3,7 @@ title: "ADR 0001: DNS resolution, VPN, captive portal, and restore semantics"
 description: Why DNS resolution, VPN tunnelling and captive-portal handling share one dnsmasq resolver layer stack instead of separate snapshots.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-04
+updated: 2026-10-25
 tags: [adr, dns, dnsmasq, adguard, vpn, wireguard, captive-portal, openwrt, luci]
 ---
 
@@ -145,8 +145,7 @@ valid in a state the operator had since left. There is therefore **one** record.
   target for dnsmasq's resolvers, and a half-written JSON document is not a recoverable state:
   `load` fails, so every layer enable aborts and every restore is refused until someone deletes
   a file whose contents they cannot read.
-- **First layer to enable** reads the live `server`/`noresolv` as the base state (or
-  the pre-stack snapshot of §3.2, when one exists), records it together with its own
+- **First layer to enable** reads the live `server`/`noresolv` as the base state, records it together with its own
   resolvers, and **writes the record before dnsmasq is touched**. A record that cannot
   be written aborts the change rather than following it: without a persisted restore
   target there is nothing to put back. A record that exists but holds **no layer**
@@ -182,22 +181,6 @@ valid in a state the operator had since left. There is therefore **one** record.
   deviation, not an oversight: `deploy-local.sh` removes guards **by name**, never by
   directory glob, so a redeploy does not delete the record. A future recovery step that
   clears `/etc/trafo` wholesale must not treat this file as a guard.
-
-### 3.2 Pre-stack snapshots and the device upgraded mid-VPN
-
-Two older files are still **read**, once, as the migration source for the base state:
-
-- **`/etc/travo/vpn-dns-snapshot.json`** (`legacyVpnDnsSnapshotPath`) — the VPN's own
-  snapshot from before the stack existed, at the pre-unification path.
-- **`/etc/trafo/adguard-dns-snapshot.json`** (`adguardDnsSnapshotPath`) — AdGuard's own
-  snapshot from the same era.
-
-A device upgraded while a layer was active therefore still has a restorable base
-state. **Both** files are **removed** as soon as the stack next saves a record or applies
-the legacy restore (plus whichever path the saving feature is configured with): two files
-holding a restore target for the same two UCI options is precisely the collision the stack
-removes. Removing only the saving feature's own file left the other feature's snapshot
-behind for the whole life of the record.
 
 ### 3.3 VPN DNS self-heal (a second restore entrypoint)
 
@@ -246,13 +229,13 @@ status read that heals rather than only reports, and that is deliberate.
   - dnsmasq **`noresolv=1`** (custom forwarders only),
   - legacy **`network.wan`** static DNS with `peerdns=0`, or
   - **AdGuard using encrypted upstreams** (DoH/DoT), which cannot resolve hijacked “hotel” names the way the upstream expects.
-- **Mechanism**: before changing anything, Travo writes a **JSON backup** to **`/etc/trafo/captive-dns-in-progress`** (also acts as the “bypass active” marker) containing relevant `wan` DNS fields, the dnsmasq `noresolv` flag, the dnsmasq `rebind_protection` flag, and AdGuard upstream/bootstrap/fallback slices. The dnsmasq **`server` list is recorded only by a bypass that actually removes it** — i.e. never by the current code; it appears in a guard file only when one was written before the layer stack (§3.2). A **`dnsmasq_layer`** flag records that this bypass put the resolvers under the stack's control, which is what lets a restore tell "the record is lost" from "this bypass never touched the list". It then:
+- **Mechanism**: before changing anything, Travo writes a **JSON backup** to **`/etc/trafo/captive-dns-in-progress`** (also acts as the “bypass active” marker) containing relevant `wan` DNS fields, the dnsmasq `noresolv` flag, the dnsmasq `rebind_protection` flag, and AdGuard upstream/bootstrap/fallback slices. The dnsmasq **`server` list is never recorded**: the stack owns it. A **`dnsmasq_layer`** flag records that this bypass put the resolvers under the stack's control, which is what lets a restore tell "the record is lost" from "this bypass never touched the list". It then:
   - **pushes the hotel DNS onto the shared dnsmasq layer stack as the `captive` layer** with `noresolv=0`, whenever dnsmasq is actually blocking (`noresolv=1`). That is the only owner of `server`/`noresolv` (§3.1): a bypass that snapshotted those two options outside the stack cannot see the layer below it, so its restore replaces the VPN or AdGuard resolvers with whatever the bypass found, and the next enable then records the bypass's own value as the “pre-any-layer” base. On a VPN that means LAN DNS forwarding into a tunnel that is not there, with `noresolv=1` and no fallback left.
   - clears static WAN DNS overrides when `peerdns=0`,
   - turns off dnsmasq `rebind_protection` while the bypass is active (the hotel resolver answers with private addresses),
   - points **AdGuard upstream** at plain **hotel DNS** when available so the resolver that actually handles queries can see portal names.
 - **Restore** (`RestoreDNS`) pops the `captive` layer, which puts back whatever is stacked beneath it, restores `rebind_protection` and the `wan`/AdGuard fields from the guard file, and removes the guard file.
-- **Restore writes only what the guard file actually holds.** The no-layer fallback (a guard file written **before** the stack existed, §3.2) is applied **per field, and only when that field is present**: a `peerdns=0` or AdGuard-encrypted bypass never removed dnsmasq's `server` list, so its guard file records none, and a restore that deleted the list anyway destroyed a split-DNS entry the operator configured that nothing could put back. The same rule covers the staged `uci delete`: a delete that is staged is always followed by `uci commit dhcp` in the same restore, never left for the next unrelated writer of `dhcp` to flush. A guard file that carries no dnsmasq resolver state and no layer record leaves dnsmasq untouched. Applying recorded values **over a live layer** would break the layer that owns dnsmasq, so that case is skipped too.
+- **Restore writes only what the guard file actually holds.** Without a layer record to pop, a guard that owned the resolvers (`dnsmasq_layer`, or `noresolv=1` from the crash window before the layer was pushed) is refused and kept for retry; any other guard restores only its recorded fields. Applying recorded values **over a live layer** would break the layer that owns dnsmasq, so that case is skipped too. Every staged `uci` change is committed in the same restore.
 - **An unreadable layer record is not an empty one.** `hasAnyLayer` fails closed and reports the error: a torn `/etc/trafo/dnsmasq-layers.json` means dnsmasq may be owned by something the guard knows nothing about, so `RestoreDNS` fails loudly, keeps the guard file for retry, and writes nothing.
 - **A lost layer record is not an empty one either, and `RestoreDNS` REFUSES.** The record is **state**, not a crash guard (§3.1): a partial `/etc/trafo` loss or a cleanup from an older package layout can take it while the guard survives. The guard holds `noresolv` but **never the resolver list** (§4), so a restore that finds no record cannot learn what the list used to be — while the hotel resolver the bypass pushed is still sitting in it. Restoring `noresolv` alone there left dnsmasq forwarding **all** DNS to the portal's resolver and then reported success, restarted dnsmasq, logged "DNS restored" and deleted the guard, so nothing would ever retry.
   - **Invariant: `RestoreDNS` never reports success while the bypass can still be in force.** If the pre-bypass resolver list cannot be determined, it writes **nothing** to dnsmasq, returns an error naming the missing `dnsmasq-layers.json`, and **keeps the guard** (ADR 0003 §2) so a later attempt can retry. Deleting the guard on a failure is the specific harm — the guard is the only remaining record that anything was ever bypassed.
@@ -311,11 +294,10 @@ new callers must not widen the condition.
   by upstream changes.
 - **Operator expectations**: finishing captive flows (or explicit restore) before other
   major DNS toggles reduces edge cases. All three dnsmasq resolver features — VPN, AdGuard
-  and the captive bypass — are unified on the one stack of §3.1; this ADR records that
-  implementation rather than the older per-feature snapshots it replaced.
+  and the captive bypass — are unified on the one stack of §3.1.
 - **Drift gate**: `TestDnsResolverStatePathsAreNamedInAdr0001` and
   `TestEtcTrafoStatePathsAreNamedInAnAdr` in
-  `backend/internal/services/dns_docs_test.go` derive the persistent paths from the
+  `backend/internal/docsgate/dns_docs_test.go` derive the persistent paths from the
   services package and fail when this ADR (or any ADR, for `/etc/trafo`) stops naming
   them. Adding a DNS state path without documenting it here is therefore a red test.
 
@@ -352,9 +334,7 @@ new callers must not widen the condition.
   `SetPassword`, bundled template `/etc/travo/adguardhome.yaml`
 - `backend/internal/services/dnsmasq_layer_stack.go` — the shared layer stack itself:
   `/etc/trafo/dnsmasq-layers.json` (`dnsmasqLayerStackPath`) and the layer
-  operations, over the per-feature legacy snapshots (`legacyDnsmasqSnapshotPaths`)
-- `backend/internal/services/vpn_service.go` — the legacy
-  `/etc/travo/vpn-dns-snapshot.json` (`legacyVpnDnsSnapshotPath`)
+  operations
 - `backend/internal/services/vpn_dns.go` — the VPN layer,
   `enableVpnDNSForwarding` / `disableVpnDNSForwarding`, `maybeSelfHealVpnDNS`
 - `backend/internal/services/captive_dnsmasq.go` — the bypass as the `captive` layer
@@ -363,7 +343,7 @@ new callers must not widen the condition.
 - `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
 - `backend/internal/services/network_dns.go` — WAN custom DNS (`SetDNSConfig`)
-- `backend/internal/services/dns_docs_test.go` — the drift gate that keeps the paths
+- `backend/internal/docsgate/dns_docs_test.go` — the drift gate that keeps the paths
   above and this ADR in agreement
 - `docs/adr/0003-crash-guards-and-live-state.md` — guard directory contract (§2)
 - `docs/adr/0010-uci-write-serialisation-and-request-contracts.md` — the `dhcp` lock

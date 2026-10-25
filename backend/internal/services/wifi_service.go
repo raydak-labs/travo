@@ -3,17 +3,14 @@ package services
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math"
-	"os"
-	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -27,83 +24,6 @@ var ErrMultipleActiveSTA = errors.New("wireless config invalid: multiple enabled
 // has the rpcd applier configured; the reloader is the test seam only.
 type WifiReloader interface {
 	Reload() error
-}
-
-// NoopWifiReloader does nothing (for tests).
-type NoopWifiReloader struct{}
-
-// Reload is a no-op.
-func (r *NoopWifiReloader) Reload() error { return nil }
-
-// uciReverter is implemented by UCI backends that can drop staged (uncommitted)
-// changes for a config. RealUCI implements it with `uci revert <config>`; the
-// in-memory mock does not, which simply skips the rollback.
-type uciReverter interface {
-	Revert(config string) error
-}
-
-// uciConfigLocks maps a config name to its lock, so a writer of `firewall` and
-// a writer of `dhcp` never block each other.
-var uciConfigLocks sync.Map // config name -> *sync.Mutex
-
-// lockUCIConfigs locks each named config and returns a single unlock func.
-//
-// The names are sorted before locking, which makes the acquisition order GLOBAL
-// and identical on every path. That is what makes nesting safe: with a fixed
-// order, no two goroutines can hold overlapping sets in opposite orders, so the
-// wait-for graph is acyclic and deadlock is impossible. Without the sort, two
-// flows that each need {network, firewall} but list them in opposite order
-// would deadlock the moment they met — and on a router that means every other
-// endpoint that touches a config also stops responding, because they all queue
-// on the same per-config locks.
-//
-// The locks are still NOT reentrant: a flow that holds a config must not ask for
-// it again. Helpers called from inside a transaction therefore have a lock-free
-// core (…Locked) that the transaction calls, while the thin exported wrapper
-// takes the lock for callers that enter cold. See setupWireGuardFirewallLocked.
-func lockUCIConfigs(configs ...string) func() {
-	// Sorted + de-duplicated: acquiring the same mutex twice on one path would
-	// self-deadlock, and mutateUCI callers legitimately pass a set.
-	names := append([]string(nil), configs...)
-	slices.Sort(names)
-	locks := make([]*sync.Mutex, 0, len(names))
-	prev := ""
-	for i, c := range names {
-		if i > 0 && c == prev {
-			continue
-		}
-		prev = c
-		v, _ := uciConfigLocks.LoadOrStore(c, &sync.Mutex{})
-		m := v.(*sync.Mutex)
-		m.Lock()
-		locks = append(locks, m)
-	}
-	return func() {
-		for i := len(locks) - 1; i >= 0; i-- {
-			locks[i].Unlock()
-		}
-	}
-}
-
-// revertUCIConfig drops the staged UCI delta for each config that has one.
-//
-// The uci CLI keeps uncommitted changes in the process-global
-// /tmp/.uci/<config>/changes file, so a write sequence that fails half-way
-// must be reverted: otherwise a later, unrelated `uci commit <config>` (a WAN
-// save, a DHCP change, …) silently persists the abandoned delta.
-//
-// The caller must already hold the config lock for every name it passes, since
-// the revert discards whatever *anyone* has staged for that config.
-func revertUCIConfig(u uci.UCI, configs ...string) {
-	reverter, ok := u.(uciReverter)
-	if !ok {
-		return
-	}
-	for _, config := range configs {
-		if err := reverter.Revert(config); err != nil {
-			log.Printf("WARNING: uci revert %s: %v", config, err)
-		}
-	}
 }
 
 // mutateWireless runs a wireless write sequence with the wireless write lock
@@ -171,7 +91,7 @@ func (w *WifiService) restoreAfterFailedMutation(cause error) error {
 	if err == nil || errors.Is(err, ErrNoSnapshot) {
 		return cause
 	}
-	return fmt.Errorf("%w (restoring the previous config also failed: %v)", cause, err)
+	return fmt.Errorf("%w (restoring the previous config also failed: %w)", cause, err)
 }
 
 // withConfigLocks holds the named configs' locks for the duration of fn, in the
@@ -188,19 +108,6 @@ func (w *WifiService) restoreAfterFailedMutation(cause error) error {
 func withConfigLocks(configs []string, fn func() error) error {
 	defer lockUCIConfigs(configs...)()
 	return fn()
-}
-
-// mutateUCI is mutateWireless for the other services: it holds the named
-// configs' locks for the duration of fn and reverts all of them if fn fails.
-// Same one-list rule, same reason — see mutateWireless.
-func mutateUCI(u uci.UCI, configs []string, fn func() error) error {
-	defer lockUCIConfigs(configs...)()
-
-	if err := fn(); err != nil {
-		revertUCIConfig(u, configs...)
-		return err
-	}
-	return nil
 }
 
 // WirelessApplyResult describes a staged rollback apply that still needs
@@ -273,7 +180,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: crashGuardDir, arpFile: procNetARP,
+		arpFile: procNetARP,
 	}
 }
 
@@ -288,7 +195,7 @@ func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier UCIApplyConfirm)
 		cmd: &RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		guardDir: crashGuardDir, arpFile: procNetARP,
+		arpFile: procNetARP,
 	}
 }
 
@@ -299,7 +206,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
 }
 
@@ -309,7 +216,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
 }
 
@@ -319,7 +226,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd Comma
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
 }
 
@@ -329,17 +236,8 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, guardDir: crashGuardDir, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
 	}
-}
-
-// testGuardDir returns a private guard directory so tests never touch /etc/travo.
-func testGuardDir() string {
-	dir, err := os.MkdirTemp("", "travo-guard-*")
-	if err != nil {
-		return filepath.Join(os.TempDir(), "travo-guard")
-	}
-	return dir
 }
 
 // validateWirelessConsistency enforces invariants that, if violated, leave the router
@@ -435,7 +333,7 @@ func (w *WifiService) ConfirmApply(token string) error {
 // window itself, so the window cannot fire later and overwrite the restore.
 func (w *WifiService) refuseAndRollback(token string, probeErr error) error {
 	if err := w.applier.Rollback(token); err != nil {
-		return fmt.Errorf("%w (rolling back to the previous config also failed: %v)", probeErr, err)
+		return fmt.Errorf("%w (rolling back to the previous config also failed: %w)", probeErr, err)
 	}
 	return probeErr
 }
@@ -483,11 +381,7 @@ const (
 )
 
 // wirelessProbeSafetyMarginSeconds is the room the CLIENT reserves on top of the
-// probe budget: PROBE_SAFETY_MARGIN_MS / 1000 in
-// frontend/src/lib/wifi-apply.ts, which is the only place that reserves it. It
-// used to exist here as well (as 1) while the client used 500 and the comment
-// said "half a second"; the Go gate in wifi_service_test.go now states it once,
-// next to the assertion that uses it, and
+// probe budget (PROBE_SAFETY_MARGIN_MS in frontend/src/lib/wifi-apply.ts).
 // TestClientProbeSafetyMarginMatchesTheGoGate fails when the two sides drift.
 const wirelessProbeSafetyMarginSeconds = 2
 
@@ -509,20 +403,13 @@ func wirelessProbeBudgetSeconds() int {
 }
 
 // verifyAppliedWirelessUp proves that every interface the applied config says
-// should be running is actually up. It is the confirmation-time counterpart of
-// GetHealth: UCI says which AP and uplink-STA sections are enabled, netifd says
-// whether they exist and are up.
+// should be running is actually up: UCI says which AP and uplink-STA sections
+// are enabled, netifd says whether they exist and are up.
 //
-// The uplink STA is proven too, not just the access points. Client mode disables
-// every AP, so a client-mode apply used to have an empty proof and confirm
-// unconditionally — a STA on the wrong band or with the wrong key then left the
-// operator with no uplink and no way back over WiFi, with rpcd's rollback
-// cancelled. Probing the STA also closes the same hole in repeater mode, where
-// the downlink AP can come up while the uplink never associates.
-//
-// A config that leaves neither an AP nor an uplink STA enabled has nothing to
-// prove — "WiFi off" is a change the operator is allowed to make and
-// reachability is exactly what the confirm request itself demonstrates.
+// The uplink STA is proven too: client mode has no AP, and a STA with the wrong
+// band or key would otherwise confirm and cancel rpcd's rollback with no uplink
+// left. A config that enables neither has nothing to prove ("WiFi off" is
+// allowed, and the confirm request itself demonstrates reachability).
 func (w *WifiService) verifyAppliedWirelessUp() error {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
@@ -537,7 +424,7 @@ func (w *WifiService) verifyAppliedWirelessUp() error {
 		return nil
 	}
 	var lastErr error
-	for attempt := 0; attempt < wirelessConfirmAttempts; attempt++ {
+	for attempt := range wirelessConfirmAttempts {
 		// The first probe is immediate and costs a single ubus round-trip, so
 		// the common "already up" case answers in well under a second and only
 		// the slow case spends the retry budget.
@@ -561,28 +448,14 @@ func (w *WifiService) verifyAppliedWirelessUp() error {
 	return lastErr
 }
 
-// ErrWirelessUnverifiable reports that this probe could not READ the answer:
-// `ubus call network.wireless status` (or the `network.device status` fallback)
-// either failed at the transport level or answered in a shape this build cannot
-// read — a radio without an "up" flag, an interface without an "ifname", an
-// entry that is not an object at all. It covers both, because to the operator
-// they are one condition: Travo does not know whether the new settings came up.
+// ErrWirelessUnverifiable reports that the probe could not READ the answer:
+// `network.wireless status` (or the `network.device status` fallback) failed at
+// the transport level or answered in a shape this build cannot read.
 //
-// The transport failure used to be reported as ErrWirelessNotUp, which put
-// "wireless apply not verified: ..." in front of the operator while rpcd's
-// rollback window was still open and the new config was still live — and the
-// frontend, which substring-matches that prefix, turned it into "so it rolled
-// back to the previous settings". rpcd has rolled back nothing at that point.
-//
-// It is deliberately NOT ErrWirelessNotUp, and its message must not start with
-// the same words either: the frontend tells the two apart by substring, so a
-// shared prefix made "I cannot read the answer" say on screen that the router
-// had already rolled back — while rpcd's rollback window was still open.
-// "I cannot read the answer" and "the access point did not come up" call for
-// different responses from an operator and from whoever is on call, and
-// collapsing the first into the second is what let a probe that could never pass
-// on real hardware look like operator error. Both still keep the rollback armed:
-// the apply is not confirmed either way.
+// It is deliberately distinct from ErrWirelessNotUp, and its message must not
+// share that prefix: the frontend tells the two apart by substring, and only
+// ErrWirelessNotUp means "the change did not come up". Both keep the rollback
+// armed: the apply is not confirmed either way.
 var ErrWirelessUnverifiable = errors.New(
 	"wireless apply could not be verified: network.wireless status could not be read")
 
@@ -597,46 +470,6 @@ func isUnreadablePayload(err error) bool {
 	return errors.Is(err, ErrWirelessUnverifiable) && !errors.Is(err, errWirelessStatusUnread)
 }
 
-// appliedWirelessUp cross-checks netifd's view of the wireless interfaces
-// against what the applied config enables. A section counts as up only when BOTH
-// hold:
-//
-//  1. netifd LISTS it (the section is present under a radio's "interfaces", so
-//     netifd created it), and
-//  2. either the owning radio is up and settled (not pending, not
-//     retry_setup_failed) AND it carries no other expected interface, or the
-//     interface itself answers
-//     `ubus call network.device status {"name":"<ifname>"}` with
-//     present && up && carrier.
-//
-// Why the radio is not proof for a shared radio: netifd reports liveness per
-// RADIO, so on a radio hosting two wanted interfaces (guest AP beside the main
-// AP — SetGuestWifi only excludes the uplink radio) the first one to come up
-// settles the radio and used to prove the second one too. The probe then
-// confirmed and cancelled the rollback with a dead access point, which is the
-// one direction that silently takes the operator's SSID away. The per-device
-// answer is therefore the authority whenever a radio carries more than one
-// expected interface.
-//
-// Why per-radio: on OpenWrt 25.12.3 / netifd 2026.02.26-r1 liveness is reported
-// per RADIO ("up", "pending", "retry_setup_failed", "autostart"). A per-interface
-// entry carries exactly {section, config, ifname, vlans, stations} — there is no
-// per-interface "up" and no "config_path". Reading iface["up"] therefore answers
-// false for every interface on every device, which is what made ConfirmApply
-// refuse to confirm anything. Why the device fallback: a radio can read up while
-// the interface on it is still being set up, and carrier is the only per-device
-// liveness netifd exposes.
-//
-// Deliberately not used as liveness signals: stations[] (empty for a healthy
-// zero-client AP, and structurally always empty for mode=sta) and iwinfo
-// assoclist. See ADR 0002 §5.
-//
-// It fails closed: an interface that cannot be observed counts as down, because
-// the whole point is to keep the rollback armed when the answer is unknown. One
-// wireless status read answers every expectation, so a settled single-interface
-// radio costs no extra ubus round-trip; the fallback is consulted for an
-// unsettled radio or one carrying several expected interfaces, and its cost is
-// budgeted (see wirelessProbeMaxUbusCalls).
 // The kinds an expected interface can be, held as values rather than inline
 // strings because the uplink kind also decides HOW an interface may be proven:
 // see appliedWirelessUp.
@@ -666,71 +499,7 @@ func (w *WifiService) lockUCIWrite() func() {
 	return w.uciWriteMu.Unlock
 }
 
-// guardPath returns the crash-guard path for a feature inside the guard dir.
-func (w *WifiService) guardPath(feature string) string {
-	dir := w.guardDir
-	if dir == "" {
-		dir = crashGuardDir
-	}
-	return filepath.Join(dir, feature+"-in-progress")
-}
-
-// resolveGuardDir returns the guard directory to use, falling back to a temp
-// directory when the configured one is not writable (dev host, unit tests, or a
-// broken installation). The guard is never skipped: a missing durable marker is
-// exactly the case the operator has to hear about, so it is logged as an error.
-func (w *WifiService) resolveGuardDir() string {
-	dir := w.guardDir
-	if dir == "" {
-		dir = crashGuardDir
-	}
-	mkErr := os.MkdirAll(dir, 0o750)
-	if mkErr == nil {
-		return dir
-	}
-	fallback := filepath.Join(os.TempDir(), "travo-guards")
-	log.Printf("ERROR: %s is not writable (%v); crash guards are being written to %s instead. A device-side power loss is NOT protected by a durable marker.", dir, mkErr, fallback)
-	_ = os.MkdirAll(fallback, 0o750)
-	return fallback
-}
-
-// writeCrashGuard creates /etc/travo/<feature>-in-progress before a dangerous
-// live-state change (ADR 0003). The marker is removed by the caller only after
-// the change completed successfully.
-func (w *WifiService) writeCrashGuard(feature string) error {
-	path := filepath.Join(w.resolveGuardDir(), feature+"-in-progress")
-	if err := os.WriteFile(path, []byte("travo: "+feature+" in progress\n"), 0o600); err != nil {
-		return fmt.Errorf("writing crash guard %s: %w", path, err)
-	}
-	return nil
-}
-
-// clearCrashGuard removes a crash guard after the operation succeeded.
-func (w *WifiService) clearCrashGuard(feature string) {
-	// Clear every directory the guard could have been written to. writeCrashGuard
-	// uses resolveGuardDir(), which falls back to a temp directory when the
-	// configured one is not writable; removing only the configured path left that
-	// fallback guard behind forever, and a stale guard means "skip".
-	// The configured dir is also removed on its own because the resolution can
-	// differ between the write and the clear (e.g. the directory became writable).
-	for _, dir := range w.guardDirs() {
-		if err := os.Remove(filepath.Join(dir, feature+"-in-progress")); err != nil && !os.IsNotExist(err) {
-			log.Printf("WARNING: removing crash guard %s/%s: %v", dir, feature, err)
-		}
-	}
-}
-
-// guardDirs returns the directories a crash guard for this service may live in,
-// most likely first: the resolved directory (configured dir, or the temp
-// fallback when it is not writable) and the configured directory itself.
-func (w *WifiService) guardDirs() []string {
-	configured := w.guardDir
-	if configured == "" {
-		configured = crashGuardDir
-	}
-	resolved := w.resolveGuardDir()
-	if resolved == configured {
-		return []string{configured}
-	}
-	return []string{resolved, configured}
+// crashGuard returns the guard for feature in the service's guard dir.
+func (w *WifiService) crashGuard(feature string) guard.Guard {
+	return guard.In(w.guardDir, feature)
 }

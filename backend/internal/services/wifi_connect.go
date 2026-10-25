@@ -20,31 +20,15 @@ var ErrPasswordRequiredForNewSTA = errors.New("password is required when adding 
 // ErrEncryptionRequiredForNewSTA is returned when Connect creates a new STA profile without an encryption mode.
 var ErrEncryptionRequiredForNewSTA = errors.New("encryption is required when adding a new wireless client profile")
 
-// Connect connects to a WiFi network.
-// Each distinct SSID gets its own UCI section so saved profiles persist across connections.
-// All other STA sections are disabled (not deleted) when connecting to a new network.
-//
-// For an existing saved profile, an empty Password leaves the stored UCI key unchanged
-// (one-tap reconnect from the saved list).
 // radioForNewSTA picks which radio a newly created uplink STA should use.
 //
-// Two properties matter, and the second one used to be missing entirely.
+// It is DETERMINISTIC (no map-order dependence): the chosen radio decides whether
+// the uplink shares a PHY with an access point.
 //
-// It must be DETERMINISTIC. The previous implementation took the first radio
-// found by ranging over a map, so the same request landed on radio0 or radio1
-// depending on Go's randomised iteration order. Downstream that is not cosmetic:
-// the chosen radio decides whether the uplink ends up sharing a PHY with an access
-// point.
-//
-// So it must also PREFER a radio that is not currently running an enabled access
-// point, the same way preferredGuestRadio does for a guest AP. A stock config has
-// an access point on every radio, so whichever one is chosen,
-// splitAPOffUplinkRadio disables that radio's access point to keep the uplink
-// alone. On the NEXT connect, preferring the now-bare radio means the previously
-// disabled access point is simply left off and no second one has to be torn down.
-// Without the preference, a second connect could pick the radio that now holds
-// the only remaining access point and be refused for it, leaving the operator
-// unable to move their uplink without first re-enabling an access point by hand.
+// It PREFERS a radio without an enabled access point, like preferredGuestRadio.
+// splitAPOffUplinkRadio disables the AP on whichever radio is chosen, so on the
+// next connect the now-bare radio is preferred and the remaining access point is
+// left alone instead of being refused for.
 func (w *WifiService) radioForNewSTA(sections map[string]map[string]string) (string, error) {
 	radios := make([]string, 0, len(sections))
 	for name, opts := range sections {
@@ -73,6 +57,12 @@ func (w *WifiService) radioForNewSTA(sections map[string]map[string]string) (str
 	return radios[0], nil
 }
 
+// Connect connects to a WiFi network.
+// Each distinct SSID gets its own UCI section so saved profiles persist across connections.
+// All other STA sections are disabled (not deleted) when connecting to a new network.
+//
+// For an existing saved profile, an empty Password leaves the stored UCI key unchanged
+// (one-tap reconnect from the saved list).
 func (w *WifiService) Connect(config models.WifiConfig) (*WirelessApplyResult, error) {
 	return w.mutateWireless([]string{"wireless", "network", "firewall"}, func() (*WirelessApplyResult, error) {
 		// WiFi client must use wwan (not wan) so netifd runs DHCP and routing uses it as WAN

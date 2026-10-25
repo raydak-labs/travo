@@ -1,10 +1,13 @@
 package services
 
 import (
+	"log/slog"
+
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,10 +24,6 @@ const (
 	defaultMinViableSignalDBm      = -80
 	bandSwitchCooldownSec          = 120
 )
-
-// bandSwitchGuardFile is a var, not a const, so tests can point the crash guard
-// at a temp directory instead of the real /etc/trafo.
-var bandSwitchGuardFile = crashGuardDir + "/band-switch-in-progress"
 
 // BandSwitchConfig holds user-configurable parameters for automatic band switching.
 type BandSwitchConfig struct {
@@ -72,6 +71,7 @@ type BandSwitchingService struct {
 	blockedRadio  string
 	stopCh        chan struct{}
 	stopOnce      sync.Once
+	crashGuard    guard.Guard
 }
 
 // NewBandSwitchingService creates a new BandSwitchingService.
@@ -82,6 +82,7 @@ func NewBandSwitchingService(wifi *WifiService, configFile string) *BandSwitchin
 		stopCh:     make(chan struct{}),
 		config:     defaultBandSwitchConfig(),
 		status:     BandSwitchStatus{State: "inactive"},
+		crashGuard: guard.New("band-switch"),
 	}
 	_ = svc.loadConfig()
 	return svc
@@ -141,11 +142,11 @@ func (b *BandSwitchingService) loadConfig() error {
 	}
 	var cfg BandSwitchConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		log.Printf("band-switching: %s is not valid JSON (%v); keeping defaults", b.configFile, err)
+		slog.Warn("band-switching: config is not valid JSON; keeping defaults", "path", b.configFile, "err", err)
 		return nil
 	}
 	if err := ValidateBandSwitchConfig(cfg); err != nil {
-		log.Printf("band-switching: %s is invalid (%v); keeping the default config", b.configFile, err)
+		slog.Warn("band-switching: config is invalid; keeping defaults", "path", b.configFile, "err", err)
 		return nil
 	}
 	b.mu.Lock()
@@ -184,8 +185,8 @@ func (b *BandSwitchingService) checkInterval() time.Duration {
 // Must be called once after service creation.
 func (b *BandSwitchingService) Start() {
 	// Safety: if a crash guard exists from a previous run, log and skip automatic switching.
-	if _, err := os.Stat(bandSwitchGuardFile); err == nil {
-		log.Printf("band-switching: crash guard found at %s — skipping auto switch; remove manually to re-enable", bandSwitchGuardFile)
+	if b.crashGuard.Present() {
+		slog.Warn("band-switching: crash guard found; automatic switching disabled until it is removed", "guard", b.crashGuard.Path())
 	}
 
 	go func() {
@@ -195,8 +196,7 @@ func (b *BandSwitchingService) Start() {
 		var (
 			weakSignalSecs int
 			// upSignalSecs accumulates how long the preferred band has been strong
-			// enough to return to. up_switch_delay_sec used to be parsed,
-			// validated and persisted, and then never read by any logic.
+			// enough to return to (up_switch_delay_sec).
 			upSignalSecs int
 			cooldownSec  int
 		)
@@ -228,7 +228,7 @@ func (b *BandSwitchingService) Start() {
 				b.refreshBlocked()
 
 				// Safety: do not switch if crash guard is present.
-				if _, err := os.Stat(bandSwitchGuardFile); err == nil {
+				if b.crashGuard.Present() {
 					b.mu.Lock()
 					b.status.State = "inactive"
 					b.mu.Unlock()
@@ -383,13 +383,8 @@ func (b *BandSwitchingService) setBlocked(reason, radio string) {
 }
 
 // refreshBlocked drops a recorded block the current radio layout no longer
-// justifies.
-//
-// Latching it for good was wrong once SwitchSTAToRadio stopped refusing every
-// layout that carries an access point: the switcher would go on reporting
-// "blocked" for a layout it can switch from, which is the card claiming a fault
-// the switcher has not observed. Re-reading the layout each tick costs a UCI
-// read and only when a block is actually on record.
+// justifies, so the UI never reports a fault the switcher has not observed. It
+// costs a UCI read, and only while a block is on record.
 func (b *BandSwitchingService) refreshBlocked() {
 	b.mu.RLock()
 	reason, radio := b.blockedReason, b.blockedRadio
@@ -415,7 +410,7 @@ func (b *BandSwitchingService) refreshBlocked() {
 		b.status.State = "monitoring"
 	}
 	b.mu.Unlock()
-	log.Printf("band-switching: %s can host the uplink again; no longer blocked", radio)
+	slog.Info("band-switching: radio can host the uplink again", "radio", radio)
 }
 
 // switchBlocked reports whether the uplink still cannot move to targetRadio:
@@ -447,11 +442,7 @@ func (b *BandSwitchingService) switchBlocked(targetRadio string) (bool, error) {
 }
 
 func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
-	// Write crash guard before touching wireless config.
-	if err := os.MkdirAll(filepath.Dir(bandSwitchGuardFile), 0750); err != nil {
-		return err
-	}
-	if err := os.WriteFile(bandSwitchGuardFile, []byte(reason), 0600); err != nil {
+	if err := b.crashGuard.Write(reason); err != nil {
 		return err
 	}
 
@@ -459,9 +450,9 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 
 	// Remove guard on success; on failure the guard remains to prevent retry loop.
 	if err == nil {
-		_ = os.Remove(bandSwitchGuardFile)
+		_ = b.crashGuard.Clear()
 		b.setBlocked("", "")
-		log.Printf("band-switching: %s", reason)
+		slog.Info("band-switching: switched", "reason", reason)
 		b.mu.Lock()
 		b.status.LastSwitchAt = time.Now().UTC().Format(time.RFC3339)
 		b.status.LastSwitchReason = reason
@@ -480,16 +471,15 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 		// AP on both radios), so what arrives here is a layout where no split
 		// is possible at all. Saying so is the difference between a feature the
 		// operator can see is stuck and one that silently never fires.
-		_ = os.Remove(bandSwitchGuardFile)
+		_ = b.crashGuard.Clear()
 		b.setBlocked(err.Error(), targetRadio)
-		log.Printf("band-switching: switch to %s blocked: %v — "+
-			"automatic band switching cannot make room on that radio", targetRadio, err)
+		slog.Warn("band-switching: switch blocked; no room on the target radio", "radio", targetRadio, "err", err)
 		b.mu.Lock()
 		b.status.LastSwitchReason = err.Error()
 		b.mu.Unlock()
 		return err
 	}
-	log.Printf("band-switching: switch failed: %v — guard file left in place", err)
+	slog.Error("band-switching: switch failed; crash guard kept", "err", err)
 	return err
 }
 
@@ -536,8 +526,7 @@ type BandRadioInfo struct {
 	Band string
 }
 
-// GetRadios returns a slim radio list for band switching logic.
-// It wraps WifiService.GetRadios() to avoid import cycles on models.
+// getRadios returns a slim radio list for band switching logic.
 func (b *BandSwitchingService) getRadios() []BandRadioInfo {
 	radios, err := b.wifi.GetRadios()
 	if err != nil {

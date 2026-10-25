@@ -32,11 +32,9 @@ func (c *CaptiveService) readDHCPDNS() string {
 // dnsmasqLayers returns this service's view of the shared stack.
 func (c *CaptiveService) dnsmasqLayers() *dnsmasqLayerStackFile {
 	path := c.dnsStackPath
-	if path == "" && c.guardFile != "" {
-		// /etc/trafo in production: the same file the VPN and AdGuard paths use,
-		// derived rather than hard-coded so a test service pointed at a temp
-		// guard file cannot reach the real record.
-		path = filepath.Join(filepath.Dir(c.guardFile), dnsmasqLayerStackFileName)
+	if path == "" && c.dnsGuard.Path() != "" {
+		// Next to the guard: /etc/trafo in production, a temp dir in tests.
+		path = filepath.Join(filepath.Dir(c.dnsGuard.Path()), dnsmasqLayerStackFileName)
 	}
 	return &dnsmasqLayerStackFile{dns: commandRunnerDNS{cmd: c.cmd}, path: path}
 }
@@ -59,31 +57,6 @@ func (c *CaptiveService) setDnsmasqOption(option, value string) error {
 		return nil
 	}
 	_, err := c.cmd.Run("uci", "set", "dhcp.@dnsmasq[0]."+option+"="+value)
-	return err
-}
-
-// deleteDnsmasqOption deletes a dnsmasq option via uci delete.
-// deleteDnsmasqOption removes a dnsmasq option. A missing option is not a
-// failure: the AdGuard-only bypass path never creates a `server` list, and
-// treating "Entry not found" as an error made RestoreDNS fail on every attempt,
-// which kept the guard forever and left IsDNSBypassed stuck true.
-func (c *CaptiveService) deleteDnsmasqOption(option string) error {
-	if c.cmd == nil {
-		return nil
-	}
-	out, err := c.cmd.Run("uci", "delete", "dhcp.@dnsmasq[0]."+option)
-	if err != nil && strings.Contains(string(out)+err.Error(), "Entry not found") {
-		return nil
-	}
-	return err
-}
-
-// addDnsmasqListItem appends a value to a dnsmasq list option.
-func (c *CaptiveService) addDnsmasqListItem(option, value string) error {
-	if c.cmd == nil {
-		return nil
-	}
-	_, err := c.cmd.Run("uci", "add_list", "dhcp.@dnsmasq[0]."+option+"="+value)
 	return err
 }
 
