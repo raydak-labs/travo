@@ -417,3 +417,80 @@ func TestRemoveWiFiScheduleCronLinesReplacesTheFileAtomically(t *testing.T) {
 		t.Error("the atomic write left its temp file behind")
 	}
 }
+
+func TestGetAutoReconnect_Default(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
+
+	enabled, err := svc.GetAutoReconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if enabled {
+		t.Error("expected auto-reconnect to be disabled by default")
+	}
+}
+
+func TestSetAutoReconnect_Enable(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
+
+	err := svc.SetAutoReconnect(true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	enabled, err := svc.GetAutoReconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !enabled {
+		t.Error("expected auto-reconnect to be enabled")
+	}
+
+	// Verify script was written and uses "wifi up" (not "wifi reload") for ath11k safety
+	data, err := os.ReadFile(tmpDir + "/wifi-reconnect.sh")
+	if err != nil {
+		t.Fatalf("expected script to exist: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("expected non-empty script")
+	}
+	if !strings.Contains(string(data), "wifi up") {
+		t.Error("expected script to use 'wifi up' for reassociation (avoids ath11k crash from wifi reload)")
+	}
+	if !strings.Contains(string(data), "crash-guard") {
+		t.Error("expected script to include crash guard check")
+	}
+}
+
+func TestSetAutoReconnect_Disable(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	tmpDir := t.TempDir()
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: tmpDir + "/priorities.json", AutoReconnectFile: tmpDir + "/autoreconnect.json", ReconnectScript: tmpDir + "/wifi-reconnect.sh"})
+
+	// Enable first, then disable
+	_ = svc.SetAutoReconnect(true)
+	err := svc.SetAutoReconnect(false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	enabled, err := svc.GetAutoReconnect()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if enabled {
+		t.Error("expected auto-reconnect to be disabled")
+	}
+
+	// Verify script was removed
+	if _, err := os.Stat(tmpDir + "/wifi-reconnect.sh"); err == nil {
+		t.Error("expected script to be removed")
+	}
+}
