@@ -10,7 +10,7 @@ import { http, HttpResponse } from 'msw/http';
 import type { ReactNode } from 'react';
 import { server } from '@/mocks/server';
 import { API_ROUTES } from '@shared/index';
-import type { NetworkInterface, NetworkInterfaceType, NetworkStatus } from '@shared/index';
+import type { NetworkInterface, NetworkStatus } from '@shared/index';
 import { mockNetworkStatus } from '@/mocks/data';
 import { setToken } from '@/lib/api-client';
 
@@ -36,7 +36,7 @@ function setWs({ connected }: { connected: boolean }) {
   });
 }
 
-function makeIface(type: NetworkInterfaceType, up: boolean, name = 'wan'): NetworkInterface {
+function makeIface(type: string, up: boolean, name = 'wan'): NetworkInterface {
   return {
     name,
     type,

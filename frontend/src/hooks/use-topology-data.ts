@@ -1,6 +1,6 @@
 import { Cable, Wifi, Smartphone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { NetworkStatus, WanType } from '@shared/index';
+import type { NetworkStatus } from '@shared/index';
 import { networkMedium, type NetworkMedium } from '@shared/index';
 import { useNetworkStatus, useIPv6Status, useWanConfig } from './use-network';
 import { useWifiConnection } from './use-wifi';
@@ -40,8 +40,8 @@ export interface TopologyData {
   wan: NetworkStatus['wan'];
   /** Medium the WAN uplink runs over (ethernet / wifi / usb / …). */
   wanMedium: NetworkMedium;
-  /** WAN connection protocol (dhcp / static / pppoe), from the WAN config. */
-  wanProtocol: WanType | null;
+  /** WAN connection protocol: the UCI proto (dhcp, static, pppoe, …). */
+  wanProtocol: string | null;
   wifiConn: ReturnType<typeof useWifiConnection>['data'];
   usbTether: ReturnType<typeof useUSBTetherStatus>['data'];
   sysInfo: ReturnType<typeof useSystemInfo>['data'];
@@ -87,7 +87,7 @@ export function useTopologyData(): TopologyData {
   const { data: wanConfig } = useWanConfig();
 
   // Connection type derivation — the interface discriminator says which
-  // medium the uplink actually runs over (see NetworkInterfaceType).
+  // medium the uplink actually runs over (see networkMedium).
   const wan = network?.wan ?? null;
   const wanMedium = networkMedium(wan);
   const ethernetUp = wan?.is_up === true && wanMedium === 'ethernet';

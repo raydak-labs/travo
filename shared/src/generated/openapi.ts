@@ -2732,7 +2732,7 @@ export interface components {
             readonly interfaces: readonly components["schemas"]["NetworkInterface"][];
             readonly internet_reachable: boolean;
             readonly lan: components["schemas"]["NetworkInterface"];
-            readonly wan: components["schemas"]["NetworkInterface"];
+            readonly wan: components["schemas"]["NetworkInterface"] | null;
         };
         readonly OK: {
             readonly ok: boolean;

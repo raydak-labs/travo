@@ -2,7 +2,12 @@ packages:
   - 'frontend'
   - 'shared'
   # openapi-typescript drives the TypeScript compiler API, which TypeScript 7
-  # (ADR 0011) does not ship, so the generator lives apart with its own 5.x.
+  # (ADR 0011) does not ship, so the generator lives apart with TypeScript 6,
+  # the last release of the JavaScript compiler.
   - 'tools/openapi-gen'
 allowBuilds:
   msw: true
+peerDependencyRules:
+  allowedVersions:
+    # openapi-typescript declares ^5.x; 6.0 generates byte-identical output.
+    openapi-typescript>typescript: '6'

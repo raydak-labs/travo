@@ -7,7 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TrafficRate } from '@/components/traffic-rate';
 import { TimezoneAlert } from '@/components/timezone-alert';
 import { useTopologyData } from '@/hooks/use-topology-data';
-import type { WanType } from '@shared/index';
 import { UPLINK_INACTIVE, UPLINK_LABELS } from '@/lib/uplink';
 import { formatUptime } from '@/lib/utils';
 import { QuickActions } from '@/pages/dashboard/quick-actions';
@@ -18,7 +17,8 @@ import { useUplinkRates } from '@/pages/dashboard/use-uplink-rates';
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 /** Human labels for the WAN connection protocol reported by the WAN config. */
-const WAN_PROTOCOL_LABEL: Record<WanType, string> = {
+/** Labels for the common UCI protos; any other renders as its raw name. */
+const WAN_PROTOCOL_LABEL: Partial<Record<string, string>> = {
   dhcp: 'DHCP',
   static: 'Static',
   pppoe: 'PPPoE',

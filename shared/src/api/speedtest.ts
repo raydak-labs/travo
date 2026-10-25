@@ -1,11 +1,7 @@
-export interface SpeedtestServiceStatus {
-  readonly installed: boolean;
-  readonly supported: boolean;
-  readonly architecture: string;
-  readonly version: string;
-  readonly package_name: string;
-  readonly storage_size_mb: number;
-}
+import type { SpeedtestService } from '../generated/schemas';
+
+/** Generated as SpeedtestService. */
+export type SpeedtestServiceStatus = SpeedtestService;
 
 export type { SpeedTestResult } from './system';
 export { isSpeedTestResult } from './system';

@@ -70,7 +70,7 @@ travo/
 ├── frontend/     # React + Vite + Tailwind
 ├── backend/      # Go + Fiber, one package per domain
 ├── shared/       # TS API types (partly generated, see below)
-├── tools/openapi-gen/  # openapi-typescript, isolated with its own TypeScript 5
+├── tools/openapi-gen/  # openapi-typescript, isolated with TypeScript 6
 ├── scripts/      # dev, deploy, install helpers
 ├── test/integration/  # real-device integration runners (SSH + API)
 ├── docs/         # Obsidian vault; hub [`+ Start here.md`](../+ Start here.md); ADRs in docs/adr/
@@ -95,7 +95,9 @@ written by hand there are UI-side unions and helpers the backend does not descri
 as an open string), such as `WifiMode` and `NetworkStatus`.
 
 The generator lives in `tools/openapi-gen` because openapi-typescript drives the TypeScript
-compiler API, which the repo's TypeScript 7 does not ship.
+compiler API, which the repo's TypeScript 7 does not ship. It uses TypeScript 6, the last release
+of the JavaScript compiler; openapi-typescript's peer range still says `^5.x`, so the workspace
+allows 6 explicitly (`peerDependencyRules`).
 
 ## Tests
 

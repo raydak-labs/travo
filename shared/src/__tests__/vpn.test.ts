@@ -1,47 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  isVpnStatus,
-  type VpnType,
-  type VpnStatus,
-  type WireguardConfig,
-  type WireguardPeer,
-  type TailscaleStatus,
-} from '../api/vpn';
-
-describe('VpnType', () => {
-  it('has correct values', () => {
-    const types: VpnType[] = ['wireguard', 'openvpn', 'tailscale'];
-    expect(types).toHaveLength(3);
-  });
-});
-
-describe('VpnStatus', () => {
-  const validStatus: VpnStatus = {
-    type: 'wireguard',
-    enabled: true,
-    connected: true,
-    connected_since: '2025-01-01T00:00:00Z',
-    endpoint: '1.2.3.4:51820',
-    rx_bytes: 1000000,
-    tx_bytes: 2000000,
-  };
-
-  it('validates a correct VpnStatus', () => {
-    expect(isVpnStatus(validStatus)).toBe(true);
-  });
-
-  it('rejects invalid data', () => {
-    expect(isVpnStatus(null)).toBe(false);
-    expect(isVpnStatus({})).toBe(false);
-    expect(isVpnStatus({ type: 'wireguard' })).toBe(false);
-    expect(isVpnStatus('string')).toBe(false);
-  });
-
-  it('rejects wrong types', () => {
-    expect(isVpnStatus({ ...validStatus, enabled: 'yes' })).toBe(false);
-    expect(isVpnStatus({ ...validStatus, rx_bytes: '100' })).toBe(false);
-  });
-});
+import { type WireguardConfig, type WireguardPeer, type TailscaleStatus } from '../api/vpn';
 
 describe('WireguardConfig', () => {
   it('validates structure', () => {

@@ -1,3 +1,5 @@
+import type { FailoverCandidate } from '../generated/schemas';
+
 // Generated from the backend's OpenAPI document (make generate).
 export type {
   FailoverCandidate,
@@ -6,7 +8,4 @@ export type {
   FailoverHealthConfig,
 } from '../generated/schemas';
 
-export type FailoverCandidateKind = 'ethernet' | 'wifi' | 'usb';
-
-export type FailoverTrackingState =
-  'online' | 'offline' | 'disabled' | 'not_installed' | 'not_available' | 'unknown';
+export type FailoverTrackingState = FailoverCandidate['tracking_state'];
