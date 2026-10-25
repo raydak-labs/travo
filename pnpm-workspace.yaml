@@ -4,4 +4,7 @@ packages:
   # The API generator (orval) and its dependency tree stay out of the app packages.
   - 'tools/openapi-gen'
 allowBuilds:
+  # esbuild's install script only re-checks the platform binary that its optional
+  # dependency already installed; orval runs fine without it.
+  esbuild: false
   msw: true
