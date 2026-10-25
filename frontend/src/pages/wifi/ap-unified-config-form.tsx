@@ -37,8 +37,8 @@ import {
 } from '@/lib/ap-section-apply';
 import { normalizeApEncryption } from './ap-config-normalize';
 import { ApRadioDisableDialog } from './ap-radio-disable-dialog';
+import { formatWifiBandLabel } from '@/lib/wifi-band';
 import {
-  bandLabel,
   pickPrimaryAp,
   credentialsMatchAcross,
   rollbackIsComplete,
@@ -230,8 +230,8 @@ export function APUnifiedConfigForm({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         {mismatch ? (
           <p className="text-xs text-amber-700 dark:text-amber-300">
-            Bands currently use different names or passwords. Showing {bandLabel(primary.band)};
-            saving applies these values to all bands.
+            Bands currently use different names or passwords. Showing{' '}
+            {formatWifiBandLabel(primary.band)}; saving applies these values to all bands.
           </p>
         ) : null}
 
@@ -253,7 +253,7 @@ export function APUnifiedConfigForm({
                   <span className="text-sm font-medium text-gray-900 dark:text-white">
                     {ap.radio}
                   </span>
-                  <Badge variant="outline">{bandLabel(ap.band)}</Badge>
+                  <Badge variant="outline">{formatWifiBandLabel(ap.band)}</Badge>
                   <span className="text-xs text-gray-500 dark:text-gray-400">Ch {ap.channel}</span>
                 </div>
                 <Switch

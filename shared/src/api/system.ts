@@ -1,4 +1,4 @@
-import type { HardwareButton, SpeedTestResult } from '../generated/schemas';
+import type { HardwareButton, SpeedTestResult } from '../generated/model';
 
 // Generated from the backend's OpenAPI document (make generate).
 export type {
@@ -27,7 +27,7 @@ export type {
   SystemInfo,
   SystemStats,
   TimezoneConfig,
-} from '../generated/schemas';
+} from '../generated/model';
 
 /** Valid hardware button actions */
 export type ButtonAction = HardwareButton['action'];

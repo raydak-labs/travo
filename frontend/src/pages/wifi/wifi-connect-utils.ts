@@ -1,4 +1,4 @@
-import type { GroupedScanNetwork, WifiBand } from '@shared/index';
+import type { GroupedScanNetwork, SavedNetwork, WifiBand, WifiConnection } from '@shared/index';
 
 export const DOWN_SWITCH_THRESHOLD_DBM = -70;
 
@@ -48,4 +48,18 @@ export function pickDefaultBandFromOptions(bandOptions: BandOption[]): string | 
   if (five && five.dbm >= DOWN_SWITCH_THRESHOLD_DBM) return '5ghz';
   if (two) return '2.4ghz';
   return bandOptions[0]?.band ?? null;
+}
+
+export type SavedNetworkStatus = 'connected' | 'not-connected' | 'standby';
+
+/**
+ * A saved profile's row status. The enabled profile is only "connected" while
+ * the uplink is associated with it; out of range it is enabled but idle.
+ */
+export function savedNetworkStatus(
+  network: Pick<SavedNetwork, 'ssid' | 'auto_connect'>,
+  connection: Pick<WifiConnection, 'connected' | 'ssid'> | undefined,
+): SavedNetworkStatus {
+  if (!network.auto_connect) return 'standby';
+  return connection?.connected && connection.ssid === network.ssid ? 'connected' : 'not-connected';
 }

@@ -1,4 +1,4 @@
-import type { SpeedtestService } from '../generated/schemas';
+import type { SpeedtestService } from '../generated/model';
 
 /** Generated as SpeedtestService. */
 export type SpeedtestServiceStatus = SpeedtestService;

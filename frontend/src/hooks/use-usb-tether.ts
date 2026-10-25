@@ -1,13 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { USBTetherStatus } from '@shared/index';
+import { configureUSBTether, getUSBTetherStatus, unconfigureUSBTether } from '@/api/endpoints';
 
 export function useUSBTetherStatus() {
   return useQuery({
     queryKey: ['usb-tethering'],
-    queryFn: () => apiClient.get<USBTetherStatus>(API_ROUTES.network.usbTethering),
+    queryFn: () => getUSBTetherStatus(),
     refetchInterval: 10_000,
   });
 }
@@ -16,7 +14,7 @@ export function useConfigureUSBTether() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (ifaceName: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.usbTetheringConfigure, {
+      configureUSBTether({
         interface: ifaceName,
       }),
     onSuccess: () => {
@@ -32,8 +30,7 @@ export function useConfigureUSBTether() {
 export function useUnconfigureUSBTether() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.usbTetheringUnconfigure, {}),
+    mutationFn: () => unconfigureUSBTether(),
     onSuccess: () => {
       toast.success('USB tethering removed');
       void queryClient.invalidateQueries({ queryKey: ['usb-tethering'] });

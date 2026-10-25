@@ -1,12 +1,6 @@
-import type { paths } from '../generated/openapi';
+import type { ApiPath } from '../generated/paths';
 
-/** `/a/{id}/b` → `/a/:id/b`, the form apiClient's route helpers fill in. */
-type ColonParams<P extends string> = P extends `${infer A}{${infer N}}${infer B}`
-  ? ColonParams<`${A}:${N}${B}`>
-  : P;
-
-/** Every path the backend serves, from the generated OpenAPI document. */
-export type ApiPath = ColonParams<Extract<keyof paths, string>>;
+export type { ApiPath };
 
 interface RouteTree {
   readonly [key: string]: ApiPath | RouteTree;

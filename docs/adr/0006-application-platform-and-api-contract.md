@@ -103,11 +103,26 @@ knobs:
   schemas (required fields, partial updates); enforcing the schema would have changed behaviour on
   every endpoint at once.
 
+- The client is generated with **orval** (`tools/openapi-gen`): one request function per
+  operation, through the app's own `apiFetch`. openapi-typescript and Hey API both drive the
+  TypeScript compiler API, which TypeScript 7 no longer ships, so they would pin the repo to an
+  older compiler; orval needs no TypeScript at all.
+
 ## Consequences and invariants
 
 - Changing an API shape is changing a Go type; the spec and the generated frontend types follow.
   Breaking a shape is still a contract change: update the frontend in the same change.
 - A new endpoint is added with `get`/`post`/`put`/`del`, never with `app.Get` on the Fiber app.
+- Responses and WebSocket messages are encoded by `jsonx.Marshal`: a nil slice is `[]` and a
+  nil map `{}`, because the document declares arrays non-nullable. On the device, interfaces
+  without DNS servers and an empty split-tunnel route list were sent as `null` (OpenWrt 25.12.3,
+  2026-10-25) before this.
+- `TestMockResponsesMatchTheirSchemas` validates every parameterless GET in mock mode against its
+  own schema; a mock that drifts from the contract fails CI.
+- The frontend calls the REST API through the generated functions in
+  `frontend/src/api/endpoints.ts`; only NDJSON streams (`streamRequest`) and the backup download
+  (`getBlob`) go through `api-client.ts` directly. A request body the spec does not describe
+  cannot be sent, so an undocumented form field is a spec bug (`formFlag`).
 - Type names must be unique across packages: the schema namer drops the package name.
 - Raising or lowering a value in §5 needs a reason tied to a device constraint.
 
@@ -116,6 +131,7 @@ knobs:
 - Path and query parameters are strings; handlers parse numbers themselves.
 - Uploads (`/system/restore`, `/system/firmware/upgrade`) and streams (backup download, NDJSON
   package installs) read and write through the Fiber context; their bodies are documented by hand
-  (`upload`, `ndjson`).
+  (`upload`, `formFlag`, `ndjson`). orval cannot type a binary or streamed response, so those two
+  calls stay hand-written.
 - The schema documents responses precisely but does not validate requests.
 - The WebSocket at `/api/v1/ws` is outside the REST contract.

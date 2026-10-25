@@ -1,5 +1,6 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { formatWifiBandLabel } from '@/lib/wifi-band';
 import type { APConfig } from '@shared/index';
 
 interface WifiQRDialogProps {
@@ -22,7 +23,7 @@ function getWifiQRString(ap: APConfig): string {
 export function WifiQRDialog({ open, onOpenChange, ap }: WifiQRDialogProps) {
   if (!ap) return null;
 
-  const bandLabel = ap.band === '2g' ? '2.4 GHz' : ap.band === '5g' ? '5 GHz' : ap.band;
+  const bandLabel = formatWifiBandLabel(ap.band);
   const encLabel = ap.encryption === 'none' ? 'Open' : ap.encryption.toUpperCase();
 
   return (

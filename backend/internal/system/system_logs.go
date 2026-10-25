@@ -12,7 +12,7 @@ import (
 // If service is non-empty, only lines containing that service name (case-insensitive) are returned.
 // If level is non-empty, only lines at or above that severity are returned.
 func (s *Service) GetLogs(service, level string) (models.LogResponse, error) {
-	out, err := streamLogTail(execx.Quick, "logread")
+	out, err := s.readLog("logread")
 	if err != nil {
 		return models.LogResponse{}, err
 	}
@@ -21,12 +21,23 @@ func (s *Service) GetLogs(service, level string) (models.LogResponse, error) {
 
 // GetKernelLogs retrieves kernel logs from dmesg.
 func (s *Service) GetKernelLogs() (models.LogResponse, error) {
-	out, err := streamLogTail(execx.Quick, "dmesg")
+	out, err := s.readLog("dmesg")
 	if err != nil {
 		return models.LogResponse{}, err
 	}
 	return parseLogOutput("kernel", out, "", ""), nil
 }
+
+// readLog returns the bounded tail of logread or dmesg.
+func (s *Service) readLog(cmd string) (string, error) {
+	if s.logTail != nil {
+		return s.logTail(cmd)
+	}
+	return streamLogTail(execx.Quick, cmd)
+}
+
+// SetLogTail replaces the log source; mock mode passes MockLogTail.
+func (s *Service) SetLogTail(fn func(cmd string) (string, error)) { s.logTail = fn }
 
 // logLevelSeverity maps syslog level names to numeric severity (lower = more severe).
 var logLevelSeverity = map[string]int{

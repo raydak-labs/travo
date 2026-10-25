@@ -40,6 +40,7 @@
   },
   "ignorePatterns": [
     "shared/src/generated/**",
+    "frontend/src/api/**",
     "dist",
     "build",
     "node_modules",

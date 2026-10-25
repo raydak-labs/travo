@@ -29,7 +29,10 @@ type recordingRunner struct {
 func (r *recordingRunner) Run(name string, args ...string) ([]byte, error) {
 	r.calls = append(r.calls, strings.TrimSpace(name+" "+strings.Join(args, " ")))
 	switch {
-	case strings.HasPrefix(name, "ip"), name == "uci" && len(args) > 0 && args[0] == "commit":
+	case name == "ip":
+		// An uplink with a gateway: the status probes only when one exists.
+		return []byte("default via 10.0.1.1 dev phy0-sta0\n"), nil
+	case name == "uci" && len(args) > 0 && args[0] == "commit":
 		return []byte(""), nil
 	case name == "/etc/init.d/dnsmasq":
 		return nil, nil

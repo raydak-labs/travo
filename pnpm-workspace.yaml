@@ -1,13 +1,10 @@
 packages:
   - 'frontend'
   - 'shared'
-  # openapi-typescript drives the TypeScript compiler API, which TypeScript 7
-  # (ADR 0011) does not ship, so the generator lives apart with TypeScript 6,
-  # the last release of the JavaScript compiler.
+  # The API generator (orval) and its dependency tree stay out of the app packages.
   - 'tools/openapi-gen'
 allowBuilds:
+  # esbuild's install script only re-checks the platform binary that its optional
+  # dependency already installed; orval runs fine without it.
+  esbuild: false
   msw: true
-peerDependencyRules:
-  allowedVersions:
-    # openapi-typescript declares ^5.x; 6.0 generates byte-identical output.
-    openapi-typescript>typescript: '6'

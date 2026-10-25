@@ -225,6 +225,12 @@ status read that heals rather than only reports, and that is deliberate.
 ### 4. Captive portal detection and temporary DNS bypass
 
 - **Detection** uses an HTTP probe (e.g. `connectivitycheck.gstatic.com/generate_204`) with redirect inspection (`CaptiveService`).
+- **The status probe is shared and skipped when pointless** (`CaptiveService.Status`). Without a
+  default route it answers at once: on the GL-AXT1800 (OpenWrt 25.12.3) an offline status took
+  3 s, the probe's timeout spent on DNS. A route counts whether it has a gateway or only a device
+  (`default dev wg0`), so an active WireGuard tunnel is an upstream. Concurrent callers share one
+  probe and reuse it for 2 s (four parallel polls took 23–95 ms, each probing in turn); a DNS
+  bypass, restore or auto-accept invalidates the cached result.
 - **Bypass** (`BypassDNS`) runs when portal-related DNS is likely blocked, including:
   - dnsmasq **`noresolv=1`** (custom forwarders only),
   - legacy **`network.wan`** static DNS with `peerdns=0`, or

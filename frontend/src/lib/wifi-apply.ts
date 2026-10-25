@@ -1,6 +1,6 @@
-import { API_ROUTES } from '@shared/index';
 import type { WifiMutationResponse } from '@shared/index';
-import { apiClient, ApiError } from '@/lib/api-client';
+import { ApiError } from '@/lib/api-client';
+import { confirmWiFiApply } from '@/api/endpoints';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -152,7 +152,7 @@ export async function confirmWifiApply(
 
   while (Date.now() <= deadline) {
     try {
-      await apiClient.post<{ status: string }>(API_ROUTES.wifi.applyConfirm, { token });
+      await confirmWiFiApply({ token });
       return;
     } catch (error) {
       lastError = error;

@@ -11,7 +11,7 @@ Tooling versions are also pinned in [`.mise.toml`](../../.mise.toml) (use [mise]
 
 ## Prerequisites
 
-- **Node.js** >= 20 (CI uses 24)
+- **Node.js** >= 22.18 (orval's minimum; mise and CI use the version in `.mise.toml`)
 - **pnpm** 10.x (see `package.json` / lockfile)
 - **Go** >= 1.23 (`backend/go.mod`)
 - **Docker** + Docker Compose (optional)
@@ -70,7 +70,7 @@ travo/
 ├── frontend/     # React + Vite + Tailwind
 ├── backend/      # Go + Fiber, one package per domain
 ├── shared/       # TS API types (partly generated, see below)
-├── tools/openapi-gen/  # openapi-typescript, isolated with TypeScript 6
+├── tools/openapi-gen/  # orval: OpenAPI → TS types and request functions
 ├── scripts/      # dev, deploy, install helpers
 ├── test/integration/  # real-device integration runners (SSH + API)
 ├── docs/         # Obsidian vault; hub [`+ Start here.md`](../+ Start here.md); ADRs in docs/adr/
@@ -86,21 +86,25 @@ types are generated from it:
 1. Change or add the operation in `backend/internal/api/*_api.go` (`get`, `post`, `put`, `del`)
    and the Go types it uses. Narrow string fields with `enum:"a,b"` where the backend only ever
    sends those values.
-2. Run `make generate`. It rewrites `shared/openapi.json`, `shared/src/generated/openapi.ts`
-   (`paths`, `components`) and `shared/src/generated/schemas.ts` (one alias per schema).
+2. Run `make generate`. It rewrites `shared/openapi.json`, the schema types in
+   `shared/src/generated/model/`, the path union in `shared/src/generated/paths.ts` and the
+   request functions in `frontend/src/api/endpoints.ts` (one per `operationId`).
 3. Commit the generated files. CI's lint job fails when they are stale.
 
-`API_ROUTES` (`shared/src/api/routes.ts`) is checked against the generated `paths`: a route the
-backend does not serve fails to compile.
+Hooks call the generated functions (`getWiFiConnection()`, `setAPConfig(section, body)`); they
+go through `apiFetch` in `frontend/src/lib/api-client.ts`, which adds the token and turns errors
+into `ApiError`. In tests, mock the function with `vi.mock('@/api/endpoints', …)`.
+
+`API_ROUTES` (`shared/src/api/routes.ts`) is checked against the generated `ApiPath` union: a
+route the backend does not serve fails to compile.
 
 `shared/src/api/*.ts` re-exports the generated types under their existing names. Unions such as
 `WifiMode` are derived from them; the few types still written by hand are UI-side (for example
 `GroupedScanNetwork`) or request values the backend does not describe as a fixed set.
 
-The generator lives in `tools/openapi-gen` because openapi-typescript drives the TypeScript
-compiler API, which the repo's TypeScript 7 does not ship. It uses TypeScript 6, the last release
-of the JavaScript compiler; openapi-typescript's peer range still says `^5.x`, so the workspace
-allows 6 explicitly (`peerDependencyRules`).
+The generator is orval (`tools/openapi-gen/orval.config.mjs`), kept in its own workspace
+package so its dependency tree stays out of the app. `postprocess.mjs` encodes path parameters
+and writes `paths.ts`. Why orval and not openapi-typescript: ADR 0006 §Why.
 
 ## Tests
 

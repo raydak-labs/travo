@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { apiClient, getToken } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { SessionResponse } from '@shared/index';
+import { getToken } from '@/lib/api-client';
+import { getSession } from '@/api/endpoints';
 
 const WARNING_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const CHECK_INTERVAL_MS = 30_000; // 30 seconds
@@ -32,7 +31,7 @@ export function useSessionTimeout(): void {
       if (refreshing) return;
       refreshing = true;
       try {
-        const session = await apiClient.get<SessionResponse>(API_ROUTES.auth.session);
+        const session = await getSession();
         if (!cancelled && session.expires_in > 0) {
           const nextDeadline = performance.now() + session.expires_in * 1000;
           // A deadline that moved forwards is a re-issued session, so clear the

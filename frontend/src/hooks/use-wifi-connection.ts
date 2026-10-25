@@ -5,26 +5,26 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithSegment } from '@/lib/api-url';
 import { finalizeWifiMutation } from '@/lib/wifi-apply';
 import { refreshRouterState } from '@/lib/router-state-refresh';
-import { API_ROUTES } from '@shared/index';
-import type {
-  WifiScanResult,
-  WifiConnection,
-  WifiHealth,
-  SavedNetwork,
-  WifiMode,
-  NetworkPriorityRequest,
-  WifiMutationResponse,
-} from '@shared/index';
+import type { WifiMode, NetworkPriorityRequest } from '@shared/index';
 import { wifiMutationSettled } from './use-wifi-settled';
+import {
+  deleteSavedNetwork,
+  getSavedNetworks,
+  getWiFiConnection,
+  getWiFiHealth,
+  setNetworkPriority,
+  setWiFiMode,
+  wiFiConnect,
+  wiFiDisconnect,
+  wiFiScan,
+} from '@/api/endpoints';
 
 export function useWifiScan(enabled = true) {
   return useQuery({
     queryKey: ['wifi', 'scan'],
-    queryFn: () => apiClient.get<WifiScanResult[]>(API_ROUTES.wifi.scan),
+    queryFn: () => wiFiScan(),
     enabled,
   });
 }
@@ -32,14 +32,14 @@ export function useWifiScan(enabled = true) {
 export function useWifiConnection() {
   return useQuery({
     queryKey: ['wifi', 'connection'],
-    queryFn: () => apiClient.get<WifiConnection>(API_ROUTES.wifi.connection),
+    queryFn: () => getWiFiConnection(),
   });
 }
 
 export function useWifiHealth() {
   return useQuery({
     queryKey: ['wifi', 'health'],
-    queryFn: () => apiClient.get<WifiHealth>(API_ROUTES.wifi.health),
+    queryFn: () => getWiFiHealth(),
     refetchInterval: 15_000,
   });
 }
@@ -54,8 +54,7 @@ export function useWifiConnect() {
       hidden?: boolean;
       /** Preferred band for dual-band networks (2.4ghz, 5ghz, 6ghz) */
       band?: string;
-    }) =>
-      finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.connect, params)),
+    }) => finalizeWifiMutation(wiFiConnect(params)),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
       wifiMutationSettled(queryClient, [
@@ -73,8 +72,7 @@ export function useWifiConnect() {
 export function useWifiDisconnect() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      finalizeWifiMutation(apiClient.post<WifiMutationResponse>(API_ROUTES.wifi.disconnect)),
+    mutationFn: () => finalizeWifiMutation(wiFiDisconnect()),
     onSuccess: () => {
       toast.success('Disconnected from WiFi');
       wifiMutationSettled(queryClient, [
@@ -103,7 +101,7 @@ export function useWifiMode() {
       acknowledge_lockout?: boolean;
     }) =>
       finalizeWifiMutation(
-        apiClient.put<WifiMutationResponse>(API_ROUTES.wifi.mode, {
+        setWiFiMode({
           mode,
           ...(acknowledge_lockout ? { acknowledge_lockout: true } : {}),
         }),
@@ -130,17 +128,14 @@ export function useWifiMode() {
 export function useSavedNetworks() {
   return useQuery({
     queryKey: ['wifi', 'saved'],
-    queryFn: () => apiClient.get<SavedNetwork[]>(API_ROUTES.wifi.saved),
+    queryFn: () => getSavedNetworks(),
   });
 }
 
 export function useWifiDelete() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (section: string) =>
-      finalizeWifiMutation(
-        apiClient.del<WifiMutationResponse>(routeWithSegment(API_ROUTES.wifi.deleteSaved, section)),
-      ),
+    mutationFn: (section: string) => finalizeWifiMutation(deleteSavedNetwork(section)),
     onSuccess: () => {
       toast.success('Network removed');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });
@@ -155,8 +150,7 @@ export function useWifiDelete() {
 export function useSetNetworkPriority() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: NetworkPriorityRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.wifi.savedPriority, req),
+    mutationFn: (req: NetworkPriorityRequest) => setNetworkPriority(req),
     onSuccess: () => {
       toast.success('Network priority updated');
       void queryClient.invalidateQueries({ queryKey: ['wifi', 'saved'] });

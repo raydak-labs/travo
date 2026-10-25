@@ -2,22 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSessionTimeout } from '../use-session-timeout';
 
-// Mock api-client
 vi.mock('@/lib/api-client', () => ({
-  apiClient: { get: vi.fn() },
   getToken: vi.fn(),
   handleUnauthorized: vi.fn(),
 }));
+vi.mock('@/api/endpoints', () => ({
+  getSession: vi.fn(),
+}));
 
-// Mock sonner
 vi.mock('sonner', () => ({
   toast: { warning: vi.fn() },
 }));
 
-import { apiClient, getToken, handleUnauthorized } from '@/lib/api-client';
+import { getToken, handleUnauthorized } from '@/lib/api-client';
+import { getSession } from '@/api/endpoints';
 import { toast } from 'sonner';
 
-const mockedGet = vi.mocked(apiClient.get);
+const mockedGet = vi.mocked(getSession);
 const mockedGetToken = vi.mocked(getToken);
 const mockedHandleUnauthorized = vi.mocked(handleUnauthorized);
 const mockedToastWarning = vi.mocked(toast.warning);
@@ -60,7 +61,7 @@ describe('useSessionTimeout', () => {
     renderHook(() => useSessionTimeout());
     await flush();
 
-    expect(mockedGet).toHaveBeenCalledWith('/api/v1/auth/session');
+    expect(mockedGet).toHaveBeenCalled();
     expect(mockedToastWarning).not.toHaveBeenCalled();
     expect(mockedHandleUnauthorized).not.toHaveBeenCalled();
   });

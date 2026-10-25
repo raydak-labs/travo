@@ -25,6 +25,7 @@ else lives under `backend/internal/`.
 | `guard` | Crash guards ([ADR 0003](../adr/0003-crash-guards-and-live-state.md)) |
 | `uci`, `ubus` | The UCI and ubus clients, with in-memory mocks for mock mode and tests |
 | `execx` | `os/exec` with mandatory timeout tiers |
+| `jsonx` | The JSON encoding of every response: `encoding/json`, but nil slices and maps encode empty |
 | `store` | The bbolt store ([ADR 0009](../adr/0009-persistent-store-bbolt.md)) |
 | `models` | JSON request and response types |
 | `config`, `docsgate` | Runtime configuration; the tests that keep `docs/` honest |

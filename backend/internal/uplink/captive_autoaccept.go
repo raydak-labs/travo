@@ -58,6 +58,7 @@ var (
 )
 
 func (c *CaptiveService) AutoAcceptCaptivePortal(portalURL string) (models.CaptiveAutoAcceptResult, error) {
+	defer c.invalidateStatus()
 	portalURL = strings.TrimSpace(portalURL)
 	if portalURL == "" {
 		return models.CaptiveAutoAcceptResult{}, fmt.Errorf("portal_url is required")

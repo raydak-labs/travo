@@ -21,6 +21,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/config"
 	"github.com/openwrt-travel-gui/backend/internal/failover"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/jsonx"
 	"github.com/openwrt-travel-gui/backend/internal/network"
 	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/store"
@@ -223,6 +224,8 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 		// while still matching it, which is what made the /api prefix check
 		// bypassable and the whole admin API reachable without a token.
 		CaseSensitive: true,
+		// Nil slices encode as [], as the OpenAPI document promises.
+		JSONEncoder: jsonx.Marshal,
 	})
 
 	// Recover middleware — registered FIRST, before CORS and the auth
@@ -312,7 +315,9 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 	}
 
 	systemSvc := system.New(ub, u, storage)
-	if !cfg.MockMode {
+	if cfg.MockMode {
+		systemSvc.SetLogTail(system.MockLogTail)
+	} else {
 		// Surface crash guards left behind by an interrupted run (flash,
 		// restore, factory reset) so the state is not silently forgotten.
 		systemSvc.LogStaleCrashGuards()

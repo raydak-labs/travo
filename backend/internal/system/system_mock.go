@@ -125,3 +125,16 @@ func (n *NoopPackageManager) InstallStream(string, func(string)) error {
 func (n *NoopPackageManager) RemoveStream(string, func(string)) error {
 	return fmt.Errorf("no package manager available")
 }
+
+// MockLogTail stands in for logread and dmesg on a machine that has neither.
+func MockLogTail(cmd string) (string, error) {
+	if cmd == "dmesg" {
+		return `[    0.000000] Booting Linux on physical CPU 0x0
+[    2.318204] ath11k c000000.wifi: qmi fw_version 0x290604a5
+[   14.502117] br-lan: port 1(lan1) entered forwarding state`, nil
+	}
+	return `Sat Oct 24 09:17:50 2026 daemon.notice netifd: Interface 'lan' is now up
+Sat Oct 24 09:17:52 2026 daemon.info dnsmasq[1234]: query from 192.168.8.100
+Sat Oct 24 09:17:55 2026 daemon.warn travo[2210]: wan probe timed out
+Sat Oct 24 09:18:01 2026 daemon.err hostapd: wlan1: deauthenticated 3c:22:fb:01:02:03`, nil
+}

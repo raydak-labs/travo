@@ -6,13 +6,6 @@ import type { APConfig } from '@shared/index';
 import { normalizeApEncryption } from './ap-config-normalize';
 import { ApApplyRollbackError } from '@/lib/ap-section-apply';
 
-export function bandLabel(band: string): string {
-  if (band === '5g') return '5 GHz';
-  if (band === '2g') return '2.4 GHz';
-  if (band === '6g') return '6 GHz';
-  return band;
-}
-
 export function bandSortKey(band: string): number {
   if (band === '2g') return 0;
   if (band === '5g') return 1;

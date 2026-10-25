@@ -5,7 +5,7 @@ export type {
   LoginRequest,
   LoginResponse,
   SessionResponse,
-} from '../generated/schemas';
+} from '../generated/model';
 
 /**
  * Minimum accepted admin password length.

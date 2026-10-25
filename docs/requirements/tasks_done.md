@@ -109,8 +109,23 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   only ever fills from a fixed set carry `enum` tags, so the generated unions are exact.
 - **API follow-ups (2026-10-25):** every shared API type is now generated or derived from a
   generated one; unused type guards and their tests are gone. Acknowledgements are always
-  `{"status":"ok"}`. `API_ROUTES` is type-checked against the generated `paths`. The generator
-  runs on TypeScript 6.
+  `{"status":"ok"}`. `API_ROUTES` is type-checked against the generated `paths`.
+- **Generated API client (2026-10-25):** the generator is now orval, which needs no TypeScript
+  compiler API, so TypeScript 6 is gone from the repo. Every hook calls a generated request
+  function; `apiClient` is removed. The port-forward request no longer requires an `id`, the
+  WiFi connect request no longer requires `mode`, and the firmware upload documents
+  `keep_settings`.
+- **On-device contract check (2026-10-25):** on the GL-AXT1800 (OpenWrt 25.12.3) all 69
+  parameterless GETs answered 200 and every UI page loaded without console errors, but four
+  responses sent `null` where the schema promises an array. Responses are now encoded with
+  `jsonx` (nil collections empty), and a mock-mode test validates every GET against its schema.
+  Mock mode serves sample logs instead of failing on a missing `logread`.
+- **Captive status and uplink display (2026-10-25):** captive status no longer probes without a
+  default route (3 s → instant offline), shares one probe between concurrent polls, and treats
+  a WireGuard `default dev` route as an upstream ([ADR 0001](../adr/0001-dns-vpn-captive-portal-architecture.md)).
+  The uplink connection reports its band from the frequency (iwinfo on 25.12 has none), the
+  saved-network row says "Not connected" for an enabled profile that is out of range, and one
+  band label helper replaces six copies.
 
 ## Frontend Toolchain
 

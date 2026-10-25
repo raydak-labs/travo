@@ -5,16 +5,21 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
 import { useWsSubscribe } from '@/lib/ws-context';
 import { useRefetchOnWsReconnect } from '@/hooks/use-refetch-on-ws-reconnect';
-import { API_ROUTES } from '@shared/index';
-import type { SystemInfo, SystemStats, LogResponse, SpeedTestResult } from '@shared/index';
+import type { SystemStats } from '@shared/index';
+import {
+  getKernelLogs,
+  getSystemInfo,
+  getSystemLogs,
+  getSystemStats,
+  runSpeedTest,
+} from '@/api/endpoints';
 
 export function useSystemInfo() {
   return useQuery({
     queryKey: ['system', 'info'],
-    queryFn: () => apiClient.get<SystemInfo>(API_ROUTES.system.info),
+    queryFn: () => getSystemInfo(),
   });
 }
 
@@ -44,7 +49,7 @@ export function useSystemStats() {
 
   return useQuery({
     queryKey: ['system', 'stats'],
-    queryFn: () => apiClient.get<SystemStats>(API_ROUTES.system.stats),
+    queryFn: () => getSystemStats(),
     refetchInterval: statsRefetchInterval(connected),
   });
 }
@@ -58,14 +63,8 @@ export function useSystemLogs(service?: string, level?: string, enabled = true) 
   return useQuery({
     queryKey: ['system', 'logs', service ?? '', level ?? ''],
     enabled,
-    queryFn: ({ signal }) => {
-      const params = new URLSearchParams();
-      if (service) params.set('service', service);
-      if (level) params.set('level', level);
-      const qs = params.toString();
-      const url = qs ? `${API_ROUTES.system.logs}?${qs}` : API_ROUTES.system.logs;
-      return apiClient.get<LogResponse>(url, signal);
-    },
+    queryFn: ({ signal }) =>
+      getSystemLogs({ ...(service && { service }), ...(level && { level }) }, { signal }),
   });
 }
 
@@ -73,13 +72,13 @@ export function useKernelLogs(enabled = true) {
   return useQuery({
     queryKey: ['system', 'logs', 'kernel'],
     enabled,
-    queryFn: ({ signal }) => apiClient.get<LogResponse>(API_ROUTES.system.kernelLogs, signal),
+    queryFn: ({ signal }) => getKernelLogs({ signal }),
   });
 }
 
 export function useRunSpeedTest() {
   return useMutation({
-    mutationFn: () => apiClient.post<SpeedTestResult>(API_ROUTES.system.speedTest),
+    mutationFn: () => runSpeedTest(),
     onError: (error) => {
       toast.error('Speed test failed', { description: error.message });
     },

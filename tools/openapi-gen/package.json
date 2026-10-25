@@ -1,13 +1,12 @@
 {
   "name": "@openwrt-travel-gui/openapi-gen",
   "private": true,
-  "description": "Generates shared/src/generated/openapi.ts from shared/openapi.json",
+  "description": "Generates the API types and request functions from shared/openapi.json",
   "type": "module",
   "scripts": {
-    "generate": "openapi-typescript ../../shared/openapi.json -o ../../shared/src/generated/openapi.ts --immutable && node aliases.mjs"
+    "generate": "orval --config orval.config.mjs && node postprocess.mjs"
   },
   "devDependencies": {
-    "openapi-typescript": "7.13.0",
-    "typescript": "6.0.3"
+    "orval": "8.44.0"
   }
 }

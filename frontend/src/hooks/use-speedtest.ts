@@ -1,14 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES, isSpeedtestServiceStatus, isSpeedTestResult } from '@shared/index';
-import type { SpeedTestResult, Status } from '@shared/index';
+import { isSpeedtestServiceStatus, isSpeedTestResult } from '@shared/index';
+import type { SpeedTestResult } from '@shared/index';
+import {
+  getSpeedtestServiceStatus,
+  installSpeedtestCLI,
+  runSpeedtestCLI,
+  uninstallSpeedtestCLI,
+} from '@/api/endpoints';
 
 export function useSpeedtestServiceStatus() {
   return useQuery({
     queryKey: ['speedtest-service'],
     queryFn: async () => {
-      const data = await apiClient.get<unknown>(API_ROUTES.system.speedtestService);
+      const data = await getSpeedtestServiceStatus();
       if (!isSpeedtestServiceStatus(data)) {
         throw new Error('Invalid speedtest service status response');
       }
@@ -20,7 +25,7 @@ export function useSpeedtestServiceStatus() {
 export function useInstallSpeedtestCLI() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<Status>(API_ROUTES.system.speedtestServiceInstall),
+    mutationFn: () => installSpeedtestCLI(),
     onSuccess: () => {
       toast.success('speedtest CLI installed');
       void queryClient.invalidateQueries({ queryKey: ['speedtest-service'] });
@@ -34,7 +39,7 @@ export function useInstallSpeedtestCLI() {
 export function useUninstallSpeedtestCLI() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<Status>(API_ROUTES.system.speedtestServiceUninstall),
+    mutationFn: () => uninstallSpeedtestCLI(),
     onSuccess: () => {
       toast.success('speedtest CLI uninstalled');
       void queryClient.invalidateQueries({ queryKey: ['speedtest-service'] });
@@ -49,7 +54,7 @@ export function useRunSpeedtest() {
   const queryClient = useQueryClient();
   return useMutation<SpeedTestResult, Error>({
     mutationFn: async () => {
-      const data = await apiClient.post<unknown>(API_ROUTES.system.speedtestServiceRun);
+      const data = await runSpeedtestCLI();
       if (!isSpeedTestResult(data)) {
         throw new Error('Invalid speedtest result response');
       }

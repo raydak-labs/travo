@@ -3,19 +3,7 @@ import { useNetworkStatus } from '@/hooks/use-network';
 import { useWifiConnection } from '@/hooks/use-wifi';
 import { SummaryBand, SummaryTile } from '@/components/ui/summary-band';
 import { StatValue } from '@/components/ui/stat-value';
-
-function bandLabel(band: string): string {
-  switch (band) {
-    case '2.4ghz':
-      return '2.4 GHz';
-    case '5ghz':
-      return '5 GHz';
-    case '6ghz':
-      return '6 GHz';
-    default:
-      return band;
-  }
-}
+import { formatWifiBandLabel } from '@/lib/wifi-band';
 
 /**
  * Always-visible summary of the WiFi page.
@@ -74,7 +62,7 @@ export function WifiSummaryBand() {
           <StatValue
             label="SSID"
             value={conn ? conn.ssid : 'Not connected'}
-            hint={conn ? `${bandLabel(conn.band)} · channel ${conn.channel}` : undefined}
+            hint={conn ? `${formatWifiBandLabel(conn.band)} · channel ${conn.channel}` : undefined}
           />
           <StatValue
             label="Signal"

@@ -6,11 +6,18 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api-client';
-import { routeWithParam } from '@/lib/api-url';
 import { useWsSubscribe } from '@/lib/ws-context';
-import { API_ROUTES } from '@shared/index';
 import type { NetworkStatus, Client, SetAliasRequest } from '@shared/index';
+import {
+  blockClient,
+  getBlockedClients,
+  getClients,
+  getNetworkStatus,
+  kickClient,
+  setClientAlias,
+  setInterfaceState,
+  unblockClient,
+} from '@/api/endpoints';
 
 export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus>>) {
   const queryClient = useQueryClient();
@@ -26,7 +33,7 @@ export function useNetworkStatus(options?: Partial<UseQueryOptions<NetworkStatus
 
   return useQuery({
     queryKey: ['network', 'status'],
-    queryFn: ({ signal }) => apiClient.get<NetworkStatus>(API_ROUTES.network.status, signal),
+    queryFn: ({ signal }) => getNetworkStatus({ signal }),
     ...options,
   });
 }
@@ -52,15 +59,14 @@ export function useClients() {
 
   return useQuery({
     queryKey: ['network', 'clients'],
-    queryFn: ({ signal }) => apiClient.get<Client[]>(API_ROUTES.network.clients, signal),
+    queryFn: ({ signal }) => getClients({ signal }),
   });
 }
 
 export function useSetClientAlias() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: SetAliasRequest) =>
-      apiClient.put<{ status: string }>(API_ROUTES.network.clientAlias, data),
+    mutationFn: (data: SetAliasRequest) => setClientAlias(data),
     onSuccess: () => {
       toast.success('Client alias updated');
       void queryClient.invalidateQueries({ queryKey: ['network', 'clients'] });
@@ -75,8 +81,7 @@ export function useSetClientAlias() {
 export function useKickClient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.clientKick, { mac }),
+    mutationFn: (mac: string) => kickClient({ mac }),
     onSuccess: () => {
       toast.success('Client disconnected');
       // Without this the kicked device stays in the table until the next
@@ -93,8 +98,7 @@ export function useKickClient() {
 export function useBlockClient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.clientBlock, { mac }),
+    mutationFn: (mac: string) => blockClient({ mac }),
     onSuccess: () => {
       toast.success('Client blocked');
       void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
@@ -110,8 +114,7 @@ export function useBlockClient() {
 export function useUnblockClient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (mac: string) =>
-      apiClient.post<{ status: string }>(API_ROUTES.network.clientUnblock, { mac }),
+    mutationFn: (mac: string) => unblockClient({ mac }),
     onSuccess: () => {
       toast.success('Client unblocked');
       void queryClient.invalidateQueries({ queryKey: ['network', 'blockedClients'] });
@@ -127,7 +130,7 @@ export function useUnblockClient() {
 export function useBlockedClients() {
   return useQuery({
     queryKey: ['network', 'blockedClients'],
-    queryFn: ({ signal }) => apiClient.get<string[]>(API_ROUTES.network.clientBlocked, signal),
+    queryFn: ({ signal }) => getBlockedClients({ signal }),
   });
 }
 
@@ -135,7 +138,7 @@ export function useSetInterfaceState() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ name, up }: { name: string; up: boolean }) =>
-      apiClient.post<{ status: string }>(routeWithParam(API_ROUTES.network.interfaceState, name), {
+      setInterfaceState(name, {
         up,
       }),
     onSuccess: (_data, variables) => {

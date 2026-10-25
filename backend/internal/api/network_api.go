@@ -36,6 +36,16 @@ type PortForwardsResponse struct {
 	Rules []models.PortForwardRule `json:"rules"`
 }
 
+// PortForwardRequest adds a port-forward rule; the server assigns the ID.
+type PortForwardRequest struct {
+	Name     string `json:"name"`
+	Protocol string `json:"protocol" enum:"tcp,udp,tcp udp"`
+	SrcDPort string `json:"src_dport" doc:"external port or range"`
+	DestIP   string `json:"dest_ip"`
+	DestPort string `json:"dest_port,omitempty" doc:"internal port; empty means the external one"`
+	Enabled  bool   `json:"enabled"`
+}
+
 // EnabledRequest toggles a feature.
 type EnabledRequest struct {
 	Enabled bool `json:"enabled"`
@@ -275,8 +285,12 @@ func registerNetwork(api *API, d *Dependencies) {
 			return reply(PortForwardsResponse{Rules: rules})
 		})
 	post(api, "/api/v1/network/firewall/port-forwards", "AddPortForward", "Add a port-forward rule",
-		func(_ context.Context, in *Body[models.PortForwardRule]) (*Body[Status], error) {
-			return okOrFail(svc.AddPortForward(in.Body))
+		func(_ context.Context, in *Body[PortForwardRequest]) (*Body[Status], error) {
+			r := in.Body
+			return okOrFail(svc.AddPortForward(models.PortForwardRule{
+				Name: r.Name, Protocol: r.Protocol, SrcDPort: r.SrcDPort,
+				DestIP: r.DestIP, DestPort: r.DestPort, Enabled: r.Enabled,
+			}))
 		}, created)
 	del(api, "/api/v1/network/firewall/port-forwards/{id}", "DeletePortForward", "Remove a port-forward rule",
 		func(_ context.Context, in *idParam) (*Body[Status], error) {

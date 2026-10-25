@@ -1,4 +1,4 @@
-import type { FailoverCandidate } from '../generated/schemas';
+import type { FailoverCandidate } from '../generated/model';
 
 // Generated from the backend's OpenAPI document (make generate).
 export type {
@@ -6,6 +6,6 @@ export type {
   FailoverConfig,
   FailoverEvent,
   FailoverHealthConfig,
-} from '../generated/schemas';
+} from '../generated/model';
 
 export type FailoverTrackingState = FailoverCandidate['tracking_state'];

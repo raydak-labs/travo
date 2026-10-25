@@ -4,7 +4,7 @@ import type {
   PriorityRequest,
   WifiConnection,
   WifiScanResult,
-} from '../generated/schemas';
+} from '../generated/model';
 
 // Generated from the backend's OpenAPI document (make generate).
 export type {
@@ -27,7 +27,7 @@ export type {
   WifiHealth,
   WifiMutationResponse,
   WifiScanResult,
-} from '../generated/schemas';
+} from '../generated/model';
 
 /** WiFi operation mode */
 export type WifiMode = WifiConnection['mode'];

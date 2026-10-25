@@ -1,6 +1,4 @@
-import { apiClient } from '@/lib/api-client';
-import { API_ROUTES } from '@shared/index';
-import type { SetupStatus } from '@shared/index';
+import { getSetupComplete as fetchSetupComplete } from '@/api/endpoints';
 
 /**
  * Cached answer for `GET /system/setup-complete`.
@@ -43,7 +41,7 @@ export async function getSetupComplete(): Promise<boolean> {
 
   const request = (async () => {
     try {
-      const data = await apiClient.get<SetupStatus>(API_ROUTES.system.setupComplete);
+      const data = await fetchSetupComplete();
       cached = { value: data.complete, at: Date.now() };
       return data.complete;
     } catch (error) {
