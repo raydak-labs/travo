@@ -90,7 +90,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	app.Use(authSvc.Middleware())
 
 	// Health endpoint is public: auth.PublicPaths exempts it.
-	app.Get("/api/health", RespondOK)
+	app.Get("/api/health", func(c fiber.Ctx) error { return c.JSON(Status{Status: "ok"}) })
 
 	SetupRoutes(app, deps)
 	return app, deps

@@ -27,8 +27,7 @@ func TestServiceHandlerErrorsAreNotLabelledAsBodyErrors(t *testing.T) {
 	sm := system.NewServiceManager(system.NewMockPackageManager(), &system.MockSystemProbe{})
 
 	app := fiber.New()
-	app.Post("/api/v1/services/:id/start", StartServiceHandler(sm))
-	app.Post("/api/v1/services/:id/install", InstallServiceHandler(sm))
+	registerServices(NewAPI(app), sm)
 
 	for _, tc := range []struct {
 		name     string

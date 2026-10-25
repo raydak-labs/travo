@@ -68,7 +68,7 @@ func TestSetBandSwitching_AcceptsBareShape(t *testing.T) {
 }
 
 // A wrong-shaped body must be a 400, not a silent wipe. This is the whole point
-// of BindStrictBodyConfig.
+// of decodeStrictJSON.
 func TestSetBandSwitching_RejectsUnknownField(t *testing.T) {
 	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")
@@ -182,9 +182,9 @@ func TestValidateBandSwitchConfig_Hysteresis(t *testing.T) {
 	}
 }
 
-// BindStrictBodyConfig itself: unknown fields, wrong JSON kinds, and trailing
+// decodeStrictJSON itself: unknown fields, wrong JSON kinds, and trailing
 // content all have to be errors.
-func TestBindStrictBodyConfig(t *testing.T) {
+func TestDecodeStrictJSON(t *testing.T) {
 	type target struct {
 		Name  string   `json:"name"`
 		Count int      `json:"count"`
@@ -209,27 +209,13 @@ func TestBindStrictBodyConfig(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			app := fiber.New()
 			var got target
-			app.Put("/", func(c fiber.Ctx) error {
-				if err := BindStrictBodyConfig(c, &got); err != nil {
-					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-				}
-				return c.SendStatus(fiber.StatusOK)
-			})
-			req, _ := http.NewRequest(http.MethodPut, "/", bytes.NewReader([]byte(tc.body)))
-			req.Header.Set("Content-Type", "application/json")
-			resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
-			if err != nil {
-				t.Fatalf("request: %v", err)
+			err := decodeStrictJSON([]byte(tc.body), &got, "")
+			if tc.wantErr && err == nil {
+				t.Errorf("expected a rejection (decoded %+v)", got)
 			}
-			defer resp.Body.Close()
-			if tc.wantErr && resp.StatusCode == fiber.StatusOK {
-				t.Errorf("expected a rejection, got 200 (decoded %+v)", got)
-			}
-			if !tc.wantErr && resp.StatusCode != fiber.StatusOK {
-				b, _ := io.ReadAll(resp.Body)
-				t.Errorf("expected 200, got %d: %s", resp.StatusCode, b)
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

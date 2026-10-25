@@ -92,7 +92,7 @@ func TestSetMode_LockoutRefusalIs409WithACode(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("br-lan"))
 	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
-	app.Put("/api/v1/wifi/mode", WifiSetModeHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/mode", map[string]any{"mode": "client"})
 
@@ -119,7 +119,7 @@ func TestSetMode_LockoutRefusalIs409WithACode(t *testing.T) {
 func TestSetMode_LockoutAcknowledgementIsAccepted(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "br-lan")
-	app.Put("/api/v1/wifi/mode", WifiSetModeHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/mode",
 		map[string]any{"mode": "client", "acknowledge_lockout": true})
@@ -132,7 +132,7 @@ func TestSetMode_LockoutAcknowledgementIsAccepted(t *testing.T) {
 func TestSetMode_WiredCallerIsNotRefused(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "eth0")
-	app.Put("/api/v1/wifi/mode", WifiSetModeHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/mode", map[string]any{"mode": "client"})
 
@@ -144,7 +144,7 @@ func TestSetMode_WiredCallerIsNotRefused(t *testing.T) {
 func TestSetAPConfig_DisablingTheLastAccessPointIsRefused(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "br-lan")
-	app.Put("/api/v1/wifi/ap/:section", SetAPConfigHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	// The two default access points are the only ones, so taking the first down
 	// still leaves the second: that one must go through.
@@ -168,7 +168,7 @@ func TestSetAPConfig_DisablingTheLastAccessPointIsRefused(t *testing.T) {
 func TestSetAPConfig_SSIDChangeOverWiFiIsNotRefused(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "br-lan")
-	app.Put("/api/v1/wifi/ap/:section", SetAPConfigHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/ap/default_radio0",
 		map[string]any{"ssid": "Renamed", "encryption": "psk2", "key": "travelrouter"})
@@ -180,7 +180,7 @@ func TestSetAPConfig_SSIDChangeOverWiFiIsNotRefused(t *testing.T) {
 func TestSetRadioEnabled_TurningTheRadiosOffIsRefused(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "br-lan")
-	app.Put("/api/v1/wifi/radio", SetRadioEnabledHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/radio", map[string]any{"enabled": false})
 	if resp.StatusCode != http.StatusConflict {
@@ -194,7 +194,7 @@ func TestSetRadioEnabled_TurningTheRadiosOffIsRefused(t *testing.T) {
 func TestSetRadioRole_TakingTheLastRadioOffIsRefused(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "br-lan")
-	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	// radio0 hosts the only other access point, so switching radio1 off is safe.
 	resp, body := putFromIP(t, app, "/api/v1/wifi/radios/radio1/role",
@@ -217,8 +217,7 @@ func TestSetRadioRole_TakingTheLastRadioOffIsRefused(t *testing.T) {
 func TestSetGuestWifi_DisablingTheOnlyAccessPointIsRefused(t *testing.T) {
 	app := fiber.New()
 	svc := lockoutService(t, "br-lan")
-	app.Put("/api/v1/wifi/ap/:section", SetAPConfigHandler(svc))
-	app.Put("/api/v1/wifi/guest", SetGuestWifiHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	// The two default access points go first (acknowledged): once they are down
 	// guest WiFi is the only access point left, and taking it down is the lockout.
@@ -463,7 +462,7 @@ func uplinkRadio(t *testing.T, u *uci.MockUCI) string {
 func TestGuardRefusal_PinsTheFixtureCallerAsNotProvenWired(t *testing.T) {
 	app := fiber.New()
 	svc, _ := serviceForFixture(t, "br-lan", disableEveryAP)
-	app.Put("/api/v1/wifi/ap/:section", SetAPConfigHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/ap/default_radio0",
 		map[string]any{"ssid": "OpenWrt-Travel", "enabled": false})
@@ -484,7 +483,7 @@ func TestGuardRefusal_PinsTheFixtureCallerAsNotProvenWired(t *testing.T) {
 func TestGuardRefusal_IsNotAboutTheConfigAlone(t *testing.T) {
 	app := fiber.New()
 	svc, _ := serviceForFixture(t, "eth0", disableEveryAP)
-	app.Put("/api/v1/wifi/ap/:section", SetAPConfigHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/ap/default_radio0",
 		map[string]any{"ssid": "OpenWrt-Travel", "enabled": false})
@@ -500,7 +499,7 @@ func TestGuardRefusal_IsNotAboutTheConfigAlone(t *testing.T) {
 func TestWifiConnect_KeepsAnAccessPointUpForAnUnclassifiedCaller(t *testing.T) {
 	app := fiber.New()
 	svc, u := serviceForFixture(t, "br-lan", nil)
-	app.Post("/api/v1/wifi/connect", WifiConnectHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 	before := enabledAPs(t, u)
 
 	// The uplink moves to the 5 GHz radio, the split path's usual target.
@@ -524,7 +523,7 @@ func TestWifiConnect_KeepsAnAccessPointUpForAnUnclassifiedCaller(t *testing.T) {
 func TestWifiDisconnect_KeepsAnAccessPointUpForAnUnclassifiedCaller(t *testing.T) {
 	app := fiber.New()
 	svc, u := serviceForFixture(t, "br-lan", nil)
-	app.Post("/api/v1/wifi/disconnect", WifiDisconnectHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 	before := enabledAPs(t, u)
 
 	resp, body := postFromIP(t, app, "/api/v1/wifi/disconnect", map[string]any{})
@@ -547,10 +546,10 @@ func TestWifiDisconnect_KeepsAnAccessPointUpForAnUnclassifiedCaller(t *testing.T
 func TestReconcileRepeater_KeepsAnAccessPointUpForAnUnclassifiedCaller(t *testing.T) {
 	app := fiber.New()
 	svc, u := serviceForFixture(t, "br-lan", nil)
-	app.Post("/api/v1/wifi/reconcile", ReconcileRepeaterAPLayoutHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 	before := enabledAPs(t, u)
 
-	resp, body := postFromIP(t, app, "/api/v1/wifi/reconcile", map[string]any{})
+	resp, body := postFromIP(t, app, "/api/v1/wifi/repeater/reconcile", map[string]any{})
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("reconcile answered %d: %s", resp.StatusCode, body)
@@ -591,7 +590,7 @@ func TestSetRadioRole_SameRadioConflictIsNotReportedAsLockout(t *testing.T) {
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("br-lan"))
 	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
-	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/radios/radio0/role",
 		map[string]any{"role": "both"})

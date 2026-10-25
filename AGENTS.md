@@ -188,7 +188,8 @@ Contract:
 GET /api/openapi.json
 ```
 
-- This endpoint is meant to be machine-readable OpenAPI 3.0 for automation and tests.
+- It is OpenAPI 3.1, generated from the handler types (ADR 0006 §4); never edit a spec by hand.
+- Add endpoints with the `get`/`post`/`put`/`del` helpers in `backend/internal/api`, not on the Fiber app.
 - It should remain available on the test device at `http://192.168.1.1/api/openapi.json`.
 - Protected endpoints use `POST /api/v1/auth/login` and `Authorization: Bearer <token>`.
 

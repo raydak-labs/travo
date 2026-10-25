@@ -101,8 +101,8 @@ zeroed `preferred_band`, both thresholds and both delays. Found on the device.
 
 Therefore:
 
-- Use `api.BindStrictBodyConfig` for any endpoint that persists a whole
-  configuration. It rejects unknown fields, wrong JSON kinds, and trailing
+- Register any endpoint that persists a whole configuration with `strict(...)`
+  (or a `strictBody` input). It rejects unknown fields, wrong JSON kinds, and trailing
   content, so a mistake is a `400` naming the field.
 - **Keep `GET` and `PUT` shapes symmetric.** If `GET` returns an envelope, `PUT`
   accepts that envelope (and may also accept the bare form for compatibility).

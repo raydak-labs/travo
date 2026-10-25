@@ -97,6 +97,12 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   `system`, `uplink` and `failover`, with shared plumbing in `platform` and the wiring in
   `internal/app` ([backend packages](../reference/backend-packages.md)). Every service has one
   constructor; tests sit next to the code they exercise.
+- **Generated OpenAPI (2026-10-25):** the hand-written spec (`openapi_paths_*.go`) and its
+  1,000-line drift test are gone. Every operation is registered with a typed handler and its
+  OpenAPI 3.1 entry is generated from the Go types through Huma's schema registry
+  ([ADR 0006 §4](../adr/0006-application-platform-and-api-contract.md)); `go run ./cmd/openapi`
+  writes the document. The binder is non-generic, so the binary shrank (15.35 → 15.12 MB) instead
+  of growing 3.5 MB with `huma.Register`. The unused `GET /services/adguardhome/status` is removed.
 
 ## Frontend Toolchain
 
