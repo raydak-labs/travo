@@ -33,7 +33,7 @@ exactly once, in a plan scheduled for deletion. Each is recorded here instead.
 
 Disabling WireGuard leaves the device without a default route more often than the
 API shape suggests. The shipped recovery is in `VpnService.restoreDefaultRouteAfterWireGuardDisable`
-(`backend/internal/services/vpn_service.go`):
+(`backend/internal/uplink/vpn_service.go`):
 
 1. If the kernel already has a default route, touch nothing.
 2. Otherwise renew every uplink netifd reports as up — discovered from a ubus dump,

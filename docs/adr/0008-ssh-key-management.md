@@ -31,7 +31,7 @@ control Travo enforces. A bug in it is a remote-root vulnerability, not a UI def
 ### 1. What the endpoint may write
 
 - The only file this feature touches is **`/etc/dropbear/authorized_keys`**
-  (`authorizedKeysFile`, `backend/internal/services/system_ssh_keys.go`), i.e. dropbear's
+  (`authorizedKeysFile`, `backend/internal/system/system_ssh_keys.go`), i.e. dropbear's
   root key file. It writes **exactly one line per accepted call** and never rewrites,
   reorders, normalizes or de-duplicates the rest of the file.
 - The API surface is three operations (`backend/internal/api/router.go`):
@@ -79,7 +79,7 @@ escaped or interpreted by anything — dropbear parses only the type and the bas
 — so a comment containing shell metacharacters is inert.
 
 These are the same class of guard as `services.ValidateHHMM` and
-`services.ValidateButtonName` (`backend/internal/services/validate.go`): values that
+`services.ValidateButtonName` (`backend/internal/platform/validate.go`): values that
 get **formatted into a root-owned file or a cron line** are validated at the point
 where they are about to be written, not only at the HTTP boundary.
 
@@ -136,7 +136,7 @@ working after Travo is uninstalled. Consequences accepted here:
 
 ## References
 
-- `backend/internal/services/system_ssh_keys.go` — `AddSSHKey`, `DeleteSSHKey`,
+- `backend/internal/system/system_ssh_keys.go` — `AddSSHKey`, `DeleteSSHKey`,
   `GetSSHKeys`, `authorizedKeysFile`
 - `backend/internal/api/router.go` — route registration
 - `backend/internal/api/system_security_handlers.go` — handlers

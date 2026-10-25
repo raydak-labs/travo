@@ -5,11 +5,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 // StatsHistoryHandler handles GET /api/v1/system/stats/history.
-func StatsHistoryHandler(svc *services.StatsHistoryService) fiber.Handler {
+func StatsHistoryHandler(svc *system.StatsHistoryService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		sinceStr := c.Query("since")
 		if sinceStr != "" {

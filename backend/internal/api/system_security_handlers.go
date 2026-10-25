@@ -4,12 +4,13 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 // GetButtonsHandler handles GET /api/v1/system/buttons.
-func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
+func GetButtonsHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// A parse failure means the UI would show "no buttons configured" while
 		// the generated hotplug script still runs the last saved actions, so
@@ -23,7 +24,7 @@ func GetButtonsHandler(svc *services.SystemService) fiber.Handler {
 }
 
 // SetButtonActionsHandler handles PUT /api/v1/system/button-actions.
-func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
+func SetButtonActionsHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.ButtonActionsRequest
 		// Strict: this persists the whole button map. A body whose field names do
@@ -40,7 +41,7 @@ func SetButtonActionsHandler(svc *services.SystemService) fiber.Handler {
 }
 
 // GetSSHKeysHandler handles GET /api/v1/system/ssh-keys.
-func GetSSHKeysHandler(svc *services.SystemService) fiber.Handler {
+func GetSSHKeysHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		resp, err := svc.GetSSHKeys()
 		if err != nil {
@@ -51,7 +52,7 @@ func GetSSHKeysHandler(svc *services.SystemService) fiber.Handler {
 }
 
 // AddSSHKeyHandler handles POST /api/v1/system/ssh-keys.
-func AddSSHKeyHandler(svc *services.SystemService) fiber.Handler {
+func AddSSHKeyHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req models.AddSSHKeyRequest
 		if err := c.Bind().Body(&req); err != nil {
@@ -65,7 +66,7 @@ func AddSSHKeyHandler(svc *services.SystemService) fiber.Handler {
 }
 
 // DeleteSSHKeyHandler handles DELETE /api/v1/system/ssh-keys/:index.
-func DeleteSSHKeyHandler(svc *services.SystemService) fiber.Handler {
+func DeleteSSHKeyHandler(svc *system.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		indexStr := c.Params("index")
 		index, err := strconv.Atoi(indexStr)

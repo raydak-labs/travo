@@ -1,7 +1,7 @@
 ---
 title: Documentation map
 description: Entrypoint for human and agent docs; the layout rules that keep this vault navigable.
-updated: 2026-10-05
+updated: 2026-10-25
 tags: [docs, index, navigation]
 ---
 
@@ -42,6 +42,7 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 | What shipped? | [`requirements/tasks_done.md`](./requirements/tasks_done.md) |
 | How do I build/deploy? | [`guides/development.md`](./guides/development.md), [`guides/deployment.md`](./guides/deployment.md) |
 | How do I verify on hardware? | [`guides/testing.md`](./guides/testing.md), then the playbook in [`tests/`](./tests/) |
+| Which backend package owns X? | [`reference/backend-packages.md`](./reference/backend-packages.md) |
 | Which UI primitive or token do I use? | [`reference/ui-theming.md`](./reference/ui-theming.md), [ADR 0012](./adr/0012-ui-consistency-and-status-language.md) |
 | What did we decide about a device quirk? | [ADR 0013](./adr/0013-operational-invariants-and-device-findings.md) |
 | What are we doing next? | [`plans/README.md`](./plans/README.md) |
@@ -55,6 +56,5 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 
 - [`_archive/init-prompt.md`](./_archive/init-prompt.md) — the initial project prompt
 - [`_archive/reviews/`](./_archive/reviews/) — the 2026-09-26 and 2026-10-04 code reviews.
-  Frozen point-in-time reports: a Go test still resolves the paths they cite and requires
-  them to exist, but they describe paths and states as they were on that date. Do not
-  treat their references as current.
+  Frozen point-in-time reports: they describe paths and states as they were on that date.
+  Do not treat their references as current.

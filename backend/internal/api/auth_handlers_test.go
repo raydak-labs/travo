@@ -12,9 +12,13 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
@@ -45,9 +49,9 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 	reconnectScriptPath := tmpDir + "/wifi-reconnect.sh"
 	bandSwitchConfigPath := tmpDir + "/band-switching.json"
 
-	systemSvc := services.NewSystemService(ub, u, &services.MockStorageProvider{})
+	systemSvc := system.New(ub, u, &system.MockStorageProvider{})
 
-	networkSvc := services.NewNetworkServiceWithRunner(u, ub, &services.MockCommandRunner{})
+	networkSvc := network.New(network.Deps{UCI: u, Ubus: ub, Cmd: &platform.MockCommandRunner{}})
 	// Pretend ddns-scripts is installed, so the DDNS endpoints exercise their
 	// normal path. TestSetDDNSConfig_MissingPackage_Returns503 covers the other
 	// case explicitly.
@@ -55,7 +59,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		t.Fatalf("write fake ddns init script: %v", err)
 	}
 	networkSvc.SetDDNSInitScript(tmpDir + "/init.d-ddns")
-	wifiSvc := services.NewWifiServiceForTesting(u, ub, &services.NoopWifiReloader{}, &services.MockCommandRunner{}, priorityPath, autoReconnectPath, reconnectScriptPath)
+	wifiSvc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Reloader: &wifi.NoopWifiReloader{}, Cmd: &platform.MockCommandRunner{}, PriorityFile: priorityPath, AutoReconnectFile: autoReconnectPath, ReconnectScript: reconnectScriptPath})
 
 	deps := &Dependencies{
 		Auth:        authSvc,
@@ -64,15 +68,15 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		System:      systemSvc,
 		Network:     networkSvc,
 		Wifi:        wifiSvc,
-		Vpn: services.NewVpnServiceWithProfilesPath(u, &services.MockCommandRunner{
+		Vpn: uplink.NewVpnService(uplink.VpnDeps{UCI: u, Cmd: &platform.MockCommandRunner{
 			Output: []byte("PRIV\tPUB_KEY\t51820\toff\nPEER1\t(none)\t1.2.3.4:51820\t0.0.0.0/0\t1710000000\t100\t200\toff\n"),
-		}, profilesPath),
-		ServiceManager: services.NewServiceManager(),
-		Speedtest:      services.NewSpeedtestServiceWith(services.NewMockPackageManager()),
-		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
-		Alerts:         services.NewAlertService(systemSvc),
-		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
-		TrafficHistory: services.NewTrafficHistoryService(services.TrafficHistoryDefaultPoints),
+		}, ProfilesPath: profilesPath}),
+		ServiceManager: system.NewServiceManager(nil, nil),
+		Speedtest:      system.NewSpeedtestService(system.NewMockPackageManager()),
+		Captive:        uplink.NewCaptiveService(uplink.CaptiveDeps{Prober: &platform.MockHTTPProber{StatusCode: 200, Body: "success\n"}}),
+		Alerts:         system.NewAlertService(systemSvc),
+		BandSwitching:  wifi.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
+		TrafficHistory: network.NewTrafficHistoryService(network.TrafficHistoryDefaultPoints),
 	}
 
 	// CaseSensitive mirrors production (cmd/server/main.go). Without it the

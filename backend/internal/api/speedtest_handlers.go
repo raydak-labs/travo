@@ -3,11 +3,11 @@ package api
 import (
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 // GetSpeedtestServiceStatusHandler handles GET /api/v1/system/speedtest-service.
-func GetSpeedtestServiceStatusHandler(svc *services.SpeedtestService) fiber.Handler {
+func GetSpeedtestServiceStatusHandler(svc *system.SpeedtestService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetSpeedtestServiceStatus()
 		if err != nil {
@@ -18,7 +18,7 @@ func GetSpeedtestServiceStatusHandler(svc *services.SpeedtestService) fiber.Hand
 }
 
 // InstallSpeedtestCLIHandler handles POST /api/v1/system/speedtest-service/install.
-func InstallSpeedtestCLIHandler(svc *services.SpeedtestService) fiber.Handler {
+func InstallSpeedtestCLIHandler(svc *system.SpeedtestService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		err := svc.InstallSpeedtestCLI()
 		if err != nil {
@@ -29,7 +29,7 @@ func InstallSpeedtestCLIHandler(svc *services.SpeedtestService) fiber.Handler {
 }
 
 // UninstallSpeedtestCLIHandler handles POST /api/v1/system/speedtest-service/uninstall.
-func UninstallSpeedtestCLIHandler(svc *services.SpeedtestService) fiber.Handler {
+func UninstallSpeedtestCLIHandler(svc *system.SpeedtestService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		err := svc.UninstallSpeedtestCLI()
 		if err != nil {
@@ -40,7 +40,7 @@ func UninstallSpeedtestCLIHandler(svc *services.SpeedtestService) fiber.Handler 
 }
 
 // RunSpeedtestCLIHandler handles POST /api/v1/system/speedtest-service/run.
-func RunSpeedtestCLIHandler(svc *services.SpeedtestService) fiber.Handler {
+func RunSpeedtestCLIHandler(svc *system.SpeedtestService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result, err := svc.RunSpeedtestCLI()
 		if err != nil {

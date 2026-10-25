@@ -74,10 +74,10 @@ Unlisted direct firewall commits are a defect.
 ## References
 
 - `docs/architecture/overview.md` §5
-- `backend/internal/services/vpn_service.go` — `setupWireGuardFirewall` and related
-- `backend/internal/services/usb_tethering_service.go` — `wanZoneSection`, `Configure`, `Unconfigure`
-- `backend/internal/services/wifi_service.go` — `uciApplyConfigs`, WWAN / guest paths
-- `backend/internal/services/failover_service.go` — mwan3 + network interaction
+- `backend/internal/uplink/vpn_service.go` — `setupWireGuardFirewall` and related
+- `backend/internal/network/usb_tethering_service.go` — `wanZoneSection`, `Configure`, `Unconfigure`
+- `backend/internal/wifi/wifi_service.go` — `uciApplyConfigs`, WWAN / guest paths
+- `backend/internal/failover/failover_service.go` — mwan3 + network interaction
 - [ADR 0003](./0003-crash-guards-and-live-state.md) — the guards this table depends on
 
 ## Device findings: USB tethering

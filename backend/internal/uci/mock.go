@@ -233,3 +233,13 @@ func (m *MockUCI) GetSections(config string) (map[string]map[string]string, erro
 	}
 	return result, nil
 }
+
+// FailingSectionsUCI wraps MockUCI but fails every GetSections read, standing
+// in for a timed-out / failed `uci show` on the device.
+type FailingSectionsUCI struct {
+	*MockUCI
+}
+
+func (f *FailingSectionsUCI) GetSections(_ string) (map[string]map[string]string, error) {
+	return nil, fmt.Errorf("uci show: timed out")
+}

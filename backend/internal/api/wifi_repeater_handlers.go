@@ -2,12 +2,13 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 // GetRepeaterOptionsHandler handles GET /api/v1/wifi/repeater-options.
-func GetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
+func GetRepeaterOptionsHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		opts, err := svc.GetRepeaterOptions()
 		if err != nil {
@@ -18,7 +19,7 @@ func GetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // SetRepeaterOptionsHandler handles PUT /api/v1/wifi/repeater-options.
-func SetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
+func SetRepeaterOptionsHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body models.RepeaterOptions
 		if err := c.Bind().Body(&body); err != nil {
@@ -35,7 +36,7 @@ func SetRepeaterOptionsHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // ReconcileRepeaterAPLayoutHandler handles POST /api/v1/wifi/repeater/reconcile.
-func ReconcileRepeaterAPLayoutHandler(svc *services.WifiService) fiber.Handler {
+func ReconcileRepeaterAPLayoutHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		apply, err := svc.ReconcileRepeaterAPLayout()
 		if err != nil {
@@ -46,7 +47,7 @@ func ReconcileRepeaterAPLayoutHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // GetAutoReconnectHandler handles GET /api/v1/wifi/autoreconnect.
-func GetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
+func GetAutoReconnectHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := svc.GetAutoReconnect()
 		if err != nil {
@@ -57,7 +58,7 @@ func GetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // SetAutoReconnectHandler handles PUT /api/v1/wifi/autoreconnect.
-func SetAutoReconnectHandler(svc *services.WifiService) fiber.Handler {
+func SetAutoReconnectHandler(svc *wifi.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled bool `json:"enabled"`

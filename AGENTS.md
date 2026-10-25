@@ -98,7 +98,8 @@ paths outside `/etc/travo/`, and a plans catalog that omits a plan.
 This is a pnpm monorepo with:
 
 - `frontend/` — React + TypeScript + Vite + TailwindCSS
-- `backend/` — Go + Fiber
+- `backend/` — Go + Fiber, one package per domain under `backend/internal/`
+  (see `docs/reference/backend-packages.md`)
 - `shared/` — Shared TypeScript types
 
 ## Documentation Workflow

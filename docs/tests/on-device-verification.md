@@ -215,7 +215,7 @@ ssh root@192.168.8.1 'iw dev phy1-ap0 station dump'       # who is associated
 
 If the wired console answers `unknown`, stop: fix the classifier, not the test.
 The captured payloads above are checked in as fixtures in
-`backend/internal/services/testdata/`; re-capture rather than hand-editing them.
+`backend/internal/testdata/`; re-capture rather than hand-editing them.
 
 This is the check that found the defect the guard was written for: on a
 GL-AXT1800 the operator switched to Client from an iPhone, the AP was removed,

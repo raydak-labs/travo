@@ -10,7 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 // The service endpoints take no request body, so none of their errors can be a
@@ -24,7 +24,7 @@ import (
 // device failed to start it" needs an error type the service manager does not
 // have yet, and that re-classification is not part of this change.
 func TestServiceHandlerErrorsAreNotLabelledAsBodyErrors(t *testing.T) {
-	sm := services.NewServiceManagerWith(services.NewMockPackageManager(), &services.MockSystemProbe{})
+	sm := system.NewServiceManager(system.NewMockPackageManager(), &system.MockSystemProbe{})
 
 	app := fiber.New()
 	app.Post("/api/v1/services/:id/start", StartServiceHandler(sm))

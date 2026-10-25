@@ -48,7 +48,7 @@ Travo is a **pnpm monorepo**: React SPA, Go API, shared TypeScript contracts. It
 
 ### 5. HTTP server limits (part of the platform contract)
 
-These are set once in `fiber.New` (`backend/cmd/server/main.go`) and are contract, not tuning knobs:
+These are set once in `fiber.New` (`backend/internal/app/app.go`) and are contract, not tuning knobs:
 
 | Setting | Value | Why |
 | ------- | ----- | --- |
@@ -77,7 +77,7 @@ connection slot and a large legitimate upload is not rejected.
 - `backend/internal/api/openapi_handler.go` — the spec header and the merge that assembles the paths
 - `backend/internal/api/openapi_paths_*.go` — the spec's path entries, one file per domain
 - `backend/internal/api/openapi_drift_test.go` — the route↔spec drift gate
-- `backend/cmd/server/main.go` — Fiber config, timeouts, body limit, shutdown order
+- `backend/internal/app/app.go` — Fiber config, timeouts, body limit, shutdown order
 - `docs/guides/deployment.md`
 - [ADR 0007](./0007-authentication-and-access-control.md) — auth contract
 - `AGENTS.md` — API documentation endpoint section

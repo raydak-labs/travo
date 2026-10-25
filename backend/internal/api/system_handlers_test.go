@@ -18,7 +18,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 func TestSystemInfoEndpoint(t *testing.T) {
@@ -605,7 +605,7 @@ func TestRestore_ReportsRejectionAsBadRequest(t *testing.T) {
 	if code != http.StatusBadRequest {
 		t.Errorf("expected 400 for a non-archive upload, got %d: %s", code, respBody)
 	}
-	if !strings.Contains(respBody, services.ErrInvalidBackupArchive.Error()) {
+	if !strings.Contains(respBody, system.ErrInvalidBackupArchive.Error()) {
 		t.Errorf("the response should explain why the archive was rejected: %s", respBody)
 	}
 }

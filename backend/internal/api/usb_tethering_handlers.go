@@ -3,18 +3,18 @@ package api
 import (
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
 )
 
 // GetUSBTetherStatusHandler returns current USB tethering detection state.
-func GetUSBTetherStatusHandler(svc *services.USBTetheringService) fiber.Handler {
+func GetUSBTetherStatusHandler(svc *network.USBTetheringService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		return c.JSON(svc.GetStatus())
 	}
 }
 
 // ConfigureUSBTetherHandler configures the detected USB interface as a WAN source.
-func ConfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler {
+func ConfigureUSBTetherHandler(svc *network.USBTetheringService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
 			Interface string `json:"interface"`
@@ -30,7 +30,7 @@ func ConfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler 
 }
 
 // UnconfigureUSBTetherHandler removes the USB tethering WAN configuration.
-func UnconfigureUSBTetherHandler(svc *services.USBTetheringService) fiber.Handler {
+func UnconfigureUSBTetherHandler(svc *network.USBTetheringService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.Unconfigure(); err != nil {
 			return RespondWithServerError(c, err)

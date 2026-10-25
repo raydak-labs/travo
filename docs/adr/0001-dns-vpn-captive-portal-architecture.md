@@ -298,7 +298,7 @@ new callers must not widen the condition.
 - **Drift gate**: `TestDnsResolverStatePathsAreNamedInAdr0001` and
   `TestEtcTrafoStatePathsAreNamedInAnAdr` in
   `backend/internal/docsgate/dns_docs_test.go` derive the persistent paths from the
-  services package and fail when this ADR (or any ADR, for `/etc/trafo`) stops naming
+  backend sources and fail when this ADR (or any ADR, for `/etc/trafo`) stops naming
   them. Adding a DNS state path without documenting it here is therefore a red test.
 
 ### 6. Built-in mechanisms summary
@@ -329,20 +329,20 @@ new callers must not widen the condition.
 
 ## References
 
-- `backend/internal/services/adguard_dns.go` — forwarding via the layer stack
-- `backend/internal/services/adguard_service.go` — `GetDNSMode`, auto-configure,
+- `backend/internal/uplink/adguard_dns.go` — forwarding via the layer stack
+- `backend/internal/uplink/adguard_service.go` — `GetDNSMode`, auto-configure,
   `SetPassword`, bundled template `/etc/travo/adguardhome.yaml`
-- `backend/internal/services/dnsmasq_layer_stack.go` — the shared layer stack itself:
+- `backend/internal/uplink/dnsmasq_layer_stack.go` — the shared layer stack itself:
   `/etc/trafo/dnsmasq-layers.json` (`dnsmasqLayerStackPath`) and the layer
   operations
-- `backend/internal/services/vpn_dns.go` — the VPN layer,
+- `backend/internal/uplink/vpn_dns.go` — the VPN layer,
   `enableVpnDNSForwarding` / `disableVpnDNSForwarding`, `maybeSelfHealVpnDNS`
-- `backend/internal/services/captive_dnsmasq.go` — the bypass as the `captive` layer
-- `backend/internal/services/captive_service.go` — the bypass guard file, restore,
+- `backend/internal/uplink/captive_dnsmasq.go` — the bypass as the `captive` layer
+- `backend/internal/uplink/captive_service.go` — the bypass guard file, restore,
   timeouts
-- `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan
+- `backend/internal/uplink/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
-- `backend/internal/services/network_dns.go` — WAN custom DNS (`SetDNSConfig`)
+- `backend/internal/network/network_dns.go` — WAN custom DNS (`SetDNSConfig`)
 - `backend/internal/docsgate/dns_docs_test.go` — the drift gate that keeps the paths
   above and this ADR in agreement
 - `docs/adr/0003-crash-guards-and-live-state.md` — guard directory contract (§2)

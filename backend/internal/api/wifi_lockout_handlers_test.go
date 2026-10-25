@@ -10,9 +10,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 // The interface every test request appears to arrive on under app.Test.
@@ -50,12 +50,12 @@ func interfaceDump(l3Device string) map[string]any {
 	}
 }
 
-func lockoutService(t *testing.T, reachableBy string) *services.WifiService {
+func lockoutService(t *testing.T, reachableBy string) *wifi.Service {
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump(reachableBy))
-	return services.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"})
+	return wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
 }
 
 func putFromIP(t *testing.T, app *fiber.App, path string, body any) (*http.Response, []byte) {
@@ -91,7 +91,7 @@ func TestSetMode_LockoutRefusalIs409WithACode(t *testing.T) {
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("br-lan"))
-	svc := services.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"})
+	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
 	app.Put("/api/v1/wifi/mode", WifiSetModeHandler(svc))
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/mode", map[string]any{"mode": "client"})
@@ -99,8 +99,8 @@ func TestSetMode_LockoutRefusalIs409WithACode(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409, got %d: %s", resp.StatusCode, body)
 	}
-	if got := codeOf(t, body); got != services.LockoutErrorCode {
-		t.Errorf("code = %q, want %q", got, services.LockoutErrorCode)
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
 	}
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -160,8 +160,8 @@ func TestSetAPConfig_DisablingTheLastAccessPointIsRefused(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 for the last access point, got %d: %s", resp.StatusCode, body)
 	}
-	if got := codeOf(t, body); got != services.LockoutErrorCode {
-		t.Errorf("code = %q, want %q", got, services.LockoutErrorCode)
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
 	}
 }
 
@@ -186,8 +186,8 @@ func TestSetRadioEnabled_TurningTheRadiosOffIsRefused(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 when the radios go off, got %d: %s", resp.StatusCode, body)
 	}
-	if got := codeOf(t, body); got != services.LockoutErrorCode {
-		t.Errorf("code = %q, want %q", got, services.LockoutErrorCode)
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
 	}
 }
 
@@ -209,8 +209,8 @@ func TestSetRadioRole_TakingTheLastRadioOffIsRefused(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 for the last radio, got %d: %s", resp.StatusCode, body)
 	}
-	if got := codeOf(t, body); got != services.LockoutErrorCode {
-		t.Errorf("code = %q, want %q", got, services.LockoutErrorCode)
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
 	}
 }
 
@@ -239,8 +239,8 @@ func TestSetGuestWifi_DisablingTheOnlyAccessPointIsRefused(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 for the last access point, got %d: %s", resp.StatusCode, body)
 	}
-	if got := codeOf(t, body); got != services.LockoutErrorCode {
-		t.Errorf("code = %q, want %q", got, services.LockoutErrorCode)
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
 	}
 }
 
@@ -371,7 +371,7 @@ func assertAPFixtureHasSomethingUp(t *testing.T, before []string, u *uci.MockUCI
 // is the one thing a wired-in guard would add to any of these three answers.
 func assertNotLockoutRefusal(t *testing.T, body []byte) {
 	t.Helper()
-	if got := codeOf(t, body); got == services.LockoutErrorCode {
+	if got := codeOf(t, body); got == wifi.LockoutErrorCode {
 		t.Errorf("answered as a lockout refusal (%q): this endpoint is not guarded", got)
 	}
 }
@@ -384,7 +384,7 @@ func assertNotLockoutRefusal(t *testing.T, body []byte) {
 // of on the default mock's `wifinet2` profile, which is in no fixture.
 func serviceForFixture(
 	t *testing.T, reachableBy string, edit func(*testing.T, *uci.MockUCI),
-) (*services.WifiService, *uci.MockUCI) {
+) (*wifi.Service, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	if edit != nil {
@@ -393,7 +393,7 @@ func serviceForFixture(
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump(reachableBy))
 	ub.RegisterResponse("network.wireless.status", wirelessStatusFor(t, u))
-	return services.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"}), u
+	return wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}}), u
 }
 
 func wirelessStatusFor(t *testing.T, u *uci.MockUCI) map[string]any {
@@ -473,8 +473,8 @@ func TestGuardRefusal_PinsTheFixtureCallerAsNotProvenWired(t *testing.T) {
 			"guard refuses, so the endpoint tests below are testing something else",
 			resp.StatusCode)
 	}
-	if got := codeOf(t, body); got != services.LockoutErrorCode {
-		t.Errorf("code = %q, want %q", got, services.LockoutErrorCode)
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
 	}
 }
 
@@ -590,7 +590,7 @@ func TestSetRadioRole_SameRadioConflictIsNotReportedAsLockout(t *testing.T) {
 	}
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("br-lan"))
-	svc := services.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "lockout"})
+	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ub, Applier: &stubApplier{token: "lockout"}})
 	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
 
 	resp, body := putFromIP(t, app, "/api/v1/wifi/radios/radio0/role",
@@ -599,7 +599,7 @@ func TestSetRadioRole_SameRadioConflictIsNotReportedAsLockout(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409 for the same-radio conflict, got %d: %s", resp.StatusCode, body)
 	}
-	if got := codeOf(t, body); got == services.LockoutErrorCode {
+	if got := codeOf(t, body); got == wifi.LockoutErrorCode {
 		t.Error("the same-radio conflict must not be reported as a lockout")
 	}
 }

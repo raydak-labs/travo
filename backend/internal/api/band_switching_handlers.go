@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 // GetBandSwitchingHandler handles GET /api/v1/wifi/band-switching.
-func GetBandSwitchingHandler(svc *services.BandSwitchingService) fiber.Handler {
+func GetBandSwitchingHandler(svc *wifi.BandSwitchingService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"config": svc.GetConfig(),
@@ -20,11 +21,11 @@ func GetBandSwitchingHandler(svc *services.BandSwitchingService) fiber.Handler {
 // bandSwitchingRequest is a shape probe: it is decoded WITHOUT
 // DisallowUnknownFields, purely to see whether the body uses the wrapper.
 type bandSwitchingRequest struct {
-	Config *services.BandSwitchConfig `json:"config"`
+	Config *wifi.BandSwitchConfig `json:"config"`
 }
 
 // SetBandSwitchingHandler handles PUT /api/v1/wifi/band-switching.
-func SetBandSwitchingHandler(svc *services.BandSwitchingService) fiber.Handler {
+func SetBandSwitchingHandler(svc *wifi.BandSwitchingService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		body := c.Body()
 
@@ -35,7 +36,7 @@ func SetBandSwitchingHandler(svc *services.BandSwitchingService) fiber.Handler {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
-		var cfg services.BandSwitchConfig
+		var cfg wifi.BandSwitchConfig
 		if probe.Config != nil {
 			if err := decodeStrictJSON(body, &cfg, "config"); err != nil {
 				return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
@@ -44,7 +45,7 @@ func SetBandSwitchingHandler(svc *services.BandSwitchingService) fiber.Handler {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 
-		if err := services.ValidateBandSwitchConfig(cfg); err != nil {
+		if err := wifi.ValidateBandSwitchConfig(cfg); err != nil {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetConfig(cfg); err != nil {

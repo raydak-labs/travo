@@ -2,12 +2,13 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
 )
 
 // GetFirewallZonesHandler handles GET /api/v1/network/firewall/zones.
-func GetFirewallZonesHandler(svc *services.NetworkService) fiber.Handler {
+func GetFirewallZonesHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		zones, err := svc.GetFirewallZones()
 		if err != nil {
@@ -18,7 +19,7 @@ func GetFirewallZonesHandler(svc *services.NetworkService) fiber.Handler {
 }
 
 // GetPortForwardsHandler handles GET /api/v1/network/firewall/port-forwards.
-func GetPortForwardsHandler(svc *services.NetworkService) fiber.Handler {
+func GetPortForwardsHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		rules, err := svc.GetPortForwards()
 		if err != nil {
@@ -29,7 +30,7 @@ func GetPortForwardsHandler(svc *services.NetworkService) fiber.Handler {
 }
 
 // AddPortForwardHandler handles POST /api/v1/network/firewall/port-forwards.
-func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
+func AddPortForwardHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var rule models.PortForwardRule
 		if err := c.Bind().Body(&rule); err != nil {
@@ -43,7 +44,7 @@ func AddPortForwardHandler(svc *services.NetworkService) fiber.Handler {
 }
 
 // DeletePortForwardHandler handles DELETE /api/v1/network/firewall/port-forwards/:id.
-func DeletePortForwardHandler(svc *services.NetworkService) fiber.Handler {
+func DeletePortForwardHandler(svc *network.Service) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := svc.DeletePortForward(id); err != nil {
