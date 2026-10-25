@@ -7,9 +7,26 @@ import {
   mockSystemLogs,
   mockSystemStats,
   mockTimezoneConfig,
+  mockUpdateStatus,
 } from '../data';
 
 export const systemHandlers = [
+  http.get(API_ROUTES.system.updates, () => HttpResponse.json(mockUpdateStatus)),
+
+  http.post(API_ROUTES.system.checkUpdates, () =>
+    HttpResponse.json({ ...mockUpdateStatus, checked_at: new Date().toISOString() }),
+  ),
+
+  http.post(API_ROUTES.system.upgradePackagesStream, () => {
+    const lines = mockUpdateStatus.packages.upgradable.map((p) =>
+      JSON.stringify({ type: 'log', data: `Upgrading ${p.name} (${p.current} -> ${p.available})` }),
+    );
+    lines.push(JSON.stringify({ type: 'done' }));
+    return new HttpResponse(lines.join('\n') + '\n', {
+      headers: { 'Content-Type': 'application/x-ndjson' },
+    });
+  }),
+
   http.get(API_ROUTES.system.info, () => {
     return HttpResponse.json(mockSystemInfo);
   }),

@@ -8,34 +8,31 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useInstallLogStream } from '@/pages/services/use-install-log-stream';
+import { useStreamLog } from '@/hooks/use-stream-log';
 
-type InstallLogDialogProps = {
+type StreamLogDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  serviceId: string;
-  serviceName: string;
-  action: 'install' | 'remove';
+  /** NDJSON endpoint the dialog POSTs and follows. */
+  route: string;
+  title: string;
   onComplete: () => void;
 };
 
-export function InstallLogDialog({
+/** Runs a streamed operation and shows its log; closable once it ended. */
+export function StreamLogDialog({
   open,
   onOpenChange,
-  serviceId,
-  serviceName,
-  action,
+  route,
+  title,
   onComplete,
-}: InstallLogDialogProps) {
-  const { lines, status, logRef, handleClose } = useInstallLogStream({
+}: StreamLogDialogProps) {
+  const { lines, status, logRef, handleClose } = useStreamLog({
     open,
-    serviceId,
-    action,
+    route,
     onComplete,
     onOpenChange,
   });
-
-  const title = action === 'install' ? `Installing ${serviceName}` : `Removing ${serviceName}`;
 
   return (
     <Dialog open={open} onOpenChange={status !== 'streaming' ? handleClose : undefined}>

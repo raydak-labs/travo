@@ -350,6 +350,17 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 	vpnSvc := uplink.NewVpnService(uplink.VpnDeps{UCI: u})
 	svcManager := system.NewServiceManager(nil, nil)
 	svcManager.RefreshCache()
+	runningVersion := func() (string, error) {
+		info, err := systemSvc.GetSystemInfo()
+		return info.FirmwareVersion, err
+	}
+	var updateSvc *system.UpdateService
+	if cfg.MockMode {
+		updateSvc = system.NewUpdateService(system.NewMockPackageManager(), runningVersion, system.MockVersionsFeed)
+	} else {
+		updateSvc = system.NewUpdateService(nil, runningVersion, nil)
+	}
+	startUpdateChecks(lifecycle, updateSvc)
 	captiveSvc := uplink.NewCaptiveService(uplink.CaptiveDeps{Prober: captiveProber, UCI: u, Cmd: &platform.RealCommandRunner{}})
 	captiveSvc.StartAutoRestore()
 	adguardSvc := uplink.NewAdGuardService(nil)
@@ -449,6 +460,7 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 		StatsHistory:   statsHistory,
 		TrafficHistory: trafficHistory,
 		Speedtest:      system.NewSpeedtestService(nil),
+		Updates:        updateSvc,
 
 		TimeSyncMinPlausible: minPlausibleTime(buildTime),
 		TimeSyncLimiter:      timeSyncLimiter,

@@ -2,6 +2,7 @@
  * Mock fixtures for the system routes.
  */
 import type {
+  UpdateStatus,
   SystemInfo,
   SystemStats,
   LogResponse,
@@ -97,4 +98,17 @@ export const mockNTPConfig: NTPConfig = {
     '2.openwrt.pool.ntp.org',
     '3.openwrt.pool.ntp.org',
   ],
+};
+
+export const mockUpdateStatus: UpdateStatus = {
+  firmware: { current: '23.05.3', latest: '23.05.6', kind: 'patch', attended_sysupgrade: true },
+  packages: {
+    manager: 'apk',
+    upgradable: [
+      { name: 'dnsmasq', current: '2.91-r2', available: '2.93-r1' },
+      { name: 'curl', current: '8.19.0-r1', available: '8.23.0-r1' },
+    ],
+  },
+  checked_at: '2026-10-25T15:00:00Z',
+  errors: [],
 };

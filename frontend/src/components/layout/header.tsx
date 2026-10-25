@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { HeaderNotificationsMenu } from './header-notifications-menu';
 import { HeaderOverflowMenu } from './header-overflow-menu';
 import { HeaderRouterStatus } from './header-router-status';
+import { HeaderUpdatesIndicator } from './header-updates-indicator';
 
 interface HeaderProps {
   title: string;
@@ -34,6 +35,7 @@ export function Header({ title, showMenuButton, onMenuToggle }: HeaderProps) {
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
         <HeaderRouterStatus systemInfo={systemInfo} systemError={systemError} />
+        <HeaderUpdatesIndicator />
         <HeaderNotificationsMenu />
         <HeaderOverflowMenu />
         <Button variant="ghost" size="sm" onClick={toggleTheme} aria-label="Toggle theme">

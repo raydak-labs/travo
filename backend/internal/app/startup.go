@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/system"
 	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
@@ -80,6 +81,24 @@ func startWifiReconciliation(lifecycle *Lifecycle, wifiSvc *wifi.Service) {
 			slog.Warn("radio discovery failed", "err", err)
 		} else if discovered {
 			slog.Info("radio discovery completed on first boot")
+		}
+	})
+}
+
+// Update checks contact the internet, so the first waits for the uplink to
+// settle after boot and the rest run once a day. A check only reads: it
+// refreshes the package index and fetches the release list.
+const (
+	updateCheckDelay    = 2 * time.Minute
+	updateCheckInterval = 24 * time.Hour
+)
+
+func startUpdateChecks(lifecycle *Lifecycle, updates *system.UpdateService) {
+	lifecycle.Go(func(stop <-chan struct{}) {
+		for wait := updateCheckDelay; sleepOrStop(stop, wait); wait = updateCheckInterval {
+			if st := updates.Check(); len(st.Errors) > 0 {
+				slog.Warn("update check incomplete", "errors", st.Errors)
+			}
 		}
 	})
 }

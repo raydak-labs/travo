@@ -11,7 +11,7 @@ Working backlog only — no duplicate “priority queue”; each item appears on
 
 Stable rules: [`../architecture/overview.md`](../architecture/overview.md). Shipped work: [`tasks_done.md`](./tasks_done.md).
 
-> **Last updated:** 2026-10-06 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-25 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## 1. WiFi Management
 
@@ -78,7 +78,8 @@ Stable rules: [`../architecture/overview.md`](../architecture/overview.md). Ship
 
 ## 13. Deployment And Packaging
 
-- [ ] Automatic updates mechanism
+- [ ] Automatic updates mechanism. Notifications and a one-click package upgrade shipped
+      (System → Updates); unattended upgrades on a schedule are still open.
 
 ## 14. Hardware Buttons
 

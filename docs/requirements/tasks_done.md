@@ -129,6 +129,10 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 - **Quiet crond (2026-10-25):** the installer sets `cronloglevel=9`, so the per-minute WiFi
   reconnect check no longer writes a `cron.err` line every minute
   ([ADR 0013 §8](../adr/0013-operational-invariants-and-device-findings.md)).
+- **Update notifications (2026-10-25):** the header and the System menu show when an OpenWrt
+  release or package updates are available. System → Updates links a new release to LuCI's
+  Attended Sysupgrade and upgrades packages (apk or opkg) with a streamed log
+  ([ADR 0006 §2](../adr/0006-application-platform-and-api-contract.md)).
 
 ## Frontend Toolchain
 

@@ -14,10 +14,15 @@ import { ThemeProvider } from '../theme-provider';
 import { AppShell } from '../app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useServices } from '@/hooks/use-services';
+import { useUpdates } from '@/hooks/use-updates';
 import { useSpeedtestServiceStatus } from '@/hooks/use-speedtest';
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: vi.fn(() => false),
+}));
+
+vi.mock('@/hooks/use-updates', () => ({
+  useUpdates: vi.fn(() => ({ data: undefined })),
 }));
 
 vi.mock('@/hooks/use-alerts', () => ({
@@ -116,6 +121,7 @@ function renderAppShellMobile(currentPath = '/dashboard') {
 describe('Sidebar', () => {
   beforeEach(() => {
     mockUseIsMobile.mockReturnValue(false);
+    vi.mocked(useUpdates).mockReturnValue({ data: undefined } as ReturnType<typeof useUpdates>);
     mockUseServices.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -127,6 +133,26 @@ describe('Sidebar', () => {
       isSuccess: false,
     } as ReturnType<typeof useSpeedtestServiceStatus>);
     localStorage.clear();
+  });
+
+  // The header indicator is the loud signal; the menu keeps a quiet dot on
+  // System so the operator knows where the details are.
+  it('marks System while updates are available', async () => {
+    vi.mocked(useUpdates).mockReturnValue({
+      data: {
+        firmware: {
+          current: '25.12.3',
+          latest: '25.12.6',
+          kind: 'patch',
+          attended_sysupgrade: true,
+        },
+        packages: { manager: 'apk', upgradable: [] },
+        checked_at: '2026-10-25T15:00:00Z',
+        errors: [],
+      },
+    } as unknown as ReturnType<typeof useUpdates>);
+    renderSidebar();
+    expect(await screen.findByText('Updates available: OpenWrt 25.12.6')).toBeInTheDocument();
   });
 
   it('renders category groups and leaf routes', async () => {

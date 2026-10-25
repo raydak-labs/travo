@@ -8,7 +8,9 @@ import {
   useStopService,
   useSetAutoStart,
 } from '@/hooks/use-services';
-import { InstallLogDialog } from '@/pages/services/install-log-dialog';
+import { StreamLogDialog } from '@/components/stream-log-dialog';
+import { routeWithParam } from '@/lib/api-url';
+import { API_ROUTES } from '@shared/index';
 import { ServicesInstalledCard } from '@/pages/services/services-installed-card';
 import { WireguardPostInstallDialog } from '@/pages/services/wireguard-post-install-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -103,12 +105,16 @@ export function ServicesPage() {
       />
 
       {streamAction && (
-        <InstallLogDialog
+        <StreamLogDialog
           open={true}
           onOpenChange={(open) => !open && handleStreamComplete()}
-          serviceId={streamAction.serviceId}
-          serviceName={streamAction.serviceName}
-          action={streamAction.action}
+          route={routeWithParam(
+            streamAction.action === 'install'
+              ? API_ROUTES.services.installStream
+              : API_ROUTES.services.removeStream,
+            streamAction.serviceId,
+          )}
+          title={`${streamAction.action === 'install' ? 'Installing' : 'Removing'} ${streamAction.serviceName}`}
           onComplete={handleStreamComplete}
         />
       )}

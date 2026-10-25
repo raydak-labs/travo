@@ -35,6 +35,7 @@ type Dependencies struct {
 	StatsHistory   *system.StatsHistoryService
 	TrafficHistory *network.TrafficHistoryService
 	Speedtest      *system.SpeedtestService
+	Updates        *system.UpdateService
 
 	// Time-sync policy (see SyncTimeHandler). MinPlausible is typically the
 	// binary build time: a clock before it is clearly broken. SetTime is
@@ -59,6 +60,7 @@ func SetupRoutes(app *fiber.App, deps *Dependencies) *API {
 	registerAuth(api, deps)
 	registerSystem(api, deps)
 	registerServices(api, deps.ServiceManager)
+	registerUpdates(api, deps.Updates)
 	registerNetwork(api, deps)
 	registerWifi(api, deps)
 	registerVPN(api, deps.Vpn)

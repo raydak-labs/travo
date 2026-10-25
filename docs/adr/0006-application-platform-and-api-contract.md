@@ -37,6 +37,15 @@ what the server does.
   ([deployment](../guides/deployment.md)).
 - Travo mutates the **same UCI and services** LuCI edits; operators can reconcile unexpected states
   via LuCI.
+- **Travo reports updates; LuCI flashes releases.** `UpdateService` compares the running release
+  with `downloads.openwrt.org/.versions.json` (newest of the running series first, else the
+  stable one) and lists upgradable apk/opkg packages. It checks 2 minutes after start, then daily,
+  or on `POST /system/updates/check`. Packages are upgraded in Travo under the `pkg-install` crash
+  guard, and only names from the last check are accepted, because they reach the package manager
+  as arguments. A new release links to LuCI's Attended Sysupgrade, which builds an image that keeps
+  the installed packages. Travo's own image upload (`/system/firmware/upgrade`) would drop them.
+  On the GL-AXT1800 (OpenWrt 25.12.3, 2026-10-25) a check took 2.6 s and found 25.12.6 plus 71
+  packages. Upgrading `htop` through the stream took 1.3 s and left no guard.
 
 ### 3. Backend as mutator, frontend as driver
 
@@ -127,6 +136,9 @@ knobs:
 - Raising or lowering a value in §5 needs a reason tied to a device constraint.
 
 ## Deliberate ceilings
+
+- The release check knows a newer release exists, not that it has an image for this board;
+  Attended Sysupgrade checks that before it builds. Snapshots are never offered an update.
 
 - Path and query parameters are strings; handlers parse numbers themselves.
 - Uploads (`/system/restore`, `/system/firmware/upgrade`) and streams (backup download, NDJSON

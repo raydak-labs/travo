@@ -12,12 +12,14 @@ import { SystemTimezoneCard } from './system-timezone-card';
 import { SystemBackupRestoreCard } from './system-backup-restore-card';
 import { SystemQuickLinksCard } from './system-quick-links-card';
 import { SystemPowerSection } from './system-power-section';
+import { SystemUpdatesCard } from './system-updates-card';
 import { AdGuardPasswordCard } from './adguard-password-card';
 
 export function SystemPage() {
   return (
     <div className="space-y-6">
       <SystemAtAGlanceSection />
+      <SystemUpdatesCard />
 
       <div>
         <SectionHeading>Configuration</SectionHeading>
