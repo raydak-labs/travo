@@ -471,7 +471,7 @@ func setupApp(t *testing.T) *fiber.App {
 
 func mustNew(t *testing.T, cfg config.Config) (*fiber.App, *Lifecycle) {
 	t.Helper()
-	app, lifecycle, err := New(cfg, "")
+	app, lifecycle, err := New(cfg, Build{Version: "0.9.0"})
 	if err != nil {
 		t.Fatalf("app.New: %v", err)
 	}

@@ -89,6 +89,11 @@ func MockVersionsFeed() ([]byte, error) {
 	return []byte(`{"stable_version":"25.12.6","versions_list":["25.12.6","24.10.8","23.05.6","23.05.2"]}`), nil
 }
 
+// MockTravoRelease stands in for GitHub's latest Travo release.
+func MockTravoRelease() ([]byte, error) {
+	return []byte(`{"tag_name":"v0.10.0","html_url":"https://github.com/raydak-labs/travo/releases/tag/v0.10.0"}`), nil
+}
+
 // MockSystemProbe tracks init.d state in memory.
 type MockSystemProbe struct {
 	scripts   map[string]bool

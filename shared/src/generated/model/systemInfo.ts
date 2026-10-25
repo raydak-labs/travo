@@ -11,5 +11,6 @@ export interface SystemInfo {
   hostname: string;
   kernel_version: string;
   model: string;
+  travo_version: string;
   uptime_seconds: number;
 }

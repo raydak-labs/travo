@@ -47,7 +47,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	srv, lifecycle, err := app.New(cfg, BuildTime)
+	srv, lifecycle, err := app.New(cfg, app.Build{Version: Version, Time: BuildTime})
 	if err != nil {
 		fatal("startup", err)
 	}

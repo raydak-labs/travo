@@ -1,5 +1,5 @@
 import { CardInset } from '@/components/ui/card-inset';
-import { Server, Cpu, HardDrive } from 'lucide-react';
+import { Server, Cpu, HardDrive, ExternalLink } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,6 +9,7 @@ import { StatValue } from '@/components/ui/stat-value';
 import { HostnameInlineForm } from './hostname-inline-form';
 import { useSystemInfo, useSystemStats } from '@/hooks/use-system';
 import { formatBytes, formatUptime } from '@/lib/utils';
+import { formatTravoVersion, travoVersionUrl } from '@/lib/updates';
 
 export function SystemAtAGlanceSection() {
   const {
@@ -64,6 +65,21 @@ export function SystemAtAGlanceSection() {
                     />
                     <StatValue label="Model" value={info.model} />
                     <StatValue label="Firmware" value={info.firmware_version} />
+                    <StatValue
+                      label="Travo"
+                      value={
+                        <a
+                          href={travoVersionUrl(info.travo_version)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                        >
+                          {formatTravoVersion(info.travo_version)}
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                          <span className="sr-only">(on GitHub)</span>
+                        </a>
+                      }
+                    />
                     <StatValue label="Kernel" value={info.kernel_version} />
                     <StatValue label="Uptime" value={formatUptime(info.uptime_seconds)} />
                   </div>

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { UpdateStatus } from '@shared/index';
-import { luciUpgradeUrl, summarizeUpdates } from '../updates';
+import { luciUpgradeUrl, summarizeUpdates, travoVersionUrl } from '../updates';
 
 function status(over: Partial<UpdateStatus> = {}): UpdateStatus {
   return {
+    travo: { current: '0.9.0' },
     firmware: { current: '25.12.3', attended_sysupgrade: true },
     packages: { manager: 'apk', upgradable: [] },
     checked_at: '2026-10-25T15:00:00Z',
@@ -34,6 +35,7 @@ describe('summarizeUpdates', () => {
     );
     expect(s).toEqual({
       any: true,
+      travo: null,
       firmware: '25.12.6',
       packages: 2,
       label: 'OpenWrt 25.12.6 and 2 package updates',
@@ -56,6 +58,52 @@ describe('summarizeUpdates', () => {
         }),
       ).label,
     ).toBe('OpenWrt 25.12.6');
+  });
+
+  it('names a Travo release first', () => {
+    const s = summarizeUpdates(
+      status({
+        travo: { current: '0.9.0', latest: '0.10.0', release_url: 'https://x/v0.10.0' },
+        packages: { manager: 'apk', upgradable: [pkg] },
+      }),
+    );
+    expect(s.travo).toBe('0.10.0');
+    expect(s.label).toBe('Travo 0.10.0 and 1 package update');
+  });
+
+  it('joins three kinds with commas', () => {
+    expect(
+      summarizeUpdates(
+        status({
+          travo: { current: '0.9.0', latest: '0.10.0' },
+          firmware: {
+            current: '25.12.3',
+            latest: '25.12.6',
+            kind: 'patch',
+            attended_sysupgrade: true,
+          },
+          packages: { manager: 'apk', upgradable: [pkg] },
+        }),
+      ).label,
+    ).toBe('Travo 0.10.0, OpenWrt 25.12.6 and 1 package update');
+  });
+});
+
+describe('travoVersionUrl', () => {
+  const repo = 'https://github.com/raydak-labs/travo';
+  it('links a release to its release page', () => {
+    expect(travoVersionUrl('0.9.0')).toBe(`${repo}/releases/tag/v0.9.0`);
+    // A build of the tag itself with local changes (seen on the router).
+    expect(travoVersionUrl('v0.9.0-dirty')).toBe(`${repo}/releases/tag/v0.9.0`);
+  });
+  // A development build is `git describe` output; its commit is the useful link.
+  it('links a development build to its commit', () => {
+    expect(travoVersionUrl('v0.9.0-3-g2705c43-dirty')).toBe(`${repo}/commit/2705c43`);
+    expect(travoVersionUrl('2705c43')).toBe(`${repo}/commit/2705c43`);
+  });
+  it('links an unknown version to the repository', () => {
+    expect(travoVersionUrl('dev')).toBe(repo);
+    expect(travoVersionUrl('')).toBe(repo);
   });
 });
 

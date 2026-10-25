@@ -39,8 +39,9 @@ what the server does.
   via LuCI.
 - **Travo reports updates; LuCI flashes releases.** `UpdateService` compares the running release
   with `downloads.openwrt.org/.versions.json` (newest of the running series first, else the
-  stable one) and lists upgradable apk/opkg packages. It checks 2 minutes after start, then daily,
-  or on `POST /system/updates/check`. Packages are upgraded in Travo under the `pkg-install` crash
+  stable one), lists upgradable apk/opkg packages, and compares the build's version
+  (`main.Version`, also in `GET /system/info` as `travo_version`) with GitHub's latest Travo
+  release. It checks 2 minutes after start, then daily, or on `POST /system/updates/check`. Packages are upgraded in Travo under the `pkg-install` crash
   guard, and only names from the last check are accepted, because they reach the package manager
   as arguments. A new release links to LuCI's Attended Sysupgrade, which builds an image that keeps
   the installed packages. Travo's own image upload (`/system/firmware/upgrade`) would drop them.
@@ -139,6 +140,9 @@ knobs:
 
 - The release check knows a newer release exists, not that it has an image for this board;
   Attended Sysupgrade checks that before it builds. Snapshots are never offered an update.
+- A Travo release is a link to its notes, not an upgrade: `install.sh` resets the root password.
+  The release check is unauthenticated, which GitHub allows 60 times an hour per address, and a
+  development build counts as its last tag.
 
 - Path and query parameters are strings; handlers parse numbers themselves.
 - Uploads (`/system/restore`, `/system/firmware/upgrade`) and streams (backup download, NDJSON

@@ -59,7 +59,12 @@ type Service struct {
 	toggleScriptPath string
 	// logTail replaces logread/dmesg (mock mode); nil runs the commands.
 	logTail func(cmd string) (string, error)
+	// travoVersion is reported by GetSystemInfo.
+	travoVersion string
 }
+
+// SetTravoVersion sets the build version GetSystemInfo reports.
+func (s *Service) SetTravoVersion(v string) { s.travoVersion = v }
 
 // sshKeysPath returns the authorized_keys path in use.
 func (s *Service) sshKeysPath() string {
@@ -134,6 +139,7 @@ func (s *Service) GetSystemInfo() (models.SystemInfo, error) {
 		FirmwareVersion: fwVersion,
 		KernelVersion:   kernel,
 		UptimeSeconds:   uptime,
+		TravoVersion:    s.travoVersion,
 	}, nil
 }
 
