@@ -4,3 +4,5 @@ build
 coverage
 backend/bin
 pnpm-lock.yaml
+shared/src/generated/
+shared/openapi.json

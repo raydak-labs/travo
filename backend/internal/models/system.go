@@ -142,8 +142,8 @@ const (
 
 // HardwareButton describes a detected hardware button and its configured action.
 type HardwareButton struct {
-	Name   string       `json:"name"`   // button identifier, e.g. "reset", "wps"
-	Action ButtonAction `json:"action"` // configured action
+	Name   string       `json:"name"`                                                        // button identifier, e.g. "reset", "wps"
+	Action ButtonAction `json:"action" enum:"none,vpn_toggle,wifi_toggle,led_toggle,reboot"` // configured action
 }
 
 // ButtonActionsRequest is the payload for PUT /api/v1/system/button-actions.
@@ -160,7 +160,7 @@ type WiFiSchedule struct {
 
 // SplitTunnelConfig holds WireGuard split tunneling settings.
 type SplitTunnelConfig struct {
-	Mode   string   `json:"mode"`   // "all" or "custom"
+	Mode   string   `json:"mode" enum:"all,custom"`
 	Routes []string `json:"routes"` // CIDR ranges when mode=custom
 }
 

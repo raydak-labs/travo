@@ -1,6 +1,2 @@
-export interface DNSMode {
-  readonly mode: 'default' | 'adguard-forwarding' | 'adguard-direct';
-  readonly description: string;
-  readonly adguard_running: boolean;
-  readonly dns_bypassed: boolean;
-}
+// Generated from the backend's OpenAPI document (make generate).
+export type { DNSMode } from '../generated/schemas';

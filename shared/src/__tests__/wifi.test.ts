@@ -114,6 +114,7 @@ describe('MACConfig', () => {
       interface: 'sta',
       current_mac: 'AA:BB:CC:DD:EE:FF',
       custom_mac: '02:11:22:33:44:55',
+      is_applied: true,
     };
     expect(mac.interface).toBe('sta');
     expect(mac.current_mac).toBe('AA:BB:CC:DD:EE:FF');
@@ -124,6 +125,7 @@ describe('MACConfig', () => {
     const mac: MACConfig = {
       interface: 'sta',
       current_mac: 'AA:BB:CC:DD:EE:FF',
+      is_applied: false,
     };
     expect(mac.custom_mac).toBeUndefined();
   });

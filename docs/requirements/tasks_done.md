@@ -103,6 +103,10 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   ([ADR 0006 §4](../adr/0006-application-platform-and-api-contract.md)); `go run ./cmd/openapi`
   writes the document. The binder is non-generic, so the binary shrank (15.35 → 15.12 MB) instead
   of growing 3.5 MB with `huma.Register`. The unused `GET /services/adguardhome/status` is removed.
+- **Generated API types (2026-10-25):** `make generate` writes `shared/openapi.json` and the TS
+  types (`openapi-typescript`, in `tools/openapi-gen`); 95 of the 105 hand-written shared types
+  are now aliases of generated ones, and CI fails on stale output. String fields the backend
+  only ever fills from a fixed set carry `enum` tags, so the generated unions are exact.
 
 ## Frontend Toolchain
 

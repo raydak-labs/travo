@@ -1,12 +1,7 @@
-/** Captive portal detection status */
-export interface CaptivePortalStatus {
-  readonly detected: boolean;
-  readonly portal_url?: string;
-  readonly can_reach_internet: boolean;
-  readonly dns_bypassed: boolean;
-  readonly dns_bypass_needed: boolean;
-  readonly sta_connected: boolean;
-}
+import type { CaptiveAutoAcceptResult, CaptivePortalStatus } from '../generated/schemas';
+
+// Generated from the backend's OpenAPI document (make generate).
+export type { CaptiveAutoAcceptResult, CaptivePortalStatus } from '../generated/schemas';
 
 /** Type guard for CaptivePortalStatus */
 export function isCaptivePortalStatus(value: unknown): value is CaptivePortalStatus {
@@ -17,15 +12,6 @@ export function isCaptivePortalStatus(value: unknown): value is CaptivePortalSta
     typeof v.can_reach_internet === 'boolean' &&
     typeof v.sta_connected === 'boolean'
   );
-}
-
-export interface CaptiveAutoAcceptResult {
-  readonly ok: boolean;
-  readonly message?: string;
-  readonly detected: boolean;
-  readonly can_reach_internet: boolean;
-  readonly portal_url?: string;
-  readonly attempts?: number;
 }
 
 export function isCaptiveAutoAcceptResult(value: unknown): value is CaptiveAutoAcceptResult {

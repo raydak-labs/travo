@@ -100,7 +100,7 @@ This is a pnpm monorepo with:
 - `frontend/` — React + TypeScript + Vite + TailwindCSS
 - `backend/` — Go + Fiber, one package per domain under `backend/internal/`
   (see `docs/reference/backend-packages.md`)
-- `shared/` — Shared TypeScript types
+- `shared/` — TypeScript API types, generated from the backend's OpenAPI document (`make generate`)
 
 ## Documentation Workflow
 
@@ -190,6 +190,8 @@ GET /api/openapi.json
 
 - It is OpenAPI 3.1, generated from the handler types (ADR 0006 §4); never edit a spec by hand.
 - Add endpoints with the `get`/`post`/`put`/`del` helpers in `backend/internal/api`, not on the Fiber app.
+- After changing an API type, run `make generate` and commit `shared/openapi.json` and
+  `shared/src/generated/` (never edit those by hand; CI checks they are current).
 - It should remain available on the test device at `http://192.168.1.1/api/openapi.json`.
 - Protected endpoints use `POST /api/v1/auth/login` and `Authorization: Bearer <token>`.
 
