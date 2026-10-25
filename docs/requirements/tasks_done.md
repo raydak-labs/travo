@@ -1,7 +1,7 @@
 ---
 title: Completed tasks
 description: Shipped milestones and done work; pair with tasks_open for current backlog.
-updated: 2026-10-22
+updated: 2026-10-25
 tags: [backlog, requirements, changelog]
 ---
 
@@ -11,7 +11,7 @@ High-level **what shipped**, grouped by subsystem. For the old exhaustive checkb
 
 When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture/overview.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
-> **Last updated:** 2026-10-22 (the `updated:` field in the frontmatter is the same date; keep them in step)
+> **Last updated:** 2026-10-25 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
 ## Milestone checklist (compact)
 
@@ -86,6 +86,13 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   spec is unchanged. The VPN lock test now walks the whole package instead of one file, so a
   split can no longer hide a nested config lock, and a new docs gate resolves every `file:line`
   reference in `docs/` so a split can no longer leave a stale pointer behind.
+- **Backend cleanup (2026-10-25):** crash guards go through one package, `internal/guard`
+  (ADR 0003), replacing seven per-service copies and their silent temp-dir fallback. Legacy
+  migrations are gone: the pre-stack dnsmasq snapshots, the pre-stack captive restore path, the
+  `enable` / `exit_node` request aliases, `expires_at`, and `/etc/travo` guard clearing. Logging
+  is `log/slog` with levels. golangci-lint adds errcheck, errorlint, gocritic, unparam,
+  bodyclose and others. The docs gates live in `internal/docsgate`, and docs cite symbols
+  instead of `file:line`.
 
 ## Frontend Toolchain
 
