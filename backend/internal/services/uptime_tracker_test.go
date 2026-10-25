@@ -3,10 +3,12 @@ package services
 import (
 	"testing"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 func TestUptimeTracker_RecordsFirstEvent(t *testing.T) {
-	prober := &MockHTTPProber{StatusCode: 204, Body: ""}
+	prober := &platform.MockHTTPProber{StatusCode: 204, Body: ""}
 	tracker := NewUptimeTracker(prober)
 
 	tracker.check()
@@ -21,7 +23,7 @@ func TestUptimeTracker_RecordsFirstEvent(t *testing.T) {
 }
 
 func TestUptimeTracker_NoEventOnNoStateChange(t *testing.T) {
-	prober := &MockHTTPProber{StatusCode: 204, Body: ""}
+	prober := &platform.MockHTTPProber{StatusCode: 204, Body: ""}
 	tracker := NewUptimeTracker(prober)
 
 	tracker.check()
@@ -34,7 +36,7 @@ func TestUptimeTracker_NoEventOnNoStateChange(t *testing.T) {
 }
 
 func TestUptimeTracker_RecordsStateTransitions(t *testing.T) {
-	prober := &MockHTTPProber{StatusCode: 204, Body: ""}
+	prober := &platform.MockHTTPProber{StatusCode: 204, Body: ""}
 	tracker := NewUptimeTracker(prober)
 
 	// connected
@@ -63,7 +65,7 @@ func TestUptimeTracker_RecordsStateTransitions(t *testing.T) {
 }
 
 func TestUptimeTracker_RingBufferCapAtMax(t *testing.T) {
-	prober := &MockHTTPProber{StatusCode: 204, Body: ""}
+	prober := &platform.MockHTTPProber{StatusCode: 204, Body: ""}
 	tracker := NewUptimeTracker(prober)
 
 	// Force maxUptimeEvents+2 transitions by alternating state
@@ -83,7 +85,7 @@ func TestUptimeTracker_RingBufferCapAtMax(t *testing.T) {
 }
 
 func TestUptimeTracker_StartStop(t *testing.T) {
-	prober := &MockHTTPProber{StatusCode: 204, Body: ""}
+	prober := &platform.MockHTTPProber{StatusCode: 204, Body: ""}
 	tracker := NewUptimeTracker(prober)
 	tracker.CheckInterval = 10 * time.Millisecond
 
@@ -100,14 +102,14 @@ func TestUptimeTracker_StartStop(t *testing.T) {
 // Stop() must be idempotent, and Start() must not spawn a second ticker: a
 // duplicate loop would record the same transition twice.
 func TestUptimeTracker_StopIsIdempotent(t *testing.T) {
-	tracker := NewUptimeTracker(&MockHTTPProber{StatusCode: 204})
+	tracker := NewUptimeTracker(&platform.MockHTTPProber{StatusCode: 204})
 	tracker.Start()
 	tracker.Stop()
 	tracker.Stop() // must not panic
 }
 
 func TestUptimeTracker_StartIsIdempotent(t *testing.T) {
-	tracker := NewUptimeTracker(&MockHTTPProber{StatusCode: 204})
+	tracker := NewUptimeTracker(&platform.MockHTTPProber{StatusCode: 204})
 	tracker.CheckInterval = 10 * time.Millisecond
 	tracker.Start()
 	tracker.Start()

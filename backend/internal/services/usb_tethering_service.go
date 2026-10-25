@@ -20,7 +20,7 @@ import (
 // usb0/usb1 = Android RNDIS; eth1/eth2 = NCM or iOS ipheth.
 var usbCandidateInterfaces = []string{"usb0", "usb1", "eth1", "eth2"}
 
-const usbTetherUCIName = "usbtether"
+const USBTetherInterface = "usbtether"
 
 // usbTetherConfigs is every UCI config this service mutates.
 var usbTetherConfigs = []string{"firewall", "network"}
@@ -234,7 +234,7 @@ func (s *USBTetheringService) GetStatus() USBTetherStatus {
 
 // isConfigured returns true when UCI has a usbtether network interface.
 func (s *USBTetheringService) isConfigured() bool {
-	out, err := s.runner.RunCommand("uci", "get", fmt.Sprintf("network.%s", usbTetherUCIName))
+	out, err := s.runner.RunCommand("uci", "get", fmt.Sprintf("network.%s", USBTetherInterface))
 	return err == nil && strings.TrimSpace(out) != ""
 }
 
@@ -263,10 +263,10 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 		return err
 	}
 	cmds := [][]string{
-		{"uci", "set", fmt.Sprintf("network.%s=interface", usbTetherUCIName)},
-		{"uci", "set", fmt.Sprintf("network.%s.proto=dhcp", usbTetherUCIName)},
-		{"uci", "set", fmt.Sprintf("network.%s.device=%s", usbTetherUCIName, ifaceName)},
-		{"uci", "set", fmt.Sprintf("network.%s.metric=30", usbTetherUCIName)},
+		{"uci", "set", fmt.Sprintf("network.%s=interface", USBTetherInterface)},
+		{"uci", "set", fmt.Sprintf("network.%s.proto=dhcp", USBTetherInterface)},
+		{"uci", "set", fmt.Sprintf("network.%s.device=%s", USBTetherInterface, ifaceName)},
+		{"uci", "set", fmt.Sprintf("network.%s.metric=30", USBTetherInterface)},
 	}
 	for _, args := range cmds {
 		if _, err := s.runner.RunCommand(args[0], args[1:]...); err != nil {
@@ -279,8 +279,8 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 	if err != nil {
 		return s.abort(err)
 	}
-	if !slices.Contains(zoneNetworks, usbTetherUCIName) {
-		if _, err := s.runner.RunCommand("uci", "add_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, usbTetherUCIName)); err != nil {
+	if !slices.Contains(zoneNetworks, USBTetherInterface) {
+		if _, err := s.runner.RunCommand("uci", "add_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, USBTetherInterface)); err != nil {
 			return s.abort(fmt.Errorf("uci add_list firewall wan zone: %w", err))
 		}
 	}
@@ -294,7 +294,7 @@ func (s *USBTetheringService) configureLocked(ifaceName string) error {
 
 	// Bring up the interface. Best effort: the UCI config is committed and
 	// netifd retries on its own, so a transient ifup failure is not fatal.
-	_, _ = s.runner.RunCommand("ifup", usbTetherUCIName)
+	_, _ = s.runner.RunCommand("ifup", USBTetherInterface)
 
 	_ = s.crashGuard.Clear()
 	return nil
@@ -311,7 +311,7 @@ func (s *USBTetheringService) unconfigureLocked() error {
 	if err := s.crashGuard.Mark(); err != nil {
 		return err
 	}
-	_, _ = s.runner.RunCommand("ifdown", usbTetherUCIName)
+	_, _ = s.runner.RunCommand("ifdown", USBTetherInterface)
 
 	// Remove the firewall reference first so a failure never leaves a dangling
 	// network in the WAN zone after the interface is gone.
@@ -319,8 +319,8 @@ func (s *USBTetheringService) unconfigureLocked() error {
 	if err != nil {
 		return s.abort(err)
 	}
-	if slices.Contains(zoneNetworks, usbTetherUCIName) {
-		if _, err := s.runner.RunCommand("uci", "del_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, usbTetherUCIName)); err != nil {
+	if slices.Contains(zoneNetworks, USBTetherInterface) {
+		if _, err := s.runner.RunCommand("uci", "del_list", fmt.Sprintf("firewall.%s.network=%s", wanZone, USBTetherInterface)); err != nil {
 			return s.abort(fmt.Errorf("uci del_list firewall wan zone: %w", err))
 		}
 		if _, err := s.runner.RunCommand("uci", "commit", "firewall"); err != nil {
@@ -328,7 +328,7 @@ func (s *USBTetheringService) unconfigureLocked() error {
 		}
 	}
 
-	if _, err := s.runner.RunCommand("uci", "delete", fmt.Sprintf("network.%s", usbTetherUCIName)); err != nil {
+	if _, err := s.runner.RunCommand("uci", "delete", fmt.Sprintf("network.%s", USBTetherInterface)); err != nil {
 		return s.abort(fmt.Errorf("uci delete: %w", err))
 	}
 	if _, err := s.runner.RunCommand("uci", "commit", "network"); err != nil {

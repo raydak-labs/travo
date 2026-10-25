@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/network/networktest"
 	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -349,7 +350,7 @@ func TestGetConnectionMethod(t *testing.T) {
 				}}
 			}
 			svc := NewNetworkServiceWithRunner(u, ub, cmd)
-			svc.arpFile = writeTempFile(t, "arp",
+			svc.arpFile = networktest.WriteTempFile(t, "arp",
 				"IP address  HW type  Flags  HW address  Mask  Device\n"+tt.arp)
 
 			result, err := svc.GetConnectionMethod(tt.clientIP)
@@ -1871,18 +1872,8 @@ func TestGetClients_HostnamesFromUbus(t *testing.T) {
 	}
 }
 
-// failingGetSectionsUCI wraps MockUCI but fails every GetSections read, standing
-// in for a timed-out / failed `uci show` on the device.
-type failingGetSectionsUCI struct {
-	*uci.MockUCI
-}
-
-func (f *failingGetSectionsUCI) GetSections(_ string) (map[string]map[string]string, error) {
-	return nil, fmt.Errorf("uci show: timed out")
-}
-
 func TestGetBlockedClients_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+	svc := NewNetworkService(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus())
 
 	blocked, err := svc.GetBlockedClients()
 	if err == nil {
@@ -1894,7 +1885,7 @@ func TestGetBlockedClients_SurfacesGetSectionsError(t *testing.T) {
 }
 
 func TestGetDNSEntries_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+	svc := NewNetworkService(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus())
 
 	if _, err := svc.GetDNSEntries(); err == nil {
 		t.Fatal("expected an error instead of an empty DNS entry list when the UCI read fails")
@@ -1902,7 +1893,7 @@ func TestGetDNSEntries_SurfacesGetSectionsError(t *testing.T) {
 }
 
 func TestGetDHCPReservations_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewNetworkService(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus())
+	svc := NewNetworkService(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus())
 
 	if _, err := svc.GetDHCPReservations(); err == nil {
 		t.Fatal("expected an error instead of an empty reservation list when the UCI read fails")

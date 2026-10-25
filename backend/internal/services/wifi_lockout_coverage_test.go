@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/network/networktest"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
@@ -163,7 +164,7 @@ func TestConnect_RefusesRatherThanRemovingTheLastAccessPoint(t *testing.T) {
 // hidden: this is the one Connect outcome the rule cannot express.
 func TestConnect_AllowAPOnSTARadioKeepsTheAccessPointEnabled(t *testing.T) {
 	svc, u, _ := newLockoutService(t)
-	svc.repeaterOptionsFile = writeTempFile(t, "repeater-options",
+	svc.repeaterOptionsFile = networktest.WriteTempFile(t, "repeater-options",
 		`{"allow_ap_on_sta_radio":true}`)
 	if err := u.Set("wireless", "default_radio0", "disabled", "1"); err != nil {
 		t.Fatal(err)

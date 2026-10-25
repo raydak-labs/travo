@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/network/networktest"
 	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
@@ -29,12 +30,12 @@ func newDeviceLockoutService(t *testing.T, stations map[string]string) (
 	t.Helper()
 	u := uci.NewMockUCI()
 	ub := ubus.NewMockUbus()
-	ub.RegisterResponse("network.interface.dump", deviceInterfaceDump(t))
+	ub.RegisterResponse("network.interface.dump", networktest.DeviceInterfaceDump(t))
 	applier := &fakeWirelessApplier{startToken: "lockout-token"}
 	svc := NewWifiServiceWithApplier(u, ub, applier)
 	svc.guardDir = t.TempDir()
-	svc.cmd = &platform.MockCommandRunner{RunFunc: fakeIw(stations)}
-	svc.arpFile = writeTempFile(t, "arp", deviceNeighborTable(t))
+	svc.cmd = &platform.MockCommandRunner{RunFunc: networktest.FakeIw(stations)}
+	svc.arpFile = networktest.WriteTempFile(t, "arp", networktest.DeviceNeighborTable(t))
 	return svc, u, applier
 }
 
@@ -42,9 +43,9 @@ func newDeviceLockoutService(t *testing.T, stations map[string]string) (
 // LAN bridge, the change removes the last access point, and they are on a wire.
 // Refusing here would make the guard unusable for the operator it protects.
 func TestGuard_DeviceWiredClientIsNotRefused(t *testing.T) {
-	svc, u, _ := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, _ := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 
-	_, err := svc.SetMode("client", LockoutRequest{ClientIP: deviceWiredClientIP})
+	_, err := svc.SetMode("client", LockoutRequest{ClientIP: networktest.DeviceWiredClientIP})
 	if err != nil {
 		t.Fatalf("SetMode from the wired client: %v", err)
 	}
@@ -57,10 +58,10 @@ func TestGuard_DeviceWiredClientIsNotRefused(t *testing.T) {
 // phy1-ap0, and the change takes every access point down.
 func TestGuard_DeviceWiFiClientIsRefused(t *testing.T) {
 	svc, u, applier := newDeviceLockoutService(t,
-		map[string]string{"phy1-ap0": phy1ApStationDump})
+		map[string]string{"phy1-ap0": networktest.Phy1APStationDump})
 	before, sessions := dumpUCI(t, u), len(applier.started)
 
-	_, err := svc.SetMode("client", LockoutRequest{ClientIP: deviceWiFiClientIP})
+	_, err := svc.SetMode("client", LockoutRequest{ClientIP: networktest.DeviceWiFiClientIP})
 
 	assertRefusedAndUntouched(t, err, before, u, applier, sessions)
 }
@@ -73,7 +74,7 @@ func TestGuard_DeviceWiFiClientIsRefused(t *testing.T) {
 // loses one click. Allowing it is the unrecoverable direction — a router with
 // no reachable access point cannot explain itself and needs physical access.
 func TestGuard_UnknownCallerIsRefused(t *testing.T) {
-	svc, u, applier := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, applier := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 	before, sessions := dumpUCI(t, u), len(applier.started)
 
 	_, err := svc.SetMode("client", LockoutRequest{ClientIP: "8.8.8.8"})
@@ -84,7 +85,7 @@ func TestGuard_UnknownCallerIsRefused(t *testing.T) {
 // An unresolvable MAC on br-lan is `unknown` for the same reason, and is the
 // case a real operator hits when their neighbour entry has not aged in yet.
 func TestGuard_UnresolvableMACOnTheLANBridgeIsRefused(t *testing.T) {
-	svc, u, applier := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, applier := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 	before, sessions := dumpUCI(t, u), len(applier.started)
 
 	_, err := svc.SetMode("client", LockoutRequest{ClientIP: "192.168.1.99"})
@@ -93,7 +94,7 @@ func TestGuard_UnresolvableMACOnTheLANBridgeIsRefused(t *testing.T) {
 }
 
 func TestGuard_UnknownCallerProceedsWhenAcknowledged(t *testing.T) {
-	svc, u, _ := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, _ := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 
 	_, err := svc.SetMode("client", LockoutRequest{
 		ClientIP:           "8.8.8.8",
@@ -110,7 +111,7 @@ func TestGuard_UnknownCallerProceedsWhenAcknowledged(t *testing.T) {
 // Refusal is about the RESULT, not about the caller's medium: an unknown caller
 // is fine when an access point stays up, exactly like a WiFi caller is.
 func TestGuard_UnknownCallerAppliesWhileAnAPRemains(t *testing.T) {
-	svc, u, applier := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, applier := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 
 	_, err := svc.SetRadioRole("radio1", "none", LockoutRequest{ClientIP: "8.8.8.8"})
 	if err != nil {
@@ -126,9 +127,9 @@ func TestGuard_UnknownCallerAppliesWhileAnAPRemains(t *testing.T) {
 
 func TestGuard_WiFiClientStillAppliesWhenAnAPRemains(t *testing.T) {
 	svc, u, applier := newDeviceLockoutService(t,
-		map[string]string{"phy1-ap0": phy1ApStationDump})
+		map[string]string{"phy1-ap0": networktest.Phy1APStationDump})
 
-	_, err := svc.SetRadioRole("radio1", "none", LockoutRequest{ClientIP: deviceWiFiClientIP})
+	_, err := svc.SetRadioRole("radio1", "none", LockoutRequest{ClientIP: networktest.DeviceWiFiClientIP})
 	if err != nil {
 		t.Fatalf("SetRadioRole from a WiFi caller while radio0 keeps its AP: %v", err)
 	}
@@ -139,19 +140,19 @@ func TestGuard_WiFiClientStillAppliesWhenAnAPRemains(t *testing.T) {
 }
 
 func TestGuard_WiredClientMayTakeBothAccessPointsDown(t *testing.T) {
-	svc, u, _ := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, _ := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 	off := false
 
 	// The wired client may take the FIRST access point down: one remains.
 	if _, err := svc.SetAPConfig("default_radio0",
 		models.APConfigUpdate{Enabled: &off},
-		LockoutRequest{ClientIP: deviceWiredClientIP}); err != nil {
+		LockoutRequest{ClientIP: networktest.DeviceWiredClientIP}); err != nil {
 		t.Fatalf("disabling the first of two access points from Ethernet: %v", err)
 	}
 	// The SECOND one strands nobody who is on a wire, so it also goes through.
 	if _, err := svc.SetAPConfig("default_radio1",
 		models.APConfigUpdate{Enabled: &off},
-		LockoutRequest{ClientIP: deviceWiredClientIP}); err != nil {
+		LockoutRequest{ClientIP: networktest.DeviceWiredClientIP}); err != nil {
 		t.Fatalf("disabling the last access point from Ethernet: %v", err)
 	}
 	if v, _ := u.Get("wireless", "default_radio1", "disabled"); v != "1" {
@@ -162,16 +163,16 @@ func TestGuard_WiredClientMayTakeBothAccessPointsDown(t *testing.T) {
 // The uplink-STA caller keeps its classification: reachable through phy0-sta0,
 // it is `wifi-client` and is refused.
 func TestGuard_UplinkSTAClientIsRefused(t *testing.T) {
-	svc, u, applier := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, applier := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 	before, sessions := dumpUCI(t, u), len(applier.started)
 
-	_, err := svc.SetMode("client", LockoutRequest{ClientIP: deviceUplinkClientIP})
+	_, err := svc.SetMode("client", LockoutRequest{ClientIP: networktest.DeviceUplinkClientIP})
 
 	assertRefusedAndUntouched(t, err, before, u, applier, sessions)
 }
 
 func TestGuard_NoCallerContextStillPasses(t *testing.T) {
-	svc, u, _ := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, u, _ := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 
 	// A background flow has no caller to strand. Refusing here would break every
 	// non-HTTP mutator to protect against nothing.
@@ -186,7 +187,7 @@ func TestGuard_NoCallerContextStillPasses(t *testing.T) {
 // The refusal must name the remedy. "Ethernet" is the word that tells the
 // operator what to do next.
 func TestGuard_UnknownRefusalNamesTheRemedy(t *testing.T) {
-	svc, _, _ := newDeviceLockoutService(t, noAssociatedAPs())
+	svc, _, _ := newDeviceLockoutService(t, networktest.NoAssociatedAPs())
 
 	_, err := svc.SetMode("client", LockoutRequest{ClientIP: "8.8.8.8"})
 	if !errors.Is(err, ErrLockoutRefused) {

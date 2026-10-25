@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -17,8 +16,6 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-const captiveProbeURL = "http://connectivitycheck.gstatic.com/generate_204"
-
 // captiveDNSGuardFeature names the guard that stores the original DNS config
 // while the bypass is active.
 const captiveDNSGuardFeature = "captive-dns"
@@ -26,53 +23,9 @@ const captiveDNSGuardFeature = "captive-dns"
 // captiveDNSRestoreTimeout auto-restores DNS if bypass has been active too long.
 const captiveDNSRestoreTimeout = 5 * time.Minute
 
-// HTTPProber performs HTTP probes for captive portal detection.
-type HTTPProber interface {
-	// Do sends a GET request and returns status code, body, redirect URL (if any), and error.
-	Do(url string) (statusCode int, body string, redirectURL string, err error)
-}
-
-// RealHTTPProber uses net/http with redirect checking disabled.
-type RealHTTPProber struct {
-	client *http.Client
-}
-
-// NewRealHTTPProber creates a prober with a 5-second timeout and no-redirect policy.
-func NewRealHTTPProber() *RealHTTPProber {
-	return &RealHTTPProber{
-		client: &http.Client{
-			Timeout: 3 * time.Second,
-			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		},
-	}
-}
-
-// Do performs an HTTP GET and returns status, body, redirect URL, and error.
-func (p *RealHTTPProber) Do(url string) (int, string, string, error) {
-	resp, err := p.client.Get(url)
-	if err != nil {
-		return 0, "", "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp.StatusCode, "", "", err
-	}
-
-	var redirectURL string
-	if loc := resp.Header.Get("Location"); loc != "" {
-		redirectURL = loc
-	}
-
-	return resp.StatusCode, string(bodyBytes), redirectURL, nil
-}
-
 // CaptiveService checks for captive portal detection.
 type CaptiveService struct {
-	prober   HTTPProber
+	prober   platform.HTTPProber
 	uci      uci.UCI
 	cmd      platform.CommandRunner
 	mu       sync.Mutex
@@ -120,12 +73,12 @@ type dnsBackup struct {
 }
 
 // NewCaptiveService creates a new CaptiveService with the given HTTP prober.
-func NewCaptiveService(prober HTTPProber) *CaptiveService {
+func NewCaptiveService(prober platform.HTTPProber) *CaptiveService {
 	return &CaptiveService{prober: prober, dnsGuard: guard.New(captiveDNSGuardFeature), stopCh: make(chan struct{})}
 }
 
 // NewCaptiveServiceWithUCI creates a CaptiveService with UCI access for DNS bypass.
-func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd platform.CommandRunner) *CaptiveService {
+func NewCaptiveServiceWithUCI(prober platform.HTTPProber, u uci.UCI, cmd platform.CommandRunner) *CaptiveService {
 	svc := newCaptiveServiceWithGuard(prober, u, cmd, guard.New(captiveDNSGuardFeature))
 	// Auto-restore stale bypass on startup. Tracked by the app lifecycle: Stop()
 	// must be able to keep this goroutine from restoring DNS after the process
@@ -140,11 +93,11 @@ func NewCaptiveServiceWithUCI(prober HTTPProber, u uci.UCI, cmd platform.Command
 
 // NewCaptiveServiceWithGuard is NewCaptiveServiceWithUCI with the bypass state
 // in an explicit guard and without the startup auto-restore.
-func NewCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
+func NewCaptiveServiceWithGuard(prober platform.HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
 	return newCaptiveServiceWithGuard(prober, u, cmd, g)
 }
 
-func newCaptiveServiceWithGuard(prober HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
+func newCaptiveServiceWithGuard(prober platform.HTTPProber, u uci.UCI, cmd platform.CommandRunner, g guard.Guard) *CaptiveService {
 	return &CaptiveService{prober: prober, uci: u, cmd: cmd, dnsGuard: g, stopCh: make(chan struct{})}
 }
 
@@ -181,7 +134,7 @@ func (c *CaptiveService) IsUpstreamConnected() bool {
 // CheckCaptivePortal probes for captive portals by making an HTTP request
 // to a known endpoint and checking for redirects or unexpected responses.
 func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error) {
-	statusCode, _, redirectURL, err := c.prober.Do(captiveProbeURL)
+	statusCode, _, redirectURL, err := c.prober.Do(platform.ConnectivityProbeURL)
 
 	if err != nil {
 		// If there's no upstream connection at all, avoid false-positive portal detection.
@@ -200,7 +153,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 		if c.CheckDNSBypassNeeded() || gatewayURL != "" {
 			portalURL := gatewayURL
 			if portalURL == "" {
-				portalURL = captiveProbeURL
+				portalURL = platform.ConnectivityProbeURL
 			}
 			return models.CaptivePortalStatus{
 				Detected:         true,
@@ -241,7 +194,7 @@ func (c *CaptiveService) CheckCaptivePortal() (models.CaptivePortalStatus, error
 
 	// 200 with content = likely captive portal login page
 	if statusCode == http.StatusOK {
-		fallback := captiveProbeURL
+		fallback := platform.ConnectivityProbeURL
 		// Prefer gateway URL if available — better for auto-accept
 		if gatewayURL := c.detectGatewayPortalURL(); gatewayURL != "" {
 			fallback = gatewayURL

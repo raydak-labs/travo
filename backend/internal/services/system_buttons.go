@@ -82,7 +82,7 @@ func (s *SystemService) SetButtonActions(buttons []models.HardwareButton) error 
 			return err
 		}
 	}
-	if err := writeWirelessToggleScriptTo(s.toggleScriptPath); err != nil {
+	if err := WriteWirelessToggleScriptTo(s.toggleScriptPath); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(buttonActionsDir, 0o755); err != nil {
@@ -160,9 +160,9 @@ func buildButtonHotplugScript(buttons []models.HardwareButton) string {
 			// Never `wifi up`/`wifi down` from a script: delegate to the
 			// generated toggle helper, which writes UCI and applies via rpcd.
 			sb.WriteString("    if iwinfo 2>/dev/null | grep -q '^'; then\n")
-			sb.WriteString("      " + wirelessToggleScriptPath + " down\n")
+			sb.WriteString("      " + WirelessToggleScriptPath + " down\n")
 			sb.WriteString("    else\n")
-			sb.WriteString("      " + wirelessToggleScriptPath + " up\n")
+			sb.WriteString("      " + WirelessToggleScriptPath + " up\n")
 			sb.WriteString("    fi\n")
 		case models.ButtonActionLEDToggle:
 			sb.WriteString("    for led in /sys/class/leds/*/brightness; do\n")

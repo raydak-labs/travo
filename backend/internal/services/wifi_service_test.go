@@ -3693,7 +3693,7 @@ func (g *guardCheckingApplier) Rollback(string) error { return nil }
 // Finding 1: a failed `uci show` must never look like an empty config in the
 // wireless read paths either.
 func TestGetRadios_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
 
 	radios, err := svc.GetRadios()
 	if err == nil {
@@ -3705,7 +3705,7 @@ func TestGetRadios_SurfacesGetSectionsError(t *testing.T) {
 }
 
 func TestGetSavedNetworks_SurfacesGetSectionsError(t *testing.T) {
-	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
 
 	networks, err := svc.GetSavedNetworks()
 	if err == nil {
@@ -3718,7 +3718,7 @@ func TestGetSavedNetworks_SurfacesGetSectionsError(t *testing.T) {
 
 // Finding 3: nextSTASectionName must not fall back to a name that may exist.
 func TestNextSTASectionName_PropagatesReadFailure(t *testing.T) {
-	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: uci.NewMockUCI()}, ubus.NewMockUbus(), &NoopWifiReloader{})
 
 	name, err := svc.nextSTASectionName()
 	if err == nil {
@@ -3767,7 +3767,7 @@ func TestEnsureNamedSection_CreatesMissingSection(t *testing.T) {
 // A read failure must not be mistaken for a missing section.
 func TestEnsureNamedSection_PropagatesReadFailure(t *testing.T) {
 	u := uci.NewMockUCI()
-	svc := NewWifiServiceWithReloader(&failingGetSectionsUCI{u}, ubus.NewMockUbus(), &NoopWifiReloader{})
+	svc := NewWifiServiceWithReloader(&uci.FailingSectionsUCI{MockUCI: u}, ubus.NewMockUbus(), &NoopWifiReloader{})
 
 	if err := svc.ensureNamedSection("wireless", "guest", "wifi-iface"); err == nil {
 		t.Fatal("expected the read failure to surface instead of silently creating a section")

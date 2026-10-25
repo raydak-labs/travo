@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -136,7 +137,7 @@ func newLayerTestCaptive(t *testing.T, u uci.UCI, dev *fakeDevice, dir string) *
 		t.Fatalf("write resolv.conf.auto: %v", err)
 	}
 	return &CaptiveService{
-		prober:                 &MockHTTPProber{StatusCode: 204},
+		prober:                 &platform.MockHTTPProber{StatusCode: 204},
 		uci:                    u,
 		cmd:                    dev,
 		dnsGuard:               guard.In(dir, captiveDNSGuardFeature),

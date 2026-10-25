@@ -100,8 +100,8 @@ type LockoutRequest struct {
 // It is deliberately INCLUSIVE of `unknown`. The classifier cannot prove a
 // caller is wired, and this guard's whole purpose is not to strand anyone, so
 // "cannot tell" is treated as "might be on WiFi". See guardLockout.
-func wifiCallerIP(deps classifyDeps, clientIP string) bool {
-	switch classifyClientConnection(deps, clientIP).Method {
+func wifiCallerIP(deps ClassifyDeps, clientIP string) bool {
+	switch ClassifyClientConnection(deps, clientIP).Method {
 	case "ethernet":
 		return false
 	default:
@@ -175,8 +175,8 @@ func (w *WifiService) guardLockout(req LockoutRequest, enabledAPRemains bool) er
 // classifyDeps builds the dependency set the shared classifier reads from, so
 // the guard classifies its caller through exactly the code the
 // GET /network/connection-method endpoint runs.
-func (w *WifiService) classifyDeps() classifyDeps {
-	return classifyDeps{ubus: w.ubus, cmd: w.cmd, arpFile: w.arpFile}
+func (w *WifiService) classifyDeps() ClassifyDeps {
+	return ClassifyDeps{Ubus: w.ubus, Cmd: w.cmd, ARPFile: w.arpFile}
 }
 
 // enabledAPRemains reports whether at least one enabled mode=ap wifi-iface

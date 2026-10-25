@@ -70,7 +70,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		}, profilesPath),
 		ServiceManager: services.NewServiceManager(),
 		Speedtest:      services.NewSpeedtestServiceWith(services.NewMockPackageManager()),
-		Captive:        services.NewCaptiveService(&services.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
+		Captive:        services.NewCaptiveService(&platform.MockHTTPProber{StatusCode: 200, Body: "success\n"}),
 		Alerts:         services.NewAlertService(systemSvc),
 		BandSwitching:  services.NewBandSwitchingService(wifiSvc, bandSwitchConfigPath),
 		TrafficHistory: services.NewTrafficHistoryService(services.TrafficHistoryDefaultPoints),

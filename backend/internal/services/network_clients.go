@@ -166,9 +166,9 @@ func connectedSinceFromLeaseExpiry(expires, leaseSec float64) string {
 	return time.Now().Add(-time.Duration(elapsed) * time.Second).UTC().Format(time.RFC3339)
 }
 
-// procNetARP is the kernel neighbour table. It is the only place on the device
+// ProcNetARP is the kernel neighbour table. It is the only place on the device
 // that maps a client IP to the MAC actually sitting behind it.
-const procNetARP = "/proc/net/arp"
+const ProcNetARP = "/proc/net/arp"
 
 // arpEntry is one row of the neighbour table, reduced to what callers need.
 type arpEntry struct{ flags, iface string }
@@ -202,7 +202,7 @@ func parseArpTable(raw string) (map[string]arpEntry, map[string]string) {
 // than as a guess.
 func readArpFile(path string) string {
 	if path == "" {
-		path = procNetARP
+		path = ProcNetARP
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {

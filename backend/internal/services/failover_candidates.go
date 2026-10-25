@@ -209,7 +209,7 @@ func (s *FailoverService) addDiscoveredUSBNetworkCandidates(known map[string]mod
 	}
 	for section, opts := range sections {
 		device := opts["device"]
-		if section == usbTetherUCIName || isUSBDeviceName(device) {
+		if section == USBTetherInterface || isUSBDeviceName(device) {
 			if _, exists := known[section]; !exists {
 				known[section] = newCandidate(section, "USB tether", models.FailoverCandidateKindUSB, false)
 			}

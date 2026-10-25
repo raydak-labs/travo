@@ -1,33 +1,28 @@
-package services
+package docsgate
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 )
 
-// The generated shell helpers cannot call the guard package, so they spell
-// the directory out; it must be the one every Go guard uses (ADR 0003 §2).
-func TestShellHelpersUseTheGuardDir(t *testing.T) {
-	toggle := strings.Split(strings.Split(wirelessToggleScript, "GUARD=")[1], "\n")[0]
-	if !strings.HasPrefix(toggle, guard.DefaultDir+"/") {
-		t.Errorf("toggle script guard %q is not under %s/", toggle, guard.DefaultDir)
-	}
-	if !strings.Contains(reconnectScriptContent, `GUARD_DIR="`+guard.DefaultDir+`"`) {
-		t.Errorf("reconnect script does not use %s as its guard dir", guard.DefaultDir)
-	}
-}
-
 // A guard declared under /etc/travo would be invisible to the startup checks
-// and to deploy-local.sh, which only look in the guard dir. State files legitimately live in /etc/travo, so this
-// only flags a /etc/travo path whose name is a guard, plus a bare /etc/trafo
-// directory assigned in a guard context.
+// and to deploy-local.sh, which only look in the guard dir. State files
+// legitimately live in /etc/travo, so this only flags a /etc/travo path whose
+// name is a guard.
 func TestNoGuardIsDeclaredUnderEtcTravo(t *testing.T) {
-	entries, err := os.ReadDir(".")
+	var files []string
+	err := filepath.WalkDir("..", func(path string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			files = append(files, path)
+		}
+		return err
+	})
 	if err != nil {
-		t.Fatalf("read services dir: %v", err)
+		t.Fatalf("walk sources: %v", err)
 	}
 	isGuardName := func(name string) bool {
 		return strings.HasSuffix(name, "-in-progress") ||
@@ -35,11 +30,7 @@ func TestNoGuardIsDeclaredUnderEtcTravo(t *testing.T) {
 			strings.HasSuffix(name, "-failcount")
 	}
 	scanned := 0
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
+	for _, name := range files {
 		data, err := os.ReadFile(name)
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)

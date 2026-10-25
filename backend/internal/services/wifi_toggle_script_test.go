@@ -10,62 +10,10 @@ import (
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
-	"github.com/openwrt-travel-gui/backend/internal/models"
 	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
-
-func TestValidateButtonName(t *testing.T) {
-	discovered := []string{"POWER", "volume_up", "reset-factory"}
-	cases := []struct {
-		name    string
-		dis     []string
-		wantErr bool
-	}{
-		{"POWER", discovered, false},
-		{"volume_up", discovered, false},
-		{"reset-factory", discovered, false},
-		{"", discovered, true},
-		{"NOT_A_BUTTON", discovered, true},
-		{"POWER; reboot", discovered, true},
-		{"POWER)\n  reboot)\n    reboot\n  x)", discovered, true},
-		{"POWER\n", discovered, true},
-		{"POWER", nil, false}, // no devicetree labels: charset check only
-		{"POWER; reboot", nil, true},
-	}
-	for _, tc := range cases {
-		err := ValidateButtonName(tc.name, tc.dis)
-		if (err != nil) != tc.wantErr {
-			t.Errorf("ValidateButtonName(%q, %v) err=%v, wantErr=%v", tc.name, tc.dis, err, tc.wantErr)
-		}
-	}
-}
-
-func TestAddSSHKeyRejectsMultilineAndGarbage(t *testing.T) {
-	s := NewSystemService(nil, nil, nil)
-	if err := s.AddSSHKey("ssh-ed25519 AAAA user@host\nssh-rsa AAAA evil@host"); err == nil {
-		t.Error("expected multi-line key to be rejected")
-	}
-	if err := s.AddSSHKey("not a key"); err == nil {
-		t.Error("expected malformed key to be rejected")
-	}
-}
-
-func TestBuildButtonHotplugScriptHasNoWifiCommands(t *testing.T) {
-	script := buildButtonHotplugScript([]models.HardwareButton{
-		{Name: "POWER", Action: models.ButtonActionWifiToggle},
-		{Name: "volume_up", Action: models.ButtonActionVPNToggle},
-	})
-	for _, forbidden := range []string{"wifi up", "wifi down", "wifi reload"} {
-		if strings.Contains(script, forbidden) {
-			t.Errorf("hotplug script must not contain %q:\n%s", forbidden, script)
-		}
-	}
-	if !strings.Contains(script, wirelessToggleScriptPath) {
-		t.Errorf("hotplug script should delegate to the toggle helper:\n%s", script)
-	}
-}
 
 func TestWirelessToggleScriptIsUCIOnly(t *testing.T) {
 	// Comments may name the forbidden commands; the executed lines may not.
@@ -611,7 +559,7 @@ func TestWriteGeneratedScriptReplacesFileWithCorrectModeAndFullContent(t *testin
 		t.Fatalf("seed helper: %v", err)
 	}
 
-	if err := writeWirelessToggleScriptTo(path); err != nil {
+	if err := WriteWirelessToggleScriptTo(path); err != nil {
 		t.Fatalf("writeWirelessToggleScriptTo: %v", err)
 	}
 
@@ -665,5 +613,17 @@ func TestSetAutoReconnect_ReplacesScriptWithCorrectMode(t *testing.T) {
 	}
 	if string(got) != reconnectScriptContent {
 		t.Error("the installed reconnect script is not the generated script in full")
+	}
+}
+
+// The generated shell helpers cannot call the guard package, so they spell
+// the directory out; it must be the one every Go guard uses (ADR 0003 §2).
+func TestShellHelpersUseTheGuardDir(t *testing.T) {
+	toggle := strings.Split(strings.Split(wirelessToggleScript, "GUARD=")[1], "\n")[0]
+	if !strings.HasPrefix(toggle, guard.DefaultDir+"/") {
+		t.Errorf("toggle script guard %q is not under %s/", toggle, guard.DefaultDir)
+	}
+	if !strings.Contains(reconnectScriptContent, `GUARD_DIR="`+guard.DefaultDir+`"`) {
+		t.Errorf("reconnect script does not use %s as its guard dir", guard.DefaultDir)
 	}
 }

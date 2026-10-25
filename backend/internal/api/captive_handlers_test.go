@@ -1,6 +1,8 @@
 package api
 
 import (
+	"github.com/openwrt-travel-gui/backend/internal/platform"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"encoding/json"
@@ -60,7 +62,7 @@ func TestCaptiveStatusGetDoesNotMutateState(t *testing.T) {
 	runner := &recordingRunner{}
 	// 204 = internet reachable, which is exactly what used to trigger the
 	// auto-restore from the read path.
-	svc := services.NewCaptiveServiceWithGuard(&services.MockHTTPProber{StatusCode: 204},
+	svc := services.NewCaptiveServiceWithGuard(&platform.MockHTTPProber{StatusCode: 204},
 		uci.NewMockUCI(), runner, guard.In(dir, "captive-dns"))
 	defer svc.Stop()
 

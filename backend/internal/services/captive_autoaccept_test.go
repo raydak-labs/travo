@@ -284,7 +284,7 @@ func useTempBounceGuard(t *testing.T) string {
 }
 
 func newBounceCaptiveService(r platform.CommandRunner) *CaptiveService {
-	return &CaptiveService{prober: &MockHTTPProber{}, cmd: r, dnsGuard: guard.New(captiveDNSGuardFeature)}
+	return &CaptiveService{prober: &platform.MockHTTPProber{}, cmd: r, dnsGuard: guard.New(captiveDNSGuardFeature)}
 }
 
 func TestUbusInterfaceDumpHasDefaultRoute(t *testing.T) {

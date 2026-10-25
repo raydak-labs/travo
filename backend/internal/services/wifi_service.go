@@ -165,7 +165,7 @@ func NewWifiService(u uci.UCI, ub ubus.Ubus, pw *auth.RootPassword) *WifiService
 		cmd: &platform.RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		arpFile: procNetARP,
+		arpFile: ProcNetARP,
 	}
 }
 
@@ -180,7 +180,7 @@ func NewWifiServiceWithApplier(u uci.UCI, ub ubus.Ubus, applier platform.UCIAppl
 		cmd: &platform.RealCommandRunner{}, priorityFile: defaultPriorityFile,
 		autoReconnectFile: defaultAutoReconnectFile, reconnectScript: defaultReconnectScript,
 		modeFile: defaultWifiModeFile, repeaterOptionsFile: defaultRepeaterOptionsFile,
-		arpFile: procNetARP,
+		arpFile: ProcNetARP,
 	}
 }
 
@@ -191,7 +191,7 @@ func NewWifiServiceWithReloader(u uci.UCI, ub ubus.Ubus, r WifiReloader) *WifiSe
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &platform.RealCommandRunner{},
 		priorityFile: defaultPriorityFile, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: ProcNetARP,
 	}
 }
 
@@ -201,7 +201,7 @@ func NewWifiServiceWithPriorityFile(u uci.UCI, ub ubus.Ubus, r WifiReloader, pf 
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: &platform.RealCommandRunner{},
 		priorityFile: pf, autoReconnectFile: defaultAutoReconnectFile,
 		reconnectScript: defaultReconnectScript, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: ProcNetARP,
 	}
 }
 
@@ -211,7 +211,7 @@ func NewWifiServiceForTesting(u uci.UCI, ub ubus.Ubus, r WifiReloader, cmd platf
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: defaultWifiModeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: ProcNetARP,
 	}
 }
 
@@ -221,7 +221,7 @@ func NewWifiServiceForTestingWithModeFile(u uci.UCI, ub ubus.Ubus, r WifiReloade
 		uci: u, ubus: ub, reloader: r, applier: nil, cmd: cmd,
 		priorityFile: pf, autoReconnectFile: arFile,
 		reconnectScript: rsFile, modeFile: modeFile,
-		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: procNetARP,
+		repeaterOptionsFile: defaultRepeaterOptionsFile, arpFile: ProcNetARP,
 	}
 }
 

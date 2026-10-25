@@ -2,10 +2,6 @@ package services
 
 import (
 	"fmt"
-	"sync"
-	"sync/atomic"
-
-	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
 // MockStorageProvider returns realistic mock storage stats.
@@ -15,19 +11,6 @@ type MockStorageProvider struct{}
 func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 	// 256MB total, 96MB used, 160MB free — realistic for a travel router
 	return 268435456, 100663296, 167772160, nil
-}
-
-// MockHTTPProber returns preset responses for testing.
-type MockHTTPProber struct {
-	StatusCode  int
-	Body        string
-	RedirectURL string
-	Err         error
-}
-
-// Do returns the preset mock response.
-func (m *MockHTTPProber) Do(_ string) (int, string, string, error) {
-	return m.StatusCode, m.Body, m.RedirectURL, m.Err
 }
 
 // MockPackageManager tracks install/remove state in memory.
@@ -118,40 +101,6 @@ func (m *MockSystemProbe) Disable(initName string) error {
 	return nil
 }
 
-// NoopEventWatcher satisfies EventWatcher but never emits anything.
-// Used in mock mode and tests.
-type NoopEventWatcher struct {
-	ch       chan models.NetworkStatus
-	stopCh   chan struct{}
-	started  atomic.Bool
-	stopOnce sync.Once
-}
-
-func NewNoopEventWatcher() *NoopEventWatcher {
-	return &NoopEventWatcher{
-		ch:     make(chan models.NetworkStatus),
-		stopCh: make(chan struct{}),
-	}
-}
-
-// Start blocks until Stop is called. A second call returns immediately instead
-// of spawning a second loop.
-func (w *NoopEventWatcher) Start() {
-	if !w.started.CompareAndSwap(false, true) {
-		return
-	}
-	<-w.stopCh
-}
-
-// Stop is safe to call multiple times.
-func (w *NoopEventWatcher) Stop() {
-	w.stopOnce.Do(func() { close(w.stopCh) })
-}
-
-func (w *NoopEventWatcher) Ch() <-chan models.NetworkStatus {
-	return w.ch
-}
-
 // NoopPackageManager for systems without a package manager.
 type NoopPackageManager struct{}
 
@@ -176,9 +125,3 @@ func (n *NoopPackageManager) InstallStream(string, func(string)) error {
 func (n *NoopPackageManager) RemoveStream(string, func(string)) error {
 	return fmt.Errorf("no package manager available")
 }
-
-// NoopWifiReloader does nothing (for tests).
-type NoopWifiReloader struct{}
-
-// Reload is a no-op.
-func (r *NoopWifiReloader) Reload() error { return nil }

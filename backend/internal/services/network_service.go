@@ -74,7 +74,7 @@ func stringFromBytes(data []byte) string {
 
 func newNetworkService(u uci.UCI, ub ubus.Ubus, aliasFile string, cmd platform.CommandRunner) *NetworkService {
 	return &NetworkService{
-		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd, arpFile: procNetARP,
+		uci: u, ubus: ub, aliasFile: aliasFile, cmd: cmd, arpFile: ProcNetARP,
 		wifiMACsSeen:     make(map[string]time.Time),
 		portForwardsFile: defaultPortForwardsFile,
 		ddnsInitScript:   ddnsInitScriptPath,
@@ -170,7 +170,7 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	// USB tethering (typically a phone) creates its own logical interface in
 	// the wan zone. It has to appear in Interfaces, or a phone-tethered router
 	// reports the uplink as down while it is up.
-	usbData, usbErr := n.ubus.Call("network.interface."+usbTetherUCIName, "status", nil)
+	usbData, usbErr := n.ubus.Call("network.interface."+USBTetherInterface, "status", nil)
 
 	status.Interfaces = []models.NetworkInterface{}
 	if status.WAN != nil {
@@ -189,7 +189,7 @@ func (n *NetworkService) GetNetworkStatus() (models.NetworkStatus, error) {
 	}
 
 	if usbErr == nil {
-		usbIface := parseInterface(usbTetherUCIName, usbTetherUCIName, usbData, n.ubus)
+		usbIface := parseInterface(USBTetherInterface, USBTetherInterface, usbData, n.ubus)
 		status.Interfaces = append(status.Interfaces, usbIface)
 		if usbIface.IsUp && (status.WAN == nil || !status.WAN.IsUp) {
 			status.WAN = &usbIface
@@ -569,22 +569,22 @@ type ConnectionMethod struct {
 // dump for accurate address detection. On error, logs details and returns
 // "unknown" to avoid breaking UI.
 func (n *NetworkService) GetConnectionMethod(clientIP string) (*ConnectionMethod, error) {
-	return classifyClientConnection(classifyDeps{
-		ubus: n.ubus, cmd: n.cmd, arpFile: n.arpFile,
+	return ClassifyClientConnection(ClassifyDeps{
+		Ubus: n.ubus, Cmd: n.cmd, ARPFile: n.arpFile,
 	}, clientIP), nil
 }
 
-// classifyDeps is everything the classifier reads off the router. It is a
+// ClassifyDeps is everything the classifier reads off the router. It is a
 // struct rather than a long argument list because both services build one, and
 // a fifth positional argument would make it easy to pass the neighbour table
 // where the command runner belongs.
-type classifyDeps struct {
-	ubus    ubus.Ubus
-	cmd     platform.CommandRunner
-	arpFile string
+type ClassifyDeps struct {
+	Ubus    ubus.Ubus
+	Cmd     platform.CommandRunner
+	ARPFile string
 }
 
-// classifyClientConnection maps a client IP to the interface it is reachable
+// ClassifyClientConnection maps a client IP to the interface it is reachable
 // through, then to a connection method. It is a free function taking the router
 // dependencies so the wireless lockout guard (wifi_lockout.go) can classify its
 // caller through the SAME code as GET /network/connection-method, instead of
@@ -602,7 +602,7 @@ type classifyDeps struct {
 // unresolvable MAC all answer "unknown", so a caller it cannot place is never
 // mistaken for a wireless one. The guard treats that answer as unsafe (see
 // guardLockout).
-func classifyClientConnection(deps classifyDeps, clientIP string) *ConnectionMethod {
+func ClassifyClientConnection(deps ClassifyDeps, clientIP string) *ConnectionMethod {
 	unknown := func() *ConnectionMethod {
 		return &ConnectionMethod{Method: "unknown", IPAddress: clientIP}
 	}
@@ -623,7 +623,7 @@ func classifyClientConnection(deps classifyDeps, clientIP string) *ConnectionMet
 	}
 
 	// Get all network interface addresses via ubus
-	ifaceDump, err := deps.ubus.Call("network.interface", "dump", nil)
+	ifaceDump, err := deps.Ubus.Call("network.interface", "dump", nil)
 	if err != nil {
 		return unknown()
 	}
@@ -710,7 +710,7 @@ func classifyClientConnection(deps classifyDeps, clientIP string) *ConnectionMet
 
 // classifyMatchedIface turns a resolved interface plus the client address into a
 // connection method. Split out so the ordering rule below is readable on its own.
-func classifyMatchedIface(deps classifyDeps, name, device, clientIP string) string {
+func classifyMatchedIface(deps ClassifyDeps, name, device, clientIP string) string {
 	switch {
 	case strings.HasPrefix(name, "wwan") ||
 		strings.HasPrefix(device, "phy") && strings.Contains(device, "-sta"):
@@ -734,12 +734,12 @@ func classifyMatchedIface(deps classifyDeps, name, device, clientIP string) stri
 // no MAC for the address, or the access-point side could not be read. "unknown"
 // is not a safe default here, it is the safe direction — the guard refuses on
 // it (see guardLockout).
-func classifyLanClient(deps classifyDeps, clientIP string) string {
-	mac, ok := arpMACForIP(deps.arpFile, clientIP)
+func classifyLanClient(deps ClassifyDeps, clientIP string) string {
+	mac, ok := arpMACForIP(deps.ARPFile, clientIP)
 	if !ok {
 		return "unknown"
 	}
-	if _, isWifi := apStationMACs(deps.cmd)[mac]; isWifi {
+	if _, isWifi := apStationMACs(deps.Cmd)[mac]; isWifi {
 		return "wifi-ap"
 	}
 	return "ethernet"

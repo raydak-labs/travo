@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-// wirelessToggleScriptPath is the helper invoked by the WiFi schedule cron
+// WirelessToggleScriptPath is the helper invoked by the WiFi schedule cron
 // entries and by the button hotplug script. It is generated (and owned) by the
 // backend: writing UCI only, never `wifi up` / `wifi down`.
 //
@@ -17,7 +17,7 @@ import (
 // helper flips `wireless.*.disabled`, commits, and goes through rpcd's
 // apply+confirm so a failed apply still rolls back. See ADR 0002 §6 and
 // docs/architecture/overview.md §3.
-const wirelessToggleScriptPath = "/usr/libexec/travo-wireless-toggle.sh"
+const WirelessToggleScriptPath = "/usr/libexec/travo-wireless-toggle.sh"
 
 // rpcdLoginHelperPath is the root-only (0600) file holding the plaintext rpcd
 // login password that the generated helper below reads. It must match
@@ -201,7 +201,7 @@ exit 0
 // write fails with EPERM, which is why the schedule path could not be covered
 // end to end until now.
 func (w *WifiService) writeWirelessToggleScript() error {
-	return writeWirelessToggleScriptTo(w.toggleScriptPathOrDefault())
+	return WriteWirelessToggleScriptTo(w.toggleScriptPathOrDefault())
 }
 
 // toggleScriptPathOrDefault returns the toggle-helper destination in use.
@@ -209,15 +209,15 @@ func (w *WifiService) toggleScriptPathOrDefault() string {
 	if w.toggleScriptPath != "" {
 		return w.toggleScriptPath
 	}
-	return wirelessToggleScriptPath
+	return WirelessToggleScriptPath
 }
 
-// writeWirelessToggleScriptTo is the shared implementation behind both the
+// WriteWirelessToggleScriptTo is the shared implementation behind both the
 // schedule path (WifiService) and the hardware-button path (SystemService).
 // An empty path means the production destination.
-func writeWirelessToggleScriptTo(path string) error {
+func WriteWirelessToggleScriptTo(path string) error {
 	if path == "" {
-		path = wirelessToggleScriptPath
+		path = WirelessToggleScriptPath
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create libexec dir: %w", err)

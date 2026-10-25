@@ -317,13 +317,13 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// jumps (NTP, time-sync, timezone fixes). See ADR 0007.
 	authSvc.SetSessionRegistry(auth.NewSessionRegistry(24 * time.Hour))
 	var storage services.StorageProvider
-	var captiveProber services.HTTPProber
+	var captiveProber platform.HTTPProber
 	if cfg.MockMode {
 		storage = &services.MockStorageProvider{}
-		captiveProber = &services.MockHTTPProber{StatusCode: 200, Body: "success\n"}
+		captiveProber = &platform.MockHTTPProber{StatusCode: 200, Body: "success\n"}
 	} else {
 		storage = &services.RealStorageProvider{}
-		captiveProber = services.NewRealHTTPProber()
+		captiveProber = platform.NewRealHTTPProber()
 	}
 
 	systemSvc := services.NewSystemService(ub, u, storage)

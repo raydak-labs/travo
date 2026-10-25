@@ -17,7 +17,7 @@ import (
 )
 
 func TestCaptivePortal_NoRedirect_NoPortal(t *testing.T) {
-	prober := &MockHTTPProber{
+	prober := &platform.MockHTTPProber{
 		StatusCode: 204,
 		Body:       "",
 	}
@@ -39,7 +39,7 @@ func TestCaptivePortal_NoRedirect_NoPortal(t *testing.T) {
 }
 
 func TestCaptivePortal_Redirect_PortalDetected(t *testing.T) {
-	prober := &MockHTTPProber{
+	prober := &platform.MockHTTPProber{
 		StatusCode:  302,
 		Body:        "",
 		RedirectURL: "http://portal.hotel.com/login",
@@ -65,7 +65,7 @@ func TestCaptivePortal_Redirect_PortalDetected(t *testing.T) {
 }
 
 func TestCaptivePortal_ConnectionFailed_NoInternet(t *testing.T) {
-	prober := &MockHTTPProber{
+	prober := &platform.MockHTTPProber{
 		Err: fmt.Errorf("dial tcp: connection refused"),
 	}
 	svc := NewCaptiveService(prober)
@@ -83,7 +83,7 @@ func TestCaptivePortal_ConnectionFailed_NoInternet(t *testing.T) {
 }
 
 func TestCaptivePortal_WrongBody_PortalDetected(t *testing.T) {
-	prober := &MockHTTPProber{
+	prober := &platform.MockHTTPProber{
 		StatusCode: 200,
 		Body:       "<html><body>Please login to continue</body></html>",
 	}
@@ -108,7 +108,7 @@ func TestCaptivePortal_WrongBody_PortalDetected(t *testing.T) {
 }
 
 func TestCaptivePortal_301Redirect(t *testing.T) {
-	prober := &MockHTTPProber{
+	prober := &platform.MockHTTPProber{
 		StatusCode:  301,
 		Body:        "",
 		RedirectURL: "http://captive.example.com",
@@ -125,7 +125,7 @@ func TestCaptivePortal_301Redirect(t *testing.T) {
 }
 
 func TestCaptivePortal_307Redirect(t *testing.T) {
-	prober := &MockHTTPProber{
+	prober := &platform.MockHTTPProber{
 		StatusCode:  307,
 		Body:        "",
 		RedirectURL: "http://captive.example.com",
@@ -166,7 +166,7 @@ func (m *mockCmdRunner) Run(name string, args ...string) ([]byte, error) {
 	return nil, fmt.Errorf("command not found: %s", key)
 }
 
-func newTestCaptiveServiceWithUCI(t *testing.T, prober HTTPProber, cmd *mockCmdRunner) (*CaptiveService, string) {
+func newTestCaptiveServiceWithUCI(t *testing.T, prober platform.HTTPProber, cmd *mockCmdRunner) (*CaptiveService, string) {
 	u := uci.NewMockUCI()
 	guardDir, _ := os.MkdirTemp("", "captive-test-*")
 	svc := &CaptiveService{prober: prober, uci: u, cmd: cmd, dnsGuard: guard.In(guardDir, captiveDNSGuardFeature), stopCh: make(chan struct{})}
@@ -194,7 +194,7 @@ func TestBypassDNS_AbortsWhenNoDHCPDNS(t *testing.T) {
 		"uci get dhcp.@dnsmasq[0].server":            "127.0.0.1#5353",
 		"uci get dhcp.@dnsmasq[0].rebind_protection": "0",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 	// Empty nameserver file: no usable upstream can be discovered.
 	svc.resolvConfAutoOverride = writeResolvAuto(t, dir, "")
@@ -225,7 +225,7 @@ func TestRestoreDNS_KeepsGuardFileOnFailure(t *testing.T) {
 		"uci commit dhcp":                               "",
 		"/etc/init.d/dnsmasq restart":                   "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 	_ = svc.uci.Set("network", "wan", "peerdns", "1")
 
@@ -250,7 +250,7 @@ func TestRestoreDNS_KeepsGuardFileOnFailure(t *testing.T) {
 // A corrupt guard file is the only copy of the pre-bypass state: the restore
 // must fail loudly instead of deleting it.
 func TestRestoreDNS_CorruptGuardFileIsKept(t *testing.T) {
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
 	defer os.RemoveAll(dir)
 	if err := os.WriteFile(svc.dnsGuard.Path(), []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
@@ -277,7 +277,7 @@ func TestRefreshBypassTimestamp_ConcurrentWithBypassIsAtomic(t *testing.T) {
 		"uci commit dhcp":                               "",
 		"/etc/init.d/dnsmasq restart":                   "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 	_ = svc.uci.Set("network", "wan", "peerdns", "1")
 
@@ -316,7 +316,7 @@ func TestRefreshBypassTimestamp_ConcurrentWithBypassIsAtomic(t *testing.T) {
 
 // Stop must cancel the startup auto-restore goroutine and be idempotent.
 func TestCaptiveService_StopIsIdempotentAndCancelsStartupGoroutine(t *testing.T) {
-	svc := NewCaptiveServiceWithUCI(&MockHTTPProber{StatusCode: 204}, uci.NewMockUCI(), nil)
+	svc := NewCaptiveServiceWithUCI(&platform.MockHTTPProber{StatusCode: 204}, uci.NewMockUCI(), nil)
 	done := make(chan struct{})
 	go func() {
 		svc.Stop()
@@ -331,7 +331,7 @@ func TestCaptiveService_StopIsIdempotentAndCancelsStartupGoroutine(t *testing.T)
 }
 
 func TestIsDNSBypassed_NoGuardFile(t *testing.T) {
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
 	defer os.RemoveAll(dir)
 
 	if svc.IsDNSBypassed() {
@@ -351,7 +351,7 @@ func TestBypassDNS_CreatesGuardFile(t *testing.T) {
 		"uci commit dhcp":                               "",
 		"/etc/init.d/dnsmasq restart":                   "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	err := svc.BypassDNS()
@@ -369,7 +369,7 @@ func TestBypassDNS_NothingToBypass(t *testing.T) {
 		"uci get dhcp.@dnsmasq[0].server":            "",
 		"uci get dhcp.@dnsmasq[0].rebind_protection": "0",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	// Set wan peerdns to something that doesn't trigger bypass
@@ -399,7 +399,7 @@ func TestRestoreDNS_RestoresAndRemovesGuard(t *testing.T) {
 		"uci add_list dhcp.@dnsmasq[0].server=127.0.0.1#5353": "",
 		"uci set dhcp.@dnsmasq[0].rebind_protection=1":        "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	// First bypass
@@ -420,7 +420,7 @@ func TestRestoreDNS_RestoresAndRemovesGuard(t *testing.T) {
 }
 
 func TestRestoreDNS_NoGuardFile_Noop(t *testing.T) {
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, &mockCmdRunner{responses: map[string]string{}})
 	defer os.RemoveAll(dir)
 
 	err := svc.RestoreDNS()
@@ -434,7 +434,7 @@ func TestCheckDNSBypassNeeded_AdGuard(t *testing.T) {
 		"uci get dhcp.@dnsmasq[0].noresolv": "1",
 		"uci get dhcp.@dnsmasq[0].server":   "127.0.0.1#5353",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	if !svc.CheckDNSBypassNeeded() {
@@ -447,7 +447,7 @@ func TestCheckDNSBypassNeeded_NoCustomDNS(t *testing.T) {
 		"uci get dhcp.@dnsmasq[0].noresolv": "0",
 		"uci get dhcp.@dnsmasq[0].server":   "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	_ = svc.uci.Set("network", "wan", "peerdns", "1")
@@ -461,7 +461,7 @@ func TestDetectGatewayPortalURL_NoRoute(t *testing.T) {
 	cmd := &mockCmdRunner{responses: map[string]string{
 		"ip route show default": "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 
 	got := svc.detectGatewayPortalURL()
@@ -471,7 +471,7 @@ func TestDetectGatewayPortalURL_NoRoute(t *testing.T) {
 }
 
 func TestDetectGatewayPortalURL_NoCmd(t *testing.T) {
-	svc := NewCaptiveService(&MockHTTPProber{StatusCode: 204})
+	svc := NewCaptiveService(&platform.MockHTTPProber{StatusCode: 204})
 
 	got := svc.detectGatewayPortalURL()
 	if got != "" {
@@ -504,7 +504,7 @@ func newTestCaptiveServiceWithAdGuard(t *testing.T, cmd *mockCmdRunner, agServer
 	t.Helper()
 	u := uci.NewMockUCI()
 	guardDir, _ := os.MkdirTemp("", "captive-test-*")
-	svc := &CaptiveService{prober: &MockHTTPProber{StatusCode: 204}, uci: u, cmd: cmd, dnsGuard: guard.In(guardDir, captiveDNSGuardFeature), stopCh: make(chan struct{})}
+	svc := &CaptiveService{prober: &platform.MockHTTPProber{StatusCode: 204}, uci: u, cmd: cmd, dnsGuard: guard.In(guardDir, captiveDNSGuardFeature), stopCh: make(chan struct{})}
 	svc.resolvConfAutoOverride = writeResolvAuto(t, guardDir, "10.1.2.3")
 	if agServer != nil {
 		// Patch the package-level constant via a subfield isn't possible directly,
@@ -633,7 +633,7 @@ func TestBypassDNS_KeepsGuardWhenNetworkWriteFails(t *testing.T) {
 		"uci get network.wan.peerdns":                   "0",
 		"uci get network.wan.dns":                       "10.1.2.3",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 	_ = svc.uci.Set("network", "wan", "peerdns", "0")
 	// The dnsmasq bypass commits and applies before the network writes, so
@@ -667,7 +667,7 @@ func TestRestoreDNS_ToleratesMissingServerList(t *testing.T) {
 		"uci set dhcp.@dnsmasq[0].rebind_protection=0":        "",
 		"uci add_list dhcp.@dnsmasq[0].server=127.0.0.1#5353": "",
 	}}
-	svc, dir := newTestCaptiveServiceWithUCI(t, &MockHTTPProber{StatusCode: 204}, cmd)
+	svc, dir := newTestCaptiveServiceWithUCI(t, &platform.MockHTTPProber{StatusCode: 204}, cmd)
 	defer os.RemoveAll(dir)
 	_ = svc.uci.Set("network", "wan", "peerdns", "1")
 

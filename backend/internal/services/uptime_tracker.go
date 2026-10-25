@@ -3,6 +3,8 @@ package services
 import (
 	"sync"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 )
 
 const maxUptimeEvents = 100
@@ -16,7 +18,7 @@ type UptimeEvent struct {
 // UptimeTracker periodically checks internet reachability and records
 // state transitions in a fixed-size ring buffer.
 type UptimeTracker struct {
-	prober        HTTPProber
+	prober        platform.HTTPProber
 	mu            sync.RWMutex
 	events        []UptimeEvent
 	lastState     *bool // nil = unknown (first run)
@@ -27,7 +29,7 @@ type UptimeTracker struct {
 }
 
 // NewUptimeTracker creates a new UptimeTracker using the given prober.
-func NewUptimeTracker(prober HTTPProber) *UptimeTracker {
+func NewUptimeTracker(prober platform.HTTPProber) *UptimeTracker {
 	return &UptimeTracker{
 		prober:        prober,
 		events:        make([]UptimeEvent, 0, maxUptimeEvents),
@@ -78,7 +80,7 @@ func (t *UptimeTracker) GetUptimeLog() []UptimeEvent {
 }
 
 func (t *UptimeTracker) check() {
-	code, _, _, err := t.prober.Do(captiveProbeURL)
+	code, _, _, err := t.prober.Do(platform.ConnectivityProbeURL)
 	connected := err == nil && code == 204
 
 	t.mu.Lock()
