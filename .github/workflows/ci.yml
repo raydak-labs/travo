@@ -340,6 +340,7 @@ jobs:
             ./usr/bin/travo \
             ./etc/init.d/travo \
             ./etc/config/travo \
+            ./etc/uci-defaults/98-travo-cron-loglevel \
             ./etc/uci-defaults/99-travel-gui-ports \
             ./etc/sysupgrade.d/10-travo-backup.sh \
             ./etc/sysupgrade.d/20-travo-restore.sh \

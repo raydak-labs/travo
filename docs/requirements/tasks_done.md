@@ -126,6 +126,9 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   The uplink connection reports its band from the frequency (iwinfo on 25.12 has none), the
   saved-network row says "Not connected" for an enabled profile that is out of range, and one
   band label helper replaces six copies.
+- **Quiet crond (2026-10-25):** the installer sets `cronloglevel=9`, so the per-minute WiFi
+  reconnect check no longer writes a `cron.err` line every minute
+  ([ADR 0013 §8](../adr/0013-operational-invariants-and-device-findings.md)).
 
 ## Frontend Toolchain
 
