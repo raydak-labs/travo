@@ -1,7 +1,7 @@
 ---
 title: Open tasks
 description: Active product and engineering backlog; link target for plans and architecture.
-updated: 2026-10-06
+updated: 2026-10-25
 tags: [backlog, requirements, tasks]
 ---
 
@@ -208,12 +208,6 @@ removed on `chore/remove-dead-code`; these four need a decision rather than a de
       usage — has no production caller. An operator can set a cap and nothing ever warns them.
       Decide: wire it into `AlertService`, or delete the write API rather than ship an endpoint
       that silently does nothing.
-- [ ] **`GET /api/v1/services/adguardhome/status` is specced but uncalled.** It is in the
-      OpenAPI contract and registered in the router, but it is the one backend route absent
-      from `shared/src/api/routes.ts`, and no frontend, mock or document references it. Either
-      the client table is missing an entry or the route is legacy. A removal must delete the
-      `router.go` line and the `openapi_handler.go` entry together —
-      `internal/api/openapi_drift_test.go` fails on drift in both directions.
 - [ ] **`scripts/setup-local.sh` is undocumented.** Not dead: `deploy-local.sh` tells the
       operator to run it for a first-time clean-router setup. But it is in no Makefile target,
       no CI job and no guide, so the only thing that ever exercises it is `make shellcheck`.

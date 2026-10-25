@@ -1,7 +1,6 @@
 package uplink
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -239,78 +238,6 @@ func (s *AdGuardService) IsRunning() bool {
 	// On OpenWRT, `/etc/init.d/<svc> status` exits 0 if running.
 	_, err := s.checker.RunCommand(adguardInitd, "status")
 	return err == nil
-}
-
-// Version returns the installed AdGuard Home version string or empty.
-func (s *AdGuardService) Version() string {
-	if !s.IsInstalled() {
-		return ""
-	}
-	out, err := s.checker.RunCommand(adguardBinary, "--version")
-	if err != nil {
-		return ""
-	}
-	// Output looks like "AdGuard Home, version v0.107.54"
-	if _, after, ok := strings.Cut(out, "version "); ok {
-		return strings.TrimSpace(after)
-	}
-	return out
-}
-
-// adguardStatsResponse matches the JSON from /control/stats.
-type adguardStatsResponse struct {
-	NumDNSQueries           int64   `json:"num_dns_queries"`
-	NumBlockedFiltering     int64   `json:"num_blocked_filtering"`
-	NumReplacedSafebrowsing int64   `json:"num_replaced_safebrowsing"`
-	NumReplacedParental     int64   `json:"num_replaced_parental"`
-	AvgProcessingTime       float64 `json:"avg_processing_time"`
-}
-
-// adguardStatusResponse matches the JSON from /control/status.
-type adguardStatusResponse struct {
-	ProtectionEnabled bool   `json:"protection_enabled"`
-	Version           string `json:"version"`
-	Running           bool   `json:"running"`
-}
-
-// GetStatus returns a combined AdGuardStatus with stats and protection state.
-func (s *AdGuardService) GetStatus() (models.AdGuardStatus, error) {
-	var result models.AdGuardStatus
-	s.refreshEndpointsFromYAML()
-	result.AdminURL = s.apiBase()
-	s.mu.RLock()
-	result.ConfigYAMLPath = s.yamlSourcePath
-	s.mu.RUnlock()
-
-	statusBody, err := s.checker.HTTPGet(s.apiBase() + "/control/status")
-	if err != nil {
-		return result, fmt.Errorf("failed to reach AdGuard API: %w", err)
-	}
-	var statusResp adguardStatusResponse
-	if err := json.Unmarshal(statusBody, &statusResp); err != nil {
-		return result, fmt.Errorf("failed to parse status response: %w", err)
-	}
-	result.Enabled = statusResp.ProtectionEnabled
-
-	statsBody, err := s.checker.HTTPGet(s.apiBase() + "/control/stats")
-	if err != nil {
-		return result, fmt.Errorf("failed to fetch stats: %w", err)
-	}
-	var statsResp adguardStatsResponse
-	if err := json.Unmarshal(statsBody, &statsResp); err != nil {
-		return result, fmt.Errorf("failed to parse stats response: %w", err)
-	}
-
-	result.TotalQueries = statsResp.NumDNSQueries
-	blocked := statsResp.NumBlockedFiltering + statsResp.NumReplacedSafebrowsing + statsResp.NumReplacedParental
-	result.BlockedQueries = blocked
-	if result.TotalQueries > 0 {
-		result.BlockPercentage = float64(blocked) / float64(result.TotalQueries) * 100.0
-	}
-	// avg_processing_time is in seconds; convert to ms.
-	result.AvgResponseMS = statsResp.AvgProcessingTime * 1000.0
-
-	return result, nil
 }
 
 // defaultAdGuardConfig is written on first install to give AdGuard sensible defaults:

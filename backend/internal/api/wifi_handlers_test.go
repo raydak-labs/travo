@@ -629,7 +629,7 @@ func putJSONRequest(
 func TestSetRadioRole_SameRadioRefusalIs409(t *testing.T) {
 	app := fiber.New()
 	svc, _ := uplinkSTAService(t)
-	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putJSONRequest(t, app, http.MethodPut, "/api/v1/wifi/radios/radio0/role",
 		map[string]string{"role": "both"})
@@ -661,7 +661,7 @@ func TestSetRadioRole_SameRadioRefusalIs409(t *testing.T) {
 func TestGuestWifiSet_FallsBackToTheOtherRadio(t *testing.T) {
 	app := fiber.New()
 	svc, u := uplinkSTAService(t)
-	app.Put("/api/v1/wifi/guest", SetGuestWifiHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putJSONRequest(t, app, http.MethodPut, "/api/v1/wifi/guest", map[string]any{
 		"enabled": true, "ssid": "Guest-Travel", "encryption": "psk2", "key": "guestpass123",
@@ -692,7 +692,7 @@ func TestSetAPConfig_SameRadioRefusalIs409(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := fiber.New()
-	app.Put("/api/v1/wifi/ap/:section", SetAPConfigHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putJSONRequest(t, app, http.MethodPut, "/api/v1/wifi/ap/default_radio0",
 		map[string]any{
@@ -710,7 +710,7 @@ func TestSetAPConfig_SameRadioRefusalIs409(t *testing.T) {
 func TestWifiMutationEnvelope_ReportsProbeBudget(t *testing.T) {
 	app := fiber.New()
 	svc, _ := uplinkSTAService(t)
-	app.Put("/api/v1/wifi/mode", WifiSetModeHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	resp, body := putJSONRequest(t, app, http.MethodPut, "/api/v1/wifi/mode",
 		map[string]string{"mode": "ap"})

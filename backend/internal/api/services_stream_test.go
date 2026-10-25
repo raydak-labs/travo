@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net"
 	"strings"
 	"testing"
@@ -13,20 +14,21 @@ import (
 // watching. Before the producer was decoupled from the socket, a full socket
 // buffer blocked the command's output reader, which execx.Stream reports as a
 // WaitDelay timeout — a failed install that actually succeeded on the device.
-func TestStreamServiceAction_SlowClientDoesNotBlockAction(t *testing.T) {
+func TestStreamAction_SlowClientDoesNotBlockAction(t *testing.T) {
 	const lines = 3000
 	actionDone := make(chan struct{})
 
 	app := fiber.New()
-	app.Post("/stream", func(c fiber.Ctx) error {
-		return streamServiceAction(c, func(logFn func(string)) error {
-			for range lines {
-				logFn(strings.Repeat("x", 512))
-			}
-			close(actionDone)
-			return nil
+	post(NewAPI(app), "/stream", "Stream", "Stream test lines",
+		func(ctx context.Context, _ *none) (*Stream, error) {
+			return streamAction(ctx, func(logFn func(string)) error {
+				for range lines {
+					logFn(strings.Repeat("x", 512))
+				}
+				close(actionDone)
+				return nil
+			}), nil
 		})
-	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

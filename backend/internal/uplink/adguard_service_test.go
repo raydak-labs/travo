@@ -203,85 +203,6 @@ func TestIsRunning_False_ServiceStopped(t *testing.T) {
 	}
 }
 
-func TestVersion_Present(t *testing.T) {
-	mock := newMockAdGuardChecker()
-	mock.files["/opt/AdGuardHome/AdGuardHome"] = true
-	mock.commands["/opt/AdGuardHome/AdGuardHome --version"] = struct {
-		output string
-		err    error
-	}{"AdGuard Home, version v0.107.54", nil}
-	svc := NewAdGuardService(mock)
-
-	v := svc.Version()
-	if v != "v0.107.54" {
-		t.Errorf("expected version 'v0.107.54', got %q", v)
-	}
-}
-
-func TestVersion_NotInstalled(t *testing.T) {
-	mock := newMockAdGuardChecker()
-	svc := NewAdGuardService(mock)
-
-	if v := svc.Version(); v != "" {
-		t.Errorf("expected empty version, got %q", v)
-	}
-}
-
-func TestGetStatus_Success(t *testing.T) {
-	mock := newMockAdGuardChecker()
-	mock.httpGets["http://127.0.0.1:3000/control/status"] = struct {
-		body []byte
-		err  error
-	}{
-		body: []byte(`{"protection_enabled":true,"running":true,"version":"v0.107.54"}`),
-	}
-	mock.httpGets["http://127.0.0.1:3000/control/stats"] = struct {
-		body []byte
-		err  error
-	}{
-		body: []byte(`{"num_dns_queries":1000,"num_blocked_filtering":200,"num_replaced_safebrowsing":10,"num_replaced_parental":5,"avg_processing_time":0.025}`),
-	}
-	svc := NewAdGuardService(mock)
-
-	status, err := svc.GetStatus()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !status.Enabled {
-		t.Error("expected Enabled=true")
-	}
-	if status.TotalQueries != 1000 {
-		t.Errorf("expected TotalQueries=1000, got %d", status.TotalQueries)
-	}
-	if status.BlockedQueries != 215 {
-		t.Errorf("expected BlockedQueries=215, got %d", status.BlockedQueries)
-	}
-	expectedPct := 21.5
-	if status.BlockPercentage != expectedPct {
-		t.Errorf("expected BlockPercentage=%.1f, got %.1f", expectedPct, status.BlockPercentage)
-	}
-	expectedMS := 25.0
-	if status.AvgResponseMS != expectedMS {
-		t.Errorf("expected AvgResponseMS=%.1f, got %.1f", expectedMS, status.AvgResponseMS)
-	}
-}
-
-func TestGetStatus_APIUnreachable(t *testing.T) {
-	mock := newMockAdGuardChecker()
-	mock.httpGets["http://127.0.0.1:3000/control/status"] = struct {
-		body []byte
-		err  error
-	}{
-		err: fmt.Errorf("connection refused"),
-	}
-	svc := NewAdGuardService(mock)
-
-	_, err := svc.GetStatus()
-	if err == nil {
-		t.Error("expected error when API is unreachable")
-	}
-}
-
 func TestGetConfig_FileNotFound(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	// Don't add the config file to the mock - it doesn't exist
@@ -757,38 +678,6 @@ func TestSetConfig_SucceedsWhenListenerComesUpLate(t *testing.T) {
 	}
 }
 
-// refreshEndpointsFromYAML is called from five different entry points and
-// rewrites three fields; without a mutex two concurrent requests could publish
-// a base URL from one file with a port from another. Run with -race.
-func TestAdGuardService_ConcurrentAccessIsRaceFree(t *testing.T) {
-	mock := newMockAdGuardChecker()
-	mock.fileContents[adguardYAMLPathOpt] = "bind_host: 0.0.0.0\nbind_port: 3000\ndns:\n  port: 5353\n"
-	mock.httpGets["http://127.0.0.1:3000/control/status"] = struct {
-		body []byte
-		err  error
-	}{body: []byte(`{"protection_enabled":true,"running":true}`)}
-	mock.httpGets["http://127.0.0.1:3000/control/stats"] = struct {
-		body []byte
-		err  error
-	}{body: []byte(`{"num_dns_queries":1}`)}
-	svc := NewAdGuardService(mock)
-
-	var wg sync.WaitGroup
-	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for range 20 {
-				svc.refreshEndpointsFromYAML()
-				_ = svc.apiBase()
-				_, _ = svc.GetStatus()
-				_ = svc.getDNSPort()
-			}
-		}()
-	}
-	wg.Wait()
-}
-
 // A successful change must not leave a backup behind: one file per edit would
 // accumulate on the overlayfs NAND, and each is a copy of a bcrypt-holding file.
 func TestSetConfig_RemovesBackupOnSuccess(t *testing.T) {
@@ -809,4 +698,25 @@ func TestSetConfig_RemovesBackupOnSuccess(t *testing.T) {
 			t.Errorf("the backup must be removed once the change is verified, found %s", path)
 		}
 	}
+}
+
+// refreshEndpointsFromYAML is called from several entry points and rewrites
+// three fields; without a mutex two concurrent requests could publish a base
+// URL from one file with a port from another. Run with -race.
+func TestAdGuardService_ConcurrentAccessIsRaceFree(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.fileContents[adguardYAMLPathOpt] = "bind_host: 0.0.0.0\nbind_port: 3000\ndns:\n  port: 5353\n"
+	svc := NewAdGuardService(mock)
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			for range 20 {
+				svc.refreshEndpointsFromYAML()
+				_ = svc.apiBase()
+				_ = svc.getDNSPort()
+			}
+		})
+	}
+	wg.Wait()
 }

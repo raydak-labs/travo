@@ -185,7 +185,7 @@ func TestSetRadioRoleHandler_ReturnsApplyEnvelopeAndGeneratedKey(t *testing.T) {
 	svc := wifi.New(wifi.Deps{UCI: u, Ubus: ubus.NewMockUbus(), Applier: &stubApplier{token: "role-session-1"}})
 
 	app := fiber.New()
-	app.Put("/api/v1/wifi/radios/:name/role", SetRadioRoleHandler(svc))
+	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 
 	body, _ := json.Marshal(map[string]string{"role": "ap"})
 	req, _ := http.NewRequest(http.MethodPut, "/api/v1/wifi/radios/radio0/role", bytes.NewReader(body))

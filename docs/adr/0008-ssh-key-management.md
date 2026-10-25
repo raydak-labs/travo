@@ -51,10 +51,9 @@ control Travo enforces. A bug in it is a remote-root vulnerability, not a UI def
   content-derived: re-adding a key after a delete shifts the indexes. This is a known
   wart of the existing contract, kept because the alternative (key fingerprints) is a
   breaking API change.
-- The three operations are documented in the OpenAPI spec
-  (`backend/internal/api/openapi_handler.go`, paths `/system/ssh-keys` and
-  `/system/ssh-keys/{index}`), which the route-drift test enforces
-  (see [ADR 0006](./0006-application-platform-and-api-contract.md)).
+- The three operations are part of the generated OpenAPI contract (paths
+  `/system/ssh-keys` and `/system/ssh-keys/{index}`, see
+  [ADR 0006](./0006-application-platform-and-api-contract.md)).
 
 ### 2. The validation boundary
 
@@ -138,11 +137,9 @@ working after Travo is uninstalled. Consequences accepted here:
 
 - `backend/internal/system/system_ssh_keys.go` — `AddSSHKey`, `DeleteSSHKey`,
   `GetSSHKeys`, `authorizedKeysFile`
-- `backend/internal/api/router.go` — route registration
-- `backend/internal/api/system_security_handlers.go` — handlers
-- `backend/internal/api/openapi_paths_system.go` — spec entries
+- `backend/internal/api/system_api.go` — the operations
 - `backend/internal/auth/auth.go` — default-deny `Middleware`
-- [ADR 0006](./0006-application-platform-and-api-contract.md) — OpenAPI drift gate
+- [ADR 0006](./0006-application-platform-and-api-contract.md) — the API contract
 - [ADR 0007](./0007-authentication-and-access-control.md) — auth and session rules
 - [ADR 0003](./0003-crash-guards-and-live-state.md) — the rule this write does **not**
   need (it does not change connectivity or routing), and why that is a considered

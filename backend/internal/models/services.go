@@ -10,17 +10,6 @@ type ServiceInfo struct {
 	AutoStart   bool    `json:"auto_start"`
 }
 
-// AdGuardStatus contains AdGuard Home statistics.
-type AdGuardStatus struct {
-	Enabled         bool    `json:"enabled"`
-	TotalQueries    int64   `json:"total_queries"`
-	BlockedQueries  int64   `json:"blocked_queries"`
-	BlockPercentage float64 `json:"block_percentage"`
-	AvgResponseMS   float64 `json:"avg_response_ms"`
-	AdminURL        string  `json:"admin_url,omitempty"`
-	ConfigYAMLPath  string  `json:"config_yaml_path,omitempty"`
-}
-
 // AdGuardDNSStatus indicates whether AdGuard is configured as the LAN DNS,
 // plus health information about the AdGuard DNS listener path.
 type AdGuardDNSStatus struct {

@@ -3,6 +3,7 @@ module github.com/openwrt-travel-gui/backend
 go 1.27.2
 
 require (
+	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/fasthttp/websocket v1.5.12
 	github.com/gofiber/contrib/v3/websocket v1.2.8
 	github.com/gofiber/fiber/v3 v3.6.1

@@ -64,7 +64,7 @@ func TestCaptiveStatusGetDoesNotMutateState(t *testing.T) {
 	defer svc.Stop()
 
 	app := fiber.New()
-	app.Get("/api/v1/captive/status", CaptiveStatusHandler(svc))
+	registerCaptive(NewAPI(app), svc)
 
 	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/api/v1/captive/status", nil))
 	if err != nil {

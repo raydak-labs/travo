@@ -6,56 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"github.com/gofiber/fiber/v3"
 )
 
-const (
-	// Error messages for request validation
-	ErrInvalidRequestBody = "invalid request body"
-	ErrInvalidJSON        = "invalid JSON"
-	ErrMissingField       = "missing required field"
-	ErrInvalidValue       = "invalid value"
-)
+// ErrInvalidRequestBody prefixes every message about a malformed request.
+const ErrInvalidRequestBody = "invalid request body"
 
-// RespondWithError sends a JSON error response with the given message and status.
-func RespondWithError(c fiber.Ctx, status int, message string) error {
-	return c.Status(status).JSON(fiber.Map{"error": message})
-}
+// errInvalidJSON is the message for a body that is not JSON at all.
+const errInvalidJSON = "invalid JSON"
 
-// RespondWithServerError sends a JSON error response with the error message and 500 status.
-func RespondWithServerError(c fiber.Ctx, err error) error {
-	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-}
-
-// RespondWithErrorCode sends a JSON error response carrying a stable
-// machine-readable "code" next to the human-readable "error".
-//
-// It exists for the wireless lockout refusal: the message has to name the
-// remedy, which means it will be reworded, and a client that matched on the
-// message would break the next time somebody improves it.
-func RespondWithErrorCode(c fiber.Ctx, status int, code, message string) error {
-	return c.Status(status).JSON(fiber.Map{"error": message, "code": code})
-}
-
-// RespondOK sends a JSON {"status":"ok"} response.
-func RespondOK(c fiber.Ctx) error {
-	return c.JSON(fiber.Map{"status": "ok"})
-}
-
-// ErrUnknownField is returned by BindStrictBodyConfig when the request carries a
+// ErrUnknownField is returned by decodeStrictJSON when the request carries a
 // field the endpoint does not know.
 var ErrUnknownField = errors.New("unknown field")
-
-// BindStrictBodyConfig decodes a configuration request body and REJECTS unknown
-// fields, unlike c.Bind().Body() which ignores them.
-//
-// Use it on every endpoint that persists a whole configuration object: with the
-// permissive binder a mismatched body (a client echoing the GET shape, a typo)
-// decodes to zero values and overwrites the user's settings behind a 200.
-func BindStrictBodyConfig(c fiber.Ctx, dst any) error {
-	return decodeStrictJSON(c.Body(), dst, "")
-}
 
 // decodeStrictJSON decodes raw into dst, rejecting unknown fields. When wrapper
 // is non-empty the object is unwrapped to that key first, so an endpoint can
@@ -91,7 +52,7 @@ func decodeStrictJSON(raw []byte, dst any, wrapper string) error {
 		}
 		var syntaxErr *json.SyntaxError
 		if errors.As(err, &syntaxErr) {
-			return errors.New(ErrInvalidJSON)
+			return errors.New(errInvalidJSON)
 		}
 		return err // json: unknown field "…"
 	}
