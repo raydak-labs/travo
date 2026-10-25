@@ -314,7 +314,7 @@ func TestDeleteDHCPReservation_Returns200(t *testing.T) {
 
 // The shared test app has no AP interface in its command runner, so a kick
 // cannot succeed: the handler must surface that failure instead of returning a
-// silent 200. The success path is covered in services.TestKickClient_SucceedsWhenAPInterfaceAccepts.
+// silent 200. The success path is covered in network.TestKickClient_SucceedsWhenAPInterfaceAccepts.
 func TestKickClient_NoAPInterfaceReturns500(t *testing.T) {
 	app, deps := setupTestApp(t)
 	token, _, _ := deps.Auth.Login("admin")

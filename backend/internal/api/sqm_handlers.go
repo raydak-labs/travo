@@ -4,11 +4,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
 )
 
 // GetSQMConfigHandler handles GET /api/v1/sqm/config.
-func GetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
+func GetSQMConfigHandler(svc *network.SQMService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetConfig()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
 }
 
 // SetSQMConfigHandler handles PUT /api/v1/sqm/config.
-func SetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
+func SetSQMConfigHandler(svc *network.SQMService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.SQMConfig
 		// Strict: this handler persists the whole config, so an unrecognised
@@ -35,7 +35,7 @@ func SetSQMConfigHandler(svc *services.SQMService) fiber.Handler {
 }
 
 // ApplySQMHandler handles POST /api/v1/sqm/apply.
-func ApplySQMHandler(svc *services.SQMService) fiber.Handler {
+func ApplySQMHandler(svc *network.SQMService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		out, err := svc.Apply()
 		if err != nil {

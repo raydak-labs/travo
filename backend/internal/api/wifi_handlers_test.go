@@ -10,9 +10,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 func TestWifiScanEndpoint(t *testing.T) {
@@ -577,7 +577,7 @@ func TestRandomizeMACEndpoint(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// The same-radio refusal (services.ErrAPAndSTASameRadio) is a conflict with the
+// The same-radio refusal (wifi.ErrAPAndSTASameRadio) is a conflict with the
 // device's radio layout, not a server failure: a 500 tells the operator Travo
 // broke, and a client that retries on 5xx keeps asking for the impossible.
 // ---------------------------------------------------------------------------
@@ -586,7 +586,7 @@ func TestRandomizeMACEndpoint(t *testing.T) {
 // mode: the STA section sta0 is enabled, bound to network=wwan and sitting on
 // radio0, and no access point is enabled. Anything that enables an AP on radio0
 // is the AP+STA-on-one-PHY state ADR 0002 §2 refuses.
-func uplinkSTAService(t *testing.T) (*services.WifiService, *uci.MockUCI) {
+func uplinkSTAService(t *testing.T) (*wifi.WifiService, *uci.MockUCI) {
 	t.Helper()
 	u := uci.NewMockUCI()
 	for _, section := range []string{"default_radio0", "default_radio1"} {
@@ -604,7 +604,7 @@ func uplinkSTAService(t *testing.T) (*services.WifiService, *uci.MockUCI) {
 	// and leaves the radio-layout rule as the thing under test.
 	ub := ubus.NewMockUbus()
 	ub.RegisterResponse("network.interface.dump", interfaceDump("eth0"))
-	return services.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "s"}), u
+	return wifi.NewWifiServiceWithApplier(u, ub, &stubApplier{token: "s"}), u
 }
 
 func putJSONRequest(

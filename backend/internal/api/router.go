@@ -6,7 +6,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/failover"
+	"github.com/openwrt-travel-gui/backend/internal/network"
+	"github.com/openwrt-travel-gui/backend/internal/system"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 // Dependencies holds all service dependencies for API handlers.
@@ -14,23 +18,23 @@ type Dependencies struct {
 	Auth           *auth.AuthService
 	Blocklist      *auth.TokenBlocklist
 	RateLimiter    *auth.RateLimiter
-	System         *services.SystemService
-	Network        *services.NetworkService
-	SQM            *services.SQMService
-	Wifi           *services.WifiService
-	Vpn            *services.VpnService
-	ServiceManager *services.ServiceManager
-	Captive        *services.CaptiveService
-	AdGuard        *services.AdGuardService
-	Alerts         *services.AlertService
-	UptimeTracker  *services.UptimeTracker
-	DataUsage      *services.DataUsageService
-	USBTether      *services.USBTetheringService
-	BandSwitching  *services.BandSwitchingService
-	Failover       *services.FailoverService
-	StatsHistory   *services.StatsHistoryService
-	TrafficHistory *services.TrafficHistoryService
-	Speedtest      *services.SpeedtestService
+	System         *system.SystemService
+	Network        *network.NetworkService
+	SQM            *network.SQMService
+	Wifi           *wifi.WifiService
+	Vpn            *uplink.VpnService
+	ServiceManager *system.ServiceManager
+	Captive        *uplink.CaptiveService
+	AdGuard        *uplink.AdGuardService
+	Alerts         *system.AlertService
+	UptimeTracker  *network.UptimeTracker
+	DataUsage      *network.DataUsageService
+	USBTether      *network.USBTetheringService
+	BandSwitching  *wifi.BandSwitchingService
+	Failover       *failover.FailoverService
+	StatsHistory   *system.StatsHistoryService
+	TrafficHistory *network.TrafficHistoryService
+	Speedtest      *system.SpeedtestService
 
 	// Time-sync policy (see SyncTimeHandler). MinPlausible is typically the
 	// binary build time: a clock before it is clearly broken. SetTime is

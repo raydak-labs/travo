@@ -163,25 +163,13 @@ func childrenOf(n ast.Node) []ast.Node {
 	return out
 }
 
-// packageStatePathRefs scans every non-test Go file of this package for declared
-// state paths.
-func packageStatePathRefs(t *testing.T, dir string) []statePathRef {
+// packageStatePathRefs scans every non-test Go file of the backend packages
+// for declared state paths.
+func packageStatePathRefs(t *testing.T) []statePathRef {
 	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read %s: %v", dir, err)
-	}
 	var refs []statePathRef
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		src, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatalf("read %s: %v", name, err)
-		}
-		fileRefs, err := statePathRefsInSource(name, string(src))
+	for name, src := range backendSources(t) {
+		fileRefs, err := statePathRefsInSource(name, src)
 		if err != nil {
 			t.Fatalf("parse %s: %v", name, err)
 		}
@@ -189,6 +177,25 @@ func packageStatePathRefs(t *testing.T, dir string) []statePathRef {
 	}
 	sort.Slice(refs, func(i, j int) bool { return refs[i].String() < refs[j].String() })
 	return dedupeRefs(refs)
+}
+
+// backendSources returns every non-test Go file under internal/, keyed by its
+// base name.
+func backendSources(t *testing.T) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	err := filepath.WalkDir("..", func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		src, err := os.ReadFile(path)
+		out[filepath.Base(path)] = string(src)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("walk sources: %v", err)
+	}
+	return out
 }
 
 // dedupeRefs collapses the same path declared twice in one file (a constructor
@@ -208,33 +215,20 @@ func dedupeRefs(refs []statePathRef) []statePathRef {
 	return out
 }
 
-// resolverStateOwners returns the package files that write dnsmasq's resolver
-// options. Both DNS forwarding features touch the same two UCI options of the
+// resolverStateOwners returns the source files that write dnsmasq's resolver
+// options. Every DNS forwarding feature touches the same two UCI options of the
 // same section, so ADR 0001 owns every state path declared by these files.
-func resolverStateOwners(t *testing.T, dir string) []string {
+func resolverStateOwners(t *testing.T) []string {
 	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read %s: %v", dir, err)
-	}
 	var owners []string
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		src, err := os.ReadFile(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatalf("read %s: %v", name, err)
-		}
-		if strings.Contains(string(src), resolverOptionMarker) {
+	for name, src := range backendSources(t) {
+		if strings.Contains(src, resolverOptionMarker) {
 			owners = append(owners, name)
 		}
 	}
 	sort.Strings(owners)
 	if len(owners) == 0 {
-		t.Fatalf("no services file mentions %q; the owner scan is broken",
-			resolverOptionMarker)
+		t.Fatalf("no source file mentions %q; the owner scan is broken", resolverOptionMarker)
 	}
 	return owners
 }
@@ -254,12 +248,12 @@ func readDoc(t *testing.T, path string) string {
 func TestDnsResolverStatePathsAreNamedInAdr0001(t *testing.T) {
 	adr := readDoc(t, adr0001)
 	owners := map[string]bool{}
-	for _, name := range resolverStateOwners(t, servicesDir) {
+	for _, name := range resolverStateOwners(t) {
 		owners[name] = true
 	}
 
 	var problems []string
-	for _, ref := range packageStatePathRefs(t, servicesDir) {
+	for _, ref := range packageStatePathRefs(t) {
 		if !owners[ref.file] || ref.guard {
 			continue
 		}
@@ -300,7 +294,7 @@ func TestEtcTrafoStatePathsAreNamedInAnAdr(t *testing.T) {
 	adrs := all.String()
 
 	var problems []string
-	for _, ref := range packageStatePathRefs(t, servicesDir) {
+	for _, ref := range packageStatePathRefs(t) {
 		if ref.guard || !ref.inGuardDir {
 			continue
 		}

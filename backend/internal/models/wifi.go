@@ -84,7 +84,7 @@ type APConfig struct {
 // APConfigUpdate is the request body for PUT /wifi/ap/:section.
 // When Enabled is nil, UCI disabled is left unchanged (repeater credential sync after radio split).
 // AcknowledgeLockout opts in to disabling the last access point while connected
-// over WiFi; without it the change is refused (see services.ErrLockoutRefused).
+// over WiFi; without it the change is refused (see wifi.ErrLockoutRefused).
 type APConfigUpdate struct {
 	SSID       string `json:"ssid"`
 	Encryption string `json:"encryption"`
@@ -111,7 +111,7 @@ type GuestWifiConfig struct {
 	Key        string `json:"key,omitempty"`
 	// AcknowledgeLockout is the explicit "yes, strand me" opt-in for turning the
 	// guest access point off while it is the last one up and the operator is on
-	// WiFi. See services.ErrLockoutRefused.
+	// WiFi. See wifi.ErrLockoutRefused.
 	AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty"`
 }
 
@@ -131,6 +131,6 @@ type RadioInfo struct {
 type RadioRoleRequest struct {
 	Role string `json:"role"`
 	// AcknowledgeLockout is the explicit "yes, strand me" opt-in for switching
-	// the last access point off. See services.ErrLockoutRefused.
+	// the last access point off. See wifi.ErrLockoutRefused.
 	AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty"`
 }

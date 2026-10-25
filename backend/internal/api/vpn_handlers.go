@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
 )
 
 // respondVPNError maps a domain error to a status code.
@@ -16,7 +16,7 @@ import (
 // it as 500 made the UI look broken and told the operator nothing. 503 plus the
 // reason lets it say "install tailscale".
 func respondVPNError(c fiber.Ctx, err error) error {
-	if errors.Is(err, services.ErrTailscaleNotInstalled) {
+	if errors.Is(err, uplink.ErrTailscaleNotInstalled) {
 		return RespondWithError(c, fiber.StatusServiceUnavailable, err.Error())
 	}
 	return RespondWithServerError(c, err)
@@ -32,7 +32,7 @@ func parseToggleEnabled(c fiber.Ctx) (bool, error) {
 }
 
 // VpnStatusHandler handles GET /api/v1/vpn/status.
-func VpnStatusHandler(svc *services.VpnService) fiber.Handler {
+func VpnStatusHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		statuses, err := svc.GetVpnStatus()
 		if err != nil {
@@ -43,7 +43,7 @@ func VpnStatusHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetWireguardHandler handles GET /api/v1/vpn/wireguard.
-func GetWireguardHandler(svc *services.VpnService) fiber.Handler {
+func GetWireguardHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		config, err := svc.GetWireguardConfig()
 		if err != nil {
@@ -54,7 +54,7 @@ func GetWireguardHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // SetWireguardHandler handles PUT /api/v1/vpn/wireguard.
-func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
+func SetWireguardHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var config models.WireguardConfig
 		if err := BindStrictBodyConfig(c, &config); err != nil {
@@ -86,7 +86,7 @@ func SetWireguardHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // ToggleWireguardHandler handles POST /api/v1/vpn/wireguard/toggle.
-func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
+func ToggleWireguardHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := parseToggleEnabled(c)
 		if err != nil {
@@ -100,7 +100,7 @@ func ToggleWireguardHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetTailscaleHandler handles GET /api/v1/vpn/tailscale.
-func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
+func GetTailscaleHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetTailscaleStatus()
 		if err != nil {
@@ -111,7 +111,7 @@ func GetTailscaleHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // ToggleTailscaleHandler handles POST /api/v1/vpn/tailscale/toggle.
-func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
+func ToggleTailscaleHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := parseToggleEnabled(c)
 		if err != nil {
@@ -126,7 +126,7 @@ func ToggleTailscaleHandler(svc *services.VpnService) fiber.Handler {
 
 // TailscaleAuthHandler handles POST /api/v1/vpn/tailscale/auth.
 // Starts `tailscale up` and returns the browser auth URL if login is required.
-func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
+func TailscaleAuthHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			AuthKey string `json:"auth_key"`
@@ -141,7 +141,7 @@ func TailscaleAuthHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // SetTailscaleExitNodeHandler handles POST /api/v1/vpn/tailscale/exit-node.
-func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
+func SetTailscaleExitNodeHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			NodeIP string `json:"node_ip"`
@@ -157,7 +157,7 @@ func SetTailscaleExitNodeHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // ImportWireguardHandler handles POST /api/v1/vpn/wireguard/import.
-func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
+func ImportWireguardHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Config string `json:"config"`
@@ -176,7 +176,7 @@ func ImportWireguardHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetWireguardStatusHandler handles GET /api/v1/vpn/wireguard/status.
-func GetWireguardStatusHandler(svc *services.VpnService) fiber.Handler {
+func GetWireguardStatusHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetWireGuardStatus()
 		if err != nil {
@@ -187,7 +187,7 @@ func GetWireguardStatusHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetWireguardProfilesHandler handles GET /api/v1/vpn/wireguard/profiles.
-func GetWireguardProfilesHandler(svc *services.VpnService) fiber.Handler {
+func GetWireguardProfilesHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		profiles, err := svc.GetProfiles()
 		if err != nil {
@@ -198,7 +198,7 @@ func GetWireguardProfilesHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // AddWireguardProfileHandler handles POST /api/v1/vpn/wireguard/profiles.
-func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
+func AddWireguardProfileHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Name   string `json:"name"`
@@ -222,7 +222,7 @@ func AddWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // DeleteWireguardProfileHandler handles DELETE /api/v1/vpn/wireguard/profiles/:id.
-func DeleteWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
+func DeleteWireguardProfileHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if id == "" {
@@ -236,7 +236,7 @@ func DeleteWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // ActivateWireguardProfileHandler handles POST /api/v1/vpn/wireguard/profiles/:id/activate.
-func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
+func ActivateWireguardProfileHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if id == "" {
@@ -250,7 +250,7 @@ func ActivateWireguardProfileHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetKillSwitchHandler handles GET /api/v1/vpn/killswitch.
-func GetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
+func GetKillSwitchHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetKillSwitch()
 		if err != nil {
@@ -261,7 +261,7 @@ func GetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // SetKillSwitchHandler handles PUT /api/v1/vpn/killswitch.
-func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
+func SetKillSwitchHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled bool `json:"enabled"`
@@ -277,7 +277,7 @@ func SetKillSwitchHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // DNSLeakTestHandler handles GET /api/v1/vpn/dns-leak-test.
-func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
+func DNSLeakTestHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result := svc.RunDNSLeakTest()
 		return c.JSON(result)
@@ -285,7 +285,7 @@ func DNSLeakTestHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // RunWireGuardSpeedTestHandler handles POST /api/v1/vpn/speed-test.
-func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
+func RunWireGuardSpeedTestHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result, err := svc.RunWireGuardSpeedTest()
 		if err != nil {
@@ -298,7 +298,7 @@ func RunWireGuardSpeedTestHandler(svc *services.VpnService) fiber.Handler {
 
 // VerifyWireguardHandler handles GET /api/v1/vpn/wireguard/verify.
 // Returns interface status, handshake recency, route check, and firewall plumbing state.
-func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
+func VerifyWireguardHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		result := svc.VerifyWireGuard()
 		return c.JSON(result)
@@ -306,7 +306,7 @@ func VerifyWireguardHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetSplitTunnelHandler handles GET /api/v1/vpn/split-tunnel.
-func GetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
+func GetSplitTunnelHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetSplitTunnel()
 		if err != nil {
@@ -317,7 +317,7 @@ func GetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // SetSplitTunnelHandler handles PUT /api/v1/vpn/split-tunnel.
-func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
+func SetSplitTunnelHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.SplitTunnelConfig
 		if err := BindStrictBodyConfig(c, &cfg); err != nil {
@@ -334,7 +334,7 @@ func SetSplitTunnelHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // GetTailscaleSSHHandler handles GET /api/v1/vpn/tailscale/ssh.
-func GetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
+func GetTailscaleSSHHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := svc.GetTailscaleSSHEnabled()
 		if err != nil {
@@ -345,7 +345,7 @@ func GetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
 }
 
 // SetTailscaleSSHHandler handles PUT /api/v1/vpn/tailscale/ssh.
-func SetTailscaleSSHHandler(svc *services.VpnService) fiber.Handler {
+func SetTailscaleSSHHandler(svc *uplink.VpnService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
 			Enabled bool `json:"enabled"`

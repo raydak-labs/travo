@@ -8,7 +8,7 @@ tags: [adr, architecture, uci, api]
 # ADR 0010 — UCI write serialisation and request-body contracts
 
 Two invariants that are load-bearing, easy to violate from outside
-`backend/internal/services`, and whose violation is silent rather than loud.
+`backend/internal/`, and whose violation is silent rather than loud.
 
 ## 1. The UCI staged-changes file is process-global
 

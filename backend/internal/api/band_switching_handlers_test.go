@@ -9,9 +9,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 func TestGetBandSwitchingHandler(t *testing.T) {
@@ -182,7 +182,7 @@ func TestSetRadioRoleHandler_ReturnsApplyEnvelopeAndGeneratedKey(t *testing.T) {
 	if err := u.DeleteSection("wireless", "default_radio0"); err != nil {
 		t.Fatal(err)
 	}
-	svc := services.NewWifiServiceWithApplier(u, ubus.NewMockUbus(),
+	svc := wifi.NewWifiServiceWithApplier(u, ubus.NewMockUbus(),
 		&stubApplier{token: "role-session-1"})
 
 	app := fiber.New()

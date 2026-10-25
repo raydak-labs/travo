@@ -17,7 +17,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 // The served /api/openapi.json is the contract automation and tests depend on,
@@ -556,7 +556,7 @@ func jsonFieldNames(t reflect.Type) []string {
 // actually builds, so renaming a key in either place fails here.
 //
 // Handlers that answer the bare apply result instead of the envelope
-// (PUT /wifi/radios/{name}/role returns *services.WirelessApplyResult) are
+// (PUT /wifi/radios/{name}/role returns *wifi.WirelessApplyResult) are
 // deliberately not listed: the spec documents the envelope they are supposed to
 // answer.
 func TestOpenAPIWifiMutationResponsesMatchEnvelope(t *testing.T) {
@@ -566,7 +566,7 @@ func TestOpenAPIWifiMutationResponsesMatchEnvelope(t *testing.T) {
 	// expected envelope with zero values would let a field be added to the
 	// handler and left out of the spec without this test noticing, which is the
 	// drift it exists to catch.
-	envelope := wifiMutationResponse(&services.WirelessApplyResult{
+	envelope := wifiMutationResponse(&wifi.WirelessApplyResult{
 		Token:                  "apply-token",
 		RollbackTimeoutSeconds: 90,
 		ProbeBudgetSeconds:     4,

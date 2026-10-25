@@ -93,10 +93,10 @@ Wireless mutation safety is intentionally modeled after LuCI. **Implementation r
 
 Contract:
 
-1. Write a guard file to persistent storage under `/etc/trafo/` **before** the dangerous operation. That single directory is authoritative: `internal/services/guards_test.go` fails the build if a guard path reappears under `/etc/travo/`, and `deploy-local.sh` clears both so a device upgraded from an older build still recovers (see ADR 0003 §2).
+1. Write a guard file to persistent storage under `/etc/trafo/` **before** the dangerous operation. That single directory is authoritative: every Go guard goes through `internal/guard`, `internal/docsgate/guards_test.go` fails the build if a guard path appears under `/etc/travo/`, and `deploy-local.sh` clears the guards listed in ADR 0003 §2.
 2. While the guard exists, the operation is skipped. Not every skip logs: **check the filesystem** (`ls /etc/trafo`) rather than assuming a log line.
 3. Remove the guard only after the whole operation completed successfully.
-4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and ``TestCrashGuardDirIsEtcTrafo`, `TestCrashGuardPathsResolveUnderCrashGuardDir` and `TestNoGuardIsDeclaredUnderEtcTravo` in `backend/internal/services/guards_test.go`` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
+4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and ``TestCrashGuardDirIsEtcTrafo`, `TestCrashGuardPathsResolveUnderCrashGuardDir` and `TestNoGuardIsDeclaredUnderEtcTravo` in `backend/internal/docsgate/guards_test.go`` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
 5. Startup is also a repair point for pre-fix artifacts: `cmd/server/startup.go` reconciles the auto-reconnect script and cron entry in **both** directions (enabled *and* disabled) and re-writes the WiFi schedule cron entry from the stored config, so a device carrying the old `wifi reload` / `/sbin/wifi up` lines converges onto the generated toggle helper without waiting for the user to re-save a setting.
 
 Guard naming convention:

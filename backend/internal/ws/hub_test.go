@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 func TestNewHub(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	alertSvc := services.NewAlertService(svc)
+	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	alertSvc := system.NewAlertService(svc)
 	hub := NewHub(svc, alertSvc, nil, nil)
 
 	if hub == nil {
@@ -30,8 +31,8 @@ func TestNewHub(t *testing.T) {
 
 func TestHubStartStop(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	alertSvc := services.NewAlertService(svc)
+	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	alertSvc := system.NewAlertService(svc)
 	hub := NewHub(svc, alertSvc, nil, nil)
 	hub.BroadcastInterval = 10 * time.Millisecond
 
@@ -43,8 +44,8 @@ func TestHubStartStop(t *testing.T) {
 
 func TestHub_BroadcastsNetworkStatus(t *testing.T) {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	alertSvc := services.NewAlertService(svc)
+	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	alertSvc := system.NewAlertService(svc)
 
 	nsCh := make(chan models.NetworkStatus, 1)
 	hub := NewHub(svc, alertSvc, nsCh, nil)
@@ -140,8 +141,8 @@ func TestHub_StopIsIdempotent(t *testing.T) {
 
 func newTestHub() *Hub {
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	return NewHub(svc, services.NewAlertService(svc), nil, nil)
+	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	return NewHub(svc, system.NewAlertService(svc), nil, nil)
 }
 
 // The traffic history exists so a dashboard opening the page has ~10 minutes of
@@ -151,12 +152,12 @@ func newTestHub() *Hub {
 func TestHub_SamplesTrafficHistoryWithNoClients(t *testing.T) {
 	root := fixtureSysfsNet(t)
 	ub := ubus.NewMockUbus()
-	svc := services.NewSystemService(ub, uci.NewMockUCI(), &services.MockStorageProvider{})
-	history := services.NewTrafficHistoryService(10)
-	restore := services.SetSysfsNetRootForTesting(root)
+	svc := system.NewSystemService(ub, uci.NewMockUCI(), &system.MockStorageProvider{})
+	history := network.NewTrafficHistoryService(10)
+	restore := system.SetSysfsNetRootForTesting(root)
 	defer restore()
 
-	hub := NewHub(svc, services.NewAlertService(svc), nil, history)
+	hub := NewHub(svc, system.NewAlertService(svc), nil, history)
 	hub.BroadcastInterval = 10 * time.Millisecond
 	hub.Start()
 
@@ -175,7 +176,7 @@ func TestHub_SamplesTrafficHistoryWithNoClients(t *testing.T) {
 
 // fixtureSysfsNet creates a temporary tree holding the interfaces
 // readNetworkStats monitors and returns its root, to be handed to
-// services.SetSysfsNetRootForTesting.
+// system.SetSysfsNetRootForTesting.
 func fixtureSysfsNet(t *testing.T) (root string) {
 	t.Helper()
 	root = t.TempDir()

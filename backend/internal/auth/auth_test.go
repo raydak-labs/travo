@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 )
 

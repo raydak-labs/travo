@@ -135,7 +135,7 @@ accepted only for a device whose UI is the recovery path.
 - `backend/cmd/server/main.go` — `store.Open`, memory-only fallback, lifecycle
   ownership and shutdown order
 - `backend/internal/auth/blocklist.go` — `blocklist` bucket, hashing, retention
-- `backend/internal/services/stats_history.go` — `stats_history` bucket, `flushEvery`
+- `backend/internal/system/stats_history.go` — `stats_history` bucket, `flushEvery`
 - `docs/architecture/overview.md` §8 — device constraints
 - [ADR 0007](./0007-authentication-and-access-control.md) — sessions, revocations
 - [ADR 0013](./0013-operational-invariants-and-device-findings.md) rule 3

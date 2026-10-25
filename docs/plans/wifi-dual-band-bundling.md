@@ -194,5 +194,5 @@ When creating/moving the STA for a new connection:
 - Connect flow: `WifiConnectDialog` passes `network.ssid` and password; backend `Connect()` sets STA SSID/key and applies; band is determined by which radio the STA is on.
 - Auto-reconnect pattern: `/etc/travo/autoreconnect.json` + cron script + crash guard.
 - Alert service pattern: `AlertService` goroutine with `time.NewTicker` for periodic checks.
-- UCI apply/confirm: `services/uci_apply.go` — safe rollback-based wireless apply.
+- UCI apply/confirm: `platform/uciapply.go` — safe rollback-based wireless apply.
 - Verified on device: AXT1800 (IPQ6018) supports cross-radio scanning while STA is connected; band switch via UCI device change works.

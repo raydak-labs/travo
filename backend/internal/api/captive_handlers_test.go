@@ -1,10 +1,6 @@
 package api
 
 import (
-	"github.com/openwrt-travel-gui/backend/internal/platform"
-
-	"github.com/openwrt-travel-gui/backend/internal/guard"
-
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,8 +13,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/platform"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
 )
 
 // recordingRunner records every command the service under test shells out, so
@@ -62,7 +60,7 @@ func TestCaptiveStatusGetDoesNotMutateState(t *testing.T) {
 	runner := &recordingRunner{}
 	// 204 = internet reachable, which is exactly what used to trigger the
 	// auto-restore from the read path.
-	svc := services.NewCaptiveServiceWithGuard(&platform.MockHTTPProber{StatusCode: 204},
+	svc := uplink.NewCaptiveServiceWithGuard(&platform.MockHTTPProber{StatusCode: 204},
 		uci.NewMockUCI(), runner, guard.In(dir, "captive-dns"))
 	defer svc.Stop()
 

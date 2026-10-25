@@ -6,11 +6,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 // ListServicesHandler handles GET /api/v1/services.
-func ListServicesHandler(sm *services.ServiceManager) fiber.Handler {
+func ListServicesHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		list, err := sm.ListServices()
 		if err != nil {
@@ -33,7 +33,7 @@ func installErr(c fiber.Ctx, err error) error {
 }
 
 // InstallServiceHandler handles POST /api/v1/services/:id/install.
-func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
+func InstallServiceHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Install(id); err != nil {
@@ -44,7 +44,7 @@ func InstallServiceHandler(sm *services.ServiceManager) fiber.Handler {
 }
 
 // RemoveServiceHandler handles POST /api/v1/services/:id/remove.
-func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
+func RemoveServiceHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Remove(id); err != nil {
@@ -55,7 +55,7 @@ func RemoveServiceHandler(sm *services.ServiceManager) fiber.Handler {
 }
 
 // StartServiceHandler handles POST /api/v1/services/:id/start.
-func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
+func StartServiceHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Start(id); err != nil {
@@ -66,7 +66,7 @@ func StartServiceHandler(sm *services.ServiceManager) fiber.Handler {
 }
 
 // StopServiceHandler handles POST /api/v1/services/:id/stop.
-func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
+func StopServiceHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		if err := sm.Stop(id); err != nil {
@@ -77,7 +77,7 @@ func StopServiceHandler(sm *services.ServiceManager) fiber.Handler {
 }
 
 // SetAutoStartHandler handles POST /api/v1/services/:id/autostart.
-func SetAutoStartHandler(mgr *services.ServiceManager) fiber.Handler {
+func SetAutoStartHandler(mgr *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		var body struct {
@@ -153,7 +153,7 @@ func streamServiceAction(c fiber.Ctx, action func(logFn func(string)) error) err
 
 // InstallServiceStreamHandler handles POST /api/v1/services/:id/install/stream.
 // Returns NDJSON with real-time install output.
-func InstallServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
+func InstallServiceStreamHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		return streamServiceAction(c, func(logFn func(string)) error {
@@ -164,7 +164,7 @@ func InstallServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
 
 // RemoveServiceStreamHandler handles POST /api/v1/services/:id/remove/stream.
 // Returns NDJSON with real-time remove output.
-func RemoveServiceStreamHandler(sm *services.ServiceManager) fiber.Handler {
+func RemoveServiceStreamHandler(sm *system.ServiceManager) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		id := c.Params("id")
 		return streamServiceAction(c, func(logFn func(string)) error {

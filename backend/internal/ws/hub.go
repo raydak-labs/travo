@@ -8,7 +8,8 @@ import (
 	"github.com/gofiber/contrib/v3/websocket"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 )
 
 // writeTimeout bounds how long a single client write may stall the broadcast
@@ -27,9 +28,9 @@ type Conn interface {
 type Hub struct {
 	clients           map[Conn]bool
 	mu                sync.RWMutex
-	systemSvc         *services.SystemService
-	alertSvc          *services.AlertService
-	trafficHistory    *services.TrafficHistoryService
+	systemSvc         *system.SystemService
+	alertSvc          *system.AlertService
+	trafficHistory    *network.TrafficHistoryService
 	networkStatusCh   <-chan models.NetworkStatus
 	stopCh            chan struct{}
 	stopOnce          sync.Once
@@ -39,10 +40,10 @@ type Hub struct {
 // NewHub creates a new WebSocket hub. trafficHistory may be nil, in which case
 // no traffic samples are retained.
 func NewHub(
-	systemSvc *services.SystemService,
-	alertSvc *services.AlertService,
+	systemSvc *system.SystemService,
+	alertSvc *system.AlertService,
 	networkStatusCh <-chan models.NetworkStatus,
-	trafficHistory *services.TrafficHistoryService,
+	trafficHistory *network.TrafficHistoryService,
 ) *Hub {
 	return &Hub{
 		clients:           make(map[Conn]bool),

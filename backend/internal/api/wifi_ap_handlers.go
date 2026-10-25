@@ -2,12 +2,13 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
+
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 // GetRadioStatusHandler handles GET /api/v1/wifi/radio.
-func GetRadioStatusHandler(svc *services.WifiService) fiber.Handler {
+func GetRadioStatusHandler(svc *wifi.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		enabled, err := svc.GetRadioStatus()
 		if err != nil {
@@ -18,7 +19,7 @@ func GetRadioStatusHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // SetRadioEnabledHandler handles PUT /api/v1/wifi/radio.
-func SetRadioEnabledHandler(svc *services.WifiService) fiber.Handler {
+func SetRadioEnabledHandler(svc *wifi.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled            bool `json:"enabled"`
@@ -37,7 +38,7 @@ func SetRadioEnabledHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // GetAPConfigHandler handles GET /api/v1/wifi/ap.
-func GetAPConfigHandler(svc *services.WifiService) fiber.Handler {
+func GetAPConfigHandler(svc *wifi.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		configs, err := svc.GetAPConfigs()
 		if err != nil {
@@ -48,7 +49,7 @@ func GetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // SetAPConfigHandler handles PUT /api/v1/wifi/ap/:section.
-func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
+func SetAPConfigHandler(svc *wifi.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		section := c.Params("section")
 		if section == "" {
@@ -76,7 +77,7 @@ func SetAPConfigHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // GetRadiosHandler handles GET /api/v1/wifi/radios.
-func GetRadiosHandler(svc *services.WifiService) fiber.Handler {
+func GetRadiosHandler(svc *wifi.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		radios, err := svc.GetRadios()
 		if err != nil {
@@ -87,7 +88,7 @@ func GetRadiosHandler(svc *services.WifiService) fiber.Handler {
 }
 
 // SetRadioRoleHandler handles PUT /api/v1/wifi/radios/:name/role.
-func SetRadioRoleHandler(svc *services.WifiService) fiber.Handler {
+func SetRadioRoleHandler(svc *wifi.WifiService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		radioName := c.Params("name")
 		var req models.RadioRoleRequest

@@ -5,11 +5,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
 )
 
 // CaptiveStatusHandler handles GET /api/v1/captive/status.
-func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
+func CaptiveStatusHandler(svc *uplink.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.CheckCaptivePortal()
 		if err != nil {
@@ -26,7 +26,7 @@ func CaptiveStatusHandler(svc *services.CaptiveService) fiber.Handler {
 }
 
 // CaptiveAutoAcceptHandler handles POST /api/v1/captive/auto-accept.
-func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
+func CaptiveAutoAcceptHandler(svc *uplink.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			PortalURL string `json:"portal_url"`
@@ -58,7 +58,7 @@ func CaptiveAutoAcceptHandler(svc *services.CaptiveService) fiber.Handler {
 }
 
 // CaptiveDNSBypassHandler handles POST /api/v1/captive/dns-bypass.
-func CaptiveDNSBypassHandler(svc *services.CaptiveService) fiber.Handler {
+func CaptiveDNSBypassHandler(svc *uplink.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.BypassDNS(); err != nil {
 			return RespondWithServerError(c, err)
@@ -68,7 +68,7 @@ func CaptiveDNSBypassHandler(svc *services.CaptiveService) fiber.Handler {
 }
 
 // CaptiveDNSRestoreHandler handles POST /api/v1/captive/dns-restore.
-func CaptiveDNSRestoreHandler(svc *services.CaptiveService) fiber.Handler {
+func CaptiveDNSRestoreHandler(svc *uplink.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if err := svc.RestoreDNS(); err != nil {
 			return RespondWithServerError(c, err)

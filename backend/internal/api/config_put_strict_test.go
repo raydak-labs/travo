@@ -8,7 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 )
 
 func putJSON(t *testing.T, app *fiber.App, token, path, body string) (int, string) {
@@ -157,7 +157,7 @@ func TestSetBandSwitching_RejectsNonPositiveInterval(t *testing.T) {
 // dBm hysteresis: coming back up needs a STRONGER signal than going down, i.e. a
 // larger (less negative) number. The defaults are -70 down / -60 up.
 func TestValidateBandSwitchConfig_Hysteresis(t *testing.T) {
-	base := services.BandSwitchConfig{
+	base := wifi.BandSwitchConfig{
 		PreferredBand:          "5g",
 		CheckIntervalSec:       10,
 		DownSwitchThresholdDBm: -70,
@@ -166,18 +166,18 @@ func TestValidateBandSwitchConfig_Hysteresis(t *testing.T) {
 		UpSwitchDelaySec:       60,
 		MinViableSignalDBm:     -80,
 	}
-	if err := services.ValidateBandSwitchConfig(base); err != nil {
+	if err := wifi.ValidateBandSwitchConfig(base); err != nil {
 		t.Errorf("the shipped defaults must validate: %v", err)
 	}
 
 	bad := base
 	bad.UpSwitchThresholdDBm = -80 // weaker than the down threshold
-	if err := services.ValidateBandSwitchConfig(bad); err == nil {
+	if err := wifi.ValidateBandSwitchConfig(bad); err == nil {
 		t.Error("up_switch below down_switch must be rejected: the switcher would oscillate")
 	}
 	bad = base
 	bad.DownSwitchThresholdDBm = 40 // not a dBm value
-	if err := services.ValidateBandSwitchConfig(bad); err == nil {
+	if err := wifi.ValidateBandSwitchConfig(bad); err == nil {
 		t.Error("a positive dBm threshold must be rejected")
 	}
 }

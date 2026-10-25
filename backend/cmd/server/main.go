@@ -20,12 +20,16 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/api"
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 	"github.com/openwrt-travel-gui/backend/internal/config"
+	"github.com/openwrt-travel-gui/backend/internal/failover"
 	"github.com/openwrt-travel-gui/backend/internal/guard"
+	"github.com/openwrt-travel-gui/backend/internal/network"
 	"github.com/openwrt-travel-gui/backend/internal/platform"
-	"github.com/openwrt-travel-gui/backend/internal/services"
 	"github.com/openwrt-travel-gui/backend/internal/store"
+	"github.com/openwrt-travel-gui/backend/internal/system"
 	"github.com/openwrt-travel-gui/backend/internal/ubus"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
+	"github.com/openwrt-travel-gui/backend/internal/wifi"
 	"github.com/openwrt-travel-gui/backend/internal/ws"
 )
 
@@ -117,16 +121,16 @@ func corsConfig(rawOrigins string) cors.Config {
 // follows lifecycle rules).
 type appLifecycle struct {
 	hub             *ws.Hub
-	alertSvc        *services.AlertService
-	uptimeTracker   *services.UptimeTracker
-	bandSwitchSvc   *services.BandSwitchingService
-	failoverSvc     *services.FailoverService
+	alertSvc        *system.AlertService
+	uptimeTracker   *network.UptimeTracker
+	bandSwitchSvc   *wifi.BandSwitchingService
+	failoverSvc     *failover.FailoverService
 	blocklist       *auth.TokenBlocklist
-	netWatcher      services.EventWatcher
+	netWatcher      network.EventWatcher
 	rateLimiter     *auth.RateLimiter
 	timeSyncLimiter *auth.RateLimiter
-	statsHistory    *services.StatsHistoryService
-	captiveSvc      *services.CaptiveService
+	statsHistory    *system.StatsHistoryService
+	captiveSvc      *uplink.CaptiveService
 	db              *store.Store // may be nil (memory-only fallback)
 
 	stopCh   chan struct{}
@@ -316,39 +320,39 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 	// Monotonic session registry: session lifetime is immune to wall-clock
 	// jumps (NTP, time-sync, timezone fixes). See ADR 0007.
 	authSvc.SetSessionRegistry(auth.NewSessionRegistry(24 * time.Hour))
-	var storage services.StorageProvider
+	var storage system.StorageProvider
 	var captiveProber platform.HTTPProber
 	if cfg.MockMode {
-		storage = &services.MockStorageProvider{}
+		storage = &system.MockStorageProvider{}
 		captiveProber = &platform.MockHTTPProber{StatusCode: 200, Body: "success\n"}
 	} else {
-		storage = &services.RealStorageProvider{}
+		storage = &system.RealStorageProvider{}
 		captiveProber = platform.NewRealHTTPProber()
 	}
 
-	systemSvc := services.NewSystemService(ub, u, storage)
+	systemSvc := system.NewSystemService(ub, u, storage)
 	if !cfg.MockMode {
 		// Surface crash guards left behind by an interrupted run (flash,
 		// restore, factory reset) so the state is not silently forgotten.
 		systemSvc.LogStaleCrashGuards()
 	}
-	networkSvc := services.NewNetworkService(u, ub)
-	sqmSvc := services.NewSQMService(u)
+	networkSvc := network.NewNetworkService(u, ub)
+	sqmSvc := network.NewSQMService(u)
 
 	// Create event watcher (noop in mock mode to avoid running ubus on dev machines).
-	var netWatcher services.EventWatcher
+	var netWatcher network.EventWatcher
 	if cfg.MockMode {
-		netWatcher = services.NewNoopEventWatcher()
+		netWatcher = network.NewNoopEventWatcher()
 	} else {
-		netWatcher = services.NewNetworkEventWatcher(networkSvc)
+		netWatcher = network.NewNetworkEventWatcher(networkSvc)
 	}
 	lifecycle.netWatcher = netWatcher
 	lifecycle.Go(func(stop <-chan struct{}) { netWatcher.Start() })
-	var wifiSvc *services.WifiService
+	var wifiSvc *wifi.WifiService
 	if cfg.MockMode {
-		wifiSvc = services.NewWifiServiceWithReloader(u, ub, &services.NoopWifiReloader{})
+		wifiSvc = wifi.NewWifiServiceWithReloader(u, ub, &wifi.NoopWifiReloader{})
 	} else {
-		wifiSvc = services.NewWifiService(u, ub, rootPassword) // uses apply+confirm instead of wifi up
+		wifiSvc = wifi.NewWifiService(u, ub, rootPassword) // uses apply+confirm instead of wifi up
 	}
 
 	// The wireless configuration and its cron entries are reconciled on
@@ -357,39 +361,39 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		startWifiReconciliation(lifecycle, wifiSvc)
 	}
 
-	vpnSvc := services.NewVpnService(u)
-	svcManager := services.NewServiceManager()
-	captiveSvc := services.NewCaptiveServiceWithUCI(captiveProber, u, &platform.RealCommandRunner{})
-	adguardSvc := services.NewAdGuardService()
-	dataUsageSvc := services.NewDataUsageService()
-	usbTetherSvc := services.NewUSBTetheringService()
-	bandSwitchSvc := services.NewBandSwitchingService(wifiSvc, "/etc/travo/band-switching.json")
-	failoverSvc := services.NewFailoverService(u, ub, networkSvc, rootPassword)
+	vpnSvc := uplink.NewVpnService(u)
+	svcManager := system.NewServiceManager()
+	captiveSvc := uplink.NewCaptiveServiceWithUCI(captiveProber, u, &platform.RealCommandRunner{})
+	adguardSvc := uplink.NewAdGuardService()
+	dataUsageSvc := network.NewDataUsageService()
+	usbTetherSvc := network.NewUSBTetheringService()
+	bandSwitchSvc := wifi.NewBandSwitchingService(wifiSvc, "/etc/travo/band-switching.json")
+	failoverSvc := failover.NewFailoverService(u, ub, networkSvc, rootPassword)
 
 	// Register post-install hook: auto-configure AdGuard Home after package install.
 	if !cfg.MockMode {
 		svcManager.SetPostInstallHook("adguardhome", adguardSvc.AutoConfigure)
 		svcManager.SetPostInstallHook("vnstat", dataUsageSvc.AutoConfigureVnstat)
 	}
-	alertSvc := services.NewAlertService(systemSvc)
+	alertSvc := system.NewAlertService(systemSvc)
 	if !cfg.MockMode {
-		alertSvc.SetCarrierChecker(&services.RealCarrierChecker{})
+		alertSvc.SetCarrierChecker(&system.RealCarrierChecker{})
 	}
 	failoverSvc.SetAlertService(alertSvc)
-	uptimeTracker := services.NewUptimeTracker(captiveProber)
+	uptimeTracker := network.NewUptimeTracker(captiveProber)
 
 	// Stats history: collect every 30s, keep 720 points (~6 hours)
-	var statsHistory *services.StatsHistoryService
+	var statsHistory *system.StatsHistoryService
 	if db != nil {
-		statsHistory = services.NewStatsHistoryServiceWithStore(systemSvc, 30*time.Second, 720, db)
+		statsHistory = system.NewStatsHistoryServiceWithStore(systemSvc, 30*time.Second, 720, db)
 	} else {
-		statsHistory = services.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
+		statsHistory = system.NewStatsHistoryService(systemSvc, 30*time.Second, 720)
 	}
 	statsHistory.Start()
 
 	// Traffic history: sampled on every WebSocket broadcast tick (2s), ~10 min
 	// per interface, so a freshly loaded dashboard chart is not empty.
-	trafficHistory := services.NewTrafficHistoryService(services.TrafficHistoryDefaultPoints)
+	trafficHistory := network.NewTrafficHistoryService(network.TrafficHistoryDefaultPoints)
 
 	// Token blocklist with cleanup goroutine
 	var blocklist *auth.TokenBlocklist
@@ -453,7 +457,7 @@ func setupAppWithConfig(cfg config.Config) (*fiber.App, *appLifecycle) {
 		Failover:       failoverSvc,
 		StatsHistory:   statsHistory,
 		TrafficHistory: trafficHistory,
-		Speedtest:      services.NewSpeedtestService(),
+		Speedtest:      system.NewSpeedtestService(),
 
 		TimeSyncMinPlausible: minPlausibleTime(),
 		TimeSyncLimiter:      timeSyncLimiter,

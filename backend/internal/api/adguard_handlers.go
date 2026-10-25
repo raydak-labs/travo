@@ -6,11 +6,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/uplink"
 )
 
 // AdGuardStatusHandler handles GET /api/v1/services/adguardhome/status.
-func AdGuardStatusHandler(adguard *services.AdGuardService) fiber.Handler {
+func AdGuardStatusHandler(adguard *uplink.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		installed := adguard.IsInstalled()
 		running := adguard.IsRunning()
@@ -34,7 +34,7 @@ func AdGuardStatusHandler(adguard *services.AdGuardService) fiber.Handler {
 }
 
 // AdGuardDNSStatusHandler handles GET /api/v1/adguard/dns.
-func AdGuardDNSStatusHandler(adguard *services.AdGuardService) fiber.Handler {
+func AdGuardDNSStatusHandler(adguard *uplink.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := adguard.GetDNSStatus()
 		if err != nil {
@@ -45,7 +45,7 @@ func AdGuardDNSStatusHandler(adguard *services.AdGuardService) fiber.Handler {
 }
 
 // SetAdGuardDNSHandler handles PUT /api/v1/adguard/dns.
-func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
+func SetAdGuardDNSHandler(adguard *uplink.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Enabled bool `json:"enabled"`
@@ -61,7 +61,7 @@ func SetAdGuardDNSHandler(adguard *services.AdGuardService) fiber.Handler {
 }
 
 // GetAdGuardConfigHandler handles GET /api/v1/adguard/config.
-func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
+func GetAdGuardConfigHandler(adguard *uplink.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		content, err := adguard.GetConfig()
 		if err != nil {
@@ -75,7 +75,7 @@ func GetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 }
 
 // SetAdGuardPasswordHandler handles PUT /api/v1/adguard/password.
-func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
+func SetAdGuardPasswordHandler(adguard *uplink.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Username string `json:"username"`
@@ -98,7 +98,7 @@ func SetAdGuardPasswordHandler(adguard *services.AdGuardService) fiber.Handler {
 }
 
 // SetAdGuardConfigHandler handles PUT /api/v1/adguard/config.
-func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
+func SetAdGuardConfigHandler(adguard *uplink.AdGuardService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var body struct {
 			Content string `json:"content"`
@@ -117,7 +117,7 @@ func SetAdGuardConfigHandler(adguard *services.AdGuardService) fiber.Handler {
 }
 
 // AdGuardDNSModeHandler handles GET /api/v1/adguard/dns-mode.
-func AdGuardDNSModeHandler(adguardSvc *services.AdGuardService, captiveSvc *services.CaptiveService) fiber.Handler {
+func AdGuardDNSModeHandler(adguardSvc *uplink.AdGuardService, captiveSvc *uplink.CaptiveService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		dnsBypassed := captiveSvc.IsDNSBypassed()
 		mode := adguardSvc.GetDNSMode(dnsBypassed)

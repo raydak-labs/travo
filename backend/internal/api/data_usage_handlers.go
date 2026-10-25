@@ -4,11 +4,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
-	"github.com/openwrt-travel-gui/backend/internal/services"
+	"github.com/openwrt-travel-gui/backend/internal/network"
 )
 
 // GetDataUsageHandler returns current usage per interface from vnstat.
-func GetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
+func GetDataUsageHandler(svc *network.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		status, err := svc.GetStatus()
 		if err != nil {
@@ -19,7 +19,7 @@ func GetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
 }
 
 // ResetDataUsageHandler resets vnstat counters for a single interface.
-func ResetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
+func ResetDataUsageHandler(svc *network.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
 			Interface string `json:"interface"`
@@ -35,7 +35,7 @@ func ResetDataUsageHandler(svc *services.DataUsageService) fiber.Handler {
 }
 
 // GetDataBudgetHandler returns the configured data budgets.
-func GetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
+func GetDataBudgetHandler(svc *network.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		cfg, err := svc.GetBudget()
 		if err != nil {
@@ -46,7 +46,7 @@ func GetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
 }
 
 // SetDataBudgetHandler writes the data budget configuration.
-func SetDataBudgetHandler(svc *services.DataUsageService) fiber.Handler {
+func SetDataBudgetHandler(svc *network.DataUsageService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var cfg models.DataBudgetConfig
 		if err := BindStrictBodyConfig(c, &cfg); err != nil {

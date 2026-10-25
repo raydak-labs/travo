@@ -1,0 +1,207 @@
+package network
+
+import (
+	"bufio"
+	"log/slog"
+	"os/exec"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/models"
+)
+
+// EventWatcher is implemented by NetworkEventWatcher (real) and NoopEventWatcher (mock/test).
+type EventWatcher interface {
+	Start()
+	Stop()
+	Ch() <-chan models.NetworkStatus
+}
+
+// subprocessRunner abstracts launching `iw event`. Replaced in tests by chanRunner.
+type subprocessRunner interface {
+	// Lines returns a channel of raw output lines.
+	// It closes the channel when the subprocess exits or stopCh is closed.
+	Lines(stopCh <-chan struct{}) <-chan string
+}
+
+// realRunner launches `iw event` and streams stdout lines.
+// `iw event` uses the kernel NL80211 interface and fires immediately when a
+// WiFi station associates or disassociates ("new station" / "del station").
+// `ubus listen` does NOT capture these events on OpenWrt because hostapd uses
+// ubus_notify() (subscriber model), not broadcast ubus_send_event().
+type realRunner struct{}
+
+func (r *realRunner) Lines(stopCh <-chan struct{}) <-chan string {
+	out := make(chan string)
+	go func() {
+		defer close(out)
+		// Deliberately not execx: `iw event` is a long-running listener whose
+		// lifetime is bounded by stopCh (killed below), not by a timeout.
+		cmd := exec.Command("iw", "event")
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return
+		}
+		if err := cmd.Start(); err != nil {
+			return
+		}
+		doneCh := make(chan struct{})
+		go func() {
+			defer close(doneCh)
+			scanner := bufio.NewScanner(stdout)
+			for scanner.Scan() {
+				select {
+				case out <- scanner.Text():
+				case <-stopCh:
+					return
+				}
+			}
+		}()
+		select {
+		case <-doneCh:
+		case <-stopCh:
+		}
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+	return out
+}
+
+// isWatched returns true for iw event lines that indicate a client or
+// interface state change worth re-snapshotting.
+func isWatched(line string) bool {
+	return strings.Contains(line, "new station") ||
+		strings.Contains(line, "del station") ||
+		strings.Contains(line, "connected") ||
+		strings.Contains(line, "disconnected") ||
+		strings.Contains(line, "join") ||
+		strings.Contains(line, "leave")
+}
+
+// NetworkEventWatcher watches ubus events and emits NetworkStatus snapshots on change.
+type NetworkEventWatcher struct {
+	networkSvc *NetworkService
+	runner     subprocessRunner
+	ch         chan models.NetworkStatus
+	stopCh     chan struct{}
+	started    atomic.Bool
+	stopOnce   sync.Once
+}
+
+func NewNetworkEventWatcher(networkSvc *NetworkService) *NetworkEventWatcher {
+	return newNetworkEventWatcherWithRunner(networkSvc, &realRunner{})
+}
+
+func newNetworkEventWatcherWithRunner(networkSvc *NetworkService, runner subprocessRunner) *NetworkEventWatcher {
+	return &NetworkEventWatcher{
+		networkSvc: networkSvc,
+		runner:     runner,
+		ch:         make(chan models.NetworkStatus, 1),
+		stopCh:     make(chan struct{}),
+	}
+}
+
+func (w *NetworkEventWatcher) Ch() <-chan models.NetworkStatus { return w.ch }
+
+// Stop is safe to call multiple times: the stop channel is closed exactly once.
+func (w *NetworkEventWatcher) Stop() {
+	w.stopOnce.Do(func() { close(w.stopCh) })
+}
+
+const pollInterval = 10 * time.Second
+
+func (w *NetworkEventWatcher) Start() {
+	// Start is normally driven from a tracked goroutine, but a double start
+	// (e.g. a retrying bootstrapper) would run two `iw event` loops and fight
+	// over the same channel. Second call returns immediately.
+	if !w.started.CompareAndSwap(false, true) {
+		return
+	}
+
+	// Emit an initial snapshot so the first WebSocket client gets data immediately.
+	w.emitSnapshot()
+
+	// Periodic ticker: guarantees updates even when iw event misses something.
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+
+	for {
+		gotLine := false
+		lines := w.runner.Lines(w.stopCh)
+		var debounce *time.Timer
+
+	loop:
+		for {
+			select {
+			case <-w.stopCh:
+				if debounce != nil {
+					debounce.Stop()
+				}
+				return
+			case <-ticker.C:
+				w.emitSnapshot()
+			case line, ok := <-lines:
+				if !ok {
+					break loop
+				}
+				gotLine = true
+				if !isWatched(line) {
+					continue
+				}
+				// Debounce: reset a 300 ms timer on every watched event.
+				if debounce != nil {
+					debounce.Stop()
+				}
+				debounce = time.AfterFunc(300*time.Millisecond, func() {
+					w.emitSnapshot()
+				})
+			}
+		}
+
+		slog.Info("network events: iw event exited, restarting", "backoff", backoff)
+		select {
+		case <-time.After(backoff):
+		case <-w.stopCh:
+			return
+		}
+		// Reset backoff only if the subprocess produced at least one line (healthy session).
+		if gotLine {
+			backoff = time.Second
+		} else {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+}
+
+func (w *NetworkEventWatcher) emitSnapshot() {
+	ns, err := w.networkSvc.GetNetworkStatus()
+	if err != nil {
+		slog.Warn("network events: reading network status", "err", err)
+		return
+	}
+	// Non-blocking send. If the hub hasn't consumed the previous value, overwrite it.
+	select {
+	case w.ch <- ns:
+	default:
+		select {
+		case <-w.ch:
+		default:
+		}
+		select {
+		case w.ch <- ns:
+		default:
+		}
+	}
+}
+
+// Compile-time interface checks.
+var _ EventWatcher = (*NetworkEventWatcher)(nil)
+var _ EventWatcher = (*NoopEventWatcher)(nil)

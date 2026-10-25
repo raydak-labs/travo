@@ -73,7 +73,7 @@ does not exist for that feature.
 | `/etc/trafo/autoreconnect-failcount` | same script | **not a guard**: the `MAX_FAIL=5` retry counter; never cleared by a redeploy |
 
 Non-guard state (aliases, WiFi priorities, repeater options, the bbolt store) lives in
-`/etc/travo/`. `internal/services/guards_test.go` fails if a guard-shaped path is declared there.
+`/etc/travo/`. `internal/docsgate/guards_test.go` fails if a guard-shaped path is declared there.
 
 ### 3. Related patterns
 
