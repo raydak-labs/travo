@@ -46,12 +46,12 @@ and on transactional `Update`. See
   bucket is **not** an error (`Get` returns `nil`, `ForEach` iterates nothing) — a
   fresh device and a bucket created by a later version must behave identically.
 - The file is **`<dir of AuthConfigPath>/travo.db`**
-  (`backend/cmd/server/main.go`). Production default:
+  (`backend/internal/app/app.go`). Production default:
   **`/etc/travo/travo.db`**, opened with mode `0600` and a **5 s open timeout** so a
   stale file lock from a hard kill cannot block startup forever. Deriving the path
   from `AuthConfigPath` is deliberate: a test with a temp auth path gets a temp
   store, with no second knob to keep in sync.
-- The handle is owned by `appLifecycle` and closed **last**, after the HTTP server
+- The handle is owned by `app.Lifecycle` and closed **last**, after the HTTP server
   has drained and after `statsHistory.Stop()` has flushed into it. Shutdown order is
   `app.ShutdownWithTimeout` → `lifecycle.Stop()` → `db.Close()`; in-flight handlers
   must never touch a closed handle.
@@ -132,7 +132,7 @@ accepted only for a device whose UI is the recovery path.
 ## References
 
 - `backend/internal/store/store.go` — the wrapper and its flash-write contract
-- `backend/cmd/server/main.go` — `store.Open`, memory-only fallback, lifecycle
+- `backend/internal/app/app.go` — `store.Open`, memory-only fallback, lifecycle
   ownership and shutdown order
 - `backend/internal/auth/blocklist.go` — `blocklist` bucket, hashing, retention
 - `backend/internal/system/stats_history.go` — `stats_history` bucket, `flushEvery`

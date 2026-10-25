@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -18,7 +19,7 @@ import (
 
 func TestHealthEndpoint(t *testing.T) {
 	// Arrange: create the app with routes
-	app := setupApp()
+	app := setupApp(t)
 
 	// Act: make a request to /api/health
 	req, err := http.NewRequest(http.MethodGet, "/api/health", nil)
@@ -56,7 +57,7 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestHealthEndpointMethod(t *testing.T) {
-	app := setupApp()
+	app := setupApp(t)
 
 	// POST to health should return 405
 	req, _ := http.NewRequest(http.MethodPost, "/api/health", nil)
@@ -86,7 +87,7 @@ func TestCatchAllDoesNotServeHTMLForAPIPaths(t *testing.T) {
 	// form left cfg.AuthConfigPath pointing at the production path
 	// /etc/travo/auth.json, so the test would read or write the real config.
 	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
-	app, lifecycle := setupAppWithConfig(cfg)
+	app, lifecycle := mustNew(t, cfg)
 	lifecycle.Stop()
 
 	// Login (mock mode password is "admin") to get past auth middleware.
@@ -151,7 +152,7 @@ func TestServerTimeoutsAreExplicit(t *testing.T) {
 	if idleTimeout > readTimeout {
 		t.Errorf("IdleTimeout (%v) should be shorter than ReadTimeout (%v)", idleTimeout, readTimeout)
 	}
-	if shutdownTimeout <= 0 {
+	if ShutdownTimeout <= 0 {
 		t.Error("shutdown must be bounded")
 	}
 }
@@ -220,7 +221,7 @@ func TestSameOriginRequestHasNoCORSHeaders(t *testing.T) {
 	// form left cfg.AuthConfigPath pointing at the production path
 	// /etc/travo/auth.json, so the test would read or write the real config.
 	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
-	app, lifecycle := setupAppWithConfig(cfg)
+	app, lifecycle := mustNew(t, cfg)
 	defer lifecycle.Stop()
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
@@ -245,7 +246,7 @@ func TestCrossOriginRequestIsNotAllowedByDefault(t *testing.T) {
 	// form left cfg.AuthConfigPath pointing at the production path
 	// /etc/travo/auth.json, so the test would read or write the real config.
 	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
-	app, lifecycle := setupAppWithConfig(cfg)
+	app, lifecycle := mustNew(t, cfg)
 	defer lifecycle.Stop()
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
@@ -271,7 +272,7 @@ func TestAppLifecycle_StopIsIdempotent(t *testing.T) {
 	// form left cfg.AuthConfigPath pointing at the production path
 	// /etc/travo/auth.json, so the test would read or write the real config.
 	cfg.AuthConfigPath = t.TempDir() + "/auth.json"
-	_, lifecycle := setupAppWithConfig(cfg)
+	_, lifecycle := mustNew(t, cfg)
 
 	done := make(chan struct{})
 	go func() {
@@ -289,7 +290,7 @@ func TestAppLifecycle_StopIsIdempotent(t *testing.T) {
 // Background goroutines must be stop-aware: on SIGTERM they must not wake up
 // later and commit UCI changes.
 func TestAppLifecycle_GoUnwindsOnStop(t *testing.T) {
-	l := newAppLifecycle()
+	l := newLifecycle()
 	var (
 		mu       sync.Mutex
 		finished bool
@@ -339,7 +340,7 @@ func TestAppLifecycle_GoUnwindsOnStop(t *testing.T) {
 // A regression that drops or reorders this middleware fails here and nowhere
 // else, which is the point: the gap was that no test observed the real wiring.
 func TestProductionAppRequiresAuthOnAPIRoutes(t *testing.T) {
-	app := setupApp()
+	app := setupApp(t)
 
 	// One representative route per shape: a plain GET, a parameterised path, and
 	// a mutating POST. Each must be rejected without a token.
@@ -383,7 +384,7 @@ func TestProductionAppRequiresAuthOnAPIRoutes(t *testing.T) {
 // broke in this branch's history — time-sync answered 401 while a group-scoped
 // middleware swallowed it.
 func TestProductionAppKeepsPublicEndpointsOpen(t *testing.T) {
-	app := setupApp()
+	app := setupApp(t)
 
 	t.Run("health", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
@@ -441,4 +442,24 @@ func TestProductionAppKeepsPublicEndpointsOpen(t *testing.T) {
 			t.Error("POST /api/v1/auth/login = 401: login cannot require its own token")
 		}
 	})
+}
+
+// setupApp builds the production app on a temp auth path with its background
+// goroutines already stopped.
+func setupApp(t *testing.T) *fiber.App {
+	t.Helper()
+	cfg := config.DefaultConfig()
+	cfg.AuthConfigPath = filepath.Join(t.TempDir(), "auth.json")
+	app, lifecycle := mustNew(t, cfg)
+	lifecycle.Stop()
+	return app
+}
+
+func mustNew(t *testing.T, cfg config.Config) (*fiber.App, *Lifecycle) {
+	t.Helper()
+	app, lifecycle, err := New(cfg, "")
+	if err != nil {
+		t.Fatalf("app.New: %v", err)
+	}
+	return app, lifecycle
 }
