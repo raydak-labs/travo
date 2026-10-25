@@ -133,6 +133,9 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   release or package updates are available. System → Updates links a new release to LuCI's
   Attended Sysupgrade and upgrades packages (apk or opkg) with a streamed log
   ([ADR 0006 §2](../adr/0006-application-platform-and-api-contract.md)).
+- **Travo version in the UI (2026-10-25):** the sidebar shows the running version, System →
+  System Information links it to its GitHub release (or a development build's commit), and the
+  update check reports a newer Travo release next to OpenWrt and packages.
 
 ## Frontend Toolchain
 

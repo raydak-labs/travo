@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusPill } from '@/components/ui/status-pill';
 import { StreamLogDialog } from '@/components/stream-log-dialog';
 import { useCheckUpdates, useRefreshUpdates, useUpdates } from '@/hooks/use-updates';
-import { luciUpgradeUrl } from '@/lib/updates';
+import { formatTravoVersion, luciUpgradeUrl, travoVersionUrl } from '@/lib/updates';
 
 /** Anchor the header's update indicator links to. */
 export const UPDATES_ANCHOR = 'updates';
@@ -20,9 +20,10 @@ const UPGRADE_WARNING =
   'Some upgrades (kernel modules, the WiFi driver) only take full effect after a reboot.';
 
 /**
- * OpenWrt releases and package updates from the router's last check. A new
- * release is flashed in LuCI (Attended Sysupgrade keeps the packages);
- * packages are upgraded here, streaming the package manager's output.
+ * Travo and OpenWrt releases and package updates from the router's last
+ * check. A Travo release links to its notes; an OpenWrt release is flashed in
+ * LuCI (Attended Sysupgrade keeps the packages); packages are upgraded here,
+ * streaming the package manager's output.
  */
 export function SystemUpdatesCard() {
   const updates = useUpdates();
@@ -75,6 +76,43 @@ export function SystemUpdatesCard() {
                 <p className="text-sm text-[var(--status-warn-text)]">
                   Part of the last check failed: {st.errors.join('; ')}
                 </p>
+              )}
+
+              {st?.travo && (
+                <CardInset variant="muted" className="space-y-2">
+                  {st.travo.latest ? (
+                    <>
+                      <StatusPill tone="info">Travo {st.travo.latest} available</StatusPill>
+                      <p className="text-sm">
+                        This router runs Travo {formatTravoVersion(st.travo.current)}. The release
+                        notes say what changed and how to upgrade.
+                      </p>
+                      <Button size="sm" variant="outline" asChild>
+                        <a
+                          href={st.travo.release_url || travoVersionUrl(st.travo.latest)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Release notes
+                        </a>
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm">
+                      Travo{' '}
+                      <a
+                        href={travoVersionUrl(st.travo.current)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {formatTravoVersion(st.travo.current)}
+                      </a>{' '}
+                      has no newer release.
+                    </p>
+                  )}
+                </CardInset>
               )}
 
               <CardInset variant="muted" className="space-y-2">

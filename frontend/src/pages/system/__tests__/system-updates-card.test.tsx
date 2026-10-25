@@ -18,6 +18,15 @@ function renderCard() {
 }
 
 describe('SystemUpdatesCard', () => {
+  it('links a new Travo release to its notes', async () => {
+    renderCard();
+    expect(await screen.findByText('Travo 0.10.0 available')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /release notes/i })).toHaveAttribute(
+      'href',
+      'https://github.com/raydak-labs/travo/releases/tag/v0.10.0',
+    );
+  });
+
   it('sends a new OpenWrt release to LuCI', async () => {
     renderCard();
     expect(await screen.findByText('OpenWrt 23.05.6 available')).toBeInTheDocument();

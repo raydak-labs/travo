@@ -76,13 +76,58 @@ func (f *fakeUpgrader) UpgradeStream(pkgs []string, logFn func(string)) error {
 	return nil
 }
 
+// A trimmed api.github.com/repos/raydak-labs/travo/releases/latest answer.
+const latestRelease = `{"tag_name":"v0.10.0","name":"v0.10.0",
+"html_url":"https://github.com/raydak-labs/travo/releases/tag/v0.10.0","draft":false}`
+
 func newTestUpdates(t *testing.T, pkg PackageManager, feedErr error) *UpdateService {
 	t.Helper()
-	u := NewUpdateService(pkg,
-		func() (string, error) { return "25.12.3", nil },
-		func() ([]byte, error) { return []byte(versionsFeed), feedErr })
+	u := NewUpdateService(UpdateDeps{
+		Packages:        pkg,
+		FirmwareVersion: func() (string, error) { return "25.12.3", nil },
+		ReleaseFeed:     func() ([]byte, error) { return []byte(versionsFeed), feedErr },
+		TravoVersion:    "0.9.0",
+		TravoRelease:    func() ([]byte, error) { return []byte(latestRelease), nil },
+	})
 	u.guardDir = t.TempDir()
 	return u
+}
+
+func TestNewerTravo(t *testing.T) {
+	for _, tc := range []struct {
+		current string
+		newer   bool
+	}{
+		{"0.9.0", true},
+		{"0.10.0", false},                   // up to date
+		{"0.11.0", false},                   // ahead of the release
+		{"v0.9.0-3-g2705c43-dirty", true},   // a dev build is its last tag
+		{"v0.10.0-3-g2705c43-dirty", false}, // a dev build after the release
+		{"dev", false},                      // a build without a tag compares with nothing
+	} {
+		latest, url, err := newerTravo(tc.current, []byte(latestRelease))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.current, err)
+		}
+		if got := latest != ""; got != tc.newer {
+			t.Errorf("%s: latest %q, want newer=%v", tc.current, latest, tc.newer)
+		}
+		if tc.newer && (latest != "0.10.0" || url != "https://github.com/raydak-labs/travo/releases/tag/v0.10.0") {
+			t.Errorf("%s: got %q %q", tc.current, latest, url)
+		}
+	}
+}
+
+func TestCheckReportsANewerTravo(t *testing.T) {
+	u := newTestUpdates(t, &fakeUpgrader{}, nil)
+	st := u.Check()
+	if st.Travo.Current != "0.9.0" || st.Travo.Latest != "0.10.0" || st.Travo.ReleaseURL == "" {
+		t.Errorf("travo = %+v", st.Travo)
+	}
+	// The running version is known before any check, for the sidebar.
+	if got := newTestUpdates(t, &fakeUpgrader{}, nil).Status().Travo.Current; got != "0.9.0" {
+		t.Errorf("status before a check reports %q", got)
+	}
 }
 
 func TestCheckReportsFirmwareAndPackages(t *testing.T) {

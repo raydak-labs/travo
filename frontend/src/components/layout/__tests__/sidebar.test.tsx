@@ -15,6 +15,7 @@ import { AppShell } from '../app-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useServices } from '@/hooks/use-services';
 import { useUpdates } from '@/hooks/use-updates';
+import { useSystemInfo } from '@/hooks/use-system';
 import { useSpeedtestServiceStatus } from '@/hooks/use-speedtest';
 
 vi.mock('@/hooks/use-mobile', () => ({
@@ -122,6 +123,10 @@ describe('Sidebar', () => {
   beforeEach(() => {
     mockUseIsMobile.mockReturnValue(false);
     vi.mocked(useUpdates).mockReturnValue({ data: undefined } as ReturnType<typeof useUpdates>);
+    vi.mocked(useSystemInfo).mockReturnValue({
+      data: null,
+      isError: false,
+    } as unknown as ReturnType<typeof useSystemInfo>);
     mockUseServices.mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -140,6 +145,7 @@ describe('Sidebar', () => {
   it('marks System while updates are available', async () => {
     vi.mocked(useUpdates).mockReturnValue({
       data: {
+        travo: { current: '0.9.0' },
         firmware: {
           current: '25.12.3',
           latest: '25.12.6',
@@ -153,6 +159,19 @@ describe('Sidebar', () => {
     } as unknown as ReturnType<typeof useUpdates>);
     renderSidebar();
     expect(await screen.findByText('Updates available: OpenWrt 25.12.6')).toBeInTheDocument();
+  });
+
+  it('shows the Travo version, linked to its release', async () => {
+    vi.mocked(useSystemInfo).mockReturnValue({
+      data: { travo_version: '0.9.0' },
+      isError: false,
+    } as unknown as ReturnType<typeof useSystemInfo>);
+    renderSidebar();
+    const link = await screen.findByRole('link', { name: 'Travo v0.9.0' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://github.com/raydak-labs/travo/releases/tag/v0.9.0',
+    );
   });
 
   it('renders category groups and leaf routes', async () => {

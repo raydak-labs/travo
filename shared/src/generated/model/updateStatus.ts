@@ -7,10 +7,12 @@
  */
 import type { FirmwareUpdate } from './firmwareUpdate';
 import type { PackageUpdates } from './packageUpdates';
+import type { TravoUpdate } from './travoUpdate';
 
 export interface UpdateStatus {
   checked_at: string;
   errors: string[];
   firmware: FirmwareUpdate;
   packages: PackageUpdates;
+  travo: TravoUpdate;
 }

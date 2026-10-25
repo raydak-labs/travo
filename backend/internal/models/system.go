@@ -7,6 +7,9 @@ type SystemInfo struct {
 	FirmwareVersion string `json:"firmware_version"`
 	KernelVersion   string `json:"kernel_version"`
 	UptimeSeconds   int64  `json:"uptime_seconds"`
+	// TravoVersion is this build's version: "0.9.0" for a release, the git
+	// description for a development build.
+	TravoVersion string `json:"travo_version"`
 }
 
 // SetHostnameRequest is the payload for changing the device hostname.

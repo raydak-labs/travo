@@ -16,6 +16,7 @@ export const mockSystemInfo: SystemInfo = {
   firmware_version: 'OpenWrt 23.05.3',
   kernel_version: '5.15.150',
   uptime_seconds: 86432,
+  travo_version: '0.9.0',
 };
 export const mockSystemStats: SystemStats = {
   cpu: {
@@ -101,6 +102,11 @@ export const mockNTPConfig: NTPConfig = {
 };
 
 export const mockUpdateStatus: UpdateStatus = {
+  travo: {
+    current: '0.9.0',
+    latest: '0.10.0',
+    release_url: 'https://github.com/raydak-labs/travo/releases/tag/v0.10.0',
+  },
   firmware: { current: '23.05.3', latest: '23.05.6', kind: 'patch', attended_sysupgrade: true },
   packages: {
     manager: 'apk',

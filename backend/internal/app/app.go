@@ -206,10 +206,18 @@ func (l *Lifecycle) Stop() {
 	})
 }
 
-// New wires every service and route into a Fiber application. buildTime is
-// the RFC3339 build stamp (may be empty), the floor of a plausible clock for
-// the time-sync gate. The returned Lifecycle owns every background goroutine.
-func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
+// Build identifies the binary, from main's ldflags-stamped variables.
+type Build struct {
+	// Version is "0.9.0" for a release, the git description otherwise.
+	Version string
+	// Time is the RFC 3339 build stamp (may be empty), the floor of a
+	// plausible clock for the time-sync gate.
+	Time string
+}
+
+// New wires every service and route into a Fiber application. The returned
+// Lifecycle owns every background goroutine.
+func New(cfg config.Config, build Build) (*fiber.App, *Lifecycle, error) {
 	lifecycle := newLifecycle()
 
 	app := fiber.New(fiber.Config{
@@ -315,6 +323,7 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 	}
 
 	systemSvc := system.New(ub, u, storage)
+	systemSvc.SetTravoVersion(build.Version)
 	if cfg.MockMode {
 		systemSvc.SetLogTail(system.MockLogTail)
 	} else {
@@ -354,12 +363,13 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 		info, err := systemSvc.GetSystemInfo()
 		return info.FirmwareVersion, err
 	}
-	var updateSvc *system.UpdateService
+	updateDeps := system.UpdateDeps{FirmwareVersion: runningVersion, TravoVersion: build.Version}
 	if cfg.MockMode {
-		updateSvc = system.NewUpdateService(system.NewMockPackageManager(), runningVersion, system.MockVersionsFeed)
-	} else {
-		updateSvc = system.NewUpdateService(nil, runningVersion, nil)
+		updateDeps.Packages = system.NewMockPackageManager()
+		updateDeps.ReleaseFeed = system.MockVersionsFeed
+		updateDeps.TravoRelease = system.MockTravoRelease
 	}
+	updateSvc := system.NewUpdateService(updateDeps)
 	startUpdateChecks(lifecycle, updateSvc)
 	captiveSvc := uplink.NewCaptiveService(uplink.CaptiveDeps{Prober: captiveProber, UCI: u, Cmd: &platform.RealCommandRunner{}})
 	captiveSvc.StartAutoRestore()
@@ -462,9 +472,9 @@ func New(cfg config.Config, buildTime string) (*fiber.App, *Lifecycle, error) {
 		Speedtest:      system.NewSpeedtestService(nil),
 		Updates:        updateSvc,
 
-		TimeSyncMinPlausible: minPlausibleTime(buildTime),
+		TimeSyncMinPlausible: minPlausibleTime(build.Time),
 		TimeSyncLimiter:      timeSyncLimiter,
-		TimeSyncGate:         api.NewTimeSyncGate(!time.Now().Before(minPlausibleTime(buildTime))),
+		TimeSyncGate:         api.NewTimeSyncGate(!time.Now().Before(minPlausibleTime(build.Time))),
 	}
 	api.SetupRoutes(app, deps)
 

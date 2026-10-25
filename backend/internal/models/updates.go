@@ -2,6 +2,7 @@ package models
 
 // UpdateStatus is the result of the last update check.
 type UpdateStatus struct {
+	Travo    TravoUpdate    `json:"travo"`
 	Firmware FirmwareUpdate `json:"firmware"`
 	Packages PackageUpdates `json:"packages"`
 	// CheckedAt is RFC 3339; empty until the first check has run.
@@ -9,6 +10,16 @@ type UpdateStatus struct {
 	// Errors lists the parts of the last check that failed (no internet,
 	// index refresh); the other parts still report.
 	Errors []string `json:"errors"`
+}
+
+// TravoUpdate compares the running Travo with its latest GitHub release.
+type TravoUpdate struct {
+	// Current is the build's version: "0.9.0" for a release, the git
+	// description ("v0.9.0-3-g2705c43-dirty") for a development build.
+	Current string `json:"current"`
+	// Latest and ReleaseURL are set only when a newer release exists.
+	Latest     string `json:"latest,omitempty"`
+	ReleaseURL string `json:"release_url,omitempty"`
 }
 
 // FirmwareUpdate compares the running OpenWrt release with the published ones.

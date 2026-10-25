@@ -137,6 +137,7 @@ export * from './timeSyncResult';
 export * from './timezoneConfig';
 export * from './trafficHistoryPoint';
 export * from './trafficHistoryResponse';
+export * from './travoUpdate';
 export * from './updateStatus';
 export * from './upgradeFirmwareBody';
 export * from './uptimeEvent';

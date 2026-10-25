@@ -10,7 +10,8 @@ import { useSidebarGroups } from '@/components/layout/use-sidebar-groups';
 import { useServices } from '@/hooks/use-services';
 import { useSpeedtestServiceStatus } from '@/hooks/use-speedtest';
 import { useUpdates } from '@/hooks/use-updates';
-import { summarizeUpdates } from '@/lib/updates';
+import { formatTravoVersion, summarizeUpdates, travoVersionUrl } from '@/lib/updates';
+import { useSystemInfo } from '@/hooks/use-system';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
   const servicesQuery = useServices();
   const speedtestQuery = useSpeedtestServiceStatus();
   const updates = summarizeUpdates(useUpdates().data);
+  const travoVersion = useSystemInfo().data?.travo_version;
   const services = servicesQuery.data;
   const hasService = (id: string) =>
     services?.some((service) => service.id === id && service.state !== 'not_installed') ?? false;
@@ -153,6 +155,19 @@ export function Sidebar({ collapsed, onToggle, onNavClick, className }: SidebarP
           </>
         )}
       </nav>
+      {/* The running version, small and out of the way; the System page has
+          the details. Hidden on the icon rail, where it cannot fit. */}
+      {!collapsedRail && travoVersion && (
+        <a
+          href={travoVersionUrl(travoVersion)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="This Travo version on GitHub"
+          className="block truncate border-t border-gray-200 px-4 py-2 text-[11px] text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-white/10 dark:text-gray-400 dark:hover:text-gray-200"
+        >
+          Travo {formatTravoVersion(travoVersion)}
+        </a>
+      )}
     </aside>
   );
 }

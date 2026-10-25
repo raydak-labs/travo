@@ -20,6 +20,9 @@ import (
 // versionsFeedURL lists every OpenWrt release and names the stable one.
 const versionsFeedURL = "https://downloads.openwrt.org/.versions.json"
 
+// travoReleaseURL is the newest published Travo release.
+const travoReleaseURL = "https://api.github.com/repos/raydak-labs/travo/releases/latest"
+
 // attendedSysupgradeMenu exists when luci-app-attendedsysupgrade is installed.
 const attendedSysupgradeMenu = "/usr/share/luci/menu.d/luci-app-attendedsysupgrade.json"
 
@@ -28,9 +31,11 @@ const attendedSysupgradeMenu = "/usr/share/luci/menu.d/luci-app-attendedsysupgra
 // release feed, the package index), so it runs in the background and Status
 // serves the last result. Flashing a new release stays with LuCI.
 type UpdateService struct {
-	pkg     PackageManager
-	version func() (string, error)
-	feed    func() ([]byte, error)
+	pkg          PackageManager
+	version      func() (string, error)
+	feed         func() ([]byte, error)
+	travoVersion string
+	travoRelease func() ([]byte, error)
 	// guardDir overrides the crash-guard directory (tests).
 	guardDir string
 
@@ -41,19 +46,39 @@ type UpdateService struct {
 	opMu sync.Mutex
 }
 
-// NewUpdateService takes the package manager, a reader of the running
-// OpenWrt version, and the release feed; a nil package manager is the one the
-// device has, and a nil feed fetches versionsFeedURL.
-func NewUpdateService(pkg PackageManager, version func() (string, error), feed func() ([]byte, error)) *UpdateService {
-	if pkg == nil {
-		pkg = detectPackageManager()
+// UpdateDeps are the collaborators of an UpdateService.
+type UpdateDeps struct {
+	// Packages is the package manager; nil is the one the device has.
+	Packages PackageManager
+	// FirmwareVersion reads the running OpenWrt release.
+	FirmwareVersion func() (string, error)
+	// ReleaseFeed returns the OpenWrt release list; nil fetches versionsFeedURL.
+	ReleaseFeed func() ([]byte, error)
+	// TravoVersion is this build's version (main.Version).
+	TravoVersion string
+	// TravoRelease returns the latest Travo release; nil fetches travoReleaseURL.
+	TravoRelease func() ([]byte, error)
+}
+
+// NewUpdateService builds the service; Status reports the running Travo
+// version before the first check.
+func NewUpdateService(d UpdateDeps) *UpdateService {
+	if d.Packages == nil {
+		d.Packages = detectPackageManager()
 	}
-	if feed == nil {
-		feed = fetchVersionsFeed
+	if d.ReleaseFeed == nil {
+		d.ReleaseFeed = func() ([]byte, error) { return fetchJSON(versionsFeedURL) }
 	}
-	u := &UpdateService{pkg: pkg, version: version, feed: feed}
+	if d.TravoRelease == nil {
+		d.TravoRelease = func() ([]byte, error) { return fetchJSON(travoReleaseURL) }
+	}
+	u := &UpdateService{
+		pkg: d.Packages, version: d.FirmwareVersion, feed: d.ReleaseFeed,
+		travoVersion: d.TravoVersion, travoRelease: d.TravoRelease,
+	}
 	u.status = models.UpdateStatus{
-		Packages: models.PackageUpdates{Manager: pkg.Name()},
+		Travo:    models.TravoUpdate{Current: d.TravoVersion},
+		Packages: models.PackageUpdates{Manager: d.Packages.Name()},
 		Errors:   []string{},
 	}
 	return u
@@ -78,9 +103,15 @@ func (u *UpdateService) Check() models.UpdateStatus {
 	defer u.opMu.Unlock()
 
 	st := models.UpdateStatus{
+		Travo:    models.TravoUpdate{Current: u.travoVersion},
 		Firmware: models.FirmwareUpdate{AttendedSysupgrade: fileExists(attendedSysupgradeMenu)},
 		Packages: models.PackageUpdates{Manager: u.pkg.Name()},
 		Errors:   []string{},
+	}
+	if body, err := u.travoRelease(); err != nil {
+		st.Errors = append(st.Errors, "fetching the latest Travo release: "+err.Error())
+	} else if st.Travo.Latest, st.Travo.ReleaseURL, err = newerTravo(u.travoVersion, body); err != nil {
+		st.Errors = append(st.Errors, "reading the latest Travo release: "+err.Error())
 	}
 	if current, err := u.version(); err != nil {
 		st.Errors = append(st.Errors, "reading the OpenWrt version: "+err.Error())
@@ -184,6 +215,55 @@ func newestFirmware(current string, feed []byte) (latest, kind string, err error
 	return "", "", nil
 }
 
+// newerTravo returns the latest release's version and page when it is newer
+// than current. A development build ("v0.9.0-3-g2705c43-dirty") counts as
+// its last tag; a build without one ("dev") is never offered an update.
+func newerTravo(current string, body []byte) (latest, url string, err error) {
+	var r struct {
+		Tag string `json:"tag_name"`
+		URL string `json:"html_url"`
+	}
+	if err := json.Unmarshal(body, &r); err != nil {
+		return "", "", err
+	}
+	cur, ok := parseSemver(current)
+	if !ok {
+		return "", "", nil
+	}
+	if next, ok := parseSemver(r.Tag); ok && semverLess(cur, next) {
+		return strings.TrimPrefix(r.Tag, "v"), r.URL, nil
+	}
+	return "", "", nil
+}
+
+// parseSemver reads major.minor.patch, ignoring a leading "v" and anything
+// after the first "-" (a git description or a pre-release suffix).
+func parseSemver(v string) ([3]int, bool) {
+	base, _, _ := strings.Cut(strings.TrimPrefix(v, "v"), "-")
+	parts := strings.Split(base, ".")
+	if len(parts) != 3 {
+		return [3]int{}, false
+	}
+	var out [3]int
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return [3]int{}, false
+		}
+		out[i] = n
+	}
+	return out, true
+}
+
+func semverLess(a, b [3]int) bool {
+	for i := range a {
+		if a[i] != b[i] {
+			return a[i] < b[i]
+		}
+	}
+	return false
+}
+
 // release is a parsed OpenWrt version such as 25.12.3 or 25.12.0-rc1.
 type release struct{ major, minor, patch, rc int }
 
@@ -228,15 +308,15 @@ func (r release) less(o release) bool {
 	return r.rc != 0 && (o.rc == 0 || r.rc < o.rc)
 }
 
-func fetchVersionsFeed() ([]byte, error) {
+func fetchJSON(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(versionsFeedURL)
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %s", versionsFeedURL, resp.Status)
+		return nil, fmt.Errorf("%s: %s", url, resp.Status)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 }
