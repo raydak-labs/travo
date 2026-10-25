@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -201,13 +201,13 @@ func (a *AuthService) persistSealedLogin(password string) {
 		return
 	}
 	if err := SaveSealedRPCDPassword(a.authConfigPath, string(a.jwtSecret), password); err != nil {
-		log.Printf("WARNING: could not persist rpcd-login seal: %v", err)
+		slog.Warn("could not persist rpcd-login seal", "err", err)
 	}
 	// The generated wireless toggle helper runs from cron/hotplug with no
 	// travo process to ask, so it needs the plaintext on disk to be able to
 	// log in to rpcd. Written here, next to the seal, so the two cannot drift.
 	if err := SaveRPCDLoginHelper(a.authConfigPath, password); err != nil {
-		log.Printf("WARNING: could not persist rpcd-login helper file: %v", err)
+		slog.Warn("could not persist rpcd-login helper file", "err", err)
 	}
 }
 

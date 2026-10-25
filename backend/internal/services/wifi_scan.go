@@ -114,22 +114,11 @@ func parseScanResultItem(rm map[string]any, bandOverride string) models.WifiScan
 	}
 	if band == "" {
 		freq, _ := rm["frequency"].(float64)
-		if freq > 0 {
-			if freq < 3000 {
-				band = "2.4GHz"
-			} else if freq < 6000 {
-				band = "5GHz"
-			} else {
-				band = "6GHz"
-			}
-		} else if ch > 0 {
-			if ch <= 14 {
-				band = "2.4GHz"
-			} else if ch <= 177 {
-				band = "5GHz"
-			} else {
-				band = "6GHz"
-			}
+		switch {
+		case freq > 0:
+			band = bandForFrequency(freq)
+		case ch > 0:
+			band = bandForChannel(ch)
 		}
 	}
 
@@ -332,4 +321,26 @@ func (w *WifiService) SwitchSTAToRadio(targetRadio string) error {
 		return nil, w.applyWireless()
 	})
 	return err
+}
+
+func bandForFrequency(mhz float64) string {
+	switch {
+	case mhz < 3000:
+		return "2.4GHz"
+	case mhz < 6000:
+		return "5GHz"
+	default:
+		return "6GHz"
+	}
+}
+
+func bandForChannel(ch float64) string {
+	switch {
+	case ch <= 14:
+		return "2.4GHz"
+	case ch <= 177:
+		return "5GHz"
+	default:
+		return "6GHz"
+	}
 }

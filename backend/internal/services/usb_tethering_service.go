@@ -1,11 +1,12 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -126,7 +127,7 @@ func NewUSBTetheringServiceWithRunner(r USBTetherRunner) *USBTetheringService {
 func (s *USBTetheringService) abort(err error) error {
 	for _, cfg := range usbTetherConfigs {
 		if _, revertErr := s.runner.RunCommand("uci", "revert", cfg); revertErr != nil {
-			log.Printf("usbtether: uci revert %s after failed change: %v", cfg, revertErr)
+			slog.Warn("usbtether: uci revert after failed change", "config", cfg, "err", revertErr)
 		}
 	}
 	return err

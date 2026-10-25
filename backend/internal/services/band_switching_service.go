@@ -1,12 +1,13 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -141,11 +142,11 @@ func (b *BandSwitchingService) loadConfig() error {
 	}
 	var cfg BandSwitchConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		log.Printf("band-switching: %s is not valid JSON (%v); keeping defaults", b.configFile, err)
+		slog.Warn("band-switching: config is not valid JSON; keeping defaults", "path", b.configFile, "err", err)
 		return nil
 	}
 	if err := ValidateBandSwitchConfig(cfg); err != nil {
-		log.Printf("band-switching: %s is invalid (%v); keeping the default config", b.configFile, err)
+		slog.Warn("band-switching: config is invalid; keeping defaults", "path", b.configFile, "err", err)
 		return nil
 	}
 	b.mu.Lock()
@@ -185,7 +186,7 @@ func (b *BandSwitchingService) checkInterval() time.Duration {
 func (b *BandSwitchingService) Start() {
 	// Safety: if a crash guard exists from a previous run, log and skip automatic switching.
 	if b.crashGuard.Present() {
-		log.Printf("band-switching: crash guard found at %s — skipping auto switch; remove manually to re-enable", b.crashGuard.Path())
+		slog.Warn("band-switching: crash guard found; automatic switching disabled until it is removed", "guard", b.crashGuard.Path())
 	}
 
 	go func() {
@@ -415,7 +416,7 @@ func (b *BandSwitchingService) refreshBlocked() {
 		b.status.State = "monitoring"
 	}
 	b.mu.Unlock()
-	log.Printf("band-switching: %s can host the uplink again; no longer blocked", radio)
+	slog.Info("band-switching: radio can host the uplink again", "radio", radio)
 }
 
 // switchBlocked reports whether the uplink still cannot move to targetRadio:
@@ -457,7 +458,7 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 	if err == nil {
 		_ = b.crashGuard.Clear()
 		b.setBlocked("", "")
-		log.Printf("band-switching: %s", reason)
+		slog.Info("band-switching: switched", "reason", reason)
 		b.mu.Lock()
 		b.status.LastSwitchAt = time.Now().UTC().Format(time.RFC3339)
 		b.status.LastSwitchReason = reason
@@ -478,14 +479,13 @@ func (b *BandSwitchingService) doSwitch(targetRadio, reason string) error {
 		// operator can see is stuck and one that silently never fires.
 		_ = b.crashGuard.Clear()
 		b.setBlocked(err.Error(), targetRadio)
-		log.Printf("band-switching: switch to %s blocked: %v — "+
-			"automatic band switching cannot make room on that radio", targetRadio, err)
+		slog.Warn("band-switching: switch blocked; no room on the target radio", "radio", targetRadio, "err", err)
 		b.mu.Lock()
 		b.status.LastSwitchReason = err.Error()
 		b.mu.Unlock()
 		return err
 	}
-	log.Printf("band-switching: switch failed: %v — guard file left in place", err)
+	slog.Error("band-switching: switch failed; crash guard kept", "err", err)
 	return err
 }
 

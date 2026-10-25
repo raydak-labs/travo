@@ -3931,8 +3931,8 @@ func TestWirelessMutatorsDoNotDeadlock(t *testing.T) {
 // bug would be invisible to the deadlock test.
 //
 // A source grep is the right shape for this — a few lines, no parser. What
-// matters is that the string `lockUCIConfigs(` appears in exactly one non-test
-// file.
+// matters is that `lockUCIConfigs(` appears only where it is defined and used
+// by mutateUCI (uci_locks.go) and by mutateWireless (wifi_service.go).
 func TestOnlyMutateWirelessTakesUCIConfigLocks(t *testing.T) {
 	t.Parallel()
 
@@ -3952,16 +3952,14 @@ func TestOnlyMutateWirelessTakesUCIConfigLocks(t *testing.T) {
 		if !bytes.Contains(src, []byte("lockUCIConfigs(")) {
 			continue
 		}
-		// mutateWireless is the only WifiService mutator; the other services go
-		// through mutateUCI, which lives here too.
-		if path != "wifi_service.go" {
+		if path != "uci_locks.go" && path != "wifi_service.go" {
 			t.Errorf("%s calls lockUCIConfigs directly; only mutateWireless/mutateUCI may, "+
 				"so the lock set and the revert set stay the same list", path)
 		}
 		matches++
 	}
-	if matches != 1 {
-		t.Errorf("expected exactly one file to take UCI config locks (wifi_service.go), found %d", matches)
+	if matches != 2 {
+		t.Errorf("expected exactly uci_locks.go and wifi_service.go to take UCI config locks, found %d files", matches)
 	}
 }
 
@@ -4190,7 +4188,7 @@ func TestRadioForNewSTAIsDeterministic(t *testing.T) {
 	}
 
 	// Repeat: the choice must not move between calls on identical input.
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		again, err := svc.radioForNewSTA(sections)
 		if err != nil {
 			t.Fatalf("radioForNewSTA call %d: %v", i, err)

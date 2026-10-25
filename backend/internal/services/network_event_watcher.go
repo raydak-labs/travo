@@ -2,7 +2,7 @@ package services
 
 import (
 	"bufio"
-	"log"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"sync"
@@ -17,40 +17,6 @@ type EventWatcher interface {
 	Start()
 	Stop()
 	Ch() <-chan models.NetworkStatus
-}
-
-// NoopEventWatcher satisfies EventWatcher but never emits anything.
-// Used in mock mode and tests.
-type NoopEventWatcher struct {
-	ch       chan models.NetworkStatus
-	stopCh   chan struct{}
-	started  atomic.Bool
-	stopOnce sync.Once
-}
-
-func NewNoopEventWatcher() *NoopEventWatcher {
-	return &NoopEventWatcher{
-		ch:     make(chan models.NetworkStatus),
-		stopCh: make(chan struct{}),
-	}
-}
-
-// Start blocks until Stop is called. A second call returns immediately instead
-// of spawning a second loop.
-func (w *NoopEventWatcher) Start() {
-	if !w.started.CompareAndSwap(false, true) {
-		return
-	}
-	<-w.stopCh
-}
-
-// Stop is safe to call multiple times.
-func (w *NoopEventWatcher) Stop() {
-	w.stopOnce.Do(func() { close(w.stopCh) })
-}
-
-func (w *NoopEventWatcher) Ch() <-chan models.NetworkStatus {
-	return w.ch
 }
 
 // subprocessRunner abstracts launching `iw event`. Replaced in tests by chanRunner.
@@ -197,7 +163,7 @@ func (w *NetworkEventWatcher) Start() {
 			}
 		}
 
-		log.Printf("NetworkEventWatcher: iw event exited, restarting in %s", backoff)
+		slog.Info("network events: iw event exited, restarting", "backoff", backoff)
 		select {
 		case <-time.After(backoff):
 		case <-w.stopCh:
@@ -218,7 +184,7 @@ func (w *NetworkEventWatcher) Start() {
 func (w *NetworkEventWatcher) emitSnapshot() {
 	ns, err := w.networkSvc.GetNetworkStatus()
 	if err != nil {
-		log.Printf("NetworkEventWatcher: GetNetworkStatus error: %v", err)
+		slog.Warn("network events: reading network status", "err", err)
 		return
 	}
 	// Non-blocking send. If the hub hasn't consumed the previous value, overwrite it.

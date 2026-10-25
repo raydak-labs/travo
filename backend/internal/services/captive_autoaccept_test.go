@@ -4,6 +4,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"errors"
+	"net/http"
 	"net/url"
 	"os"
 	"testing"
@@ -101,7 +102,7 @@ func TestExtractAllForms(t *testing.T) {
 	if f.Action != "http://gw.example/submit" {
 		t.Errorf("action = %q, want http://gw.example/submit", f.Action)
 	}
-	if f.Method != "POST" {
+	if f.Method != http.MethodPost {
 		t.Errorf("method = %q, want POST", f.Method)
 	}
 	if f.Values.Get("token") != "abc123" {

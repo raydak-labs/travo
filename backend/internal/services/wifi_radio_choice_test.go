@@ -21,7 +21,7 @@ import (
 func TestEnsureSTASectionForScan_ChoosesTheSameRadioEveryTime(t *testing.T) {
 	svc, u := newTestWifiService()
 	seen := map[string]int{}
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		if err := u.DeleteSection("wireless", "sta0"); err != nil {
 			t.Fatalf("deleting sta0: %v", err)
 		}
@@ -185,7 +185,7 @@ func TestSwitchSTAToRadio_SucceedsWhenTheTargetRadioHasNoEnabledAP(t *testing.T)
 // switcher above all — makes the same choice on every tick.
 func TestGetRadios_ReturnsRadiosInAStableOrder(t *testing.T) {
 	svc, _ := newTestWifiService()
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		radios, err := svc.GetRadios()
 		if err != nil {
 			t.Fatalf("GetRadios: %v", err)
@@ -202,7 +202,7 @@ func TestGetRadios_ReturnsRadiosInAStableOrder(t *testing.T) {
 
 func TestGetAPConfigs_ReturnsSectionsInAStableOrder(t *testing.T) {
 	svc, _ := newTestWifiService()
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		configs, err := svc.GetAPConfigs()
 		if err != nil {
 			t.Fatalf("GetAPConfigs: %v", err)
@@ -230,7 +230,7 @@ func TestBandSwitching_PicksTheSameRadioOnEveryTick(t *testing.T) {
 	}
 	b := NewBandSwitchingService(svc, filepath.Join(t.TempDir(), "band-switch.json"))
 
-	for i := 0; i < 25; i++ {
+	for i := range 25 {
 		radios := b.getRadios()
 		if got := b.findRadioByBand(radios, "2g"); got != "radio0" {
 			t.Fatalf("tick %d: expected radio0 for band 2g, got %q", i, got)

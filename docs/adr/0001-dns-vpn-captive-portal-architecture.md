@@ -315,7 +315,7 @@ new callers must not widen the condition.
   implementation rather than the older per-feature snapshots it replaced.
 - **Drift gate**: `TestDnsResolverStatePathsAreNamedInAdr0001` and
   `TestEtcTrafoStatePathsAreNamedInAnAdr` in
-  `backend/internal/services/dns_docs_test.go` derive the persistent paths from the
+  `backend/internal/docsgate/dns_docs_test.go` derive the persistent paths from the
   services package and fail when this ADR (or any ADR, for `/etc/trafo`) stops naming
   them. Adding a DNS state path without documenting it here is therefore a red test.
 
@@ -363,7 +363,7 @@ new callers must not widen the condition.
 - `backend/internal/services/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
 - `backend/internal/services/network_dns.go` — WAN custom DNS (`SetDNSConfig`)
-- `backend/internal/services/dns_docs_test.go` — the drift gate that keeps the paths
+- `backend/internal/docsgate/dns_docs_test.go` — the drift gate that keeps the paths
   above and this ADR in agreement
 - `docs/adr/0003-crash-guards-and-live-state.md` — guard directory contract (§2)
 - `docs/adr/0010-uci-write-serialisation-and-request-contracts.md` — the `dhcp` lock

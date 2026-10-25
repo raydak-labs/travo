@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -105,7 +105,7 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 		defer func() {
 			if guardStays {
 				// The apply did not complete; leave the guard for recovery.
-				log.Printf("WARNING: %s MAC change incomplete, crash guard kept at %s", macGuardFeature, w.crashGuard(macGuardFeature).Path())
+				slog.Warn("wifi: MAC change incomplete; crash guard kept", "guard", w.crashGuard(macGuardFeature).Path())
 			}
 		}()
 		if err := w.uci.Set("wireless", staSection, "macaddr", targetMAC); err != nil {
@@ -137,7 +137,7 @@ func (w *WifiService) SetMACAddress(mac string) (*WirelessApplyResult, error) {
 		}
 		guardStays = false
 		if err := w.crashGuard(macGuardFeature).Clear(); err != nil {
-			log.Printf("WARNING: %v", err)
+			slog.Warn("wifi: clearing MAC crash guard", "err", err)
 		}
 		return apply, nil
 	})
@@ -191,7 +191,7 @@ func (w *WifiService) bringLinkUp(ifname string) {
 		return
 	}
 	if _, err := w.cmd.Run("ip", "link", "set", ifname, "up"); err != nil {
-		log.Printf("WARNING: could not bring %s back up after a failed MAC change: %v", ifname, err)
+		slog.Warn("wifi: could not bring the interface back up after a failed MAC change", "iface", ifname, "err", err)
 	}
 }
 

@@ -3,12 +3,27 @@ version: '2'
 linters:
   default: none
   enable:
+    - bodyclose
+    - copyloopvar
+    - dupword
+    - errcheck
+    - errorlint
+    - gocritic
     - govet
     - ineffassign
+    - intrange
+    - misspell
+    - nolintlint
     - staticcheck
+    - unconvert
+    - unparam
     - unused
+    - usestdlibvars
+    - wastedassign
   exclusions:
     rules:
       - path: '(.+)_test\.go'
         linters:
+          - bodyclose
           - errcheck
+          - unparam

@@ -1,11 +1,12 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -106,7 +107,7 @@ func (v *VpnService) enableWireguard() error {
 		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
 			// The device is in an unknown state: keep the crash guard so no
 			// other flow mutates it before a human looks.
-			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w (rollback incomplete, crash guard %s kept: %v)", err, v.crashGuard.Path(), rbErr)
+			return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w (rollback incomplete, crash guard %s kept: %w)", err, v.crashGuard.Path(), rbErr)
 		}
 		_ = v.crashGuard.Clear()
 		return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
@@ -120,7 +121,7 @@ func (v *VpnService) enableWireguard() error {
 
 	if err := v.setupWireGuardFirewall(); err != nil {
 		if rbErr := v.rollbackWireguardEnable(prevDisabled); rbErr != nil {
-			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %v)", err, v.crashGuard.Path(), rbErr)
+			return fmt.Errorf("setting up WireGuard firewall: %w (rollback incomplete, crash guard %s kept: %w)", err, v.crashGuard.Path(), rbErr)
 		}
 		_ = v.crashGuard.Clear()
 		return fmt.Errorf("setting up WireGuard firewall: %w", err)
@@ -131,7 +132,7 @@ func (v *VpnService) enableWireguard() error {
 		// could not be written), so dnsmasq still has the pre-VPN resolvers.
 		// The tunnel is up and verified; failing the toggle here would tear
 		// down a working VPN over a DNS bookkeeping problem. Record it.
-		log.Printf("vpn: tunnel up but LAN DNS left unchanged: %v", err)
+		slog.Warn("vpn: tunnel up but LAN DNS left unchanged", "err", err)
 	}
 	_ = v.crashGuard.Clear()
 	return nil
@@ -179,7 +180,7 @@ func (v *VpnService) disableWireguard() error {
 	routeConfirmed := false
 	defer func() {
 		if err := v.teardownWireGuardFirewall(); err != nil {
-			log.Printf("vpn: tearing down WireGuard firewall: %v", err)
+			slog.Warn("vpn: tearing down WireGuard firewall", "err", err)
 		}
 		if routeConfirmed {
 			_ = v.crashGuard.Clear()

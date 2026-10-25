@@ -1031,7 +1031,7 @@ func TestValidateRestoreArchive_RejectsUnsafeMembers(t *testing.T) {
 			name: "total uncompressed size over the cap",
 			headers: func() []*tar.Header {
 				var hs []*tar.Header
-				for i := 0; i < 16; i++ {
+				for i := range 16 {
 					hs = append(hs, &tar.Header{
 						Name:     fmt.Sprintf("etc/config/big%d", i),
 						Typeflag: tar.TypeReg,
@@ -1202,7 +1202,7 @@ func TestCommitSystemConfig_GuardLifecycle(t *testing.T) {
 func TestUniqueTempPath_IsUniqueAndFree(t *testing.T) {
 	dir := t.TempDir()
 	seen := make(map[string]bool)
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		p, err := uniqueTempPath(dir, "backup-*.tar.gz")
 		if err != nil {
 			t.Fatalf("uniqueTempPath: %v", err)

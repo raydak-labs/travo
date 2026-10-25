@@ -2,7 +2,7 @@ package services
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 )
@@ -103,7 +103,7 @@ func (w *WifiService) ensureAPRunningLocked() (fixed bool, needWifiUp bool, err 
 	// schedule. See wifiScheduleOffWindow.
 	scheduleOff := w.wifiScheduleOffWindow()
 	if scheduleOff {
-		log.Printf("wifi: schedule off-window active; leaving the radios as the schedule set them")
+		slog.Info("wifi: schedule off-window active; leaving the radios as the schedule set them")
 	}
 	for name, opts := range sections {
 		if scheduleOff {

@@ -1,4 +1,4 @@
-package services
+package docsgate
 
 // Executable tests for the shell scripts under scripts/ and test/integration/.
 //
@@ -102,7 +102,7 @@ func guardPathsIn(cmd string) []string {
 func guardPathsInSimple(seg string) []string {
 	var out []string
 	words := splitWords(seg)
-	for i := 0; i < len(words); i++ {
+	for i := range words {
 		switch words[i] {
 		case "busybox", "env", "sudo", "nohup", "time", "timeout", "xargs":
 			// The real command name follows the wrapper.
@@ -244,12 +244,13 @@ func splitWords(cmd string) []string {
 				cur.WriteByte(c)
 			}
 		case quote == '"':
-			if c == '"' {
+			switch {
+			case c == '"':
 				quote = 0
-			} else if c == '\\' && i+1 < len(cmd) {
+			case c == '\\' && i+1 < len(cmd):
 				i++
 				cur.WriteByte(cmd[i])
-			} else {
+			default:
 				cur.WriteByte(c)
 			}
 		case c == '\'' || c == '"':

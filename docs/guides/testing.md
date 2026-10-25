@@ -39,7 +39,7 @@ cd frontend && pnpm test
 Docs have gates too. Run them in the same change as any edit under `docs/`:
 
 ```sh
-cd backend && go test ./internal/services/
+cd backend && go test ./internal/docsgate/
 ```
 
 They fail on a crash-guard path outside `/etc/trafo/`, a persistent-store path outside

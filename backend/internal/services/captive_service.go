@@ -1,13 +1,14 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -68,19 +69,6 @@ func (p *RealHTTPProber) Do(url string) (int, string, string, error) {
 	}
 
 	return resp.StatusCode, string(bodyBytes), redirectURL, nil
-}
-
-// MockHTTPProber returns preset responses for testing.
-type MockHTTPProber struct {
-	StatusCode  int
-	Body        string
-	RedirectURL string
-	Err         error
-}
-
-// Do returns the preset mock response.
-func (m *MockHTTPProber) Do(_ string) (int, string, string, error) {
-	return m.StatusCode, m.Body, m.RedirectURL, m.Err
 }
 
 // CaptiveService checks for captive portal detection.
@@ -383,7 +371,7 @@ func (c *CaptiveService) BypassDNS() error {
 			if err := c.dnsmasqLayers().EnableLayerAs(dnsLayerCaptive, []string{hotelDNS}, "0"); err != nil {
 				if rebindProtect == "1" {
 					_ = c.setDnsmasqOption("rebind_protection", "1")
-					c.commitDhcp()
+					_ = c.commitDhcp()
 				}
 				_ = c.dnsGuard.Clear()
 				return err
@@ -435,14 +423,14 @@ func (c *CaptiveService) BypassDNS() error {
 		// captive portal hostnames (which resolve to private IPs) are resolved.
 		if hotelDNS != "" {
 			if err := c.setAdGuardUpstream([]string{hotelDNS}, nil, nil); err != nil {
-				log.Printf("captive: warning — could not update AdGuardHome upstream: %v", err)
+				slog.Warn("captive: could not update AdGuardHome upstream", "err", err)
 				// Non-fatal: dnsmasq changes are still in effect
 			} else {
-				log.Printf("captive: AdGuardHome upstream switched to %s", hotelDNS)
+				slog.Info("captive: AdGuardHome upstream switched", "dns", hotelDNS)
 			}
 		}
 
-		log.Printf("captive: DNS bypassed (noresolv=%s, hotelDNS=%s)", noresolv, hotelDNS)
+		slog.Info("captive: DNS bypassed", "noresolv", noresolv, "dns", hotelDNS)
 		return nil
 	})
 }
@@ -557,7 +545,7 @@ func (c *CaptiveService) RestoreDNS() error {
 				// file in place so the next attempt (or the auto-restore) retries it.
 				fail("restoring AdGuardHome upstream: %w", err)
 			} else {
-				log.Printf("captive: AdGuardHome upstream restored to %v", backup.AdGuardUpstream)
+				slog.Info("captive: AdGuardHome upstream restored", "upstream", backup.AdGuardUpstream)
 			}
 		}
 
@@ -576,7 +564,7 @@ func (c *CaptiveService) RestoreDNS() error {
 			return fmt.Errorf("captive: DNS restored but could not remove %s: %w", c.dnsGuard.Path(), err)
 		}
 
-		log.Printf("captive: DNS restored")
+		slog.Info("captive: DNS restored")
 		return nil
 	})
 }
@@ -613,12 +601,12 @@ func (c *CaptiveService) autoRestoreStaleBypass() {
 	if err := json.Unmarshal(data, &backup); err != nil {
 		// A corrupt guard file is the only record of the pre-bypass DNS config.
 		// Keep it (ADR 0003) instead of deleting it, and let an operator decide.
-		log.Printf("captive: guard file %s is unreadable (%v); leaving it in place for manual recovery", c.dnsGuard.Path(), err)
+		slog.Error("captive: guard is unreadable; left in place for manual recovery", "guard", c.dnsGuard.Path(), "err", err)
 		return
 	}
 	age := time.Since(time.Unix(backup.Time, 0))
 	if age > captiveDNSRestoreTimeout {
-		log.Printf("captive: auto-restoring DNS bypass (stale %v)", age)
+		slog.Info("captive: auto-restoring a stale DNS bypass", "age", age)
 		_ = c.RestoreDNS()
 	}
 }
@@ -637,7 +625,7 @@ func (c *CaptiveService) refreshBypassTimestamp() {
 	}
 	var backup dnsBackup
 	if err := json.Unmarshal(data, &backup); err != nil {
-		log.Printf("captive: cannot refresh bypass timestamp: %s unreadable: %v", c.dnsGuard.Path(), err)
+		slog.Warn("captive: cannot refresh bypass timestamp; guard unreadable", "guard", c.dnsGuard.Path(), "err", err)
 		return
 	}
 	backup.Time = time.Now().Unix()
@@ -646,7 +634,7 @@ func (c *CaptiveService) refreshBypassTimestamp() {
 		return
 	}
 	if err := c.dnsGuard.Write(string(newData)); err != nil {
-		log.Printf("captive: cannot refresh bypass timestamp: %v", err)
+		slog.Warn("captive: cannot refresh bypass timestamp", "err", err)
 	}
 }
 

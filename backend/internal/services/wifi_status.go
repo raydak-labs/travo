@@ -13,7 +13,7 @@ func (w *WifiService) appliedWirelessUp(
 ) error {
 	resp, err := w.ubus.Call("network.wireless", "status", nil)
 	if err != nil {
-		return fmt.Errorf("%w: %w: %v", ErrWirelessUnverifiable, errWirelessStatusUnread, err)
+		return fmt.Errorf("%w: %w: %w", ErrWirelessUnverifiable, errWirelessStatusUnread, err)
 	}
 	radios, unreadable, shapeErr := wirelessStatusRadios(resp)
 	// section name -> what the config expects it to be, so one pass over the

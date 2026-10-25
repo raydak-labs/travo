@@ -1,7 +1,7 @@
 package services
 
 import (
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -61,7 +61,7 @@ func (v *VpnService) enableVpnDNSForwarding() error {
 // last one. It is best-effort and reports nothing.
 func (v *VpnService) disableVpnDNSForwarding() {
 	if _, err := v.dnsmasqLayers().RemoveLayer(dnsLayerVPN, false); err != nil {
-		log.Printf("vpn: restoring dnsmasq from the layer stack: %v", err)
+		slog.Error("vpn: restoring dnsmasq from the layer stack", "err", err)
 	}
 }
 
@@ -117,8 +117,7 @@ func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
 		// No layer stacked: dnsmasq was never pointed at the tunnel.
 		return false
 	}
-	log.Printf("vpn: tunnel state %q with the VPN resolver layer stacked;"+
-		" restoring the dnsmasq layer below it", tunnelDetail)
+	slog.Info("vpn: tunnel down with the VPN resolver layer stacked; restoring the layer below", "state", tunnelDetail)
 	// The stack shells out to `uci` for dhcp, so it needs the same lock every
 	// other dhcp writer holds (ADR 0010).
 	if err := withConfigLocks([]string{"dhcp"}, func() error {
@@ -127,7 +126,7 @@ func (v *VpnService) maybeSelfHealVpnDNS(tunnelDetail string) bool {
 		_, err := layers.RemoveLayer(dnsLayerVPN, true)
 		return err
 	}); err != nil {
-		log.Printf("vpn: healing dnsmasq after tunnel state %q: %v", tunnelDetail, err)
+		slog.Error("vpn: healing dnsmasq", "state", tunnelDetail, "err", err)
 		return false
 	}
 	return true

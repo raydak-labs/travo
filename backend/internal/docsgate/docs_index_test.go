@@ -1,4 +1,4 @@
-package services
+package docsgate
 
 import (
 	"fmt"
@@ -705,7 +705,7 @@ func logicalStatements(script string) []string {
 // # directly after a ${ is left alone.
 func stripShellComment(line string) string {
 	depth := 0
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		switch line[i] {
 		case '{':
 			depth++

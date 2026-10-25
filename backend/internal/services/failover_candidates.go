@@ -63,17 +63,18 @@ func (s *FailoverService) discoverCandidates(networkStatus models.NetworkStatus,
 			candidate.Enabled = true
 		}
 		trackerState, ok := trackerStates[candidate.InterfaceName]
-		if !s.serviceInstalled() {
+		switch {
+		case !s.serviceInstalled():
 			candidate.TrackingState = models.FailoverTrackingStateNotInstalled
-		} else if !candidate.Available {
+		case !candidate.Available:
 			candidate.TrackingState = models.FailoverTrackingStateNotAvailable
-		} else if !candidate.Enabled {
+		case !candidate.Enabled:
 			candidate.TrackingState = models.FailoverTrackingStateDisabled
-		} else if ok {
+		case ok:
 			candidate.TrackingState = trackerState
-		} else if candidate.IsUp {
+		case candidate.IsUp:
 			candidate.TrackingState = models.FailoverTrackingStateOnline
-		} else {
+		default:
 			candidate.TrackingState = models.FailoverTrackingStateOffline
 		}
 		candidates = append(candidates, candidate)

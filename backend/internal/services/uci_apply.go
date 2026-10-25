@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,7 +171,7 @@ func (r *RealUCIApplyConfirm) Rollback(sessionID string) error {
 	dir := r.snapshotDir(sessionID)
 	raw, err := os.ReadFile(filepath.Join(dir, snapshotManifest))
 	if err != nil {
-		return fmt.Errorf("%w: session %q under %s: %v", ErrNoSnapshot, sessionID, dir, err)
+		return fmt.Errorf("%w: session %q under %s: %w", ErrNoSnapshot, sessionID, dir, err)
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
 		state, name, ok := strings.Cut(strings.TrimSpace(line), " ")
@@ -282,8 +282,7 @@ func (r *RealUCIApplyConfirm) claimPendingSnapshot(sessionID string) {
 		return
 	}
 	if err := os.Rename(pending, r.snapshotDir(sessionID)); err != nil {
-		log.Printf("ERROR: uci apply: cannot key the config snapshot to session %s: %v",
-			sessionID, err)
+		slog.Error("uci apply: cannot key the config snapshot to the session", "session", sessionID, "err", err)
 	}
 }
 
@@ -305,12 +304,6 @@ func (r *RealUCIApplyConfirm) Confirm(sessionID string) error {
 	}
 	return nil
 }
-
-// Snapshot is a no-op for the no-op applier.
-func (NoopUCIApplyConfirm) Snapshot(_ []string) error { return nil }
-
-// Rollback is a no-op for the no-op applier.
-func (NoopUCIApplyConfirm) Rollback(_ string) error { return nil }
 
 // ApplyAndConfirm implements UCIApplyConfirm. A guarded internal flow has no
 // browser to confirm, so it snapshots the configs first, then applies and
@@ -344,7 +337,7 @@ func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
 // previous config is NOT back on disk.
 func (r *RealUCIApplyConfirm) rollbackOrJoin(stage, sessionID string, cause error) error {
 	if rbErr := r.Rollback(sessionID); rbErr != nil {
-		return fmt.Errorf("%w (rolling back to the previous config after a failed %s also failed: %v)",
+		return fmt.Errorf("%w (rolling back to the previous config after a failed %s also failed: %w)",
 			cause, stage, rbErr)
 	}
 	return cause
@@ -384,22 +377,4 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Sync()
-}
-
-// NoopUCIApplyConfirm does nothing (for tests).
-type NoopUCIApplyConfirm struct{}
-
-// StartApply is a no-op.
-func (NoopUCIApplyConfirm) StartApply(_ []string) (string, error) {
-	return "", nil
-}
-
-// Confirm is a no-op.
-func (NoopUCIApplyConfirm) Confirm(_ string) error {
-	return nil
-}
-
-// ApplyAndConfirm is a no-op.
-func (NoopUCIApplyConfirm) ApplyAndConfirm(_ []string) error {
-	return nil
 }

@@ -1,12 +1,13 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -41,15 +42,6 @@ func (r *RealStorageProvider) GetRootStorage() (int64, int64, int64, error) {
 	free := int64(stat.Bavail) * int64(stat.Bsize)
 	used := total - free
 	return total, used, free, nil
-}
-
-// MockStorageProvider returns realistic mock storage stats.
-type MockStorageProvider struct{}
-
-// GetRootStorage returns mock storage stats.
-func (m *MockStorageProvider) GetRootStorage() (int64, int64, int64, error) {
-	// 256MB total, 96MB used, 160MB free — realistic for a travel router
-	return 268435456, 100663296, 167772160, nil
 }
 
 // SystemService provides system information and statistics.
@@ -104,7 +96,7 @@ func (s *SystemService) LogStaleCrashGuards() {
 		if err != nil {
 			continue
 		}
-		log.Printf("WARNING: crash guard present: %s (%s). The previous operation did not finish; clear it manually if the system looks healthy.", g.Path(), strings.TrimSpace(string(data)))
+		slog.Warn("crash guard present: the previous operation did not finish; clear it manually if the system looks healthy", "path", g.Path(), "reason", strings.TrimSpace(string(data)))
 	}
 }
 
@@ -286,7 +278,7 @@ func (s *SystemService) Shutdown() error {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		if err := execx.Run(execx.Quick, "poweroff"); err != nil {
-			log.Printf("ERROR: poweroff failed: %v", err)
+			slog.Error("poweroff failed", "err", err)
 		}
 	}()
 	return nil
@@ -452,7 +444,7 @@ func streamLogTail(timeout time.Duration, name string, args ...string) (string, 
 		return "", err
 	}
 	if truncated > 0 {
-		log.Printf("WARNING: %s output truncated to the last %d lines (%d older lines dropped)", name, maxLogLines, truncated)
+		slog.Warn("command output truncated", "command", name, "kept_lines", maxLogLines, "dropped_lines", truncated)
 	}
 	return strings.Join(lines, "\n"), nil
 }
@@ -514,11 +506,11 @@ func (s *SystemService) FactoryReset() error {
 	}
 	go func() {
 		if err := execx.Run(execx.Package, "firstboot", "-y"); err != nil {
-			log.Printf("ERROR: firstboot failed: %v (crash guard %s kept; device not reset)", err, s.crashGuard(factoryResetGuard).Path())
+			slog.Error("firstboot failed; device not reset, crash guard kept", "err", err, "guard", s.crashGuard(factoryResetGuard).Path())
 			return
 		}
 		if err := execx.Run(execx.Quick, "reboot"); err != nil {
-			log.Printf("ERROR: reboot after firstboot failed: %v", err)
+			slog.Error("reboot after firstboot failed", "err", err)
 		}
 	}()
 	return nil

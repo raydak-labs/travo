@@ -73,14 +73,14 @@ func (v *VpnService) SetSplitTunnelLocked(cfg models.SplitTunnelConfig) error {
 	for _, snap := range snapshots {
 		if err := v.setPeerAllowedIPs(snap.name, allowedParts); err != nil {
 			if rbErr := v.restorePeerAllowedIPs(snapshots); rbErr != nil {
-				return fmt.Errorf("updating split tunnel: %w (revert incomplete: %v)", err, rbErr)
+				return fmt.Errorf("updating split tunnel: %w (revert incomplete: %w)", err, rbErr)
 			}
 			return fmt.Errorf("updating split tunnel: %w", err)
 		}
 	}
 	if err := v.uci.Commit("network"); err != nil {
 		if rbErr := v.restorePeerAllowedIPs(snapshots); rbErr != nil {
-			return fmt.Errorf("committing split tunnel: %w (revert incomplete: %v)", err, rbErr)
+			return fmt.Errorf("committing split tunnel: %w (revert incomplete: %w)", err, rbErr)
 		}
 		return fmt.Errorf("committing split tunnel: %w", err)
 	}

@@ -407,7 +407,7 @@ func (n *NetworkService) BlockClient(mac string) error {
 			// The rule is committed but the running firewall never loaded it.
 			// Take it back out so the file and the running firewall agree.
 			if undoErr := n.undoFirewallSection(section, nil); undoErr != nil {
-				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %v)", err, section, undoErr)
+				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %w)", err, section, undoErr)
 			}
 			return fmt.Errorf("restart firewall: %w", err)
 		}
@@ -432,7 +432,7 @@ func (n *NetworkService) UnblockClient(mac string) error {
 			// Same contract as BlockClient: the committed config must not be
 			// left saying "unblocked" while the running firewall still drops it.
 			if undoErr := n.undoFirewallSection(section, previous); undoErr != nil {
-				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %v)", err, section, undoErr)
+				return fmt.Errorf("restart firewall: %w (rollback of %s failed: %w)", err, section, undoErr)
 			}
 			return fmt.Errorf("restart firewall: %w", err)
 		}

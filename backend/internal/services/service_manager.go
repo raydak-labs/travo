@@ -483,24 +483,4 @@ func (sm *ServiceManager) SetAutoStart(serviceID string, enabled bool) error {
 
 // --- Real implementations ---
 
-// NoopPackageManager for systems without a package manager.
-type NoopPackageManager struct{}
-
-func (n *NoopPackageManager) Update() (string, error) {
-	return "", fmt.Errorf("no package manager available")
-}
-func (n *NoopPackageManager) Install(string) (string, error) {
-	return "", fmt.Errorf("no package manager available")
-}
-func (n *NoopPackageManager) Remove(string) (string, error) {
-	return "", fmt.Errorf("no package manager available")
-}
-func (n *NoopPackageManager) IsInstalled(string) bool { return false }
-func (n *NoopPackageManager) InstallStream(string, func(string)) error {
-	return fmt.Errorf("no package manager available")
-}
-func (n *NoopPackageManager) RemoveStream(string, func(string)) error {
-	return fmt.Errorf("no package manager available")
-}
-
 // --- Mock implementations for tests ---

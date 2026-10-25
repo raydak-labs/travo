@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -73,7 +73,7 @@ func (r *RealAdGuardChecker) HTTPGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
 	}
@@ -100,7 +100,7 @@ func (r *RealAdGuardChecker) TCPProbe(addr string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 
@@ -488,12 +488,12 @@ func (s *AdGuardService) rollbackAdGuardConfig(path, backupPath string,
 ) {
 	if readErr == nil {
 		if err := s.checker.WriteFile(path, previous, 0600); err != nil {
-			log.Printf("adguard: restoring config from %s: %v", backupPath, err)
+			slog.Error("adguard: restoring config", "backup", backupPath, "err", err)
 			return
 		}
 	}
 	if _, err := s.checker.RunCommand(adguardInitd, "restart"); err != nil {
-		log.Printf("adguard: restarting after config rollback: %v", err)
+		slog.Error("adguard: restarting after config rollback", "err", err)
 	}
 	s.refreshEndpointsFromYAML()
 }

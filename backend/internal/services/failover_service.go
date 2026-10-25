@@ -1,12 +1,13 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/openwrt-travel-gui/backend/internal/guard"
 
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -70,16 +71,15 @@ func (s *FailoverService) rollbackOrKeepGuard() {
 	rollbackPending := s.rollbackStillPending()
 	pendingSession := s.pendingApplySession
 	if err := s.restoreManagedSections(); err != nil {
-		log.Printf("failover: rollback failed, crash guard kept at %s: %v", s.crashGuard.Path(), err)
+		slog.Error("failover: rollback failed; crash guard kept", "guard", s.crashGuard.Path(), "err", err)
 		return
 	}
 	if rollbackPending {
-		log.Printf("failover: restored, but rpcd rollback %s was still armed; crash guard kept at %s",
-			pendingSession, s.crashGuard.Path())
+		slog.Warn("failover: restored, but the rpcd rollback is still armed; crash guard kept", "session", pendingSession, "guard", s.crashGuard.Path())
 		return
 	}
 	if err := s.crashGuard.Clear(); err != nil {
-		log.Printf("failover: %v", err)
+		slog.Warn("failover: clearing crash guard", "err", err)
 	}
 }
 
@@ -180,7 +180,7 @@ func (s *FailoverService) Start() {
 	// instead of silently skipping forever (band-switching logs the same case).
 	// ADR 0003 §1.2.
 	if s.crashGuard.Present() {
-		log.Printf("failover: crash guard found at %s — automatic switching is disabled; remove it or redeploy to re-enable", s.crashGuard.Path())
+		slog.Warn("failover: crash guard found; automatic switching disabled until it is removed or the app is redeployed", "guard", s.crashGuard.Path())
 	}
 
 	for {
