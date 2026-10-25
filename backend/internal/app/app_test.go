@@ -165,6 +165,20 @@ func TestBodyLimitAllowsFirmwareImages(t *testing.T) {
 	}
 }
 
+// The OpenAPI document declares arrays non-nullable; a nil slice in a
+// response (an interface without DNS servers) must reach the UI as [].
+func TestResponsesEncodeNilSlicesAsEmptyArrays(t *testing.T) {
+	got, err := setupApp(t).Config().JSONEncoder(struct {
+		DNS []string `json:"dns_servers"`
+	}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `{"dns_servers":[]}` {
+		t.Errorf("encoded %s, want an empty array", got)
+	}
+}
+
 // An unset CORS_ORIGINS must mean same-origin only, never "*".
 func TestSplitCORSOrigins_UnsetIsEmpty(t *testing.T) {
 	for _, in := range []string{"", "   ", ",", " , "} {

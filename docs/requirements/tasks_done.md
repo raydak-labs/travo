@@ -115,6 +115,11 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   function; `apiClient` is removed. The port-forward request no longer requires an `id`, the
   WiFi connect request no longer requires `mode`, and the firmware upload documents
   `keep_settings`.
+- **On-device contract check (2026-10-25):** on the GL-AXT1800 (OpenWrt 25.12.3) all 69
+  parameterless GETs answered 200 and every UI page loaded without console errors, but four
+  responses sent `null` where the schema promises an array. Responses are now encoded with
+  `jsonx` (nil collections empty), and a mock-mode test validates every GET against its schema.
+  Mock mode serves sample logs instead of failing on a missing `logread`.
 
 ## Frontend Toolchain
 

@@ -1,9 +1,10 @@
 package ws
 
 import (
-	"encoding/json"
 	"sync"
 	"time"
+
+	"github.com/openwrt-travel-gui/backend/internal/jsonx"
 
 	"github.com/gofiber/contrib/v3/websocket"
 
@@ -184,7 +185,7 @@ func (h *Hub) broadcastStats() {
 		"type": "system_stats",
 		"data": stats,
 	}
-	data, err := json.Marshal(msg)
+	data, err := jsonx.Marshal(msg)
 	if err != nil {
 		return
 	}
@@ -199,7 +200,7 @@ func (h *Hub) broadcastNetworkStatus(ns models.NetworkStatus) {
 		"type": "network_status",
 		"data": ns,
 	}
-	data, err := json.Marshal(msg)
+	data, err := jsonx.Marshal(msg)
 	if err != nil {
 		return
 	}
@@ -211,7 +212,7 @@ func (h *Hub) broadcastAlert(alert models.Alert) {
 		"type": "alert",
 		"data": alert,
 	}
-	data, err := json.Marshal(msg)
+	data, err := jsonx.Marshal(msg)
 	if err != nil {
 		return
 	}

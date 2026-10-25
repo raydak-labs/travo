@@ -57,6 +57,8 @@ type Service struct {
 	// toggleScriptPath overrides where the generated wireless toggle helper is
 	// written (tests only); empty means the production /usr/libexec path.
 	toggleScriptPath string
+	// logTail replaces logread/dmesg (mock mode); nil runs the commands.
+	logTail func(cmd string) (string, error)
 }
 
 // sshKeysPath returns the authorized_keys path in use.

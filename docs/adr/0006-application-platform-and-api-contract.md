@@ -113,6 +113,12 @@ knobs:
 - Changing an API shape is changing a Go type; the spec and the generated frontend types follow.
   Breaking a shape is still a contract change: update the frontend in the same change.
 - A new endpoint is added with `get`/`post`/`put`/`del`, never with `app.Get` on the Fiber app.
+- Responses and WebSocket messages are encoded by `jsonx.Marshal`: a nil slice is `[]` and a
+  nil map `{}`, because the document declares arrays non-nullable. On the device, interfaces
+  without DNS servers and an empty split-tunnel route list were sent as `null` (OpenWrt 25.12.3,
+  2026-10-25) before this.
+- `TestMockResponsesMatchTheirSchemas` validates every parameterless GET in mock mode against its
+  own schema; a mock that drifts from the contract fails CI.
 - The frontend calls the REST API through the generated functions in
   `frontend/src/api/endpoints.ts`; only NDJSON streams (`streamRequest`) and the backup download
   (`getBlob`) go through `api-client.ts` directly. A request body the spec does not describe
