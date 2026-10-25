@@ -15,6 +15,7 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { CardInset } from '@/components/ui/card-inset';
 import type { RepeaterUpstreamConfig, RepeaterApFormConfig } from './types';
+import { formatWifiBandLabel } from '@/lib/wifi-band';
 import { mapScanEncryptionToUci } from './map-encryption';
 
 type ConfigureApStepProps = {
@@ -28,13 +29,6 @@ type ConfigureApStepProps = {
   onBack: () => void;
   onNext: () => void;
 };
-
-function bandLabel(band: string): string {
-  if (band === '2g') return '2.4 GHz';
-  if (band === '5g') return '5 GHz';
-  if (band === '6g') return '6 GHz';
-  return band;
-}
 
 export function RepeaterWizardConfigureApStep({
   upstream,
@@ -185,7 +179,7 @@ export function RepeaterWizardConfigureApStep({
               };
               return (
                 <CardInset key={ap.section} className="space-y-3 p-4">
-                  <p className="text-sm font-medium">{bandLabel(ap.band)}</p>
+                  <p className="text-sm font-medium">{formatWifiBandLabel(ap.band)}</p>
                   <div className="space-y-2">
                     <Label htmlFor={`ap-ssid-${ap.section}`}>SSID</Label>
                     <Input

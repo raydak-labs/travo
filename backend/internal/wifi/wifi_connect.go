@@ -243,6 +243,9 @@ func (w *Service) GetConnection() (models.WifiConnection, error) {
 	qual, _ := resp["quality"].(float64)
 	enc := parseIwinfoEncryption(resp["encryption"])
 	band, _ := resp["band"].(string)
+	if mhz, ok := resp["frequency"].(float64); ok && band == "" {
+		band = uciBandForFrequency(mhz) // iwinfo on 25.12 reports no band for a STA
+	}
 
 	conn := models.WifiConnection{
 		SSID: ssid, BSSID: bssid,

@@ -334,6 +334,18 @@ func bandForFrequency(mhz float64) string {
 	}
 }
 
+// uciBandForFrequency is bandForFrequency in UCI's spelling (2g, 5g, 6g).
+func uciBandForFrequency(mhz float64) string {
+	switch {
+	case mhz < 3000:
+		return "2g"
+	case mhz < 6000:
+		return "5g"
+	default:
+		return "6g"
+	}
+}
+
 func bandForChannel(ch float64) string {
 	switch {
 	case ch <= 14:

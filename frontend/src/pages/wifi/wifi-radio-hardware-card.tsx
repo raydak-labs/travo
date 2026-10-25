@@ -21,6 +21,7 @@ import { useWifiLockout } from '@/hooks/use-wifi-lockout';
 // disruptive role change is even sent.
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { OperationProgressDialog } from '@/components/ui/operation-progress-dialog';
+import { formatWifiBandLabel } from '@/lib/wifi-band';
 import { InlineError } from '@/components/ui/inline-error';
 
 /**
@@ -108,14 +109,7 @@ export function WifiRadioHardwareCard() {
         ) : (
           <div className="space-y-3">
             {radios.map((radio) => {
-              const bandLabel =
-                radio.band === '5g'
-                  ? '5 GHz'
-                  : radio.band === '2g'
-                    ? '2.4 GHz'
-                    : radio.band === '6g'
-                      ? '6 GHz'
-                      : radio.band;
+              const bandLabel = formatWifiBandLabel(radio.band);
               const recommendedRole =
                 radio.band === '5g' ? 'ap' : radio.band === '2g' ? 'sta' : null;
               const isRecommended = recommendedRole && radio.role === recommendedRole;

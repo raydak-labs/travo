@@ -120,6 +120,12 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   responses sent `null` where the schema promises an array. Responses are now encoded with
   `jsonx` (nil collections empty), and a mock-mode test validates every GET against its schema.
   Mock mode serves sample logs instead of failing on a missing `logread`.
+- **Captive status and uplink display (2026-10-25):** captive status no longer probes without a
+  default route (3 s → instant offline), shares one probe between concurrent polls, and treats
+  a WireGuard `default dev` route as an upstream ([ADR 0001](../adr/0001-dns-vpn-captive-portal-architecture.md)).
+  The uplink connection reports its band from the frequency (iwinfo on 25.12 has none), the
+  saved-network row says "Not connected" for an enabled profile that is out of range, and one
+  band label helper replaces six copies.
 
 ## Frontend Toolchain
 

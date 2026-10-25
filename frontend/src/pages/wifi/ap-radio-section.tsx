@@ -10,6 +10,7 @@ import type { APConfig, APConfigUpdate } from '@shared/index';
 import { apRadioFormSchema, type APRadioFormValues } from '@/lib/schemas/wifi-forms';
 import { normalizeApEncryption } from './ap-config-normalize';
 import { ApRadioFormFields } from './ap-radio-form-fields';
+import { formatWifiBandLabel } from '@/lib/wifi-band';
 import { ApRadioDisableDialog } from './ap-radio-disable-dialog';
 
 export type APRadioSectionProps = {
@@ -103,7 +104,7 @@ export function APRadioSection({ ap, activeEnabledCount, onEnabledChange }: APRa
   const confirmDisable = () => submitDisable(false);
 
   const isLastActive = activeEnabledCount <= 1;
-  const bandLabel = ap.band === '5g' ? '5 GHz' : ap.band === '2g' ? '2.4 GHz' : ap.band;
+  const bandLabel = formatWifiBandLabel(ap.band);
 
   const openQrFromForm = () => {
     const v = getValues();

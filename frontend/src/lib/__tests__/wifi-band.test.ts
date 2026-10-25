@@ -9,6 +9,13 @@ describe('formatWifiBandLabel', () => {
     expect(formatWifiBandLabel('6ghz')).toBe('6 GHz');
   });
 
+  // UCI's spelling, which radios, access points and the uplink connection use.
+  it('formats UCI band names', () => {
+    expect(formatWifiBandLabel('2g')).toBe('2.4 GHz');
+    expect(formatWifiBandLabel('5g')).toBe('5 GHz');
+    expect(formatWifiBandLabel('6g')).toBe('6 GHz');
+  });
+
   it('returns unknown strings unchanged', () => {
     expect(formatWifiBandLabel('custom')).toBe('custom');
   });

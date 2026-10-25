@@ -277,16 +277,9 @@ func registerAdGuard(api *API, svc *uplink.AdGuardService, captive *uplink.Capti
 func registerCaptive(api *API, svc *uplink.CaptiveService) {
 	get(api, "/api/v1/captive/status", "GetCaptiveStatus", "Captive portal detection",
 		func(context.Context, *none) (*Body[models.CaptivePortalStatus], error) {
-			status, err := svc.CheckCaptivePortal()
-			if err != nil {
-				return nil, serverError(err)
-			}
-			status.DNSBypassed = svc.IsDNSBypassed()
-			status.DNSBypassNeeded = !status.DNSBypassed && status.Detected && svc.CheckDNSBypassNeeded()
-			status.STAConnected = svc.IsUpstreamConnected()
 			// No side effects: the dashboard polls this. Recovery from a stale
 			// bypass is POST /captive/dns-restore or the startup auto-restore.
-			return reply(status)
+			return replyOrFail(svc.Status())
 		})
 	post(api, "/api/v1/captive/auto-accept", "CaptiveAutoAccept", "Accept the portal's terms automatically",
 		func(_ context.Context, in *portalInput) (*Body[models.CaptiveAutoAcceptResult], error) {

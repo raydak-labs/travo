@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/guard"
@@ -30,6 +31,13 @@ type CaptiveService struct {
 	cmd      platform.CommandRunner
 	mu       sync.Mutex
 	dnsGuard guard.Guard
+	// The cached Status result; statusGen moves on every DNS change.
+	statusMu    sync.Mutex
+	status      models.CaptivePortalStatus
+	statusTime  time.Time
+	statusAt    uint64
+	statusValid bool
+	statusGen   atomic.Uint64
 	// test overrides (empty in production)
 	adguardAPIBaseOverride string
 	resolvConfAutoOverride string
@@ -112,9 +120,9 @@ func (c *CaptiveService) Stop() {
 	c.wg.Wait()
 }
 
-// isUpstreamConnected returns true if the device has an active default route,
-// indicating it is connected to an upstream network. In test/mock mode (cmd == nil)
-// it always returns true to avoid breaking tests.
+// isUpstreamConnected returns true if the device has a default route, through
+// a gateway ("default via …") or straight out of a device ("default dev wg0",
+// as WireGuard installs it). In test/mock mode (cmd == nil) it returns true.
 func (c *CaptiveService) isUpstreamConnected() bool {
 	if c.cmd == nil {
 		return true // test mode: assume connected
@@ -123,13 +131,48 @@ func (c *CaptiveService) isUpstreamConnected() bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(strings.TrimSpace(string(out)), "default via")
+	for line := range strings.Lines(string(out)) {
+		if strings.HasPrefix(line, "default ") {
+			return true
+		}
+	}
+	return false
 }
 
-// IsUpstreamConnected is the exported wrapper around isUpstreamConnected.
-func (c *CaptiveService) IsUpstreamConnected() bool {
-	return c.isUpstreamConnected()
+// statusTTL is how long Status reuses a result. Polls closer together than
+// this (several components, several tabs) share one outbound probe.
+const statusTTL = 2 * time.Second
+
+// Status is what GET /captive/status reports. Without a default route it
+// answers at once: the probe could only wait out its timeout. Otherwise
+// concurrent callers share one probe, and its result is reused for statusTTL
+// unless a DNS change invalidated it.
+func (c *CaptiveService) Status() (models.CaptivePortalStatus, error) {
+	c.statusMu.Lock()
+	defer c.statusMu.Unlock()
+	gen := c.statusGen.Load()
+	if c.statusValid && c.statusAt == gen && time.Since(c.statusTime) < statusTTL {
+		return c.status, nil
+	}
+
+	var st models.CaptivePortalStatus
+	if c.isUpstreamConnected() {
+		var err error
+		if st, err = c.CheckCaptivePortal(); err != nil {
+			return st, err
+		}
+		st.STAConnected = true
+	}
+	st.DNSBypassed = c.IsDNSBypassed()
+	st.DNSBypassNeeded = !st.DNSBypassed && st.Detected && c.CheckDNSBypassNeeded()
+
+	c.status, c.statusTime, c.statusAt, c.statusValid = st, time.Now(), gen, true
+	return st, nil
 }
+
+// invalidateStatus makes the next Status probe again. It takes no lock, so
+// the DNS methods can call it while holding c.mu.
+func (c *CaptiveService) invalidateStatus() { c.statusGen.Add(1) }
 
 // CheckCaptivePortal probes for captive portals by making an HTTP request
 // to a known endpoint and checking for redirects or unexpected responses.
@@ -223,6 +266,7 @@ func (c *CaptiveService) IsDNSBypassed() bool {
 // local consumers) and AdGuardHome (which is the actual port-53 resolver for
 // LAN clients).  Original config is stored in the guard file for restoration.
 func (c *CaptiveService) BypassDNS() error {
+	defer c.invalidateStatus()
 	return platform.MutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -405,6 +449,7 @@ func (c *CaptiveService) rewriteGuard(backup dnsBackup) error {
 // restore that cannot determine the pre-bypass state at all — a bypass that is
 // still in force must never be reported as restored.
 func (c *CaptiveService) RestoreDNS() error {
+	defer c.invalidateStatus()
 	return platform.MutateUCI(c.uci, []string{"network", "dhcp"}, func() error {
 		c.mu.Lock()
 		defer c.mu.Unlock()

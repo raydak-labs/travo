@@ -23,6 +23,26 @@ func TestGetConnection_DerivesRepeaterMode(t *testing.T) {
 	}
 }
 
+// iwinfo on OpenWrt 25.12 reports no "band" for a STA, only its frequency
+// (GL-AXT1800: channel 149, frequency 5745); the WiFi summary showed no band.
+func TestGetConnection_DerivesBandFromFrequency(t *testing.T) {
+	u := uci.NewMockUCI()
+	ub := ubus.NewMockUbus()
+	ub.RegisterResponse("iwinfo.info", map[string]any{
+		"ssid": "Cappuxinno", "channel": float64(149), "frequency": float64(5745),
+		"signal": float64(-27), "quality": float64(70),
+	})
+	svc := New(Deps{UCI: u, Ubus: ub, Reloader: &NoopWifiReloader{}, PriorityFile: t.TempDir() + "/p.json"})
+
+	conn, err := svc.GetConnection()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn.Band != "5g" {
+		t.Errorf("band = %q, want 5g", conn.Band)
+	}
+}
+
 // Regression for the "connected but no IP" bug: Connect() chose sta_B, disabling sta_A.
 // Later SetMode("repeater") must not blindly re-enable sta_A; the currently-active profile
 // (sta_B) stays the sole STA on wwan.

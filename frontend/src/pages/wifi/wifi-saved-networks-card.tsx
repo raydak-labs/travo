@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Wifi, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { SecurityBadge } from '@/components/wifi/security-badge';
+import { savedNetworkStatus, type SavedNetworkStatus } from './wifi-connect-utils';
 import {
   useSavedNetworks,
   useWifiDelete,
@@ -32,6 +33,15 @@ const SAVED_LIST_TOOLTIP =
 
 const AUTO_RECONNECT_HELP =
   'If Wi‑Fi drops, periodically runs a safe reconnect for the active profile. It does not automatically switch to another saved SSID for stronger signal.';
+
+const STATUS_BADGE = {
+  connected: { label: 'Connected', variant: 'success' },
+  'not-connected': { label: 'Not connected', variant: 'warning' },
+  standby: { label: 'Standby', variant: 'secondary' },
+} as const satisfies Record<
+  SavedNetworkStatus,
+  { label: string; variant: NonNullable<BadgeProps['variant']> }
+>;
 
 /** Saved station profiles, rendered as the second section of the uplink card. */
 export function WifiSavedNetworksCard() {
@@ -113,6 +123,7 @@ export function WifiSavedNetworksCard() {
               {savedNetworks.map((network, index) => {
                 const isThisNetwork =
                   connection?.connected === true && connection.ssid === network.ssid;
+                const status = savedNetworkStatus(network, connection);
                 const rowBusy =
                   connectMutation.isPending ||
                   priorityMutation.isPending ||
@@ -131,8 +142,8 @@ export function WifiSavedNetworksCard() {
                     </div>
                     <div className="flex items-center gap-2 sm:contents">
                       <div className="justify-self-start">
-                        <Badge variant={network.auto_connect ? 'success' : 'secondary'}>
-                          {network.auto_connect ? 'In use' : 'Standby'}
+                        <Badge variant={STATUS_BADGE[status].variant}>
+                          {STATUS_BADGE[status].label}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-1">
