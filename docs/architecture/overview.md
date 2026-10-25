@@ -29,6 +29,7 @@ For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks
   - `docs/plans/` historical design notes (not runtime truth; see `docs/README.md`)
 - Travo coexists with LuCI instead of replacing it outright.
 - Backend is the source of truth for OpenWRT mutations; frontend drives API calls and renders device state.
+- Sysupgrade preservation includes Travo's enabled boot link (`/etc/rc.d/S99travo`) as well as its init script and binary ([ADR 0013 §10](../adr/0013-operational-invariants-and-device-findings.md)).
 - The backend exposes a machine-readable OpenAPI contract at `GET /api/openapi.json` for automation and integration work.
 
 Normative detail for repo layout, LuCI coexistence, OpenAPI, and footprint expectations: **[`docs/adr/0006-application-platform-and-api-contract.md`](../adr/0006-application-platform-and-api-contract.md)**.
