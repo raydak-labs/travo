@@ -1,0 +1,13 @@
+#!/bin/sh
+# BusyBox crond logs every job start ("USER root pid … cmd …") as cron.err at
+# OpenWrt's default level 7. Travo's WiFi reconnect check runs every minute, so
+# the system log fills with error lines that are not errors. Level 9 still logs
+# real cron failures. A cronloglevel the operator set is left alone.
+
+[ -n "$(uci -q get system.@system[0].cronloglevel)" ] && exit 0
+
+uci set system.@system[0].cronloglevel='9'
+uci commit system
+/etc/init.d/cron restart 2>/dev/null
+
+exit 0

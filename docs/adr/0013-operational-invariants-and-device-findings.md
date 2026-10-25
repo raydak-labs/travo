@@ -3,7 +3,7 @@ title: "ADR 0013: Operational invariants and device findings"
 description: Cross-cutting operational invariants and the device findings behind them: VPN disable route recovery, push wiring, store cost, band switching, buttons, AdGuard.
 status: Accepted
 date: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-25
 tags: [adr, operations, invariants, vpn, wifi, hardware, findings]
 ---
 
@@ -129,7 +129,17 @@ AdGuard's default mode is **dnsmasq forwarding** to AdGuard Home (its listener o
 must warn the operator, because it changes the resolution path for every client
 and composes with the VPN DNS layer stack in ADR 0001.
 
-### 8. One retired question, recorded so it stops resurfacing
+### 8. crond logs at level 9
+
+BusyBox crond logs every job start (`USER root pid … cmd …`) as `cron.err` at
+OpenWrt's default `-l 7`. With the WiFi reconnect check in cron every minute, the
+system log gained an error line per minute (GL-AXT1800, OpenWrt 25.12.3: 18 since
+boot), which buried real errors under the Logs page's error filter. The installer's
+`98-travo-cron-loglevel` sets `system.@system[0].cronloglevel=9` unless the operator
+set one. On the same device, after the change, the job still ran each minute and no
+`cron.err` line followed. Level 9 still logs cron's own failures.
+
+### 9. One retired question, recorded so it stops resurfacing
 
 A plan in March 2026 asked for a measurement explaining VPN disable latency and
 what dominates it. No measurement was ever taken and none of the follow-ups depend

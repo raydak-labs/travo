@@ -1,7 +1,7 @@
 ---
 title: Deployment guide
 description: Official install path (tarball), LuCI coexistence, AdGuard, build and package.
-updated: 2026-10-05
+updated: 2026-10-25
 tags: [docs, deployment, openwrt]
 ---
 
@@ -42,6 +42,7 @@ The script downloads `travo_<version>_<arch>.tar.gz`, extracts to `/`, moves LuC
 | ----- | ------------ | ----- |
 | Travo UI + API | `http://<router>:80` (default) | Static UI under `/www/travo`; binary `/usr/bin/travo` |
 | LuCI (after move) | `http://<router>:8080`, HTTPS `8443` | `uhttpd` listen updated by uci-defaults |
+| crond log level | `system.@system[0].cronloglevel=9` | Set by uci-defaults unless already set: job starts stop logging as `cron.err` ([ADR 0013 §8](../adr/0013-operational-invariants-and-device-findings.md)) |
 | AdGuard Home (optional) | Web UI `3000`; DNS **`5353`** | dnsmasq on the router forwards LAN DNS to AdGuard (`127.0.0.1#5353` pattern); see bundled `packaging/adguard/AdGuardHome.yaml` |
 
 JWT secret and sealed auth data live under `/etc/travo/` (created on first start).
@@ -55,7 +56,10 @@ cd /tmp
 wget "https://github.com/raydak-labs/travo/releases/download/v1.0.0/travo_1.0.0_aarch64_cortex-a53.tar.gz"
 tar -xzf travo_1.0.0_aarch64_cortex-a53.tar.gz -C /
 chmod +x /usr/bin/travo /etc/init.d/travo 2>/dev/null || true
-# Run any pending uci-defaults (e.g. LuCI port move), then:
+# Run the pending uci-defaults (cron log level, LuCI port move), then:
+for f in /etc/uci-defaults/98-travo-cron-loglevel /etc/uci-defaults/99-travel-gui-ports; do
+  [ -f "$f" ] && sh "$f" && rm -f "$f"
+done
 /etc/init.d/travo enable
 /etc/init.d/travo start
 ```
