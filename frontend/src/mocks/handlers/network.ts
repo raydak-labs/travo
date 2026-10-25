@@ -95,7 +95,7 @@ export const networkHandlers = [
   }),
 
   http.put(API_ROUTES.network.wan, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.network.clients, () => {
@@ -202,11 +202,11 @@ export const networkHandlers = [
   }),
 
   http.post(API_ROUTES.network.portForwards, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.delete(`${API_ROUTES.network.portForwards}/:id`, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.network.diagnostics, () => {
@@ -222,7 +222,7 @@ export const networkHandlers = [
   }),
 
   http.put(API_ROUTES.network.doh, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.network.ipv6, () => {
@@ -230,11 +230,11 @@ export const networkHandlers = [
   }),
 
   http.put(API_ROUTES.network.ipv6, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.network.wol, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.network.connectionMethod, () => {

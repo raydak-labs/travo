@@ -7,7 +7,12 @@ import { toast } from 'sonner';
 import { apiClient, isTokenRemembered, setToken } from '@/lib/api-client';
 import { resetSetupStatusCache } from '@/lib/setup-status';
 import { API_ROUTES } from '@shared/index';
-import type { ChangePasswordRequest, ChangePasswordResponse, AlertThresholds } from '@shared/index';
+import type {
+  AlertThresholds,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  Status,
+} from '@shared/index';
 
 export function useChangePassword() {
   return useMutation({
@@ -48,8 +53,7 @@ export function useAlertThresholds() {
 export function useSetAlertThresholds() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (t: AlertThresholds) =>
-      apiClient.put<{ ok: boolean }>(API_ROUTES.system.alertThresholds, t),
+    mutationFn: (t: AlertThresholds) => apiClient.put<Status>(API_ROUTES.system.alertThresholds, t),
     onSuccess: () => {
       toast.success('Alert thresholds saved');
       void queryClient.invalidateQueries({ queryKey: ['system', 'alert-thresholds'] });

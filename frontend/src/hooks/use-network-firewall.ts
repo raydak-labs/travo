@@ -8,14 +8,15 @@ import { apiClient } from '@/lib/api-client';
 import { routeWithSegment } from '@/lib/api-url';
 import { API_ROUTES } from '@shared/index';
 import type {
-  FirewallZone,
-  PortForwardRule,
   AddPortForwardRequest,
-  WoLRequest,
-  DoHConfig,
-  IPv6Status,
   DiagnosticsRequest,
   DiagnosticsResult,
+  DoHConfig,
+  FirewallZone,
+  IPv6Status,
+  PortForwardRule,
+  Status,
+  WoLRequest,
 } from '@shared/index';
 
 export function useFirewallZones() {
@@ -44,7 +45,7 @@ export function useAddPortForward() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (rule: AddPortForwardRequest) =>
-      apiClient.post<{ ok: boolean }>(API_ROUTES.network.portForwards, rule),
+      apiClient.post<Status>(API_ROUTES.network.portForwards, rule),
     onSuccess: () => {
       toast.success('Port forward added');
       void queryClient.invalidateQueries({ queryKey: ['network', 'portForwards'] });
@@ -59,7 +60,7 @@ export function useDeletePortForward() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.del<{ ok: boolean }>(routeWithSegment(API_ROUTES.network.portForwards, id)),
+      apiClient.del<Status>(routeWithSegment(API_ROUTES.network.portForwards, id)),
     onSuccess: () => {
       toast.success('Port forward deleted');
       void queryClient.invalidateQueries({ queryKey: ['network', 'portForwards'] });
@@ -82,7 +83,7 @@ export function useRunDiagnostics() {
 
 export function useSendWoL() {
   return useMutation({
-    mutationFn: (req: WoLRequest) => apiClient.post<{ ok: boolean }>(API_ROUTES.network.wol, req),
+    mutationFn: (req: WoLRequest) => apiClient.post<Status>(API_ROUTES.network.wol, req),
     onSuccess: () => {
       toast.success('Wake-on-LAN packet sent');
     },
@@ -102,8 +103,7 @@ export function useIPv6Status() {
 export function useSetIPv6Enabled() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (enabled: boolean) =>
-      apiClient.put<{ ok: boolean }>(API_ROUTES.network.ipv6, { enabled }),
+    mutationFn: (enabled: boolean) => apiClient.put<Status>(API_ROUTES.network.ipv6, { enabled }),
     onSuccess: () => {
       toast.success('IPv6 setting saved');
       void queryClient.invalidateQueries({ queryKey: ['network', 'ipv6'] });
@@ -124,7 +124,7 @@ export function useDoHConfig() {
 export function useSetDoHConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (cfg: DoHConfig) => apiClient.put<{ ok: boolean }>(API_ROUTES.network.doh, cfg),
+    mutationFn: (cfg: DoHConfig) => apiClient.put<Status>(API_ROUTES.network.doh, cfg),
     onSuccess: () => {
       toast.success('DNS-over-HTTPS settings saved');
       void queryClient.invalidateQueries({ queryKey: ['network', 'doh'] });

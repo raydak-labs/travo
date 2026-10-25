@@ -40,11 +40,11 @@ export const speedtestHandlers = [
   }),
 
   http.post(API_ROUTES.system.speedtestServiceInstall, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.system.speedtestServiceUninstall, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.system.speedtestServiceRun, () => {

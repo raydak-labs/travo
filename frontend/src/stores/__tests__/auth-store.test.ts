@@ -20,7 +20,7 @@ describe('auth store', () => {
       http.post('/api/v1/auth/logout', ({ request }) => {
         seen.calls += 1;
         seen.auth = request.headers.get('authorization');
-        return HttpResponse.json({ success: true });
+        return HttpResponse.json({ status: 'ok' });
       }),
     );
 
