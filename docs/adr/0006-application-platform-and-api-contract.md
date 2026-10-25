@@ -64,6 +64,8 @@ what the server does.
   user's settings with zero values. Such operations carry `x-strict-body: true` in the spec.
 - **Errors** are `{"error": "...", "code"?: "..."}` (`APIError`) on every status; `code` is stable
   for clients that branch on the cause (`wifi_lockout_risk`).
+- **Acknowledgements** are `{"status": "ok"}` (`Status`); `StatusMessage` adds a `message`, and
+  `RebootRequired` a `reboot_required` flag. There is no `{"ok": true}` variant.
 - **Gates**: `TestEveryRouteIsInTheSpec` (no raw Fiber route under `/api/v1`),
   `TestOperationsAreIdentifiedAndDescribed` (unique `operationId`, a summary) and
   `TestWholeConfigPutsDecodeStrictly` (every multi-field PUT is strict, with a short, reasoned

@@ -69,7 +69,7 @@ export const systemHandlers = [
   }),
 
   http.post(API_ROUTES.system.timeSync, () => {
-    return HttpResponse.json({ ok: true, skew_seconds: 0 });
+    return HttpResponse.json({ synced: false, reason: 'clock already accurate' });
   }),
 
   http.post(API_ROUTES.system.reboot, () => {
@@ -180,7 +180,7 @@ export const systemHandlers = [
   }),
 
   http.put(API_ROUTES.system.alertThresholds, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.system.sshKeys, () => {
@@ -188,10 +188,10 @@ export const systemHandlers = [
   }),
 
   http.post(API_ROUTES.system.sshKeys, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.delete(`${API_ROUTES.system.sshKeys}/:index`, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 ];

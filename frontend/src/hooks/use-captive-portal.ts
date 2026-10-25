@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES } from '@shared/index';
-import type { CaptiveAutoAcceptResult, CaptivePortalStatus, DNSMode } from '@shared/index';
+import type {
+  CaptiveAutoAcceptResult,
+  CaptivePortalStatus,
+  DNSMode,
+  StatusMessage,
+} from '@shared/index';
 
 export function useCaptivePortal() {
   const query = useQuery({
@@ -34,8 +39,7 @@ export function useCaptiveAutoAccept() {
 export function useCaptiveDNSBypass() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiClient.post<{ ok: boolean; message: string }>(API_ROUTES.captive.dnsBypass, {}),
+    mutationFn: () => apiClient.post<StatusMessage>(API_ROUTES.captive.dnsBypass, {}),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
     },
@@ -45,8 +49,7 @@ export function useCaptiveDNSBypass() {
 export function useCaptiveDNSRestore() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiClient.post<{ ok: boolean; message: string }>(API_ROUTES.captive.dnsRestore, {}),
+    mutationFn: () => apiClient.post<StatusMessage>(API_ROUTES.captive.dnsRestore, {}),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['captive', 'status'] });
     },

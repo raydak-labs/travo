@@ -15,10 +15,3 @@ export type {
  * server shows the user a validation error only after submitting.
  */
 export const MIN_PASSWORD_LENGTH = 8;
-
-/** Active session */
-export interface Session {
-  readonly token: string;
-  readonly expires_at: string;
-  readonly created_at: string;
-}

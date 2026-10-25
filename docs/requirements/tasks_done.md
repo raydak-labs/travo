@@ -107,6 +107,10 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
   types (`openapi-typescript`, in `tools/openapi-gen`); 95 of the 105 hand-written shared types
   are now aliases of generated ones, and CI fails on stale output. String fields the backend
   only ever fills from a fixed set carry `enum` tags, so the generated unions are exact.
+- **API follow-ups (2026-10-25):** every shared API type is now generated or derived from a
+  generated one; unused type guards and their tests are gone. Acknowledgements are always
+  `{"status":"ok"}`. `API_ROUTES` is type-checked against the generated `paths`. The generator
+  runs on TypeScript 6.
 
 ## Frontend Toolchain
 

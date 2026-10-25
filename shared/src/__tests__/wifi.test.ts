@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isWifiScanResult,
-  type WifiMode,
-  type WifiEncryption,
   type WifiBand,
-  type WifiScanResult,
   type WifiConnection,
   type WifiConfig,
   type SavedNetwork,
@@ -13,47 +9,10 @@ import {
   type RandomizeMACResponse,
 } from '../api/wifi';
 
-describe('WifiMode', () => {
-  it('has correct values', () => {
-    const modes: WifiMode[] = ['client', 'ap', 'repeater'];
-    expect(modes).toHaveLength(3);
-  });
-});
-
-describe('WifiEncryption', () => {
-  it('has correct values', () => {
-    const encryptions: WifiEncryption[] = ['none', 'wep', 'wpa', 'wpa2', 'wpa3', 'wpa2/wpa3'];
-    expect(encryptions).toHaveLength(6);
-  });
-});
-
 describe('WifiBand', () => {
   it('has correct values', () => {
     const bands: WifiBand[] = ['2.4ghz', '5ghz', '6ghz'];
     expect(bands).toHaveLength(3);
-  });
-});
-
-describe('WifiScanResult', () => {
-  const validScan: WifiScanResult = {
-    ssid: 'MyNetwork',
-    bssid: 'AA:BB:CC:DD:EE:FF',
-    channel: 6,
-    signal_dbm: -55,
-    signal_percent: 70,
-    encryption: 'wpa2',
-    band: '2.4ghz',
-  };
-
-  it('validates a correct WifiScanResult', () => {
-    expect(isWifiScanResult(validScan)).toBe(true);
-  });
-
-  it('rejects invalid data', () => {
-    expect(isWifiScanResult(null)).toBe(false);
-    expect(isWifiScanResult({})).toBe(false);
-    expect(isWifiScanResult({ ssid: 'test' })).toBe(false);
-    expect(isWifiScanResult({ ...validScan, channel: 'six' })).toBe(false);
   });
 });
 

@@ -275,12 +275,12 @@ func registerNetwork(api *API, d *Dependencies) {
 			return reply(PortForwardsResponse{Rules: rules})
 		})
 	post(api, "/api/v1/network/firewall/port-forwards", "AddPortForward", "Add a port-forward rule",
-		func(_ context.Context, in *Body[models.PortForwardRule]) (*Body[OK], error) {
-			return okTrueOrFail(svc.AddPortForward(in.Body))
+		func(_ context.Context, in *Body[models.PortForwardRule]) (*Body[Status], error) {
+			return okOrFail(svc.AddPortForward(in.Body))
 		}, created)
 	del(api, "/api/v1/network/firewall/port-forwards/{id}", "DeletePortForward", "Remove a port-forward rule",
-		func(_ context.Context, in *idParam) (*Body[OK], error) {
-			return okTrueOrFail(svc.DeletePortForward(in.ID))
+		func(_ context.Context, in *idParam) (*Body[Status], error) {
+			return okOrFail(svc.DeletePortForward(in.ID))
 		})
 
 	post(api, "/api/v1/network/diagnostics", "RunDiagnostics", "Run ping, traceroute or a DNS lookup",
@@ -299,20 +299,20 @@ func registerNetwork(api *API, d *Dependencies) {
 	get(api, "/api/v1/network/doh", "GetDoHConfig", "DNS-over-HTTPS configuration",
 		func(context.Context, *none) (*Body[models.DoHConfig], error) { return replyOrFail(svc.GetDoHConfig()) })
 	put(api, "/api/v1/network/doh", "SetDoHConfig", "Set the DNS-over-HTTPS configuration",
-		strict(func(_ context.Context, cfg models.DoHConfig) (*Body[OK], error) {
-			return okTrueOrFail(svc.SetDoHConfig(cfg))
+		strict(func(_ context.Context, cfg models.DoHConfig) (*Body[Status], error) {
+			return okOrFail(svc.SetDoHConfig(cfg))
 		}))
 	get(api, "/api/v1/network/ipv6", "GetIPv6Status", "IPv6 state",
 		func(context.Context, *none) (*Body[models.IPv6Status], error) {
 			return replyOrFail(svc.GetIPv6Status())
 		})
 	put(api, "/api/v1/network/ipv6", "SetIPv6Enabled", "Enable or disable IPv6",
-		func(_ context.Context, in *Body[EnabledRequest]) (*Body[OK], error) {
-			return okTrueOrFail(svc.SetIPv6Enabled(in.Body.Enabled))
+		func(_ context.Context, in *Body[EnabledRequest]) (*Body[Status], error) {
+			return okOrFail(svc.SetIPv6Enabled(in.Body.Enabled))
 		})
 	post(api, "/api/v1/network/wol", "SendWoL", "Send a Wake-on-LAN packet",
-		func(_ context.Context, in *Body[models.WoLRequest]) (*Body[OK], error) {
-			return okTrueOrFail(svc.SendWoL(in.Body.MAC, in.Body.Interface))
+		func(_ context.Context, in *Body[models.WoLRequest]) (*Body[Status], error) {
+			return okOrFail(svc.SendWoL(in.Body.MAC, in.Body.Interface))
 		})
 
 	get(api, "/api/v1/sqm/config", "GetSQMConfig", "Smart queue management configuration",

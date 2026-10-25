@@ -43,12 +43,6 @@ type PortalRequest struct {
 	PortalURL string `json:"portal_url,omitempty"`
 }
 
-// OKMessage is an acknowledgement with a human-readable message.
-type OKMessage struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message"`
-}
-
 // AdGuardConfigBody is the raw AdGuard Home YAML.
 type AdGuardConfigBody struct {
 	Content string `json:"content"`
@@ -231,11 +225,11 @@ func registerVPN(api *API, svc *uplink.VpnService) {
 			return replyOrFail(EnabledResponse{Enabled: enabled}, err)
 		})
 	put(api, "/api/v1/vpn/tailscale/ssh", "SetTailscaleSSH", "Enable or disable Tailscale SSH",
-		func(_ context.Context, in *Body[EnabledRequest]) (*Body[OK], error) {
+		func(_ context.Context, in *Body[EnabledRequest]) (*Body[Status], error) {
 			if err := svc.SetTailscaleSSHEnabled(in.Body.Enabled); err != nil {
 				return nil, vpnErr(err)
 			}
-			return okTrue, nil
+			return statusOK, nil
 		})
 }
 
@@ -315,17 +309,17 @@ func registerCaptive(api *API, svc *uplink.CaptiveService) {
 			return replyOrFail(svc.AutoAcceptCaptivePortal(portal))
 		})
 	post(api, "/api/v1/captive/dns-bypass", "CaptiveDNSBypass", "Point DNS at the upstream network for the portal",
-		func(context.Context, *none) (*Body[OKMessage], error) {
+		func(context.Context, *none) (*Body[StatusMessage], error) {
 			if err := svc.BypassDNS(); err != nil {
 				return nil, serverError(err)
 			}
-			return reply(OKMessage{OK: true, Message: "DNS switched to upstream for captive portal access"})
+			return reply(StatusMessage{Status: "ok", Message: "DNS switched to upstream for captive portal access"})
 		})
 	post(api, "/api/v1/captive/dns-restore", "CaptiveDNSRestore", "Restore DNS after the portal",
-		func(context.Context, *none) (*Body[OKMessage], error) {
+		func(context.Context, *none) (*Body[StatusMessage], error) {
 			if err := svc.RestoreDNS(); err != nil {
 				return nil, serverError(err)
 			}
-			return reply(OKMessage{OK: true, Message: "DNS restored to original configuration"})
+			return reply(StatusMessage{Status: "ok", Message: "DNS restored to original configuration"})
 		})
 }

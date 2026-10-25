@@ -19,11 +19,11 @@ export const vpnHandlers = [
   }),
 
   http.put(API_ROUTES.vpn.wireguard.config, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.vpn.wireguard.toggle, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.vpn.wireguard.status, () => {
@@ -69,7 +69,7 @@ export const vpnHandlers = [
   }),
 
   http.post(API_ROUTES.vpn.tailscale.toggle, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.vpn.tailscale.auth, () => {
@@ -105,7 +105,7 @@ export const vpnHandlers = [
   }),
 
   http.put(API_ROUTES.vpn.tailscale.ssh, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.vpn.splitTunnel, () => {
@@ -113,7 +113,7 @@ export const vpnHandlers = [
   }),
 
   http.put(API_ROUTES.vpn.splitTunnel, () => {
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.vpn.wireguard.import, async ({ request }) => {

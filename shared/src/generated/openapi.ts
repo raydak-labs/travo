@@ -2732,14 +2732,7 @@ export interface components {
             readonly interfaces: readonly components["schemas"]["NetworkInterface"][];
             readonly internet_reachable: boolean;
             readonly lan: components["schemas"]["NetworkInterface"];
-            readonly wan: components["schemas"]["NetworkInterface"];
-        };
-        readonly OK: {
-            readonly ok: boolean;
-        };
-        readonly OKMessage: {
-            readonly message: string;
-            readonly ok: boolean;
+            readonly wan: components["schemas"]["NetworkInterface"] | null;
         };
         readonly PortForwardRule: {
             readonly dest_ip: string;
@@ -3531,7 +3524,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OKMessage"];
+                    readonly "application/json": components["schemas"]["StatusMessage"];
                 };
             };
             /** @description Error */
@@ -3560,7 +3553,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OKMessage"];
+                    readonly "application/json": components["schemas"]["StatusMessage"];
                 };
             };
             /** @description Error */
@@ -4457,7 +4450,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -4610,7 +4603,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -4641,7 +4634,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -4767,7 +4760,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -5069,7 +5062,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -5472,7 +5465,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -6232,7 +6225,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -6290,7 +6283,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -6352,7 +6345,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -6383,7 +6376,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */
@@ -6907,7 +6900,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["OK"];
+                    readonly "application/json": components["schemas"]["Status"];
                 };
             };
             /** @description Error */

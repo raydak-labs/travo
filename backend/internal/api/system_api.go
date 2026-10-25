@@ -20,13 +20,6 @@ import (
 // on the router, so an unbounded upload is a way to fill RAM.
 const maxRestoreUploadBytes = 32 << 20 // 32 MiB
 
-// OK is the {"ok":true} acknowledgement some endpoints answer with.
-type OK struct {
-	OK bool `json:"ok"`
-}
-
-var okTrue = &Body[OK]{Body: OK{OK: true}}
-
 // RebootRequired acknowledges a change that takes effect after a reboot.
 type RebootRequired struct {
 	Status         string `json:"status" example:"ok"`
@@ -199,14 +192,14 @@ func registerSystem(api *API, d *Dependencies) {
 			return reply(d.Alerts.GetAlertThresholds())
 		})
 	put(api, "/api/v1/system/alert-thresholds", "SetAlertThresholds", "Set the alert thresholds",
-		strict(func(_ context.Context, t models.AlertThresholds) (*Body[OK], error) {
+		strict(func(_ context.Context, t models.AlertThresholds) (*Body[Status], error) {
 			if err := system.ValidateAlertThresholds(t); err != nil {
 				return nil, badRequest(ErrInvalidRequestBody + ": " + err.Error())
 			}
 			if err := d.Alerts.SetAlertThresholds(t); err != nil {
 				return nil, serverError(err)
 			}
-			return okTrue, nil
+			return statusOK, nil
 		}))
 
 	get(api, "/api/v1/system/ssh-keys", "GetSSHKeys", "Authorized SSH keys",
@@ -214,14 +207,14 @@ func registerSystem(api *API, d *Dependencies) {
 			return replyOrFail(svc.GetSSHKeys())
 		})
 	post(api, "/api/v1/system/ssh-keys", "AddSSHKey", "Authorize an SSH public key",
-		func(_ context.Context, in *Body[models.AddSSHKeyRequest]) (*Body[OK], error) {
+		func(_ context.Context, in *Body[models.AddSSHKeyRequest]) (*Body[Status], error) {
 			if err := svc.AddSSHKey(in.Body.Key); err != nil {
 				return nil, badRequest(ErrInvalidRequestBody + ": " + err.Error())
 			}
-			return okTrue, nil
+			return statusOK, nil
 		}, created)
 	del(api, "/api/v1/system/ssh-keys/{index}", "DeleteSSHKey", "Remove an authorized SSH key",
-		func(_ context.Context, in *indexParam) (*Body[OK], error) {
+		func(_ context.Context, in *indexParam) (*Body[Status], error) {
 			index, err := strconv.Atoi(in.Index)
 			if err != nil || index < 0 {
 				return nil, badRequest("invalid index")
@@ -229,7 +222,7 @@ func registerSystem(api *API, d *Dependencies) {
 			if err := svc.DeleteSSHKey(index); err != nil {
 				return nil, badRequest(ErrInvalidRequestBody + ": " + err.Error())
 			}
-			return okTrue, nil
+			return statusOK, nil
 		})
 
 	post(api, "/api/v1/system/speed-test", "RunSpeedTest", "Measure WAN throughput",
@@ -241,12 +234,12 @@ func registerSystem(api *API, d *Dependencies) {
 			return replyOrFail(d.Speedtest.GetSpeedtestServiceStatus())
 		})
 	post(api, "/api/v1/system/speedtest-service/install", "InstallSpeedtestCLI", "Install the speedtest CLI",
-		func(context.Context, *none) (*Body[OK], error) {
-			return okTrueOrFail(d.Speedtest.InstallSpeedtestCLI())
+		func(context.Context, *none) (*Body[Status], error) {
+			return okOrFail(d.Speedtest.InstallSpeedtestCLI())
 		})
 	post(api, "/api/v1/system/speedtest-service/uninstall", "UninstallSpeedtestCLI", "Remove the speedtest CLI",
-		func(context.Context, *none) (*Body[OK], error) {
-			return okTrueOrFail(d.Speedtest.UninstallSpeedtestCLI())
+		func(context.Context, *none) (*Body[Status], error) {
+			return okOrFail(d.Speedtest.UninstallSpeedtestCLI())
 		})
 	post(api, "/api/v1/system/speedtest-service/run", "RunSpeedtestCLI", "Run the speedtest CLI",
 		func(context.Context, *none) (*Body[models.SpeedTestResult], error) {
@@ -287,13 +280,6 @@ func registerSystem(api *API, d *Dependencies) {
 			return upgradeFirmware(ctx, svc)
 		}, upload("firmware"),
 		describe("The image's OpenWrt metadata is checked against this board before the flash starts."))
-}
-
-func okTrueOrFail(err error) (*Body[OK], error) {
-	if err != nil {
-		return nil, serverError(err)
-	}
-	return okTrue, nil
 }
 
 // restoreBackup saves the upload to a unique temp path (concurrent restores

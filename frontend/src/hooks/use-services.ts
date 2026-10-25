@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { routeWithParam } from '@/lib/api-url';
 import { API_ROUTES } from '@shared/index';
-import type { ServiceInfo, AdGuardDNSStatus, AdGuardConfig } from '@shared/index';
+import type { AdGuardConfig, AdGuardDNSStatus, ServiceInfo, Status } from '@shared/index';
 
 export function useServices() {
   return useQuery({
@@ -16,7 +16,7 @@ export function useInstallService() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<{ success: boolean }>(routeWithParam(API_ROUTES.services.install, id)),
+      apiClient.post<Status>(routeWithParam(API_ROUTES.services.install, id)),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" installed`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -31,7 +31,7 @@ export function useRemoveService() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<{ success: boolean }>(routeWithParam(API_ROUTES.services.remove, id)),
+      apiClient.post<Status>(routeWithParam(API_ROUTES.services.remove, id)),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" removed`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -46,7 +46,7 @@ export function useStartService() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<{ success: boolean }>(routeWithParam(API_ROUTES.services.start, id)),
+      apiClient.post<Status>(routeWithParam(API_ROUTES.services.start, id)),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" started`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });
@@ -61,7 +61,7 @@ export function useStopService() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.post<{ success: boolean }>(routeWithParam(API_ROUTES.services.stop, id)),
+      apiClient.post<Status>(routeWithParam(API_ROUTES.services.stop, id)),
     onSuccess: (_data, id) => {
       toast.success(`Service "${id}" stopped`);
       void queryClient.invalidateQueries({ queryKey: ['services'] });

@@ -8,7 +8,7 @@ export const servicesHandlers = [
   }),
 
   http.post(API_ROUTES.services.install, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(`${API_ROUTES.services.installStream.replace(':id', ':id')}`, ({ params }) => {
@@ -25,7 +25,7 @@ export const servicesHandlers = [
   }),
 
   http.post(API_ROUTES.services.remove, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(`${API_ROUTES.services.removeStream.replace(':id', ':id')}`, ({ params }) => {
@@ -41,11 +41,11 @@ export const servicesHandlers = [
   }),
 
   http.post(API_ROUTES.services.start, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.services.stop, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.post(API_ROUTES.services.autostart, () => {

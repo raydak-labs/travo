@@ -15,7 +15,7 @@ export const authHandlers = [
   }),
 
   http.post(API_ROUTES.auth.logout, () => {
-    return HttpResponse.json({ success: true });
+    return HttpResponse.json({ status: 'ok' });
   }),
 
   http.get(API_ROUTES.auth.session, () => {

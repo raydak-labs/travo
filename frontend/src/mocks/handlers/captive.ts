@@ -17,10 +17,10 @@ export const captiveHandlers = [
   }),
 
   http.post(API_ROUTES.captive.dnsBypass, () => {
-    return HttpResponse.json({ ok: true, message: 'DNS switched to upstream' });
+    return HttpResponse.json({ status: 'ok', message: 'DNS switched to upstream' });
   }),
 
   http.post(API_ROUTES.captive.dnsRestore, () => {
-    return HttpResponse.json({ ok: true, message: 'DNS restored' });
+    return HttpResponse.json({ status: 'ok', message: 'DNS restored' });
   }),
 ];

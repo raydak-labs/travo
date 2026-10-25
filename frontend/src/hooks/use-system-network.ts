@@ -8,16 +8,17 @@ import { apiClient } from '@/lib/api-client';
 import { routeWithSegment } from '@/lib/api-url';
 import { API_ROUTES } from '@shared/index';
 import type {
-  SetHostnameRequest,
-  LEDStatus,
-  SetLEDRequest,
-  LEDSchedule,
-  TimezoneConfig,
-  NTPConfig,
-  HardwareButton,
-  ButtonActionsRequest,
-  SSHKeysResponse,
   AddSSHKeyRequest,
+  ButtonActionsRequest,
+  HardwareButton,
+  LEDSchedule,
+  LEDStatus,
+  NTPConfig,
+  SSHKeysResponse,
+  SetHostnameRequest,
+  SetLEDRequest,
+  Status,
+  TimezoneConfig,
 } from '@shared/index';
 
 export function useSetHostname() {
@@ -169,8 +170,7 @@ export function useSSHKeys() {
 export function useAddSSHKey() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: AddSSHKeyRequest) =>
-      apiClient.post<{ ok: boolean }>(API_ROUTES.system.sshKeys, req),
+    mutationFn: (req: AddSSHKeyRequest) => apiClient.post<Status>(API_ROUTES.system.sshKeys, req),
     onSuccess: () => {
       toast.success('SSH key added');
       void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });
@@ -185,7 +185,7 @@ export function useDeleteSSHKey() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (index: number) =>
-      apiClient.del<{ ok: boolean }>(routeWithSegment(API_ROUTES.system.sshKeys, index)),
+      apiClient.del<Status>(routeWithSegment(API_ROUTES.system.sshKeys, index)),
     onSuccess: () => {
       toast.success('SSH key deleted');
       void queryClient.invalidateQueries({ queryKey: ['system', 'ssh-keys'] });

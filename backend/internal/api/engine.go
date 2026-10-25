@@ -277,6 +277,39 @@ func newBinder(t reflect.Type) func(fiber.Ctx, reflect.Value) error {
 	}
 }
 
+// schema documents t, marking nullable references on the way (nullableRefs).
+func (a *API) schema(t reflect.Type, hint string) *huma.Schema {
+	s := a.registry.Schema(t, true, hint)
+	a.nullableRefs(t, map[reflect.Type]bool{})
+	return s
+}
+
+// nullableRefs documents a pointer-to-struct field without omitempty as
+// "the struct or null", which is what encoding/json sends for a nil pointer.
+// Huma's nullable tag does not apply to a referenced schema.
+func (a *API) nullableRefs(t reflect.Type, seen map[reflect.Type]bool) {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice || t.Kind() == reflect.Array || t.Kind() == reflect.Map {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct || seen[t] {
+		return
+	}
+	seen[t] = true
+	parent := a.registry.Map()[huma.DefaultSchemaNamer(t, "")]
+	for i := range t.NumField() {
+		f := t.Field(i)
+		a.nullableRefs(f.Type, seen)
+		name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if parent == nil || name == "" || name == "-" || strings.Contains(opts, "omitempty") ||
+			f.Type.Kind() != reflect.Pointer || f.Type.Elem().Kind() != reflect.Struct {
+			continue
+		}
+		if prop := parent.Properties[name]; prop != nil && prop.Ref != "" {
+			parent.Properties[name] = &huma.Schema{AnyOf: []*huma.Schema{{Ref: prop.Ref}, {Type: "null"}}}
+		}
+	}
+}
+
 // document adds the operation to the OpenAPI document and returns its success
 // status.
 func (a *API) document(method, path, id, summary string, in, out reflect.Type, opts []opt) int {
@@ -302,7 +335,7 @@ func (a *API) document(method, path, id, summary string, in, out reflect.Type, o
 			op.RequestBody = &huma.RequestBody{
 				Required: f.Type.Kind() != reflect.Pointer,
 				Content: map[string]*huma.MediaType{"application/json": {
-					Schema: a.registry.Schema(t, true, id+"Request"),
+					Schema: a.schema(t, id+"Request"),
 				}},
 			}
 		case f.Name == "RawBody":
@@ -321,7 +354,7 @@ func (a *API) document(method, path, id, summary string, in, out reflect.Type, o
 		resp := &huma.Response{Description: http.StatusText(op.DefaultStatus)}
 		if f, ok := out.FieldByName("Body"); ok {
 			resp.Content = map[string]*huma.MediaType{"application/json": {
-				Schema: a.registry.Schema(f.Type, true, id+"Response"),
+				Schema: a.schema(f.Type, id+"Response"),
 			}}
 		}
 		op.Responses[status] = resp

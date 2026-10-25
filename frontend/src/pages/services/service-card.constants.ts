@@ -13,13 +13,12 @@ export const serviceCardIcons: Record<string, LucideIcon> = {
   cloudflared: Cloud,
 };
 
-/** A stopped service is a choice, not yet a problem; only `error` reads red. */
+/** A stopped service is a choice, not a problem, so nothing reads red. */
 export const serviceStateTone: Record<ServiceState, StatusPillProps['tone']> = {
   running: 'ok',
   installed: 'info',
   stopped: 'warn',
   not_installed: 'neutral',
-  error: 'danger',
 };
 
 export const serviceStateLabels: Record<ServiceState, string> = {
@@ -27,5 +26,4 @@ export const serviceStateLabels: Record<ServiceState, string> = {
   installed: 'Installed',
   stopped: 'Stopped',
   not_installed: 'Not Installed',
-  error: 'Error',
 };

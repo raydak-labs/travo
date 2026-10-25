@@ -5,17 +5,18 @@ import { routeWithSegment } from '@/lib/api-url';
 import { refreshRouterState } from '@/lib/router-state-refresh';
 import { API_ROUTES } from '@shared/index';
 import type {
-  VpnStatus,
-  WireguardConfig,
-  TailscaleStatus,
-  WireGuardStatus,
-  WireGuardProfile,
-  KillSwitchStatus,
   DNSLeakResult,
-  VPNVerifyResult,
-  SplitTunnelConfig,
-  TailscaleSSHStatus,
+  KillSwitchStatus,
   SpeedTestResult,
+  SplitTunnelConfig,
+  Status,
+  TailscaleSSHStatus,
+  TailscaleStatus,
+  VPNVerifyResult,
+  VpnStatus,
+  WireGuardProfile,
+  WireGuardStatus,
+  WireguardConfig,
 } from '@shared/index';
 
 export function useVpnStatus() {
@@ -44,7 +45,7 @@ export function useToggleWireguard() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enable: boolean) =>
-      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.wireguard.toggle, { enabled: enable }),
+      apiClient.post<Status>(API_ROUTES.vpn.wireguard.toggle, { enabled: enable }),
     onSuccess: (_data, enable) => {
       toast.success(`WireGuard ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -72,7 +73,7 @@ export function useToggleTailscale() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enable: boolean) =>
-      apiClient.post<{ success: boolean }>(API_ROUTES.vpn.tailscale.toggle, { enabled: enable }),
+      apiClient.post<Status>(API_ROUTES.vpn.tailscale.toggle, { enabled: enable }),
     onSuccess: (_data, enable) => {
       toast.success(`Tailscale ${enable ? 'enabled' : 'disabled'}`);
       void queryClient.invalidateQueries({ queryKey: ['vpn'] });
@@ -267,7 +268,7 @@ export function useSetTailscaleSSH() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enabled: boolean) =>
-      apiClient.put<{ ok: boolean }>(API_ROUTES.vpn.tailscale.ssh, { enabled }),
+      apiClient.put<Status>(API_ROUTES.vpn.tailscale.ssh, { enabled }),
     onSuccess: () => {
       toast.success('Tailscale SSH setting updated');
       void queryClient.invalidateQueries({ queryKey: ['vpn', 'tailscale', 'ssh'] });

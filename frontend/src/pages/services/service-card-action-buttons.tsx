@@ -104,14 +104,6 @@ export function ServiceCardActionButtons({
           {remove}
         </>
       )}
-      {service.state === 'error' && (
-        <>
-          <Button size="sm" disabled={isPending} onClick={() => onStart(service.id)}>
-            Restart
-          </Button>
-          {remove}
-        </>
-      )}
     </div>
   );
 }

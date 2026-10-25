@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { API_ROUTES, isSpeedtestServiceStatus, isSpeedTestResult } from '@shared/index';
-import type { SpeedTestResult } from '@shared/index';
+import type { SpeedTestResult, Status } from '@shared/index';
 
 export function useSpeedtestServiceStatus() {
   return useQuery({
@@ -20,7 +20,7 @@ export function useSpeedtestServiceStatus() {
 export function useInstallSpeedtestCLI() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<{ ok: boolean }>(API_ROUTES.system.speedtestServiceInstall),
+    mutationFn: () => apiClient.post<Status>(API_ROUTES.system.speedtestServiceInstall),
     onSuccess: () => {
       toast.success('speedtest CLI installed');
       void queryClient.invalidateQueries({ queryKey: ['speedtest-service'] });
@@ -34,7 +34,7 @@ export function useInstallSpeedtestCLI() {
 export function useUninstallSpeedtestCLI() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiClient.post<{ ok: boolean }>(API_ROUTES.system.speedtestServiceUninstall),
+    mutationFn: () => apiClient.post<Status>(API_ROUTES.system.speedtestServiceUninstall),
     onSuccess: () => {
       toast.success('speedtest CLI uninstalled');
       void queryClient.invalidateQueries({ queryKey: ['speedtest-service'] });
