@@ -471,9 +471,16 @@ do_install() {
     fi
 
     # --- Step 5: Start travel GUI ---
-    info "Enabling and starting ${PKG_NAME}..."
+    # restart, not start: on an upgrade travo is already running, and procd's
+    # start leaves that process alone. It keeps serving from the replaced
+    # binary (/proc/<pid>/exe -> "/usr/bin/travo (deleted)") and the health
+    # check below passes against the old version. A fresh install starts it:
+    # restart on a stopped service prints a misleading ubus "Not found".
+    _action=start
+    pgrep -f "^/usr/bin/${PKG_NAME}( |\$)" >/dev/null 2>&1 && _action=restart
+    info "Enabling and ${_action}ing ${PKG_NAME}..."
     /etc/init.d/"$PKG_NAME" enable 2>/dev/null || true
-    if ! /etc/init.d/"$PKG_NAME" start; then
+    if ! /etc/init.d/"$PKG_NAME" "$_action"; then
         warn "${PKG_NAME} failed to start — recent log lines follow."
         logread 2>/dev/null | tail -n 20 || true
         die "install did not complete: ${PKG_NAME} is not running.
@@ -507,6 +514,14 @@ do_install() {
         logread 2>/dev/null | tail -n 20 || true
         die "install did not complete: ${PKG_NAME} is not responding on port ${_port}.
        Check:  logread | grep -i travo"
+    fi
+    # The answer must come from the binary just installed, not from a process
+    # that survived the restart.
+    _pid="$(pgrep -f "^/usr/bin/${PKG_NAME}( |\$)" | head -n 1)"
+    _exe="$(readlink "/proc/${_pid}/exe" 2>/dev/null || true)"
+    if [ "$_exe" != "/usr/bin/${PKG_NAME}" ]; then
+        die "install did not complete: ${PKG_NAME} (pid ${_pid:-none}) runs '${_exe:-unknown}', not the
+       installed /usr/bin/${PKG_NAME}. Run:  /etc/init.d/${PKG_NAME} restart"
     fi
     success "${PKG_NAME} is running"
 
