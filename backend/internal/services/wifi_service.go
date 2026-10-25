@@ -381,11 +381,7 @@ const (
 )
 
 // wirelessProbeSafetyMarginSeconds is the room the CLIENT reserves on top of the
-// probe budget: PROBE_SAFETY_MARGIN_MS / 1000 in
-// frontend/src/lib/wifi-apply.ts, which is the only place that reserves it. It
-// used to exist here as well (as 1) while the client used 500 and the comment
-// said "half a second"; the Go gate in wifi_service_test.go now states it once,
-// next to the assertion that uses it, and
+// probe budget (PROBE_SAFETY_MARGIN_MS in frontend/src/lib/wifi-apply.ts).
 // TestClientProbeSafetyMarginMatchesTheGoGate fails when the two sides drift.
 const wirelessProbeSafetyMarginSeconds = 2
 
@@ -407,20 +403,13 @@ func wirelessProbeBudgetSeconds() int {
 }
 
 // verifyAppliedWirelessUp proves that every interface the applied config says
-// should be running is actually up. It is the confirmation-time counterpart of
-// GetHealth: UCI says which AP and uplink-STA sections are enabled, netifd says
-// whether they exist and are up.
+// should be running is actually up: UCI says which AP and uplink-STA sections
+// are enabled, netifd says whether they exist and are up.
 //
-// The uplink STA is proven too, not just the access points. Client mode disables
-// every AP, so a client-mode apply used to have an empty proof and confirm
-// unconditionally — a STA on the wrong band or with the wrong key then left the
-// operator with no uplink and no way back over WiFi, with rpcd's rollback
-// cancelled. Probing the STA also closes the same hole in repeater mode, where
-// the downlink AP can come up while the uplink never associates.
-//
-// A config that leaves neither an AP nor an uplink STA enabled has nothing to
-// prove — "WiFi off" is a change the operator is allowed to make and
-// reachability is exactly what the confirm request itself demonstrates.
+// The uplink STA is proven too: client mode has no AP, and a STA with the wrong
+// band or key would otherwise confirm and cancel rpcd's rollback with no uplink
+// left. A config that enables neither has nothing to prove ("WiFi off" is
+// allowed, and the confirm request itself demonstrates reachability).
 func (w *WifiService) verifyAppliedWirelessUp() error {
 	sections, err := w.uci.GetSections("wireless")
 	if err != nil {
@@ -459,28 +448,14 @@ func (w *WifiService) verifyAppliedWirelessUp() error {
 	return lastErr
 }
 
-// ErrWirelessUnverifiable reports that this probe could not READ the answer:
-// `ubus call network.wireless status` (or the `network.device status` fallback)
-// either failed at the transport level or answered in a shape this build cannot
-// read — a radio without an "up" flag, an interface without an "ifname", an
-// entry that is not an object at all. It covers both, because to the operator
-// they are one condition: Travo does not know whether the new settings came up.
+// ErrWirelessUnverifiable reports that the probe could not READ the answer:
+// `network.wireless status` (or the `network.device status` fallback) failed at
+// the transport level or answered in a shape this build cannot read.
 //
-// The transport failure used to be reported as ErrWirelessNotUp, which put
-// "wireless apply not verified: ..." in front of the operator while rpcd's
-// rollback window was still open and the new config was still live — and the
-// frontend, which substring-matches that prefix, turned it into "so it rolled
-// back to the previous settings". rpcd has rolled back nothing at that point.
-//
-// It is deliberately NOT ErrWirelessNotUp, and its message must not start with
-// the same words either: the frontend tells the two apart by substring, so a
-// shared prefix made "I cannot read the answer" say on screen that the router
-// had already rolled back — while rpcd's rollback window was still open.
-// "I cannot read the answer" and "the access point did not come up" call for
-// different responses from an operator and from whoever is on call, and
-// collapsing the first into the second is what let a probe that could never pass
-// on real hardware look like operator error. Both still keep the rollback armed:
-// the apply is not confirmed either way.
+// It is deliberately distinct from ErrWirelessNotUp, and its message must not
+// share that prefix: the frontend tells the two apart by substring, and only
+// ErrWirelessNotUp means "the change did not come up". Both keep the rollback
+// armed: the apply is not confirmed either way.
 var ErrWirelessUnverifiable = errors.New(
 	"wireless apply could not be verified: network.wireless status could not be read")
 
@@ -495,46 +470,6 @@ func isUnreadablePayload(err error) bool {
 	return errors.Is(err, ErrWirelessUnverifiable) && !errors.Is(err, errWirelessStatusUnread)
 }
 
-// appliedWirelessUp cross-checks netifd's view of the wireless interfaces
-// against what the applied config enables. A section counts as up only when BOTH
-// hold:
-//
-//  1. netifd LISTS it (the section is present under a radio's "interfaces", so
-//     netifd created it), and
-//  2. either the owning radio is up and settled (not pending, not
-//     retry_setup_failed) AND it carries no other expected interface, or the
-//     interface itself answers
-//     `ubus call network.device status {"name":"<ifname>"}` with
-//     present && up && carrier.
-//
-// Why the radio is not proof for a shared radio: netifd reports liveness per
-// RADIO, so on a radio hosting two wanted interfaces (guest AP beside the main
-// AP — SetGuestWifi only excludes the uplink radio) the first one to come up
-// settles the radio and used to prove the second one too. The probe then
-// confirmed and cancelled the rollback with a dead access point, which is the
-// one direction that silently takes the operator's SSID away. The per-device
-// answer is therefore the authority whenever a radio carries more than one
-// expected interface.
-//
-// Why per-radio: on OpenWrt 25.12.3 / netifd 2026.02.26-r1 liveness is reported
-// per RADIO ("up", "pending", "retry_setup_failed", "autostart"). A per-interface
-// entry carries exactly {section, config, ifname, vlans, stations} — there is no
-// per-interface "up" and no "config_path". Reading iface["up"] therefore answers
-// false for every interface on every device, which is what made ConfirmApply
-// refuse to confirm anything. Why the device fallback: a radio can read up while
-// the interface on it is still being set up, and carrier is the only per-device
-// liveness netifd exposes.
-//
-// Deliberately not used as liveness signals: stations[] (empty for a healthy
-// zero-client AP, and structurally always empty for mode=sta) and iwinfo
-// assoclist. See ADR 0002 §5.
-//
-// It fails closed: an interface that cannot be observed counts as down, because
-// the whole point is to keep the rollback armed when the answer is unknown. One
-// wireless status read answers every expectation, so a settled single-interface
-// radio costs no extra ubus round-trip; the fallback is consulted for an
-// unsettled radio or one carrying several expected interfaces, and its cost is
-// budgeted (see wirelessProbeMaxUbusCalls).
 // The kinds an expected interface can be, held as values rather than inline
 // strings because the uplink kind also decides HOW an interface may be proven:
 // see appliedWirelessUp.

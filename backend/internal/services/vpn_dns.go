@@ -88,12 +88,10 @@ func (v *VpnService) observeTunnelDown(tunnelDetail string) bool {
 // maybeSelfHealVpnDNS pops the VPN layer when the tunnel that justified it can
 // no longer carry DNS: wg0 is absent for good, or the tunnel is disabled in UCI.
 //
-// It heals only on TERMINAL states. `configured` (no peers yet) and
-// `up_no_handshake` (peers, tunnel up, no handshake yet) both mean the tunnel
-// is on its way up, and burning the restore on them is what a reboot into an
-// unreachable upstream used to do. `enabled_not_up` is the one ambiguous state
-// — it is also what a single failed `wg show` looks like — so it is debounced
-// (see observeTunnelDown) instead of trusted.
+// It heals only on TERMINAL states. `configured` and `up_no_handshake` mean the
+// tunnel is on its way up (a reboot into a slow upstream). `enabled_not_up` is
+// ambiguous, since a single failed `wg show` looks the same, so it is debounced
+// (observeTunnelDown) instead of trusted.
 //
 // tunnelDetail is the already-computed wgRuntimeState detail, so this costs no
 // extra shell-out. Returns true when a restore happened.

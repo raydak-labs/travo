@@ -184,31 +184,17 @@ func (w *WifiService) GetWiFiSchedule() (models.WiFiSchedule, error) {
 	return s, nil
 }
 
-// crontabMu serialises read-modify-write of /etc/crontabs/root.
-//
-// Every writer of that one file takes it: the WiFi schedule, the LED schedule,
-// AND the auto-reconnect cron entry. The auto-reconnect path rewrites the file
-// through `crontab -l | grep -v ... | crontab -`, which is the same
-// read-modify-write as the others — two concurrent rewrites each read the same
-// base and each wrote their own version, so one silently dropped the other's
-// entries. That is not hypothetical at boot: main.go reconciles auto-reconnect
-// at 5s and the schedules at 6s.
-//
-// Keyed on the FILE, not on a UCI config: this is a plain crontab, with no
-// uci delta involved.
+// crontabMu serialises read-modify-write of /etc/crontabs/root. Every writer of
+// that file takes it: the WiFi schedule, the LED schedule and the auto-reconnect
+// entry, which all reconcile at boot within a second of each other. It is keyed
+// on the file, not on a UCI config.
 var crontabMu sync.Mutex
 
 // SetWiFiSchedule saves the WiFi schedule and updates the crontab.
 func (w *WifiService) SetWiFiSchedule(schedule models.WiFiSchedule) error {
 	// The times are formatted straight into a crontab line, so they must be
-	// strict HH:MM: a newline would inject an extra attacker-controlled cron
-	// entry that runs as root.
-	//
-	// Validate BEFORE persisting. Writing first left the rejected value in
-	// wifi-schedule.json (so GetWiFiSchedule reported it back to the UI and the
-	// startup reconcile goroutine re-read it) while the previously written cron
-	// file kept toggling WiFi — a request that returned 400 had in fact changed
-	// persisted state.
+	// strict HH:MM: a newline would inject a root cron entry. Validate before
+	// persisting, so a rejected request changes nothing.
 	if schedule.Enabled && schedule.OnTime != "" && schedule.OffTime != "" {
 		if err := ValidateHHMM(schedule.OnTime); err != nil {
 			return fmt.Errorf("on_time: %w", err)

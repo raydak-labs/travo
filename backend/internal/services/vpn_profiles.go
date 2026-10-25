@@ -137,7 +137,7 @@ func (v *VpnService) ActivateProfileLocked(id string) error {
 	}
 
 	// Apply the config via the existing import logic
-	if err := v.ImportWireguardConfigLocked(target.Config); err != nil {
+	if err := v.importWireguardConfigLocked(target.Config); err != nil {
 		return fmt.Errorf("applying profile config: %w", err)
 	}
 

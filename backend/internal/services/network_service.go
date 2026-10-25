@@ -14,6 +14,9 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
+// ErrUnknownInterface is returned for an interface name netifd does not know.
+var ErrUnknownInterface = errors.New("unknown interface")
+
 // NetworkService provides network status and configuration.
 type NetworkService struct {
 	uci       uci.UCI
@@ -133,7 +136,7 @@ var allowedInterfaces = map[string]bool{
 // SetInterfaceState brings a network interface up or down via ifup/ifdown.
 func (n *NetworkService) SetInterfaceState(iface string, up bool) error {
 	if !allowedInterfaces[iface] {
-		return fmt.Errorf("unknown interface: %s", iface)
+		return fmt.Errorf("%w: %s", ErrUnknownInterface, iface)
 	}
 	cmd := "ifdown"
 	if up {

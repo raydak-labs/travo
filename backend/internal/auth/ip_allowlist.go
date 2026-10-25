@@ -70,18 +70,13 @@ func IPAllowed(nets []*net.IPNet, ip net.IP) bool {
 }
 
 // shouldBypassIPAllowlist reports whether a path is reachable from a client IP
-// outside ALLOWED_ADMIN_CIDRS.
+// outside ALLOWED_ADMIN_CIDRS. It is a subset of PublicPaths, derived from it so
+// the two cannot drift.
 //
-// It is a subset of PublicPaths, not a second independent list: the two used to
-// drift, and the drift is invisible at runtime because neither list is checked
-// against the route table.
-//
-// /api/v1/ws is deliberately NOT exempt. It authenticates itself with a session
-// token, but it is also a live administrative channel, so the IP allowlist --
-// "only administer this router from my laptop" -- must still apply to it. The
-// remaining public paths are bootstrap or read-only: the health probe, the
-// machine-readable API contract for automation, login, and the pre-login clock
-// recovery that an operator needs when the device's clock is wrong.
+// /api/v1/ws is NOT exempt: it is a live administrative channel, so "only
+// administer this router from my laptop" applies to it. The exempt paths are
+// bootstrap or read-only: health, the API contract, login and the pre-login
+// clock recovery.
 func shouldBypassIPAllowlist(path string) bool {
 	if path == "/api/v1/ws" {
 		return false

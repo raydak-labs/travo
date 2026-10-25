@@ -486,27 +486,16 @@ func (w *WifiService) rejectAPOnUplinkRadio(radioName, reason string) error {
 }
 
 // splitAPOffUplinkRadio keeps the radio an uplink STA is about to be enabled on
-// from also running an access point.
-//
-// It is the same split reconcileRepeaterAPRadioLayout performs, applied for
-// every mode. Connect used to rely on that reconcile alone, and it returns
-// immediately outside repeater mode — so on a device in client or ap mode
-// nothing stood between the uplink and an enabled AP on the same radio, which
-// is the state ADR 0002 §2 says is enough to crash ath11k/IPQ6018.
-//
-// Two outcomes, both deliberate:
+// from also running an access point, in every mode: an AP and a STA on one PHY
+// is enough to crash ath11k/IPQ6018 (ADR 0002 §2).
 //
 //   - Another radio hosts an access point: the APs on the uplink radio are
-//     disabled and the downlink moves to the other band, exactly what
-//     SetMode("repeater") already does. The uplink is what the operator asked
-//     for; the downlink follows.
-//   - No other radio hosts one: the request is refused. Disabling the only
-//     access point to free a radio would silently take the router's WiFi away,
-//     which is not what a "connect" request means. allow_ap_on_sta_radio is the
-//     documented escape.
+//     disabled and the downlink moves to the other band, as SetMode("repeater")
+//     does.
+//   - No other radio hosts one: the request is refused rather than silently
+//     taking the router's WiFi away. allow_ap_on_sta_radio is the escape hatch.
 //
-// Single-radio hardware keeps coexistence: there is no split to make, which is
-// the trade-off SetMode("repeater") already accepts.
+// Single-radio hardware keeps coexistence: there is no split to make.
 func (w *WifiService) splitAPOffUplinkRadio(radioName string) error {
 	if radioName == "" {
 		return nil

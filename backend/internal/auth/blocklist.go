@@ -22,8 +22,7 @@ const blocklistBucket = "blocklist"
 const jtiKeyPrefix = "jti:"
 
 // TokenBlocklist maintains a set of blocked (revoked) JWT tokens, keyed by
-// token hash. With a store attached, revocations survive backend restarts
-// (previously a restart resurrected logged-out tokens for up to 24h).
+// token hash. With a store attached, revocations survive backend restarts.
 type TokenBlocklist struct {
 	mu       sync.RWMutex
 	tokens   map[string]time.Time // sha256(token) hex -> expiry

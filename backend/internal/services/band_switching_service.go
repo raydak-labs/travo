@@ -196,8 +196,7 @@ func (b *BandSwitchingService) Start() {
 		var (
 			weakSignalSecs int
 			// upSignalSecs accumulates how long the preferred band has been strong
-			// enough to return to. up_switch_delay_sec used to be parsed,
-			// validated and persisted, and then never read by any logic.
+			// enough to return to (up_switch_delay_sec).
 			upSignalSecs int
 			cooldownSec  int
 		)
@@ -384,13 +383,8 @@ func (b *BandSwitchingService) setBlocked(reason, radio string) {
 }
 
 // refreshBlocked drops a recorded block the current radio layout no longer
-// justifies.
-//
-// Latching it for good was wrong once SwitchSTAToRadio stopped refusing every
-// layout that carries an access point: the switcher would go on reporting
-// "blocked" for a layout it can switch from, which is the card claiming a fault
-// the switcher has not observed. Re-reading the layout each tick costs a UCI
-// read and only when a block is actually on record.
+// justifies, so the UI never reports a fault the switcher has not observed. It
+// costs a UCI read, and only while a block is on record.
 func (b *BandSwitchingService) refreshBlocked() {
 	b.mu.RLock()
 	reason, radio := b.blockedReason, b.blockedRadio
@@ -532,8 +526,7 @@ type BandRadioInfo struct {
 	Band string
 }
 
-// GetRadios returns a slim radio list for band switching logic.
-// It wraps WifiService.GetRadios() to avoid import cycles on models.
+// getRadios returns a slim radio list for band switching logic.
 func (b *BandSwitchingService) getRadios() []BandRadioInfo {
 	radios, err := b.wifi.GetRadios()
 	if err != nil {

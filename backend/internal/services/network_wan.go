@@ -47,12 +47,8 @@ var errPPPoEUnsupported = errors.New(
 	"PPPoE needs a username and password that this API cannot store: " +
 		"configure PPPoE in LuCI (Network -> Interfaces -> WAN), then save other WAN fields here")
 
-// SetWanConfig updates the WAN configuration.
-//
-// Everything the request declares is written. MTU and the DNS servers used to be
-// validated by the handler, published in the OpenAPI body and then dropped on
-// the floor, so the documented "GET, change a field, PUT it back" client pattern
-// answered 200 having changed nothing at all.
+// SetWanConfig updates the WAN configuration. Every field the request declares
+// is written, so "GET, change a field, PUT it back" works for all of them.
 func (n *NetworkService) SetWanConfig(config models.WanConfig) error {
 	return mutateUCI(n.uci, []string{"network"}, func() error {
 		if config.MTU != 0 && (config.MTU < 68 || config.MTU > 9000) {

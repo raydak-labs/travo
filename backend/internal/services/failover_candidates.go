@@ -111,15 +111,10 @@ func (s *FailoverService) updateOnlineTimestamps() {
 // computeActiveInterface reports which uplink is carrying the connection, or ""
 // when none is.
 //
-// Candidates arrive in priority order, so the first qualifying one wins. Two
-// things qualify it: a candidate that has been online long enough to clear the
-// hold-down, and — only as a fallback — the uplink that is active right now.
-//
-// The fallback used to come FIRST and it returned the active uplink whenever
-// that uplink was merely online. A lower-priority link that came back first was
-// therefore never given back to a higher-priority link that later recovered:
-// the sticky branch matched and returned before the hold-down branch ever ran.
-// Failback could not happen at all.
+// Candidates arrive in priority order, so the first qualifying one wins: a
+// candidate online long enough to clear the hold-down, and only as a fallback the
+// uplink that is active right now. The order is what makes failback possible: a
+// higher-priority link that recovers must win over the sticky active one.
 func (s *FailoverService) computeActiveInterface(candidates []models.FailoverCandidate) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -242,13 +237,9 @@ func markUnavailable(candidate models.FailoverCandidate) models.FailoverCandidat
 
 // managedSectionNames lists the mwan3 sections the apply is expected to create
 // for a candidate list, with the option values that must match what the apply
-// wrote. Members are only written for enabled candidates.
-//
-// The values matter as much as the names: mwan3 members reference the mwan3
-// interface SECTION, so a member left pointing at a pre-namespacing section name
-// ("wan" instead of "travo_if_wan") keeps the policy bound to a section the
-// service no longer writes or updates. Checking presence alone would let that
-// through in production.
+// wrote. Members are only written for enabled candidates. The values matter: a
+// member pointing at the wrong interface section keeps the policy bound to a
+// section the service does not manage.
 func managedSectionNames(candidates []models.FailoverCandidate) map[string]map[string]string {
 	names := map[string]map[string]string{
 		failoverPolicySection: nil,

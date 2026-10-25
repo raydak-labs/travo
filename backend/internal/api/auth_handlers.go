@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -88,7 +89,7 @@ func ChangePasswordHandler(authSvc *auth.AuthService) fiber.Handler {
 		res, err := authSvc.ChangePassword(req.CurrentPassword, req.NewPassword)
 		if err != nil {
 			status := fiber.StatusBadRequest
-			if err.Error() == "invalid current password" {
+			if errors.Is(err, auth.ErrInvalidCurrentPassword) {
 				status = fiber.StatusUnauthorized
 			}
 			return RespondWithError(c, status, err.Error())

@@ -102,7 +102,7 @@ func SetInterfaceStateHandler(svc *services.NetworkService) fiber.Handler {
 			return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 		}
 		if err := svc.SetInterfaceState(name, req.Up); err != nil {
-			if err.Error() == fmt.Sprintf("unknown interface: %s", name) {
+			if errors.Is(err, services.ErrUnknownInterface) {
 				return RespondWithError(c, fiber.StatusBadRequest, ErrInvalidRequestBody+": "+err.Error())
 			}
 			return RespondWithServerError(c, err)

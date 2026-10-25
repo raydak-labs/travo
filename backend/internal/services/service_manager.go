@@ -273,8 +273,8 @@ func (sm *ServiceManager) postInstallHook(serviceID string) func() error {
 // Install installs the packages for a service.
 func (sm *ServiceManager) Install(serviceID string) error {
 	// opMu serializes mutating work; the cache write lock is only taken for the
-	// short refreshOne call at the end, so reads stay responsive while a
-	// 3-package install runs (previously 30 minutes of blocking).
+	// short refreshOne call at the end, so reads stay responsive during a
+	// multi-package install.
 	sm.opMu.Lock()
 	defer sm.opMu.Unlock()
 

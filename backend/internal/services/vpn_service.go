@@ -113,10 +113,8 @@ func (v *VpnService) enableWireguard() error {
 		return fmt.Errorf("WireGuard enabled in UCI but tunnel failed to start: %w", err)
 	}
 
-	// The tunnel is verified up, so clearing the Tailscale exit node can no
-	// longer strand a failed enable. It used to run first, which meant a failed
-	// enable silently changed where the router's own traffic egresses with
-	// nothing to put it back (rollbackWireguardEnable never restored it).
+	// Clear the Tailscale exit node only once the tunnel is verified up, so a
+	// failed enable never changes where the router's own traffic egresses.
 	_, _ = v.cmd.Run(tailscaleBin(), "set", "--exit-node=")
 
 	if err := v.setupWireGuardFirewall(); err != nil {
@@ -162,16 +160,12 @@ func (v *VpnService) rollbackWireguardEnable(prevDisabled string) error {
 
 func (v *VpnService) disableWireguard() error {
 	// The disable path bounces uplinks (ubus down/up, then ifdown/ifup as a last
-	// resort). That is live state, so it needs the crash guard exactly like the
-	// enable path (ADR 0003). It used to be written only by enableWireguard, so
-	// an interrupted bounce left the uplink down with no marker at all.
+	// resort), so it needs the crash guard like the enable path (ADR 0003).
 	if err := v.crashGuard.Mark(); err != nil {
 		return err
 	}
-	// Every exit path tears the wg0 firewall plumbing down. Returning early on
-	// the missing-default-route branch used to leave firewall.wg0_zone and
-	// firewall.wg0_fwd committed across reboots, and the next enable reused
-	// those stale sections.
+	// Every exit path tears the wg0 firewall plumbing down, so no stale
+	// wg0_zone/wg0_fwd survives a reboot into the next enable.
 	//
 	// The guard is cleared inside this defer, after the teardown, so a device
 	// that dies mid-teardown still has the marker. routeConfirmed is false on
@@ -357,18 +351,17 @@ func (v *VpnService) VerifyWireGuard() models.VPNVerifyResult {
 	return result
 }
 
-// ImportWireguardConfig is the entry point from the API. It takes the UCI transaction for every
-// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
-// the middle of a VPN toggle and revert half of it.
+// ImportWireguardConfig parses a .conf file, normalizes the UCI structure,
+// applies the config, and verifies the tunnel comes up. It holds the UCI locks
+// for every config the VPN flow touches (vpnFlowConfigs).
 func (v *VpnService) ImportWireguardConfig(confContent string) error {
 	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
-		return v.ImportWireguardConfigLocked(confContent)
+		return v.importWireguardConfigLocked(confContent)
 	})
 }
 
-// ImportWireguardConfig parses a .conf file, normalizes the UCI structure,
-// applies the config, and verifies the tunnel comes up.
-func (v *VpnService) ImportWireguardConfigLocked(confContent string) error {
+// importWireguardConfigLocked is ImportWireguardConfig for a caller that holds the locks.
+func (v *VpnService) importWireguardConfigLocked(confContent string) error {
 	parsed, err := ParseWireguardConfig(confContent)
 	if err != nil {
 		return err

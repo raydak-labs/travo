@@ -142,9 +142,7 @@ func newAppLifecycle() *appLifecycle {
 
 // Go runs fn as a tracked background goroutine. fn receives a channel that is
 // closed when Stop() begins, so work that waits (startup delays, retries) can
-// bail out instead of committing UCI changes after SIGTERM. Untracked
-// goroutines are the reason a detached worker used to be able to flash or
-// reconfigure the device after the HTTP server was already gone.
+// bail out instead of committing UCI changes after SIGTERM.
 func (l *appLifecycle) Go(fn func(stop <-chan struct{})) {
 	l.wg.Add(1)
 	l.live.Add(1)

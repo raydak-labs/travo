@@ -257,19 +257,13 @@ func apStationMACs(cmd CommandRunner) map[string]struct{} {
 }
 
 // parseIfaceIPv4Prefixes extracts an interface's IPv4 prefixes from one entry of
-// `ubus call network.interface dump`.
+// `ubus call network.interface dump`. It reads both shapes netifd builds emit:
 //
-// It reads BOTH shapes, because they differ between netifd builds:
+//   - {"address": "192.168.1.1", "mask": 24} (OpenWrt 25.12 on the test device)
+//   - {"address": "192.168.8.0/24"}
 //
-//   - {"address": "192.168.1.1", "mask": 24} — a bare address plus a separate
-//     integer netmask length. This is what the device on 192.168.1.1 emits, and
-//     it is the shape the classifier used to ignore.
-//   - {"address": "192.168.8.0/24"} — a CIDR string, which is what the previous
-//     test fixture invented under an `ipv4-prefix` key the device never sends.
-//
-// A malformed entry is SKIPPED and the rest of the list is still returned.
-// Returning an empty list on any bad entry is the failure mode that made every
-// real client `unknown`: no prefix, no match, no discrimination.
+// A malformed entry is skipped and the rest are still returned, so one bad entry
+// cannot turn every client into `unknown`.
 func parseIfaceIPv4Prefixes(iface map[string]any) []netip.Prefix {
 	var prefixes []netip.Prefix
 	for _, key := range []string{"ipv4-address", "ipv4-prefix"} {

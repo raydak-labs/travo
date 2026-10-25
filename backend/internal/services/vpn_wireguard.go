@@ -383,13 +383,10 @@ func (v *VpnService) wgRuntimeState(enabled bool) string {
 			return "configured"
 		}
 	}
-	// `wg show` is unusable — the binary is missing, or its output no longer
-	// parses. That is a broken PROBE, not a broken tunnel, and the two must not
-	// collapse into one reading: the debounced heal of ADR 0001 §3.3 pops the VPN
-	// resolver layer on enabled_not_up, so a persistently broken probe would
-	// eventually take the DNS layer away from a tunnel that is carrying it fine.
-	// The link state is the only evidence left, and an UP wg0 outranks the
-	// missing tool.
+	// `wg show` is unusable (missing binary, unparsable output). That is a
+	// broken PROBE, not a broken tunnel: the debounced heal (ADR 0001 §3.3) would
+	// otherwise eventually pop the DNS layer of a working tunnel. An UP wg0
+	// outranks the missing tool.
 	if link, lerr := v.cmd.Run(openwrtIPBin, "link", "show", "dev", "wg0"); lerr == nil {
 		if wireGuardIfaceLooksUp(string(link)) {
 			return "up_no_handshake"
@@ -537,17 +534,16 @@ func (v *VpnService) GetWireguardConfig() (models.WireguardConfig, error) {
 	return config, nil
 }
 
-// SetWireguardConfig is the entry point from the API. It takes the UCI transaction for every
-// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
-// the middle of a VPN toggle and revert half of it.
+// SetWireguardConfig updates the WireGuard configuration. It holds the UCI
+// locks for every config the VPN flow touches (vpnFlowConfigs).
 func (v *VpnService) SetWireguardConfig(config models.WireguardConfig) error {
 	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
-		return v.SetWireguardConfigLocked(config)
+		return v.setWireguardConfigLocked(config)
 	})
 }
 
-// SetWireguardConfig updates the WireGuard configuration.
-func (v *VpnService) SetWireguardConfigLocked(config models.WireguardConfig) error {
+// setWireguardConfigLocked is SetWireguardConfig for a caller that holds the locks.
+func (v *VpnService) setWireguardConfigLocked(config models.WireguardConfig) error {
 	if err := v.ensureWireGuardInterface(); err != nil {
 		return err
 	}

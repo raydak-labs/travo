@@ -266,10 +266,9 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 		return "", fmt.Errorf("uci apply: %w", err)
 	}
 	applyStarted = true
-	// The apply itself is harmless and still buys rpcd's crash-time rollback,
-	// but it is no longer what puts the previous config back (see Snapshot).
-	// What it does is give this session a name: from here the pending snapshot
-	// is this session's snapshot, and ConfirmApply can restore it.
+	// The apply still buys rpcd's crash-time rollback, but Snapshot is what puts
+	// the previous config back. Claiming the pending snapshot names it after this
+	// session, so ConfirmApply can restore it.
 	r.claimPendingSnapshot(sid)
 	return sid, nil
 }

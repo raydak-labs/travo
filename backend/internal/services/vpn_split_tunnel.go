@@ -27,24 +27,21 @@ func (v *VpnService) GetSplitTunnel() (models.SplitTunnelConfig, error) {
 	return cfg, nil
 }
 
-// SetSplitTunnel is the entry point from the API. It takes the UCI transaction for every
-// config the flow can touch, so a concurrent WiFi or DHCP write cannot land in
-// the middle of a VPN toggle and revert half of it.
+// SetSplitTunnel saves the split tunnel config and updates WireGuard allowed IPs in UCI.
+// Mode "all" routes everything through the VPN (0.0.0.0/0, ::/0); mode "custom"
+// routes only the given CIDR ranges and requires at least one, so an empty list
+// never silently becomes a full tunnel. Staged UCI deltas are reverted when any
+// write fails.
+//
+// It holds the UCI locks for every config the VPN flow touches (vpnFlowConfigs).
 func (v *VpnService) SetSplitTunnel(cfg models.SplitTunnelConfig) error {
 	return mutateUCI(v.uci, vpnFlowConfigs, func() error {
-		return v.SetSplitTunnelLocked(cfg)
+		return v.setSplitTunnelLocked(cfg)
 	})
 }
 
-// SetSplitTunnel saves the split tunnel config and updates WireGuard allowed IPs in UCI.
-// mode "all" = route everything through VPN (0.0.0.0/0,::/0)
-// mode "custom" = only route the specified CIDR ranges (at least one is required;
-//
-//	an empty custom list must never silently become a full tunnel)
-//
-// Staged UCI deltas are reverted when any write fails, so a failed save cannot
-// leave peers with a half-written allowed_ips list.
-func (v *VpnService) SetSplitTunnelLocked(cfg models.SplitTunnelConfig) error {
+// setSplitTunnelLocked is SetSplitTunnel for a caller that holds the locks.
+func (v *VpnService) setSplitTunnelLocked(cfg models.SplitTunnelConfig) error {
 	allowedParts, err := splitTunnelAllowedIPs(cfg)
 	if err != nil {
 		return err

@@ -87,7 +87,7 @@ type CaptiveService struct {
 	// names) and a temp dir in tests.
 	dnsStackPath string
 	// stopCh cancels the startup auto-restore goroutine so a shutdown does not
-	// race with a DNS restore (the goroutine used to be untracked).
+	// race with a DNS restore.
 	stopCh   chan struct{}
 	stopOnce sync.Once
 	wg       sync.WaitGroup

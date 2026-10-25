@@ -82,29 +82,14 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 	return status, nil
 }
 
-// SetDNS enables or disables dnsmasq forwarding to AdGuard Home.
-// When enabling, it first verifies that AdGuard is running and its DNS listener
-// is reachable. If the pre-flight check fails, no dnsmasq changes are made and
-// the error is returned (safe: DNS resolution is never left in a broken state).
 // SetDNS stacks or unstacks AdGuard on the shared dnsmasq resolver layer stack
-// (see dnsmasqLayerStackFile in dnsmasq_layer_stack.go).
+// (dnsmasqLayerStackFile, ADR 0001 §3). Enabling first verifies that AdGuard is
+// running and its DNS listener answers; on failure nothing is changed. The stack
+// keeps the pre-any-layer resolvers, so split-DNS entries added in LuCI survive.
 //
-// It used to `uci delete` the whole server list on both paths, which destroyed
-// split-DNS entries the operator added by hand in LuCI (server=/lan.example.com/...)
-// with nothing to put them back. The stack holds the pre-any-layer state instead
-// (ADR 0001 §3).
-//
-// Takes the `dhcp` lock. This writes dhcp.@dnsmasq[0].server and .noresolv — the
-// SAME section and options that the VPN's enableVpnDNSForwarding /
-// disableVpnDNSForwarding and CaptiveService's dnsmasq helpers mutate. Holding the
-// lock on the VPN side while this side does not achieves nothing: whichever
-// sequence commits last wins, and the loser's commit persists whatever the other
-// had staged. The stack is also what stops one feature's restore from landing
-// on top of the other's: both consult the same record.
-//
-// withConfigLocks rather than mutateUCI: this shells out to `uci` and has no
-// uci.UCI handle to revert through, so a failure here leaves its staged delta for
-// the next writer of `dhcp`.
+// It takes the `dhcp` lock: the VPN and captive paths write the same
+// dhcp.@dnsmasq[0] options. withConfigLocks rather than mutateUCI, because this
+// shells out to `uci` and has no uci.UCI handle to revert through.
 func (s *AdGuardService) SetDNS(enabled bool) error {
 	return withConfigLocks([]string{"dhcp"}, func() error { return s.setDNSLocked(enabled) })
 }

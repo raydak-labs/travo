@@ -451,16 +451,6 @@ func (s *FailoverService) saveConfigFile(cfg failoverConfigFile) error {
 	return writeFileAtomic(s.configPath, data)
 }
 
-// restoreManagedSections puts the backed-up mwan3/network sections back and
-// re-applies them, so the running mwan3 does not keep the broken partial policy
-// while the user is told the save failed.
-//
-// The re-apply deliberately BYPASSES the pending-rollback-window check that
-// stagedApplyMwan3 normally enforces. This function is the recovery path for a
-// failed apply, so it runs precisely when a session is still pending; letting it
-// short-circuit on errApplyRollingBack would make every failed save leave the
-// crash guard behind and permanently disable failover, which is the opposite of
-// what the restore is for.
 // mwan3ListOptions are the options mwan3 reads as UCI lists. Restoring one with
 // Set writes the whole joined value as a SINGLE element, which mwan3 then reads
 // as one invalid address — so they are rebuilt with AddList instead.

@@ -367,6 +367,10 @@ func (a *AuthService) TokenExpiry(tokenStr string) (time.Time, error) {
 	return exp.Time, nil
 }
 
+// ErrInvalidCurrentPassword is returned by ChangePassword when the current
+// password does not match.
+var ErrInvalidCurrentPassword = errors.New("invalid current password")
+
 // ChangePasswordResult carries the session issued after a password change.
 type ChangePasswordResult struct {
 	// Token is a freshly minted session for the caller: the change revoked
@@ -388,7 +392,7 @@ func (a *AuthService) ChangePassword(currentPassword, newPassword string) (Chang
 
 	if a.ubus != nil {
 		if err := a.tryUbusLogin(currentPassword); err != nil {
-			return ChangePasswordResult{}, errors.New("invalid current password")
+			return ChangePasswordResult{}, ErrInvalidCurrentPassword
 		}
 		_, err := a.ubus.Call("luci", "setPassword", map[string]any{
 			"username": "root",
@@ -403,7 +407,7 @@ func (a *AuthService) ChangePassword(currentPassword, newPassword string) (Chang
 		a.persistSealedLogin(newPassword)
 	} else {
 		if err := bcrypt.CompareHashAndPassword(a.passwordHashBytes(), []byte(currentPassword)); err != nil {
-			return ChangePasswordResult{}, errors.New("invalid current password")
+			return ChangePasswordResult{}, ErrInvalidCurrentPassword
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptCost)
 		if err != nil {
@@ -435,26 +439,17 @@ func (a *AuthService) rotateSessions() (ChangePasswordResult, error) {
 // PublicPaths is the complete set of API paths reachable without a Bearer
 // token. Every other path under /api/ requires one.
 //
-// This is a path allowlist rather than a route-group middleware because Fiber v3
-// group middleware is scoped by PATH PREFIX, not by which router the route was
-// registered on: mounting the auth middleware on the /api/v1 group also
-// intercepted routes registered directly on the app (the WebSocket upgrade and
-// the public time-sync endpoint), breaking both.
+// It is a path allowlist rather than group middleware because Fiber v3 scopes
+// group middleware by path prefix, which would also intercept the WebSocket
+// upgrade and the public time-sync route registered on the app.
 //
-// Safety now rests on two things together, not on this list alone:
-//   - fiber.Config.CaseSensitive is true, so a request whose path differs in
-//     case from the registered route matches no route at all and cannot reach a
-//     handler. That is what previously broke the prefix check below: Fiber routed
-//     on a lowercased copy while c.Path() returned the original, so
-//     /API/v1/system/reboot matched the registered route while failing the
-//     prefix test, and the whole admin API was reachable with no token.
-//   - TestAuthCoversEveryRoute in internal/api walks the live route table and
-//     asserts an unauthenticated request is rejected for every registered /api
-//     route not in this list, in both the canonical and a case-varied spelling.
-//     Adding a route without deciding whether it is public fails that test.
+// Safety rests on two things together:
+//   - fiber.Config.CaseSensitive is true, so a case-variant path matches no
+//     route and cannot reach a handler past this check;
+//   - TestAuthCoversEveryRoute walks the live route table and asserts every
+//     /api route outside this list rejects an unauthenticated request.
 //
-// /api/v1/ws is listed because it authenticates itself: ws.UpgradeMiddleware
-// validates the query token and the session before upgrading.
+// /api/v1/ws is listed because ws.UpgradeMiddleware authenticates it.
 var PublicPaths = map[string]bool{
 	"/api/health":              true,
 	"/api/openapi.json":        true,

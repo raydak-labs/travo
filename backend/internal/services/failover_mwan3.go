@@ -173,8 +173,15 @@ func (s *FailoverService) backupManagedSections() error {
 	return writeFileAtomic(s.backupPath, data)
 }
 
-// RestoreManagedSections is the rollback path: it must put the operator's
-// pre-save config back, not a lossy version of it.
+// restoreManagedSections is the rollback path: it puts the backed-up
+// mwan3/network sections back, unchanged, and re-applies them, so the running
+// mwan3 does not keep a broken partial policy while the user is told the save
+// failed.
+//
+// The re-apply deliberately BYPASSES the pending-rollback-window check that
+// stagedApplyMwan3 enforces: it runs precisely while a session is pending, and
+// short-circuiting on errApplyRollingBack would leave the crash guard behind
+// after every failed save.
 func (s *FailoverService) restoreManagedSections() error {
 	data, err := os.ReadFile(s.backupPath)
 	if err != nil {
