@@ -5,7 +5,7 @@ min_version = "2024.1.0"
   # Must match the `go` directive in backend/go.mod: CI resolves Go from
   # go-version-file, so a mismatch here means developers and CI compile against
   # different patch releases and nothing notices. Enforced by TestGoVersionPinsAgree.
-  go = "1.27.2"
+  go = "1.27.3"
   golangci-lint = "2.15.0"
   "go:golang.org/x/tools/cmd/goimports" = "v0.52.0"
 
@@ -18,7 +18,7 @@ min_version = "2024.1.0"
   shellcheck = "0.11.0"
 
   # Python
-  python = "3.15.0"
+  python = "3.15.1"
 
 [settings]
   experimental = true

@@ -24,13 +24,33 @@
 
   "packageRules": [
     {
-      // mise `go` and go.mod `go` are different managers/datasources. Without a
-      // shared group, patch automerge can bump .mise.toml alone (see #190) and
-      // leave go.mod behind — TestGoVersionPinsAgree then fails on main.
-      "description": "Keep Go toolchain pins (mise + go.mod + golang images) in one PR",
-      "matchManagers": ["mise", "gomod", "dockerfile", "docker-compose"],
+      // Renovate leaves go.mod's `go` directive alone by default (minimum
+      // language version). We pin the exact patch in both .mise.toml and
+      // go.mod (TestGoVersionPinsAgree), so bump it when mise's go moves.
+      "description": "Bump go.mod go directive in lockstep with the toolchain pin",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump",
+    },
+    {
+      // matchPackageNames no longer falls back to depName (Renovate 38+).
+      // mise's go tool has depName=go / packageName=golang/go, so the old
+      // matchPackageNames:["go"] rule never matched and mise-only bumps
+      // landed in the catch-all patch group (#190, #213) while go.mod stayed
+      // behind. matchDepNames is the right matcher; same groupName merges
+      // the docker image rule below.
+      "description": "Keep mise + go.mod go pins in one PR",
+      "matchManagers": ["mise", "gomod"],
+      "matchDepNames": ["go"],
+      "groupName": "go toolchain",
+      "groupSlug": "go-toolchain",
+      "automerge": true,
+      "automergeType": "pr",
+    },
+    {
+      "description": "Keep golang docker images with the go toolchain group",
       "matchPackageNames": [
-        "go",
         "golang",
         "docker.io/library/golang",
         "/^golang$/",
@@ -56,8 +76,10 @@
     {
       "description": "Group all patch/pin/digest updates together",
       "matchUpdateTypes": ["!major", "!minor"],
-      // Go pins handled by the dedicated go-toolchain group above.
-      "matchPackageNames": ["!go", "!golang", "!docker.io/library/golang"],
+      // Exclude by depName (mise/gomod go) and packageName (golang images).
+      // Negative matchers are ANDed: a dep is excluded if any name matches.
+      "matchDepNames": ["!go"],
+      "matchPackageNames": ["!golang", "!docker.io/library/golang"],
       "groupName": "all patch/pin/digest updates",
       "groupSlug": "all-patch-pin-digest",
       "automerge": true,
