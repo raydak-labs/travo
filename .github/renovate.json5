@@ -31,8 +31,21 @@
   "packageRules": [
     {
       // go.json5 defines the group but leaves automerge to the consumer.
-      "description": "Automerge the shared go toolchain group",
-      "matchGroupNames": ["go toolchain"],
+      // There is no matchGroupNames matcher — Renovate rejects unknown
+      // packageRules keys and stops the whole repo. Rematch the same deps.
+      "description": "Automerge mise + go.mod go pins (go toolchain group)",
+      "matchManagers": ["mise", "gomod"],
+      "matchDepNames": ["go", "core:go", "asdf:golang", "vfox:go"],
+      "automerge": true,
+      "automergeType": "pr",
+    },
+    {
+      "description": "Automerge golang docker images (go toolchain group)",
+      "matchPackageNames": [
+        "golang",
+        "docker.io/library/golang",
+        "/^golang$/",
+      ],
       "automerge": true,
       "automergeType": "pr",
     },
