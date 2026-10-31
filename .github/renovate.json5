@@ -1,6 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices"],
+  "extends": [
+    "config:best-practices",
+    // Shared Go toolchain rules (bump go.mod directive, group mise + go.mod
+    // + golang images). Trav-specific automerge / catch-all exclusions below.
+    "github>blackdark/renovate-base//go.json5",
+  ],
 
   // Only create/update Renovate branches once a week
   "schedule": ["before 4am on monday"],
@@ -13,6 +18,7 @@
   // Without gomodTidy the gomod manager only appends the new hashes for the
   // versions it bumps, so go.sum keeps the superseded ones and CI's
   // `go mod tidy -diff` gate (test-backend) goes red on the next patch PR.
+  // Also set by go.json5; kept here so this file stays self-explanatory.
   "postUpdateOptions": ["gomodTidy"],
 
   // docker-compose.yml pins node:26-alpine by digest (restored in 5baa9c7 after a
@@ -24,39 +30,22 @@
 
   "packageRules": [
     {
-      // Renovate leaves go.mod's `go` directive alone by default (minimum
-      // language version). We pin the exact patch in both .mise.toml and
-      // go.mod (TestGoVersionPinsAgree), so bump it when mise's go moves.
-      "description": "Bump go.mod go directive in lockstep with the toolchain pin",
-      "matchManagers": ["gomod"],
-      "matchDepNames": ["go"],
-      "matchDepTypes": ["golang"],
-      "rangeStrategy": "bump",
-    },
-    {
-      // matchPackageNames no longer falls back to depName (Renovate 38+).
-      // mise's go tool has depName=go / packageName=golang/go, so the old
-      // matchPackageNames:["go"] rule never matched and mise-only bumps
-      // landed in the catch-all patch group (#190, #213) while go.mod stayed
-      // behind. matchDepNames is the right matcher; same groupName merges
-      // the docker image rule below.
-      "description": "Keep mise + go.mod go pins in one PR",
+      // go.json5 defines the group but leaves automerge to the consumer.
+      // There is no matchGroupNames matcher — Renovate rejects unknown
+      // packageRules keys and stops the whole repo. Rematch the same deps.
+      "description": "Automerge mise + go.mod go pins (go toolchain group)",
       "matchManagers": ["mise", "gomod"],
-      "matchDepNames": ["go"],
-      "groupName": "go toolchain",
-      "groupSlug": "go-toolchain",
+      "matchDepNames": ["go", "core:go", "asdf:golang", "vfox:go"],
       "automerge": true,
       "automergeType": "pr",
     },
     {
-      "description": "Keep golang docker images with the go toolchain group",
+      "description": "Automerge golang docker images (go toolchain group)",
       "matchPackageNames": [
         "golang",
         "docker.io/library/golang",
         "/^golang$/",
       ],
-      "groupName": "go toolchain",
-      "groupSlug": "go-toolchain",
       "automerge": true,
       "automergeType": "pr",
     },
@@ -76,9 +65,9 @@
     {
       "description": "Group all patch/pin/digest updates together",
       "matchUpdateTypes": ["!major", "!minor"],
-      // Exclude by depName (mise/gomod go) and packageName (golang images).
-      // Negative matchers are ANDed: a dep is excluded if any name matches.
-      "matchDepNames": ["!go"],
+      // Keep go toolchain deps out of this catch-all (go.json5 group). Include
+      // mise explicit backends so core:go cannot sneak in via !go alone.
+      "matchDepNames": ["!go", "!core:go", "!asdf:golang", "!vfox:go"],
       "matchPackageNames": ["!golang", "!docker.io/library/golang"],
       "groupName": "all patch/pin/digest updates",
       "groupSlug": "all-patch-pin-digest",
