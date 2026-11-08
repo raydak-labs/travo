@@ -59,11 +59,14 @@ func (w *Service) SetAutoReconnect(enabled bool) error {
 // Two layered guards:
 //  1. Crash guard: written before `wifi up`; if the call causes a kernel crash
 //     the file survives reboot and every subsequent cron tick becomes a no-op.
-//  2. Failure-count guard: increments on every non-crash failure. Once it hits
-//     MAX_FAIL the script stops retrying — this catches the case where the
-//     saved wireless config is broken (e.g. after an rpcd rollback restored a
-//     pre-incident bad config) and cron would otherwise replay the failure
-//     forever. Counter is cleared on any successful reconnect or on redeploy.
+//  2. Attempt counter: increments on every `wifi up`, whatever its exit code.
+//     Once it hits MAX_FAIL the script stops retrying — `wifi up` exits 0 even
+//     when the uplink never comes back, so counting only failures never ended
+//     the loop. Only an address on wwan clears it (or a redeploy keeps it, see
+//     ADR 0003).
+//
+// The script acts only on a radio that is enabled but down. An up radio with no
+// uplink address is retrying by itself; `wifi up` would only drop every client.
 //
 // BOTH guards are worthless unless the script can create them, and the script
 // runs from cron — potentially before the backend has ever run — so nothing
@@ -85,17 +88,30 @@ const reconnectScriptContent = "#!/bin/sh\n# Auto-reconnect to saved WiFi networ
 	"if [ -f \"$GUARD\" ]; then\n    exit 0\nfi\n\n" +
 	"FAILCOUNT=0\n" +
 	"if [ -f \"$FAILCOUNT_FILE\" ]; then\n    FAILCOUNT=$(cat \"$FAILCOUNT_FILE\" 2>/dev/null || echo 0)\nfi\n" +
-	"if [ \"$FAILCOUNT\" -ge \"$MAX_FAIL\" ] 2>/dev/null; then\n    exit 0\nfi\n\n" +
 	"IP=$(ubus call network.interface.wwan status 2>/dev/null | jsonfilter -e '@[\"ipv4-address\"][0].address' 2>/dev/null)\n" +
 	"if [ -n \"$IP\" ]; then\n    rm -f \"$FAILCOUNT_FILE\"\n    exit 0\nfi\n\n" +
-	"# Connection dropped — write crash guard, bring up WiFi, update counters on exit\n" +
+	"# The limit comes after the address check so a lease always clears the counter.\n" +
+	"if [ \"$FAILCOUNT\" -ge \"$MAX_FAIL\" ] 2>/dev/null; then\n    exit 0\nfi\n\n" +
+	"# `wifi up` only helps a radio that is enabled but not running. A radio that\n" +
+	"# is up and simply has no uplink address is already retrying by itself, and\n" +
+	"# `wifi up` would restart every radio, the access point included, once a minute.\n" +
+	"# `wifi up` needs positive evidence: no status, or a radio the status omits, is\n" +
+	"# not a radio that is enabled and down.\n" +
+	"STATUS=$(ubus call network.wireless status 2>/dev/null) || exit 0\n" +
+	"[ -n \"$STATUS\" ] || exit 0\n" +
+	"NEEDS_UP=0\n" +
+	"for RADIO in $(uci -q show wireless | sed -n 's/^wireless\\.\\([A-Za-z0-9_]*\\)=wifi-device$/\\1/p'); do\n" +
+	"    DISABLED=$(echo \"$STATUS\" | jsonfilter -e \"@.$RADIO.disabled\" 2>/dev/null)\n" +
+	"    UP=$(echo \"$STATUS\" | jsonfilter -e \"@.$RADIO.up\" 2>/dev/null)\n" +
+	"    if [ \"$DISABLED\" = \"false\" ] && [ \"$UP\" = \"false\" ]; then NEEDS_UP=1; fi\n" +
+	"done\n" +
+	"[ \"$NEEDS_UP\" = 1 ] || exit 0\n\n" +
+	"# A radio is down — write crash guard, bring up WiFi. The attempt is counted\n" +
+	"# whatever `wifi up` returns; only an address on wwan (above) clears the counter.\n" +
 	"echo wifi-reconnect > \"$GUARD\" || exit 1\n" +
-	"if wifi up; then\n" +
-	"    rm -f \"$GUARD\" \"$FAILCOUNT_FILE\"\n" +
-	"else\n" +
-	"    rm -f \"$GUARD\"\n" +
-	"    echo $((FAILCOUNT + 1)) > \"$FAILCOUNT_FILE\"\n" +
-	"fi\n"
+	"echo $((FAILCOUNT + 1)) > \"$FAILCOUNT_FILE\"\n" +
+	"wifi up\n" +
+	"rm -f \"$GUARD\"\n"
 
 func (w *Service) enableAutoReconnect() error {
 	scriptDir := filepath.Dir(w.reconnectScript)

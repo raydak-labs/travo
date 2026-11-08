@@ -182,13 +182,15 @@ func writeReconnectScriptFixture(t *testing.T, guardDir string) (dir, script, ma
 	if err := os.WriteFile(filepath.Join(binDir, "wifi"), []byte(stub), 0o755); err != nil {
 		t.Fatalf("write wifi stub: %v", err)
 	}
-	// No wwan address on the test machine: the stub reports an interface with no
-	// ipv4-address, which is the "connection dropped" branch the guard exists for.
-	for _, name := range []string{"ubus", "jsonfilter"} {
-		body := "#!/bin/sh\nexit 0\n"
-		if name == "ubus" {
-			body = "#!/bin/sh\necho '{\"up\":false}'\n"
-		}
+	// ubus, uci and jsonfilter are stubbed from environment variables so each
+	// test picks the device state: RADIO_UP / RADIO_DISABLED describe radio0 and
+	// WWAN_IP the uplink lease (empty = no address).
+	stubs := map[string]string{
+		"ubus":       "#!/bin/sh\n[ -n \"$UBUS_FAIL\" ] && exit 1\necho '{}'\n",
+		"uci":        "#!/bin/sh\necho 'wireless.radio0=wifi-device'\n",
+		"jsonfilter": jsonfilterStub,
+	}
+	for name, body := range stubs {
 		if err := os.WriteFile(filepath.Join(binDir, name), []byte(body), 0o755); err != nil {
 			t.Fatalf("write %s stub: %v", name, err)
 		}
@@ -200,6 +202,157 @@ func writeReconnectScriptFixture(t *testing.T, guardDir string) (dir, script, ma
 	}
 	dir = binDir
 	return dir, scriptPath, marker
+}
+
+// jsonfilterStub answers the three expressions the script asks for.
+const jsonfilterStub = `#!/bin/sh
+case "$*" in
+*radio0.up*) echo "$RADIO_UP" ;;
+*radio0.disabled*) echo "$RADIO_DISABLED" ;;
+*ipv4-address*) [ -n "$WWAN_IP" ] && echo "$WWAN_IP" ;;
+esac
+exit 0
+`
+
+// runReconnect runs the staged script with the given device state.
+func runReconnect(t *testing.T, binDir, scriptPath string, env ...string) error {
+	t.Helper()
+	cmd := exec.Command("sh", scriptPath)
+	cmd.Env = append(os.Environ(), append([]string{"PATH=" + binDir + ":" + os.Getenv("PATH")}, env...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("script output: %s", out)
+	}
+	return err
+}
+
+func wifiCalls(marker string) string {
+	b, _ := os.ReadFile(marker)
+	return string(b)
+}
+
+// The reported flapping: the uplink never gets an address because the saved
+// network is out of range, but every radio is UP. `wifi up` cannot help (the
+// STA keeps retrying by itself) and it tears down every radio, AP included, so
+// the cron tick dropped all clients once a minute.
+func TestAutoReconnectScriptLeavesRunningRadiosAloneWhenTheUplinkHasNoAddress(t *testing.T) {
+	guardDir := filepath.Join(t.TempDir(), "trafo")
+	binDir, scriptPath, marker := writeReconnectScriptFixture(t, guardDir)
+
+	for i := range 3 {
+		if err := runReconnect(t, binDir, scriptPath, "RADIO_UP=true", "RADIO_DISABLED=false"); err != nil {
+			t.Fatalf("tick %d: %v", i, err)
+		}
+	}
+	if got := wifiCalls(marker); got != "" {
+		t.Errorf("`wifi up` ran although every radio was up: %q", got)
+	}
+}
+
+// A radio the operator switched off (schedule, button) is not a dropped
+// connection, so it must not be brought back by the reconnect cron.
+func TestAutoReconnectScriptLeavesDisabledRadiosAlone(t *testing.T) {
+	guardDir := filepath.Join(t.TempDir(), "trafo")
+	binDir, scriptPath, marker := writeReconnectScriptFixture(t, guardDir)
+
+	if err := runReconnect(t, binDir, scriptPath, "RADIO_UP=false", "RADIO_DISABLED=true"); err != nil {
+		t.Fatal(err)
+	}
+	if got := wifiCalls(marker); got != "" {
+		t.Errorf("`wifi up` ran for a radio that is switched off: %q", got)
+	}
+}
+
+// `wifi up` that exits 0 but leaves the radio down is still a failed attempt:
+// the counter must survive it so MAX_FAIL ends the loop.
+func TestAutoReconnectScriptStopsAfterMaxFailedAttempts(t *testing.T) {
+	guardDir := filepath.Join(t.TempDir(), "trafo")
+	binDir, scriptPath, marker := writeReconnectScriptFixture(t, guardDir)
+
+	for i := range 8 {
+		if err := runReconnect(t, binDir, scriptPath, "RADIO_UP=false", "RADIO_DISABLED=false"); err != nil {
+			t.Fatalf("tick %d: %v", i, err)
+		}
+	}
+	if got := strings.Count(wifiCalls(marker), "up"); got != 5 {
+		t.Errorf("`wifi up` ran %d times, want exactly MAX_FAIL=5", got)
+	}
+}
+
+// `wifi up` is a driver restart, so it needs positive evidence: a radio the
+// status explicitly reports as enabled and down. A failed status call, or a
+// configured radio missing from the answer (unknown driver type), is not that,
+// and must not use up attempts.
+func TestAutoReconnectScriptNeedsExplicitEnabledAndDownRadioState(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  []string
+	}{
+		{"status call fails", []string{"UBUS_FAIL=1"}},
+		{"radio missing from status", nil},
+		{"radio.up missing", []string{"RADIO_DISABLED=false"}},
+		{"radio.disabled missing", []string{"RADIO_UP=false"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			guardDir := filepath.Join(t.TempDir(), "trafo")
+			binDir, scriptPath, marker := writeReconnectScriptFixture(t, guardDir)
+
+			if err := runReconnect(t, binDir, scriptPath, tc.env...); err != nil {
+				t.Fatal(err)
+			}
+			if got := wifiCalls(marker); got != "" {
+				t.Errorf("`wifi up` ran without an explicit enabled-and-down radio: %q", got)
+			}
+			if _, err := os.Stat(filepath.Join(guardDir, "autoreconnect-failcount")); !os.IsNotExist(err) {
+				t.Error("an attempt was counted although `wifi up` never ran")
+			}
+		})
+	}
+}
+
+// After the limit is reached the script stops retrying, but a lease must still
+// clear the counter, or a later real radio failure could never be recovered.
+func TestAutoReconnectScriptClearsCounterAtTheLimitOnceTheUplinkHasAnAddress(t *testing.T) {
+	guardDir := filepath.Join(t.TempDir(), "trafo")
+	binDir, scriptPath, marker := writeReconnectScriptFixture(t, guardDir)
+	counter := filepath.Join(guardDir, "autoreconnect-failcount")
+	if err := os.MkdirAll(guardDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(counter, []byte("5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runReconnect(t, binDir, scriptPath, "WWAN_IP=10.0.0.5"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(counter); !os.IsNotExist(err) {
+		t.Error("a lease must clear the counter even when it already reached MAX_FAIL")
+	}
+	if got := wifiCalls(marker); got != "" {
+		t.Errorf("`wifi up` ran although the uplink has an address: %q", got)
+	}
+}
+
+// Getting an address is the only thing that proves recovery, so it is the only
+// thing that resets the counter.
+func TestAutoReconnectScriptClearsCounterOnceTheUplinkHasAnAddress(t *testing.T) {
+	guardDir := filepath.Join(t.TempDir(), "trafo")
+	binDir, scriptPath, _ := writeReconnectScriptFixture(t, guardDir)
+
+	if err := runReconnect(t, binDir, scriptPath, "RADIO_UP=false", "RADIO_DISABLED=false"); err != nil {
+		t.Fatal(err)
+	}
+	counter := filepath.Join(guardDir, "autoreconnect-failcount")
+	if _, err := os.Stat(counter); err != nil {
+		t.Fatalf("a `wifi up` attempt must leave the counter behind: %v", err)
+	}
+	if err := runReconnect(t, binDir, scriptPath, "WWAN_IP=10.0.0.5"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(counter); !os.IsNotExist(err) {
+		t.Error("an address on wwan must clear the counter")
+	}
 }
 
 // The crash guard and the MAX_FAIL counter are the only things standing between
@@ -224,7 +377,7 @@ func TestAutoReconnectScriptRefusesToRunWhenTheGuardDirIsMissing(t *testing.T) {
 	binDir, scriptPath, wifiMarker := writeReconnectScriptFixture(t, guardDir)
 
 	cmd := exec.Command("sh", scriptPath)
-	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"))
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "RADIO_UP=false", "RADIO_DISABLED=false")
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("the script exited 0 although it could not create its guard directory:\n%s", out)
@@ -243,7 +396,7 @@ func TestAutoReconnectScriptRunsWifiWhenTheGuardDirIsWritable(t *testing.T) {
 	binDir, scriptPath, wifiMarker := writeReconnectScriptFixture(t, guardDir)
 
 	cmd := exec.Command("sh", scriptPath)
-	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"))
+	cmd.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "RADIO_UP=false", "RADIO_DISABLED=false")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("the script failed with a writable guard dir: %v\n%s", err, out)
 	}
@@ -254,9 +407,8 @@ func TestAutoReconnectScriptRunsWifiWhenTheGuardDirIsWritable(t *testing.T) {
 	if !strings.Contains(string(calls), "up") {
 		t.Errorf("expected `wifi up`, stub recorded: %q", calls)
 	}
-	// A successful reconnect clears both the guard and the counter.
 	if _, err := os.Stat(filepath.Join(guardDir, "autoreconnect-crash-guard")); !os.IsNotExist(err) {
-		t.Error("a successful reconnect must clear the crash guard")
+		t.Error("a finished `wifi up` must clear the crash guard")
 	}
 }
 

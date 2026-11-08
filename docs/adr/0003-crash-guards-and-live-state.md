@@ -3,7 +3,7 @@ title: "ADR 0003: Crash guards and automated live-state changes"
 description: The crash-guard contract for automated live-state changes: what is guarded in /etc/trafo, where ordinary state lives, and how a guard is cleared.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-25
+updated: 2026-10-26
 tags: [adr, safety, travo, guards, operations]
 ---
 
@@ -69,8 +69,8 @@ does not exist for that feature.
 | `/etc/trafo/factory-reset-in-progress` | `SystemService.FactoryReset` | `firstboot -y && reboot`; never removed, the device reboots first |
 | `/etc/trafo/system-config-in-progress` | `SystemService` system config commit | committing `/etc/config/system`; the commit, not an apply |
 | `/etc/trafo/pkg-install-in-progress` | `ServiceManager` install/remove, `UpdateService.Upgrade` | package operations that rewrite init scripts, `/etc/config` and modules |
-| `/etc/trafo/autoreconnect-crash-guard` | generated script `reconnectScriptContent` | the bounded `wifi up` in auto-reconnect |
-| `/etc/trafo/autoreconnect-failcount` | same script | **not a guard**: the `MAX_FAIL=5` retry counter; never cleared by a redeploy |
+| `/etc/trafo/autoreconnect-crash-guard` | generated script `reconnectScriptContent` | the bounded `wifi up` in auto-reconnect, only for a radio that is enabled but down |
+| `/etc/trafo/autoreconnect-failcount` | same script | **not a guard**: the `MAX_FAIL=5` counter of `wifi up` attempts; cleared only by an address on `wwan`, never by a redeploy |
 
 Non-guard state (aliases, WiFi priorities, repeater options, the bbolt store) lives in
 `/etc/travo/`. `internal/contracts/guards_test.go` fails if a guard-shaped path is declared there.
