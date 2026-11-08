@@ -127,4 +127,27 @@ describe('WifiHealthBanner', () => {
     });
     expect(screen.getByText(/Waiting for IP/i)).toBeInTheDocument();
   });
+
+  it('shows a not-connected title, the SSID, and no raw ifname or empty parentheses', async () => {
+    server.use(
+      http.get(API_ROUTES.wifi.health, () =>
+        HttpResponse.json({
+          status: 'warning',
+          issues: ['Not connected to "Cappuxinno" yet — check the password, range and band.'],
+          sta: { ifname: 'phy0-sta0', ssid: '', associated: false },
+          wwan: { device: 'phy0-sta0', up: false, ip_address: '' },
+        }),
+      ),
+    );
+
+    renderBanner();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Wi‑Fi not connected')).toBeInTheDocument();
+    expect(screen.getByText(/Not connected to "Cappuxinno" yet/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).not.toHaveTextContent('phy0-sta0');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('()');
+  });
 });
