@@ -10,52 +10,6 @@ import (
 	"testing"
 )
 
-// docs/plans/README.md calls itself a "searchable catalog of all planning and
-// historical design docs in this directory". It was missing 11 of 44 files,
-// including the plan describing the most recent remediation effort, so two
-// navigable sources of truth existed with no stated precedence — and a reader
-// routing through the index would not find the current work.
-//
-// A hand-maintained index of a directory that is wrong about its entries is
-// worse than no index, so the catalog is checked mechanically. The floor is low
-// on purpose: since ADR 0013, a shipped plan is deleted once its decisions are
-// folded into an ADR, so this directory only holds live and normative plans. A
-// sudden rise means plans are accumulating again and should be triaged.
-func TestPlansIndexListsEveryPlan(t *testing.T) {
-	const plansDir = "../../../docs/plans"
-	const indexPath = "../../../docs/plans/README.md"
-
-	entries, err := os.ReadDir(plansDir)
-	if err != nil {
-		t.Fatalf("read plans dir: %v", err)
-	}
-
-	body, err := os.ReadFile(indexPath)
-	if err != nil {
-		t.Fatalf("read plans index: %v", err)
-	}
-	index := string(body)
-
-	listed := 0
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".md") || name == "README.md" {
-			continue
-		}
-		listed++
-		if !strings.Contains(index, name) {
-			t.Errorf("%s is not listed in docs/plans/README.md, which claims to be a "+
-				"catalog of every plan in this directory", name)
-		}
-	}
-	if listed < 2 {
-		t.Fatalf("only %d plans found — the directory walk is probably broken, or live "+
-			"and normative plans were deleted without folding their decisions into an ADR "+
-			"(ADR 0013). The floor is deliberately well below today's count: deletion is "+
-			"the normal end of a plan's life, so the gate must not punish it.", listed)
-	}
-}
-
 // goPinRe reads the Go version each source of truth claims, so a divergence
 // between mise, go.mod and CI cannot be discovered by a developer six months
 // later the way the 2026-10-04 review found one: the remediation plan recorded a

@@ -79,4 +79,3 @@ On device, the administrative password is the **root** password shared with **Lu
 - `backend/internal/config/config.go` — default paths
 - [ADR 0009](./0009-persistent-store-bbolt.md) — `travo.db` persistence rules
 - [ADR 0008](./0008-ssh-key-management.md) — the other root-credential-granting surface
-- `docs/requirements/tasks_done.md` — authentication / IP ACL shipped items

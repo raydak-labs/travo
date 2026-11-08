@@ -190,7 +190,6 @@ travo/
 ├── shared/            # Shared TypeScript types
 │   └── src/
 ├── scripts/           # Dev and build scripts
-├── docs/plans/        # Project planning documents
 ├── Makefile
 └── package.json       # Workspace root
 ```

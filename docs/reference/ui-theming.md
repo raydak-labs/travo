@@ -153,11 +153,11 @@ Light mode keeps **`border-gray-200`** (and similar) on white/off-white surfaces
 
 ## Navigation patterns (sidebar vs in-page tabs)
 
-Normative IA: [`plans/2026-07-24-frontend-traveler-ia.md`](../plans/2026-07-24-frontend-traveler-ia.md). Summary:
+Normative IA: [`frontend-information-architecture.md`](./frontend-information-architecture.md). Summary:
 
 | Pattern | Typical role |
 | --------|--------------|
-| **Sidebar** (group label → daily default; chevron toggles leaves) | *Where in the app am I?* Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](../plans/2026-07-25-sidebar-defaults-lighter-disclosure.md). |
+| **Sidebar** (group label → daily default; chevron toggles leaves) | *Where in the app am I?* Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](./frontend-information-architecture.md#sidebar-defaults-and-disclosure-table). |
 | **In-page tabs** | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**). |
 | **Page sections** (collapsed boxes) | Only for rare / power / geek cards. Everyday cards stay visible. |
 

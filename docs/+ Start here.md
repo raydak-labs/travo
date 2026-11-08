@@ -36,7 +36,6 @@ updated: 2026-10-05
 ## Backlog and shipped work
 
 - [GitHub issues](https://github.com/raydak-labs/travo/issues) — open work
-- [[requirements/tasks_done]]
 
 ## Guides (how to do something)
 
@@ -49,9 +48,9 @@ updated: 2026-10-05
 - [[reference/backend-packages|backend-packages]] — what each backend package owns
 - [[reference/ui-theming|ui-theming]] — frontend tokens and component contracts
 
-## Plans (live and normative work)
+## Frontend navigation
 
-- [[plans/README]] — catalog of `plans/`; shipped plans are deleted once folded into ADRs
+- [[reference/frontend-information-architecture]] — sidebar rules and disclosure table
 
 ## On-device verification
 

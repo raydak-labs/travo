@@ -17,7 +17,6 @@ first place to update when we decide or change:
 - performance or footprint constraints
 
 Active backlog: [GitHub issues](https://github.com/raydak-labs/travo/issues)  
-For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks_done.md).
 
 ## 1. System Shape
 
@@ -26,7 +25,6 @@ For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks
   - `backend/` Go + Fiber API and device orchestration, one package per domain
     ([`reference/backend-packages.md`](../reference/backend-packages.md))
   - `shared/` shared TypeScript API contracts
-  - `docs/plans/` unfinished and normative plans (not runtime truth; see `docs/README.md`)
 - Travo coexists with LuCI instead of replacing it outright.
 - Backend is the source of truth for OpenWRT mutations; frontend drives API calls and renders device state.
 - Sysupgrade preservation includes Travo's enabled boot link (`/etc/rc.d/S99travo`) as well as its init script and binary ([ADR 0013 §10](../adr/0013-operational-invariants-and-device-findings.md)).
@@ -215,8 +213,8 @@ Router hardware is constrained. Every feature must justify its footprint.
 ## 9. Documentation Rules
 
 - Put stable rules here, not in backlog files.
-- Put open work in GitHub issues, completed work in `tasks_done.md`.
-- Use [`docs/README.md`](../README.md) as the documentation map; plans live under [`docs/plans/`](../plans), catalogued in [`docs/plans/README.md`](../plans/README.md) — a shipped plan is deleted once its decisions are folded into an ADR ([ADR 0013](../adr/0013-operational-invariants-and-device-findings.md)).
+- Put open work in GitHub issues.
+- Use [`docs/README.md`](../README.md) as the documentation map.
 - Long-lived topic decisions that need more room than this file may become **ADRs** under [`docs/adr/`](../adr) (see [`docs/adr/README.md`](../adr/README.md)); `docs/architecture/overview.md` links to them where relevant.
 - The **`docs/`** tree is an **Obsidian vault**; humans and agents with the Obsidian CLI should start from **`+ Start here.md`** (see `AGENTS.md` → *Documentation retrieval (Obsidian CLI)*).
 - When a plan graduates into a durable rule, copy the essential decision here and link back to the plan for rationale if useful.
