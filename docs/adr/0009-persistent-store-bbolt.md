@@ -29,7 +29,7 @@ relational engine** is disproportionate on a device whose whole budget is a
 ~12.8 MB stripped binary and NAND-backed flash.
 
 The SQLite-vs-alternative question was an explicit backlog item
-(`docs/requirements/tasks_open.md` §16). It was **measured, not guessed**: on this
+(now closed). It was **measured, not guessed**: on this
 repo, `go.etcd.io/bbolt` adds **247 KB** to the stripped binary (12.57 → 12.83 MB),
 while `modernc.org/sqlite` would add roughly **10 MB**; flat JSON files cannot do a
 transactional multi-key write and need hand-rolled locking. bbolt won on footprint

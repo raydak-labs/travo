@@ -28,8 +28,6 @@ what the server does.
 - **`backend/`** — Go + Fiber: device orchestration, UCI, ubus, filesystem access, one package per
   domain ([backend packages](../reference/backend-packages.md)).
 - **`shared/`** — TypeScript API types for the frontend, generated from the OpenAPI document.
-- **`docs/plans/`** — live and normative plans only; a shipped plan is deleted once folded into an
-  ADR (ADR 0013).
 
 ### 2. LuCI coexistence
 

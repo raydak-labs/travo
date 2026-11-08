@@ -8,8 +8,8 @@ tags: [docs, testing, integration, openwrt]
 # Testing
 
 This page is the entry point: which check settles a question, and the command that runs it.
-Procedures and hardware facts do not live here. They live in the playbooks under
-[`docs/tests/`](../tests/), and a fact written in both places is one place wrong within a month.
+Procedures and hardware facts do not live here. They live in the playbook
+[`on-device-verification.md`](./on-device-verification.md), and a fact written in both places is one place wrong within a month.
 When you find a procedure on this page, move it to the owning playbook rather than fixing it here.
 
 ## Local checks
@@ -17,16 +17,16 @@ When you find a procedure on this page, move it to the owning playbook rather th
 Run from the repo root. `make` resolves the pinned toolchain through [mise](../../.mise.toml), so a
 local run uses the same tool versions CI does.
 
-| Command | What it runs |
-| ------- | ------------ |
-| `make test` | `go test -count=1 ./...`, then `pnpm test` in `shared/` and `frontend/` |
-| `make test-race` | the backend suite with `-race`, same as the CI race job |
-| `make lint` | oxlint over `frontend/src` and `shared/src`, `golangci-lint` in `backend/` |
-| `make format-check` | prettier `--check`, `gofmt -l`, `goimports -l`; non-zero when unformatted |
-| `make format` | the same tools in write mode |
-| `make shellcheck` | `shellcheck --severity=warning` over `scripts/`, `test/integration/` |
-| `make coverage` | per-package Go coverage summary; informational, not a gate |
-| `make build` | frontend production build plus `backend/bin/server` |
+| Command             | What it runs                                                               |
+| ------------------- | -------------------------------------------------------------------------- |
+| `make test`         | `go test -count=1 ./...`, then `pnpm test` in `shared/` and `frontend/`    |
+| `make test-race`    | the backend suite with `-race`, same as the CI race job                    |
+| `make lint`         | oxlint over `frontend/src` and `shared/src`, `golangci-lint` in `backend/` |
+| `make format-check` | prettier `--check`, `gofmt -l`, `goimports -l`; non-zero when unformatted  |
+| `make format`       | the same tools in write mode                                               |
+| `make shellcheck`   | `shellcheck --severity=warning` over `scripts/`, `test/integration/`       |
+| `make coverage`     | per-package Go coverage summary; informational, not a gate                 |
+| `make build`        | frontend production build plus `backend/bin/server`                        |
 
 Narrower loops, when one project is what you touched:
 
@@ -36,15 +36,15 @@ cd shared && pnpm test
 cd frontend && pnpm test
 ```
 
-Docs have gates too. Run them in the same change as any edit under `docs/`:
+Shell and install contracts are pinned by Go tests. Run them after any change to `scripts/`
+or the install one-liner:
 
 ```sh
-cd backend && go test ./internal/docsgate/
+cd backend && go test ./internal/contracts/
 ```
 
-They fail on a crash-guard path outside `/etc/trafo/`, a persistent-store path outside
-`/etc/travo/`, an ADR missing from the index or the Obsidian hub, a playbook in `docs/tests/`
-that nothing links to, and a plans catalog that omits a plan.
+They fail on a script that no longer parses, a deploy-local crash guard that is not cleared,
+and a published install one-liner that does not run.
 
 A green local suite is not evidence about the router. The on-device playbook's §2 lists the
 classes of defect it demonstrably cannot catch.
@@ -96,10 +96,10 @@ make integration SUITE=integration-device.sh LOGIN_PASSWORD='…'
 A script asserts what it can reach over the API. Anything that needs an operator, a second uplink
 or a deliberate fault injection belongs to a playbook:
 
-- [`on-device-verification.md`](../tests/on-device-verification.md) — the standing playbook. Read
+- [`on-device-verification.md`](./on-device-verification.md) — the standing playbook. Read
   its §1 prerequisites before anything else; §4 settles whether the build on the device is the
   build under test, which every later suite depends on.
-- [`failover-verification.md`](../tests/failover-verification.md) — multi-WAN failover with two
+- [multi-WAN failover](./on-device-verification.md#multi-wan-failover-verification) — two
   real uplinks. `on-device-verification.md` §9.1 carries the mwan3 rpcd ACL finding that has to be
   resolved before it can run.
 
@@ -124,5 +124,5 @@ Some changes only settle on hardware. If `192.168.1.1` cannot be reached:
   assuming they were covered.
 - **Expect a punch list, and expect it to be temporary.** The 2026-10-04 review could only do
   static analysis while the device was down
-  ([report](../_archive/reviews/2026-10-04-deep-code-review.md)); the checklist it produced was replaced by the
+  (report removed; full text at commit `3cee6c6`); the checklist it produced was replaced by the
   standing playbook once the device came back. Add findings to the playbook, not to a new list.

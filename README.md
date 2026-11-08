@@ -15,7 +15,7 @@ Provides an intuitive dashboard, WiFi management with hotel captive portal suppo
 - Contributor and agent doc map: [docs/README.md](docs/README.md)
 - Stable architecture decisions: [docs/architecture/overview.md](docs/architecture/overview.md)
 - Architecture decision records (normative detail by topic): [docs/adr/README.md](docs/adr/README.md)
-- Active backlog: [docs/requirements/tasks_open.md](docs/requirements/tasks_open.md)
+- Active backlog: [GitHub issues](https://github.com/raydak-labs/travo/issues)
 - Agent instructions and guardrails: [AGENTS.md](AGENTS.md)
 
 ## Quick Install
@@ -190,7 +190,6 @@ travo/
 ├── shared/            # Shared TypeScript types
 │   └── src/
 ├── scripts/           # Dev and build scripts
-├── docs/plans/        # Project planning documents
 ├── Makefile
 └── package.json       # Workspace root
 ```

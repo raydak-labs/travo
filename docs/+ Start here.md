@@ -35,8 +35,7 @@ updated: 2026-10-05
 
 ## Backlog and shipped work
 
-- [[requirements/tasks_open]]
-- [[requirements/tasks_done]]
+- [GitHub issues](https://github.com/raydak-labs/travo/issues) — open work
 
 ## Guides (how to do something)
 
@@ -49,14 +48,13 @@ updated: 2026-10-05
 - [[reference/backend-packages|backend-packages]] — what each backend package owns
 - [[reference/ui-theming|ui-theming]] — frontend tokens and component contracts
 
-## Plans (live and normative work)
+## Frontend navigation
 
-- [[plans/README]] — catalog of `plans/`; shipped plans are deleted once folded into ADRs
+- [[reference/frontend-information-architecture]] — sidebar rules and disclosure table
 
 ## On-device verification
 
-- [[tests/failover-verification]]
-- [[tests/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
+- [[guides/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
   guard or install change touches a device
 
 ## Agent skills config
@@ -64,7 +62,3 @@ updated: 2026-10-05
 - [[agents/issue-tracker]]
 - [[agents/triage-labels]]
 - [[agents/domain]]
-
-## Archive
-
-- [[_archive/requirements_done]] — legacy exhaustive export (read-only)

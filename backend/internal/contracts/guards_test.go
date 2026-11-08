@@ -1,4 +1,4 @@
-package docsgate
+package contracts
 
 import (
 	"os"

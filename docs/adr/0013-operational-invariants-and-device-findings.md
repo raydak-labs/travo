@@ -14,8 +14,8 @@ rediscover and cheap to lose. The subsystem ADRs own *what* each area does; this
 one owns the cross-cutting invariants and the evidence behind them.
 
 It exists because those facts used to live only in executed plans under
-`docs/plans/`, which are deleted once their work ships. Deleting the plan must
-never delete the rule.
+planning documents, which were deleted once their work shipped. Deleting the
+document must never delete the rule.
 
 ## Status
 
@@ -23,7 +23,7 @@ Accepted.
 
 ## Context
 
-A documentation audit of `docs/plans/` found eight decisions or findings that no
+A documentation audit of the planning documents found eight decisions or findings that no
 ADR and no section of the architecture overview recorded, all of them written down
 exactly once, in a plan scheduled for deletion. Each is recorded here instead.
 
@@ -171,9 +171,8 @@ convenience, the token in the query string forever) was cheaper and wrong.
 
 ## Consequences and invariants
 
-- A rule that only exists in a plan under `docs/plans/` does not exist. When a plan
-  ships, its normative content moves here or into the owning ADR before the plan
-  is deleted.
+- A rule that only exists in a planning document does not exist. When work ships, its
+  normative content moves here or into the owning ADR before the document is deleted.
 - Device findings recorded here are evidence, not behaviour. Changing the code
   does not invalidate the finding; superseding it does, explicitly.
 - Rule 1 is enforced in code by `hasKernelDefaultRoute` and its three wait windows

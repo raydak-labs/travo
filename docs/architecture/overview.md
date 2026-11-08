@@ -16,8 +16,7 @@ first place to update when we decide or change:
 - deployment assumptions
 - performance or footprint constraints
 
-For active backlog use [`docs/requirements/tasks_open.md`](../requirements/tasks_open.md).  
-For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks_done.md).
+Active backlog: [GitHub issues](https://github.com/raydak-labs/travo/issues)  
 
 ## 1. System Shape
 
@@ -26,7 +25,6 @@ For completed work use [`docs/requirements/tasks_done.md`](../requirements/tasks
   - `backend/` Go + Fiber API and device orchestration, one package per domain
     ([`reference/backend-packages.md`](../reference/backend-packages.md))
   - `shared/` shared TypeScript API contracts
-  - `docs/plans/` historical design notes (not runtime truth; see `docs/README.md`)
 - Travo coexists with LuCI instead of replacing it outright.
 - Backend is the source of truth for OpenWRT mutations; frontend drives API calls and renders device state.
 - Sysupgrade preservation includes Travo's enabled boot link (`/etc/rc.d/S99travo`) as well as its init script and binary ([ADR 0013 §10](../adr/0013-operational-invariants-and-device-findings.md)).
@@ -95,10 +93,10 @@ Wireless mutation safety is intentionally modeled after LuCI. **Implementation r
 
 Contract:
 
-1. Write a guard file to persistent storage under `/etc/trafo/` **before** the dangerous operation. That single directory is authoritative: every Go guard goes through `internal/guard`, `internal/docsgate/guards_test.go` fails the build if a guard path appears under `/etc/travo/`, and `deploy-local.sh` clears the guards listed in ADR 0003 §2.
+1. Write a guard file to persistent storage under `/etc/trafo/` **before** the dangerous operation. That single directory is authoritative: every Go guard goes through `internal/guard`, `internal/contracts/guards_test.go` fails the build if a guard path appears under `/etc/travo/`, and `deploy-local.sh` clears the guards listed in ADR 0003 §2.
 2. While the guard exists, the operation is skipped. Not every skip logs: **check the filesystem** (`ls /etc/trafo`) rather than assuming a log line.
 3. Remove the guard only after the whole operation completed successfully.
-4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and ``TestCrashGuardDirIsEtcTrafo`, `TestCrashGuardPathsResolveUnderCrashGuardDir` and `TestNoGuardIsDeclaredUnderEtcTravo` in `backend/internal/docsgate/guards_test.go`` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
+4. A manual redeploy (`deploy-local.sh`) clears the guards listed in ADR 0003 §2 and is the explicit retry signal. If a new guard is added, that script must clear it too. The script clears `/etc/trafo` and the legacy `/etc/travo` spelling, and ``TestCrashGuardDirIsEtcTrafo`, `TestCrashGuardPathsResolveUnderCrashGuardDir` and `TestNoGuardIsDeclaredUnderEtcTravo` in `backend/internal/contracts/guards_test.go`` fails the build if a guard path reappears outside `/etc/trafo` — add the row to ADR 0003 §2 and to the deploy loop together.
 5. Startup is also a repair point for pre-fix artifacts: `internal/app/startup.go` reconciles the auto-reconnect script and cron entry in **both** directions (enabled *and* disabled) and re-writes the WiFi schedule cron entry from the stored config, so a device carrying the old `wifi reload` / `/sbin/wifi up` lines converges onto the generated toggle helper without waiting for the user to re-save a setting.
 
 Guard naming convention:
@@ -215,8 +213,7 @@ Router hardware is constrained. Every feature must justify its footprint.
 ## 9. Documentation Rules
 
 - Put stable rules here, not in backlog files.
-- Put open work in `tasks_open.md`, completed work in `tasks_done.md`.
-- Use [`docs/README.md`](../README.md) as the documentation map; plans live under [`docs/plans/`](../plans), catalogued in [`docs/plans/README.md`](../plans/README.md) — a shipped plan is deleted once its decisions are folded into an ADR ([ADR 0013](../adr/0013-operational-invariants-and-device-findings.md)).
+- Put open work in GitHub issues.
+- Use [`docs/README.md`](../README.md) as the documentation map.
 - Long-lived topic decisions that need more room than this file may become **ADRs** under [`docs/adr/`](../adr) (see [`docs/adr/README.md`](../adr/README.md)); `docs/architecture/overview.md` links to them where relevant.
 - The **`docs/`** tree is an **Obsidian vault**; humans and agents with the Obsidian CLI should start from **`+ Start here.md`** (see `AGENTS.md` → *Documentation retrieval (Obsidian CLI)*).
-- When a plan graduates into a durable rule, copy the essential decision here and link back to the plan for rationale if useful.

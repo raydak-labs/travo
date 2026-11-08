@@ -2003,7 +2003,7 @@ func TestBandSwitchingLoadConfigAppliesValidFile(t *testing.T) {
 // (up/pending/retry_setup_failed) and a per-interface entry carries exactly
 // {section, config, ifname, vlans, stations}. A fixture that adds a field the
 // device does not emit makes a probe that can never pass on hardware look green.
-// See docs/tests/on-device-verification.md.
+// See docs/guides/on-device-verification.md.
 const goldenWirelessStatus = `	{
 	 "radio0": {
 	  "up": true,
