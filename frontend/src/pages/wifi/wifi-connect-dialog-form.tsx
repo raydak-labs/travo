@@ -40,11 +40,13 @@ export function WifiConnectDialogForm({
   onCancel,
 }: WifiConnectDialogFormProps) {
   return (
-    <div>
+    <div data-testid="wifi-connect-form" className="min-w-0">
       <div className="mb-4 flex items-center gap-3">
-        <Wifi className="h-5 w-5 text-blue-500" />
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{group.ssid}</h2>
+        <Wifi className="h-5 w-5 shrink-0 text-blue-500" />
+        <div className="min-w-0">
+          <h2 className="wrap-anywhere text-lg font-semibold text-gray-900 dark:text-white">
+            {group.ssid}
+          </h2>
           <SecurityBadge encryption={group.encryption} />
         </div>
       </div>
@@ -108,7 +110,7 @@ export function WifiConnectDialogForm({
         )}
 
         {error ? (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          <p className="wrap-anywhere text-sm text-red-600 dark:text-red-400" role="alert">
             {error}
           </p>
         ) : null}

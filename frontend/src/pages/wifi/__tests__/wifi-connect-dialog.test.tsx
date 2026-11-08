@@ -114,6 +114,45 @@ describe('WifiConnectDialog', () => {
     expect(screen.getByText('Connection failed')).toBeInTheDocument();
   });
 
+  // jsdom has no layout, so this pins the classes that stop a long unbroken token (the
+  // rpc session id in a raw ubus error) from widening the dialog; the rendered result was
+  // checked in a real browser (see the PR).
+  it('lets a long unbroken error wrap inside the dialog', () => {
+    const longError = `Command failed {"ubus_rpc_session":"${'a1b2c3d4'.repeat(8)}"} (No response)`;
+    render(
+      <WifiConnectDialog
+        group={mockGroup}
+        isConnecting={false}
+        error={longError}
+        onConnect={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const alert = screen.getByText(longError);
+    expect(alert).toHaveClass('wrap-anywhere');
+    expect(alert.closest('[data-testid="wifi-connect-form"]')).toHaveClass('min-w-0');
+  });
+
+  it('keeps Cancel and Connect usable after a failed attempt', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(
+      <WifiConnectDialog
+        group={mockGroup}
+        isConnecting={false}
+        error="The router could not apply the change."
+        onConnect={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Password'), 'mypassword');
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
   it('shows connecting state', () => {
     render(
       <WifiConnectDialog

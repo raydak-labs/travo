@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/openwrt-travel-gui/backend/internal/auth"
@@ -69,10 +70,43 @@ func (r *RealUCIApplyConfirm) snapshotDir(sessionID string) string {
 	return filepath.Join(r.RPCDRunDir, uciSnapshotPrefix+sessionID)
 }
 
+// ErrApplyFailedMessage is what a caller sees when rpcd refuses an apply or a
+// confirm. The ubus CLI's own text carries the call arguments, including the rpc
+// session id (a bearer token), so it is logged redacted and never returned.
+const ErrApplyFailedMessage = "The router could not apply the change. Please try again; " +
+	"if it keeps failing, check the router logs."
+
+// applyError is the caller-facing error: a fixed message that still unwraps to
+// the cause, so errors.Is keeps working.
+type applyError struct{ cause error }
+
+func (e *applyError) Error() string { return ErrApplyFailedMessage }
+func (e *applyError) Unwrap() error { return e.cause }
+
+var sessionTokenRe = regexp.MustCompile(`("ubus_rpc_session"\s*:\s*")[^"]*(")`)
+
+// redactSession blanks the rpc session id in a ubus failure text.
+func redactSession(text string) string { return sessionTokenRe.ReplaceAllString(text, "${1}***${2}") }
+
+// failApply logs the redacted detail and returns the fixed caller-facing error.
+func (r *RealUCIApplyConfirm) failApply(stage string, cause error) error {
+	r.logger().Error("uci "+stage+" failed", "err", redactSession(cause.Error()))
+	return &applyError{cause: cause}
+}
+
+func (r *RealUCIApplyConfirm) logger() *slog.Logger {
+	if r.Log != nil {
+		return r.Log
+	}
+	return slog.Default()
+}
+
 // RealUCIApplyConfirm uses ubus session + rpcd uci apply/confirm.
 type RealUCIApplyConfirm struct {
 	ubus     ubus.Ubus
 	password *auth.RootPassword
+	// Log receives the redacted detail of a failed apply; nil means slog.Default.
+	Log *slog.Logger
 	// RPCDRunDir and etcConfigDir are struct fields (not constants) so the
 	// apply/confirm flow can be exercised in tests against a temp directory.
 	RPCDRunDir   string
@@ -288,7 +322,7 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 		"timeout":          ApplyRollbackTimeout,
 	}
 	if _, err := r.ubus.Call("uci", "apply", applyArgs); err != nil {
-		return "", fmt.Errorf("uci apply: %w", err)
+		return "", r.failApply("apply", err)
 	}
 	applyStarted = true
 	// The apply still buys rpcd's crash-time rollback, but Snapshot is what puts
@@ -352,7 +386,7 @@ func (r *RealUCIApplyConfirm) Confirm(sessionID string) error {
 		"ubus_rpc_session": sessionID,
 	}
 	if _, err := r.ubus.Call("uci", "confirm", confirmArgs); err != nil {
-		return fmt.Errorf("uci confirm: %w", err)
+		return r.failApply("confirm", err)
 	}
 	// Success: this session's snapshot is dead weight, and a stale one must not
 	// be able to undo a LATER unrelated change.
