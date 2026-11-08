@@ -48,7 +48,6 @@ var retiredStateDirRe = regexp.MustCompile(`/etc/openwrt-travel-gui/`)
 var retiredStateDirAllowed = map[string]bool{
 	filepath.Join(docsDir, "adr", "0003-crash-guards-and-live-state.md"):                true,
 	filepath.Join(docsDir, "adr", "0013-operational-invariants-and-device-findings.md"): true,
-	filepath.Join(docsDir, "requirements", "tasks_open.md"):                             true,
 }
 
 // TestDocsDoNotNameTheRetiredStateDirectory fails when a document prescribes a
@@ -96,17 +95,12 @@ func docsToScan(t *testing.T) []string {
 		t.Fatalf("glob repo-root docs: %v", err)
 	}
 	files := append([]string(nil), roots...)
-	// docs/_archive is excluded by the walk below, so the review report needs no
-	// exemption here: it is a frozen point-in-time artifact that quotes wrong
-	// paths on purpose. Its existence is enforced by
-	// TestReviewReportIsPresentAndScoped in docs_index_test.go.
-
 	err = filepath.Walk(docsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if info.IsDir() {
-			if info.Name() == ".obsidian" || info.Name() == "_archive" {
+			if info.Name() == ".obsidian" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -263,7 +257,7 @@ func TestVerificationPlaybooksAreLinked(t *testing.T) {
 			return err
 		}
 		if !strings.HasSuffix(path, ".md") ||
-			info.Name() == ".obsidian" || strings.Contains(path, "_archive") {
+			info.Name() == ".obsidian" {
 			return nil
 		}
 		body, err := os.ReadFile(path)

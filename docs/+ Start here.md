@@ -35,7 +35,7 @@ updated: 2026-10-05
 
 ## Backlog and shipped work
 
-- [[requirements/tasks_open]]
+- [GitHub issues](https://github.com/raydak-labs/travo/issues) — open work
 - [[requirements/tasks_done]]
 
 ## Guides (how to do something)
@@ -64,7 +64,3 @@ updated: 2026-10-05
 - [[agents/issue-tracker]]
 - [[agents/triage-labels]]
 - [[agents/domain]]
-
-## Archive
-
-- [[_archive/requirements_done]] — legacy exhaustive export (read-only)

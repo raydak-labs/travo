@@ -1,15 +1,15 @@
 ---
 title: Completed tasks
-description: Shipped milestones and done work; pair with tasks_open for current backlog.
+description: Shipped milestones and done work; open work is tracked as GitHub issues.
 updated: 2026-10-25
 tags: [backlog, requirements, changelog]
 ---
 
 # Completed Tasks
 
-High-level **what shipped**, grouped by subsystem. For the old exhaustive checkbox export, see [`../_archive/requirements_done.md`](../_archive/requirements_done.md) (read-only).
+High-level **what shipped**, grouped by subsystem. Open work lives in [GitHub issues](https://github.com/raydak-labs/travo/issues).
 
-When you finish something in [`tasks_open.md`](./tasks_open.md): remove it there, add a short bullet under the right heading here, and update [`../architecture/overview.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
+When you close an issue: add a short bullet under the right heading here, and update [`../architecture/overview.md`](../architecture/overview.md) and the relevant [`../adr/`](../adr/) ADR if you introduced or changed a normative invariant.
 
 > **Last updated:** 2026-10-25 (the `updated:` field in the frontmatter is the same date; keep them in step)
 
@@ -148,7 +148,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 ## Frontend Toolchain
 
 - **ESLint replaced by oxlint, TypeScript 7 adopted.** The `TypeScript 7 — blocked by
-  typescript-eslint` hold in [`tasks_open.md`](./tasks_open.md) §17 (and the matching
+  typescript-eslint` hold (former backlog §17, and the matching
   Renovate `allowedVersions` rule) is resolved by the escape hatch it named: ESLint and
   `typescript-eslint` are gone, `.oxlintrc.json` replaces `eslint.config.js`, and
   `typescript` is pinned to `7.0.2` in the root, `frontend/`, and `shared/` packages.
@@ -191,7 +191,7 @@ Closed “Task N” items from earlier tracking — detail lives in the sections
 
 ## Closed From The Open Backlog (2026-09-28)
 
-Moved here from `tasks_open.md` because the code shipped; the items were still listed as open.
+Moved here from the former backlog because the code shipped; the items were still listed as open.
 
 - **Connection failover (§2.7) — all four items implemented.** Priority-based WAN source with deterministic generation from `/etc/travo/failover.json`, mwan3 health checks (configurable target), automatic switching to the next source on failure, and event notifications. Service: `failover/failover_service.go`; routes `GET`/`PUT /api/v1/network/failover` and `GET /api/v1/network/failover/events`, all present in the OpenAPI spec. Normative detail: [ADR 0005](../adr/0005-multi-wan-failover-mwan3.md). Device validation with two uplinks is still outstanding; see [`docs/tests/failover-verification.md`](../tests/failover-verification.md).
 - **Persistence backend (§16) — decided and implemented as bbolt.** `/etc/travo/travo.db` (bbolt, 0600, 5 s open timeout) replaces the "is SQLite a better fit?" research item; measured at +247 KB on the stripped binary versus ~10 MB for `modernc.org/sqlite`. Degrades to memory-only on open failure. Buckets, retention and the flash-write batching rule: [ADR 0009](../adr/0009-persistent-store-bbolt.md).

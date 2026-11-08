@@ -12,10 +12,6 @@ import (
 // keeps being referred to: AGENTS.md prescribes "a link check for anything you
 // moved", but nothing resolved those links, so removing CLAUDE.md reached main
 // and the only mechanical signal was a docs gate dying on a missing file.
-//
-// docs/_archive is deliberately excluded: it holds frozen point-in-time reports
-// whose references describe the tree as it was, and 50 of its 61 links are
-// broken for that reason alone (docs/README.md says so).
 var (
 	mdLinkRe    = regexp.MustCompile(`\]\(([^)]+)\)`)
 	wikiLinkRe  = regexp.MustCompile(`\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]`)

@@ -12,9 +12,8 @@ Pick by question, not by habit:
 - `docs/reference/` holds what things are: `ui-theming.md` (tokens, component contracts).
 - `docs/tests/` holds on-device verification playbooks.
 - `docs/plans/README.md` indexes live and normative plans. A shipped plan is deleted, not archived.
-- `docs/requirements/tasks_open.md` is the working backlog; `tasks_done.md` is the completed log.
+- Open work is GitHub issues on `raydak-labs/travo`; `docs/requirements/tasks_done.md` is the completed log.
 - `GLOSSARY.md` at the repo root fixes the words: summary band, status tone, stale, traffic history, configured vs live radio.
-- `docs/_archive/requirements_done.md` is a legacy exhaustive archive; never a source of truth, never edit it.
 - `docs/+ Start here.md` is the **Obsidian hub** (wikilinks) for the vault rooted at `docs/`.
 
 ## Documentation
@@ -35,7 +34,7 @@ look for it, and link rather than duplicate:
 | A check that only settles on hardware | `docs/tests/<area>-verification.md` | a guide, if the guide only runs commands |
 | Work not yet shipped | `docs/plans/` (listed in `docs/plans/README.md`) | anywhere else |
 | A term with a specific meaning in this project | `GLOSSARY.md` | a paragraph in a plan |
-| Backlog / shipped log | `docs/requirements/tasks_open.md` / `tasks_done.md` | a plan's checklist |
+| Backlog / shipped log | GitHub issues / `docs/requirements/tasks_done.md` | a plan's checklist |
 
 Prefer a link over a second copy. A fact maintained in two places is one place
 wrong within a month.
@@ -75,7 +74,7 @@ wrong within a month.
 ### When you change behaviour
 
 In the same change: update the owning ADR or guide, update
-`docs/requirements/tasks_open.md` / `tasks_done.md`, and run
+the GitHub issue and `docs/requirements/tasks_done.md`, and run
 `cd backend && go test ./internal/docsgate/` — the docs gates fail on unlinked
 playbooks, ADR index drift, crash-guard paths outside `/etc/trafo/`, persistent-store
 paths outside `/etc/travo/`, and a plans catalog that omits a plan.
@@ -139,7 +138,7 @@ The rules above are the source of truth. Operationally:
 
 3. **Typical commands** (pass `vault=docs` explicitly; cwd can be anywhere once the vault is registered):
    - Search: `obsidian search query="mwan3 failover" vault=docs`
-   - Read note body to stdout: `obsidian read path=architecture/overview.md vault=docs` — paths are **vault-relative** (`adr/0002-wireless-model-and-luci-apply.md`, `requirements/tasks_open.md`, …). Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`. Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`.
+   - Read note body to stdout: `obsidian read path=architecture/overview.md vault=docs` — paths are **vault-relative** (`adr/0002-wireless-model-and-luci-apply.md`, `requirements/tasks_done.md`, …). Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`. Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`.
    - Backlinks: `obsidian backlinks path=adr/0001-dns-vpn-captive-portal-architecture.md vault=docs`
    - More: `obsidian help`
 

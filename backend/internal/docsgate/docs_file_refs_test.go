@@ -15,8 +15,7 @@ func TestDocsCiteNoLineNumbers(t *testing.T) {
 	docsDir := filepath.Join("..", "..", "..", "docs")
 	scanned := 0
 	err := filepath.WalkDir(docsDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".md") ||
-			strings.Contains(path, string(filepath.Separator)+"_archive"+string(filepath.Separator)) {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".md") {
 			return err
 		}
 		body, err := os.ReadFile(path)

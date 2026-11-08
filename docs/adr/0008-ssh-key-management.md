@@ -131,7 +131,7 @@ working after Travo is uninstalled. Consequences accepted here:
 - The positional index delete is re-order-fragile. A fingerprint-addressed delete
   would be strictly better and is a breaking API change.
 - Whether `AddSSHKey` should log (an audit line for "root SSH key added") is not
-  decided here; see `docs/requirements/tasks_open.md`.
+  decided here; see [issue #238](https://github.com/raydak-labs/travo/issues/238).
 
 ## References
 

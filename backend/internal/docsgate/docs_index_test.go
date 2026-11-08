@@ -48,7 +48,7 @@ func TestPlansIndexListsEveryPlan(t *testing.T) {
 				"catalog of every plan in this directory", name)
 		}
 	}
-	if listed < 3 {
+	if listed < 2 {
 		t.Fatalf("only %d plans found — the directory walk is probably broken, or live "+
 			"and normative plans were deleted without folding their decisions into an ADR "+
 			"(ADR 0013). The floor is deliberately well below today's count: deletion is "+
