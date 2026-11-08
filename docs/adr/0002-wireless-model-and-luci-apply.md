@@ -3,7 +3,7 @@ title: "ADR 0002: Wireless model, health, and LuCI-style UCI apply"
 description: The wireless model: configured vs live radio, role assignment, LuCI-style apply/rollback/confirm, and the health API that reports fragile layouts.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-04
+updated: 2026-11-08
 tags: [adr, wireless, wwan, repeater, uci, rpcd, openwrt]
 ---
 
@@ -428,6 +428,15 @@ section.
 `wifi_reconnect.go`): a cron minute-tick that runs `wifi up` behind
 `autoreconnect-crash-guard` and the `MAX_FAIL=5` counter. It stays narrow, guarded,
 and documented; nothing else may add a `wifi` invocation.
+
+It acts only on a radio that is enabled but not up. An up radio whose uplink has no address
+is already retrying, and `wifi up` would restart every radio, the access point included, so
+every client dropped once a minute (device finding, OpenWrt 25.12.6: `logread` showed
+`Tearing down phy0/phy1` at `:01` every minute while `sta0` never associated). Each `wifi up`
+counts toward `MAX_FAIL` whatever its exit code, because it exits 0 without bringing the
+uplink back; only an address on `wwan` clears the counter, even once the limit is reached.
+It needs positive evidence: a radio that `network.wireless status` reports as `disabled=false`
+and `up=false`. A failed status call or a radio missing from the answer runs nothing.
 
 **Validation on the schedule path** is a precondition of generating cron at all: the
 `on_time`/`off_time` values are formatted straight into a root crontab line, so
