@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -136,17 +137,21 @@ func TestRealUCIApplyConfirm_ApplyAndConfirmEmptyListIsNoop(t *testing.T) {
 	}
 }
 
-func TestRealUCIApplyConfirm_StartApplyStagesConfigsWithRollbackWindow(t *testing.T) {
+// The #220 regression. rpcd 2026.10.04 acts on a session's pending uci changes
+// and ignores files dropped into /var/run/rpcd/uci-<session id>; with nothing
+// pending, `uci apply` answers "No response". StartApply therefore has to create
+// a pending change through the session itself, and FakeUbusApply refuses an
+// apply without one, so staging files by hand can no longer pass this test.
+func TestRealUCIApplyConfirm_StartApplyAppliesAPendingChangeMadeThroughTheSession(t *testing.T) {
 	t.Parallel()
 
 	fu := &FakeUbusApply{LoginSID: "sess-42"}
 	applier, etcDir, runDir := newTestUCIApply(t, fu)
 
-	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config mwan3 'x'\n"), 0600); err != nil {
-		t.Fatalf("write mwan3 config: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(etcDir, "network"), []byte("config network 'x'\n"), 0600); err != nil {
-		t.Fatalf("write network config: %v", err)
+	for _, name := range []string{"mwan3", "network"} {
+		if err := os.WriteFile(filepath.Join(etcDir, name), []byte("config x 'x'\n"), 0600); err != nil {
+			t.Fatalf("write %s config: %v", name, err)
+		}
 	}
 
 	sid, err := applier.StartApply([]string{"network", "mwan3"})
@@ -156,12 +161,12 @@ func TestRealUCIApplyConfirm_StartApplyStagesConfigsWithRollbackWindow(t *testin
 	if sid != "sess-42" {
 		t.Fatalf("session = %q, want sess-42", sid)
 	}
-
-	sessionDir := filepath.Join(runDir, "uci-"+sid)
-	for _, name := range []string{"network", "mwan3"} {
-		if _, statErr := os.Stat(filepath.Join(sessionDir, name)); statErr != nil {
-			t.Errorf("expected staged %s in session dir: %v", name, statErr)
-		}
+	if got := fu.PendingConfigs(sid); !slices.Equal(got, []string{"mwan3", "network"}) {
+		t.Errorf("pending configs in the session = %v, want both configs", got)
+	}
+	// Nothing may be hand-staged into rpcd's run dir any more.
+	if entries, _ := os.ReadDir(runDir); len(entries) != 0 {
+		t.Errorf("StartApply wrote into %s: %v", runDir, entries)
 	}
 
 	applyCall := fu.find("uci", "apply")
@@ -182,58 +187,121 @@ func TestRealUCIApplyConfirm_StartApplyStagesConfigsWithRollbackWindow(t *testin
 	}
 }
 
-func TestRealUCIApplyConfirm_StartApplySkipsMissingConfig(t *testing.T) {
+// The marker must leave the real config unchanged: it is added and deleted in
+// the same session, so the net delta rpcd commits is empty.
+func TestRealUCIApplyConfirm_StartApplyMarkerIsAddedThenDeletedPerConfig(t *testing.T) {
 	t.Parallel()
 
 	fu := &FakeUbusApply{}
-	applier, _, runDir := newTestUCIApply(t, fu)
-
-	sid, err := applier.StartApply([]string{"mwan3"})
-	if err != nil {
-		t.Fatalf("StartApply error = %v (missing configs are skipped)", err)
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	if err := os.WriteFile(filepath.Join(etcDir, "wireless"), []byte("config x 'x'\n"), 0600); err != nil {
+		t.Fatal(err)
 	}
-	if _, statErr := os.Stat(filepath.Join(runDir, "uci-"+sid)); statErr != nil {
-		t.Errorf("session dir should be kept for a started apply: %v", statErr)
+
+	if _, err := applier.StartApply([]string{"wireless"}); err != nil {
+		t.Fatalf("StartApply error = %v", err)
+	}
+	add, del := fu.indexOf("uci", "add"), fu.indexOf("uci", "delete")
+	apply := fu.indexOf("uci", "apply")
+	if add < 0 || del <= add || apply <= del {
+		t.Fatalf("want add < delete < apply, got add=%d delete=%d apply=%d: %+v", add, del, apply, fu.calls)
+	}
+	if fu.calls[add].args["name"] != fu.calls[del].args["section"] {
+		t.Errorf("marker added as %v but deleted as %v", fu.calls[add].args["name"], fu.calls[del].args["section"])
 	}
 }
 
-func TestRealUCIApplyConfirm_StartApplyCleansSessionDirOnApplyFailure(t *testing.T) {
+// A config that does not exist (mwan3 not installed) is skipped, as before. If
+// every config is skipped there is nothing to apply, which is the "applier had
+// nothing to do" empty-session answer, not an error.
+func TestRealUCIApplyConfirm_StartApplySkipsMissingConfig(t *testing.T) {
+	t.Parallel()
+
+	fu := &FakeUbusApply{LoginSID: "sess-skip"}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	if err := os.WriteFile(filepath.Join(etcDir, "network"), []byte("config x 'x'\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	sid, err := applier.StartApply([]string{"mwan3", "network"})
+	if err != nil || sid != "sess-skip" {
+		t.Fatalf("StartApply = (%q, %v), want the session with mwan3 skipped", sid, err)
+	}
+	if got := fu.PendingConfigs(sid); !slices.Equal(got, []string{"network"}) {
+		t.Errorf("pending configs = %v, want only network", got)
+	}
+
+	fu2 := &FakeUbusApply{}
+	applier2, _, _ := newTestUCIApply(t, fu2)
+	sid, err = applier2.StartApply([]string{"mwan3"})
+	if err != nil || sid != "" {
+		t.Errorf("StartApply with nothing to apply = (%q, %v), want (\"\", nil)", sid, err)
+	}
+	if fu2.find("uci", "apply") != nil {
+		t.Error("uci.apply must not run when no config was staged")
+	}
+}
+
+// A failed apply must not leave the marker changes pending in a session nobody
+// will confirm.
+func TestRealUCIApplyConfirm_StartApplyRevertsTheSessionOnApplyFailure(t *testing.T) {
 	t.Parallel()
 
 	fu := &FakeUbusApply{LoginSID: "sess-fail", ApplyErr: errors.New("apply boom")}
-	applier, etcDir, runDir := newTestUCIApply(t, fu)
-
-	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config mwan3 'x'\n"), 0600); err != nil {
-		t.Fatalf("write mwan3 config: %v", err)
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config x 'x'\n"), 0600); err != nil {
+		t.Fatal(err)
 	}
 
 	if _, err := applier.StartApply([]string{"mwan3"}); err == nil {
 		t.Fatal("expected StartApply to fail when uci.apply fails")
 	}
-	if _, statErr := os.Stat(filepath.Join(runDir, "uci-"+"sess-fail")); !os.IsNotExist(statErr) {
-		t.Errorf("expected session dir cleanup after failed apply, stat err = %v", statErr)
+	if got := fu.PendingConfigs("sess-fail"); len(got) != 0 {
+		t.Errorf("failed apply left pending changes in the session: %v", got)
 	}
 }
 
-func TestRealUCIApplyConfirm_StartApplyCleansSessionDirOnCopyFailure(t *testing.T) {
+func TestRealUCIApplyConfirm_StartApplyFailsWhenTheSessionRefusesTheMarker(t *testing.T) {
 	t.Parallel()
 
-	fu := &FakeUbusApply{LoginSID: "sess-copy"}
-	applier, etcDir, runDir := newTestUCIApply(t, fu)
-
-	// A directory named like a config makes the staged copy fail.
-	if err := os.MkdirAll(filepath.Join(etcDir, "mwan3"), 0700); err != nil {
-		t.Fatalf("create bogus mwan3 dir: %v", err)
+	fu := &FakeUbusApply{AddErr: errors.New("permission denied")}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	if err := os.WriteFile(filepath.Join(etcDir, "mwan3"), []byte("config x 'x'\n"), 0600); err != nil {
+		t.Fatal(err)
 	}
 
 	if _, err := applier.StartApply([]string{"mwan3"}); err == nil {
-		t.Fatal("expected StartApply to fail when staging a config fails")
+		t.Fatal("expected StartApply to fail when the session cannot stage a change")
 	}
 	if fu.find("uci", "apply") != nil {
-		t.Error("uci.apply must not run when staging fails")
+		t.Error("uci.apply must not run when staging failed")
 	}
-	if _, statErr := os.Stat(filepath.Join(runDir, "uci-sess-copy")); !os.IsNotExist(statErr) {
-		t.Errorf("expected session dir cleanup after staging failure, stat err = %v", statErr)
+}
+
+// Config A is staged, then config B's marker cannot be deleted: nothing may stay
+// pending in the session, or a later apply would commit a stray marker section.
+func TestRealUCIApplyConfirm_StartApplyRevertsEveryStagedConfigWhenALaterOneFails(t *testing.T) {
+	t.Parallel()
+
+	fu := &FakeUbusApply{
+		LoginSID:     "sess-half",
+		DeleteErrFor: map[string]error{"network": errors.New("delete boom")},
+	}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	for _, name := range []string{"wireless", "network"} {
+		if err := os.WriteFile(filepath.Join(etcDir, name), []byte("config x 'x'\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := applier.StartApply([]string{"wireless", "network"}); err == nil {
+		t.Fatal("expected StartApply to fail when a marker cannot be deleted")
+	}
+	if fu.find("uci", "apply") != nil {
+		t.Error("uci.apply must not run after a staging failure")
+	}
+	if got := fu.PendingConfigs("sess-half"); len(got) != 0 {
+		t.Errorf("session still has pending changes after the failure: %v", got)
 	}
 }
 
@@ -298,6 +366,22 @@ func TestRealUCIApplyConfirm_ApplyAndConfirmRunsApplyThenConfirm(t *testing.T) {
 	}
 	if applyIdx > confirmIdx {
 		t.Errorf("uci.apply must precede uci.confirm (apply=%d confirm=%d)", applyIdx, confirmIdx)
+	}
+}
+
+// With none of the configs present StartApply applies nothing and returns no
+// session. ApplyAndConfirm used to read that as a failed confirm and roll back.
+func TestRealUCIApplyConfirm_ApplyAndConfirmWithNoExistingConfigIsANoop(t *testing.T) {
+	t.Parallel()
+
+	fu := &FakeUbusApply{}
+	applier, _, _ := newTestUCIApply(t, fu)
+
+	if err := applier.ApplyAndConfirm([]string{"mwan3"}); err != nil {
+		t.Fatalf("ApplyAndConfirm error = %v, want nil", err)
+	}
+	if fu.find("uci", "confirm") != nil || fu.find("uci", "reload_config") != nil {
+		t.Errorf("nothing was applied, so nothing may be confirmed or rolled back: %+v", fu.calls)
 	}
 }
 

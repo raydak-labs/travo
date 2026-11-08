@@ -3,7 +3,7 @@ title: "ADR 0013: Operational invariants and device findings"
 description: Cross-cutting operational invariants and the device findings behind them: VPN disable route recovery, push wiring, store cost, band switching, buttons, AdGuard.
 status: Accepted
 date: 2026-10-05
-updated: 2026-10-25
+updated: 2026-11-08
 tags: [adr, operations, invariants, vpn, wifi, hardware, findings]
 ---
 
@@ -158,6 +158,35 @@ process answered. Running `/etc/init.d/travo start` restored the service (`/api/
 
 The release keep list therefore includes `/etc/rc.d/S99travo`. This preserves the established
 boot-enabled state when firmware upgrade does not retain the generated enablement symlink.
+
+### 11. rpcd applies only what is pending in the calling session
+
+`ubus call uci apply` acts on the configs that have a pending change in the calling session's
+delta. It ignores files copied into `/var/run/rpcd/uci-<session id>/`, which older rpcd read.
+rpcd 2026.10.04 (OpenWrt 25.12.6) names that directory after a private random value
+(`rpc_session_new` in `session.c`) that no ubus method returns, so a session id cannot be mapped
+to it. With nothing pending, apply answers `UBUS_STATUS_NO_DATA` and the `ubus` CLI prints
+`Command failed: ubus call uci apply {...} (No response)` (#220).
+
+Observed on the device: a session created with `ubus call session create` and a `uci set` through
+it produced `/var/run/rpcd/uci-87ae2895...` while the session id was `180ae843...`; copying
+`wireless` into `uci-<session id>` by hand and applying gave exactly the reported error.
+
+Travo commits before it applies (ADR 0002 §5.0), so the real edit is never in the session.
+`StartApply`, the generated toggle helper and `scripts/setup-wireless-ap.sh` therefore add and
+delete a `travo_apply` marker section per config through the session. The delta is non-empty and
+its net effect on the config is nothing. Do not copy files into rpcd's run dir to stage an apply.
+
+Two consequences of rpcd committing every staged config, both checked in rpcd's `uci.c` and on a
+scratch copy, not on the device's live files: the commit re-exports each config through libuci,
+so hand-written comments in `system`, `firewall` or `dhcp` are dropped (the device's files hold
+none, so their checksums did not change), and each commit fires a `config.change` event, so the
+services behind all five configs reload on every wireless apply. A second `StartApply` while a
+first apply is unconfirmed reuses that pending session (`session login` reclaims it) and its
+`uci apply` is refused. Failover guards against this with its pending-session check; the wireless
+write lock is released before confirm, so the wireless path has no such guard.
+Writing the real edits through rpcd's own `uci set/add/delete` is the cleaner design and is
+tracked separately.
 
 ## Why
 

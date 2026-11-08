@@ -3,7 +3,7 @@ title: "ADR 0002: Wireless model, health, and LuCI-style UCI apply"
 description: The wireless model: configured vs live radio, role assignment, LuCI-style apply/rollback/confirm, and the health API that reports fragile layouts.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-04
+updated: 2026-11-08
 tags: [adr, wireless, wwan, repeater, uci, rpcd, openwrt]
 ---
 
@@ -54,8 +54,8 @@ Travel-router behavior depends on predictable **STA/WWAN**, **repeater** radio l
 travo relied on restored **nothing**, because travo **commits the UCI change before either
 of them runs**:
 
-1. **rpcd's rollback window.** `StartApply` copies `/etc/config/<name>` into the session dir
-   and *then* calls `uci apply` with `rollback:true`. rpcd snapshots at **apply** time, so its
+1. **rpcd's rollback window.** Travo commits (§5.0) *before* `StartApply` calls `uci apply` with
+   `rollback:true`. rpcd snapshots at **apply** time, so its
    rollback target is the **already-changed** config: when the 30 s window expired without a
    confirm, rpcd faithfully restored the change it existed to undo. Observed on the device:
    after a refused confirm and the full window, the working uplink section was still disabled
@@ -379,7 +379,9 @@ timer- or button-driven `wifi down` has no rollback. Those paths therefore call 
   `wireless.@wifi-device[*].disabled=0`; `down` sets it to `1`. Any other argument
   exits `2`.
 - **Mechanism:** `uci set` → `uci commit wireless` → rpcd
-  `ubus call session login` → stage `wireless` into `/var/run/rpcd/uci-<sid>` →
+  `ubus call session login` → add and delete a `travo_apply` marker in `wireless` through the
+  session (rpcd applies only what is pending in the session,
+  [ADR 0013](./0013-operational-invariants-and-device-findings.md) §11) →
   `ubus call uci apply '{"ubus_rpc_session":"<sid>","rollback":true,"timeout":30}'`
   → `ubus call uci confirm '{"ubus_rpc_session":"<sid>"}'`. A missing apply session,
   a failed set/commit, or a failed confirm runs `uci revert wireless` and exits
