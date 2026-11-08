@@ -1,7 +1,7 @@
 ---
 title: Documentation map
 description: Entrypoint for human and agent docs; the layout rules that keep this vault navigable.
-updated: 2026-10-25
+updated: 2026-10-26
 tags: [docs, index, navigation]
 ---
 
@@ -29,6 +29,7 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 | [`tests/`](./tests/) | On-device verification playbooks | Every playbook must be linked from somewhere in `docs/`; a Go test enforces it. |
 | [`plans/`](./plans/README.md) | Live and normative plans only | A shipped plan is deleted once its decisions are folded into an ADR. |
 | [`requirements/`](./requirements/) | Backlog (`tasks_open`) and shipped log (`tasks_done`) | Remove from one, add to the other, in the same commit. |
+| [`agents/`](./agents/) | Config the engineering skills read: issue tracker, triage labels, domain-doc rules | Edit directly; no decisions or plans here. |
 | [`images/`](./images/) | Screenshots and assets referenced from docs and the repo README | Binary assets only; no prose. |
 | [`_archive/`](./_archive/) | Frozen historical exports: the legacy checkbox dump and the point-in-time review reports | Never a source of truth, never edited, never linked as current. |
 

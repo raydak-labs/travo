@@ -81,6 +81,21 @@ playbooks, ADR index drift, crash-guard paths outside `/etc/trafo/`, persistent-
 paths outside `/etc/travo/`, and a plans catalog that omits a plan.
 
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `raydak-labs/travo`, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,
+`wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Tools & Setup
 
 - everything should be installed via `mise`. See `.mise.toml`
