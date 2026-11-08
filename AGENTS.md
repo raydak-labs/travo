@@ -17,22 +17,22 @@ Pick by question, not by habit:
 
 ## Documentation
 
-Structure, enforced in parts by the tests in `backend/internal/docsgate/`.
+Structure is enforced by review, not by tests. Shell and install contracts are pinned by `backend/internal/contracts/`.
 
 ### Where a fact goes
 
 One canonical home per fact. When you learn something, put it where a reader will
 look for it, and link rather than duplicate:
 
-| Fact | Home | Not |
-| ---- | ---- | --- |
-| A durable decision (hard to reverse, surprising without context, real trade-off) | a numbered ADR in `docs/adr/` | a plan, a code comment, a task |
-| An invariant or safety rule that spans subsystems | `docs/architecture/overview.md`, or [ADR 0013](docs/adr/0013-operational-invariants-and-device-findings.md) once an ADR owns it | the other one |
-| How to do something | `docs/guides/<task>.md` | `docs/reference/` |
-| What something is (tokens, tables, contracts) | `docs/reference/` | a guide |
-| A check that only settles on hardware | `docs/guides/on-device-verification.md` | a guide, if the guide only runs commands |
-| A term with a specific meaning in this project | `GLOSSARY.md` | a paragraph in a plan |
-| Backlog | GitHub issues | a doc checklist |
+| Fact                                                                             | Home                                                                                                                            | Not                                      |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| A durable decision (hard to reverse, surprising without context, real trade-off) | a numbered ADR in `docs/adr/`                                                                                                   | a plan, a code comment, a task           |
+| An invariant or safety rule that spans subsystems                                | `docs/architecture/overview.md`, or [ADR 0013](docs/adr/0013-operational-invariants-and-device-findings.md) once an ADR owns it | the other one                            |
+| How to do something                                                              | `docs/guides/<task>.md`                                                                                                         | `docs/reference/`                        |
+| What something is (tokens, tables, contracts)                                    | `docs/reference/`                                                                                                               | a guide                                  |
+| A check that only settles on hardware                                            | `docs/guides/on-device-verification.md`                                                                                         | a guide, if the guide only runs commands |
+| A term with a specific meaning in this project                                   | `GLOSSARY.md`                                                                                                                   | a paragraph in a plan                    |
+| Backlog                                                                          | GitHub issues                                                                                                                   | a doc checklist                          |
 
 Prefer a link over a second copy. A fact maintained in two places is one place
 wrong within a month.
@@ -58,10 +58,8 @@ wrong within a month.
 
 In the same change: update the owning ADR or guide, update
 the GitHub issue, and run
-`cd backend && go test ./internal/docsgate/` — the docs gates fail on unlinked
-playbooks, ADR index drift, crash-guard paths outside `/etc/trafo/`, persistent-store
-paths outside `/etc/travo/`, and an ADR index that omits an ADR.
-
+`cd backend && go test ./internal/contracts/` — the contract tests fail on scripts that
+no longer parse, a deploy-local guard that is not cleared, and a broken install one-liner.
 
 ## Agent skills
 
@@ -102,7 +100,7 @@ The rules above are the source of truth. Operationally:
 - `docs/architecture/overview.md` stays a short overview that links deeper — never a second copy of an ADR.
 - New normative cross-cutting decision → new numbered ADR + index entry + hub wikilink, in the same commit.
 - Shipped work → fold any normative part into an ADR or guide; close the issue.
-- Before finishing: `cd backend && go test ./internal/docsgate/` and a link check for anything you moved.
+- Before finishing: `make test`, and check links by hand for anything you moved.
 
 ## Documentation retrieval (Obsidian CLI)
 

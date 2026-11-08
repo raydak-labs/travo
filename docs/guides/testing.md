@@ -17,16 +17,16 @@ When you find a procedure on this page, move it to the owning playbook rather th
 Run from the repo root. `make` resolves the pinned toolchain through [mise](../../.mise.toml), so a
 local run uses the same tool versions CI does.
 
-| Command | What it runs |
-| ------- | ------------ |
-| `make test` | `go test -count=1 ./...`, then `pnpm test` in `shared/` and `frontend/` |
-| `make test-race` | the backend suite with `-race`, same as the CI race job |
-| `make lint` | oxlint over `frontend/src` and `shared/src`, `golangci-lint` in `backend/` |
-| `make format-check` | prettier `--check`, `gofmt -l`, `goimports -l`; non-zero when unformatted |
-| `make format` | the same tools in write mode |
-| `make shellcheck` | `shellcheck --severity=warning` over `scripts/`, `test/integration/` |
-| `make coverage` | per-package Go coverage summary; informational, not a gate |
-| `make build` | frontend production build plus `backend/bin/server` |
+| Command             | What it runs                                                               |
+| ------------------- | -------------------------------------------------------------------------- |
+| `make test`         | `go test -count=1 ./...`, then `pnpm test` in `shared/` and `frontend/`    |
+| `make test-race`    | the backend suite with `-race`, same as the CI race job                    |
+| `make lint`         | oxlint over `frontend/src` and `shared/src`, `golangci-lint` in `backend/` |
+| `make format-check` | prettier `--check`, `gofmt -l`, `goimports -l`; non-zero when unformatted  |
+| `make format`       | the same tools in write mode                                               |
+| `make shellcheck`   | `shellcheck --severity=warning` over `scripts/`, `test/integration/`       |
+| `make coverage`     | per-package Go coverage summary; informational, not a gate                 |
+| `make build`        | frontend production build plus `backend/bin/server`                        |
 
 Narrower loops, when one project is what you touched:
 
@@ -36,14 +36,15 @@ cd shared && pnpm test
 cd frontend && pnpm test
 ```
 
-Docs have gates too. Run them in the same change as any edit under `docs/`:
+Shell and install contracts are pinned by Go tests. Run them after any change to `scripts/`
+or the install one-liner:
 
 ```sh
-cd backend && go test ./internal/docsgate/
+cd backend && go test ./internal/contracts/
 ```
 
-They fail on a crash-guard path outside `/etc/trafo/`, a persistent-store path outside
-`/etc/travo/`, an ADR missing from the index or the Obsidian hub, a guide that nothing links to.
+They fail on a script that no longer parses, a deploy-local crash guard that is not cleared,
+and a published install one-liner that does not run.
 
 A green local suite is not evidence about the router. The on-device playbook's §2 lists the
 classes of defect it demonstrably cannot catch.

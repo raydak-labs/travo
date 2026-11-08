@@ -301,11 +301,8 @@ new callers must not widen the condition.
 - **Operator expectations**: finishing captive flows (or explicit restore) before other
   major DNS toggles reduces edge cases. All three dnsmasq resolver features — VPN, AdGuard
   and the captive bypass — are unified on the one stack of §3.1.
-- **Drift gate**: `TestDnsResolverStatePathsAreNamedInAdr0001` and
-  `TestEtcTrafoStatePathsAreNamedInAnAdr` in
-  `backend/internal/docsgate/dns_docs_test.go` derive the persistent paths from the
-  backend sources and fail when this ADR (or any ADR, for `/etc/trafo`) stops naming
-  them. Adding a DNS state path without documenting it here is therefore a red test.
+- **Drift**: no test checks that this ADR names every DNS state path. Keep the list
+  in step with the backend sources in review.
 
 ### 6. Built-in mechanisms summary
 
@@ -349,8 +346,6 @@ new callers must not widen the condition.
 - `backend/internal/uplink/captive_autoaccept.go` — portal walk, conditional wwan
   bounce
 - `backend/internal/network/network_dns.go` — WAN custom DNS (`SetDNSConfig`)
-- `backend/internal/docsgate/dns_docs_test.go` — the drift gate that keeps the paths
-  above and this ADR in agreement
 - `docs/adr/0003-crash-guards-and-live-state.md` — guard directory contract (§2)
 - `docs/adr/0010-uci-write-serialisation-and-request-contracts.md` — the `dhcp` lock
 - `packaging/adguard/AdGuardHome.yaml` — the shipped AdGuard config, incl. `users: []`

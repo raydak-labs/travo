@@ -1,4 +1,4 @@
-package docsgate
+package contracts
 
 // Executable tests for the shell scripts under scripts/ and test/integration/.
 //
