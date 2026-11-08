@@ -59,6 +59,12 @@ updated: 2026-10-05
 - [[tests/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
   guard or install change touches a device
 
+## Agent skills config
+
+- [[agents/issue-tracker]]
+- [[agents/triage-labels]]
+- [[agents/domain]]
+
 ## Archive
 
 - [[_archive/requirements_done]] — legacy exhaustive export (read-only)
