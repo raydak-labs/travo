@@ -81,8 +81,6 @@ Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`
 - everything should be installed via `mise`. See `.mise.toml`
 - Run `make install` once after cloning or whenever dependencies change (installs pnpm packages and downloads Go modules)
 
-## Project Plans
-
 ## Project Structure
 
 This is a pnpm monorepo with:
