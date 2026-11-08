@@ -1,7 +1,9 @@
 package platform
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -302,6 +304,62 @@ func TestRealUCIApplyConfirm_StartApplyRevertsEveryStagedConfigWhenALaterOneFail
 	}
 	if got := fu.PendingConfigs("sess-half"); len(got) != 0 {
 		t.Errorf("session still has pending changes after the failure: %v", got)
+	}
+}
+
+// The #223 report: the UI showed the whole CLI failure, including the rpc session
+// id. The caller gets a fixed message, the cause stays reachable with errors.Is,
+// and the detail goes to the log with the session id removed.
+func TestRealUCIApplyConfirm_ApplyFailureHidesTheSessionIdFromCallers(t *testing.T) {
+	t.Parallel()
+
+	const sid = "1dc8470c5b6c4f0e9d0f3a6f6a5c2b11"
+	cause := errors.New(`Command failed: ubus call uci apply {"rollback":true,"timeout":30,` +
+		`"ubus_rpc_session":"` + sid + `"} (No response)`)
+	fu := &FakeUbusApply{LoginSID: sid, ApplyErr: cause}
+	applier, etcDir, _ := newTestUCIApply(t, fu)
+	var logged bytes.Buffer
+	applier.Log = slog.New(slog.NewTextHandler(&logged, nil))
+	if err := os.WriteFile(filepath.Join(etcDir, "wireless"), []byte("config x 'x'\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := applier.StartApply([]string{"wireless"})
+	if err == nil {
+		t.Fatal("expected StartApply to fail")
+	}
+	if strings.Contains(err.Error(), sid) || strings.Contains(err.Error(), "ubus_rpc_session") {
+		t.Errorf("the caller-facing error leaks the session: %q", err.Error())
+	}
+	if err.Error() != ErrApplyFailedMessage {
+		t.Errorf("error = %q, want the fixed message %q", err.Error(), ErrApplyFailedMessage)
+	}
+	if !errors.Is(err, cause) {
+		t.Error("the cause must stay reachable with errors.Is")
+	}
+	if !strings.Contains(logged.String(), "No response") {
+		t.Errorf("the detail must reach the log, got %q", logged.String())
+	}
+	if strings.Contains(logged.String(), sid) {
+		t.Errorf("the log must not contain the session id: %q", logged.String())
+	}
+}
+
+func TestRealUCIApplyConfirm_ConfirmFailureHidesTheSessionIdFromCallers(t *testing.T) {
+	t.Parallel()
+
+	const sid = "feedfacefeedfacefeedfacefeedface"
+	fu := &FakeUbusApply{ConfirmErr: errors.New(`Command failed: ubus call uci confirm ` +
+		`{"ubus_rpc_session":"` + sid + `"} (Not found)`)}
+	applier, _, _ := newTestUCIApply(t, fu)
+	applier.Log = slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+
+	err := applier.Confirm(sid)
+	if err == nil {
+		t.Fatal("expected Confirm to fail")
+	}
+	if strings.Contains(err.Error(), sid) {
+		t.Errorf("the caller-facing error leaks the session: %q", err.Error())
 	}
 }
 
