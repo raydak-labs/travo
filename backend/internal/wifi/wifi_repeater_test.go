@@ -176,6 +176,39 @@ func TestGetHealth_STAAssociatedButNoIP_ReturnsWarning(t *testing.T) {
 	}
 }
 
+func notAssociatedIssue(t *testing.T, svc *Service) string {
+	t.Helper()
+	svc.ubus.(*ubus.MockUbus).RegisterResponse("iwinfo.info", map[string]any{"ssid": ""})
+	h, err := svc.GetHealth()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.Status != "warning" || len(h.Issues) == 0 {
+		t.Fatalf("expected warning with issues, got %q %v", h.Status, h.Issues)
+	}
+	return h.Issues[0]
+}
+
+func TestGetHealth_NotAssociated_NamesConfiguredSSID(t *testing.T) {
+	svc, _ := newTestWifiService()
+	want := `Not connected to "Hotel-WiFi" yet — check the password, range and band.`
+	if got := notAssociatedIssue(t, svc); got != want {
+		t.Errorf("issue = %q, want %q", got, want)
+	}
+}
+
+func TestGetHealth_NotAssociated_NoConfiguredSSID_OmitsName(t *testing.T) {
+	svc, u := newTestWifiService()
+	_ = u.Set("wireless", "sta0", "ssid", "")
+	got := notAssociatedIssue(t, svc)
+	if strings.Contains(got, "()") || strings.Contains(got, `""`) || strings.Contains(got, "phy0-sta0") {
+		t.Errorf("issue must not contain empty name or ifname, got %q", got)
+	}
+	if !strings.HasPrefix(got, "Not connected to a Wi‑Fi network yet") {
+		t.Errorf("unexpected issue %q", got)
+	}
+}
+
 func TestGetHealth_RepeaterSameRadioAPSTA(t *testing.T) {
 	svc, _ := newTestWifiService()
 	h, err := svc.GetHealth()

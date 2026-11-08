@@ -17,7 +17,7 @@ function warningBannerTitle(issues: readonly string[]): string {
     ) {
       return 'Waiting for IP address';
     }
-    if (i.includes('not associated')) {
+    if (i.startsWith('Not connected')) {
       return 'Wi‑Fi not connected';
     }
   }
@@ -65,12 +65,6 @@ export function WifiHealthBanner() {
               <li key={issue}>{issue}</li>
             ))}
           </ul>
-        )}
-        {data.sta && data.wwan && (
-          <p className={`text-xs ${bodyClasses}`}>
-            STA: <span className="font-mono">{data.sta.ifname}</span> ({data.sta.ssid}) · wwan
-            device: <span className="font-mono">{data.wwan.device || '—'}</span>
-          </p>
         )}
       </div>
     </div>

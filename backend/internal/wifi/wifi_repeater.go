@@ -421,6 +421,18 @@ func (w *Service) sameRadioRepeaterAPSTAConflict() (bool, error) {
 	return false, nil
 }
 
+// notConnectedIssue names the uplink profile being tried, if UCI has its SSID.
+func (w *Service) notConnectedIssue() string {
+	const hint = " yet — check the password, range and band."
+	section, err := w.selectActiveSTA()
+	if err == nil && section != "" {
+		if ssid, err := w.uci.Get("wireless", section, "ssid"); err == nil && ssid != "" {
+			return fmt.Sprintf("Not connected to %q", ssid) + hint
+		}
+	}
+	return "Not connected to a Wi‑Fi network" + hint
+}
+
 // GetHealth returns a cross-checked view of the WiFi state to surface mismatches
 // between iwinfo (association state) and netifd (wwan lease/binding). The classic
 // failure mode it detects: a STA interface is associated to an SSID, but the wwan
@@ -501,7 +513,7 @@ func (w *Service) GetHealth() (models.WifiHealth, error) {
 			"STA is associated to %q but wwan has no DHCP lease yet", staSSID))
 	case !staAssociated:
 		h.Status = "warning"
-		h.Issues = append(h.Issues, "STA enabled but not associated to any network")
+		h.Issues = append(h.Issues, w.notConnectedIssue())
 	}
 
 	conflict, err := w.sameRadioRepeaterAPSTAConflict()
