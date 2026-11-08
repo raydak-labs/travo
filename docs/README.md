@@ -26,7 +26,6 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 | [`architecture/overview.md`](./architecture/overview.md) | Cross-cutting invariants and safety rules that predate or span ADRs                | Point to ADRs instead of restating them.                                                                            |
 | [`guides/`](./guides/)                                   | How to _do_ something: develop, deploy, test                                       | Task-shaped, not topic-shaped.                                                                                      |
 | [`reference/`](./reference/)                             | What something _is_: tokens, component contracts, tables                           | Read before changing the thing described.                                                                           |
-| [`tests/`](./tests/)                                     | On-device verification playbooks                                                   | Every playbook must be linked from somewhere in `docs/`; a Go test enforces it.                                     |
 | [`agents/`](./agents/)                                   | Config the engineering skills read: issue tracker, triage labels, domain-doc rules | Edit directly; no decisions or plans here.                                                                          |
 | [`images/`](./images/)                                   | Screenshots and assets referenced from docs and the repo README                    | Binary assets only; no prose.                                                                                       |
 
@@ -38,7 +37,7 @@ see [`AGENTS.md`](../AGENTS.md) § Documentation.
 | What is decided about X?                 | [`adr/README.md`](./adr/README.md)                                                                                   |
 | What is the state of the work?           | [GitHub issues](https://github.com/raydak-labs/travo/issues)                                                         |
 | How do I build/deploy?                   | [`guides/development.md`](./guides/development.md), [`guides/deployment.md`](./guides/deployment.md)                 |
-| How do I verify on hardware?             | [`guides/testing.md`](./guides/testing.md), then the playbook in [`tests/`](./tests/)                                |
+| How do I verify on hardware?             | [`guides/on-device-verification.md`](./guides/on-device-verification.md)                                             |
 | Which backend package owns X?            | [`reference/backend-packages.md`](./reference/backend-packages.md)                                                   |
 | Which UI primitive or token do I use?    | [`reference/ui-theming.md`](./reference/ui-theming.md), [ADR 0012](./adr/0012-ui-consistency-and-status-language.md) |
 | What did we decide about a device quirk? | [ADR 0013](./adr/0013-operational-invariants-and-device-findings.md)                                                 |

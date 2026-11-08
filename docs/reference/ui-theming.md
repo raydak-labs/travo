@@ -11,14 +11,14 @@ Short reference for Tailwind + dark mode in `frontend/`.
 
 ## Card / Label / feedback contracts
 
-| Primitive | Default contract |
-|-----------|------------------|
-| **`CardTitle`** | `text-sm font-medium leading-none tracking-tight` + `text-gray-900 dark:text-white`. Prefer layout-only `className` overrides (`flex items-center gap-2`). Exceptions: Login hero (`text-2xl`); Setup step titles that are not `CardTitle`. |
-| **`Label`** | `text-xs font-medium text-gray-500 dark:text-gray-400`. Dense forms use this; Login may override to `text-sm font-medium` for prominence. |
-| **`SectionHeading`** | The only in-page group label (`mb-3 text-xs font-semibold uppercase tracking-wider` + gray tones). Six pages had hand-rolled it; a seventh copy is a defect. |
-| **Loading** | `Skeleton` for card/page content. Spinners (`Loader2`) only for in-button/submit busy. |
-| **Empty** | `EmptyState` from `@/components/ui/empty-state`. |
-| **Load/display errors** | `InlineError` (`role="alert"`, `text-sm`, red border/bg light+dark pairs). Mutation success/failure stays on `sonner` toasts. |
+| Primitive               | Default contract                                                                                                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`CardTitle`**         | `text-sm font-medium leading-none tracking-tight` + `text-gray-900 dark:text-white`. Prefer layout-only `className` overrides (`flex items-center gap-2`). Exceptions: Login hero (`text-2xl`); Setup step titles that are not `CardTitle`. |
+| **`Label`**             | `text-xs font-medium text-gray-500 dark:text-gray-400`. Dense forms use this; Login may override to `text-sm font-medium` for prominence.                                                                                                   |
+| **`SectionHeading`**    | The only in-page group label (`mb-3 text-xs font-semibold uppercase tracking-wider` + gray tones). Six pages had hand-rolled it; a seventh copy is a defect.                                                                                |
+| **Loading**             | `Skeleton` for card/page content. Spinners (`Loader2`) only for in-button/submit busy.                                                                                                                                                      |
+| **Empty**               | `EmptyState` from `@/components/ui/empty-state`.                                                                                                                                                                                            |
+| **Load/display errors** | `InlineError` (`role="alert"`, `text-sm`, red border/bg light+dark pairs). Mutation success/failure stays on `sonner` toasts.                                                                                                               |
 
 ## How theme works
 
@@ -99,14 +99,14 @@ this is the token reference. Status colour comes from `--status-*` tokens in
 (`tone="ok|warn|danger|info|neutral|stale"`). Raw `bg-green-*` / `text-red-*`
 status strings are a defect, not a style choice.
 
-| Tone | Means |
-| ---- | ----- |
-| `ok` | working as configured |
-| `warn` | degraded, user may want to act |
-| `danger` | broken / not reachable |
-| `info` | noteworthy but not a problem |
-| `neutral` | inactive or not applicable |
-| `stale` | last known value; weaker than `warn`, never blanks the value |
+| Tone      | Means                                                        |
+| --------- | ------------------------------------------------------------ |
+| `ok`      | working as configured                                        |
+| `warn`    | degraded, user may want to act                               |
+| `danger`  | broken / not reachable                                       |
+| `info`    | noteworthy but not a problem                                 |
+| `neutral` | inactive or not applicable                                   |
+| `stale`   | last known value; weaker than `warn`, never blanks the value |
 
 Use `StatValue stale` rather than recolouring a fact to grey.
 
@@ -123,10 +123,10 @@ Inside a `Card`, use **`CardInset`** (`frontend/src/components/ui/card-inset.tsx
 
 ## Form density
 
-| Tier | Height | When |
-|------|--------|------|
-| **Form rows** | Default control height (`Input` / `SelectTrigger` / submit `Button` = **`h-10`**) | Labeled fields, add/save rows next to `Input` |
-| **Dense chrome** | `Button size="sm"` (and icon rows) | Logs filters, page header actions, service action icon rows, quick actions — **not** form rows with labeled Inputs |
+| Tier             | Height                                                                            | When                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Form rows**    | Default control height (`Input` / `SelectTrigger` / submit `Button` = **`h-10`**) | Labeled fields, add/save rows next to `Input`                                                                      |
+| **Dense chrome** | `Button size="sm"` (and icon rows)                                                | Logs filters, page header actions, service action icon rows, quick actions — **not** form rows with labeled Inputs |
 
 `SelectTrigger` default is **`h-10`** with the same `fieldClassName` surface as
 `Input` (card-plane consistency). Do not leave form submits at `size="sm"` beside
@@ -134,8 +134,8 @@ default Inputs.
 
 ## Badge exceptions
 
-| Exception | Where | Why |
-|-----------|--------|-----|
+| Exception            | Where                  | Why                                                           |
+| -------------------- | ---------------------- | ------------------------------------------------------------- |
 | **`LogsLevelBadge`** | `logs-level-badge.tsx` | Dense uppercase terminal chips; parallel to `Badge` by design |
 
 Elsewhere prefer `Badge` variants (`success` / `destructive` / `default` / `secondary` / `outline` / `warning`) for neutral category labels, and `StatusPill` for anything that reports state. Hand-rolled `bg-green-*` / `bg-red-*` / `bg-blue-*` overrides are no longer accepted (ADR 0012).
@@ -155,11 +155,11 @@ Light mode keeps **`border-gray-200`** (and similar) on white/off-white surfaces
 
 Normative IA: [`frontend-information-architecture.md`](./frontend-information-architecture.md). Summary:
 
-| Pattern | Typical role |
-| --------|--------------|
-| **Sidebar** (group label → daily default; chevron toggles leaves) | *Where in the app am I?* Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](./frontend-information-architecture.md#sidebar-defaults-and-disclosure-table). |
-| **In-page tabs** | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**). |
-| **Page sections** (collapsed boxes) | Only for rare / power / geek cards. Everyday cards stay visible. |
+| Pattern                                                           | Typical role                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sidebar** (group label → daily default; chevron toggles leaves) | _Where in the app am I?_ Label click opens the group default (WiFi→Connect, Network→Status, …). Chevron alone expands Internet & LAN / Advanced leaves. Switching Connect/Advanced etc. is **sidebar-only** — do **not** mirror with an in-page tab bar. See [`plans/2026-07-25-sidebar-defaults-lighter-disclosure.md`](./frontend-information-architecture.md#sidebar-defaults-and-disclosure-table). |
+| **In-page tabs**                                                  | Only when the axis is **not** a sidebar hierarchy (today: Logs **System Log / Kernel Log**).                                                                                                                                                                                                                                                                                                            |
+| **Page sections** (collapsed boxes)                               | Only for rare / power / geek cards. Everyday cards stay visible.                                                                                                                                                                                                                                                                                                                                        |
 
 Sidebar group open/closed is for nav density (defaults collapsed on first visit; auto-expand the active group on child routes). It does not replace page-section collapse for card content.
 

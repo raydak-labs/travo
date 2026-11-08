@@ -8,8 +8,8 @@ tags: [docs, testing, integration, openwrt]
 # Testing
 
 This page is the entry point: which check settles a question, and the command that runs it.
-Procedures and hardware facts do not live here. They live in the playbooks under
-[`docs/tests/`](../tests/), and a fact written in both places is one place wrong within a month.
+Procedures and hardware facts do not live here. They live in the playbook
+[`on-device-verification.md`](./on-device-verification.md), and a fact written in both places is one place wrong within a month.
 When you find a procedure on this page, move it to the owning playbook rather than fixing it here.
 
 ## Local checks
@@ -43,8 +43,7 @@ cd backend && go test ./internal/docsgate/
 ```
 
 They fail on a crash-guard path outside `/etc/trafo/`, a persistent-store path outside
-`/etc/travo/`, an ADR missing from the index or the Obsidian hub, a playbook in `docs/tests/`
-that nothing links to, and a plans catalog that omits a plan.
+`/etc/travo/`, an ADR missing from the index or the Obsidian hub, a guide that nothing links to.
 
 A green local suite is not evidence about the router. The on-device playbook's §2 lists the
 classes of defect it demonstrably cannot catch.
@@ -96,10 +95,10 @@ make integration SUITE=integration-device.sh LOGIN_PASSWORD='…'
 A script asserts what it can reach over the API. Anything that needs an operator, a second uplink
 or a deliberate fault injection belongs to a playbook:
 
-- [`on-device-verification.md`](../tests/on-device-verification.md) — the standing playbook. Read
+- [`on-device-verification.md`](./on-device-verification.md) — the standing playbook. Read
   its §1 prerequisites before anything else; §4 settles whether the build on the device is the
   build under test, which every later suite depends on.
-- [`failover-verification.md`](../tests/failover-verification.md) — multi-WAN failover with two
+- [multi-WAN failover](./on-device-verification.md#multi-wan-failover-verification) — two
   real uplinks. `on-device-verification.md` §9.1 carries the mwan3 rpcd ACL finding that has to be
   resolved before it can run.
 

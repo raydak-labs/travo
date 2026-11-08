@@ -225,7 +225,7 @@ and the client stops probing early rather than late.
 
 Device-side verification steps and captured payloads — including the ubus
 round-trip timings the budget is built from — live in
-[`docs/tests/on-device-verification.md`](../tests/on-device-verification.md); this
+[`docs/guides/on-device-verification.md`](../guides/on-device-verification.md); this
 section records the decision, not the procedure.
 
 #### 5.2 The lockout guard: refuse unless acknowledged

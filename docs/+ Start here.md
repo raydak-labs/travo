@@ -54,8 +54,7 @@ updated: 2026-10-05
 
 ## On-device verification
 
-- [[tests/failover-verification]]
-- [[tests/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
+- [[guides/on-device-verification]] — standing playbook; start here before any wireless, DNS/VPN,
   guard or install change touches a device
 
 ## Agent skills config

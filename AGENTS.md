@@ -10,7 +10,7 @@ Pick by question, not by habit:
 - `docs/adr/README.md` indexes **architecture decision records** (ADRs). Before changing a subsystem, read the ADR for that area from that index (e.g. wireless → 0002, crash guards → 0003, firewall → 0004, mwan3 failover → 0005, platform/OpenAPI → 0006, auth → 0007, DNS/VPN/captive → 0001, UI language → 0012, cross-cutting invariants and device findings → 0013).
 - `docs/guides/` holds task-shaped how-tos: `development.md`, `deployment.md`, `testing.md`.
 - `docs/reference/` holds what things are: `ui-theming.md` (tokens, component contracts), `frontend-information-architecture.md` (navigation rules).
-- `docs/tests/` holds on-device verification playbooks.
+- `docs/guides/on-device-verification.md` is the device playbook (standing checks and multi-WAN failover).
 - Open work and the shipped history are GitHub issues on `raydak-labs/travo`. Git is the history.
 - `GLOSSARY.md` at the repo root fixes the words: summary band, status tone, stale, traffic history, configured vs live radio.
 - `docs/+ Start here.md` is the **Obsidian hub** (wikilinks) for the vault rooted at `docs/`.
@@ -30,7 +30,7 @@ look for it, and link rather than duplicate:
 | An invariant or safety rule that spans subsystems | `docs/architecture/overview.md`, or [ADR 0013](docs/adr/0013-operational-invariants-and-device-findings.md) once an ADR owns it | the other one |
 | How to do something | `docs/guides/<task>.md` | `docs/reference/` |
 | What something is (tokens, tables, contracts) | `docs/reference/` | a guide |
-| A check that only settles on hardware | `docs/tests/<area>-verification.md` | a guide, if the guide only runs commands |
+| A check that only settles on hardware | `docs/guides/on-device-verification.md` | a guide, if the guide only runs commands |
 | A term with a specific meaning in this project | `GLOSSARY.md` | a paragraph in a plan |
 | Backlog | GitHub issues | a doc checklist |
 
