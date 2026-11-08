@@ -5,6 +5,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // persistedWifiMode reads the mode file and answers only the three modes the
@@ -185,14 +187,51 @@ func (w *Service) ensureWwanFirewall() error {
 	if wanZone == "" {
 		return fmt.Errorf("wan firewall zone not found")
 	}
-	// Check if wwan is already in the network list to avoid duplicates.
-	if net := sections[wanZone]["network"]; net != "" {
-		if slices.Contains(strings.Fields(net), "wwan") {
-			return nil
+	networks := uci.SplitListValue(sections[wanZone]["network"])
+	switch count := countOf(networks, "wwan"); {
+	case count == 1:
+		return nil
+	case count > 1:
+		if err := w.rewriteZoneNetworks(wanZone, uniqueInOrder(networks)); err != nil {
+			return err
+		}
+	default:
+		if err := w.uci.AddList("firewall", wanZone, "network", "wwan"); err != nil {
+			return err
 		}
 	}
-	if err := w.uci.AddList("firewall", wanZone, "network", "wwan"); err != nil {
+	return w.uci.Commit("firewall")
+}
+
+// rewriteZoneNetworks replaces the zone's network list with networks, in order.
+func (w *Service) rewriteZoneNetworks(zone string, networks []string) error {
+	if err := w.uci.DeleteOption("firewall", zone, "network"); err != nil {
 		return err
 	}
-	return w.uci.Commit("firewall")
+	for _, n := range networks {
+		if err := w.uci.AddList("firewall", zone, "network", n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func countOf(values []string, want string) int {
+	n := 0
+	for _, v := range values {
+		if v == want {
+			n++
+		}
+	}
+	return n
+}
+
+func uniqueInOrder(values []string) []string {
+	var out []string
+	for _, v := range values {
+		if !slices.Contains(out, v) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
