@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/openwrt-travel-gui/backend/internal/models"
+	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
 // GetFirewallZones returns a summary of all UCI firewall zones.
@@ -42,7 +42,7 @@ func (n *Service) GetFirewallZones() ([]models.FirewallZone, error) {
 			z.Forward = v
 		}
 		if v := opts["network"]; v != "" {
-			z.Network = strings.Fields(v)
+			z.Network = uci.SplitListValue(v)
 		}
 		if z.Network == nil {
 			z.Network = []string{}

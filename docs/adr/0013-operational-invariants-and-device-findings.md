@@ -188,6 +188,14 @@ write lock is released before confirm, so the wireless path has no such guard.
 Writing the real edits through rpcd's own `uci set/add/delete` is the cleaner design and is
 tracked separately.
 
+### 12. `GetSections` returns list options comma-joined
+
+`parseShowOutput` (`backend/internal/uci/real.go`) joins list elements with `,`, so the wan
+zone's `network` list reads `wan,wan6,wwan`. `MockUCI` joins with a space. Membership tests on
+a list read through `uci.UCI` go through `uci.SplitListValue`, which accepts both; a bare
+`strings.Fields` never matched on a device, and `ensureWwanFirewall` appended `wwan` to the
+wan zone on every connect (16 copies, #262). It now also collapses existing duplicates once.
+
 ## Why
 
 Hard to reverse: each of these cost a real device incident or a real design
