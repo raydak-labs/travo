@@ -228,7 +228,24 @@ func restoreFile(src, dst string) error {
 	return copyFile(src, dst)
 }
 
-// StartApply stages an rpcd rollback apply and returns the session ID.
+// applyMarkerSection names the throwaway section StartApply adds and deletes.
+const applyMarkerSection = "travo_apply"
+
+// StartApply opens an rpcd rollback apply and returns the session ID.
+//
+// rpcd's `uci apply` acts only on the configs that have a pending change in the
+// calling session. Older rpcd also picked up files copied into
+// /var/run/rpcd/uci-<session id>, which is what this used to do; rpcd
+// 2026.10.04 names that directory after a private random value instead, finds
+// nothing, and the ubus CLI reports "(No response)" (#220). The only supported
+// way to put a config into the session's pending set is to change it through
+// the session.
+//
+// Travo has already committed its change by the time it gets here (ADR 0002
+// §5.0), so the real edit is not in the session. Each config therefore gets a
+// marker section added and deleted again through the session: the pending delta
+// is non-empty, which makes rpcd apply and snapshot the config, and its net
+// effect on the config is nothing.
 func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	if len(configs) == 0 {
 		return "", nil
@@ -237,25 +254,33 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	if err != nil || sid == "" {
 		return "", fmt.Errorf("uci apply: no session (login failed): %w", err)
 	}
-	sessionDir := filepath.Join(r.RPCDRunDir, "uci-"+sid)
-	if err := os.MkdirAll(sessionDir, 0700); err != nil {
-		return "", fmt.Errorf("uci apply: mkdir session dir: %w", err)
-	}
-	// The staged copy under /var/run/rpcd is only useful if the apply call
-	// actually starts. Any failure below leaves nothing running, so the session
-	// dir must be removed instead of lingering as a half-staged session.
+	// Anything pending in the session when apply does not start is dropped, or a
+	// later reuse of the session would apply a marker nobody asked for.
+	staged := make([]string, 0, len(configs))
 	applyStarted := false
 	defer func() {
 		if !applyStarted {
-			_ = os.RemoveAll(sessionDir)
+			r.revertSession(sid, staged)
 		}
 	}()
 	for _, name := range configs {
-		src := filepath.Join(r.EtcConfigDir, name)
-		dst := filepath.Join(sessionDir, name)
-		if err := copyFile(src, dst); err != nil {
-			return "", fmt.Errorf("uci apply: copy %s: %w", name, err)
+		// A config that does not exist (mwan3 not installed) has nothing to
+		// apply, as before.
+		if _, err := os.Stat(filepath.Join(r.EtcConfigDir, name)); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("uci apply: stat %s: %w", name, err)
 		}
+		// Recorded before staging: a marker added but not deleted has to be
+		// reverted too.
+		staged = append(staged, name)
+		if err := r.stageMarker(sid, name); err != nil {
+			return "", err
+		}
+	}
+	if len(staged) == 0 {
+		return "", nil
 	}
 	applyArgs := map[string]any{
 		"ubus_rpc_session": sid,
@@ -271,6 +296,39 @@ func (r *RealUCIApplyConfirm) StartApply(configs []string) (string, error) {
 	// session, so ConfirmApply can restore it.
 	r.claimPendingSnapshot(sid)
 	return sid, nil
+}
+
+// stageMarker leaves config with a pending, net-empty change in the session.
+func (r *RealUCIApplyConfirm) stageMarker(sid, config string) error {
+	add := map[string]any{
+		"config":           config,
+		"type":             applyMarkerSection,
+		"name":             applyMarkerSection,
+		"ubus_rpc_session": sid,
+	}
+	if _, err := r.ubus.Call("uci", "add", add); err != nil {
+		return fmt.Errorf("uci apply: add marker to %s in the session: %w", config, err)
+	}
+	del := map[string]any{
+		"config":           config,
+		"section":          applyMarkerSection,
+		"ubus_rpc_session": sid,
+	}
+	if _, err := r.ubus.Call("uci", "delete", del); err != nil {
+		return fmt.Errorf("uci apply: delete marker from %s in the session: %w", config, err)
+	}
+	return nil
+}
+
+// revertSession drops the pending changes StartApply made, best effort: the
+// caller is already returning the error that matters.
+func (r *RealUCIApplyConfirm) revertSession(sid string, configs []string) {
+	for _, name := range configs {
+		args := map[string]any{"config": name, "ubus_rpc_session": sid}
+		if _, err := r.ubus.Call("uci", "revert", args); err != nil {
+			slog.Warn("uci apply: could not revert the staged marker", "config", name, "err", err)
+		}
+	}
 }
 
 // claimPendingSnapshot moves the pending snapshot onto the apply session it
@@ -323,6 +381,11 @@ func (r *RealUCIApplyConfirm) ApplyAndConfirm(configs []string) error {
 		// StartApply failed AFTER the mutation committed and there is no session
 		// to roll back, so the pending snapshot is the only way back.
 		return r.rollbackOrJoin("apply", "", err)
+	}
+	if sid == "" {
+		// None of the configs exist, so nothing was applied and there is nothing
+		// to confirm. Discard the snapshot the way a confirmed apply would.
+		return os.RemoveAll(r.snapshotDir(""))
 	}
 	if err := r.Confirm(sid); err != nil {
 		return r.rollbackOrJoin("confirm", sid, err)

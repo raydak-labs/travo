@@ -1,7 +1,7 @@
 ---
 title: UCI write serialisation and request-body contracts
 description: One-list mutate helpers, globally ordered config locks, and why config PUTs must reject unknown fields.
-updated: 2026-09-30
+updated: 2026-11-08
 tags: [adr, architecture, uci, api]
 ---
 
@@ -153,8 +153,8 @@ exercises an endpoint whose service is not wired.
 
 Stated rather than left implicit. None of these is solved by the config locks.
 
-1. **The rpcd rollback window outlives them.** `StartApply` snapshots whole config
-   *files* into the rpcd session dir and arms rpcd's own 30 s timer, which can
+1. **The rpcd rollback window outlives them.** `StartApply` makes rpcd snapshot whole config
+   *files* and arm its own 30 s timer, which can
    outlive the request that armed it. A change committed to one of those configs
    after the snapshot is reverted when the window expires — and the browser not
    confirming is the common case, not the rare one, because confirming is what

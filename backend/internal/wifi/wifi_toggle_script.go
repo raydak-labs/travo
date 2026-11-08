@@ -50,7 +50,6 @@ const wirelessToggleScript = `#!/bin/sh
 set -u
 
 STATE="${1:-}"
-RPCD_RUN_DIR=/var/run/rpcd
 RPCD_UCI_DIR=/etc/config
 RPCD_LOGIN_ARG_FILE=` + rpcdLoginHelperPath + `
 SESSION=""
@@ -86,12 +85,13 @@ mkdir -p "$(dirname "$GUARD")" || exit 1
 : > "$GUARD" || exit 1
 
 cleanup_session() {
-	# Only safe once the apply has NOT started. After "uci apply" succeeds,
-	# rpcd reads its rollback snapshot from this session dir when its timer
-	# fires; removing it first would leave the rollback with nothing to
-	# restore. This mirrors RealUCIApplyConfirm.StartApply, which removes the
-	# session dir only when the apply did not start.
-	[ -n "$SESSION" ] && [ "$APPLY_STARTED" -eq 0 ] && rm -rf "$RPCD_RUN_DIR/uci-$SESSION"
+	# Only safe once the apply has NOT started. After "uci apply" succeeds, rpcd
+	# holds its rollback snapshot for this session and its timer is armed, so the
+	# session's pending state must stay. Before that, drop the marker. This
+	# mirrors RealUCIApplyConfirm.StartApply, which reverts the session only
+	# when the apply did not start.
+	[ -n "$SESSION" ] && [ "$APPLY_STARTED" -eq 0 ] && \
+		ubus call uci revert "{\"config\":\"wireless\",\"ubus_rpc_session\":\"$SESSION\"}" >/dev/null 2>&1
 	return 0
 }
 
@@ -153,15 +153,11 @@ LOGIN_OUT=$(ubus -S call session login "$LOGIN_ARG" 2>/dev/null) || true
 SESSION=$(printf '%s' "$LOGIN_OUT" | sed -n 's/.*"ubus_rpc_session":"\([^"]*\)".*/\1/p')
 [ -n "$SESSION" ] || fail "no rpcd session (checked $RPCD_LOGIN_ARG_FILE; apply via LuCI Save & Apply or reboot)"
 
-# Snapshot the PRE-change config into the session dir, which is where rpcd
-# restores from when the apply is never confirmed. This has to happen BEFORE
-# "uci commit wireless": copying afterwards staged the very change the rollback
-# exists to undo, so an aborted apply left disabled=1 committed while the radios
-# stayed up and the next unrelated apply picked it up. BACKUP is the same
-# pre-change file, kept beside the guard for the fail() path.
-SESSION_DIR="$RPCD_RUN_DIR/uci-$SESSION"
-mkdir -p "$SESSION_DIR" || fail "mkdir $SESSION_DIR"
-cp "$RPCD_UCI_DIR/wireless" "$SESSION_DIR/wireless" || fail "stage wireless"
+# Keep the PRE-change config beside the guard. This has to happen BEFORE "uci
+# commit wireless": "uci revert" is a no-op after a commit, so fail() needs a
+# real pre-change file to put back, or an aborted apply would leave disabled=1
+# committed while the radios stayed up and the next unrelated apply would pick
+# it up.
 cp "$RPCD_UCI_DIR/wireless" "$BACKUP" || fail "back up wireless to $BACKUP"
 
 # "uci show" prints a named section as wireless.radio0=wifi-device and an
@@ -174,19 +170,28 @@ done
 
 uci -q commit wireless || fail "uci commit wireless"
 
+# rpcd applies only configs with a pending change in THIS session; files copied
+# into /var/run/rpcd by hand are ignored by rpcd 2026.10.04 and the apply then
+# answers "No response" (#220). The change is already committed above, so give
+# the session a net-empty pending change: add a marker section and delete it.
+ubus call uci add \
+	"{\"config\":\"wireless\",\"type\":\"travo_apply\",\"name\":\"travo_apply\",\"ubus_rpc_session\":\"$SESSION\"}" \
+	>/dev/null 2>&1 || fail "stage wireless in the rpcd session"
+ubus call uci delete \
+	"{\"config\":\"wireless\",\"section\":\"travo_apply\",\"ubus_rpc_session\":\"$SESSION\"}" \
+	>/dev/null 2>&1 || fail "stage wireless in the rpcd session"
+
 ubus call uci apply \
 	"{\"ubus_rpc_session\":\"$SESSION\",\"rollback\":true,\"timeout\":${ROLLBACK_TIMEOUT}}" \
 	>/dev/null 2>&1 || fail "uci apply"
 
-# From here on rpcd holds the rollback snapshot in the session dir and its
-# timer is armed, so the session dir and the guard must both survive a later
-# failure. See fail().
+# From here on rpcd holds the rollback snapshot for the session and its timer is
+# armed, so the guard must survive a later failure and the session must not be
+# reverted. See fail().
 APPLY_STARTED=1
 
 ubus call uci confirm "{\"ubus_rpc_session\":\"$SESSION\"}" >/dev/null 2>&1 || fail "uci confirm"
 
-APPLY_STARTED=0
-cleanup_session
 rm -f "$GUARD" "$BACKUP"
 log "wireless toggled ${STATE} (session ${SESSION})"
 exit 0

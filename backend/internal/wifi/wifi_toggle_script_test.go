@@ -96,7 +96,7 @@ func TestWirelessToggleScriptSelectsNamedAndAnonymousRadios(t *testing.T) {
 //
 // This runs the real script under /bin/sh with a stub `ubus` on PATH and
 // asserts the actual call sequence: rpcd's uci apply/confirm are session
-// scoped, so the script must log in, stage the config into the session dir, and
+// scoped, so the script must log in, stage a marker change in the session, and
 // pass "ubus_rpc_session" on BOTH calls. Passing a config name or a bare
 // "session" key makes rpcd return INVALID_ARGUMENT, which turned every
 // scheduled and button-driven WiFi toggle into a silent no-op.
@@ -122,6 +122,8 @@ exit 0
 	seq := string(log)
 	for _, want := range []string{
 		"call session login",               // establish a session first
+		`uci add {"config":"wireless"`,     // rpcd applies only what is pending in the session
+		`uci delete {"config":"wireless"`,  // the marker leaves the config unchanged
 		`uci apply {"ubus_rpc_session":`,   // apply must carry the session
 		`uci confirm {"ubus_rpc_session":`, // confirm takes the same key
 	} {
@@ -129,10 +131,14 @@ exit 0
 			t.Errorf("toggle helper did not issue %q; recorded calls:\n%s", want, seq)
 		}
 	}
-	// The session id login returned must be the one both calls carry. The login
-	// call itself does not echo it back, so it appears exactly twice.
-	if n := strings.Count(seq, "sid-1"); n != 2 {
-		t.Errorf("expected the login session id in exactly the apply and confirm calls, saw %d:\n%s", n, seq)
+	// Order matters: rpcd ignores an apply for a session with nothing pending.
+	if add, apply := strings.Index(seq, "uci add"), strings.Index(seq, "uci apply"); add < 0 || apply < add {
+		t.Errorf("the marker must be staged before uci apply:\n%s", seq)
+	}
+	// The session id login returned must be the one every later call carries
+	// (add, delete, apply, confirm); the login call does not echo it back.
+	if n := strings.Count(seq, "sid-1"); n != 4 {
+		t.Errorf("expected the login session id in exactly add, delete, apply and confirm, saw %d:\n%s", n, seq)
 	}
 	// A guard is written before the first mutation and removed only after a
 	// confirmed apply; the script must not leave it behind on success.
@@ -167,7 +173,7 @@ exit 0
 // and the crash guard (removing it would let the next cron run start a second
 // apply against rpcd's single apply slot while the first is still pending).
 func TestWirelessToggleScriptKeepsGuardAndSessionAfterApplyStarted(t *testing.T) {
-	binDir, _, guardDir := runToggleScript(t, `#!/bin/sh
+	_, calls, guardDir := runToggleScript(t, `#!/bin/sh
 printf '%s\n' "ubus $*" >> "$CALLS"
 if [ "$1" = "-S" ]; then shift; fi
 case "$3" in
@@ -182,9 +188,14 @@ exit 0
 		t.Error("the guard must survive a post-apply failure: it is the only marker that the\n" +
 			"rollback is unresolved")
 	}
-	// The session dir is what rpcd restores from, so it must not be deleted.
-	if _, err := os.Stat(filepath.Join(binDir, "run", "uci-sid-1")); err != nil {
-		t.Error("the rpcd session dir must survive a post-apply failure; it holds the rollback snapshot")
+	// rpcd holds the rollback snapshot for the session, so the helper must not
+	// revert the session's pending state once the apply has started.
+	log, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatalf("read stub log: %v", err)
+	}
+	if strings.Contains(string(log), "uci revert") {
+		t.Errorf("the session was reverted after the apply started:\n%s", log)
 	}
 }
 
@@ -343,7 +354,6 @@ func writeToggleScriptFixture(t *testing.T, ubusStub string) (binDir, calls, gua
 	}
 
 	script := strings.ReplaceAll(wirelessToggleScript, guard.DefaultDir, guardDir)
-	script = strings.ReplaceAll(script, "RPCD_RUN_DIR=/var/run/rpcd", "RPCD_RUN_DIR="+filepath.Join(binDir, "run"))
 	script = strings.ReplaceAll(script, "RPCD_UCI_DIR=/etc/config", "RPCD_UCI_DIR="+filepath.Join(binDir, "config"))
 	script = strings.ReplaceAll(script, "RPCD_LOGIN_ARG_FILE="+rpcdLoginHelperPath, "RPCD_LOGIN_ARG_FILE="+rpcLoginArgPath(binDir))
 	if err := os.MkdirAll(filepath.Join(binDir, "config"), 0o755); err != nil {
@@ -384,10 +394,10 @@ func runToggleScript(t *testing.T, ubusStub, state string, wantSuccess bool) (bi
 // (it only drops the uncommitted /tmp/.uci delta), and the next unrelated apply
 // silently committed it with the radios still up.
 //
-// rpcd restores an aborted apply from the copy in the session dir, so that copy
-// must be the PRE-change file. It was taken after "uci commit wireless", which
-// staged exactly the change the rollback exists to undo.
-func TestWirelessToggleScriptStagesPreChangeFileBeforeCommit(t *testing.T) {
+// The backup beside the guard is what fail() puts back, so it must be the
+// PRE-change file. It was once taken after "uci commit wireless", which kept
+// exactly the change the rollback exists to undo.
+func TestWirelessToggleScriptBacksUpPreChangeFileBeforeCommit(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no /bin/sh available")
 	}
@@ -440,17 +450,7 @@ exit 0
 	if !strings.Contains(string(log), "uci -q commit wireless") {
 		t.Fatalf("the fixture never committed, so it proves nothing:\n%s", log)
 	}
-	// What rpcd restores from when the apply is not confirmed: it must be the
-	// PRE-change file, or the rollback re-applies the change it should undo.
-	stagedCopy, err := os.ReadFile(filepath.Join(binDir, "run", "uci-sid-1", "wireless"))
-	if err != nil {
-		t.Fatalf("read the session snapshot: %v", err)
-	}
-	if strings.Contains(string(stagedCopy), "disabled=1") {
-		t.Errorf("the session snapshot holds the POST-change file, so an aborted apply rolls "+
-			"the change back IN instead of undoing it: %q", stagedCopy)
-	}
-	// The second pre-change copy, kept beside the guard, is what fail() restores.
+	// The pre-change copy kept beside the guard is what fail() restores.
 	backup, err := os.ReadFile(filepath.Join(guardDir, "wifi-toggle-wireless.bak"))
 	if err != nil {
 		t.Fatalf("read the pre-change backup: %v", err)

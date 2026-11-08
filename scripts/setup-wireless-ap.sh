@@ -141,9 +141,15 @@ fi
 if [ -z "$_sid" ]; then
   log "Phase 4: no session (use LuCI or reboot to apply). Apply via LuCI Save & Apply or reboot."
 else
-  _savedir="/var/run/rpcd/uci-${_sid}"
-  mkdir -p "$_savedir"
-  cp /etc/config/wireless /etc/config/network /etc/config/system "$_savedir/" 2>/dev/null || true
+  # rpcd applies only configs with a pending change in this session (copying
+  # files into /var/run/rpcd/uci-* is ignored by rpcd 2026.10.04): add and delete
+  # a marker section so the session has a net-empty pending change per config.
+  for _cfg in wireless network system; do
+    ubus call uci add "{\"config\":\"$_cfg\",\"type\":\"travo_apply\",\"name\":\"travo_apply\",\"ubus_rpc_session\":\"$_sid\"}" >/dev/null 2>&1 || continue
+    # A marker that stays added would be committed as a real section.
+    ubus call uci delete "{\"config\":\"$_cfg\",\"section\":\"travo_apply\",\"ubus_rpc_session\":\"$_sid\"}" >/dev/null 2>&1 \
+      || ubus call uci revert "{\"config\":\"$_cfg\",\"ubus_rpc_session\":\"$_sid\"}" >/dev/null 2>&1
+  done
   if ubus call uci apply "{\"rollback\":true,\"timeout\":$_apply_timeout,\"ubus_rpc_session\":\"$_sid\"}" 2>/dev/null; then
     log "Phase 4: apply started (rollback in ${_apply_timeout}s if not confirmed)."
     echo "UCI_APPLY_SESSION=$_sid"
