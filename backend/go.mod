@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/fasthttp/websocket v1.5.12
-	github.com/gofiber/contrib/v3/websocket v1.2.10
+	github.com/gofiber/contrib/v3/websocket v1.2.13
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	go.etcd.io/bbolt v1.5.0
@@ -14,8 +14,8 @@ require (
 )
 
 require (
-	github.com/gofiber/schema v1.9.1 // indirect
-	github.com/gofiber/utils/v2 v2.6.3 // indirect
+	github.com/gofiber/schema v1.9.3 // indirect
+	github.com/gofiber/utils/v2 v2.6.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
