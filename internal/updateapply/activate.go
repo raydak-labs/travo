@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -92,11 +93,16 @@ func healthyVersion(ctx context.Context, client *http.Client, endpoint, version 
 }
 
 func processAt(pid int) (processIdentity, error) {
+	return readProcessAt(pid, os.ReadFile)
+}
+
+func readProcessAt(pid int, readFile func(string) ([]byte, error)) (processIdentity, error) {
 	if pid == 0 {
 		return processIdentity{}, nil
 	}
-	raw, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-	if errors.Is(err, os.ErrNotExist) {
+	raw, err := readFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	// Procfs may return ESRCH if the task exits after the file is opened.
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
 		return processIdentity{}, nil
 	}
 	if err != nil {

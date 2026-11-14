@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -101,5 +102,26 @@ func TestWaitsForOriginalProcess(t *testing.T) {
 	defer cancel()
 	if err := waitProcess(ctx, process); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal(err)
+	}
+}
+
+func TestReadProcessAtHandlesExitedProcess(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		read error
+		want error
+	}{
+		{"missing", syscall.ENOENT, nil},
+		{"exited during read", syscall.ESRCH, nil},
+		{"permission denied", syscall.EACCES, syscall.EACCES},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			process, err := readProcessAt(2315, func(path string) ([]byte, error) {
+				return nil, &os.PathError{Op: "read", Path: path, Err: tc.read}
+			})
+			if process != (processIdentity{}) || !errors.Is(err, tc.want) {
+				t.Fatalf("process=%+v error=%v, want absent process and error %v", process, err, tc.want)
+			}
+		})
 	}
 }
