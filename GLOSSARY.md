@@ -13,7 +13,7 @@
 - **Transaction**: snapshot → commit/apply → watchdog → probe → user confirm. The only way to change live state.
 - **Watchdog**: out-of-process procd-run script that restores the snapshot unless the confirm file appears in time.
 - **Confirm**: the user's explicit acknowledgement that the router is still reachable. Never issued by the backend.
-- **Guard**: a file in `/etc/travo-guards/` marking an in-progress live-state operation. Present guard = feature skips.
+- **Guard**: a file in `/etc/travo-greenfield-guards/` marking an in-progress live-state operation. Present guard = feature skips.
 - **Layer (DNS)**: one entry in the ordered DNS stack (`captive`, `vpn`, `adguard`, reserved `tailscale`).
 - **Base DNS**: dnsmasq's DNS state captured before the first layer; restored when the last layer is popped.
 - **Fail open**: when a filter/service fails, fall back to working connectivity and say so loudly.
