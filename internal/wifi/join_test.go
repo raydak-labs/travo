@@ -270,6 +270,12 @@ func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
 	base := mock.New()
 	seedJoinDevice(t, base)
 	root := t.TempDir()
+	// Restore real files, but leave durability to the OpenWrt integration tests.
+	// A host-wide sync can exceed the restore budget on a busy CI runner.
+	if err := os.WriteFile(filepath.Join(root, "sync"), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
 	configDir := filepath.Join(root, "config")
 	if err := os.Mkdir(configDir, 0o700); err != nil {
 		t.Fatal(err)
