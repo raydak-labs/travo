@@ -5,6 +5,7 @@ package updateapply
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ func realService(version string, stage Stage) *Service {
 func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == "--update-worker" {
 		if err := realService("", nil).Work(len(os.Args) > 2 && os.Args[2] == "--update-await-ack"); err != nil {
+			fmt.Fprintln(os.Stderr, "update test worker:", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -117,7 +119,11 @@ func await(t *testing.T, s *Service, want string) {
 			t.Fatal(err)
 		}
 		if state == "recovery_required" {
-			t.Fatal(state)
+			j, err := s.load()
+			if err != nil {
+				t.Fatalf("%s: load journal: %v", state, err)
+			}
+			t.Fatalf("%s: journal phase=%q state=%q", state, j.Phase, j.State)
 		}
 		if state == want && !guarded {
 			lock, err := s.acquire()
