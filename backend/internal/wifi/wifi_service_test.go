@@ -100,6 +100,27 @@ func TestWifiScan(t *testing.T) {
 	}
 }
 
+func TestWifiScanReportsFailureWhenNoRadioReturnsResults(t *testing.T) {
+	svc, _ := newTestWifiService()
+	mock := svc.ubus.(*ubus.MockUbus)
+	mock.RegisterResponse("iwinfo.scan", map[string]any{})
+
+	if _, err := svc.Scan(); err == nil {
+		t.Fatal("expected a scan error, got a successful empty scan")
+	}
+}
+
+func TestWifiScanReturnsEmptyListWhenScanSucceedsWithoutNetworks(t *testing.T) {
+	svc, _ := newTestWifiService()
+	mock := svc.ubus.(*ubus.MockUbus)
+	mock.RegisterResponse("iwinfo.scan", map[string]any{"results": []any{}})
+
+	results, err := svc.Scan()
+	if err != nil || results == nil || len(results) != 0 {
+		t.Fatalf("expected an empty list, got %v, err = %v", results, err)
+	}
+}
+
 func TestWifiConnect(t *testing.T) {
 	svc, u := newTestWifiService()
 

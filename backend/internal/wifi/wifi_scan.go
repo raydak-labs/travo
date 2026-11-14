@@ -183,12 +183,16 @@ func (w *Service) getRadioForBand(band string) (string, error) {
 // Scan returns available WiFi networks by scanning each radio (LuCI-style). No STA required.
 func (w *Service) Scan() ([]models.WifiScanResult, error) {
 	radios, err := w.getWifiRadioNames()
-	if err != nil || len(radios) == 0 {
+	if err != nil {
+		return nil, fmt.Errorf("listing radios for WiFi scan: %w", err)
+	}
+	if len(radios) == 0 {
 		return []models.WifiScanResult{}, nil
 	}
 
-	var all []models.WifiScanResult
+	all := []models.WifiScanResult{}
 	seen := make(map[string]bool)
+	scanned := false
 
 	for _, radioName := range radios {
 		opts, _ := w.uci.GetAll("wireless", radioName)
@@ -202,6 +206,7 @@ func (w *Service) Scan() ([]models.WifiScanResult, error) {
 		if !ok {
 			continue
 		}
+		scanned = true
 		for _, r := range results {
 			rm, ok := r.(map[string]any)
 			if !ok {
@@ -215,6 +220,10 @@ func (w *Service) Scan() ([]models.WifiScanResult, error) {
 			seen[key] = true
 			all = append(all, item)
 		}
+	}
+
+	if !scanned {
+		return nil, fmt.Errorf("WiFi scan failed on every radio")
 	}
 
 	sort.Slice(all, func(i, j int) bool {

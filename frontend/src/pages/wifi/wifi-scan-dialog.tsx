@@ -16,7 +16,7 @@ import { useWifiScan, useWifiConnect, useWifiConnection } from '@/hooks/use-wifi
 export function WifiScanDialog() {
   const [open, setOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<GroupedScanNetwork | null>(null);
-  const { data: scanResults = [], isLoading, refetch } = useWifiScan(!open ? false : true);
+  const { data: scanResults = [], isFetching, isError, refetch } = useWifiScan(open);
   const { data: connection } = useWifiConnection();
   const connectMutation = useWifiConnect();
 
@@ -40,10 +40,7 @@ export function WifiScanDialog() {
   return (
     <>
       <Button
-        onClick={() => {
-          setOpen(true);
-          void refetch();
-        }}
+        onClick={() => setOpen(true)}
         size="sm"
         aria-label="Scan networks"
         title="Scan networks"
@@ -52,7 +49,17 @@ export function WifiScanDialog() {
         Scan
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && connectMutation.isPending) return;
+          setOpen(nextOpen);
+          if (!nextOpen) {
+            setSelectedGroup(null);
+            connectMutation.reset();
+          }
+        }}
+      >
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Available Networks</DialogTitle>
@@ -65,12 +72,16 @@ export function WifiScanDialog() {
               isConnecting={connectMutation.isPending}
               error={connectMutation.error?.message ?? null}
               onConnect={handleConnect}
-              onCancel={() => setSelectedGroup(null)}
+              onCancel={() => {
+                setSelectedGroup(null);
+                connectMutation.reset();
+              }}
             />
           ) : (
             <WifiScanList
               networks={scanResults}
-              isLoading={isLoading}
+              isLoading={isFetching}
+              scanFailed={isError}
               onRefresh={() => void refetch()}
               onConnect={setSelectedGroup}
               connectedSSID={connection?.connected ? connection.ssid : null}

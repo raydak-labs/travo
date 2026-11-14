@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { InlineError } from '@/components/ui/inline-error';
 import { SignalStrengthIcon } from '@/components/wifi/signal-strength-icon';
 import { SecurityBadge } from '@/components/wifi/security-badge';
 import { formatWifiBandLabel, normalizeWifiBandKey } from '@/lib/wifi-band';
@@ -14,6 +15,7 @@ import { WifiScanListPerBandSignals } from './wifi-scan-list-per-band-signals';
 interface WifiScanListProps {
   networks: WifiScanResult[];
   isLoading: boolean;
+  scanFailed?: boolean;
   onRefresh: () => void;
   onConnect: (group: GroupedScanNetwork) => void;
   /** When set, show "Connected (band)" for the matching SSID */
@@ -24,6 +26,7 @@ interface WifiScanListProps {
 export function WifiScanList({
   networks,
   isLoading,
+  scanFailed,
   onRefresh,
   onConnect,
   connectedSSID,
@@ -48,6 +51,8 @@ export function WifiScanList({
             <Skeleton key={i} className="h-14 w-full" />
           ))}
         </div>
+      ) : scanFailed ? (
+        <InlineError>Wi-Fi scan failed. Try scanning again.</InlineError>
       ) : groups.length === 0 ? (
         <EmptyState message="No networks found" />
       ) : (

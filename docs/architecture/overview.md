@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-10-05
+updated: 2026-11-14
 tags: [architecture, invariants, safety]
 ---
 
@@ -65,6 +65,7 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 - `GET /api/v1/wifi/health` is the place where frontend learns about wireless invariant violations and fragile layouts.
 - Repeater same-radio AP/STA situations must be surfaced as a warning and have a reconcile action.
 - Auto-reconnect logic must have a failure-count guard so broken config is not replayed forever.
+- [Access Point mode keeps uplink selection available](../adr/0002-wireless-model-and-luci-apply.md#addendum-radio-choice-determinism-and-one-definition-of-the-uplink-radio).
 
 ## 3. Wireless Apply And Rollback Flow
 

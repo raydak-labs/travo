@@ -80,6 +80,32 @@ func TestConnectThenSetModeRepeater_PreservesSingleActiveSTA(t *testing.T) {
 	}
 }
 
+func TestConnectFromAccessPointModeSelectsNewTravelUplink(t *testing.T) {
+	svc, u := newTestWifiService()
+	if _, err := svc.SetMode("ap", LockoutRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Connect(models.WifiConfig{
+		SSID: "Airport-WiFi", Encryption: "none", Band: "5ghz",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	connection, err := svc.GetConnection()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if connection.Mode != "repeater" {
+		t.Fatalf("mode = %q, want repeater", connection.Mode)
+	}
+	for section, want := range map[string]string{
+		"sta0": "1", "sta1": "0", "default_radio0": "0", "default_radio1": "1",
+	} {
+		if got, err := u.Get("wireless", section, "disabled"); err != nil || got != want {
+			t.Errorf("%s disabled = %q, err = %v, want %q", section, got, err, want)
+		}
+	}
+}
+
 // A second enabled access point on ANOTHER radio is the layout ADR 0002 §2 asks
 // for, so Connect is not refused; with no split available the uplink would put
 // an AP and a STA on the only PHY that runs an access point, which is refused
