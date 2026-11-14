@@ -19,7 +19,7 @@ import { WifiPage } from '../wifi-page';
 
 function renderWifiPage(initialPath = '/wifi') {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
   });
 
   const rootRoute = createRootRoute({ component: Outlet });
@@ -178,6 +178,24 @@ describe('WifiPage', () => {
       await within(await screen.findByRole('region', { name: 'Current connection' })).findByText(
         'Airport_Free_WiFi',
       ),
+    ).toBeInTheDocument();
+  });
+
+  it('scans again when reopened while the previous results are still fresh', async () => {
+    server.use(http.get(API_ROUTES.wifi.scan, () => HttpResponse.json([])));
+    const user = userEvent.setup();
+    renderWifiPage();
+
+    const scan = await screen.findByRole('button', { name: 'Scan networks' });
+    await user.click(scan);
+    const dialog = within(screen.getByRole('dialog'));
+    expect(await dialog.findByText('No networks found')).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: 'Close' }));
+
+    server.resetHandlers();
+    await user.click(scan);
+    expect(
+      await within(screen.getByRole('dialog')).findByText('Airport_Free_WiFi'),
     ).toBeInTheDocument();
   });
 

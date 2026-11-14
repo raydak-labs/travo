@@ -40,7 +40,10 @@ export function WifiScanDialog() {
   return (
     <>
       <Button
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          void refetch({ cancelRefetch: false });
+        }}
         size="sm"
         aria-label="Scan networks"
         title="Scan networks"
