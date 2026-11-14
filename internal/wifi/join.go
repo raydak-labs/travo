@@ -236,28 +236,32 @@ func (s *Service) probe(radio, section string) txn.Probe {
 }
 
 func (s *Service) proven(ctx context.Context, radio, section string) bool {
-	raw, err := s.join.Ubus.Call(ctx, "network.wireless", "status", nil)
+	radios, err := s.joinRadios(ctx)
 	if err != nil {
 		return false
 	}
-	ifaces, err := facts.ParseWirelessStatus(raw)
-	if err != nil {
-		return false
-	}
-	for _, iface := range ifaces {
-		if iface.Radio != radio || iface.Section != section || iface.Ifname == "" {
+	for _, r := range radios {
+		if r.Name != radio || r.Disabled {
 			continue
 		}
-		raw, err := s.join.Ubus.Call(ctx, "network.device", "status", map[string]string{"name": iface.Ifname})
-		if err != nil {
-			return false
+		for _, iface := range r.Ifaces {
+			if iface.Section == section && iface.Mode == "sta" && iface.Ifname != "" {
+				return s.provenLink(ctx, iface.Ifname)
+			}
 		}
-		link, err := facts.ParseDeviceStatus(raw)
-		if err != nil || !link.Present || !link.Carrier {
-			return false
-		}
-		route, found, err := s.join.Routes.DefaultIPv4Route(ctx)
-		return err == nil && found && route.Device == iface.Ifname
 	}
 	return false
+}
+
+func (s *Service) provenLink(ctx context.Context, ifname string) bool {
+	raw, err := s.join.Ubus.Call(ctx, "network.device", "status", map[string]string{"name": ifname})
+	if err != nil {
+		return false
+	}
+	link, err := facts.ParseDeviceStatus(raw)
+	if err != nil || !link.Present || !link.Carrier {
+		return false
+	}
+	route, found, err := s.join.Routes.DefaultIPv4Route(ctx)
+	return err == nil && found && route.Device == ifname
 }

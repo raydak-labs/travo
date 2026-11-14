@@ -33,12 +33,15 @@ let scanStatus = $state<LoadStatus>(initialScanStatus);
 // svelte-ignore state_referenced_locally
 let scanData = $state<ScanResult | undefined>(initialScanData);
 
-onDestroy(() => request.abort());
+onDestroy(() => {
+  request.abort();
+  activePoll?.abort();
+});
 
 let selected = $state<Network>();
 let joining = $state<JoinState>({ state: 'idle' });
 let commandPending = $state(false);
-let pollPending = $state(false);
+let activePoll: AbortController | undefined;
 let now = $state(0);
 const busy = $derived(
   joining.state === 'joining' || joining.state === 'pending' || joining.state === 'restoring',
@@ -66,18 +69,20 @@ async function submitJoin(body: JoinWiFiData['body']) {
 
 async function poll() {
   if (
-    pollPending ||
+    activePoll ||
     commandPending ||
     (joining.state !== 'pending' && joining.state !== 'restoring')
   )
     return;
   const id = joining.transaction.id;
-  pollPending = true;
+  const pollRequest = new AbortController();
+  activePoll = pollRequest;
+  const timeout = setTimeout(() => pollRequest.abort(), 4000);
   try {
-    const response = await getTransaction({ path: { id }, signal: request.signal });
+    const response = await getTransaction({ path: { id }, signal: pollRequest.signal });
     if (
-      request.signal.aborted ||
-      commandPending ||
+      pollRequest.signal.aborted ||
+      activePoll !== pollRequest ||
       !('transaction' in joining) ||
       joining.transaction.id !== id
     )
@@ -94,13 +99,16 @@ async function poll() {
   } catch {
     // A transient read failure does not prove an outcome.
   } finally {
-    pollPending = false;
+    clearTimeout(timeout);
+    if (activePoll === pollRequest) activePoll = undefined;
   }
 }
 
 async function settle(confirm: boolean) {
-  if (commandPending || pollPending || joining.state !== 'pending') return;
+  if (commandPending || joining.state !== 'pending') return;
   commandPending = true;
+  activePoll?.abort();
+  activePoll = undefined;
   const operation = confirm ? confirmTransaction : rollbackTransaction;
   try {
     const response = await operation({
@@ -208,8 +216,8 @@ async function scan() {
   {:else if joining.state === 'pending'}
     <p>{m.wifi_join_pending({ seconds: Math.max(0, Math.ceil((joining.deadline - now) / 1000)) })}</p>
     <div class="flex gap-2">
-      <button type="button" class="rounded border border-border px-3 py-2" disabled={commandPending || pollPending} onclick={() => settle(true)}>{m.wifi_join_confirm()}</button>
-      <button type="button" class="rounded border border-border px-3 py-2" disabled={commandPending || pollPending} onclick={() => settle(false)}>{m.wifi_join_rollback()}</button>
+      <button type="button" class="rounded border border-border px-3 py-2" disabled={commandPending} onclick={() => settle(true)}>{m.wifi_join_confirm()}</button>
+      <button type="button" class="rounded border border-border px-3 py-2" disabled={commandPending} onclick={() => settle(false)}>{m.wifi_join_rollback()}</button>
     </div>
   {:else if joining.state === 'restoring'}
     <p>{m.wifi_join_restoring()}</p>

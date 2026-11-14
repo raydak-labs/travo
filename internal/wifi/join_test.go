@@ -114,19 +114,24 @@ func (r joinRoute) DefaultIPv4Route(context.Context) (device.IPv4DefaultRoute, b
 
 func TestJoinProbeRequiresCarrierAndSelectedDefaultRoute(t *testing.T) {
 	for _, tc := range []struct {
-		name, link, route string
-		pass              bool
+		name, link, route, section, ifname string
+		pass                               bool
 	}{
-		{"connected", "device-status-phy0-sta0.json", "phy0-sta0", true},
-		{"wrong password", "wwan-down/device-status-phy0-sta0-disconnected.json", "phy0-sta0", false},
-		{"no default", "device-status-phy0-sta0.json", "", false},
-		{"ethernet default", "device-status-phy0-sta0.json", "wan", false},
+		{"connected", "device-status-phy0-sta0.json", "phy0-sta0", "wwan", "phy0-sta0", true},
+		{"wrong password", "wwan-down/device-status-phy0-sta0-disconnected.json", "phy0-sta0", "wwan", "phy0-sta0", false},
+		{"no default", "device-status-phy0-sta0.json", "", "wwan", "phy0-sta0", false},
+		{"ethernet default", "device-status-phy0-sta0.json", "wan", "wwan", "phy0-sta0", false},
+		{"AP with carrier and route", "device-status-phy1-ap0.json", "phy1-ap0", "default_radio1", "phy1-ap0", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ubus := summaryUbus(t, "wifi-scan/connected/wireless-status.json")
-			ubus.replies[ubusKey{"network.device", "status", "phy0-sta0"}] = fixture(t, tc.link)
+			ubus.replies[ubusKey{"network.device", "status", tc.ifname}] = fixture(t, tc.link)
 			service := New(context.Background(), ubus, nil).WithJoin(JoinDeps{Ubus: ubus, Routes: joinRoute{tc.route}, ProbeBudget: 10 * time.Millisecond, ProbeEvery: time.Millisecond})
-			err := service.probe("radio0", "wwan")(context.Background())
+			radio := "radio0"
+			if tc.ifname == "phy1-ap0" {
+				radio = "radio1"
+			}
+			err := service.probe(radio, tc.section)(context.Background())
 			if (err == nil) != tc.pass {
 				t.Fatal(err)
 			}
