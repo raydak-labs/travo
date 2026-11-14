@@ -23,22 +23,22 @@ export function WifiWirelessPanel() {
       <WifiSummaryBand />
       <WifiModeCard />
 
-      {!isPureAP && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle>WiFi uplink</CardTitle>
-            <CardDescription>
-              The network this router uses for internet, and the profiles it can switch to.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <WifiCurrentConnectionCard />
-            <div className="border-t border-gray-200 pt-4 dark:border-white/10">
-              <WifiSavedNetworksCard />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>WiFi uplink</CardTitle>
+          <CardDescription>
+            {isPureAP
+              ? 'Connect to an upstream Wi-Fi network to switch to Travel / repeater mode.'
+              : 'The network this router uses for internet, and the profiles it can switch to.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <WifiCurrentConnectionCard />
+          <div className="border-t border-gray-200 pt-4 dark:border-white/10">
+            <WifiSavedNetworksCard />
+          </div>
+        </CardContent>
+      </Card>
 
       {!isPureSTA && (
         <div className="mx-auto w-full max-w-screen-2xl 2xl:max-w-[90rem]">

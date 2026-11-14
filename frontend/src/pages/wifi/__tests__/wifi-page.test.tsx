@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw/http';
+import { API_ROUTES } from '@shared/index';
+import { server } from '@/mocks/server';
+import { mockWifiConnection } from '@/mocks/data';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
@@ -14,7 +19,7 @@ import { WifiPage } from '../wifi-page';
 
 function renderWifiPage(initialPath = '/wifi') {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
   });
 
   const rootRoute = createRootRoute({ component: Outlet });
@@ -121,6 +126,96 @@ describe('WifiPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Scan')).toBeInTheDocument();
     });
+  });
+
+  it('joins a new uplink directly from Access Point mode', async () => {
+    let joined = false;
+    const applyToken = 'new-uplink';
+    server.use(
+      http.get(API_ROUTES.wifi.connection, () =>
+        HttpResponse.json(
+          joined
+            ? { ...mockWifiConnection, mode: 'repeater', ssid: 'Airport_Free_WiFi' }
+            : { mode: 'ap', connected: false },
+        ),
+      ),
+      http.post(API_ROUTES.wifi.connect, async ({ request }) => {
+        const body = await request.json();
+        if (
+          !body ||
+          typeof body !== 'object' ||
+          !('ssid' in body) ||
+          body.ssid !== 'Airport_Free_WiFi'
+        ) {
+          return HttpResponse.json({ error: 'Unexpected uplink' }, { status: 400 });
+        }
+        return HttpResponse.json({
+          status: 'ok',
+          apply: { pending: true, token: applyToken, rollback_timeout_seconds: 30 },
+        });
+      }),
+      http.post(API_ROUTES.wifi.applyConfirm, async ({ request }) => {
+        expect(await request.json()).toEqual({ token: applyToken });
+        joined = true;
+        return HttpResponse.json({ status: 'ok' });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWifiPage();
+
+    await screen.findByRole('button', { name: /Access Point/ });
+    await user.click(await screen.findByRole('button', { name: 'Scan networks' }));
+    const dialog = screen.getByRole('dialog');
+    const network = await within(dialog).findByText('Airport_Free_WiFi');
+    const networkRow = within(dialog)
+      .getAllByRole('listitem')
+      .find((row) => row.contains(network));
+    expect(networkRow).toBeDefined();
+    await user.click(within(networkRow!).getByRole('button', { name: 'Connect' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Connect' }));
+
+    expect(
+      await within(await screen.findByRole('region', { name: 'Current connection' })).findByText(
+        'Airport_Free_WiFi',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('scans again when reopened while the previous results are still fresh', async () => {
+    server.use(http.get(API_ROUTES.wifi.scan, () => HttpResponse.json([])));
+    const user = userEvent.setup();
+    renderWifiPage();
+
+    const scan = await screen.findByRole('button', { name: 'Scan networks' });
+    await user.click(scan);
+    const dialog = within(screen.getByRole('dialog'));
+    expect(await dialog.findByText('No networks found')).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: 'Close' }));
+
+    server.resetHandlers();
+    await user.click(scan);
+    expect(
+      await within(screen.getByRole('dialog')).findByText('Airport_Free_WiFi'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows scan failure and lets the user retry', async () => {
+    server.use(
+      http.get(API_ROUTES.wifi.scan, () =>
+        HttpResponse.json({ error: 'Radio unavailable' }, { status: 500 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWifiPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Scan networks' }));
+    const dialog = within(screen.getByRole('dialog'));
+    expect(await dialog.findByText(/Wi-Fi scan failed/)).toBeInTheDocument();
+    expect(dialog.queryByText('No networks found')).not.toBeInTheDocument();
+
+    server.resetHandlers();
+    await user.click(dialog.getByRole('button', { name: 'Scan' }));
+    expect(await dialog.findByText('Airport_Free_WiFi')).toBeInTheDocument();
   });
 
   it('renders signal strength and IP for current connection', async () => {

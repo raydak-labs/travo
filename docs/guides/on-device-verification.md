@@ -3,7 +3,7 @@ title: On-device verification
 description: Standing device playbook: what to run, in what order, which defect classes local suites cannot catch, and the multi-WAN failover playbook.
 status: standing — run whenever a change touches wireless, DNS/VPN layering, guards, install or failover
 last-verified-against: 192.168.1.1 (GL.iNet GL-AXT1800, OpenWrt 25.12.3), commit 3634ea6
-updated: 2026-11-08
+updated: 2026-11-14
 tags: [testing, on-device, playbook, failover, mwan3]
 ---
 
@@ -181,6 +181,15 @@ router with Wi-Fi off entirely.
 | B.6  | Client mode with the uplink on 2.4 GHz, then enable guest Wi-Fi.                                            | Guest AP lands on the radio that does **not** carry the STA: `uci show wireless` — guest's `device` vs the `wwan` STA's. Both APs may end up on one radio; the confirm must still prove **each** interface, not the radio.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | B.7  | With every enabled AP on the uplink radio, switch to Travel/repeater mode.                                  | Must be **refused**, matching `Connect`'s behaviour. See B4.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | B.8  | Press Scan, or switch to Client mode, with no saved upstream on a stock layout where both radios run an AP. | The AP is moved off the uplink radio before the STA is enabled; `uci show wireless` must never show an enabled AP and an enabled STA on one `device`. See B7.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+### Recover Travel mode with a different uplink
+
+From Travel mode, switch to Access Point and make the old upstream unavailable.
+On WiFi → Connect, use **Scan** to select a different network. Confirm that
+the UI returns to Travel mode, the router reaches the internet through the
+selected network, and the old profile remains saved. Repeat with invalid
+credentials and verify the router returns to Access Point mode with Scan
+still available. See [ADR 0002](../adr/0002-wireless-model-and-luci-apply.md).
 
 ### 5.1 How the lockout guard is checked on the device (B.3)
 

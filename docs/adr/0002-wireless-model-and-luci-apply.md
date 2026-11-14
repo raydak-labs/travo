@@ -3,7 +3,7 @@ title: "ADR 0002: Wireless model, health, and LuCI-style UCI apply"
 description: The wireless model: configured vs live radio, role assignment, LuCI-style apply/rollback/confirm, and the health API that reports fragile layouts.
 status: Accepted
 date: 2026-05-14
-updated: 2026-11-08
+updated: 2026-11-14
 tags: [adr, wireless, wwan, repeater, uci, rpcd, openwrt]
 ---
 
@@ -472,6 +472,13 @@ switcher (`band_switching_service.go`) sorts before it picks "the radio for this
 band" or "the other radio". A randomised choice here is not cosmetic: it decides
 whether the uplink shares a PHY with an access point, and on a device where two
 radios report the same band it makes the band switcher oscillate.
+
+**Access Point mode keeps uplink selection available.** WiFi → Connect can scan
+without an active STA. Joining a selected upstream network in Access Point mode
+uses the normal `Connect` apply and confirmation flow to enter Travel mode.
+This gives users a recovery path when switching modes would try an unavailable
+saved uplink. Scan reports a failure if no radio successfully scans and keeps
+results from any radio that succeeds.
 
 **"The uplink radio" means one thing: the radio of any enabled `mode=sta`
 wifi-iface.** A `network=wwan` STA wins when several radios qualify, but a
