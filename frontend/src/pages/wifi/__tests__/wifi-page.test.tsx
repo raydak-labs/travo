@@ -175,7 +175,7 @@ describe('WifiPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Connect' }));
 
     expect(
-      await within(screen.getByRole('region', { name: 'Current connection' })).findByText(
+      await within(await screen.findByRole('region', { name: 'Current connection' })).findByText(
         'Airport_Free_WiFi',
       ),
     ).toBeInTheDocument();
