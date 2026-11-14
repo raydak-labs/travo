@@ -24,7 +24,8 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/updatestage"
 )
 
-const guardName = "update-in-progress"
+// GuardName is the crash guard held while an update is active or needs recovery.
+const GuardName = "update-in-progress"
 
 var (
 	ErrBusy        = errors.New("update busy")
@@ -102,7 +103,7 @@ func (s *Service) acquire() (*os.File, error) {
 }
 
 func (s *Service) guarded() (bool, error) {
-	_, err := os.Lstat(filepath.Join(s.guards.Path, guardName))
+	_, err := os.Lstat(filepath.Join(s.guards.Path, GuardName))
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
@@ -267,7 +268,7 @@ func (s *Service) Begin(ctx context.Context, version string) (*Accepted, error) 
 	if err = s.save(j); err != nil {
 		return nil, err
 	}
-	if err = s.guards.Acquire(guardName); err != nil {
+	if err = s.guards.Acquire(GuardName); err != nil {
 		return nil, err
 	}
 	if err = syncDir(s.guards.Path); err != nil {
@@ -439,7 +440,7 @@ func (s *Service) finalize(j journal, result string) error {
 		}
 	}
 	// Keep the saved worker until the guard is released so finalization remains retryable.
-	if err := s.guards.Release(guardName); err != nil {
+	if err := s.guards.Release(GuardName); err != nil {
 		return err
 	}
 	if err := syncDir(s.guards.Path); err != nil && !errors.Is(err, os.ErrNotExist) {

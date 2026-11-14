@@ -70,7 +70,7 @@ func (m *Manager) releaseIfIdle() {
 			return
 		}
 	}
-	_ = m.Guards.Release(guardName)
+	_ = m.Guards.Release(GuardName)
 }
 
 // outcome reads the on-disk state without side effects.

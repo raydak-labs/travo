@@ -49,7 +49,8 @@ const (
 	RollbackFailed State = "rollback_failed"
 )
 
-const guardName = "txn-in-progress"
+// GuardName is the crash guard held while a transaction needs confirmation.
+const GuardName = "txn-in-progress"
 
 // MinWindow is the floor for the confirm window (AP bring-up ~10 s, device-facts §2).
 const MinWindow = 15 * time.Second
@@ -140,7 +141,7 @@ func (m *Manager) Begin(ctx context.Context, summary string, configs []string, s
 		return Status{}, ErrStopped
 	}
 	m.reapFinished()
-	if err := m.Guards.Acquire(guardName); err != nil {
+	if err := m.Guards.Acquire(GuardName); err != nil {
 		if errors.Is(err, guard.ErrActive) {
 			return Status{}, ErrActive
 		}
@@ -317,7 +318,7 @@ func (m *Manager) revertAll(ctx context.Context, cs []string) error {
 }
 
 func (m *Manager) release(err error) error {
-	if rerr := m.Guards.Release(guardName); rerr != nil {
+	if rerr := m.Guards.Release(GuardName); rerr != nil {
 		return errors.Join(err, rerr)
 	}
 	return err

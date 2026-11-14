@@ -86,7 +86,7 @@ func TestRealApply(t *testing.T) {
 	if err := s.save(j); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.guards.Acquire(guardName); err != nil {
+	if err := s.guards.Acquire(GuardName); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.quiesce(ctx, &j); err != nil {

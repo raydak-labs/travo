@@ -25,7 +25,7 @@ func (m *Manager) Recover(ctx context.Context, alive Alive) ([]Status, error) {
 	defer m.mu.Unlock()
 	entries, err := os.ReadDir(m.Dir)
 	if errors.Is(err, os.ErrNotExist) {
-		return []Status{}, m.Guards.Release(guardName)
+		return []Status{}, m.Guards.Release(GuardName)
 	}
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (m *Manager) Recover(ctx context.Context, alive Alive) ([]Status, error) {
 	if pending {
 		return out, nil
 	}
-	return out, m.Guards.Release(guardName)
+	return out, m.Guards.Release(GuardName)
 }
 
 func (m *Manager) discardUnstarted(ctx context.Context, id string) error {

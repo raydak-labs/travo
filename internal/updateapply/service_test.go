@@ -37,7 +37,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 func TestInvalidJournalRetainsGuard(t *testing.T) {
 	s := fixtureService(t)
-	if err := s.guards.Acquire(guardName); err != nil {
+	if err := s.guards.Acquire(GuardName); err != nil {
 		t.Fatal(err)
 	}
 	j := journal{ApplyStatus: ApplyStatus{ID: strings.Repeat("a", 32), Version: "1.2.3", State: "succeeded"}, Phase: "switching", PreviousVersion: "1.2.2", Endpoint: "http://127.0.0.1:80/api/health"}

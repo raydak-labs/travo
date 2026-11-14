@@ -394,7 +394,7 @@ func TestRecoverKeepsLiveWatchdogAndCleansConfirmed(t *testing.T) {
 func TestRecoverDiscardsCrashBeforeWatchdog(t *testing.T) {
 	t.Parallel()
 	m, d := setup(t, 30*time.Second)
-	_ = m.Guards.Acquire(guardName)
+	_ = m.Guards.Acquire(GuardName)
 	dir := filepath.Join(m.Dir, "00000000000000aa")
 	_ = os.MkdirAll(filepath.Join(dir, "snap"), 0o700)
 	_ = os.WriteFile(filepath.Join(dir, "configs"), []byte("network\n"), 0o600) // no meta, no pid
