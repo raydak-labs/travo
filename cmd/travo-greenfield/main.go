@@ -25,6 +25,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
+	"github.com/blackdark-org/travo-greenfield/internal/reboot"
 	"github.com/blackdark-org/travo-greenfield/internal/static"
 	"github.com/blackdark-org/travo-greenfield/internal/throughput"
 	"github.com/blackdark-org/travo-greenfield/internal/trust"
@@ -130,12 +131,29 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 	}()
 	slog.Info("adapters", "mock", deps.Mock, "packages", deps.Packages.Name())
 
+	clock := auth.SystemClock{}
+	var rebooter api.Rebooter
+	var bootID func(context.Context) string
+	if router, ok := deps.Device.(reboot.Router); ok {
+		svc := reboot.New(router, deps.Guards, deps.Paths.RebootFile(), clock.Now, workers.Stopped)
+		if err := svc.Settle(ctx); err != nil {
+			slog.Warn("reboot settlement", "err", err)
+		}
+		rebooter = svc
+		bootID = func(ctx context.Context) string {
+			id, err := svc.BootID(ctx)
+			if err != nil {
+				return ""
+			}
+			return id
+		}
+	}
+
 	sessions, err := startState(ctx, deps)
 	if err != nil {
 		return err
 	}
 	limiter, provider := auth.NewRateLimiter(), &trust.Provider{}
-	clock := auth.SystemClock{}
 	workers.Go("rate-limit-sweep", lifecycle.Every(time.Minute, func(context.Context) { limiter.Sweep(clock.Now()) }))
 	workers.Go("session-sweep", lifecycle.Every(time.Minute, func(context.Context) { sessions.Sweep(clock.Now()) }))
 	workers.Go("trust-refresh", lifecycle.Every(30*time.Second, func(c context.Context) {
@@ -212,6 +230,8 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		VPNStatus:     vpnStatus,
 		UpdateApply:   updater,
 		UpdateStage:   updateStage,
+		Rebooter:      rebooter,
+		BootID:        bootID,
 		Backup:        backup,
 		Updates:       updates,
 		Connectivity:  connection,

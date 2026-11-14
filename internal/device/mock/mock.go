@@ -17,14 +17,20 @@ type config struct{ sections map[string]*device.Section }
 
 // Device implements device.Device.
 type Device struct {
-	Reloads      int
-	ReloadErr    error
-	mu           sync.Mutex
-	committed    map[string]*config
-	staged       map[string]*config
-	ubus         map[string]json.RawMessage
-	scanReplies  map[string]json.RawMessage
-	DefaultRoute bool
+	Reloads            int
+	ReloadErr          error
+	Reboots            int
+	RebootErr          error
+	BootIDErr          error
+	RotateBootOnReboot bool
+	mu                 sync.Mutex
+	bootID             string
+	bootSequence       int
+	committed          map[string]*config
+	staged             map[string]*config
+	ubus               map[string]json.RawMessage
+	scanReplies        map[string]json.RawMessage
+	DefaultRoute       bool
 	// AccountsErr makes every Accounts call fail (shadow unreadable).
 	AccountsErr  error
 	password     string
@@ -32,7 +38,7 @@ type Device struct {
 }
 
 func New() *Device {
-	return &Device{committed: map[string]*config{}, staged: map[string]*config{}, ubus: map[string]json.RawMessage{}, scanReplies: map[string]json.RawMessage{}}
+	return &Device{bootID: "mock-boot-0", committed: map[string]*config{}, staged: map[string]*config{}, ubus: map[string]json.RawMessage{}, scanReplies: map[string]json.RawMessage{}}
 }
 
 // SetUbusReply scripts the reply for object.method (use verbatim captured payloads).

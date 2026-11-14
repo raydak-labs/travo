@@ -7,6 +7,7 @@
     "postinstall": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide",
     "dev": "vite",
     "build": "vite build && node scripts/gzip-dist.mjs",
+    "test": "vitest run",
     "check": "biome check . && svelte-check --tsconfig ./tsconfig.json && vitest run && pnpm build && node scripts/size-budget.mjs"
   },
   "devDependencies": {

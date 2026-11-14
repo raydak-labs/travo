@@ -104,7 +104,7 @@ for spec in "linux/aarch64_generic arm64 openwrt/rootfs:aarch64_generic-25.12.6@
   CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/pkgmgr-$2.test ./internal/pkgmgr
   CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/dnslayer-$2.test ./internal/dnslayer
   CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/txn-$2.test ./internal/txn
-  docker run --rm --platform $1 --entrypoint sh -v "$PWD/dist:/t:ro" "$3" -c "mkdir -p /var/lock && /t/cli-$2.test -test.run TestRealUCI -test.v && /t/pkgmgr-$2.test -test.run TestRealManager -test.v && /t/dnslayer-$2.test -test.run TestRealStack -test.v && /t/txn-$2.test -test.run '^TestReal(WatchdogRestoresAfterDaemonDeath|ConfirmKeepsChange)$' -test.v"
+  docker run --rm --platform $1 --entrypoint sh -v "$PWD/dist:/t:ro" "$3" -c "mkdir -p /var/lock && /t/cli-$2.test -test.run 'TestReal(UCI|RebootReturnsBeforeDelay)' -test.v && /t/pkgmgr-$2.test -test.run TestRealManager -test.v && /t/dnslayer-$2.test -test.run TestRealStack -test.v && /t/txn-$2.test -test.run '^TestReal(WatchdogRestoresAfterDaemonDeath|ConfirmKeepsChange)$' -test.v"
   # booted container (procd as PID 1): watchdog must survive a procd service stop
   name=travo-itest-$2
   docker rm -f $name >/dev/null 2>&1 || true

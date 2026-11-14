@@ -23,6 +23,7 @@ The dashboard shows the active uplink, carrier, and internet reachability separa
 The **WiFi** page summarizes configured radios, uplink STA and access points, and its **Scan** button lists nearby networks without changing live state.
 
 Use **System → Download backup** to save the router configuration as `travo-config.tar.gz`.
+Use **System → Restart router** to restart the router after confirming; the page reconnects when it is back.
 
 System can check GitHub for a newer stable release. An automatic attempt occurs only when opening System, at most once per 24 hours. Use **Check for updates** to check manually. Set `travo-greenfield.main.release_source` to an alternate GitHub `OWNER/REPO` or `off`, then restart the daemon. The default is `blackdark-org/travo-greenfield`.
 

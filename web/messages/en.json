@@ -73,6 +73,24 @@
   "system_backup_download": "Download backup",
   "system_backup_pending": "Preparing backup…",
   "system_backup_failed": "Could not download the configuration backup.",
+  "reboot_title": "Restart",
+  "reboot_router": "Restart router",
+  "reboot_confirm": "Restart the router? The interface will be unreachable for about a minute. Active sessions end.",
+  "reboot_restarting": "Restarting… this page reconnects automatically.",
+  "reboot_back": "Router restarted. Sign in again.",
+  "reboot_timeout": "The router did not come back within 3 minutes. Check power and the Ethernet cable, then reload this page.",
+  "reboot_error": [
+    {
+      "declarations": ["input key"],
+      "selectors": ["key"],
+      "match": {
+        "key=txn": "Confirm or roll back the pending change first.",
+        "key=update": "An update is in progress.",
+        "key=pending": "A restart is already in progress.",
+        "key=*": "Could not restart the router."
+      }
+    }
+  ],
   "system_device": "Device",
   "system_model": "Model",
   "system_hostname": "Hostname",

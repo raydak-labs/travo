@@ -15,6 +15,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/auth"
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/blackdark-org/travo-greenfield/internal/reboot"
 	"github.com/blackdark-org/travo-greenfield/internal/throughput"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
@@ -27,6 +28,11 @@ type Txns interface {
 	Get(id string) (txn.Status, error)
 	Confirm(id string) (txn.Status, error)
 	Rollback(id string) (txn.Status, error)
+}
+
+// Rebooter is the confirmed system restart operation exposed by reboot.Service.
+type Rebooter interface {
+	Reboot(context.Context) (reboot.Accepted, error)
 }
 
 // ThroughputReader reads the latest sampled interface rates.
@@ -60,9 +66,12 @@ type Deps struct {
 	DaemonContext context.Context
 	UpdateStage   UpdateStager
 	UpdateApply   UpdateApplier
+	Rebooter      Rebooter
 	Updates       UpdateChecker
 	Version       string
-	Accounts      device.Accounts
+	// BootID returns the current opaque boot id, or empty when unknown.
+	BootID   func(context.Context) string
+	Accounts device.Accounts
 	// Ubus feeds read-only system facts; nil answers 503 device_unavailable.
 	Ubus         device.Ubus
 	Backup       device.ConfigBackupper
@@ -100,6 +109,7 @@ type healthOutput struct {
 	Body struct {
 		Status  string `json:"status" enum:"ok" doc:"Always ok when the daemon answers"`
 		Version string `json:"version" doc:"Running build version"`
+		BootID  string `json:"boot_id" doc:"Opaque id of the current boot; empty when unknown"`
 	}
 }
 
@@ -131,16 +141,20 @@ func New(d Deps) (http.Handler, huma.API) {
 	register(s, true, huma.Operation{
 		OperationID: "getHealth", Method: http.MethodGet, Path: "/api/health",
 		Summary: "Liveness check", Tags: []string{"system"},
-	}, a, func(context.Context, *struct{}) (*healthOutput, error) {
+	}, a, func(ctx context.Context, _ *struct{}) (*healthOutput, error) {
 		out := &healthOutput{}
 		out.Body.Status = "ok"
 		out.Body.Version = d.Version
+		if d.BootID != nil {
+			out.Body.BootID = d.BootID(ctx)
+		}
 		return out, nil
 	})
 	s.registerAuth(a)
 	s.registerSetup(a)
 	s.registerTxn(a)
 	s.registerSystem(a)
+	s.registerReboot(a)
 	s.registerVPNProfiles(a)
 	s.registerVPNStatus(a)
 	s.registerUpdateCheck(a)

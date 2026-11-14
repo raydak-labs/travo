@@ -1,4 +1,9 @@
 <script lang="ts">
+import { onMount } from 'svelte';
+import { postSystemReboot } from '../api/gen';
+import '../api/client';
+import { fetchHealth } from '../api/health';
+import { rebootErrorKey, waitForBoot } from '../api/reboot';
 import { downloadSystemBackup, fetchSystemInfo } from '../api/system';
 import { type AuthMessage, passwordMessage } from '../auth-messages';
 import { formatBytes, formatLoad, formatUptime } from '../format';
@@ -17,6 +22,55 @@ import SystemUpdate from './SystemUpdate.svelte';
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
 let backupError = $state(false);
+
+type RebootState =
+  | 'idle'
+  | 'confirming'
+  | 'requesting'
+  | 'restarting'
+  | 'back'
+  | 'timeout'
+  | 'failed';
+let rebootState = $state<RebootState>('idle');
+let rebootFailure = $state<ReturnType<typeof rebootErrorKey>>('generic');
+let rebootController: AbortController | undefined;
+
+onMount(() => {
+  const controller = new AbortController();
+  rebootController = controller;
+  return () => controller.abort();
+});
+
+async function restartRouter() {
+  const controller = rebootController;
+  if (!controller || rebootState === 'requesting') return;
+  rebootState = 'requesting';
+  try {
+    const { data, error } = await postSystemReboot({
+      body: { confirm: true },
+      signal: controller.signal,
+    });
+    if (controller.signal.aborted) return;
+    if (!data) {
+      rebootFailure = rebootErrorKey((error as { code?: string } | undefined)?.code);
+      rebootState = 'failed';
+      return;
+    }
+    rebootState = 'restarting';
+    const result = await waitForBoot(data.boot_id, {
+      health: fetchHealth,
+      sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+      now: Date.now,
+      signal: controller.signal,
+    });
+    if (!controller.signal.aborted) rebootState = result === 'restarted' ? 'back' : 'timeout';
+  } catch {
+    if (!controller.signal.aborted) {
+      rebootFailure = 'generic';
+      rebootState = 'failed';
+    }
+  }
+}
 
 async function downloadBackup() {
   backupPending = true;
@@ -125,6 +179,51 @@ async function logout() {
     </div>
     {#if backupError}
       <p role="alert" class="status status-danger self-start">{m.system_backup_failed()}</p>
+    {/if}
+  </Card>
+
+  <Card title={m.reboot_title()}>
+    {#if rebootState === 'confirming' || rebootState === 'requesting'}
+      <p>{m.reboot_confirm()}</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
+          disabled={rebootState === 'requesting'}
+          onclick={restartRouter}
+        >
+          {m.reboot_title()}
+        </button>
+        <button
+          type="button"
+          class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
+          disabled={rebootState === 'requesting'}
+          onclick={() => { rebootState = 'idle'; }}
+        >
+          {m.update_cancel()}
+        </button>
+      </div>
+    {:else if rebootState === 'restarting'}
+      <p aria-live="polite">{m.reboot_restarting()}</p>
+    {:else if rebootState === 'back'}
+      <p aria-live="polite">{m.reboot_back()}</p>
+    {:else if rebootState === 'timeout'}
+      <p role="alert" class="status status-danger self-start">{m.reboot_timeout()}</p>
+    {:else}
+      <div>
+        <button
+          type="button"
+          class="rounded-md border border-border px-3 py-2 hover:bg-bg"
+          onclick={() => { rebootState = 'confirming'; }}
+        >
+          {m.reboot_router()}
+        </button>
+      </div>
+      {#if rebootState === 'failed'}
+        <p role="alert" class="status status-danger mt-3 self-start">
+          {m.reboot_error({ key: rebootFailure })}
+        </p>
+      {/if}
     {/if}
   </Card>
 

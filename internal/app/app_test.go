@@ -42,3 +42,29 @@ func TestCloseRemovesMockStateDir(t *testing.T) {
 		t.Fatalf("mock dir left behind: %v", err)
 	}
 }
+
+func TestRebootFileAndMockBootRotation(t *testing.T) {
+	if got := RealPaths().RebootFile(); got != "/etc/travo-greenfield/reboot.json" {
+		t.Fatalf("reboot file = %q", got)
+	}
+	d, err := New(Options{Mock: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	router, ok := d.Device.(interface {
+		Reboot(context.Context) error
+		BootID(context.Context) (string, error)
+	})
+	if !ok {
+		t.Fatal("mock device does not implement reboot ports")
+	}
+	before, _ := router.BootID(context.Background())
+	if err := router.Reboot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := router.BootID(context.Background())
+	if before == after {
+		t.Fatalf("mock boot id did not rotate: %q", before)
+	}
+}

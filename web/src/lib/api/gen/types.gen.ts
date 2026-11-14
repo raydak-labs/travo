@@ -60,6 +60,10 @@ export type GetSetupStateResponse = {
 
 export type HealthOutputBody = {
     /**
+     * Opaque id of the current boot; empty when unknown
+     */
+    boot_id: string;
+    /**
      * Always ok when the daemon answers
      */
     status: 'ok';
@@ -131,6 +135,21 @@ export type Rate = {
     name: string;
     rx_bytes_per_second: number | null;
     tx_bytes_per_second: number | null;
+};
+
+export type RebootBody = {
+    /**
+     * Opaque id of the boot that accepted the request; compare with GET /api/health after the restart
+     */
+    boot_id: string;
+    status: 'ok';
+};
+
+export type RebootInputBody = {
+    /**
+     * Must be true: the caller has shown the operator a confirmation
+     */
+    confirm: boolean;
 };
 
 export type Result = {
@@ -662,6 +681,47 @@ export type GetSystemInfoResponses = {
 };
 
 export type GetSystemInfoResponse = GetSystemInfoResponses[keyof GetSystemInfoResponses];
+
+export type PostSystemRebootData = {
+    body: RebootInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/reboot';
+};
+
+export type PostSystemRebootErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type PostSystemRebootError = PostSystemRebootErrors[keyof PostSystemRebootErrors];
+
+export type PostSystemRebootResponses = {
+    /**
+     * Accepted
+     */
+    202: RebootBody;
+};
+
+export type PostSystemRebootResponse = PostSystemRebootResponses[keyof PostSystemRebootResponses];
 
 export type GetSystemUpdateApplyData = {
     body?: never;

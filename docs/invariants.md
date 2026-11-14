@@ -10,6 +10,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Guard present → the feature SKIPS. Stale guards are reported at startup (a stuck guard is silent feature death).
 - Manual redeploy/reinstall is the explicit retry path; it clears guards by NAME, never by glob.
 - Guard write fails → abort the operation. Never degrade to unguarded.
+- Confirmed reboot writes `reboot-in-progress` and its boot record before scheduling. After scheduling succeeds, keep both until the next daemon start proves a different kernel boot id; setup or scheduling failure releases the guard, and a same-boot guard becomes retryable only after `reboot.Grace`.
 - Firmware-upgrade and factory-reset guards are never removed (interruption must stay visible).
 - Every shell-out has an explicit timeout tier. Exceptions: terminal ops (reboot, poweroff, sysupgrade, firstboot) and long-lived listeners (stopped by lifecycle signal, not timeout).
 - Every background worker is registered in one lifecycle. SIGTERM stops all; no UCI commit after stop.
@@ -177,4 +178,5 @@ Accept; do not "fix" silently.
 - Config locks are held across blocking reload/apply; long holds queue all writers of that config.
 - Hardware button = detection only until actions are designed.
 - External writers (cron/hotplug) outside the lock model.
+- Reboot exclusion has a residual ~2 s window where `txn.Begin` can start after the second guard check; boot-time `txn.Recover` restores that transaction.
 - AdGuard sees all queries from 127.0.0.1 (no per-client stats) under the default topology.

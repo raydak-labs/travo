@@ -34,6 +34,9 @@ func RealPaths() Paths {
 // EpochFile is where the session epoch is persisted.
 func (p Paths) EpochFile() string { return filepath.Join(p.State, "epoch.json") }
 
+// RebootFile is the durable record of the boot that accepted a restart.
+func (p Paths) RebootFile() string { return filepath.Join(p.State, "reboot.json") }
+
 // Options select the adapters.
 type Options struct {
 	Mock      bool
@@ -67,6 +70,7 @@ func New(o Options) (Deps, error) {
 	var d Deps
 	if o.Mock {
 		dev := mock.New()
+		dev.RotateBootOnReboot = true
 		mock.SeedSystem(dev)
 		mock.SeedConnectivity(dev)
 		mock.SeedWiFi(dev)

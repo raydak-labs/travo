@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiData, GetWiFiErrors, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses } from './types.gen';
+import type { ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiData, GetWiFiErrors, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -160,6 +160,23 @@ export const getSystemInfo = <ThrowOnError extends boolean = false>(options?: Op
         }],
     url: '/api/v1/system/info',
     ...options
+});
+
+/**
+ * Restart the router
+ */
+export const postSystemReboot = <ThrowOnError extends boolean = false>(options: Options<PostSystemRebootData, ThrowOnError>): RequestResult<PostSystemRebootResponses, PostSystemRebootErrors, ThrowOnError> => (options.client ?? client).post<PostSystemRebootResponses, PostSystemRebootErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/system/reboot',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

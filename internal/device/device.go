@@ -102,6 +102,17 @@ type WirelessKeyWriter interface {
 	SetWirelessKey(ctx context.Context, section, key string) error
 }
 
+// Rebooter schedules a router restart and returns before it happens, so the
+// caller can flush its HTTP response. The reboot itself is a terminal operation.
+type Rebooter interface {
+	Reboot(ctx context.Context) error
+}
+
+// BootIDReader returns the kernel's random per-boot id, which changes on every boot.
+type BootIDReader interface {
+	BootID(ctx context.Context) (string, error)
+}
+
 // Device is the full port.
 type Device interface {
 	UCI
