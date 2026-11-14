@@ -36,6 +36,8 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 - [HW greenfield 2026-11-13] With no STA interface, `ubus call iwinfo scan '{"device":"phy0"}'` (or `radio0`) scans that radio read-only: rc 0, ~4.7 s, AP on the other radio stayed `up`/`carrier`, `iw dev` and `uci changes` unchanged. A scan covers only its radio's band; a dual-band list needs one scan per radio (`phy1`/the AP ifname scans 2.4 GHz in ~2 s without dropping the AP). Captures: `testdata/device/axt1800-25.12.6/wifi-scan/`.
 - [HW greenfield] `iwinfo scan` can exceed `TierRead` (about 4.7 s on 5 GHz), so scan replies use `TierScan`.
 - [HW] Only enabled APs have a `hostapd.<ifname>` ubus object. `iwinfo assoclist` was empty while `hostapd.*` `get_clients` listed the station: use `get_clients`.
+- Join allows up to 30 s for STA carrier and its kernel default route, based on roughly 10 s each for association and DHCP. The transaction’s shared live apply deadline can end the probe sooner.
+- [UNVERIFIED] WPA2/WPA3 mixed-mode join stages `sae-mixed`. Its behavior on the AXT1800 remains to be verified.
 
 ## 3. ath11k crash triggers
 

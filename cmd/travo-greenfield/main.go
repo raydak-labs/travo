@@ -166,9 +166,17 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		})
 	}
 	var wireless api.WiFiService
+	var wirelessJoin api.WiFiJoiner
 	if scanner, ok := deps.Device.(device.WirelessScanner); ok {
-		wireless = wifi.New(ctx, deps.Device, scanner)
+		service := wifi.New(ctx, deps.Device, scanner)
+		wireless = service
+		routes, hasRoutes := deps.Device.(device.DefaultRouteReader)
+		keys, hasKeys := deps.Device.(device.WirelessKeyWriter)
+		if hasRoutes && hasKeys {
+			wirelessJoin = service.WithJoin(wifi.JoinDeps{UCI: deps.Device, Ubus: deps.Device, Routes: routes, Keys: keys, Txns: deps.Txn})
+		}
 	}
+
 	if useMock {
 		releaseSource = "off"
 	}
@@ -208,6 +216,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		Updates:       updates,
 		Connectivity:  connection,
 		WiFi:          wireless,
+		WiFiJoin:      wirelessJoin,
 		Throughput:    sampler,
 		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,

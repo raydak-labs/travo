@@ -3,6 +3,7 @@
 - **Uplink**: the connection to the internet. One of `wan` (Ethernet), `wwan` (WiFi STA), `usbtether`.
 - **STA**: WiFi client interface (`mode=sta`) bound to `wwan`; joins hotel/home WiFi.
 - **Scan**: the on-demand, read-only per-radio site survey.
+- **Join**: the guarded configuration and verification of an uplink STA, followed by explicit confirmation or rollback.
 - **AP**: WiFi access point serving the LAN. **Guest AP**: separate SSID, key, subnet (192.168.2.0/24) and zone.
 - **Caller**: the client making an API request. Classified as ethernet / wifi-ap / wifi-client / unknown.
 - **Lockout**: a change that would leave the caller without a way to reach the router.

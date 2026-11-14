@@ -43,6 +43,10 @@ type VPNStatusReader interface {
 }
 
 // WiFiService is the read-only wireless summary and site-survey service.
+type WiFiJoiner interface {
+	Join(context.Context, wifi.JoinRequest) (txn.Status, error)
+}
+
 type WiFiService interface {
 	Summary(context.Context) (wifi.Summary, error)
 	Scan(context.Context) (wifi.ScanResult, error)
@@ -65,6 +69,7 @@ type Deps struct {
 	Throughput   ThroughputReader
 	Connectivity ConnectivityReader
 	WiFi         WiFiService
+	WiFiJoin     WiFiJoiner
 	Txns         Txns
 	Sessions     *auth.Store
 	Limiter      *auth.RateLimiter

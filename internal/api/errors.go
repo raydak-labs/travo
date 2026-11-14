@@ -28,6 +28,9 @@ func init() {
 		if ctx.Operation().OperationID == vpnImportOperation {
 			return huma.NewError(status, "invalid profile request")
 		}
+		if ctx.Operation().OperationID == wifiJoinOperation {
+			return huma.NewError(status, "invalid WiFi join request")
+		}
 		return huma.NewError(status, msg, errs...)
 	}
 	// JSON keys are case-sensitive: `{"Password":...}` must not bind to `password`.

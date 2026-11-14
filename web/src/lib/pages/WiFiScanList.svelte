@@ -1,10 +1,14 @@
 <script lang="ts">
-import type { AccessPoint, ScanResult } from '../api/gen';
+import type { AccessPoint, Network, ScanResult } from '../api/gen';
 import { m } from '../paraglide/messages.js';
 import Status from '../ui/Status.svelte';
 import { accessPointKey, bandLabel, bandsBadge, securityLabel, signalLabel } from '../wifi';
 
-let { result }: { result: ScanResult } = $props();
+let {
+  result,
+  join,
+  busy = false,
+}: { result: ScanResult; join?: (network: Network) => void; busy?: boolean } = $props();
 </script>
 
 {#snippet accessPoints(aps: AccessPoint[])}
@@ -27,6 +31,15 @@ let { result }: { result: ScanResult } = $props();
       </summary>
       {@render accessPoints(network.access_points)}
     </details>
+    {#if join}
+      <button
+        type="button"
+        class="mb-2 rounded border border-border px-3 py-1 text-sm disabled:opacity-60"
+        disabled={busy || network.security === 'other'}
+        aria-label={network.security === 'other' ? m.wifi_join_unsupported() : m.wifi_join_network({ ssid: network.ssid })}
+        onclick={() => join?.(network)}
+      >{network.security === 'other' ? m.wifi_join_unsupported() : m.wifi_join_action()}</button>
+    {/if}
   {/each}
 
   {#if result.networks.length === 0 && result.hidden.length === 0 && result.radios.every((radio) => radio.status === 'ok')}

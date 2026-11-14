@@ -56,6 +56,8 @@ Per release, each from Ethernet unless stated (issues with label `needs-hardware
    - With a real endpoint after `ifup wg0`, expect `connected` with a handshake age under 180 seconds.
    Compare each result with `wg show wg0 latest-handshakes`. After disabling, run `ifup wwan` if the kernel default route is gone (device-facts §1).
 
+**WiFi Join (#71).** Test over Ethernet with a backup and console ready. Join a known uplink with a band-compatible free radio. Record time to STA carrier and a kernel default route via the STA, then confirm and verify the route persists. Repeat without confirming and with a wrong password. Verify rollback restores the previous STA and route, and the UI reports rollback only after the transaction does. Verify the AP stays up and remains on a separate radio. Check mixed WPA2/WPA3 only with an operator-owned test network. Record the result in SPIKES.md with the SSID and BSSID redacted.
+
 ## Web
 
 `pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size budget. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR; attach screenshots to the PR.

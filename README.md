@@ -30,6 +30,8 @@ When System finds a newer release, **Verify package** checks the signed archive 
 
 Use **VPN** to import a WireGuard configuration, select a saved profile, or delete a profile; the page also shows the WireGuard tunnel state.
 
+On the WiFi page, scan for an uplink, join it on a free radio, and confirm the connection once it is verified.
+
 ## Docs
 
 - [Spec](docs/spec.md) · [Invariants](docs/invariants.md) · Plan: [milestone 0.1.0](https://github.com/blackdark-org/travo-greenfield/milestone/1) and [project board](https://github.com/orgs/blackdark-org/projects/1)

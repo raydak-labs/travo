@@ -45,11 +45,15 @@ func (s *server) txnCall(f func(string) (txn.Status, error)) func(context.Contex
 		case err != nil:
 			return nil, fail(http.StatusServiceUnavailable, "txn_unavailable", "transaction state unavailable")
 		}
-		cfgs := st.Configs
-		if cfgs == nil {
-			cfgs = []string{}
-		}
-		return &txnOutput{txnBody{ID: st.ID, State: string(st.State), Summary: st.Summary,
-			Configs: cfgs, Started: st.Started, WindowSeconds: st.WindowSeconds}}, nil
+		return txnResponse(st), nil
 	}
+}
+
+func txnResponse(st txn.Status) *txnOutput {
+	cfgs := st.Configs
+	if cfgs == nil {
+		cfgs = []string{}
+	}
+	return &txnOutput{txnBody{ID: st.ID, State: string(st.State), Summary: st.Summary,
+		Configs: cfgs, Started: st.Started, WindowSeconds: st.WindowSeconds}}
 }

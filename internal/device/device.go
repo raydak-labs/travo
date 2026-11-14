@@ -97,6 +97,11 @@ type ConfigBackupper interface {
 	BackupConfig(ctx context.Context, destination string) error
 }
 
+// WirelessKeyWriter stages a WiFi key without passing it in process arguments.
+type WirelessKeyWriter interface {
+	SetWirelessKey(ctx context.Context, section, key string) error
+}
+
 // Device is the full port.
 type Device interface {
 	UCI

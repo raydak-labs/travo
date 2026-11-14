@@ -5,11 +5,39 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 )
+
+func TestRealUCIWirelessKey(t *testing.T) {
+	ctx := context.Background()
+	d := New()
+	const config = "/etc/config/wireless"
+	if _, err := os.Stat(config); errors.Is(err, os.ErrNotExist) {
+		if err := os.WriteFile(config, nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(config) })
+	}
+	if err := d.SetType(ctx, "wireless", "travo_test", "wifi-iface"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := d.Revert(ctx, "wireless"); err != nil {
+			t.Error(err)
+		}
+	})
+	const key = ` it's "quoted" \ # $`
+	if err := d.SetWirelessKey(ctx, "travo_test", key); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.SetWirelessKey(ctx, "travo_missing", key); !errors.Is(err, errStageWirelessKey) {
+		t.Fatalf("write on missing section returned %v", err)
+	}
+}
 
 // Runs against the real uci inside an OpenWrt container (see mise task test:integration).
 func TestRealUCIMissingConfig(t *testing.T) {

@@ -1,4 +1,4 @@
-// Package wifi provides read-only wireless summaries and on-demand site surveys.
+// Package wifi provides wireless summaries, site surveys and guarded uplink joins.
 package wifi
 
 import (
@@ -18,7 +18,7 @@ var (
 
 const defaultRadioTimeout = 20 * time.Second
 
-// Service reads wireless state through narrow device ports. It never writes configuration.
+// Service accesses wireless state through narrow device ports.
 type Service struct {
 	RadioTimeout time.Duration
 	daemon       context.Context
@@ -26,6 +26,7 @@ type Service struct {
 	scanner      device.WirelessScanner
 	flightMu     sync.Mutex
 	flight       *scanFlight
+	join         *JoinDeps
 }
 
 func New(daemon context.Context, ubus device.Ubus, scanner device.WirelessScanner) *Service {

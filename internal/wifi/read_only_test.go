@@ -4,21 +4,13 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 )
 
-func TestPackageHasNoWriteDependencies(t *testing.T) {
-	paths, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range paths {
-		if strings.HasSuffix(path, "_test.go") {
-			continue
-		}
+func TestReadOnlyPathsHaveNoWriteDependencies(t *testing.T) {
+	// Join is a separate, transaction-backed path. Summary and scan stay read-only.
+	for _, path := range []string{"service.go", "scan.go"} {
 		t.Run(path, func(t *testing.T) {
 			fset := token.NewFileSet()
 			imports, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
@@ -67,5 +59,20 @@ func TestPackageHasNoWriteDependencies(t *testing.T) {
 				return true
 			})
 		})
+	}
+}
+
+func TestJoinUsesDevicePorts(t *testing.T) {
+	for _, path := range []string{"join.go", "join_plan.go"} {
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, spec := range f.Imports {
+			switch spec.Path.Value {
+			case `"os/exec"`, `"syscall"`, `"github.com/blackdark-org/travo-greenfield/internal/device/cli"`:
+				t.Errorf("%s accesses OpenWrt outside the Device ports (%s)", path, spec.Path.Value)
+			}
+		}
 	}
 }

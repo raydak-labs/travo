@@ -17,6 +17,11 @@ type wifiScanOutput struct{ Body wifi.ScanResult }
 func (s *server) registerWiFi(a huma.API) {
 	register(s, false, op("getWiFi", http.MethodGet, "/api/v1/wifi", "WiFi radios, uplink and access points", "wifi", 503), a, s.getWiFi)
 	register(s, false, op("getWiFiScan", http.MethodGet, "/api/v1/wifi/scan", "Scan nearby networks (read-only)", "wifi", 503), a, s.getWiFiScan)
+	join := op(wifiJoinOperation, http.MethodPost, "/api/v1/wifi/join", "Join an uplink network (guarded transaction)", "wifi", 400, 409, 422, 503)
+	join.DefaultStatus = http.StatusAccepted
+	join.MaxBodyBytes = 4096
+	register(s, false, join, a, s.joinWiFi)
+
 }
 
 func (s *server) getWiFi(ctx context.Context, _ *struct{}) (*wifiOutput, error) {

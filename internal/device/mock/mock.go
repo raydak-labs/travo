@@ -103,6 +103,10 @@ func (d *Device) Set(_ context.Context, cfg, sec, opt, val string) error {
 	return nil
 }
 
+func (d *Device) SetWirelessKey(ctx context.Context, section, key string) error {
+	return d.Set(ctx, "wireless", section, "key", key)
+}
+
 func (d *Device) SetType(_ context.Context, cfg, sec, typ string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()

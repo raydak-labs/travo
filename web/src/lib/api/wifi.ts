@@ -1,6 +1,6 @@
 import { m } from '../paraglide/messages.js';
 import './client';
-import { getWiFi, getWiFiScan } from './gen';
+import { getWiFi, getWiFiScan, type JoinWiFiData, joinWiFi } from './gen';
 
 export async function fetchWifi(signal?: AbortSignal) {
   const response = await getWiFi({ signal });
@@ -18,4 +18,8 @@ export async function fetchWifiScan(signal?: AbortSignal) {
     throw Object.assign(new Error(m.wifi_unavailable()), { code });
   }
   return response.data;
+}
+
+export function joinWifi(body: JoinWiFiData['body'], signal?: AbortSignal) {
+  return joinWiFi({ body, signal });
 }

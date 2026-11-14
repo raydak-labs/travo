@@ -69,6 +69,12 @@ export type HealthOutputBody = {
     version: string;
 };
 
+export type JoinWiFiInputBody = {
+    bssid?: string;
+    security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';
+    ssid: string;
+};
+
 export type List = {
     profiles: Array<Summary>;
     selected_id: string | null;
@@ -268,6 +274,13 @@ export type WiFiSummary = {
     aps: Array<Ap>;
     radios: Array<RadioInfo>;
     stas: Array<Sta>;
+};
+
+export type JoinWiFiInputBodyWritable = {
+    bssid?: string;
+    key?: string;
+    security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';
+    ssid: string;
 };
 
 export type GetHealthData = {
@@ -1187,6 +1200,47 @@ export type GetWiFiResponses = {
 };
 
 export type GetWiFiResponse = GetWiFiResponses[keyof GetWiFiResponses];
+
+export type JoinWiFiData = {
+    body: JoinWiFiInputBodyWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/join';
+};
+
+export type JoinWiFiErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type JoinWiFiError = JoinWiFiErrors[keyof JoinWiFiErrors];
+
+export type JoinWiFiResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type JoinWiFiResponse = JoinWiFiResponses[keyof JoinWiFiResponses];
 
 export type GetWiFiScanData = {
     body?: never;
