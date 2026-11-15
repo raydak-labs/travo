@@ -99,3 +99,47 @@ For a valid key and a changed BSSID pin, the replacement had carrier at
 transaction confirmed and the route persisted. The AP stayed up on its own
 radio in both cases. Times are from invoking Join and include the site survey.
 This test used WPA2; mixed WPA2/WPA3 was not exercised.
+
+
+## WiFi Join browser acceptance (#71, 2026-11-15)
+
+GL-AXT1800, OpenWrt 25.12.6, Ethernet. Tested the SPA and daemon built
+from `2341539`, including #115, on a temporary LAN listener at port 8082.
+Health reported `dev`; the running executable was verified at the temporary
+test path. The installed daemon on port 80 stayed running. A fresh sysupgrade
+backup was copied off the router before testing.
+
+The browser signed in with the router's root password and used WiFi → Scan →
+the operator-owned WPA2 uplink → Join. Credentials and network identities
+are omitted here. Fetch observations recorded only HTTP status, transaction
+state and elapsed time; they did not replace responses.
+
+- Wrong key for the connected SSID: the page showed Connecting while POST
+  was in flight, then Rolled back only after the 202 response reported
+  `rolled_back`, after 39.74 s. No Pending response occurred. Independent
+  samples observed STA carrier false and no STA default before recovery.
+- Valid key, no confirmation: POST reached Pending after 15.65 s. The UI
+  showed Confirm, Rollback and the countdown, then polled every two seconds.
+  After the normal confirmation window expired, a GET returned
+  `rolled_back` and the page showed Rolled back.
+- Valid key, explicit confirmation: POST reached Pending after 21.54 s.
+  Before confirmation, an independent SSH read proved STA carrier and the
+  kernel default via that STA. Clicking Confirm returned `confirmed` and
+  the page displayed Connection confirmed. The kernel default persisted.
+
+A guarded API join first pinned the existing uplink BSSID so the browser's
+un-pinned Join made an effective change. The timeout restored that pin;
+final browser confirmation removed it. The setup confirmation connection
+reset after the request; a subsequent read found the pin persisted and no
+guard. This setup is separate from the successful browser confirmation.
+
+The AP was up in the independent readable samples, including while the
+wrong key had no carrier. `iw dev` showed AP and STA on separate radios.
+A combined sample could not parse the transiently absent STA during reload;
+it is not evidence of an AP outage or uninterrupted AP availability.
+After recovery, all `/etc/config` files and crontabs in the pre-test backup
+matched byte for byte, the kernel default used the original STA, and no
+transaction guard remained. The temporary listener was stopped after testing.
+Mixed WPA2/WPA3 was not tested. The AP lockout-refusal case is not applicable
+to Join because it does not edit APs. `mise run check` passed with unchanged
+limits (WiFi chunk 5,210 bytes gzip).
