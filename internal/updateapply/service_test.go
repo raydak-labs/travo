@@ -105,6 +105,65 @@ func TestWaitsForOriginalProcess(t *testing.T) {
 	}
 }
 
+type exitRouter struct {
+	pids  []int
+	stops int
+}
+
+func (r *exitRouter) UpdateSettings(context.Context) (string, string, error) { return "", "", nil }
+func (r *exitRouter) StartUpdateService(context.Context) error               { return nil }
+func (r *exitRouter) StopUpdateService(context.Context) error {
+	r.stops++
+	return nil
+}
+func (r *exitRouter) UpdatePID(context.Context) (int, error) {
+	if len(r.pids) == 0 {
+		return 0, nil
+	}
+	pid := r.pids[0]
+	if len(r.pids) > 1 {
+		r.pids = r.pids[1:]
+	}
+	return pid, nil
+}
+
+func TestAwaitInstanceExitAcceptsStaleListing(t *testing.T) {
+	router := &exitRouter{pids: []int{9, 9, 0}}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	err := awaitInstanceExit(ctx, router, processIdentity{PID: 9, Start: "1"}, func(int) (processIdentity, error) {
+		return processIdentity{}, nil
+	})
+	if err != nil || router.stops != 0 {
+		t.Fatal(err, router.stops)
+	}
+}
+
+func TestAwaitInstanceExitStopsRespawn(t *testing.T) {
+	const respawned = 1 << 30 // not a live pid; waitProcess must observe it as gone
+	router := &exitRouter{pids: []int{respawned, 0}}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	err := awaitInstanceExit(ctx, router, processIdentity{PID: 1, Start: "1"}, func(pid int) (processIdentity, error) {
+		return processIdentity{PID: pid, Start: "2"}, nil
+	})
+	if err != nil || router.stops != 1 {
+		t.Fatal(err, router.stops)
+	}
+}
+
+func TestAwaitInstanceExitTimesOutWhileListed(t *testing.T) {
+	router := &exitRouter{pids: []int{4}}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	err := awaitInstanceExit(ctx, router, processIdentity{PID: 4, Start: "1"}, func(int) (processIdentity, error) {
+		return processIdentity{}, nil
+	})
+	if err == nil || err.Error() != "procd instance still running" || router.stops != 0 {
+		t.Fatal(err, router.stops)
+	}
+}
+
 func TestReadProcessAtHandlesExitedProcess(t *testing.T) {
 	for _, tc := range []struct {
 		name string

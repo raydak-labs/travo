@@ -169,13 +169,43 @@ func (s *Service) quiesce(ctx context.Context, j *journal) error {
 	if err := waitProcess(ctx, current); err != nil {
 		return err
 	}
-	remaining, err := s.router.UpdatePID(ctx)
-	if err != nil {
+	// service list can keep the instance after the task has exited or respawned.
+	if err := awaitInstanceExit(ctx, s.router, current, processAt); err != nil {
 		return err
-	}
-	if remaining != 0 {
-		return errors.New("procd instance still running")
 	}
 	j.Stopping = processIdentity{}
 	return s.save(*j)
+}
+
+func awaitInstanceExit(ctx context.Context, router Router, stopped processIdentity, lookup func(int) (processIdentity, error)) error {
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		remaining, err := router.UpdatePID(ctx)
+		if err != nil {
+			return err
+		}
+		if remaining == 0 {
+			return nil
+		}
+		actual, err := lookup(remaining)
+		if err != nil {
+			return err
+		}
+		if actual.PID != 0 && actual != stopped {
+			if err := router.StopUpdateService(ctx); err != nil {
+				return err
+			}
+			if err := waitProcess(ctx, actual); err != nil {
+				return err
+			}
+			stopped = actual
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return errors.New("procd instance still running")
+		case <-tick.C:
+		}
+	}
 }
