@@ -129,7 +129,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - MAC clone/randomize; per-client MAC policies.
 - Radio hardware status is CONFIGURED state, labelled as such.
 - Post-apply probe proves each enabled AP/STA interface individually (see device-facts §2). Failure → rollback. "Could not read netifd" is distinct from "AP not up".
-- Join replaces one STA on wwan in place. It chooses the first band-compatible radio by name with no enabled AP, returns `wifi_no_free_radio` otherwise, and requires STA carrier and a kernel default route via that STA before arming confirmation.
+- Join replaces one STA on wwan in place. It chooses the first band-compatible radio by name with no enabled AP, returns `wifi_no_free_radio` otherwise, and requires STA carrier and a kernel default route via that STA before arming confirmation. The STA kernel link index must be absent from the snapshot taken under the transaction lock before staging and remain stable across the carrier and route checks.
 
 ## 11. VPN
 

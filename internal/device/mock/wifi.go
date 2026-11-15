@@ -41,7 +41,23 @@ func (d *Device) ScanWireless(ctx context.Context, name string) (json.RawMessage
 
 // SeedWiFi scripts the connected radio summary and one scan for each radio.
 func SeedWiFi(d *Device) {
+	d.mu.Lock()
+	d.staLinkIndex = 2
+	d.mu.Unlock()
 	d.SetUbusReply("network.wireless", "status", wirelessStatus)
 	d.SetScanReply("phy0-sta0", scanPHY0STA)
 	d.SetScanReply("phy1-ap0", scanPHY1AP)
+}
+
+func (d *Device) LinkIndices(ctx context.Context) (map[string]int, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	links := map[string]int{"lo": 1}
+	if d.staLinkIndex > 0 {
+		links["phy0-sta0"] = d.staLinkIndex
+	}
+	return links, nil
 }

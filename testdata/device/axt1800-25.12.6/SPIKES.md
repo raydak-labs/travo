@@ -83,3 +83,19 @@ restored that route. After #113's watchdog fix, the same failed-enable
 scenario reached RolledBack after 80.50 s with the original underlying
 default present and wg0 absent. The network configuration and crontabs
 matched the backup byte for byte, and the guard cleared.
+
+## WiFi Join and fresh STA proof (#71, #115)
+
+On the AXT1800 over Ethernet SSH, changing the key for the already-connected
+WPA2 uplink could arm confirmation on the old STA's carrier and default route.
+The next sample showed no carrier or default. A valid change likewise armed
+on the old kernel link, before the replacement gained carrier and a route.
+
+With the link-index check, the wrong key was rejected after 39.86 s without
+reaching Pending. The original kernel default returned following rollback,
+and configuration and crontabs matched the pre-test backup byte for byte.
+For a valid key and a changed BSSID pin, the replacement had carrier at
+17.21 s and the independent sample saw the kernel default at 17.62 s. The
+transaction confirmed and the route persisted. The AP stayed up on its own
+radio in both cases. Times are from invoking Join and include the site survey.
+This test used WPA2; mixed WPA2/WPA3 was not exercised.

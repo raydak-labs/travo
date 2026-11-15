@@ -126,12 +126,12 @@ func TestJoinProbeRequiresCarrierAndSelectedDefaultRoute(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ubus := summaryUbus(t, "wifi-scan/connected/wireless-status.json")
 			ubus.replies[ubusKey{"network.device", "status", tc.ifname}] = fixture(t, tc.link)
-			service := New(context.Background(), ubus, nil).WithJoin(JoinDeps{Ubus: ubus, Routes: joinRoute{tc.route}, ProbeBudget: 10 * time.Millisecond, ProbeEvery: time.Millisecond})
+			service := New(context.Background(), ubus, nil).WithJoin(JoinDeps{Ubus: ubus, Routes: joinRoute{tc.route}, Links: fixedJoinLinks(2), ProbeBudget: 10 * time.Millisecond, ProbeEvery: time.Millisecond})
 			radio := "radio0"
 			if tc.ifname == "phy1-ap0" {
 				radio = "radio1"
 			}
-			err := service.probe(radio, tc.section)(context.Background())
+			err := service.probe(radio, tc.section, map[int]struct{}{1: {}})(context.Background())
 			if (err == nil) != tc.pass {
 				t.Fatal(err)
 			}
@@ -167,7 +167,7 @@ func TestJoinReplansUnderTransactionLock(t *testing.T) {
 				}
 				return txn.Status{State: txn.Pending}, nil
 			})
-			service.WithJoin(JoinDeps{UCI: d, Ubus: service.ubus, Keys: d, Txns: begin})
+			service.WithJoin(JoinDeps{UCI: d, Ubus: service.ubus, Keys: d, Links: d, Txns: begin})
 			st, err := service.Join(ctx, JoinRequest{SSID: ssid, Security: SecurityWPA2, Key: "test-password"})
 			if stale {
 				if !errors.Is(err, ErrNoFreeRadio) {
@@ -289,7 +289,8 @@ func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
 	device := joinFileDevice{Device: base, configDir: configDir, afterWirelessCommit: func() {
 		ubus.replies[ubusKey{"network.wireless", "status", ""}] = fixture(t, "wifi-scan/connected/wireless-status.json")
 	}}
-	ubus.replies[ubusKey{"network.device", "status", "phy0-sta0"}] = fixture(t, "wwan-down/device-status-phy0-sta0-disconnected.json")
+	// Immediately after reload the previous association still reports carrier.
+	ubus.replies[ubusKey{"network.device", "status", "phy0-sta0"}] = fixture(t, "device-status-phy0-sta0.json")
 	manager := &txn.Manager{
 		Device: device, Locks: &uciwrite.Locks{},
 		Guards: guard.Dir{Path: filepath.Join(root, "guards"), Now: time.Now},
@@ -298,10 +299,30 @@ func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
 		NewID: func() string { return "0000000000000001" }, Window: txn.MinWindow,
 		ArmLimit: 30 * time.Second, ApplyBudget: 3 * time.Second, Settle: 3 * time.Second,
 	}
-	service.WithJoin(JoinDeps{UCI: device, Ubus: ubus, Routes: joinRoute{"phy0-sta0"}, Keys: device, Txns: manager, ProbeBudget: 10 * time.Millisecond, ProbeEvery: time.Millisecond})
+	lostCarrier := fixture(t, "wwan-down/device-status-phy0-sta0-disconnected.json")
+	reads := 0
+	links := joinLinks(func() (map[string]int, error) {
+		reads++
+		// Baseline and the first post-reload read still see the old healthy STA.
+		if reads <= 2 {
+			return fixedJoinLinks(2)()
+		}
+		ubus.replies[ubusKey{"network.device", "status", "phy0-sta0"}] = lostCarrier
+		return fixedJoinLinks(3)()
+	})
+	route := joinRouteFunc(func() string {
+		if reads > 2 {
+			return ""
+		}
+		return "phy0-sta0"
+	})
+	service.WithJoin(JoinDeps{UCI: device, Ubus: ubus, Routes: route, Keys: device, Links: links, Txns: manager, ProbeBudget: 50 * time.Millisecond, ProbeEvery: time.Millisecond})
 	st, err := service.Join(ctx, JoinRequest{SSID: joinFixtureSSID(t, service), Key: "wrong-password", Security: SecurityWPA2})
 	if !errors.Is(err, txn.ErrProbeFailed) || st.State != txn.RolledBack {
 		t.Fatal(st, err)
+	}
+	if reads < 3 {
+		t.Fatal("probe never reached the replacement STA with lost carrier")
 	}
 	for _, config := range []string{"wireless", "network", "firewall"} {
 		content, err := os.ReadFile(filepath.Join(configDir, config))

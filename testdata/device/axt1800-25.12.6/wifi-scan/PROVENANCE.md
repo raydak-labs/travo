@@ -13,6 +13,7 @@ STA `phy0-sta0` associated, `wwan` up with kernel default route; AP `phy1-ap0` u
 - iwinfo-scan-phy0-sta0.json: ubus call iwinfo scan '{"device":"phy0-sta0"}'
 - uci-show-wireless.txt: uci show wireless
 - iw-dev.txt: iw dev
+- ip-link-indices.txt: `ip -o link show` captured over Ethernet on 2026-11-15 for #115 on the same firmware with the STA and AP up. Each row was reduced to its index and displayed interface name; values and row order are unchanged.
 
 ## no-sta/
 

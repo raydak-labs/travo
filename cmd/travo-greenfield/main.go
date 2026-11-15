@@ -198,8 +198,9 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		wireless = service
 		routes, hasRoutes := deps.Device.(device.DefaultRouteReader)
 		keys, hasKeys := deps.Device.(device.WirelessKeyWriter)
-		if hasRoutes && hasKeys {
-			wirelessJoin = service.WithJoin(wifi.JoinDeps{UCI: deps.Device, Ubus: deps.Device, Routes: routes, Keys: keys, Txns: deps.Txn})
+		links, hasLinks := deps.Device.(device.LinkIndexReader)
+		if hasRoutes && hasKeys && hasLinks {
+			wirelessJoin = service.WithJoin(wifi.JoinDeps{UCI: deps.Device, Ubus: deps.Device, Routes: routes, Links: links, Keys: keys, Txns: deps.Txn})
 		}
 	}
 

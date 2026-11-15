@@ -30,6 +30,8 @@ type Device struct {
 	staged             map[string]*config
 	ubus               map[string]json.RawMessage
 	scanReplies        map[string]json.RawMessage
+	staLinkIndex       int
+	wirelessChanged    bool
 	DefaultRoute       bool
 	// AccountsErr makes every Accounts call fail (shadow unreadable).
 	AccountsErr  error
@@ -164,6 +166,7 @@ func (d *Device) Commit(_ context.Context, cfg string) error {
 	defer d.mu.Unlock()
 	if s, ok := d.staged[cfg]; ok {
 		d.committed[cfg] = s
+		d.wirelessChanged = d.wirelessChanged || cfg == "wireless"
 		delete(d.staged, cfg)
 	}
 	return nil
@@ -198,6 +201,12 @@ func (d *Device) Reload(context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.Reloads++
+	if d.ReloadErr == nil && d.wirelessChanged {
+		if d.staLinkIndex > 0 {
+			d.staLinkIndex++
+		}
+		d.wirelessChanged = false
+	}
 	return d.ReloadErr
 }
 

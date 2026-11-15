@@ -22,6 +22,7 @@ type JoinDeps struct {
 	UCI                     device.UCI
 	Ubus                    device.Ubus
 	Routes                  device.DefaultRouteReader
+	Links                   device.LinkIndexReader
 	Keys                    device.WirelessKeyWriter
 	Txns                    Beginner
 	Clock                   func() time.Time
@@ -99,7 +100,7 @@ func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error)
 	if err := req.validate(); err != nil {
 		return txn.Status{}, err
 	}
-	if s.join == nil {
+	if s.join == nil || s.join.Links == nil {
 		return txn.Status{}, ErrUnavailable
 	}
 	radios, err := s.joinRadios(ctx)
@@ -118,6 +119,7 @@ func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error)
 		return txn.Status{}, err
 	}
 	var radio, section string
+	var oldLinks map[int]struct{}
 	st, err := s.join.Txns.Begin(ctx, "wifi: join "+req.SSID, []string{"wireless", "network", "firewall"}, func(ctx context.Context) error {
 		radios, err := s.joinRadios(ctx)
 		if err != nil {
@@ -128,8 +130,16 @@ func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error)
 		if err != nil {
 			return err
 		}
+		links, err := s.join.Links.LinkIndices(ctx)
+		if err != nil || len(links) == 0 {
+			return ErrUnavailable
+		}
+		oldLinks = make(map[int]struct{}, len(links))
+		for _, index := range links {
+			oldLinks[index] = struct{}{}
+		}
 		return s.stageJoin(ctx, writes, req.Key)
-	}, func(ctx context.Context) error { return s.probe(radio, section)(ctx) })
+	}, func(ctx context.Context) error { return s.probe(radio, section, oldLinks)(ctx) })
 	if errors.Is(err, txn.ErrActive) {
 		return st, ErrTransactionPending
 	}
@@ -216,26 +226,26 @@ func checkJoinLockout(caller lockout.Caller, before, after []lockout.AP) error {
 	return lockout.Check(caller, lockout.Plan{Before: before, After: after}, false)
 }
 
-func (s *Service) probe(radio, section string) txn.Probe {
+func (s *Service) probe(radio, section string, oldLinks map[int]struct{}) txn.Probe {
 	return func(ctx context.Context) error {
 		ctx, cancel := context.WithTimeout(ctx, s.join.ProbeBudget)
 		defer cancel()
 		ticker := time.NewTicker(s.join.ProbeEvery)
 		defer ticker.Stop()
 		for {
-			if ctx.Err() == nil && s.proven(ctx, radio, section) {
+			if ctx.Err() == nil && s.proven(ctx, radio, section, oldLinks) {
 				return nil
 			}
 			select {
 			case <-ctx.Done():
-				return errors.New("STA carrier and default route not proven")
+				return errors.New("fresh STA carrier and default route not proven")
 			case <-ticker.C:
 			}
 		}
 	}
 }
 
-func (s *Service) proven(ctx context.Context, radio, section string) bool {
+func (s *Service) proven(ctx context.Context, radio, section string, oldLinks map[int]struct{}) bool {
 	radios, err := s.joinRadios(ctx)
 	if err != nil {
 		return false
@@ -246,11 +256,25 @@ func (s *Service) proven(ctx context.Context, radio, section string) bool {
 		}
 		for _, iface := range r.Ifaces {
 			if iface.Section == section && iface.Mode == "sta" && iface.Ifname != "" {
-				return s.provenLink(ctx, iface.Ifname)
+				return s.provenFreshLink(ctx, iface.Ifname, oldLinks)
 			}
 		}
 	}
 	return false
+}
+
+func (s *Service) provenFreshLink(ctx context.Context, ifname string, oldLinks map[int]struct{}) bool {
+	before, err := s.join.Links.LinkIndices(ctx)
+	index := before[ifname]
+	if err != nil || index <= 0 {
+		return false
+	}
+	if _, stale := oldLinks[index]; stale || !s.provenLink(ctx, ifname) {
+		return false
+	}
+	// A name can be reused while carrier and route checks are in flight.
+	after, err := s.join.Links.LinkIndices(ctx)
+	return err == nil && after[ifname] == index
 }
 
 func (s *Service) provenLink(ctx context.Context, ifname string) bool {

@@ -73,6 +73,11 @@ type DefaultRouteReader interface {
 	DefaultIPv4Route(context.Context) (route IPv4DefaultRoute, found bool, err error)
 }
 
+// LinkIndexReader returns the kernel link name and index snapshot.
+type LinkIndexReader interface {
+	LinkIndices(context.Context) (map[string]int, error)
+}
+
 type Routes interface {
 	HasDefaultRoute(ctx context.Context) (bool, error)
 }
