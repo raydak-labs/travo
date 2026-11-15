@@ -128,6 +128,15 @@ func (m *Manager) stopped() bool { return m.Stopped != nil && m.Stopped() }
 // watchdog. On success the transaction is Pending until Confirm or the window expires.
 // stage receives a ctx that marks the locks held: helpers must not lock again.
 func (m *Manager) Begin(ctx context.Context, summary string, configs []string, stage func(ctx context.Context) error, probe Probe) (Status, error) {
+	return m.begin(ctx, summary, configs, false, stage, probe)
+}
+
+// BeginWireGuard restores the live wg0 device as part of rolling back a network change.
+func (m *Manager) BeginWireGuard(ctx context.Context, summary string, stage func(context.Context) error, probe Probe) (Status, error) {
+	return m.begin(ctx, summary, []string{"network"}, true, stage, probe)
+}
+
+func (m *Manager) begin(ctx context.Context, summary string, configs []string, restoreWireGuard bool, stage func(context.Context) error, probe Probe) (Status, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.Window < MinWindow || m.ApplyBudget <= 0 || m.ArmLimit < m.ApplyBudget+armMargin {
@@ -166,6 +175,11 @@ func (m *Manager) Begin(ctx context.Context, summary string, configs []string, s
 	meta, err := m.snapshot(id, cs, summary)
 	if err != nil {
 		return abort(fmt.Errorf("txn: snapshot: %w", err))
+	}
+	if restoreWireGuard {
+		if err := m.recordWireGuardBaseline(lctx, id); err != nil {
+			return abort(fmt.Errorf("txn: record wg0 baseline: %w", err))
+		}
 	}
 	if err := stage(lctx); err != nil {
 		return abort(fmt.Errorf("txn: stage: %w", err))
