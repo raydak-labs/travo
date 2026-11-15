@@ -1,0 +1,124 @@
+// Package vpntunnel applies and verifies guarded WireGuard tunnel changes.
+package vpntunnel
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
+)
+
+const iface = "wg0"
+
+var errUnavailable = errors.New("WireGuard tunnel changes are unavailable")
+var errProof = errors.New("could not verify WireGuard tunnel change")
+
+type ProfileStore interface {
+	SelectedConfig() (vpnprofiles.Config, error)
+}
+
+type Transactions interface {
+	BeginWireGuard(context.Context, string, func(context.Context) error, txn.Probe) (txn.Status, error)
+}
+
+type Service struct {
+	uci        device.UCI
+	keys       device.WireGuardKeyWriter
+	ubus       device.Ubus
+	control    device.WireGuardControl
+	handshakes device.WireGuardReader
+	routes     device.DefaultRouteReader
+	profiles   ProfileStore
+	txns       Transactions
+	now        func() time.Time
+}
+
+func New(uci device.UCI, keys device.WireGuardKeyWriter, ubus device.Ubus, control device.WireGuardControl, handshakes device.WireGuardReader, routes device.DefaultRouteReader, profiles ProfileStore, txns Transactions, now func() time.Time) *Service {
+	return &Service{uci, keys, ubus, control, handshakes, routes, profiles, txns, now}
+}
+
+func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
+	if s.txns == nil || s.uci == nil || s.control == nil || s.ubus == nil || s.routes == nil ||
+		(enabled && (s.keys == nil || s.profiles == nil || s.handshakes == nil || s.now == nil)) {
+		return txn.Status{}, errUnavailable
+	}
+	if !enabled {
+		return s.txns.BeginWireGuard(ctx, "Disable WireGuard tunnel", stageBounded(s.stageDisable), s.proveDisabled)
+	}
+
+	profile, err := s.profiles.SelectedConfig()
+	if err != nil {
+		return txn.Status{}, err
+	}
+	desired, err := desiredSections(profile)
+	if err != nil {
+		return txn.Status{}, errUnavailable
+	}
+	var proof enableProof
+	return s.txns.BeginWireGuard(ctx, "Enable WireGuard tunnel", stageBounded(func(ctx context.Context) error {
+		current, err := s.uci.Show(ctx, "network")
+		if err != nil {
+			return errUnavailable
+		}
+		wasEnabled, err := configuredEnabled(current)
+		if err != nil {
+			return err
+		}
+		if matches(current, desired, wasEnabled) {
+			return txn.ErrNoChanges
+		}
+		if err := checkPeerNames(current, desired[1:]); err != nil {
+			return err
+		}
+
+		proof.started = s.now().Unix()
+		proof.wasEnabled = wasEnabled
+		previous, err := s.handshakes.LatestHandshakes(ctx, iface)
+		if err != nil && !errors.Is(err, device.ErrNotFound) {
+			return errUnavailable
+		}
+		proof.previous = make(map[string]time.Time, len(previous))
+		for _, peer := range previous {
+			proof.previous[peer.PublicKey] = peer.At
+		}
+		proof.configured = make(map[string]struct{}, len(profile.Peers))
+		for _, peer := range profile.Peers {
+			proof.configured[peer.PublicKey] = struct{}{}
+		}
+		return s.stageEnable(ctx, current, desired)
+	}), func(ctx context.Context) error {
+		return s.proveEnabled(ctx, proof)
+	})
+}
+
+func stageBounded(stage func(context.Context) error) func(context.Context) error {
+	return func(ctx context.Context) error {
+		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		if err := stage(ctx); err != nil {
+			return err
+		}
+		return ctx.Err()
+	}
+}
+
+func (s *Service) stageDisable(ctx context.Context) error {
+	current, err := s.uci.Show(ctx, "network")
+	if err != nil {
+		return errUnavailable
+	}
+	enabled, err := configuredEnabled(current)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return txn.ErrNoChanges
+	}
+	if err := s.uci.Set(ctx, "network", iface, "disabled", "1"); err != nil {
+		return errUnavailable
+	}
+	return nil
+}

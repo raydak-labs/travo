@@ -44,6 +44,10 @@ type ConnectivityReader interface {
 	Status(context.Context) connectivity.Status
 }
 
+type VPNTunnelSetter interface {
+	Set(context.Context, bool) (txn.Status, error)
+}
+
 type VPNStatusReader interface {
 	Status(context.Context) (vpnstatus.TunnelStatus, error)
 }
@@ -62,6 +66,7 @@ type WiFiService interface {
 type Deps struct {
 	VPNProfiles *vpnprofiles.Service
 	VPNStatus   VPNStatusReader
+	VPNTunnel   VPNTunnelSetter
 	// DaemonContext stops live streams and their producers before HTTP shutdown drains.
 	DaemonContext context.Context
 	UpdateStage   UpdateStager
@@ -157,6 +162,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerReboot(a)
 	s.registerVPNProfiles(a)
 	s.registerVPNStatus(a)
+	s.registerVPNTunnel(a)
 	s.registerUpdateCheck(a)
 	s.registerUpdateStage(a)
 	s.registerUpdateApply(a)

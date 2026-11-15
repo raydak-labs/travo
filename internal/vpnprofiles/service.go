@@ -162,3 +162,17 @@ func (s *Service) change(id string, del bool) (List, error) {
 	}
 	return d.list(), nil
 }
+
+// SelectedConfig returns a private snapshot for applying the selected profile.
+func (s *Service) SelectedConfig() (Config, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := s.load()
+	if err != nil {
+		return Config{}, err
+	}
+	if data.SelectedID == nil {
+		return Config{}, ErrNotFound
+	}
+	return data.Profiles[data.index(*data.SelectedID)].Config, nil
+}

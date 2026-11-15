@@ -36,6 +36,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/version"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
+	"github.com/blackdark-org/travo-greenfield/internal/vpntunnel"
 	"github.com/blackdark-org/travo-greenfield/internal/wifi"
 	"github.com/blackdark-org/travo-greenfield/packaging"
 )
@@ -177,8 +178,15 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 	backup, _ := deps.Device.(device.ConfigBackupper)
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))
 	var vpnStatus api.VPNStatusReader
+	var vpnTunnel api.VPNTunnelSetter
 	if wg, ok := deps.Device.(device.WireGuardReader); ok {
 		statusStart := time.Now()
+		keys, hasKeys := deps.Device.(device.WireGuardKeyWriter)
+		control, hasControl := deps.Device.(device.WireGuardControl)
+		routes, hasRoutes := deps.Device.(device.DefaultRouteReader)
+		if hasKeys && hasControl && hasRoutes && deps.Txn != nil {
+			vpnTunnel = vpntunnel.New(deps.Device, keys, deps.Device, control, wg, routes, profiles, deps.Txn, clock.Now)
+		}
 		vpnStatus = vpnstatus.New(deps.Device, deps.Device, wg, profiles, clock.Now, func() time.Duration {
 			return time.Since(statusStart)
 		})
@@ -228,6 +236,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		DaemonContext: ctx,
 		VPNProfiles:   profiles,
 		VPNStatus:     vpnStatus,
+		VPNTunnel:     vpnTunnel,
 		UpdateApply:   updater,
 		UpdateStage:   updateStage,
 		Rebooter:      rebooter,

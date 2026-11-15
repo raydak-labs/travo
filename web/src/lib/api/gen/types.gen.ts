@@ -289,6 +289,10 @@ export type VpnImportInputBody = {
     name: string;
 };
 
+export type VpnTunnelInputBody = {
+    enabled: boolean | null;
+};
+
 export type WiFiSummary = {
     aps: Array<Ap>;
     radios: Array<RadioInfo>;
@@ -1231,6 +1235,47 @@ export type GetVpnStatusResponses = {
 };
 
 export type GetVpnStatusResponse = GetVpnStatusResponses[keyof GetVpnStatusResponses];
+
+export type SetVpnTunnelData = {
+    body: VpnTunnelInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/tunnel';
+};
+
+export type SetVpnTunnelErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetVpnTunnelError = SetVpnTunnelErrors[keyof SetVpnTunnelErrors];
+
+export type SetVpnTunnelResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetVpnTunnelResponse = SetVpnTunnelResponses[keyof SetVpnTunnelResponses];
 
 export type GetWiFiData = {
     body?: never;

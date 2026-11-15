@@ -137,3 +137,15 @@ type InterfaceCounterReader interface {
 type ReleaseVerifier interface {
 	VerifyRelease(ctx context.Context, manifest, signature, key string) error
 }
+
+// WireGuardControl changes netifd state inside a guarded tunnel transaction.
+type WireGuardControl interface {
+	ReloadNetwork(context.Context) error
+	SetInterfaceUp(ctx context.Context, logical string, up bool) error
+	WireGuardLinkPresent(context.Context) (bool, error)
+}
+
+// WireGuardKeyWriter stages private or preshared keys without passing them in argv.
+type WireGuardKeyWriter interface {
+	SetWireGuardKey(ctx context.Context, section, option, key string) error
+}

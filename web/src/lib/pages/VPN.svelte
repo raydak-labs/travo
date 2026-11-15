@@ -1,7 +1,17 @@
 <script lang="ts">
-import { onDestroy } from 'svelte';
+import { onDestroy, onMount } from 'svelte';
 import '../api/client';
-import { deleteVpnProfile, getVpnProfiles, postVpnProfile, selectVpnProfile } from '../api/gen';
+import {
+  confirmTransaction,
+  deleteVpnProfile,
+  getTransaction,
+  getVpnProfiles,
+  postVpnProfile,
+  rollbackTransaction,
+  selectVpnProfile,
+  setVpnTunnel,
+  type TxnBody,
+} from '../api/gen';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
@@ -65,6 +75,109 @@ async function change(action: 'import' | 'select' | 'delete', id = '') {
   }
 }
 
+let applying = $state(false);
+let settling = $state(false);
+let transaction = $state<TxnBody>();
+let tunnelMessage = $state('');
+let tunnelError = $state('');
+let statusPoll: AbortController | undefined;
+const hasTransaction = $derived(
+  transaction?.state === 'pending' || transaction?.state === 'restoring',
+);
+const tunnelBusy = $derived(applying || settling || hasTransaction);
+
+function acceptTunnelResult(result: TxnBody) {
+  transaction = result;
+  if (result.state === 'confirmed') tunnelMessage = m.vpn_tunnel_confirmed();
+  if (result.state === 'rolled_back') tunnelMessage = m.vpn_tunnel_rolled_back();
+  if (result.state === 'rollback_failed') tunnelError = m.vpn_tunnel_rollback_failed();
+  if (result.state !== 'pending' && result.state !== 'restoring') void status.retry();
+}
+
+async function setTunnel(enabled: boolean) {
+  if (tunnelBusy) return;
+  applying = true;
+  transaction = undefined;
+  tunnelMessage = '';
+  tunnelError = '';
+  try {
+    const response = await setVpnTunnel({ body: { enabled }, signal: request.signal });
+    if (request.signal.aborted) return;
+    if (response.data) {
+      acceptTunnelResult(response.data);
+    } else {
+      switch (response.error?.code) {
+        case 'vpn_profile_required':
+          tunnelError = m.vpn_tunnel_profile_required();
+          break;
+        case 'vpn_no_change':
+          tunnelMessage = m.vpn_tunnel_no_change();
+          break;
+        case 'transaction_pending':
+          tunnelError = m.vpn_tunnel_busy();
+          break;
+        default:
+          tunnelError = m.vpn_tunnel_failed();
+      }
+    }
+  } catch {
+    if (!request.signal.aborted) tunnelError = m.vpn_tunnel_failed();
+  } finally {
+    applying = false;
+  }
+}
+
+async function pollTunnel() {
+  if (statusPoll || settling || !hasTransaction || !transaction) return;
+  const id = transaction.id;
+  const poll = new AbortController();
+  statusPoll = poll;
+  const timer = setTimeout(() => poll.abort(), 4000);
+  try {
+    const response = await getTransaction({ path: { id }, signal: poll.signal });
+    if (poll.signal.aborted || statusPoll !== poll || transaction?.id !== id) return;
+    if (response.data) acceptTunnelResult(response.data);
+    else if (response.response?.status === 404) {
+      transaction = undefined;
+      tunnelError = m.vpn_tunnel_unknown_result();
+      void status.retry();
+    }
+  } catch {
+    // A failed status read gives no evidence about the transaction outcome.
+  } finally {
+    clearTimeout(timer);
+    if (statusPoll === poll) statusPoll = undefined;
+  }
+}
+
+async function settleTunnel(confirm: boolean) {
+  if (settling || transaction?.state !== 'pending') return;
+  settling = true;
+  statusPoll?.abort();
+  statusPoll = undefined;
+  try {
+    const operation = confirm ? confirmTransaction : rollbackTransaction;
+    const response = await operation({ path: { id: transaction.id }, signal: request.signal });
+    if (request.signal.aborted) return;
+    if (response.data) acceptTunnelResult(response.data);
+    else if (response.error?.code === 'restoring' || response.error?.code === 'rollback_failed') {
+      acceptTunnelResult({ ...transaction, state: response.error.code });
+    }
+  } catch {
+    // Resume polling after a failed command.
+  } finally {
+    settling = false;
+  }
+}
+
+onMount(() => {
+  const timer = setInterval(() => void pollTunnel(), 2000);
+  return () => {
+    clearInterval(timer);
+    statusPoll?.abort();
+  };
+});
+
 const tunnelStates = {
   disabled: { kind: 'neutral', label: m.vpn_state_disabled },
   configured: { kind: 'info', label: m.vpn_state_configured },
@@ -89,6 +202,28 @@ const tunnelStates = {
         {/if}
       {/if}
     </LoadState>
+    <div class="mt-3 flex flex-wrap gap-2">
+      {#if transaction?.state === 'pending'}
+        <button type="button" class="rounded-md border border-border px-3 py-1" disabled={settling} onclick={() => settleTunnel(true)}>{m.vpn_tunnel_confirm()}</button>
+        <button type="button" class="rounded-md border border-border px-3 py-1" disabled={settling} onclick={() => settleTunnel(false)}>{m.vpn_tunnel_rollback()}</button>
+      {:else if status.data && !tunnelBusy}
+        {@const enabled = !['disabled', 'configured'].includes(status.data.state)}
+        <button type="button" class="rounded-md border border-border px-3 py-1 disabled:opacity-60" disabled={status.data.stale || (!enabled && !profiles.data?.selected_id)} onclick={() => setTunnel(!enabled)}>{enabled ? m.vpn_tunnel_disable() : m.vpn_tunnel_enable()}</button>
+        {#if enabled && profiles.data?.selected_id}
+          <button type="button" class="rounded-md border border-border px-3 py-1 disabled:opacity-60" disabled={status.data.stale} onclick={() => setTunnel(true)}>{m.vpn_tunnel_apply()}</button>
+        {/if}
+      {/if}
+    </div>
+    {#if applying}
+      <p role="status" class="mt-2">{m.vpn_tunnel_applying()}</p>
+    {:else if transaction?.state === 'pending'}
+      <p role="status" class="mt-2">{m.vpn_tunnel_pending()}</p>
+    {:else if transaction?.state === 'restoring'}
+      <p role="status" class="mt-2">{m.vpn_tunnel_restoring()}</p>
+    {:else if tunnelMessage}
+      <p role="status" class="mt-2">{tunnelMessage}</p>
+    {/if}
+    {#if tunnelError}<p role="alert" class="mt-2 text-danger">{tunnelError}</p>{/if}
   </Card>
 
   <Card title={m.vpn_saved_profiles()}>

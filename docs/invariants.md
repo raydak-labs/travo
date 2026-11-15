@@ -134,8 +134,8 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 ## 11. VPN
 
 - WireGuard: profiles (import, list, activate, delete), enable/disable, kill switch, split tunnel, DNS verify, DNS leak test, speed test. Profiles in `/etc/travo-greenfield/`, tunnel in UCI `network.wg0`.
-- Enable: commit tunnel → verify up BEFORE firewall/DNS; failure tears it down.
-- Disable MUST end with a kernel default route present, or report failure. Recovery waits are bounded and never assume the uplink is `wan`.
+- Enable: stage the selected profile in the WireGuard transaction and prove a new handshake from one configured peer before confirmation. The transaction owns the wg0 interface and wireguard_wg0 peer sections. Firewall and DNS are separate operations.
+- Disable must prove the wg0 link is absent and the kernel has a non-wg0 default route before confirmation. Recovery waits are bounded and never assume the uplink is `wan`.
 - Tailscale (post-0.1): runs with `--accept-dns=false`; its resolver is a dnsmasq layer.
 
 ## 12. Captive portal
