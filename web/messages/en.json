@@ -26,6 +26,7 @@
   "dashboard_unavailable": "Unavailable",
   "dashboard_refresh": "Refresh",
   "dashboard_connectivity": "Connectivity",
+  "dashboard_connect_to_wifi": "Connect to WiFi",
   "dashboard_active_uplink": "Active uplink",
   "dashboard_carrier": "Carrier",
   "dashboard_carrier_up": "Link up",

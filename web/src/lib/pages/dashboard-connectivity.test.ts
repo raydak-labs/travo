@@ -16,7 +16,7 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
 vi.mock('../dashboard-events.svelte', () => ({ dashboardEvents }));
 
-function dashboard(status: LoadStatus, data: Status) {
+function dashboard(status: LoadStatus, data: Status | undefined) {
   createLoader.mockReturnValue({ status: { state: 'ready' }, data: undefined, retry: vi.fn() });
   dashboardEvents.connectivity.status = status;
   dashboardEvents.connectivity.data = data;
@@ -58,5 +58,12 @@ describe('Dashboard connectivity', () => {
     expect(body).toContain('phy0-sta0');
     expect(body).toContain('Captive portal');
     expect(body).toContain('Connectivity unavailable');
+  });
+
+  it('keeps the WiFi connection link available when connectivity is unavailable', () => {
+    const body = dashboard({ state: 'error', message: 'Connectivity unavailable' }, undefined);
+
+    expect(body).toContain('Connect to WiFi');
+    expect(body).toMatch(/<a[^>]*href="#\/wifi"[^>]*>Connect to WiFi<\/a>/);
   });
 });

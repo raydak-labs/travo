@@ -3,6 +3,7 @@ import { fetchHealth } from '../api/health';
 import type { dashboardEvents } from '../dashboard-events.svelte';
 import { formatBytes, formatLoad, formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
+import { href } from '../router';
 import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
@@ -64,6 +65,9 @@ function formatRate(rate: number | null): string {
         {/if}
       {/if}
     </LoadState>
+    <a class="mt-3 inline-block text-accent underline" href={href('wifi')}>
+      {m.dashboard_connect_to_wifi()}
+    </a>
   </Card>
   <Card title={m.dashboard_daemon()}>
     <LoadState status={health.status} retry={health.retry}>
