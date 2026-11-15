@@ -14,6 +14,7 @@ Unit-green does not mean it works. Several real bugs shipped green because a fix
 - A constant asserted against itself proves nothing. Check timing budgets against measured latency.
 - Test the fail-closed direction explicitly: a broken AP reads DOWN; an unknown caller is refused.
 - Property tests for the DNS layer stack (any push/pop order restores base).
+- Transaction unit tests stub host-wide `sync` so disk load cannot consume the restore timeout; container and hardware tests use real `sync`.
 - Table-driven tests for caller classification using real payload shapes.
 - No destructive probes (e.g. reboot POST) against an unknown build: GET-only reachability first.
 - Verify the running binary is the one under test (path + version) before measuring.

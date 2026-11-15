@@ -62,6 +62,12 @@ func (c *stepClock) Now() time.Time { return time.Unix(1700000000+c.n.Add(1), 0)
 func setup(t *testing.T, window time.Duration) (*Manager, *fileDevice) {
 	t.Helper()
 	root := t.TempDir()
+	// These tests prove transaction state, not host-wide disk durability. A real
+	// sync can exceed the restore timeout on loaded runners; integration uses it.
+	shell := filepath.Join(root, "unit-shell")
+	if err := os.WriteFile(shell, []byte("#!/bin/sh\nsync() { :; }\nscript=$1\nshift\n. \"$script\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	cfgDir := filepath.Join(root, "config")
 	_ = os.MkdirAll(cfgDir, 0o755)
 	for _, c := range []string{"network", "wireless"} {
@@ -78,7 +84,7 @@ func setup(t *testing.T, window time.Duration) (*Manager, *fileDevice) {
 		Guards:    guard.Dir{Path: filepath.Join(root, "guards"), Now: time.Now},
 		Dir:       filepath.Join(root, "txn"),
 		ConfigDir: cfgDir, Reload: []string{"true"}, UCI: "true",
-		Spawner:     &shortSpawner{ShellSpawner: ShellSpawner{Shell: "/bin/sh", RunTimeout: 10 * time.Second}, window: window},
+		Spawner:     &shortSpawner{ShellSpawner: ShellSpawner{Shell: shell, RunTimeout: 10 * time.Second}, window: window},
 		Clock:       &stepClock{},
 		NewID:       func() string { return fmt.Sprintf("%016x", n.Add(1)) },
 		Window:      MinWindow,
