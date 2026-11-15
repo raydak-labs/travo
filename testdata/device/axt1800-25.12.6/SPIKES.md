@@ -45,3 +45,26 @@ A plain Go `httputil.ReverseProxy` on its own port (root path, no rewriting) ser
 - BusyBox on the device has no `timeout`, `diff` or `pkill`.
 - `wpad` provides hostapd and wpa_supplicant; `ubus -v list` shows `hostapd.<if>` with `get_clients`, `del_client`, `reload`.
 - procd triggers: a `wireless` change reloads `network`, and a `dhcp` change reloads `dnsmasq` and `odhcpd`.
+
+## WireGuard rollback acceptance (#108, 2026-11-15)
+
+GL-AXT1800, OpenWrt 25.12.6, connected by Ethernet. A fresh sysupgrade
+backup passed archive verification. The test used the production transaction
+and watchdog code from PR #109, with a temporary hardware adaptation of the
+container harness. It retained the existing key material, disabled peer
+route installation and used two literal documentation addresses.
+
+| Restore trigger | Result | Scenario elapsed |
+| --- | --- | ---: |
+| Explicit rollback | RolledBack, original live endpoint observed | 3.04 s |
+| Probe failure after the new endpoint was live | RolledBack, original live endpoint observed | 3.22 s |
+| Confirmation timeout | RolledBack, original live endpoint observed | 5.21 s |
+| Startup recovery of a killed, unclaimed watchdog | RolledBack, original live endpoint observed | 3.43 s |
+| Explicit rollback to a disabled baseline | RolledBack, kernel wg0 link absent | 7.44 s |
+
+The first fixture setup attempt encountered netifd exit 4 before the logical
+object appeared. The guard restored the original configuration. The passing
+run waited for the netifd reload before checking the fixture endpoint.
+After cleanup, configuration and crontabs matched the backup byte for byte.
+The kernel default remained on the WiFi uplink, wg0 was absent and no
+transaction guard remained.
