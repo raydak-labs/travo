@@ -39,6 +39,7 @@ func TestDefaultRouteRanking(t *testing.T) {
 		{"different ties", "default dev lan metric 5\ndefault dev wan metric 5", ""},
 		{"unsupported winner", "blackhole default metric 3\ndefault dev wan metric 4", ""},
 		{"invalid metric", "default dev lan metric nope\ndefault dev wan", ""},
+		{"linkdown winner", "default dev lan metric 1 linkdown\ndefault dev wan metric 2", ""},
 		{"missing device", "default via 192.0.2.1\ndefault dev wan metric 4", ""},
 		{"multiline multipath", "default metric 3\n  nexthop via 192.0.2.1 dev lan weight 1\n  nexthop via 192.0.2.2 dev wan weight 1\ndefault dev wan metric 4", ""},
 	} {

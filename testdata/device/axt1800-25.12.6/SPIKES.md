@@ -68,3 +68,18 @@ run waited for the netifd reload before checking the fixture endpoint.
 After cleanup, configuration and crontabs matched the backup byte for byte.
 The kernel default remained on the WiFi uplink, wg0 was absent and no
 transaction guard remained.
+
+## WireGuard toggle and default-route rollback (#87, #113)
+
+Tested over Ethernet on OpenWrt 25.12.6, using the configured single-peer
+test profile through SSH stdin. A fresh handshake let enable reach Pending
+and confirm after 1.18 s. Disable removed wg0 and restored the underlying
+kernel default before confirmation after 12.18 s.
+
+An in-memory unreachable endpoint first exposed the rollback defect. The
+watchdog returned RolledBack after 69.24 s with the network file restored
+and wg0 absent, but the kernel had no default. Manual uplink restart
+restored that route. After #113's watchdog fix, the same failed-enable
+scenario reached RolledBack after 80.50 s with the original underlying
+default present and wg0 absent. The network configuration and crontabs
+matched the backup byte for byte, and the guard cleared.

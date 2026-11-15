@@ -90,6 +90,136 @@ wait_wg0_absent() {
 	return 1
 }
 
+# Exit 1 means a readable but unusable default. Exit 2 means no trustworthy read.
+uplink_default() {
+	routes=$(ip -4 route show table main default 2>/dev/null) || return 2
+	printf '%s\n' "$routes" | awk -v expected="$uplink_device" '
+		function ipv4(value,   octets,i) {
+			if (split(value, octets, /[.]/) != 4) return 0
+			for (i = 1; i <= 4; i++) {
+				if (octets[i] !~ /^(0|[1-9][0-9]*)$/ || octets[i] + 0 > 255) return 0
+			}
+			return 1
+		}
+		function route(line,   fields,n,i,metric,ranked,dev,via,src,key,value,valid,identity,hop) {
+			sub(/^[ \t]+/, "", line)
+			n = split(line, fields, /[ \t]+/)
+			i = 1
+			if (fields[1] != "default") {
+				if (fields[1] !~ /^(unicast|local|broadcast|multicast|throw|unreachable|prohibit|blackhole|nat|anycast)$/ || fields[2] != "default") {
+					bad = 1
+					return
+				}
+				i++
+			}
+			valid = i == 1 || fields[1] == "unicast"
+			metric = 0
+			for (++i; i <= n; i++) {
+				key = fields[i]
+				if (key == "") continue
+				if (key ~ /^(onlink|linkdown|dead|pervasive|offload|trap|rt_offload_failed)$/) {
+					if (key == "linkdown" || key == "dead") valid = 0
+					continue
+				}
+				if (key == "nexthop") {
+					if (hop && dev == "") { bad = 1; return }
+					valid = 0
+					hop = 1
+					dev = via = src = ""
+					continue
+				}
+				if (key !~ /^(dev|via|src|metric|proto|scope|nhid|weight|table|pref)$/) { bad = 1; return }
+				value = fields[++i]
+				if (value == "" || value ~ /^(dev|via|src|metric|proto|scope|nhid|weight|table|pref|nexthop|linkdown|onlink)$/) { bad = 1; return }
+				if (key == "metric") {
+					if (ranked || hop || value !~ /^[0-9]+$/ || value + 0 > 4294967295) { bad = 1; return }
+					metric = value + 0
+					ranked = 1
+				} else if (key == "dev") {
+					if (dev != "" || value !~ /^[[:alnum:]_.:@-]+$/) { bad = 1; return }
+					dev = value
+				} else if (key == "via") {
+					if (via != "" || !ipv4(value)) { bad = 1; return }
+					via = value
+				} else if (key == "src") {
+					if (src != "" || !ipv4(value)) { bad = 1; return }
+					src = value
+				} else if (key == "nhid" || key == "weight") {
+					if (value !~ /^[0-9]+$/ || (key == "weight" && !hop)) { bad = 1; return }
+					valid = 0
+				} else if (value !~ /^[[:alnum:]_-]+$/) {
+					bad = 1
+					return
+				}
+			}
+			if (hop && dev == "") { bad = 1; return }
+			valid = valid && dev != ""
+			gsub(/[ 	]+/, " ", line)
+			sub(/ $/, "", line)
+			identity = line
+			if (!seen || metric < best) {
+				seen = 1
+				best = metric
+				best_id = identity
+				best_dev = dev
+				best_valid = valid
+				ambiguous = 0
+			} else if (metric == best && (identity != best_id || !valid || !best_valid)) {
+				ambiguous = 1
+			}
+		}
+		NF && $1 == "nexthop" {
+			if (line == "") bad = 1
+			line = line " " $0
+			next
+		}
+		NF {
+			if (line != "") route(line)
+			line = $0
+		}
+		END {
+			if (line != "") route(line)
+			if (bad) exit 2
+			if (!seen || ambiguous || !best_valid || best_dev != expected) exit 1
+		}'
+}
+
+valid_uplink_name() {
+	case $1 in
+		''|[!A-Za-z0-9_]*|*[!A-Za-z0-9_-]*) return 1 ;;
+	esac
+}
+
+restore_uplink() {
+	[ -f "$uplink_marker" ] && [ ! -L "$uplink_marker" ] || return 1
+	{
+		IFS= read -r uplink_logical && IFS= read -r uplink_device
+	} < "$uplink_marker" || return 1
+	valid_uplink_name "$uplink_logical" && valid_uplink_name "$uplink_device" || return 1
+	[ "$uplink_logical" != wg0 ] && [ "$uplink_device" != wg0 ] && [ "${#uplink_device}" -le 15 ] || return 1
+	printf '%s\n%s\n' "$uplink_logical" "$uplink_device" | cmp -s - "$uplink_marker" || return 1
+
+	rc=0
+	uplink_default || rc=$?
+	[ "$rc" -ne 0 ] || return 0
+	[ "$rc" -eq 1 ] || return 1
+
+	object=network.interface.$uplink_logical
+	info=$(ubus -t 3 call "$object" status 2>/dev/null) || return 1
+	current_device=$(printf '%s\n' "$info" | jsonfilter -e '@.l3_device') || return 1
+	[ "$current_device" = "$uplink_device" ] || return 1
+	ubus -t 3 call "$object" down >/dev/null 2>&1 || return 1
+	ubus -t 3 call "$object" up >/dev/null 2>&1 || return 1
+	for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+		sleep 1
+		rc=0
+		uplink_default || rc=$?
+		[ "$rc" -ne 0 ] || return 0
+		[ "$rc" -eq 1 ] || return 1
+	done
+	return 1
+}
+
 # noclobber makes claiming atomic: the first claimant (confirm or another restorer) wins,
 # so exactly one restore ever runs. Losers exit; the daemon waits for "result".
 ( set -C; echo restore > "$dir/claim" ) 2>/dev/null || exit 0
@@ -128,6 +258,10 @@ if [ "$status" = restored ] && [ -n "$baseline" ]; then
 	else
 		wait_wg0_absent || status=failed
 	fi
+fi
+uplink_marker=$dir/restore-uplink
+if [ "$status" = restored ] && { [ -e "$uplink_marker" ] || [ -L "$uplink_marker" ]; }; then
+	{ [ -n "$baseline" ] && restore_uplink; } || status=failed
 fi
 echo "$status" > "$dir/result.tmp" && mv -f "$dir/result.tmp" "$dir/result"
 sync

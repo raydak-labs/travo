@@ -57,7 +57,7 @@ func parseDefaultCandidate(fields []string) (route device.IPv4DefaultRoute, usab
 	for i := 1; i < len(fields); i++ {
 		key := fields[i]
 		switch key {
-		case "nexthop", "nhid":
+		case "nexthop", "nhid", "linkdown":
 			usable = false
 		case "dev", "via", "src", "metric":
 			if i+1 == len(fields) {
