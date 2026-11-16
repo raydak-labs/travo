@@ -145,6 +145,8 @@
   "update_recovery_required": "The router update needs recovery.",
   "update_apply_failed": "Could not start the update operation.",
   "update_retry_recovery": "Retry recovery",
+  "dashboard_vpn": "VPN",
+  "dashboard_vpn_settings": "VPN settings",
   "vpn_saved_profiles": "Saved WireGuard profiles",
   "vpn_no_profiles": "No saved profiles.",
   "vpn_selected": "Selected",

@@ -92,12 +92,16 @@ async function shootVpnStates(chrome) {
     const { identifier } = await chrome.send('Page.addScriptToEvaluateOnNewDocument', {
       source: fakeVpnStatus(state),
     });
-    for (const vp of VIEWPORTS) {
-      for (const scheme of SCHEMES) {
-        await chrome.open(`${BASE_URL}/#/vpn`, { ...vp, scheme });
-        const out = `${OUT_DIR}vpn-${state}-${vp.width}-${scheme}.png`;
-        await chrome.screenshot(out);
-        console.log(`wrote ${out}`);
+    // The dashboard quick action shares the VPN page states; one ready-to-enable shot covers it.
+    const pages = state === 'configured' ? ['vpn', 'dashboard'] : ['vpn'];
+    for (const page of pages) {
+      for (const vp of VIEWPORTS) {
+        for (const scheme of SCHEMES) {
+          await chrome.open(`${BASE_URL}/#/${page === 'dashboard' ? '' : page}`, { ...vp, scheme });
+          const out = `${OUT_DIR}${page === 'vpn' ? 'vpn' : 'dashboard-vpn'}-${state}-${vp.width}-${scheme}.png`;
+          await chrome.screenshot(out);
+          console.log(`wrote ${out}`);
+        }
       }
     }
     await chrome.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });

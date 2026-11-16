@@ -17,7 +17,12 @@ vi.mock('../ui/loader.svelte', () => ({ createLoader }));
 vi.mock('../dashboard-events.svelte', () => ({ dashboardEvents }));
 
 function dashboard(status: LoadStatus, interfaces?: Rate[]) {
-  createLoader.mockReturnValue({ status: { state: 'ready' }, data: undefined, retry: vi.fn() });
+  createLoader.mockReturnValue({
+    status: { state: 'ready' },
+    data: undefined,
+    retry: vi.fn(),
+    stop: vi.fn(),
+  });
   dashboardEvents.throughput.status = status;
   dashboardEvents.throughput.data = interfaces ? { interfaces } : undefined;
   return render(Dashboard, { props: { events: dashboardEvents as never } }).body;

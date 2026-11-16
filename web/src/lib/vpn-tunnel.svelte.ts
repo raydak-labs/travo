@@ -68,6 +68,7 @@ export function createTunnelControl(refresh: () => unknown) {
         const refusal = tunnelRefusal(response.error?.code);
         message = refusal.message ?? '';
         error = refusal.error ?? '';
+        void refresh();
       }
     } catch {
       if (!request.signal.aborted) error = m.vpn_tunnel_failed();

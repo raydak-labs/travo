@@ -1,7 +1,9 @@
 <script lang="ts">
+import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Table from '$lib/components/ui/table';
 import { fetchHealth } from '../api/health';
+import { fetchVpnStatus } from '../api/vpn-status';
 import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
 import { formatBytes, formatLoad, formatUptime } from '../format';
@@ -11,7 +13,9 @@ import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Status from '../ui/Status.svelte';
+import { createTunnelControl } from '../vpn-tunnel.svelte';
 import CaptivePortalCard from './CaptivePortalCard.svelte';
+import VPNTunnelPanel from './VPNTunnelPanel.svelte';
 
 let {
   events,
@@ -21,6 +25,13 @@ const connectivity = $derived(events.connectivity);
 const health = createLoader(fetchHealth);
 const resources = $derived(events.resources);
 const throughput = $derived(events.throughput);
+// Same status poll and guarded toggle as the VPN page: Enable, then Confirm (two taps).
+const vpn = createLoader(fetchVpnStatus, 10000);
+const tunnel = createTunnelControl(() => vpn.retry());
+onDestroy(() => {
+  vpn.stop();
+  tunnel.stop();
+});
 
 const internetStatus = {
   online: { kind: 'ok', label: m.dashboard_internet_online },
@@ -75,6 +86,10 @@ function formatRate(rate: number | null): string {
     <Button size="sm" class="mt-3" href={href('wifi')}>
       {m.dashboard_connect_to_wifi()}
     </Button>
+  </Card>
+  <Card title={m.dashboard_vpn()}>
+    <VPNTunnelPanel status={vpn} control={tunnel} canEnable={(snapshot) => snapshot.state === 'configured'} />
+    <Button variant="link" size="sm" class="self-start px-0" href={href('vpn')}>{m.dashboard_vpn_settings()}</Button>
   </Card>
   <Card title={m.dashboard_daemon()}>
     <LoadState status={health.status} retry={health.retry}>

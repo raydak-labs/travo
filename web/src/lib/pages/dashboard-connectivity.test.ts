@@ -21,7 +21,12 @@ type Snapshot = Omit<DashboardConnectivity, 'captive'> & {
 };
 
 function dashboard(status: LoadStatus, data: Snapshot | undefined) {
-  createLoader.mockReturnValue({ status: { state: 'ready' }, data: undefined, retry: vi.fn() });
+  createLoader.mockReturnValue({
+    status: { state: 'ready' },
+    data: undefined,
+    retry: vi.fn(),
+    stop: vi.fn(),
+  });
   dashboardEvents.connectivity.status = status;
   dashboardEvents.connectivity.data = data && {
     ...data,

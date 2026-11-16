@@ -126,11 +126,12 @@ describe('createTunnelControl', () => {
     expect(control.error).toBe('The transaction result is unavailable. Check the tunnel status.');
   });
 
-  it('shows the missing capability as a failure', async () => {
+  it('shows the missing capability as a failure and refreshes status', async () => {
     serve({ [TUNNEL]: () => json(503, { error: 'unavailable', code: 'vpn_tunnel_unavailable' }) });
     await control.set(true);
     expect(control.error).toBe('Could not apply the tunnel change.');
     expect(control.busy).toBe(false);
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it('shows a network failure', async () => {
