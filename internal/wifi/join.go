@@ -70,6 +70,16 @@ func (s *Service) WithJoin(d JoinDeps) *Service {
 	return s
 }
 
+// ValidateJoinRequest lowercases the BSSID and applies every Join input rule.
+// Join and saved uplink profiles share it so both accept the same credentials.
+func ValidateJoinRequest(req JoinRequest) (JoinRequest, error) {
+	req.BSSID = strings.ToLower(req.BSSID)
+	if err := req.validate(); err != nil {
+		return JoinRequest{}, err
+	}
+	return req, nil
+}
+
 func (r JoinRequest) validate() error {
 	if len(r.SSID) < 1 || len(r.SSID) > 32 || strings.ContainsAny(r.SSID, "\x00\r\n") {
 		return ValidationError{"wifi_ssid_invalid"}
@@ -96,8 +106,8 @@ func (r JoinRequest) validate() error {
 }
 
 func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error) {
-	req.BSSID = strings.ToLower(req.BSSID)
-	if err := req.validate(); err != nil {
+	req, err := ValidateJoinRequest(req)
+	if err != nil {
 		return txn.Status{}, err
 	}
 	if s.join == nil || s.join.Links == nil {
