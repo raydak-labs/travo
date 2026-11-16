@@ -23,13 +23,15 @@ type Status struct {
 	ActiveInterface *string  `json:"active_interface" nullable:"true"`
 	Carrier         *bool    `json:"carrier" nullable:"true"`
 	Internet        Internet `json:"internet" enum:"online,offline,captive,unknown"`
+	// PortalURL is where a captive portal redirected the probe (http or https only).
+	PortalURL *string `json:"portal_url" nullable:"true" doc:"Captive portal login URL; null unless internet is captive"`
 }
 
-type Probe func(context.Context) Internet
+type Probe func(context.Context) Result
 
 type flight struct {
 	done   chan struct{}
-	result Internet
+	result Result
 }
 
 // Service keeps only the current route generation's completed or pending probe.
@@ -58,13 +60,18 @@ func (s *Service) Status(ctx context.Context) Status {
 		return Status{Internet: initial}
 	}
 	carrier := s.carrier(ctx, route.Device)
+	st := Status{ActiveInterface: &route.Device, Carrier: carrier, Internet: initial}
 	select {
 	case <-ctx.Done():
 	case <-s.daemon.Done():
 	case <-pending.done:
-		initial = pending.result
+		st.Internet = pending.result.Internet
+		if st.Internet == Captive && pending.result.Portal != "" {
+			portal := pending.result.Portal
+			st.PortalURL = &portal
+		}
 	}
-	return Status{ActiveInterface: &route.Device, Carrier: carrier, Internet: initial}
+	return st
 }
 
 func (s *Service) observeRoute(ctx context.Context) (device.IPv4DefaultRoute, *flight, Internet) {

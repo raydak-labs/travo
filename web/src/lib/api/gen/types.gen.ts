@@ -216,6 +216,10 @@ export type Status = {
     active_interface: string | null;
     carrier: boolean | null;
     internet: 'online' | 'offline' | 'captive' | 'unknown';
+    /**
+     * Captive portal login URL; null unless internet is captive
+     */
+    portal_url: string | null;
 };
 
 export type Summary = {

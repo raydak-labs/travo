@@ -32,7 +32,7 @@ describe('Dashboard connectivity', () => {
   it('shows active uplink and link up even when the internet is offline', () => {
     const body = dashboard(
       { state: 'ready' },
-      { active_interface: 'phy0-sta0', carrier: true, internet: 'offline' },
+      { active_interface: 'phy0-sta0', carrier: true, internet: 'offline', portal_url: null },
     );
     expect(body).toContain('phy0-sta0');
     expect(body).toContain('Link up');
@@ -41,7 +41,12 @@ describe('Dashboard connectivity', () => {
   });
 
   it('distinguishes unknown and down carrier', () => {
-    const data = { active_interface: null, carrier: null, internet: 'online' } as const;
+    const data = {
+      active_interface: null,
+      carrier: null,
+      internet: 'online',
+      portal_url: null,
+    } as const;
     const body = dashboard({ state: 'ready' }, data);
     expect(body).toContain('Unknown');
     expect(body).toContain('Online');
@@ -52,7 +57,7 @@ describe('Dashboard connectivity', () => {
   it('retains the last connectivity snapshot on failed refresh', () => {
     const body = dashboard(
       { state: 'error', message: 'Connectivity unavailable' },
-      { active_interface: 'phy0-sta0', carrier: true, internet: 'captive' },
+      { active_interface: 'phy0-sta0', carrier: true, internet: 'captive', portal_url: null },
     );
     expect(body).toContain('Last known value');
     expect(body).toContain('phy0-sta0');
@@ -67,5 +72,31 @@ describe('Dashboard connectivity', () => {
     expect(body.replace(/<!--.*?-->/g, '')).toMatch(
       /<a[^>]*href="#\/wifi"[^>]*>Connect to WiFi<\/a>/,
     );
+  });
+
+  it('shows no hotel login card unless a portal is detected', () => {
+    const body = dashboard(
+      { state: 'ready' },
+      { active_interface: 'phy0-sta0', carrier: true, internet: 'online', portal_url: null },
+    );
+    expect(body).not.toContain('Hotel WiFi login');
+    expect(body).not.toContain('Open hotel login');
+  });
+
+  it('links the detected portal in a new tab', () => {
+    const body = dashboard(
+      { state: 'ready' },
+      {
+        active_interface: 'phy0-sta0',
+        carrier: true,
+        internet: 'captive',
+        portal_url: 'http://portal.example/login?a=1&b=2',
+      },
+    ).replace(/<!--.*?-->/g, '');
+    expect(body).toContain('Hotel WiFi login');
+    const link = body.match(/<a[^>]*>Open hotel login<\/a>/)?.[0] ?? '';
+    expect(link).toContain('href="http://portal.example/login?a=1&amp;b=2"');
+    expect(link).toContain('target="_blank"');
+    expect(link).toContain('rel="noopener noreferrer"');
   });
 });

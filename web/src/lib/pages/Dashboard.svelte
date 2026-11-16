@@ -10,6 +10,7 @@ import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Status from '../ui/Status.svelte';
+import CaptivePortalCard from './CaptivePortalCard.svelte';
 
 let {
   events,
@@ -35,6 +36,9 @@ function formatRate(rate: number | null): string {
 </script>
 
 <div class="flex flex-col gap-4">
+  {#if connectivity.data?.internet === 'captive'}
+    <CaptivePortalCard info={connectivity.data} />
+  {/if}
   <Card title={m.dashboard_connectivity()}>
     <LoadState status={connectivity.status} retry={connectivity.retry} stale={connectivity.data !== undefined}>
       {#if connectivity.data}

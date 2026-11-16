@@ -172,7 +172,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 	if routes, ok := deps.Device.(device.DefaultRouteReader); ok {
 		probe := connectivity.NewHTTPProbe(connectivity.ProbeURL, 3*time.Second)
 		if deps.Mock {
-			probe = func(context.Context) connectivity.Internet { return connectivity.Online }
+			probe = func(context.Context) connectivity.Result { return connectivity.Result{Internet: connectivity.Online} }
 		}
 		connection = connectivity.New(ctx, routes, deps.Device, probe, clock.Now)
 	}

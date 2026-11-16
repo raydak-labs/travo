@@ -30,7 +30,7 @@ func TestConnectivitySignals(t *testing.T) {
 	dev.SetUbusReply("network.device", "status", raw)
 	route := &routeSource{}
 	var calls atomic.Int32
-	probe := func(context.Context) Internet { calls.Add(1); return Offline }
+	probe := func(context.Context) Result { calls.Add(1); return Result{Internet: Offline} }
 	service := New(t.Context(), route, dev, probe, time.Now)
 	if got := service.Status(t.Context()); got.Internet != Offline || got.ActiveInterface != nil || got.Carrier != nil || calls.Load() != 0 {
 		t.Fatalf("no route: %+v", got)
@@ -44,7 +44,7 @@ func TestConnectivitySignals(t *testing.T) {
 	if got := service.Status(t.Context()); got.Internet != Offline || got.ActiveInterface == nil || *got.ActiveInterface != "phy0-sta0" || got.Carrier == nil || !*got.Carrier {
 		t.Fatalf("carrier up and offline: %+v", got)
 	}
-	service = New(t.Context(), route, mock.New(), func(context.Context) Internet { return Online }, time.Now)
+	service = New(t.Context(), route, mock.New(), func(context.Context) Result { return Result{Internet: Online} }, time.Now)
 	if got := service.Status(t.Context()); got.Internet != Online || got.Carrier != nil {
 		t.Fatalf("unknown carrier and online: %+v", got)
 	}
@@ -55,7 +55,7 @@ func TestCacheExpiry(t *testing.T) {
 	var tick atomic.Int64
 	var calls atomic.Int32
 	start := time.Now()
-	service := New(t.Context(), route, mock.New(), func(context.Context) Internet { calls.Add(1); return Online }, func() time.Time { return start.Add(time.Duration(tick.Load())) })
+	service := New(t.Context(), route, mock.New(), func(context.Context) Result { calls.Add(1); return Result{Internet: Online} }, func() time.Time { return start.Add(time.Duration(tick.Load())) })
 	service.Status(t.Context())
 	tick.Store(int64(1999 * time.Millisecond))
 	service.Status(t.Context())
@@ -74,18 +74,18 @@ func TestFlightGenerationsAndCancellation(t *testing.T) {
 	defer cancel()
 	route := &routeSource{route: device.IPv4DefaultRoute{Device: "wan"}}
 	started := make(chan chan Internet)
-	service := New(daemon, route, mock.New(), func(ctx context.Context) Internet {
+	service := New(daemon, route, mock.New(), func(ctx context.Context) Result {
 		result := make(chan Internet, 1)
 		select {
 		case started <- result:
 		case <-ctx.Done():
-			return Unknown
+			return Result{Internet: Unknown}
 		}
 		select {
 		case value := <-result:
-			return value
+			return Result{Internet: value}
 		case <-ctx.Done():
-			return Unknown
+			return Result{Internet: Unknown}
 		}
 	}, time.Now)
 
@@ -168,5 +168,23 @@ func TestCanceledCallerDoesNotWaitForRouteReader(t *testing.T) {
 	cancel()
 	if got := receive(t, done); got.Internet != Unknown || calls.Load() != 1 {
 		t.Fatalf("canceled caller got %+v with %d route reads", got, calls.Load())
+	}
+}
+
+func TestPortalURLOnlyWhenCaptive(t *testing.T) {
+	route := &routeSource{route: device.IPv4DefaultRoute{Device: "wan"}}
+	result := Result{Internet: Captive, Portal: "http://portal.example/login"}
+	service := New(t.Context(), route, mock.New(), func(context.Context) Result { return result }, time.Now)
+	if got := service.Status(t.Context()); got.PortalURL == nil || *got.PortalURL != result.Portal {
+		t.Fatalf("captive: %+v", got)
+	}
+	result = Result{Internet: Online, Portal: "http://ignored.example/"}
+	service.Invalidate()
+	if got := service.Status(t.Context()); got.PortalURL != nil {
+		t.Fatalf("online carries a portal: %+v", got)
+	}
+	route.route = device.IPv4DefaultRoute{}
+	if got := service.Status(t.Context()); got.PortalURL != nil {
+		t.Fatalf("no route carries a portal: %+v", got)
 	}
 }

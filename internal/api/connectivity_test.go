@@ -25,7 +25,8 @@ func TestConnectivityContract(t *testing.T) {
 	cookie, _ := e.login()
 	for _, want := range []string{
 		`{"active_interface":null,"carrier":null,"internet":"offline"}`,
-		`{"active_interface":"phy0-sta0","carrier":false,"internet":"online"}`,
+		`{"active_interface":"phy0-sta0","carrier":false,"internet":"online","portal_url":null}`,
+		`{"active_interface":"phy0-sta0","carrier":true,"internet":"captive","portal_url":"http://portal.example/login?x=1"}`,
 	} {
 		var st connectivity.Status
 		if err := json.Unmarshal([]byte(want), &st); err != nil {
