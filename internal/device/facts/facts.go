@@ -21,6 +21,8 @@ type Interface struct {
 	L3Device  string
 	IPv4      []netip.Prefix
 	HasDefRte bool // netifd's view only; route truth is the kernel table (device-facts §1)
+	// DNSServers are the resolvers the interface learned (DHCP/static), in netifd order.
+	DNSServers []string
 }
 
 // ParseInterfaceDump parses `ubus call network.interface dump`. IPv4 arrives as
@@ -39,6 +41,7 @@ func ParseInterfaceDump(b []byte) ([]Interface, error) {
 				Target string `json:"target"`
 				Mask   *int   `json:"mask"`
 			} `json:"route"`
+			DNSServer []string `json:"dns-server"`
 		} `json:"interface"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -53,6 +56,12 @@ func ParseInterfaceDump(b []byte) ([]Interface, error) {
 			return nil, fmt.Errorf("interface dump: %w: entry without name or up", ErrShape)
 		}
 		it := Interface{Name: r.Interface, Up: *r.Up, L3Device: r.L3Device}
+		for _, d := range r.DNSServer {
+			if _, err := netip.ParseAddr(d); err != nil {
+				return nil, fmt.Errorf("interface %s: dns-server: %w", r.Interface, err)
+			}
+			it.DNSServers = append(it.DNSServers, d)
+		}
 		for _, a := range r.IPv4 {
 			if a.Mask == nil {
 				return nil, fmt.Errorf("interface %s: %w: address without mask", r.Interface, ErrShape)

@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -35,10 +36,10 @@ func TestInterfaceDumpFromDevice(t *testing.T) {
 	if lan.IPv4[0].Masked() != netip.MustParsePrefix("192.168.1.0/24") {
 		t.Fatal("masked")
 	}
-	if w := by["wwan"]; !w.Up || w.L3Device != "phy0-sta0" || !w.HasDefRte {
+	if w := by["wwan"]; !w.Up || w.L3Device != "phy0-sta0" || !w.HasDefRte || !slices.Equal(w.DNSServers, []string{"192.168.90.2"}) {
 		t.Fatalf("wwan %+v", w)
 	}
-	if w := by["wan"]; w.Up || w.L3Device != "" {
+	if w := by["wan"]; w.Up || w.L3Device != "" || len(w.DNSServers) != 0 {
 		t.Fatalf("wan (cable unplugged) %+v", w)
 	}
 }
@@ -48,6 +49,9 @@ func TestInterfaceDumpRejectsCIDRStrings(t *testing.T) {
 	bad := []byte(`{"interface":[{"interface":"lan","up":true,"ipv4-address":[{"address":"192.168.1.1/24"}]}]}`)
 	if _, err := ParseInterfaceDump(bad); err == nil {
 		t.Fatal("accepted CIDR string")
+	}
+	if _, err := ParseInterfaceDump([]byte(`{"interface":[{"interface":"wwan","up":true,"dns-server":["hotel"]}]}`)); err == nil {
+		t.Fatal("accepted a non-address dns-server")
 	}
 	if _, err := ParseInterfaceDump([]byte(`{}`)); !errors.Is(err, ErrShape) {
 		t.Fatal(err)
