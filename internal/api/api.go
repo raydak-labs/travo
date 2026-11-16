@@ -70,6 +70,7 @@ type Deps struct {
 	VPNSplit    VPNSplit
 	// VPNKillSwitch is nil when the device cannot change firewall config.
 	VPNKillSwitch VPNKillSwitch
+	VPNDNS        VPNDNS
 	// DaemonContext stops live streams and their producers before HTTP shutdown drains.
 	DaemonContext context.Context
 	UpdateStage   UpdateStager
@@ -173,6 +174,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerVPNTunnel(a)
 	s.registerVPNSplit(a)
 	s.registerVPNKillSwitch(a)
+	s.registerVPNDNS(a)
 	s.registerUpdateCheck(a)
 	s.registerUpdateStage(a)
 	s.registerUpdateApply(a)

@@ -102,6 +102,21 @@ export type BypassStatus = {
     restore_in_seconds: number | null;
 };
 
+export type DnsStatus = {
+    effective: Array<string> | null;
+    layer: 'active' | 'inactive' | 'failed';
+    resolvers: Array<string> | null;
+    /**
+     * captive, adguard or vpn
+     */
+    top: string | null;
+};
+
+export type DnsVerification = {
+    result: 'ok' | 'not_active' | 'overridden' | 'mismatch' | 'lookup_failed' | 'layer_failed';
+    status: DnsStatus;
+};
+
 export type DashboardConnectivity = {
     active_interface: string | null;
     captive: BypassStatus;
@@ -1344,6 +1359,64 @@ export type RollbackTransactionResponses = {
 };
 
 export type RollbackTransactionResponse = RollbackTransactionResponses[keyof RollbackTransactionResponses];
+
+export type GetVpndnsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/dns';
+};
+
+export type GetVpndnsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetVpndnsError = GetVpndnsErrors[keyof GetVpndnsErrors];
+
+export type GetVpndnsResponses = {
+    /**
+     * OK
+     */
+    200: DnsStatus;
+};
+
+export type GetVpndnsResponse = GetVpndnsResponses[keyof GetVpndnsResponses];
+
+export type VerifyVpndnsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/dns/verify';
+};
+
+export type VerifyVpndnsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type VerifyVpndnsError = VerifyVpndnsErrors[keyof VerifyVpndnsErrors];
+
+export type VerifyVpndnsResponses = {
+    /**
+     * OK
+     */
+    200: DnsVerification;
+};
+
+export type VerifyVpndnsResponse = VerifyVpndnsResponses[keyof VerifyVpndnsResponses];
 
 export type GetVpnKillSwitchData = {
     body?: never;

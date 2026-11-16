@@ -12,7 +12,9 @@ import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Status from '../ui/Status.svelte';
 import { createTunnelControl, tunnelEnabled } from '../vpn-tunnel.svelte';
+import VPNDNSCard from './VPNDNSCard.svelte';
 import VPNKillSwitchCard from './VPNKillSwitchCard.svelte';
 import VPNSplitCard from './VPNSplitCard.svelte';
 import VPNTunnelPanel from './VPNTunnelPanel.svelte';
@@ -89,6 +91,7 @@ async function change(action: 'import' | 'select' | 'delete', id = '') {
   <VPNKillSwitchCard tunnel={status.data} />
 
   <VPNSplitCard />
+  <VPNDNSCard />
 
   <Card title={m.vpn_saved_profiles()}>
     <LoadState status={profiles.status} retry={profiles.retry}>
