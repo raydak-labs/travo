@@ -10,7 +10,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "$lib/*": ["./src/lib/*"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts", "openapi-ts.config.ts"]
 }

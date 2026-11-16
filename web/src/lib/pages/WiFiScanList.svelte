@@ -1,4 +1,6 @@
 <script lang="ts">
+import Button from '$lib/components/ui/button/button.svelte';
+import * as Collapsible from '$lib/components/ui/collapsible';
 import type { AccessPoint, Network, ScanResult } from '../api/gen';
 import { m } from '../paraglide/messages.js';
 import Status from '../ui/Status.svelte';
@@ -23,22 +25,22 @@ let {
 
 <div>
   {#each result.networks as network (network.ssid)}
-    <details class="border-t border-border py-2 first:border-t-0">
-      <summary class="flex cursor-pointer flex-wrap items-center gap-2">
+    <Collapsible.Root class="border-t border-border py-2 first:border-t-0">
+      <Collapsible.Trigger class="flex cursor-pointer flex-wrap items-center gap-2">
         <span class="break-all font-medium">{network.ssid}</span>
         <Status kind="info">{bandsBadge(network.bands)}</Status>
         <span class="text-sm text-muted">{signalLabel(network.best_signal_dbm)} · {securityLabel(network.security)}</span>
-      </summary>
+      </Collapsible.Trigger><Collapsible.Content forceMount>
       {@render accessPoints(network.access_points)}
-    </details>
+    </Collapsible.Content></Collapsible.Root>
     {#if join}
-      <button
+      <Button variant="outline" size="sm"
         type="button"
-        class="mb-2 rounded border border-border px-3 py-1 text-sm disabled:opacity-60"
+        class="mb-2 text-sm"
         disabled={busy || network.security === 'other'}
         aria-label={network.security === 'other' ? m.wifi_join_unsupported() : m.wifi_join_network({ ssid: network.ssid })}
         onclick={() => join?.(network)}
-      >{network.security === 'other' ? m.wifi_join_unsupported() : m.wifi_join_action()}</button>
+      >{network.security === 'other' ? m.wifi_join_unsupported() : m.wifi_join_action()}</Button>
     {/if}
   {/each}
 
@@ -63,9 +65,9 @@ let {
   </div>
 
   {#if result.hidden.length > 0}
-    <details class="border-t border-border py-2">
-      <summary class="cursor-pointer font-medium">{m.wifi_hidden({ count: result.hidden.length })}</summary>
+    <Collapsible.Root class="border-t border-border py-2">
+      <Collapsible.Trigger class="cursor-pointer font-medium">{m.wifi_hidden({ count: result.hidden.length })}</Collapsible.Trigger><Collapsible.Content forceMount>
       {@render accessPoints(result.hidden)}
-    </details>
+    </Collapsible.Content></Collapsible.Root>
   {/if}
 </div>

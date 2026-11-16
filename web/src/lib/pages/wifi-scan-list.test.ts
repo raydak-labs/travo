@@ -47,7 +47,7 @@ describe('WiFi scan list', () => {
     });
     expect(body).toContain('2.4 + 5 GHz');
     expect(body).toContain('5 GHz');
-    expect(body).toContain('<details');
+    expect(body).toMatch(/<button[^>]*aria-expanded="false"/);
     expect(body).toContain('60:22:32:2f:05:2b');
     expect(body).toContain('a4:ce:da:51:f2:cf');
     expect(body).toContain('WPA2');

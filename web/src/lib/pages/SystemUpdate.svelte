@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from 'svelte';
+import Button from '$lib/components/ui/button/button.svelte';
 import {
   getSystemUpdateApply,
   getSystemUpdateStage,
@@ -156,25 +157,25 @@ onMount(() => {
         {labels[result?.status ?? 'unavailable']()}
       {/if}
     </p>
-    <button
+    <Button variant="outline"
       type="button"
-      class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
+
       disabled={pending || verifying || result?.status === 'disabled'}
       onclick={() => { if (controller) void check('manual', controller); }}
     >
       {m.update_check()}
-    </button>
+    </Button>
     {#if result?.status === 'available' && result.latest_version}
-      <button
+      <Button variant="outline"
         type="button"
-        class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
+
         disabled={pending || verifying || stage?.status === 'verifying'}
         onclick={() => {
           if (controller && result?.latest_version) void verify(result.latest_version, controller);
         }}
       >
         {m.update_verify()}
-      </button>
+      </Button>
     {/if}
   </div>
   <div aria-live="polite">
@@ -204,29 +205,29 @@ onMount(() => {
     {/if}
   </div>
   {#if operation?.state === 'recovery_required'}
-    <button type="button" class="mt-2 rounded-md border border-border px-3 py-2"
+    <Button variant="outline" type="button" class="mt-2"
       disabled={updating} onclick={() => { if (controller) void changeOperation(controller); }}>
       {m.update_retry_recovery()}
-    </button>
+    </Button>
   {:else if operation && operation.state !== 'applying' && stage?.status === 'verified' && stage.version}
     {#if confirming}
       <p class="mt-2">{m.update_confirm({ version: stage.version })}</p>
       <div class="mt-2 flex flex-wrap gap-2">
-        <button type="button" class="rounded-md border border-border px-3 py-2"
+        <Button variant="outline" type="button"
           disabled={updating}
           onclick={() => { if (controller && stage?.version) void changeOperation(controller, stage.version); }}>
           {m.update_apply()}
-        </button>
-        <button type="button" class="rounded-md border border-border px-3 py-2"
+        </Button>
+        <Button variant="outline" type="button"
           onclick={() => { confirming = false; }}>
           {m.update_cancel()}
-        </button>
+        </Button>
       </div>
     {:else}
-      <button type="button" class="mt-2 rounded-md border border-border px-3 py-2"
+      <Button variant="outline" type="button" class="mt-2"
         disabled={updating} onclick={() => { confirming = true; }}>
         {m.update_apply()}
-      </button>
+      </Button>
     {/if}
   {/if}
 </Card>

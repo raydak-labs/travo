@@ -1,5 +1,10 @@
 <script lang="ts">
 import { onDestroy, onMount } from 'svelte';
+import Alert from '$lib/components/ui/alert/alert.svelte';
+import Button from '$lib/components/ui/button/button.svelte';
+import Input from '$lib/components/ui/input/input.svelte';
+import Label from '$lib/components/ui/label/label.svelte';
+import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 import '../api/client';
 import {
   confirmTransaction,
@@ -204,13 +209,13 @@ const tunnelStates = {
     </LoadState>
     <div class="mt-3 flex flex-wrap gap-2">
       {#if transaction?.state === 'pending'}
-        <button type="button" class="rounded-md border border-border px-3 py-1" disabled={settling} onclick={() => settleTunnel(true)}>{m.vpn_tunnel_confirm()}</button>
-        <button type="button" class="rounded-md border border-border px-3 py-1" disabled={settling} onclick={() => settleTunnel(false)}>{m.vpn_tunnel_rollback()}</button>
+        <Button variant="outline" size="sm" type="button" disabled={settling} onclick={() => settleTunnel(true)}>{m.vpn_tunnel_confirm()}</Button>
+        <Button variant="outline" size="sm" type="button" disabled={settling} onclick={() => settleTunnel(false)}>{m.vpn_tunnel_rollback()}</Button>
       {:else if status.data && !tunnelBusy}
         {@const enabled = !['disabled', 'configured'].includes(status.data.state)}
-        <button type="button" class="rounded-md border border-border px-3 py-1 disabled:opacity-60" disabled={status.data.stale || (!enabled && !profiles.data?.selected_id)} onclick={() => setTunnel(!enabled)}>{enabled ? m.vpn_tunnel_disable() : m.vpn_tunnel_enable()}</button>
+        <Button variant="outline" size="sm" type="button" disabled={status.data.stale || (!enabled && !profiles.data?.selected_id)} onclick={() => setTunnel(!enabled)}>{enabled ? m.vpn_tunnel_disable() : m.vpn_tunnel_enable()}</Button>
         {#if enabled && profiles.data?.selected_id}
-          <button type="button" class="rounded-md border border-border px-3 py-1 disabled:opacity-60" disabled={status.data.stale} onclick={() => setTunnel(true)}>{m.vpn_tunnel_apply()}</button>
+          <Button variant="outline" size="sm" type="button" disabled={status.data.stale} onclick={() => setTunnel(true)}>{m.vpn_tunnel_apply()}</Button>
         {/if}
       {/if}
     </div>
@@ -223,7 +228,7 @@ const tunnelStates = {
     {:else if tunnelMessage}
       <p role="status" class="mt-2">{tunnelMessage}</p>
     {/if}
-    {#if tunnelError}<p role="alert" class="mt-2 text-danger">{tunnelError}</p>{/if}
+    {#if tunnelError}<Alert class="mt-2 text-danger">{tunnelError}</Alert>{/if}
   </Card>
 
   <Card title={m.vpn_saved_profiles()}>
@@ -240,13 +245,13 @@ const tunnelStates = {
                   {#if profile.id === profiles.data.selected_id}
                     <span class="text-muted">{m.vpn_selected()}</span>
                   {:else}
-                    <button type="button" class="rounded-md border border-border px-3 py-1 text-sm hover:bg-bg disabled:opacity-60" disabled={pending} onclick={() => change('select', profile.id)}>{m.vpn_select()}</button>
+                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('select', profile.id)}>{m.vpn_select()}</Button>
                   {/if}
                   {#if removing === profile.id}
-                    <button type="button" class="rounded-md border border-border px-3 py-1 text-sm hover:bg-bg disabled:opacity-60" disabled={pending} onclick={() => change('delete', profile.id)}>{m.vpn_confirm_delete()}</button>
-                    <button type="button" class="rounded-md border border-border px-3 py-1 text-sm hover:bg-bg disabled:opacity-60" disabled={pending} onclick={() => { removing = undefined; }}>{m.vpn_cancel()}</button>
+                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('delete', profile.id)}>{m.vpn_confirm_delete()}</Button>
+                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => { removing = undefined; }}>{m.vpn_cancel()}</Button>
                   {:else}
-                    <button type="button" class="rounded-md border border-border px-3 py-1 text-sm hover:bg-bg disabled:opacity-60" disabled={pending} onclick={() => { removing = profile.id; }}>{m.vpn_delete()}</button>
+                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => { removing = profile.id; }}>{m.vpn_delete()}</Button>
                   {/if}
                 </div>
               </li>
@@ -259,16 +264,16 @@ const tunnelStates = {
 
   <Card title={m.vpn_import()}>
     <form class="grid gap-3" autocomplete="off" onsubmit={(event) => { event.preventDefault(); void change('import'); }}>
-      <label class="grid gap-1">
+      <Label class="grid gap-1">
         <span>{m.vpn_name()}</span>
-        <input class="rounded-md border border-border bg-bg px-3 py-2" bind:value={name} required disabled={pending} />
-      </label>
-      <label class="grid gap-1">
+        <Input  bind:value={name} required disabled={pending} />
+      </Label>
+      <Label class="grid gap-1">
         <span>{m.vpn_config()}</span>
-        <textarea class="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono" rows="6" bind:value={config} required disabled={pending} spellcheck="false"></textarea>
-      </label>
-      <button type="submit" class="w-fit rounded-md bg-accent px-4 py-2 text-accent-contrast disabled:opacity-60" disabled={pending || !name.trim() || !config.trim()}>{m.vpn_import()}</button>
+        <Textarea class="w-full font-mono" rows={6} bind:value={config} required disabled={pending} spellcheck="false"></Textarea>
+      </Label>
+      <Button variant="default" type="submit" class="w-fit" disabled={pending || !name.trim() || !config.trim()}>{m.vpn_import()}</Button>
     </form>
   </Card>
-  {#if error}<p role="alert" class="text-danger">{error}</p>{/if}
+  {#if error}<Alert class="text-danger">{error}</Alert>{/if}
 </div>

@@ -1,4 +1,7 @@
 <script lang="ts">
+import Input from '$lib/components/ui/input/input.svelte';
+import Label from '$lib/components/ui/label/label.svelte';
+
 let {
   id,
   label,
@@ -15,8 +18,8 @@ let {
 </script>
 
 <div class="flex flex-col gap-1">
-  <label for={id} class="text-sm font-medium">{label}</label>
-  <input
+  <Label for={id} class="text-sm font-medium">{label}</Label>
+  <Input
     {id}
     type="password"
     name={id}
@@ -25,7 +28,7 @@ let {
     bind:value
     aria-invalid={error ? 'true' : undefined}
     aria-describedby={error ? `${id}-error` : undefined}
-    class="rounded-md border border-border bg-bg px-3 py-2"
+
   />
   {#if error}
     <p id="{id}-error" class="text-sm text-(--danger)">{error}</p>

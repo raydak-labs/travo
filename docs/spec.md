@@ -16,7 +16,7 @@ Travel-router web UI and API that runs ON the router, next to stock LuCI. Clean-
 
 1. **Install and run**: release tarball + install script on fresh OpenWrt; travo-greenfield on `:80` (configurable), LuCI moved to `:8080`/`:8443` reversibly. Mock mode (`--mock`).
 2. **Auth and first-run**: root-password login, cookie session; first-run "set password" reachable from `br-lan` only; password change; SSH keys optional later.
-3. **Dashboard**: internet reachability, carrier and the active IPv4 uplink device (GET /api/v1/dashboard/connectivity). When this status is requested and a default route is selected, the daemon may send an HTTP GET to `http://connectivitycheck.gstatic.com/generate_204`. Dashboard also shows CPU load, memory, uptime, per-interface RX/TX throughput by kernel name (GET /api/v1/dashboard/throughput), quick actions (the **Connect to WiFi** link remains available if connectivity is unavailable, plus VPN toggle). Version visible. The authenticated SPA seeds these values through the existing GETs and refreshes them through one shared SSE subscription (GET /api/v1/dashboard/events); throughput is sampled every 2 seconds and connectivity/resources every 5 seconds. If live updates disconnect, last known values stay visible and marked stale while the client reconnects and polls the GETs every 5 seconds.
+3. **Dashboard**: internet reachability, carrier and the active IPv4 uplink device (GET /api/v1/dashboard/connectivity). When this status is requested and a default route is selected, the daemon may send an HTTP GET to `http://connectivitycheck.gstatic.com/generate_204`. Dashboard also shows CPU load, memory, uptime, per-interface RX/TX throughput by kernel name (GET /api/v1/dashboard/throughput), quick actions (the **Connect to WiFi** button remains available if connectivity is unavailable, plus VPN toggle). Version visible. The authenticated SPA seeds these values through the existing GETs and refreshes them through one shared SSE subscription (GET /api/v1/dashboard/events); throughput is sampled every 2 seconds and connectivity/resources every 5 seconds. If live updates disconnect, last known values stay visible and marked stale while the client reconnects and polls the GETs every 5 seconds.
 4. **Uplink WiFi**: radio, STA and AP summary (GET /api/v1/wifi), on-demand read-only scan (GET /api/v1/wifi/scan, one row per SSID, dual-band badge), join (`POST /api/v1/wifi/join` with guarded confirmation, ≤3 taps from dashboard), ordered saved-upstream list, auto-reconnect with failure cap, MAC clone/randomize.
 5. **AP and guest basics**: SSID/key, enable/disable per radio, guest AP with own subnet/zone.
 6. **Safe apply**: snapshot → commit → watchdog → probe → explicit confirm; lockout guard.
@@ -24,13 +24,15 @@ Travel-router web UI and API that runs ON the router, next to stock LuCI. Clean-
 8. **WireGuard**: profile import/list/select/delete through authenticated `/api/v1/vpn/profiles` routes, on/off (≤3 taps), kill switch, split tunnel, 5-state status (`GET /api/v1/vpn/status`), DNS verify.
 9. **AdGuard Home (default on)**: installed after the first uplink; dnsmasq `:53` → AGH `127.0.0.1:5353`; on/off and "default DNS" toggle in Travo; full UI via the Travo-gated port `:3001`. See [adr/0006](adr/0006-adguard-package-and-topology.md).
 10. **System**: info, reboot, authenticated config tarball download (`GET /api/v1/system/backup`), and signed self-update from GitHub releases. System checks the configured release source on demand and at most once per 24 hours on page entry. The running version is shown even when checks are disabled. System can verify and temporarily stage a signed release, apply it after confirmation, and report the outcome after restart. A failed activation restores the previous installation.
-11. **UI**: Svelte 5 SPA, dark mode without flash, English via Paraglide, shell ≤ 40 KB gzip, route chunk ≤ 8 KB, total ≤ 100 KB.
+11. **UI**: Svelte 5 SPA, dark by default without flash (a stored choice can switch to light), English via Paraglide, shell ≤ 128 KB gzip, route chunk ≤ 16 KB, total ≤ 256 KB.
 
 ## Out of 0.1 (do not break when adding)
 
 Planned work lives in GitHub issues (milestone `0.1.0`, project board "travo-greenfield"); later features are issues without a milestone. Every later feature must go through the `Device` port, the transaction module and the DNS layer stack; a contract test enforces it.
 
 ## Frontend requirements
+
+- Use copied shadcn-svelte primitives by default for applicable UI controls. Keep app-specific wrapper contracts, semantic tokens and localization; record measured compatibility/size exceptions in [ADR 0013](adr/0013-shadcn-components.md) and its inventory.
 
 - Responsive, mobile-first; route-level code split; vector assets; no CDN or external fonts (device is often offline).
 - Only the generated API client is called; no hand-typed endpoints.

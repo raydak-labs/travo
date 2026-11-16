@@ -18,7 +18,7 @@ const info = {
 
 describe('System Device card', () => {
   it('renders the fixture values once the loader is ready', async () => {
-    vi.stubGlobal('document', { documentElement: { getAttribute: () => null } });
+    vi.doMock('../theme.svelte', () => ({ theme: { value: 'light', toggle: () => {} } }));
     // A server render never runs effects, so hand the page a loader that is already ready.
     vi.doMock('../ui/loader.svelte', () => ({
       createLoader: () => ({ status: { state: 'ready' }, data: info, retry: async () => {} }),

@@ -70,6 +70,8 @@ Per release, each from Ethernet unless stated (issues with label `needs-hardware
 
 `mise run screenshots` writes PNGs for UI PRs to `web/screenshots/`; `web/scripts/cdp.mjs` is the shared headless-Chrome helper for browser checks.
 
+Component migration checks: build, then run `scripts/with-mock.sh -- node web/scripts/e2e-components.mjs`. These check keyboard/focus, form validation, confirmations and transaction controls against mock/HTTP seams. See [the migration inventory](testing/shadcn-migration.md); no hardware is required.
+
 ### Signed update hardware acceptance
 
 On the AXT1800, use the release staging controls to verify a newer signed build, then confirm Apply update with Ethernet available. Record the configured listen port, new health version, procd PID and executable identity. Confirm the matching UI loads, the previous generation remains under `update-operation/.old`, and the update guard is gone. Exercise rollback with a controlled signed test release that cannot pass health, and confirm the prior version and UI return. Keep archives and private signing material outside the repository.

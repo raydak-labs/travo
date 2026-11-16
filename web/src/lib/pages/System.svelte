@@ -1,5 +1,8 @@
 <script lang="ts">
 import { onMount } from 'svelte';
+import Alert from '$lib/components/ui/alert/alert.svelte';
+import Badge from '$lib/components/ui/badge/badge.svelte';
+import Button from '$lib/components/ui/button/button.svelte';
 import { postSystemReboot } from '../api/gen';
 import '../api/client';
 import { fetchHealth } from '../api/health';
@@ -168,17 +171,17 @@ async function logout() {
 
   <Card title={m.system_backup()}>
     <div>
-      <button
+      <Button variant="outline"
         type="button"
-        class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
+
         disabled={backupPending}
         onclick={downloadBackup}
       >
         {backupPending ? m.system_backup_pending() : m.system_backup_download()}
-      </button>
+      </Button>
     </div>
     {#if backupError}
-      <p role="alert" class="status status-danger self-start">{m.system_backup_failed()}</p>
+      <Alert class="status status-danger self-start">{m.system_backup_failed()}</Alert>
     {/if}
   </Card>
 
@@ -186,43 +189,40 @@ async function logout() {
     {#if rebootState === 'confirming' || rebootState === 'requesting'}
       <p>{m.reboot_confirm()}</p>
       <div class="mt-3 flex flex-wrap gap-2">
-        <button
+        <Button variant="outline"
           type="button"
-          class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
           disabled={rebootState === 'requesting'}
           onclick={restartRouter}
         >
           {m.reboot_title()}
-        </button>
-        <button
+        </Button>
+        <Button variant="outline"
           type="button"
-          class="rounded-md border border-border px-3 py-2 hover:bg-bg disabled:opacity-60"
           disabled={rebootState === 'requesting'}
           onclick={() => { rebootState = 'idle'; }}
         >
           {m.update_cancel()}
-        </button>
+        </Button>
       </div>
     {:else if rebootState === 'restarting'}
       <p aria-live="polite">{m.reboot_restarting()}</p>
     {:else if rebootState === 'back'}
       <p aria-live="polite">{m.reboot_back()}</p>
     {:else if rebootState === 'timeout'}
-      <p role="alert" class="status status-danger self-start">{m.reboot_timeout()}</p>
+      <Alert class="status status-danger self-start">{m.reboot_timeout()}</Alert>
     {:else}
       <div>
-        <button
+        <Button variant="outline"
           type="button"
-          class="rounded-md border border-border px-3 py-2 hover:bg-bg"
           onclick={() => { rebootState = 'confirming'; }}
         >
           {m.reboot_router()}
-        </button>
+        </Button>
       </div>
       {#if rebootState === 'failed'}
-        <p role="alert" class="status status-danger mt-3 self-start">
+        <Alert class="status status-danger mt-3 self-start">
           {m.reboot_error({ key: rebootFailure })}
-        </p>
+        </Alert>
       {/if}
     {/if}
   </Card>
@@ -230,14 +230,14 @@ async function logout() {
   <Card title={m.system_about()}>
     <div class="flex items-center justify-between gap-4">
       <span>{m.system_theme()}</span>
-      <button
+      <Button variant="outline" size="sm"
         type="button"
-        class="rounded-md border border-border px-3 py-1 text-sm hover:bg-bg"
+        class="text-sm"
         aria-pressed={theme.value === 'dark'}
         onclick={() => theme.toggle()}
       >
         {m.theme_toggle()}
-      </button>
+      </Button>
     </div>
   </Card>
 
@@ -268,27 +268,26 @@ async function logout() {
         <FormMessage message={failure} retry={() => submit()} />
       {/if}
       {#if changed}
-        <p role="status" class="status status-ok self-start">{m.password_changed()}</p>
+        <Badge role="status" class="status status-ok self-start">{m.password_changed()}</Badge>
       {/if}
       <div>
-        <button
+        <Button variant="default"
           type="submit"
           disabled={pending}
-          class="rounded-md bg-accent px-4 py-2 text-accent-contrast disabled:opacity-60"
         >
           {m.password_submit()}
-        </button>
+        </Button>
       </div>
     </form>
   </Card>
 
   <div>
-    <button
+    <Button variant="outline"
       type="button"
-      class="rounded-md border border-border px-3 py-2 hover:bg-bg"
+
       onclick={logout}
     >
       {m.logout()}
-    </button>
+    </Button>
   </div>
 </div>

@@ -18,7 +18,7 @@ Start with a fresh OpenWrt installation. The first install trusts the release ke
 
 The UI answers on `http://<router>/` by default, and LuCI moves to ports 8080 and 8443. To leave LuCI in place, pass `--port N` during install and open `http://<router>:N`. Remove it with `sh /tmp/tg/install.sh --uninstall`; add `--purge` to also delete its config and state. Settings live in `/etc/config/travo-greenfield`. Build the tarball yourself with `mise run package`.
 
-The dashboard shows the active uplink, carrier, and internet reachability separately. Its **Connect to WiFi** link opens the WiFi page even when connectivity is unavailable. It also shows one-minute CPU load, memory use, uptime, and the running version. Connectivity and resource snapshots refresh every five seconds, and interface throughput every two seconds, over one shared live stream. If the stream disconnects, the UI keeps the last known values marked stale while it reconnects and polls every five seconds.
+The dashboard shows the active uplink, carrier, and internet reachability separately. Its **Connect to WiFi** button opens the WiFi page even when connectivity is unavailable. It also shows one-minute CPU load, memory use, uptime, and the running version. Connectivity and resource snapshots refresh every five seconds, and interface throughput every two seconds, over one shared live stream. If the stream disconnects, the UI keeps the last known values marked stale while it reconnects and polls every five seconds.
 
 The **WiFi** page summarizes configured radios, uplink STA and access points, and its **Scan** button lists nearby networks without changing live state.
 
@@ -32,6 +32,10 @@ When System finds a newer release, **Verify package** checks the signed archive 
 Use **VPN** to import and select a WireGuard profile, then enable or disable the tunnel. Confirm the change once the router verifies connectivity, or roll it back. The page also shows the current tunnel state and handshake age.
 
 On the WiFi page, scan for an uplink, join it on a free radio, and confirm the connection once it is verified.
+
+## UI components
+
+The Svelte UI uses locally owned shadcn-svelte components, with the same light/dark palette and offline assets. New controls compose these primitives through the existing app wrappers. See [ADR 0013](docs/adr/0013-shadcn-components.md) for the size tradeoffs and [migration evidence](docs/testing/shadcn-migration.md) for the inventory and keyboard checks.
 
 ## Docs
 

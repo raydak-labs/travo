@@ -1,5 +1,8 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
+import Alert from '$lib/components/ui/alert/alert.svelte';
+import Button from '$lib/components/ui/button/button.svelte';
+import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 import { m } from '../paraglide/messages.js';
 import type { LoadStatus } from './loader.svelte';
 import Status from './Status.svelte';
@@ -22,25 +25,25 @@ let {
 {:else if status.state === 'loading'}
   <div role="status" aria-live="polite" aria-busy="true">
     <span class="sr-only">{m.load_loading()}</span>
-    <div class="skeleton h-5 w-40"></div>
+    <Skeleton class="h-5 w-40" />
   </div>
 {:else if status.state === 'error'}
   {#if stale}
     <div class="opacity-60">{@render children()}</div>
   {/if}
-  <div role="alert" class="flex flex-wrap items-center gap-3">
+  <Alert class="flex flex-wrap items-center gap-3">
     {#if stale}
       <Status kind="stale">{m.load_stale()}</Status>
     {/if}
-    <span class="status status-danger">{m.load_error({ cause: status.message })}</span>
-    <button
+    <Status kind="danger">{m.load_error({ cause: status.message })}</Status>
+    <Button variant="outline" size="sm"
       type="button"
-      class="rounded-md border border-border px-3 py-1 text-sm hover:bg-bg"
+      class="text-sm"
       onclick={retry}
     >
       {m.load_retry()}
-    </button>
-  </div>
+    </Button>
+  </Alert>
 {:else}
   {@render children()}
 {/if}

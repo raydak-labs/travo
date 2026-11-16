@@ -10,7 +10,7 @@ describe('auth pages', () => {
     expect(body).toContain('for="login-password"');
     expect(body).toContain('autocomplete="current-password"');
     expect(body).toContain('type="submit"');
-    expect(body).not.toContain('disabled=');
+    expect(body).not.toMatch(/<(?:input|button)\b[^>]*\sdisabled(?:=|\s|>)/);
   });
 
   it('Setup: two new-password inputs', () => {
@@ -21,8 +21,8 @@ describe('auth pages', () => {
   });
 
   it('System: change-password card and log-out button', async () => {
-    // theme.svelte.ts reads the document at import; there is none in a server render
-    vi.stubGlobal('document', { documentElement: { getAttribute: () => null } });
+    // Supply the theme boundary without pretending SSR has a browser document.
+    vi.doMock('../theme.svelte', () => ({ theme: { value: 'light', toggle: () => {} } }));
     const { default: System } = await import('./System.svelte');
     const { body } = render(System);
     vi.unstubAllGlobals();

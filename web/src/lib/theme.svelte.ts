@@ -1,7 +1,7 @@
 type Theme = 'light' | 'dark';
 
 let current = $state<Theme>(
-  document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+  document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
 );
 
 export const theme = {

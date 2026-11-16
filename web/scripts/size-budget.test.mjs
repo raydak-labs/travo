@@ -41,31 +41,31 @@ describe('checkBudget', () => {
       files: new Map([
         ['index.html', 1],
         ['index.js', 1],
-        ['lazy.js', 8 * 1024 + 1],
+        ['lazy.js', 16 * 1024 + 1],
       ]),
       html: '<script src="/index.js"></script>',
       sources: new Map([['index.js', 'import("./lazy.js");']]),
     });
 
-    expect(result.chunks).toEqual([{ name: 'lazy.js', bytes: 8193 }]);
+    expect(result.chunks).toEqual([{ name: 'lazy.js', bytes: 16385 }]);
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0]).toMatch(/chunk lazy\.js.*8 KB/);
+    expect(result.violations[0]).toMatch(/chunk lazy\.js.*16 KB/);
   });
 
   it('reports an over-limit shell without also counting its entry as a chunk', () => {
     const result = checkBudget({
       files: new Map([
         ['index.html', 1],
-        ['index.js', 40 * 1024],
+        ['index.js', 128 * 1024],
       ]),
       html: '<script src="/index.js"></script>',
       sources: new Map([['index.js', '']]),
     });
 
-    expect(result.shell).toBe(40 * 1024 + 1);
+    expect(result.shell).toBe(128 * 1024 + 1);
     expect(result.chunks).toEqual([]);
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0]).toMatch(/shell.*40 KB/);
+    expect(result.violations[0]).toMatch(/shell.*128 KB/);
   });
 
   it('reports an over-limit total independently of the shell and chunk limits', () => {
@@ -73,15 +73,15 @@ describe('checkBudget', () => {
       files: new Map([
         ['index.html', 1],
         ['index.js', 1],
-        ['extra.css', 100 * 1024 - 1],
+        ['extra.css', 256 * 1024 - 1],
       ]),
       html: '<script src="/index.js"></script>',
       sources: new Map([['index.js', '']]),
     });
 
     expect(result.shell).toBe(2);
-    expect(result.total).toBe(100 * 1024 + 1);
+    expect(result.total).toBe(256 * 1024 + 1);
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0]).toMatch(/total.*100 KB/);
+    expect(result.violations[0]).toMatch(/total.*256 KB/);
   });
 });

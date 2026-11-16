@@ -12,9 +12,8 @@
       try {
         t = localStorage.getItem('theme');
       } catch {}
-      if (t !== 'light' && t !== 'dark') {
-        t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
+      // Stored choice wins. Otherwise dark, ignoring the OS scheme.
+      if (t !== 'light' && t !== 'dark') t = 'dark';
       document.documentElement.setAttribute('data-theme', t);
     })();
     </script>

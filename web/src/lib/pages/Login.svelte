@@ -1,4 +1,5 @@
 <script lang="ts">
+import Button from '$lib/components/ui/button/button.svelte';
 import { type AuthMessage, loginMessage } from '../auth-messages';
 import { m } from '../paraglide/messages.js';
 import { session } from '../session.svelte';
@@ -34,13 +35,13 @@ async function submit(event?: SubmitEvent) {
       <FormMessage message={failure} retry={() => submit()} />
     {/if}
     <div>
-      <button
+      <Button variant="default"
         type="submit"
         disabled={pending}
-        class="rounded-md bg-accent px-4 py-2 text-accent-contrast disabled:opacity-60"
+
       >
         {m.login_submit()}
-      </button>
+      </Button>
     </div>
   </form>
 </Card>

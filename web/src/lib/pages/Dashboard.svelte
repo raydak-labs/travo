@@ -1,4 +1,6 @@
 <script lang="ts">
+import Button from '$lib/components/ui/button/button.svelte';
+import * as Table from '$lib/components/ui/table';
 import { fetchHealth } from '../api/health';
 import type { dashboardEvents } from '../dashboard-events.svelte';
 import { formatBytes, formatLoad, formatUptime } from '../format';
@@ -55,19 +57,19 @@ function formatRate(rate: number | null): string {
           <dd><Status kind={internet.kind}>{internet.label()}</Status></dd>
         </dl>
         {#if connectivity.status.state === 'ready'}
-          <button
+          <Button variant="outline" size="sm"
             type="button"
-            class="mt-3 rounded-md border border-border px-3 py-1 text-sm hover:bg-bg"
+            class="mt-3 text-sm"
             onclick={connectivity.retry}
           >
             {m.dashboard_refresh()}
-          </button>
+          </Button>
         {/if}
       {/if}
     </LoadState>
-    <a class="mt-3 inline-block text-accent underline" href={href('wifi')}>
+    <Button size="sm" class="mt-3" href={href('wifi')}>
       {m.dashboard_connect_to_wifi()}
-    </a>
+    </Button>
   </Card>
   <Card title={m.dashboard_daemon()}>
     <LoadState status={health.status} retry={health.retry}>
@@ -102,13 +104,13 @@ function formatRate(rate: number | null): string {
           <dd class="break-all">{info.app.version}</dd>
         </dl>
         {#if resources.status.state === 'ready'}
-          <button
+          <Button variant="outline" size="sm"
             type="button"
-            class="mt-3 rounded-md border border-border px-3 py-1 text-sm hover:bg-bg"
+            class="mt-3 text-sm"
             onclick={resources.retry}
           >
             {m.dashboard_refresh()}
-          </button>
+          </Button>
         {/if}
       {/if}
     </LoadState>
@@ -116,24 +118,24 @@ function formatRate(rate: number | null): string {
   <Card title={m.dashboard_throughput()}>
     <LoadState status={throughput.status} retry={throughput.retry} stale={throughput.data !== undefined}>
       {#if throughput.data?.interfaces.length}
-        <table class="w-full table-fixed text-left">
-          <thead class="text-muted">
-            <tr>
-              <th scope="col" class="font-normal">{m.dashboard_interface()}</th>
-              <th scope="col" class="text-right font-normal">{m.dashboard_rx()}</th>
-              <th scope="col" class="text-right font-normal">{m.dashboard_tx()}</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table.Root class="w-full table-fixed text-left">
+          <Table.Header class="text-muted">
+            <Table.Row>
+              <Table.Head scope="col" class="font-normal">{m.dashboard_interface()}</Table.Head>
+              <Table.Head scope="col" class="text-right font-normal">{m.dashboard_rx()}</Table.Head>
+              <Table.Head scope="col" class="text-right font-normal">{m.dashboard_tx()}</Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
             {#each throughput.data.interfaces as row (row.name)}
-              <tr class="border-t border-border">
-                <th scope="row" class="break-all py-2 font-medium">{row.name}</th>
-                <td class="py-2 text-right tabular-nums">{formatRate(row.rx_bytes_per_second)}</td>
-                <td class="py-2 text-right tabular-nums">{formatRate(row.tx_bytes_per_second)}</td>
-              </tr>
+              <Table.Row class="border-t border-border">
+                <Table.Head scope="row" class="break-all py-2 font-medium">{row.name}</Table.Head>
+                <Table.Cell class="py-2 text-right tabular-nums">{formatRate(row.rx_bytes_per_second)}</Table.Cell>
+                <Table.Cell class="py-2 text-right tabular-nums">{formatRate(row.tx_bytes_per_second)}</Table.Cell>
+              </Table.Row>
             {/each}
-          </tbody>
-        </table>
+          </Table.Body>
+        </Table.Root>
       {:else}
         <p class="text-muted">{m.dashboard_no_interfaces()}</p>
       {/if}

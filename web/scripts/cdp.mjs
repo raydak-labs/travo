@@ -126,6 +126,7 @@ export async function launchChrome({ userDataDir } = {}) {
     return result.result.value;
   }
 
+  let themeScript;
   /** Sets viewport and colour scheme, navigates, and waits until the page has settled. */
   async function open(url, { width, height, mobile = false, scheme = 'light' }) {
     await send('Page.enable');
@@ -139,6 +140,12 @@ export async function launchChrome({ userDataDir } = {}) {
     await send('Emulation.setEmulatedMedia', {
       features: [{ name: 'prefers-color-scheme', value: scheme }],
     });
+    // App ignores the OS scheme. Inject the requested theme before the boot script.
+    if (themeScript)
+      await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: themeScript });
+    ({ identifier: themeScript } = await send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `try{localStorage.setItem('theme',${JSON.stringify(scheme)})}catch(e){}`,
+    }));
     // A hash-only change does not reload, and the theme is applied at boot: leave the page first.
     await send('Page.navigate', { url: 'about:blank' });
     await send('Page.navigate', { url });

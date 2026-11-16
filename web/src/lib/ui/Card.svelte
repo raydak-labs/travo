@@ -1,12 +1,17 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
+import Root from '$lib/components/ui/card/card.svelte';
+import Content from '$lib/components/ui/card/card-content.svelte';
+import Header from '$lib/components/ui/card/card-header.svelte';
 
 let { title, children }: { title?: string; children: Snippet } = $props();
 </script>
 
-<section class="rounded-lg border border-border bg-surface p-4">
+<Root>
   {#if title}
-    <h2 class="mb-3 text-base font-semibold">{title}</h2>
+    <Header>
+      <h2 class="text-base leading-normal font-medium">{title}</h2>
+    </Header>
   {/if}
-  {@render children()}
-</section>
+  <Content>{@render children()}</Content>
+</Root>
