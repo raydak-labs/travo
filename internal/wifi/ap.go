@@ -175,21 +175,30 @@ func (s *Service) UpdateAP(ctx context.Context, req APRequest) (txn.Status, erro
 	if s.join == nil {
 		return txn.Status{}, ErrUnavailable
 	}
-	if _, err := s.prepareAP(ctx, req); err != nil {
+	return s.applyAPPlan(ctx, "wifi: access point "+req.Section, []string{"wireless", "network", "firewall"}, req.Key,
+		func(ctx context.Context) (apPlan, error) { return s.prepareAP(ctx, req) })
+}
+
+// apPlan is what one AP transaction stages and what its probe must then prove.
+type apPlan struct {
+	writes []uciWrite
+	expect []apExpectation
+}
+
+// applyAPPlan plans once without the lock (fail fast, no guard), then again inside the
+// transaction stage so the writes match the config the lock protects.
+func (s *Service) applyAPPlan(ctx context.Context, summary string, configs []string, key string, prepare func(context.Context) (apPlan, error)) (txn.Status, error) {
+	if _, err := prepare(ctx); err != nil {
 		return txn.Status{}, err
 	}
 	var expect []apExpectation
-	st, err := s.join.Txns.Begin(ctx, "wifi: access point "+req.Section, []string{"wireless", "network", "firewall"}, func(ctx context.Context) error {
-		writes, err := s.prepareAP(ctx, req)
+	st, err := s.join.Txns.Begin(ctx, summary, configs, func(ctx context.Context) error {
+		plan, err := prepare(ctx)
 		if err != nil {
 			return err
 		}
-		wireless, err := s.join.UCI.Show(ctx, "wireless")
-		if err != nil {
-			return ErrUnavailable
-		}
-		expect = apExpectations(wireless, req.Section, req)
-		return s.stageWrites(ctx, writes, req.Key)
+		expect = plan.expect
+		return s.stageWrites(ctx, plan.writes, key)
 	}, func(ctx context.Context) error { return s.probeAPs(expect)(ctx) })
 	if errors.Is(err, txn.ErrActive) {
 		return st, ErrTransactionPending
@@ -197,23 +206,28 @@ func (s *Service) UpdateAP(ctx context.Context, req APRequest) (txn.Status, erro
 	return st, err
 }
 
-func (s *Service) prepareAP(ctx context.Context, req APRequest) ([]uciWrite, error) {
+func (s *Service) prepareAP(ctx context.Context, req APRequest) (apPlan, error) {
 	wireless, err := s.join.UCI.Show(ctx, "wireless")
 	if err != nil {
-		return nil, ErrUnavailable
+		return apPlan{}, ErrUnavailable
 	}
 	writes, before, after, err := planAP(wireless, req)
 	if err != nil {
-		return nil, err
+		return apPlan{}, err
 	}
-	if disablesAP(before, after) {
-		caller := classifyCaller(ctx, s.join.Ubus, s.join.Neighbours, apNetworks(wireless), req.Caller)
-		before = withIfnames(ctx, s.join.Ubus, before)
-		if err := lockout.Check(caller, lockout.Plan{Before: before, After: after}, req.Acknowledge); err != nil {
-			return nil, err
-		}
+	if err := s.checkAPLockout(ctx, wireless, before, after, req.Caller, req.Acknowledge); err != nil {
+		return apPlan{}, err
 	}
-	return writes, nil
+	return apPlan{writes, apExpectations(wireless, req.Section, req.Enabled, req.SSID)}, nil
+}
+
+// checkAPLockout runs the lockout check only when an enabled AP gets disabled.
+func (s *Service) checkAPLockout(ctx context.Context, wireless []device.Section, before, after []lockout.AP, ip netip.Addr, acknowledge bool) error {
+	if !disablesAP(before, after) {
+		return nil
+	}
+	caller := classifyCaller(ctx, s.join.Ubus, s.join.Neighbours, apNetworks(wireless), ip)
+	return lockout.Check(caller, lockout.Plan{Before: withIfnames(ctx, s.join.Ubus, before), After: after}, acknowledge)
 }
 
 func disablesAP(before, after []lockout.AP) bool {
@@ -256,14 +270,14 @@ type apExpectation struct {
 }
 
 // apExpectations lists every AP that must be up after the edit, plus the edited AP.
-func apExpectations(wireless []device.Section, edited string, req APRequest) []apExpectation {
+func apExpectations(wireless []device.Section, edited string, enabled bool, ssid string) []apExpectation {
 	var out []apExpectation
 	for _, section := range wireless {
 		if !isAP(section) {
 			continue
 		}
 		if section.Name == edited {
-			out = append(out, apExpectation{section: edited, enabled: req.Enabled, ssid: req.SSID})
+			out = append(out, apExpectation{section: edited, enabled: enabled, ssid: ssid})
 		} else if section.Options["disabled"] != "1" && !radioDisabled(wireless, section.Options["device"]) {
 			out = append(out, apExpectation{section: section.Name, enabled: true})
 		}
