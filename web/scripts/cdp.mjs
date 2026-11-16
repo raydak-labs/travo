@@ -5,7 +5,8 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 
-const DEBUG_PORT = 9333;
+// CDP_PORT lets parallel browser checks (one per worktree) run side by side.
+const DEBUG_PORT = Number(process.env.CDP_PORT ?? 9333);
 const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
