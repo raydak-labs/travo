@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7 tools from mise.toml; Rust from rust-toolchain.toml via rustup
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9 tools from mise.toml; Rust from rust-toolchain.toml via rustup
         with:
           cache_save: ${{ github.ref == 'refs/heads/main' }} # PRs reuse main's toolchain cache (192 MB each otherwise)
       # Go module + build cache and the pnpm store, keyed on the toolchain pins and lockfiles.
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7 tools from mise.toml
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9 tools from mise.toml
         with:
           cache_save: ${{ github.ref == 'refs/heads/main' }} # restore-only here; the app job on main saves
       - id: dirs
