@@ -25,6 +25,11 @@ describe('WiFi join', () => {
   it('keeps the deadline while polling and uses the authoritative outcome', () => {
     const joining = reduceJoin({ state: 'idle' }, { type: 'start', ssid: network.ssid });
     expect(joining).toEqual({ state: 'joining', ssid: network.ssid });
+    expect(reduceJoin({ state: 'idle' }, { type: 'start', ssid: 'AP', ap: true })).toEqual({
+      state: 'joining',
+      ssid: 'AP',
+      ap: true,
+    });
     const armed = reduceJoin(joining, { type: 'transaction', now: 1000, transaction: pending });
     expect(armed).toMatchObject({ state: 'pending', deadline: 61000 });
     expect(reduceJoin(armed, { type: 'transaction', now: 3000, transaction: pending })).toEqual(
@@ -81,6 +86,9 @@ describe('WiFi join', () => {
       'wifi_lockout_risk',
       'wifi_no_change',
       'wifi_unavailable',
+      'wifi_radio_in_use',
+      'wifi_ap_not_found',
+      'wifi_ssid_invalid',
     ];
     expect(new Set(codes.map(joinError)).size).toBe(codes.length);
     expect(joinError('wifi_key_required')).toBe(joinError('wifi_key_invalid'));

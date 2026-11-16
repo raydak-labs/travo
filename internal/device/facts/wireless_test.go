@@ -118,3 +118,17 @@ func TestParseIwinfoScanRejectsUnreadablePayload(t *testing.T) {
 		})
 	}
 }
+
+func TestParseIwinfoAPSSIDFromDevice(t *testing.T) {
+	ssid, err := ParseIwinfoAPSSID(read(t, "iwinfo-info-phy1-ap0.json"))
+	if err != nil || ssid != "TravelAP" {
+		t.Fatalf("%q %v", ssid, err)
+	}
+	// A STA reply never proves an AP.
+	if _, err := ParseIwinfoAPSSID(read(t, "iwinfo-info-phy0-sta0.json")); !errors.Is(err, ErrShape) {
+		t.Fatal(err)
+	}
+	if _, err := ParseIwinfoAPSSID([]byte(`{"mode":"Master"}`)); !errors.Is(err, ErrShape) {
+		t.Fatal(err)
+	}
+}

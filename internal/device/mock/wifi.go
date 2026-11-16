@@ -61,3 +61,24 @@ func (d *Device) LinkIndices(ctx context.Context) (map[string]int, error) {
 	}
 	return links, nil
 }
+
+// Neighbours returns the scripted `ip -j -4 neigh show` reply; unset means an empty table,
+// so every caller classifies as unknown (fail closed).
+func (d *Device) Neighbours(ctx context.Context) (json.RawMessage, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.neighbours == nil {
+		return json.RawMessage("[]"), nil
+	}
+	return d.neighbours, nil
+}
+
+// SetNeighbours scripts the neighbour table (use a verbatim capture).
+func (d *Device) SetNeighbours(reply json.RawMessage) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.neighbours = reply
+}

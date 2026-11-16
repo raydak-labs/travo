@@ -15,6 +15,19 @@ export type Ap = {
     up: boolean | null;
 };
 
+export type ApConfig = {
+    band: '2g' | '5g' | '6g' | 'unknown';
+    enabled: boolean;
+    /**
+     * Not bridged into lan
+     */
+    guest: boolean;
+    radio: string;
+    section: string;
+    security: 'open' | 'protected';
+    ssid: string;
+};
+
 export type AccessPoint = {
     band: '2g' | '5g' | '6g';
     bssid: string;
@@ -367,6 +380,15 @@ export type TxnBody = {
     window_seconds: number;
 };
 
+export type UpdateApInputBody = {
+    /**
+     * Apply even if the caller may lose its access point
+     */
+    acknowledge_lockout?: boolean;
+    enabled: boolean;
+    ssid: string;
+};
+
 export type UpdateCheckInputBody = {
     mode: 'automatic' | 'manual';
 };
@@ -408,6 +430,10 @@ export type WiFiSummary = {
     stas: Array<Sta>;
 };
 
+export type WifiApsOutputBody = {
+    aps: Array<ApConfig>;
+};
+
 export type WifiProfileOrderInputBody = {
     ids: Array<string>;
 };
@@ -416,6 +442,19 @@ export type JoinWiFiInputBodyWritable = {
     bssid?: string;
     key?: string;
     security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';
+    ssid: string;
+};
+
+export type UpdateApInputBodyWritable = {
+    /**
+     * Apply even if the caller may lose its access point
+     */
+    acknowledge_lockout?: boolean;
+    enabled: boolean;
+    /**
+     * New WPA key; omitted keeps the current key
+     */
+    key?: string;
     ssid: string;
 };
 
@@ -1859,6 +1898,85 @@ export type GetWiFiResponses = {
 };
 
 export type GetWiFiResponse = GetWiFiResponses[keyof GetWiFiResponses];
+
+export type GetWiFiAccessPointsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/aps';
+};
+
+export type GetWiFiAccessPointsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiAccessPointsError = GetWiFiAccessPointsErrors[keyof GetWiFiAccessPointsErrors];
+
+export type GetWiFiAccessPointsResponses = {
+    /**
+     * OK
+     */
+    200: WifiApsOutputBody;
+};
+
+export type GetWiFiAccessPointsResponse = GetWiFiAccessPointsResponses[keyof GetWiFiAccessPointsResponses];
+
+export type UpdateWiFiAccessPointData = {
+    body: UpdateApInputBodyWritable;
+    path: {
+        /**
+         * UCI wifi-iface section of the access point
+         */
+        section: string;
+    };
+    query?: never;
+    url: '/api/v1/wifi/aps/{section}';
+};
+
+export type UpdateWiFiAccessPointErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type UpdateWiFiAccessPointError = UpdateWiFiAccessPointErrors[keyof UpdateWiFiAccessPointErrors];
+
+export type UpdateWiFiAccessPointResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type UpdateWiFiAccessPointResponse = UpdateWiFiAccessPointResponses[keyof UpdateWiFiAccessPointResponses];
 
 export type JoinWiFiData = {
     body: JoinWiFiInputBodyWritable;

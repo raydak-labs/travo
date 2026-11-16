@@ -99,6 +99,22 @@ type ScanAP struct {
 	Encryption Encryption
 }
 
+// ParseIwinfoAPSSID parses `ubus call iwinfo info {"device": ifname}` and returns the
+// SSID the AP broadcasts now. Only a Master-mode reply proves a live AP.
+func ParseIwinfoAPSSID(b []byte) (string, error) {
+	var raw struct {
+		SSID *string `json:"ssid"`
+		Mode string  `json:"mode"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return "", fmt.Errorf("iwinfo info: %w", err)
+	}
+	if raw.SSID == nil || raw.Mode != "Master" {
+		return "", fmt.Errorf("iwinfo info: %w: need ssid in Master mode", ErrShape)
+	}
+	return *raw.SSID, nil
+}
+
 // ParseIwinfoScan parses every result; an unreadable entry fails the whole payload.
 func ParseIwinfoScan(b []byte) ([]ScanAP, error) {
 	var raw struct {

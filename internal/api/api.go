@@ -57,6 +57,12 @@ type WiFiJoiner interface {
 	Join(context.Context, wifi.JoinRequest) (txn.Status, error)
 }
 
+// WiFiAPEditor lists and edits configured access points through guarded transactions.
+type WiFiAPEditor interface {
+	AccessPoints(context.Context) ([]wifi.APConfig, error)
+	UpdateAP(context.Context, wifi.APRequest) (txn.Status, error)
+}
+
 type WiFiService interface {
 	Summary(context.Context) (wifi.Summary, error)
 	Scan(context.Context) (wifi.ScanResult, error)
@@ -100,6 +106,7 @@ type Deps struct {
 	Clock    auth.Clock
 	// WiFiReconnect is the capped auto-reconnect counter; nil answers 503 device_unavailable.
 	WiFiReconnect WiFiReconnectReader
+	WiFiAPs       WiFiAPEditor
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.

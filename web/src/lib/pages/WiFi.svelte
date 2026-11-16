@@ -8,6 +8,8 @@ import {
   type Network,
   rollbackTransaction,
   type ScanResult,
+  type TxnBody,
+  type UpdateWiFiAccessPointData,
   type WiFiProfileSummary,
 } from '../api/gen';
 import {
@@ -20,6 +22,7 @@ import {
   reorderWifiProfiles,
   saveWifiProfile,
   selectWifiProfile,
+  updateAccessPoint,
 } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
@@ -37,6 +40,7 @@ import WiFiScanList from './WiFiScanList.svelte';
 import WiFiSummary from './WiFiSummary.svelte';
 
 const joinDialog = lazyPage(() => import('./WiFiJoinDialog.svelte'));
+const accessPoints = lazyPage(() => import('./WiFiAccessPoints.svelte'));
 
 const idle: LoadStatus = { state: 'ready' };
 let {
@@ -66,6 +70,9 @@ let joinTrigger = $state<HTMLElement | null>(null);
 let joining = $state<JoinState>({ state: 'idle' });
 let commandPending = $state(false);
 let activePoll: AbortController | undefined;
+let apVersion = $state(0);
+// Resends the last refused change with acknowledge_lockout (invariants §2).
+let anyway = $state<() => void>();
 let now = $state(0);
 const busy = $derived(
   joining.state === 'joining' || joining.state === 'pending' || joining.state === 'restoring',
@@ -75,18 +82,11 @@ function failure(error: { code?: string } | undefined) {
   joining = reduceJoin(joining, { type: 'failure', code: error?.code ?? '' });
 }
 
-type JoinResponse = Awaited<ReturnType<typeof joinWifi>>;
+type Send = () => Promise<{ data?: TxnBody; error?: { code?: string } }>;
 
-function submitJoin(body: JoinWiFiData['body']) {
-  return startJoin(body.ssid, () => joinWifi(body, request.signal));
-}
-
-function selectProfile(profile: WiFiProfileSummary) {
-  return startJoin(profile.ssid, () => selectWifiProfile(profile.id, request.signal));
-}
-
-async function startJoin(ssid: string, send: () => Promise<JoinResponse>) {
-  joining = reduceJoin(joining, { type: 'start', ssid });
+async function submit(ssid: string, send: Send, ap = false, acknowledge?: () => void) {
+  joining = reduceJoin(joining, { type: 'start', ssid, ap });
+  anyway = undefined;
   try {
     const response = await send();
     if (request.signal.aborted) return;
@@ -95,10 +95,28 @@ async function startJoin(ssid: string, send: () => Promise<JoinResponse>) {
       joining = reduceJoin(joining, { type: 'transaction', transaction: response.data, now });
     } else {
       failure(response.error);
+      if (response.error?.code === 'wifi_lockout_risk') anyway = acknowledge;
     }
   } catch {
     if (!request.signal.aborted) failure(undefined);
   }
+}
+
+function submitJoin(body: JoinWiFiData['body']) {
+  return submit(body.ssid, () => joinWifi(body, request.signal));
+}
+
+function selectProfile(profile: WiFiProfileSummary) {
+  return submit(profile.ssid, () => selectWifiProfile(profile.id, request.signal));
+}
+
+function submitAP(section: string, body: UpdateWiFiAccessPointData['body']) {
+  return submit(
+    body.ssid,
+    () => updateAccessPoint(section, body, request.signal),
+    true,
+    () => submitAP(section, { ...body, acknowledge_lockout: true }),
+  );
 }
 
 async function poll() {
@@ -160,6 +178,7 @@ async function settle(confirm: boolean) {
       });
       summary.retry();
       void profiles.retry();
+      apVersion++;
     } else if (response.error?.code === 'restoring' || response.error?.code === 'rollback_failed') {
       joining = { ...joining, state: response.error.code };
     }
@@ -270,6 +289,12 @@ async function scan() {
     {/if}
   </Card>
 
+  <Card title={m.wifi_aps_title()}>
+    {#key apVersion}
+      <PageHost load={accessPoints} props={{ busy, apply: submitAP }} />
+    {/key}
+  </Card>
+
   <Card title={m.wifi_scan_title()}>
     <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
       {#if scanData}
@@ -302,7 +327,7 @@ async function scan() {
 {/if}
 <div aria-live="polite" class="mt-4 space-y-2 text-sm">
   {#if joining.state === 'joining'}
-    <p>{m.wifi_join_connecting({ ssid: joining.ssid })}</p>
+    <p>{joining.ap ? m.wifi_ap_applying({ ssid: joining.ssid }) : m.wifi_join_connecting({ ssid: joining.ssid })}</p>
   {:else if joining.state === 'pending'}
     <p>{m.wifi_join_pending({ seconds: Math.max(0, Math.ceil((joining.deadline - now) / 1000)) })}</p>
     <div class="flex gap-2">
@@ -319,5 +344,8 @@ async function scan() {
     <p class="text-danger">{m.wifi_join_rollback_failed()}</p>
   {:else if joining.state === 'failed'}
     <p class="text-danger">{joinError(joining.code)}</p>
+    {#if anyway}
+      <Button variant="outline" type="button" onclick={anyway}>{m.wifi_join_anyway()}</Button>
+    {/if}
   {/if}
 </div>

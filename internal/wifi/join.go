@@ -24,6 +24,7 @@ type JoinDeps struct {
 	Routes                  device.DefaultRouteReader
 	Links                   device.LinkIndexReader
 	Keys                    device.WirelessKeyWriter
+	Neighbours              device.NeighbourReader
 	Txns                    Beginner
 	Clock                   func() time.Time
 	Caller                  func(context.Context) lockout.Caller
@@ -81,8 +82,8 @@ func ValidateJoinRequest(req JoinRequest) (JoinRequest, error) {
 }
 
 func (r JoinRequest) validate() error {
-	if len(r.SSID) < 1 || len(r.SSID) > 32 || strings.ContainsAny(r.SSID, "\x00\r\n") {
-		return ValidationError{"wifi_ssid_invalid"}
+	if err := validSSID(r.SSID); err != nil {
+		return err
 	}
 	if r.BSSID != "" && !macPattern.MatchString(r.BSSID) {
 		return ValidationError{"wifi_bssid_invalid"}
@@ -96,8 +97,8 @@ func (r JoinRequest) validate() error {
 		if r.Key == "" {
 			return ValidationError{"wifi_key_required"}
 		}
-		if len(r.Key) < 8 || len(r.Key) > 63 || strings.IndexFunc(r.Key, func(c rune) bool { return c < 32 || c > 126 }) >= 0 {
-			return ValidationError{"wifi_key_invalid"}
+		if err := validKey(r.Key); err != nil {
+			return err
 		}
 	default:
 		return ErrSecurityUnsupported
@@ -148,7 +149,7 @@ func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error)
 		for _, index := range links {
 			oldLinks[index] = struct{}{}
 		}
-		return s.stageJoin(ctx, writes, req.Key)
+		return s.stageWrites(ctx, writes, req.Key)
 	}, func(ctx context.Context) error { return s.probe(radio, section, oldLinks)(ctx) })
 	if errors.Is(err, txn.ErrActive) {
 		return st, ErrTransactionPending

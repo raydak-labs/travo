@@ -197,9 +197,9 @@ async function wifi(width, scheme) {
   await wait(
     `${writeCount('/api/v1/wifi/join')} === 1 && !document.querySelector('[role="dialog"]')`,
   );
-  await wait(`document.body.textContent.includes('Confirm this connection')`);
+  await wait(`document.body.textContent.includes('Confirm this change')`);
   await activate('Confirm');
-  await wait(`document.body.textContent.includes('Connection confirmed')`);
+  await wait(`document.body.textContent.includes('Change confirmed')`);
   await noOverflow();
   await chrome.evaluate('history.back()');
   await wait(`location.hash==='#/' && !!document.querySelector('a[href="#/wifi"]:not(nav a)')`);

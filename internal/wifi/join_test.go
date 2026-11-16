@@ -186,14 +186,20 @@ func TestJoinReplansUnderTransactionLock(t *testing.T) {
 
 func seedJoinDevice(t *testing.T, d *mock.Device) {
 	t.Helper()
+	seedConfigs(t, d, "wifi-scan/no-sta/uci-show-wireless.txt", func(s device.Section) bool { return s.Name == "wwan" })
+}
+
+// seedConfigs commits verbatim UCI captures; skip drops sections a case must not have.
+func seedConfigs(t *testing.T, d *mock.Device, wirelessFile string, skip func(device.Section) bool) {
+	t.Helper()
 	ctx := context.Background()
 	for _, cfg := range []string{"wireless", "network", "firewall"} {
 		filename := "uci-show-" + cfg + ".txt"
 		if cfg == "wireless" {
-			filename = "wifi-scan/no-sta/" + filename
+			filename = wirelessFile
 		}
 		for _, section := range configFixture(t, cfg, filename) {
-			if cfg == "wireless" && section.Name == "wwan" {
+			if cfg == "wireless" && skip != nil && skip(section) {
 				continue
 			}
 			if err := d.SetType(ctx, cfg, section.Name, section.Type); err != nil {
@@ -264,11 +270,9 @@ func (d joinFileDevice) Commit(ctx context.Context, config string) error {
 	return d.Device.Commit(ctx, config)
 }
 
-func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
-	ctx := context.Background()
-	service, _ := noSTAScanService(t)
-	base := mock.New()
-	seedJoinDevice(t, base)
+// fileTxnManager runs a real txn.Manager whose commits and restores touch real files.
+func fileTxnManager(t *testing.T, base *mock.Device, afterWirelessCommit func()) (*txn.Manager, string) {
+	t.Helper()
 	root := t.TempDir()
 	// Restore real files, but leave durability to the OpenWrt integration tests.
 	// A host-wide sync can exceed the restore budget on a busy CI runner.
@@ -285,20 +289,28 @@ func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ubus := service.ubus.(*fakeUbus)
-	device := joinFileDevice{Device: base, configDir: configDir, afterWirelessCommit: func() {
-		ubus.replies[ubusKey{"network.wireless", "status", ""}] = fixture(t, "wifi-scan/connected/wireless-status.json")
-	}}
-	// Immediately after reload the previous association still reports carrier.
-	ubus.replies[ubusKey{"network.device", "status", "phy0-sta0"}] = fixture(t, "device-status-phy0-sta0.json")
-	manager := &txn.Manager{
+	device := joinFileDevice{Device: base, configDir: configDir, afterWirelessCommit: afterWirelessCommit}
+	return &txn.Manager{
 		Device: device, Locks: &uciwrite.Locks{},
 		Guards: guard.Dir{Path: filepath.Join(root, "guards"), Now: time.Now},
 		Dir:    filepath.Join(root, "txn"), ConfigDir: configDir, Reload: []string{"true"}, UCI: "true",
 		Spawner: txn.ShellSpawner{Shell: "/bin/sh", RunTimeout: 5 * time.Second}, Clock: joinClock{},
 		NewID: func() string { return "0000000000000001" }, Window: txn.MinWindow,
 		ArmLimit: 30 * time.Second, ApplyBudget: 3 * time.Second, Settle: 3 * time.Second,
-	}
+	}, configDir
+}
+
+func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
+	ctx := context.Background()
+	service, _ := noSTAScanService(t)
+	base := mock.New()
+	seedJoinDevice(t, base)
+	ubus := service.ubus.(*fakeUbus)
+	manager, configDir := fileTxnManager(t, base, func() {
+		ubus.replies[ubusKey{"network.wireless", "status", ""}] = fixture(t, "wifi-scan/connected/wireless-status.json")
+	})
+	// Immediately after reload the previous association still reports carrier.
+	ubus.replies[ubusKey{"network.device", "status", "phy0-sta0"}] = fixture(t, "device-status-phy0-sta0.json")
 	lostCarrier := fixture(t, "wwan-down/device-status-phy0-sta0-disconnected.json")
 	reads := 0
 	links := joinLinks(func() (map[string]int, error) {
@@ -316,7 +328,7 @@ func TestJoinWrongPasswordRestoresTransaction(t *testing.T) {
 		}
 		return "phy0-sta0"
 	})
-	service.WithJoin(JoinDeps{UCI: device, Ubus: ubus, Routes: route, Keys: device, Links: links, Txns: manager, ProbeBudget: 50 * time.Millisecond, ProbeEvery: time.Millisecond})
+	service.WithJoin(JoinDeps{UCI: manager.Device, Ubus: ubus, Routes: route, Keys: manager.Device.(device.WirelessKeyWriter), Links: links, Txns: manager, ProbeBudget: 50 * time.Millisecond, ProbeEvery: time.Millisecond})
 	st, err := service.Join(ctx, JoinRequest{SSID: joinFixtureSSID(t, service), Key: "wrong-password", Security: SecurityWPA2})
 	if !errors.Is(err, txn.ErrProbeFailed) || st.State != txn.RolledBack {
 		t.Fatal(st, err)

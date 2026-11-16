@@ -179,3 +179,9 @@ type WireGuardKeyWriter interface {
 type UplinkReconnector interface {
 	ReconnectUplink(context.Context) error
 }
+
+// NeighbourReader returns the kernel IPv4 neighbour table as `ip -j -4 neigh show` JSON.
+// Lockout classification maps the caller's IP to a MAC with it (ADR 0011).
+type NeighbourReader interface {
+	Neighbours(context.Context) (json.RawMessage, error)
+}

@@ -48,12 +48,18 @@ describe('WiFi page', () => {
     vi.clearAllMocks();
     saved = { profiles: [], connected_id: null };
     reconnect = { state: 'idle', attempts: 0, max_attempts: 5 };
-    createLoader.mockImplementation((fn) => ({
-      status: { state: 'ready' },
-      data: fn === fetchWifiProfiles ? saved : fn === fetchWifiReconnect ? reconnect : summary,
-      retry: vi.fn(),
-      stop: vi.fn(),
-    }));
+    // Lazy panels (PageHost) stay loading; summary, saved uplinks and reconnect have data.
+    createLoader.mockImplementation((fn) =>
+      fn === fetchWifi || fn === fetchWifiProfiles || fn === fetchWifiReconnect
+        ? {
+            status: { state: 'ready' },
+            data:
+              fn === fetchWifiProfiles ? saved : fn === fetchWifiReconnect ? reconnect : summary,
+            retry: vi.fn(),
+            stop: vi.fn(),
+          }
+        : { status: { state: 'loading' }, data: undefined, retry: vi.fn() },
+    );
   });
 
   it('lists saved uplinks in priority order with ends disabled', () => {
@@ -89,6 +95,7 @@ describe('WiFi page', () => {
     expect(body).toContain('Scan');
     expect(fetchWifiScan).not.toHaveBeenCalled();
     expect(createLoader).toHaveBeenCalledWith(fetchWifi);
+    expect(body).toContain('Access point settings');
   });
 
   it('announces a slow scan and disables the button', () => {

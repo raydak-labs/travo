@@ -32,6 +32,7 @@ type Device struct {
 	ubus               map[string]json.RawMessage
 	scanReplies        map[string]json.RawMessage
 	staLinkIndex       int
+	neighbours         json.RawMessage
 	wirelessChanged    bool
 	DefaultRoute       bool
 	// RenewErr makes RenewLease fail; renews records the interfaces renewed.

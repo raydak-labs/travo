@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, CreateWiFiProfileData, CreateWiFiProfileErrors, CreateWiFiProfileResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, DeleteWiFiProfileData, DeleteWiFiProfileErrors, DeleteWiFiProfileResponses, EnableCaptiveDnsBypassData, EnableCaptiveDnsBypassErrors, EnableCaptiveDnsBypassResponses, GetAdGuardData, GetAdGuardErrors, GetAdGuardResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetVpndnsData, GetVpndnsErrors, GetVpndnsResponses, GetVpnKillSwitchData, GetVpnKillSwitchErrors, GetVpnKillSwitchResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnSplitData, GetVpnSplitErrors, GetVpnSplitResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiData, GetWiFiErrors, GetWiFiProfilesData, GetWiFiProfilesErrors, GetWiFiProfilesResponses, GetWiFiReconnectData, GetWiFiReconnectErrors, GetWiFiReconnectResponses, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, InstallAdGuardData, InstallAdGuardErrors, InstallAdGuardResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RenewCaptiveDhcpData, RenewCaptiveDhcpErrors, RenewCaptiveDhcpResponses, ReorderWiFiProfilesData, ReorderWiFiProfilesErrors, ReorderWiFiProfilesResponses, RestoreCaptiveDnsData, RestoreCaptiveDnsErrors, RestoreCaptiveDnsResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses, SelectWiFiProfileData, SelectWiFiProfileErrors, SelectWiFiProfileResponses, SetAdGuardDnsData, SetAdGuardDnsErrors, SetAdGuardDnsResponses, SetAdGuardServiceData, SetAdGuardServiceErrors, SetAdGuardServiceResponses, SetVpnKillSwitchData, SetVpnKillSwitchErrors, SetVpnKillSwitchResponses, SetVpnSplitData, SetVpnSplitErrors, SetVpnSplitResponses, SetVpnTunnelData, SetVpnTunnelErrors, SetVpnTunnelResponses, VerifyVpndnsData, VerifyVpndnsErrors, VerifyVpndnsResponses } from './types.gen';
+import type { ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, CreateWiFiProfileData, CreateWiFiProfileErrors, CreateWiFiProfileResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, DeleteWiFiProfileData, DeleteWiFiProfileErrors, DeleteWiFiProfileResponses, EnableCaptiveDnsBypassData, EnableCaptiveDnsBypassErrors, EnableCaptiveDnsBypassResponses, GetAdGuardData, GetAdGuardErrors, GetAdGuardResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetVpndnsData, GetVpndnsErrors, GetVpndnsResponses, GetVpnKillSwitchData, GetVpnKillSwitchErrors, GetVpnKillSwitchResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnSplitData, GetVpnSplitErrors, GetVpnSplitResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiAccessPointsData, GetWiFiAccessPointsErrors, GetWiFiAccessPointsResponses, GetWiFiData, GetWiFiErrors, GetWiFiProfilesData, GetWiFiProfilesErrors, GetWiFiProfilesResponses, GetWiFiReconnectData, GetWiFiReconnectErrors, GetWiFiReconnectResponses, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, InstallAdGuardData, InstallAdGuardErrors, InstallAdGuardResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RenewCaptiveDhcpData, RenewCaptiveDhcpErrors, RenewCaptiveDhcpResponses, ReorderWiFiProfilesData, ReorderWiFiProfilesErrors, ReorderWiFiProfilesResponses, RestoreCaptiveDnsData, RestoreCaptiveDnsErrors, RestoreCaptiveDnsResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses, SelectWiFiProfileData, SelectWiFiProfileErrors, SelectWiFiProfileResponses, SetAdGuardDnsData, SetAdGuardDnsErrors, SetAdGuardDnsResponses, SetAdGuardServiceData, SetAdGuardServiceErrors, SetAdGuardServiceResponses, SetVpnKillSwitchData, SetVpnKillSwitchErrors, SetVpnKillSwitchResponses, SetVpnSplitData, SetVpnSplitErrors, SetVpnSplitResponses, SetVpnTunnelData, SetVpnTunnelErrors, SetVpnTunnelResponses, UpdateWiFiAccessPointData, UpdateWiFiAccessPointErrors, UpdateWiFiAccessPointResponses, VerifyVpndnsData, VerifyVpndnsErrors, VerifyVpndnsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -590,6 +590,36 @@ export const getWiFi = <ThrowOnError extends boolean = false>(options?: Options<
         }],
     url: '/api/v1/wifi',
     ...options
+});
+
+/**
+ * Configured access points
+ */
+export const getWiFiAccessPoints = <ThrowOnError extends boolean = false>(options?: Options<GetWiFiAccessPointsData, ThrowOnError>): RequestResult<GetWiFiAccessPointsResponses, GetWiFiAccessPointsErrors, ThrowOnError> => (options?.client ?? client).get<GetWiFiAccessPointsResponses, GetWiFiAccessPointsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/wifi/aps',
+    ...options
+});
+
+/**
+ * Edit one access point (guarded transaction)
+ */
+export const updateWiFiAccessPoint = <ThrowOnError extends boolean = false>(options: Options<UpdateWiFiAccessPointData, ThrowOnError>): RequestResult<UpdateWiFiAccessPointResponses, UpdateWiFiAccessPointErrors, ThrowOnError> => (options.client ?? client).post<UpdateWiFiAccessPointResponses, UpdateWiFiAccessPointErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/wifi/aps/{section}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

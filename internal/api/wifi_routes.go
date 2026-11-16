@@ -21,6 +21,7 @@ func (s *server) registerWiFi(a huma.API) {
 	join.DefaultStatus = http.StatusAccepted
 	join.MaxBodyBytes = 4096
 	register(s, false, join, a, s.joinWiFi)
+	s.registerWiFiAPs(a)
 
 }
 

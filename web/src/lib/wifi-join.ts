@@ -3,19 +3,21 @@ import { m } from './paraglide/messages.js';
 
 export type JoinState =
   | { state: 'idle' }
-  | { state: 'joining'; ssid: string }
+  | { state: 'joining'; ssid: string; ap?: boolean }
   | { state: 'failed'; code: string }
   | { state: TxnBody['state']; transaction: TxnBody; deadline: number };
 
 export type JoinEvent =
-  | { type: 'start'; ssid: string }
+  | { type: 'start'; ssid: string; ap?: boolean }
   | { type: 'transaction'; transaction: TxnBody; now: number }
   | { type: 'failure'; code: string };
 
 export function reduceJoin(state: JoinState, event: JoinEvent): JoinState {
   switch (event.type) {
     case 'start':
-      return { state: 'joining', ssid: event.ssid };
+      return event.ap
+        ? { state: 'joining', ssid: event.ssid, ap: true }
+        : { state: 'joining', ssid: event.ssid };
     case 'failure':
       return { state: 'failed', code: event.code };
     case 'transaction': {
@@ -44,6 +46,12 @@ export function joinError(code: string) {
       return m.wifi_join_not_found();
     case 'wifi_lockout_risk':
       return m.wifi_join_lockout();
+    case 'wifi_radio_in_use':
+      return m.wifi_ap_radio_in_use();
+    case 'wifi_ap_not_found':
+      return m.wifi_ap_not_found();
+    case 'wifi_ssid_invalid':
+      return m.wifi_ssid_invalid();
     case 'wifi_no_change':
       return m.wifi_join_no_change();
     default:

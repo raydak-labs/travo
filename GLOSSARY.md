@@ -5,7 +5,7 @@
 - **Scan**: the on-demand, read-only per-radio site survey.
 - **Join**: the guarded configuration and verification of an uplink STA, followed by explicit confirmation or rollback.
 - **Saved uplink**: one entry in the ordered list of stored uplink credentials (`wifi-profiles.json`). Saving or forgetting one never changes the STA; selecting one is a Join.
-- **AP**: WiFi access point serving the LAN. **Guest AP**: separate SSID, key, subnet (192.168.2.0/24) and zone.
+- **AP**: WiFi access point serving the LAN; one `wifi-iface` section with `mode=ap`, edited per section ("per radio"). **Guest AP**: separate SSID, key, subnet (192.168.2.0/24) and zone.
 - **Caller**: the client making an API request. Classified as ethernet / wifi-ap / wifi-client / unknown.
 - **Lockout**: a change that would leave the caller without a way to reach the router.
 - **Device port**: the interface through which all `uci`/`ubus`/netifd access happens. Adapters: CLI (real), mock.

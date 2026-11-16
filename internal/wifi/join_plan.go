@@ -40,12 +40,7 @@ func uplinkSections(wireless []device.Section) []device.Section {
 type uciWrite struct{ action, config, section, option, value string }
 
 func planJoin(wireless, network, firewall []device.Section, req JoinRequest, radio string) (writes []uciWrite, before, after []lockout.AP, err error) {
-	for _, section := range wireless {
-		if section.Type == "wifi-iface" && section.Options["mode"] == "ap" {
-			onLAN := slices.Contains(strings.Fields(section.Options["network"]), "lan") || slices.Contains(section.Lists["network"], "lan")
-			before = append(before, lockout.AP{Section: section.Name, Enabled: section.Options["disabled"] != "1", Guest: !onLAN})
-		}
-	}
+	before = apLayout(wireless)
 	after = slices.Clone(before)
 	zone := slices.IndexFunc(firewall, func(s device.Section) bool { return s.Type == "zone" && s.Options["name"] == "wan" })
 	if zone < 0 {
@@ -130,7 +125,8 @@ func planSTA(wireless, sta []device.Section, req JoinRequest, radio string) ([]u
 	return writes, nil
 }
 
-func (s *Service) stageJoin(ctx context.Context, writes []uciWrite, key string) error {
+// stageWrites applies planned writes inside a transaction stage; the key travels by value.
+func (s *Service) stageWrites(ctx context.Context, writes []uciWrite, key string) error {
 	d := s.join.UCI
 	for _, w := range writes {
 		var err error
