@@ -151,6 +151,7 @@ describe('Dashboard connectivity', () => {
       },
     );
     expect(body).toContain('A DNS change did not finish');
+    expect(body).toContain('Retry DNS restore');
     expect(body).not.toContain('Use hotel DNS for 5 min');
     expect(body).not.toContain('Restore DNS now');
   });

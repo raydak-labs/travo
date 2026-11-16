@@ -54,11 +54,15 @@ async function run(action: () => Promise<{ data?: unknown; error?: { code?: stri
           {m.captive_open_login()}
         </Button>
       {/if}
-      {#if info.captive.dns_bypass}
+      {#if info.captive.pending}
+        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => restoreCaptiveDns())}>
+          {m.captive_dns_retry()}
+        </Button>
+      {:else if info.captive.dns_bypass}
         <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => restoreCaptiveDns())}>
           {m.captive_dns_restore()}
         </Button>
-      {:else if !info.captive.pending}
+      {:else}
         <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => enableCaptiveDnsBypass())}>
           {m.captive_dns_bypass()}
         </Button>

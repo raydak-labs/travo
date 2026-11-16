@@ -28,6 +28,8 @@ var (
 type Layers interface {
 	Push(context.Context, dnslayer.Layer) error
 	Pop(context.Context, dnslayer.Name) error
+	// Resume finishes an interrupted change; a no-op when no guard is held.
+	Resume(context.Context) error
 	Status() (dnslayer.Status, error)
 }
 
@@ -86,9 +88,14 @@ func (b *Bypass) armed() time.Time {
 
 // Restore pops the captive layer. On failure the dnslayer guard stays and Status reports
 // pending: success is never reported while the bypass could still be in force.
+// Restore is also the user's explicit retry: an unfinished stack change is resumed
+// first (the worker never resumes), then the layer is popped if it is still there.
 func (b *Bypass) Restore(ctx context.Context) error {
 	b.op.Lock()
 	defer b.op.Unlock()
+	if err := b.layers.Resume(ctx); err != nil {
+		return err
+	}
 	return b.restoreLocked(ctx)
 }
 

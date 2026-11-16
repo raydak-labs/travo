@@ -217,9 +217,19 @@ func TestFailedRestoreKeepsBypassVisible(t *testing.T) {
 		t.Fatalf("failed restore must stay visible: %+v", got)
 	}
 	r.clock.t = r.clock.t.Add(RestoreAfter)
-	r.bypass.Tick(t.Context())
+	r.apply.fail = false
+	r.bypass.Tick(t.Context()) // the worker never resumes: only the explicit retry does
 	if got := r.bypass.Status(); !got.Pending {
 		t.Fatalf("tick hid the failure: %+v", got)
+	}
+	if err := r.bypass.Restore(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.bypass.Status(); got.Pending || got.DNSBypass {
+		t.Fatalf("explicit retry did not finish: %+v", got)
+	}
+	if after := dnsmasq(t, r.dev); after.RebindProtection.Set && after.RebindProtection.Value == "0" {
+		t.Fatalf("bypass still in force: %+v", after)
 	}
 }
 
