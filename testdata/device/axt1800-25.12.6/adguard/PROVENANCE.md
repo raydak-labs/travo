@@ -37,3 +37,11 @@ adguard-log.txt: logread -e AdGuardHome | tail -40
 
 - Failed first-attempt captures (BusyBox wget has no -S flag; the first run used wget for HTTP headers) were overwritten with curl-based captures. No .err files remain.
 - conffiles.txt was first captured with a broad sed range that over-printed; overwritten with the narrower command above.
+
+## Addendum 2026-11-16 (issue #132)
+
+Captured read-only on the same router (OpenWrt 25.12.6 r33311-981c978eff) on Mon Nov 16 20:00 UTC 2026, AGH 0.107.79-r1 still installed and running. No redactions (the output holds no secrets).
+
+- service-list-adguardhome.json: `ubus call service list '{"name":"adguardhome"}'`
+- service-list-absent.json: `ubus call service list '{"name":"nonexistent-svc"}'` (procd answers an empty object for an unknown service)
+- df-overlay.txt: `df -k /overlay`

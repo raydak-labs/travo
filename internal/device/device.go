@@ -150,6 +150,18 @@ type WireGuardControl interface {
 	WireGuardLinkPresent(context.Context) (bool, error)
 }
 
+// Services reads and drives procd services by init script name (e.g. "adguardhome").
+// Actions are live-state changes: callers guard them. Never used for `network` or `wifi`.
+type Services interface {
+	// ServiceRunning is true when procd reports a running instance. An absent service is false.
+	ServiceRunning(ctx context.Context, name string) (bool, error)
+	// ServiceAction runs one of ServiceActions through the init script.
+	ServiceAction(ctx context.Context, name, action string) error
+}
+
+// ServiceActions are the init script verbs Services accepts.
+var ServiceActions = map[string]bool{"start": true, "stop": true, "restart": true, "enable": true, "disable": true}
+
 // WireGuardKeyWriter stages private or preshared keys without passing them in argv.
 type WireGuardKeyWriter interface {
 	SetWireGuardKey(ctx context.Context, section, option, key string) error

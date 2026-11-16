@@ -34,9 +34,13 @@ type Device struct {
 	wirelessChanged    bool
 	DefaultRoute       bool
 	// AccountsErr makes every Accounts call fail (shadow unreadable).
-	AccountsErr  error
-	password     string
-	passwordInit bool
+	AccountsErr error
+	// ServiceErr makes every ServiceAction fail; ServiceActions records "name action".
+	ServiceErr     error
+	ServiceActions []string
+	services       map[string]serviceState
+	password       string
+	passwordInit   bool
 }
 
 func New() *Device {
