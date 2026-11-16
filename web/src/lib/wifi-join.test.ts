@@ -50,6 +50,16 @@ describe('WiFi join', () => {
     ).not.toContain('type="password"');
   });
 
+  it('offers Save as a separate explicit action only when saving is wired', () => {
+    const props = { network, close: () => {}, submit: () => {} };
+    expect(render(WiFiJoinDialog, { props }).body).not.toContain('Save');
+    const body = render(WiFiJoinDialog, {
+      props: { ...props, save: async () => undefined },
+    }).body;
+    expect(body).toContain('Save');
+    expect(body).toContain('type="submit"');
+  });
+
   it('disables joining unsupported networks', () => {
     const { body } = render(WiFiScanList, {
       props: {

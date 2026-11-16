@@ -8,17 +8,29 @@ import {
   type Network,
   rollbackTransaction,
   type ScanResult,
+  type WiFiProfileSummary,
 } from '../api/gen';
-import { fetchWifi, fetchWifiScan, joinWifi } from '../api/wifi';
+import {
+  fetchWifi,
+  fetchWifiProfiles,
+  fetchWifiScan,
+  forgetWifiProfile,
+  joinWifi,
+  reorderWifiProfiles,
+  saveWifiProfile,
+  selectWifiProfile,
+} from '../api/wifi';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader, type LoadStatus } from '../ui/loader.svelte';
 import { wifiScanErrorMessage } from '../wifi';
 import { type JoinState, joinError, reduceJoin } from '../wifi-join';
+import { savedChangeError, saveError } from '../wifi-profiles';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
 
+import WiFiSavedUplinks from './WiFiSavedUplinks.svelte';
 import WiFiScanList from './WiFiScanList.svelte';
 import WiFiSummary from './WiFiSummary.svelte';
 
@@ -31,6 +43,7 @@ let {
 }: { initialScanStatus?: LoadStatus; initialScanData?: ScanResult } = $props();
 
 const summary = createLoader(fetchWifi);
+const profiles = createLoader(fetchWifiProfiles);
 const request = new AbortController();
 // The optional initial values exist for deterministic SSR state tests; normal routes start idle.
 // svelte-ignore state_referenced_locally
@@ -57,10 +70,20 @@ function failure(error: { code?: string } | undefined) {
   joining = reduceJoin(joining, { type: 'failure', code: error?.code ?? '' });
 }
 
-async function submitJoin(body: JoinWiFiData['body']) {
-  joining = reduceJoin(joining, { type: 'start', ssid: body.ssid });
+type JoinResponse = Awaited<ReturnType<typeof joinWifi>>;
+
+function submitJoin(body: JoinWiFiData['body']) {
+  return startJoin(body.ssid, () => joinWifi(body, request.signal));
+}
+
+function selectProfile(profile: WiFiProfileSummary) {
+  return startJoin(profile.ssid, () => selectWifiProfile(profile.id, request.signal));
+}
+
+async function startJoin(ssid: string, send: () => Promise<JoinResponse>) {
+  joining = reduceJoin(joining, { type: 'start', ssid });
   try {
-    const response = await joinWifi(body, request.signal);
+    const response = await send();
     if (request.signal.aborted) return;
     now = performance.now();
     if (response.data) {
@@ -99,6 +122,8 @@ async function poll() {
         transaction: response.data,
         now: performance.now(),
       });
+      // An expired window rolls back on its own; the connected uplink may have changed.
+      if (joining.state !== 'pending' && joining.state !== 'restoring') void profiles.retry();
     } else if (response.response?.status === 404) {
       failure(response.error);
     }
@@ -129,6 +154,7 @@ async function settle(confirm: boolean) {
         now: performance.now(),
       });
       summary.retry();
+      void profiles.retry();
     } else if (response.error?.code === 'restoring' || response.error?.code === 'rollback_failed') {
       joining = { ...joining, state: response.error.code };
     }
@@ -151,6 +177,39 @@ onMount(() => {
     clearInterval(statusTimer);
   };
 });
+
+let profileBusy = $state(false);
+let profileError = $state('');
+
+async function changeProfiles(send: () => Promise<{ data?: unknown; error?: unknown }>) {
+  if (profileBusy) return;
+  profileBusy = true;
+  profileError = '';
+  try {
+    const response = await send();
+    if (request.signal.aborted) return;
+    if (!response.data) {
+      profileError = savedChangeError((response.error as { code?: string } | undefined)?.code);
+    }
+    await profiles.retry();
+  } catch {
+    if (!request.signal.aborted) profileError = savedChangeError(undefined);
+  } finally {
+    profileBusy = false;
+  }
+}
+
+// Saving stores credentials only; the live uplink is untouched.
+async function saveProfile(body: JoinWiFiData['body']): Promise<string | undefined> {
+  try {
+    const response = await saveWifiProfile(body, request.signal);
+    if (!response.data) return saveError((response.error as { code?: string } | undefined)?.code);
+    void profiles.retry();
+    return undefined;
+  } catch {
+    return saveError(undefined);
+  }
+}
 
 async function scan() {
   if (scanStatus.state === 'loading') return;
@@ -186,6 +245,24 @@ async function scan() {
     {/if}
   </Card>
 
+  <Card title={m.wifi_saved_title()}>
+    <LoadState status={profiles.status} retry={profiles.retry} stale={profiles.data !== undefined}>
+      {#if profiles.data}
+        <WiFiSavedUplinks
+          list={profiles.data}
+          busy={profileBusy}
+          joinBusy={busy}
+          reorder={(ids) => changeProfiles(() => reorderWifiProfiles(ids, request.signal))}
+          forget={(profile) => changeProfiles(() => forgetWifiProfile(profile.id, request.signal))}
+          select={selectProfile}
+        />
+      {/if}
+    </LoadState>
+    {#if profileError}
+      <p class="mt-2 text-sm text-danger" role="alert">{profileError}</p>
+    {/if}
+  </Card>
+
   <Card title={m.wifi_scan_title()}>
     <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
       {#if scanData}
@@ -214,7 +291,7 @@ async function scan() {
 
 
 {#if selected}
-  <PageHost load={joinDialog} props={{ network: selected, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, close: () => { selected = undefined; } }} />
+  <PageHost load={joinDialog} props={{ network: selected, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
 {/if}
 <div aria-live="polite" class="mt-4 space-y-2 text-sm">
   {#if joining.state === 'joining'}

@@ -293,10 +293,26 @@ export type VpnTunnelInputBody = {
     enabled: boolean | null;
 };
 
+export type WiFiProfileList = {
+    connected_id: string | null;
+    profiles: Array<WiFiProfileSummary>;
+};
+
+export type WiFiProfileSummary = {
+    bssid?: string;
+    id: string;
+    security: 'open' | 'wpa2' | 'wpa2_wpa3';
+    ssid: string;
+};
+
 export type WiFiSummary = {
     aps: Array<Ap>;
     radios: Array<RadioInfo>;
     stas: Array<Sta>;
+};
+
+export type WifiProfileOrderInputBody = {
+    ids: Array<string>;
 };
 
 export type JoinWiFiInputBodyWritable = {
@@ -1346,6 +1362,203 @@ export type JoinWiFiResponses = {
 };
 
 export type JoinWiFiResponse = JoinWiFiResponses[keyof JoinWiFiResponses];
+
+export type GetWiFiProfilesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/profiles';
+};
+
+export type GetWiFiProfilesErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiProfilesError = GetWiFiProfilesErrors[keyof GetWiFiProfilesErrors];
+
+export type GetWiFiProfilesResponses = {
+    /**
+     * OK
+     */
+    200: WiFiProfileList;
+};
+
+export type GetWiFiProfilesResponse = GetWiFiProfilesResponses[keyof GetWiFiProfilesResponses];
+
+export type CreateWiFiProfileData = {
+    body: JoinWiFiInputBodyWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/profiles';
+};
+
+export type CreateWiFiProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type CreateWiFiProfileError = CreateWiFiProfileErrors[keyof CreateWiFiProfileErrors];
+
+export type CreateWiFiProfileResponses = {
+    /**
+     * Created
+     */
+    201: WiFiProfileSummary;
+};
+
+export type CreateWiFiProfileResponse = CreateWiFiProfileResponses[keyof CreateWiFiProfileResponses];
+
+export type ReorderWiFiProfilesData = {
+    body: WifiProfileOrderInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/profiles/order';
+};
+
+export type ReorderWiFiProfilesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ReorderWiFiProfilesError = ReorderWiFiProfilesErrors[keyof ReorderWiFiProfilesErrors];
+
+export type ReorderWiFiProfilesResponses = {
+    /**
+     * OK
+     */
+    200: WiFiProfileList;
+};
+
+export type ReorderWiFiProfilesResponse = ReorderWiFiProfilesResponses[keyof ReorderWiFiProfilesResponses];
+
+export type DeleteWiFiProfileData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/wifi/profiles/{id}';
+};
+
+export type DeleteWiFiProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DeleteWiFiProfileError = DeleteWiFiProfileErrors[keyof DeleteWiFiProfileErrors];
+
+export type DeleteWiFiProfileResponses = {
+    /**
+     * OK
+     */
+    200: WiFiProfileList;
+};
+
+export type DeleteWiFiProfileResponse = DeleteWiFiProfileResponses[keyof DeleteWiFiProfileResponses];
+
+export type SelectWiFiProfileData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/wifi/profiles/{id}/select';
+};
+
+export type SelectWiFiProfileErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SelectWiFiProfileError = SelectWiFiProfileErrors[keyof SelectWiFiProfileErrors];
+
+export type SelectWiFiProfileResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SelectWiFiProfileResponse = SelectWiFiProfileResponses[keyof SelectWiFiProfileResponses];
 
 export type GetWiFiScanData = {
     body?: never;

@@ -35,6 +35,9 @@ func (f *fakeUbus) Call(_ context.Context, object, method string, args any) (jso
 			return nil, fmt.Errorf("unexpected args %#v", args)
 		}
 		key.name = fields["name"]
+		if key.name == "" {
+			key.name = fields["device"]
+		}
 	}
 	f.calls = append(f.calls, key)
 	if err := f.failures[key]; err != nil {

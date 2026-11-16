@@ -1,17 +1,20 @@
 import { render } from 'svelte/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ScanResult } from '../api/gen';
+import type { ScanResult, WiFiProfileList } from '../api/gen';
 import WiFi from './WiFi.svelte';
 
-const { createLoader, fetchWifi, fetchWifiScan } = vi.hoisted(() => ({
+const { createLoader, fetchWifi, fetchWifiProfiles, fetchWifiScan } = vi.hoisted(() => ({
   createLoader: vi.fn(),
   fetchWifi: vi.fn(),
+  fetchWifiProfiles: vi.fn(),
   fetchWifiScan: vi.fn(),
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
-vi.mock('../api/wifi', () => ({ fetchWifi, fetchWifiScan }));
+vi.mock('../api/wifi', () => ({ fetchWifi, fetchWifiProfiles, fetchWifiScan }));
 
 const summary = { radios: [], stas: [], aps: [] };
+// HomeUplink and Neighbor2 are the mock device's scan fixtures.
+let saved: WiFiProfileList = { profiles: [], connected_id: null };
 const scan: ScanResult = {
   networks: [
     {
@@ -40,7 +43,39 @@ const scan: ScanResult = {
 describe('WiFi page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createLoader.mockReturnValue({ status: { state: 'ready' }, data: summary, retry: vi.fn() });
+    saved = { profiles: [], connected_id: null };
+    createLoader.mockImplementation((fn) => ({
+      status: { state: 'ready' },
+      data: fn === fetchWifiProfiles ? saved : summary,
+      retry: vi.fn(),
+    }));
+  });
+
+  it('lists saved uplinks in priority order with ends disabled', () => {
+    saved = {
+      profiles: [
+        { id: 'a'.repeat(32), ssid: 'Neighbor2', security: 'wpa2' },
+        { id: 'b'.repeat(32), ssid: 'HomeUplink', bssid: '94:83:c4:1f:28:3a', security: 'wpa2' },
+      ],
+      connected_id: 'b'.repeat(32),
+    };
+    const body = render(WiFi).body;
+    expect(body).toContain('Saved uplinks');
+    expect(body.indexOf('Neighbor2')).toBeLessThan(body.indexOf('HomeUplink'));
+    expect(body).toContain('BSSID 94:83:c4:1f:28:3a');
+    expect(body).toContain('Connected');
+    expect(body).toMatch(
+      /disabled[^>]*aria-label="Move Neighbor2 up"|aria-label="Move Neighbor2 up"[^>]*disabled/,
+    );
+    expect(body).toMatch(
+      /disabled[^>]*aria-label="Move HomeUplink down"|aria-label="Move HomeUplink down"[^>]*disabled/,
+    );
+    expect(body).not.toContain('sentinel');
+    expect(createLoader).toHaveBeenCalledWith(fetchWifiProfiles);
+  });
+
+  it('shows an empty saved list as empty, not absent', () => {
+    expect(render(WiFi).body).toContain('No saved uplinks. Save one from a nearby network.');
   });
 
   it('starts idle and never scans automatically', () => {

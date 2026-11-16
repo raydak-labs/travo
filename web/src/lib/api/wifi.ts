@@ -1,6 +1,17 @@
 import { m } from '../paraglide/messages.js';
 import './client';
-import { getWiFi, getWiFiScan, type JoinWiFiData, joinWiFi } from './gen';
+import {
+  type CreateWiFiProfileData,
+  createWiFiProfile,
+  deleteWiFiProfile,
+  getWiFi,
+  getWiFiProfiles,
+  getWiFiScan,
+  type JoinWiFiData,
+  joinWiFi,
+  reorderWiFiProfiles,
+  selectWiFiProfile,
+} from './gen';
 
 export async function fetchWifi(signal?: AbortSignal) {
   const response = await getWiFi({ signal });
@@ -22,4 +33,26 @@ export async function fetchWifiScan(signal?: AbortSignal) {
 
 export function joinWifi(body: JoinWiFiData['body'], signal?: AbortSignal) {
   return joinWiFi({ body, signal });
+}
+
+export async function fetchWifiProfiles(signal?: AbortSignal) {
+  const response = await getWiFiProfiles({ signal });
+  if (!response.data) throw new Error(m.wifi_saved_unavailable());
+  return response.data;
+}
+
+export function saveWifiProfile(body: CreateWiFiProfileData['body'], signal?: AbortSignal) {
+  return createWiFiProfile({ body, signal });
+}
+
+export function reorderWifiProfiles(ids: string[], signal?: AbortSignal) {
+  return reorderWiFiProfiles({ body: { ids }, signal });
+}
+
+export function forgetWifiProfile(id: string, signal?: AbortSignal) {
+  return deleteWiFiProfile({ path: { id }, signal });
+}
+
+export function selectWifiProfile(id: string, signal?: AbortSignal) {
+  return selectWiFiProfile({ path: { id }, signal });
 }

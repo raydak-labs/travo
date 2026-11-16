@@ -28,7 +28,7 @@ func init() {
 		if ctx.Operation().OperationID == vpnImportOperation {
 			return huma.NewError(status, "invalid profile request")
 		}
-		if ctx.Operation().OperationID == wifiJoinOperation {
+		if id := ctx.Operation().OperationID; id == wifiJoinOperation || id == wifiProfileCreateOperation {
 			return huma.NewError(status, "invalid WiFi join request")
 		}
 		return huma.NewError(status, msg, errs...)

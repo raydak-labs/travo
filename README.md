@@ -33,6 +33,8 @@ Use **VPN** to import and select a WireGuard profile, then enable or disable the
 
 On the WiFi page, scan for an uplink, join it on a free radio, and confirm the connection once it is verified.
 
+**Saved uplinks** keeps an ordered list of networks. Use **Save** in a network's dialog to store its credentials without changing the current connection. Move a network up or down to change its priority. **Select** joins a saved network with the same confirm or rollback flow as Join. **Forget** removes a saved network and leaves the current connection up.
+
 ## UI components
 
 The Svelte UI uses locally owned shadcn-svelte components, with the same light/dark palette and offline assets. New controls compose these primitives through the existing app wrappers. See [ADR 0013](docs/adr/0013-shadcn-components.md) for the size tradeoffs and [migration evidence](docs/testing/shadcn-migration.md) for the inventory and keyboard checks.

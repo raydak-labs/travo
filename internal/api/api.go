@@ -84,6 +84,7 @@ type Deps struct {
 	Connectivity ConnectivityReader
 	WiFi         WiFiService
 	WiFiJoin     WiFiJoiner
+	WiFiProfiles WiFiProfileService
 	Txns         Txns
 	Sessions     *auth.Store
 	Limiter      *auth.RateLimiter
@@ -170,6 +171,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerThroughput(a)
 	s.registerConnectivity(a)
 	s.registerWiFi(a)
+	s.registerWiFiProfiles(a)
 	s.registerDashboardEvents(a)
 	if d.UI != nil {
 		mux.Handle("/", d.UI)
@@ -177,14 +179,19 @@ func New(d Deps) (http.Handler, huma.API) {
 	return s.outer(mux), a
 }
 
-// schemaNamer disambiguates the WiFi summary from the VPN profile Summary model.
+// schemaNamer disambiguates the WiFi and saved-uplink models from the VPN profile models.
 func schemaNamer(t reflect.Type, hint string) string {
 	name := huma.DefaultSchemaNamer(t, hint)
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/wifi" && t.Name() == "Summary" {
-		return "WiFi" + name
+	switch t.PkgPath() {
+	case "github.com/blackdark-org/travo-greenfield/internal/wifi":
+		if t.Name() == "Summary" {
+			return "WiFi" + name
+		}
+	case "github.com/blackdark-org/travo-greenfield/internal/wifiprofiles":
+		return "WiFiProfile" + name
 	}
 	return name
 }

@@ -117,6 +117,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 
 - Roles: uplink STA (`mode=sta`, bound to `wwan`, in `wan` zone), downlink AP(s) (shared SSID/key default), guest AP (own subnet 192.168.2.0/24, own zone; refuse subnet overlap).
 - Max ONE enabled STA bound to `wwan`. Multiple saved upstreams = ordered priority list, one active.
+- Saved uplinks never write UCI on save, reorder or forget; select is a Join on a copy of the stored credentials and never rewrites the list. A saved uplink is connected only when the managed STA has carrier and `iwinfo info` reports its SSID (and BSSID when pinned); a configured SSID alone never counts. Keys never appear in list responses, errors or logs.
 - With ≥2 radios, STA and AP go on DIFFERENT radios. Same-radio is an opt-in escape hatch, visible in health. Refuse STA enable on a radio carrying an enabled AP (409) unless single-radio/opt-in.
 - Radio pick is deterministic (sorted by name, prefer no-AP). "Uplink radio" = radio of ANY enabled `mode=sta` iface.
 - Layout reconcile happens BEFORE a single commit (stage STA, reconcile AP, commit once). Never commit AP+STA on one radio, even transiently.
