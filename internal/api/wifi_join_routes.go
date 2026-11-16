@@ -25,8 +25,17 @@ func (s *server) joinWiFi(ctx context.Context, in *joinWiFiInput) (*txnOutput, e
 	if s.WiFiJoin == nil {
 		return nil, wifiDeviceUnavailable()
 	}
+	return joinResult(s.WiFiJoin.Join(ctx, in.request()))
+}
+
+func (in *joinWiFiInput) request() wifi.JoinRequest {
 	b := in.Body
-	st, err := s.WiFiJoin.Join(ctx, wifi.JoinRequest{SSID: b.SSID, BSSID: b.BSSID, Key: b.Key, Security: b.Security})
+	return wifi.JoinRequest{SSID: b.SSID, BSSID: b.BSSID, Key: b.Key, Security: b.Security}
+}
+
+// joinResult maps a join outcome. A returned rolled-back transaction is authoritative
+// and answers 202 even with an error.
+func joinResult(st txn.Status, err error) (*txnOutput, error) {
 	if err == nil || (st.ID != "" && (st.State == txn.RolledBack || st.State == txn.Restoring || st.State == txn.RollbackFailed)) {
 		return txnResponse(st), nil
 	}
