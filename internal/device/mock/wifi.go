@@ -18,6 +18,12 @@ var scanPHY0STA []byte
 //go:embed testdata/iwinfo-scan-phy1-ap0.json
 var scanPHY1AP []byte
 
+// WirelessUCI is the `uci show wireless` capture matching the seeded wireless status.
+// The caller parses it with the CLI adapter's parser and commits it with Load.
+//
+//go:embed testdata/uci-show-wireless.txt
+var WirelessUCI []byte
+
 // SetScanReply scripts a scan for one exact interface or radio name.
 func (d *Device) SetScanReply(name string, reply json.RawMessage) {
 	d.mu.Lock()

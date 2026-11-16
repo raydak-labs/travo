@@ -49,7 +49,7 @@ function save(event: SubmitEvent) {
       {#each aps.data as ap (ap.section)}
         <li class="flex flex-wrap items-center gap-2">
           <span class="break-all">{ap.ssid}</span>
-          <span class="text-sm text-muted">{bandLabel(ap.band)}</span>
+          <span class="text-sm text-muted-foreground">{bandLabel(ap.band)}</span>
           {#if ap.guest}<Status kind="info">{m.wifi_ap_guest()}</Status>{/if}
           <Status kind={ap.enabled ? 'ok' : 'neutral'}>{ap.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
           <span class="ml-auto flex gap-2">
@@ -77,7 +77,7 @@ function save(event: SubmitEvent) {
     <Label class="grid gap-1">
       {m.wifi_ap_key()}
       <Input bind:value={key} type="password" autocomplete="new-password" minlength={8} maxlength={63} disabled={busy} />
-      <span class="text-sm text-muted">{m.wifi_ap_key_hint()}</span>
+      <span class="text-sm text-muted-foreground">{m.wifi_ap_key_hint()}</span>
     </Label>
     <div class="flex justify-end gap-2">
       <Button variant="outline" type="button" onclick={() => (open = false)}>{m.wifi_join_cancel()}</Button>
