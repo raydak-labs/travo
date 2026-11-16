@@ -1,6 +1,11 @@
 import { scopedAPIClient } from './api/client';
 import { fetchConnectivity } from './api/connectivity';
-import type { GetDashboardEventsData, Status, SystemInfoBody, ThroughputBody } from './api/gen';
+import type {
+  DashboardConnectivity,
+  GetDashboardEventsData,
+  SystemInfoBody,
+  ThroughputBody,
+} from './api/gen';
 import type { Client } from './api/gen/client';
 import { createSseClient } from './api/gen/core/serverSentEvents.gen';
 import { APIRequestError } from './api/request';
@@ -16,7 +21,7 @@ const EVENTS_URL = '/api/v1/dashboard/events' satisfies GetDashboardEventsData['
 const SOURCE_NAMES = ['connectivity', 'resources', 'throughput'] as const;
 
 export type DashboardSourceName = (typeof SOURCE_NAMES)[number];
-type SourceData = Status | SystemInfoBody | ThroughputBody;
+type SourceData = DashboardConnectivity | SystemInfoBody | ThroughputBody;
 type SourceState = { status: LoadStatus; data?: SourceData };
 type Reader = (signal: AbortSignal | undefined, client: Client) => Promise<SourceData>;
 
@@ -277,7 +282,7 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
   }
 
   return {
-    connectivity: view<Status>('connectivity'),
+    connectivity: view<DashboardConnectivity>('connectivity'),
     resources: view<SystemInfoBody>('resources'),
     throughput: view<ThroughputBody>('throughput'),
     get streaming(): boolean {

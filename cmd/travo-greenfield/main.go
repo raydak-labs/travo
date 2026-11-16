@@ -20,9 +20,11 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/app"
 	"github.com/blackdark-org/travo-greenfield/internal/auth"
 	"github.com/blackdark-org/travo-greenfield/internal/auth/epochfile"
+	"github.com/blackdark-org/travo-greenfield/internal/captive"
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
+	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
@@ -169,12 +171,20 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		workers.Go("interface-throughput", func(ctx context.Context) { sampler.Run(ctx, counters, clock.Now) })
 	}
 	var connection api.ConnectivityReader
+	var captiveAssist api.CaptiveAssist
+	// One DNS layer stack for every feature (ADR 0010); applies invalidate the shared probe.
+	dnsLayers := &dnslayer.Service{Device: deps.Device, Guards: deps.Guards, Apply: deps.Txn,
+		RecordPath: filepath.Join(deps.Paths.State, "dns-layers.json")}
 	if routes, ok := deps.Device.(device.DefaultRouteReader); ok {
 		probe := connectivity.NewHTTPProbe(connectivity.ProbeURL, 3*time.Second)
 		if deps.Mock {
 			probe = func(context.Context) connectivity.Result { return connectivity.Result{Internet: connectivity.Online} }
 		}
-		connection = connectivity.New(ctx, routes, deps.Device, probe, clock.Now)
+		shared := connectivity.New(ctx, routes, deps.Device, probe, clock.Now)
+		connection, dnsLayers.AfterApply = shared, shared.Invalidate
+		bypass := captive.NewBypass(dnsLayers, deps.Device, routes, clock.Now)
+		captiveAssist = bypass
+		workers.Go("captive-dns-restore", lifecycle.Every(15*time.Second, bypass.Tick))
 	}
 	backup, _ := deps.Device.(device.ConfigBackupper)
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))
@@ -249,6 +259,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		Backup:        backup,
 		Updates:       updates,
 		Connectivity:  connection,
+		Captive:       captiveAssist,
 		WiFi:          wireless,
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,

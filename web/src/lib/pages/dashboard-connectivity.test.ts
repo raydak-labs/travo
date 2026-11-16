@@ -1,6 +1,6 @@
 import { render } from 'svelte/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Status } from '../api/gen';
+import type { DashboardConnectivity } from '../api/gen';
 import { fetchHealth } from '../api/health';
 import type { LoadStatus } from '../ui/loader.svelte';
 import Dashboard from './Dashboard.svelte';
@@ -16,10 +16,17 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
 vi.mock('../dashboard-events.svelte', () => ({ dashboardEvents }));
 
-function dashboard(status: LoadStatus, data: Status | undefined) {
+type Snapshot = Omit<DashboardConnectivity, 'captive'> & {
+  captive?: Partial<DashboardConnectivity['captive']>;
+};
+
+function dashboard(status: LoadStatus, data: Snapshot | undefined) {
   createLoader.mockReturnValue({ status: { state: 'ready' }, data: undefined, retry: vi.fn() });
   dashboardEvents.connectivity.status = status;
-  dashboardEvents.connectivity.data = data;
+  dashboardEvents.connectivity.data = data && {
+    ...data,
+    captive: { dns_bypass: false, pending: false, restore_in_seconds: null, ...data.captive },
+  };
   return render(Dashboard, { props: { events: dashboardEvents as never } }).body;
 }
 
@@ -98,5 +105,53 @@ describe('Dashboard connectivity', () => {
     expect(link).toContain('href="http://portal.example/login?a=1&amp;b=2"');
     expect(link).toContain('target="_blank"');
     expect(link).toContain('rel="noopener noreferrer"');
+  });
+
+  it('offers the DNS bypass when connected but offline, and hides it when online', () => {
+    const offline = dashboard(
+      { state: 'ready' },
+      { active_interface: 'phy0-sta0', carrier: true, internet: 'offline', portal_url: null },
+    );
+    expect(offline).toContain('Hotel WiFi login');
+    expect(offline).toContain('Use hotel DNS for 5 min');
+    expect(offline).not.toContain('Open hotel login');
+    const noLink = dashboard(
+      { state: 'ready' },
+      { active_interface: 'phy0-sta0', carrier: false, internet: 'offline', portal_url: null },
+    );
+    expect(noLink).not.toContain('Hotel WiFi login');
+  });
+
+  it('shows the active bypass with its countdown and a restore action', () => {
+    const body = dashboard(
+      { state: 'ready' },
+      {
+        active_interface: 'phy0-sta0',
+        carrier: true,
+        internet: 'online',
+        portal_url: null,
+        captive: { dns_bypass: true, restore_in_seconds: 125 },
+      },
+    );
+    expect(body).toContain('Hotel DNS in use');
+    expect(body).toContain('Restores automatically in 2:05.');
+    expect(body).toContain('Restore DNS now');
+    expect(body).not.toContain('Use hotel DNS for 5 min');
+  });
+
+  it('keeps an unfinished DNS change visible without offering another change', () => {
+    const body = dashboard(
+      { state: 'ready' },
+      {
+        active_interface: 'phy0-sta0',
+        carrier: true,
+        internet: 'online',
+        portal_url: null,
+        captive: { pending: true },
+      },
+    );
+    expect(body).toContain('A DNS change did not finish');
+    expect(body).not.toContain('Use hotel DNS for 5 min');
+    expect(body).not.toContain('Restore DNS now');
   });
 });

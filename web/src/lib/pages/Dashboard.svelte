@@ -2,6 +2,7 @@
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Table from '$lib/components/ui/table';
 import { fetchHealth } from '../api/health';
+import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
 import { formatBytes, formatLoad, formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
@@ -36,8 +37,8 @@ function formatRate(rate: number | null): string {
 </script>
 
 <div class="flex flex-col gap-4">
-  {#if connectivity.data?.internet === 'captive'}
-    <CaptivePortalCard info={connectivity.data} />
+  {#if connectivity.data && captiveCardVisible(connectivity.data)}
+    <CaptivePortalCard info={connectivity.data} refresh={connectivity.retry} />
   {/if}
   <Card title={m.dashboard_connectivity()}>
     <LoadState status={connectivity.status} retry={connectivity.retry} stale={connectivity.data !== undefined}>

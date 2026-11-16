@@ -98,7 +98,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Status reads never mutate DNS. Only an explicit POST or a scheduler with its own guard mutates.
 - VPN self-heal on status read only for terminal "disabled"; "enabled-not-up" needs debounce (N readings over T seconds). A broken probe is not a broken tunnel.
 - Known gap: layer record survives but the tunnel config is deleted → heal never runs.
-- Captive bypass: back up WAN DNS fields, rebind flag, AdGuard upstream; never record the dnsmasq server list outside the stack. Auto-restore after 5 min.
+- Captive bypass is the `captive` layer: the active uplink's resolvers with rebind protection off. It never edits WAN DNS fields or the AdGuard upstream, so the stack's base is the only backup; never record the dnsmasq server list outside the stack. Auto-restore after 5 min (monotonic, memory-only deadline; a daemon restart re-arms a full 5 min, see [adr/0010](adr/0010-dns-layer-stack.md)).
 - AdGuard: liveness probe resolves a fresh uncached name via `127.0.0.1:5353`. After M failures the `adguard` layer is popped (fail OPEN), a loud banner shows, and it does not re-enable until the user confirms or a probe passed for a hold-down period.
 - AdGuard binds loopback only, has no accounts, and is reached through the Travo-gated proxy. No first-run wizard is ever exposed on the LAN.
 

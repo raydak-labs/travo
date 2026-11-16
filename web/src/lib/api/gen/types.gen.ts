@@ -54,6 +54,32 @@ export type ApplyStatus = {
     version?: string;
 };
 
+export type BypassStatus = {
+    /**
+     * The captive DNS layer is on the stack
+     */
+    dns_bypass: boolean;
+    /**
+     * A DNS layer change did not finish; the bypass may still be in force
+     */
+    pending: boolean;
+    /**
+     * Seconds until the bypass is restored automatically; null when not armed
+     */
+    restore_in_seconds: number | null;
+};
+
+export type DashboardConnectivity = {
+    active_interface: string | null;
+    captive: BypassStatus;
+    carrier: boolean | null;
+    internet: 'online' | 'offline' | 'captive' | 'unknown';
+    /**
+     * Captive portal login URL; null unless internet is captive
+     */
+    portal_url: string | null;
+};
+
 export type GetSetupStateResponse = {
     password_set: boolean;
 };
@@ -210,16 +236,6 @@ export type StageInputBody = {
 export type StageStatus = {
     status: 'idle' | 'verifying' | 'verified';
     version: string | null;
-};
-
-export type Status = {
-    active_interface: string | null;
-    carrier: boolean | null;
-    internet: 'online' | 'offline' | 'captive' | 'unknown';
-    /**
-     * Captive portal login URL; null unless internet is captive
-     */
-    portal_url: string | null;
 };
 
 export type Summary = {
@@ -491,6 +507,72 @@ export type GetSessionResponses = {
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
 
+export type EnableCaptiveDnsBypassData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/captive/dns-bypass';
+};
+
+export type EnableCaptiveDnsBypassErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type EnableCaptiveDnsBypassError = EnableCaptiveDnsBypassErrors[keyof EnableCaptiveDnsBypassErrors];
+
+export type EnableCaptiveDnsBypassResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type EnableCaptiveDnsBypassResponse = EnableCaptiveDnsBypassResponses[keyof EnableCaptiveDnsBypassResponses];
+
+export type RestoreCaptiveDnsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/captive/dns-restore';
+};
+
+export type RestoreCaptiveDnsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type RestoreCaptiveDnsError = RestoreCaptiveDnsErrors[keyof RestoreCaptiveDnsErrors];
+
+export type RestoreCaptiveDnsResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type RestoreCaptiveDnsResponse = RestoreCaptiveDnsResponses[keyof RestoreCaptiveDnsResponses];
+
 export type GetDashboardConnectivityData = {
     body?: never;
     path?: never;
@@ -511,7 +593,7 @@ export type GetDashboardConnectivityResponses = {
     /**
      * OK
      */
-    200: Status;
+    200: DashboardConnectivity;
 };
 
 export type GetDashboardConnectivityResponse = GetDashboardConnectivityResponses[keyof GetDashboardConnectivityResponses];

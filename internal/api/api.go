@@ -82,6 +82,8 @@ type Deps struct {
 	Backup       device.ConfigBackupper
 	Throughput   ThroughputReader
 	Connectivity ConnectivityReader
+	// Captive is the portal DNS bypass; nil answers 503 captive_unavailable.
+	Captive      CaptiveAssist
 	WiFi         WiFiService
 	WiFiJoin     WiFiJoiner
 	WiFiProfiles WiFiProfileService
@@ -170,6 +172,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerBackup(a)
 	s.registerThroughput(a)
 	s.registerConnectivity(a)
+	s.registerCaptive(a)
 	s.registerWiFi(a)
 	s.registerWiFiProfiles(a)
 	s.registerDashboardEvents(a)
