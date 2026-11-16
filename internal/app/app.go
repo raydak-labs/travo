@@ -74,6 +74,7 @@ func New(o Options) (Deps, error) {
 		mock.SeedSystem(dev)
 		mock.SeedConnectivity(dev)
 		mock.SeedWiFi(dev)
+		dev.SetService("adguardhome", false, false) // absent package; the mock install adds it
 		if o.FirstRun {
 			dev.SetPassword("")
 		}

@@ -26,6 +26,27 @@ export type AccessPoint = {
     signal_dbm: number;
 };
 
+export type AdGuardStatus = {
+    /**
+     * An install or config change is in progress or was interrupted
+     */
+    busy: boolean;
+    config_error?: string;
+    installed: boolean;
+    /**
+     * The config binds the admin UI and DNS to loopback only (ADR 0006)
+     */
+    loopback: boolean;
+    /**
+     * procd reports a running instance
+     */
+    running: boolean;
+    /**
+     * Installed package version; empty when absent
+     */
+    version: string;
+};
+
 export type ApiError = {
     /**
      * Stable error code
@@ -366,6 +387,68 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetAdGuardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard';
+};
+
+export type GetAdGuardErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetAdGuardError = GetAdGuardErrors[keyof GetAdGuardErrors];
+
+export type GetAdGuardResponses = {
+    /**
+     * OK
+     */
+    200: AdGuardStatus;
+};
+
+export type GetAdGuardResponse = GetAdGuardResponses[keyof GetAdGuardResponses];
+
+export type InstallAdGuardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard/install';
+};
+
+export type InstallAdGuardErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type InstallAdGuardError = InstallAdGuardErrors[keyof InstallAdGuardErrors];
+
+export type InstallAdGuardResponses = {
+    /**
+     * OK
+     */
+    200: AdGuardStatus;
+};
+
+export type InstallAdGuardResponse = InstallAdGuardResponses[keyof InstallAdGuardResponses];
 
 export type PostLoginData = {
     body: LoginInputBody;

@@ -87,10 +87,12 @@ type Deps struct {
 	WiFi         WiFiService
 	WiFiJoin     WiFiJoiner
 	WiFiProfiles WiFiProfileService
-	Txns         Txns
-	Sessions     *auth.Store
-	Limiter      *auth.RateLimiter
-	Clock        auth.Clock
+	// AdGuard is nil when the daemon cannot supervise the package (no service port).
+	AdGuard  AdGuard
+	Txns     Txns
+	Sessions *auth.Store
+	Limiter  *auth.RateLimiter
+	Clock    auth.Clock
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -175,6 +177,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerCaptive(a)
 	s.registerWiFi(a)
 	s.registerWiFiProfiles(a)
+	s.registerAdGuard(a)
 	s.registerDashboardEvents(a)
 	if d.UI != nil {
 		mux.Handle("/", d.UI)
@@ -182,7 +185,8 @@ func New(d Deps) (http.Handler, huma.API) {
 	return s.outer(mux), a
 }
 
-// schemaNamer disambiguates the WiFi and saved-uplink models from the VPN profile models.
+// schemaNamer disambiguates the WiFi and saved-uplink models from the VPN profile models,
+// and the AdGuard status from the transaction Status.
 func schemaNamer(t reflect.Type, hint string) string {
 	name := huma.DefaultSchemaNamer(t, hint)
 	for t.Kind() == reflect.Pointer {
@@ -195,6 +199,9 @@ func schemaNamer(t reflect.Type, hint string) string {
 		}
 	case "github.com/blackdark-org/travo-greenfield/internal/wifiprofiles":
 		return "WiFiProfile" + name
+	}
+	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
+		return "AdGuard" + name
 	}
 	return name
 }

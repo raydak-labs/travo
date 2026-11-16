@@ -247,6 +247,10 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 			slog.Warn("update recovery", "err", err)
 		}
 	}
+	var adguardSvc api.AdGuard
+	if svc := startAdGuard(ctx, deps, workers, connection); svc != nil {
+		adguardSvc = svc
+	}
 	h, _ := api.New(api.Deps{
 		DaemonContext: ctx,
 		VPNProfiles:   profiles,
@@ -263,6 +267,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		WiFi:          wireless,
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,
+		AdGuard:       adguardSvc,
 		Throughput:    sampler,
 		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,
