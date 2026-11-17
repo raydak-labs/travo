@@ -13,6 +13,7 @@ import {
 } from '@tanstack/react-router';
 import { API_ROUTES } from '@shared/index';
 import { ThemeProvider } from '@/components/layout/theme-provider';
+import { mockServices } from '@/mocks/data-services';
 import { server } from '@/mocks/server';
 import { ServicesPage } from '../services-page';
 
@@ -148,6 +149,54 @@ describe('ServicesPage', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
     expect(removed).toEqual([]);
+  });
+
+  it.each([
+    { layout: 'package', version: '0.107.45' },
+    { layout: 'standalone', version: undefined },
+  ])('repairs a missing config for a $layout AdGuard install', async ({ version }) => {
+    const user = userEvent.setup();
+    let repaired = false;
+    let repairCalls = 0;
+    const status = () => ({
+      enabled: true,
+      dns_port: 5353,
+      // A deleted YAML does not stop the already-running listener. That state
+      // must still show repair, never a simultaneous healthy message.
+      adguard_listener_ready: true,
+      dnsmasq_forward_target: '127.0.0.1#5353',
+      resolver_probe_ok: true,
+      config_present: repaired,
+      repair_needed: !repaired,
+    });
+    server.use(
+      http.get(API_ROUTES.services.list, () =>
+        HttpResponse.json(
+          mockServices.map((service) =>
+            service.id === 'adguardhome' ? { ...service, version } : service,
+          ),
+        ),
+      ),
+      http.get(API_ROUTES.adguard.dns, () => HttpResponse.json(status())),
+      http.post('/api/v1/adguard/repair', () => {
+        repairCalls += 1;
+        repaired = true;
+        return HttpResponse.json(status());
+      }),
+    );
+
+    renderServicesPage();
+
+    expect(await screen.findByText('AdGuard DNS needs repair')).toBeInTheDocument();
+    expect(screen.getByText(/configuration is missing/i)).toBeInTheDocument();
+    expect(screen.queryByText('DNS resolution is healthy')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Repair AdGuard Home' }));
+
+    await waitFor(() => {
+      expect(repairCalls).toBe(1);
+      expect(screen.queryByText('AdGuard DNS needs repair')).not.toBeInTheDocument();
+    });
+    expect(await screen.findByText('DNS resolution is healthy')).toBeInTheDocument();
   });
 
   it('shows service descriptions', async () => {

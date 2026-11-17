@@ -226,6 +226,7 @@ restart_service() {
       local guard_paths=()
       for guard in failover-in-progress band-switch-in-progress captive-dns-in-progress \
         captive-wwan-bounce-in-progress vpn-in-progress usbtether-in-progress \
+        adguard-repair-in-progress \
         wifi-toggle-in-progress mac-in-progress pkg-install-in-progress restore-in-progress \
         system-config-in-progress autoreconnect-crash-guard; do
         guard_paths+=("/etc/trafo/${guard}")

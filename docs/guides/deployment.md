@@ -1,7 +1,7 @@
 ---
 title: Deployment guide
 description: Official install path (tarball), LuCI coexistence, AdGuard, build and package.
-updated: 2026-10-25
+updated: 2026-11-17
 tags: [docs, deployment, openwrt]
 ---
 
@@ -104,10 +104,15 @@ uci commit travo
 
 ## AdGuard Home
 
-- Binary/config: `/opt/AdGuardHome`
+- Package config: `/etc/adguardhome/adguardhome.yaml`
+- Standalone binary/config: `/opt/AdGuardHome`
 - UI: `http://<router>:3000`
 - DNS listener: **5353** in the stock template (not raw `53` on WAN)
-- Resolver modes, VPN interplay, and captive-portal temporary DNS are documented in [`docs/adr/0001-dns-vpn-captive-portal-architecture.md`](../adr/0001-dns-vpn-captive-portal-architecture.md).
+- Services → AdGuard Home shows config/listener health and offers **Repair AdGuard Home**
+  when forwarding is broken. Repair restores missing config and verifies the restarted listener.
+- Travo's sysupgrade keep list preserves both config paths.
+- Resolver modes, VPN interplay, and captive-portal temporary DNS are documented in
+  [ADR 0001](../adr/0001-dns-vpn-captive-portal-architecture.md).
 
 Restart: `/etc/init.d/adguardhome restart`
 

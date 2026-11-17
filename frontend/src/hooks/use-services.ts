@@ -6,6 +6,7 @@ import {
   installService,
   listServices,
   removeService,
+  repairAdGuard,
   setAdGuardConfig,
   setAdGuardDNS,
   setAdGuardPassword,
@@ -111,6 +112,22 @@ export function useSetAdGuardDNS() {
     },
     onError: (error) => {
       toast.error('Failed to update AdGuard DNS', { description: error.message });
+    },
+  });
+}
+
+export function useRepairAdGuard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => repairAdGuard(),
+    onSuccess: (status) => {
+      queryClient.setQueryData(['adguard-dns'], status);
+      void queryClient.invalidateQueries({ queryKey: ['services'] });
+      void queryClient.invalidateQueries({ queryKey: ['adguard-config'] });
+      toast.success('AdGuard Home repaired');
+    },
+    onError: (error) => {
+      toast.error('Failed to repair AdGuard Home', { description: error.message });
     },
   });
 }

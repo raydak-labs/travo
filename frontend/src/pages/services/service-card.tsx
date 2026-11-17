@@ -1,10 +1,11 @@
 import type { ServiceInfo } from '@shared/index';
 import { Globe } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { QueryCard } from '@/components/ui/query-card';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Switch } from '@/components/ui/switch';
-import { useAdGuardDNS, useSetAdGuardDNS } from '@/hooks/use-services';
+import { useAdGuardDNS, useRepairAdGuard, useSetAdGuardDNS } from '@/hooks/use-services';
 import { serviceCardIcons, serviceStateTone, serviceStateLabels } from './service-card.constants';
 import { ServiceCardActionButtons } from './service-card-action-buttons';
 
@@ -30,10 +31,13 @@ export function ServiceCard({
   isAutoStartPending,
 }: ServiceCardProps) {
   const Icon = serviceCardIcons[service.id] ?? Globe;
-  const isAdGuardRunning = service.id === 'adguardhome' && service.state === 'running';
+  const isAdGuard = service.id === 'adguardhome';
   const dnsQuery = useAdGuardDNS();
   const dnsStatus = dnsQuery.data;
   const setDNS = useSetAdGuardDNS();
+  const repair = useRepairAdGuard();
+  const showAdGuardDNS =
+    isAdGuard && (service.state !== 'not_installed' || dnsStatus?.enabled === true);
 
   return (
     <Card className="shadow-none hover:shadow-none">
@@ -67,7 +71,7 @@ export function ServiceCard({
           </div>
         )}
 
-        {isAdGuardRunning && (
+        {showAdGuardDNS && (
           <div className="mt-2">
             {/* Without an error state a failed DNS read dropped the toggle,
                 reading as "AdGuard does not handle LAN DNS". */}
@@ -83,7 +87,7 @@ export function ServiceCard({
                     id="adguard-dns-toggle"
                     label="DNS Filtering Active"
                     checked={dnsStatus.enabled}
-                    disabled={setDNS.isPending}
+                    disabled={setDNS.isPending || repair.isPending}
                     onChange={() => setDNS.mutate(!dnsStatus.enabled)}
                   />
                   <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
@@ -91,6 +95,39 @@ export function ServiceCard({
                       ? `Forwarding LAN DNS to AdGuard (port ${dnsStatus.dns_port})`
                       : 'AdGuard is not handling LAN DNS queries'}
                   </p>
+                  {dnsStatus.repair_needed ? (
+                    <div className="mt-3 rounded-md border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-3">
+                      <p className="text-sm font-medium text-[var(--status-danger-text)]">
+                        AdGuard DNS needs repair
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--status-danger-text)]">
+                        {dnsStatus.config_present
+                          ? 'LAN DNS forwards to AdGuard, but its DNS listener is not responding.'
+                          : 'LAN DNS forwards to AdGuard, but its configuration is missing.'}
+                      </p>
+                      {service.state === 'not_installed' ? (
+                        <p className="mt-2 text-xs text-[var(--status-danger-text)]">
+                          Reinstall AdGuard Home, or disable DNS forwarding to restore ordinary DNS.
+                        </p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="mt-3"
+                          disabled={repair.isPending}
+                          onClick={() => repair.mutate()}
+                        >
+                          {repair.isPending ? 'Repairing…' : 'Repair AdGuard Home'}
+                        </Button>
+                      )}
+                    </div>
+                  ) : null}
+                  {dnsStatus.enabled && !dnsStatus.repair_needed && dnsStatus.resolver_probe_ok ? (
+                    <p className="mt-2 text-xs text-[var(--status-ok-text)]">
+                      DNS resolution is healthy
+                    </p>
+                  ) : null}
                 </>
               ) : null}
             </QueryCard>

@@ -3,7 +3,7 @@ title: "ADR 0003: Crash guards and automated live-state changes"
 description: The crash-guard contract for automated live-state changes: what is guarded in /etc/trafo, where ordinary state lives, and how a guard is cleared.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-26
+updated: 2026-11-17
 tags: [adr, safety, travo, guards, operations]
 ---
 
@@ -60,6 +60,7 @@ does not exist for that feature.
 | `/etc/trafo/band-switch-in-progress` | `BandSwitchingService.doSwitch` | automated move of the client between radios |
 | `/etc/trafo/captive-dns-in-progress` | `CaptiveService.BypassDNS` | the DNS bypass; doubles as the pre-bypass backup and the "bypass active" marker (ADR 0001) |
 | `/etc/trafo/captive-wwan-bounce-in-progress` | `CaptiveService.bounceActiveWwanDHCP` | the `ifdown`/`ifup wwan` lease bounce |
+| `/etc/trafo/adguard-repair-in-progress` | `AdGuardService.Repair` | config + restart |
 | `/etc/trafo/vpn-in-progress` | `VpnService.ToggleWireguard` | WireGuard enable/disable: tunnel, `wg0` zone, DNS layer, rollback |
 | `/etc/trafo/usbtether-in-progress` | `USBTetheringService` | the `usbtether` interface, its `wan` zone membership, `ifup`/`ifdown` |
 | `/etc/trafo/wifi-toggle-in-progress` | generated helper `wirelessToggleScript` | flipping `wireless.*.disabled` + rpcd apply/confirm for schedule and button |

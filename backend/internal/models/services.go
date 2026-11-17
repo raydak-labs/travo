@@ -21,4 +21,8 @@ type AdGuardDNSStatus struct {
 	DnsmasqForwardTarget string `json:"dnsmasq_forward_target"`
 	// ResolverProbeOk is true when a DNS lookup via the AdGuard listener succeeds.
 	ResolverProbeOk bool `json:"resolver_probe_ok"`
+	// ConfigPresent reports whether either supported init layout has a config file.
+	ConfigPresent bool `json:"config_present"`
+	// RepairNeeded is true when dnsmasq forwards here but config or the listener is missing.
+	RepairNeeded bool `json:"repair_needed"`
 }

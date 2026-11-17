@@ -97,6 +97,7 @@ func MockTravoRelease() ([]byte, error) {
 // MockSystemProbe tracks init.d state in memory.
 type MockSystemProbe struct {
 	scripts   map[string]bool
+	files     map[string]bool
 	running   map[string]bool
 	autoStart map[string]bool
 }
@@ -104,12 +105,15 @@ type MockSystemProbe struct {
 func NewMockSystemProbe() *MockSystemProbe {
 	return &MockSystemProbe{
 		scripts:   make(map[string]bool),
+		files:     make(map[string]bool),
 		running:   make(map[string]bool),
 		autoStart: make(map[string]bool),
 	}
 }
 
 func (m *MockSystemProbe) HasInitScript(name string) bool { return m.scripts[name] }
+
+func (m *MockSystemProbe) FileExists(path string) bool { return m.files[path] }
 
 func (m *MockSystemProbe) IsRunning(initName string) bool { return m.running[initName] }
 

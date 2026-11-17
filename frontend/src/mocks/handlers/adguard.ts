@@ -11,7 +11,27 @@ const mockAdGuardConfig: AdGuardConfig = {
 
 export const adguardHandlers = [
   http.get(API_ROUTES.adguard.dns, () => {
-    return HttpResponse.json({ enabled: false, dns_port: 5353 });
+    return HttpResponse.json({
+      enabled: false,
+      dns_port: 5353,
+      adguard_listener_ready: true,
+      dnsmasq_forward_target: '',
+      resolver_probe_ok: true,
+      config_present: true,
+      repair_needed: false,
+    });
+  }),
+
+  http.post(API_ROUTES.adguard.repair, () => {
+    return HttpResponse.json({
+      enabled: true,
+      dns_port: 5353,
+      adguard_listener_ready: true,
+      dnsmasq_forward_target: '127.0.0.1#5353',
+      resolver_probe_ok: true,
+      config_present: true,
+      repair_needed: false,
+    });
   }),
 
   http.put(API_ROUTES.adguard.dns, async ({ request }) => {

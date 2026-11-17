@@ -246,6 +246,13 @@ func registerAdGuard(api *API, svc *uplink.AdGuardService, captive *uplink.Capti
 		func(context.Context, *none) (*Body[models.DNSMode], error) {
 			return reply(svc.GetDNSMode(captive.IsDNSBypassed()))
 		})
+	post(api, "/api/v1/adguard/repair", "RepairAdGuard", "Restore missing config and restart AdGuard Home",
+		func(context.Context, *none) (*Body[models.AdGuardDNSStatus], error) {
+			if err := svc.Repair(); err != nil {
+				return nil, serverError(err)
+			}
+			return replyOrFail(svc.GetDNSStatus())
+		})
 	get(api, "/api/v1/adguard/config", "GetAdGuardConfig", "AdGuard Home YAML",
 		func(context.Context, *none) (*Body[AdGuardConfigBody], error) {
 			content, err := svc.GetConfig()

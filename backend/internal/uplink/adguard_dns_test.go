@@ -33,6 +33,61 @@ func TestGetDNSStatus_Enabled(t *testing.T) {
 	}
 }
 
+func TestGetDNSStatus_MissingConfigNeedsRepair(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {
+		body []byte
+		err  error
+	}{
+		body: []byte(`{"port":5353}`),
+	}
+	mock.commands["uci get dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"127.0.0.1#5353", nil}
+	svc := NewAdGuardService(mock)
+
+	status, err := svc.GetDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !status.Enabled {
+		t.Fatal("fixture must forward dnsmasq to AdGuard")
+	}
+	if status.ConfigPresent {
+		t.Error("no config exists in the fixture")
+	}
+	if !status.RepairNeeded {
+		t.Error("forwarding to a resolver with no config must offer repair")
+	}
+}
+
+func TestGetDNSStatus_StandaloneLeftoverDoesNotMaskPackageConfig(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardYAMLPathOpt] = true
+	mock.fileContents[adguardYAMLPathOpt] = defaultAdGuardConfig
+	mock.commands["uci -q get adguardhome.config.config_file"] = struct {
+		output string
+		err    error
+	}{adguardYAMLPathUCI, nil}
+	mock.commands["uci get dhcp.@dnsmasq[0].server"] = struct {
+		output string
+		err    error
+	}{"127.0.0.1#5353", nil}
+	svc := NewAdGuardService(mock)
+
+	status, err := svc.GetDNSStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status.ConfigPresent {
+		t.Error("stale standalone YAML must not count as the active package config")
+	}
+	if !status.RepairNeeded {
+		t.Error("missing active package config must offer repair")
+	}
+}
+
 func TestGetDNSStatus_Disabled(t *testing.T) {
 	mock := newMockAdGuardChecker()
 	mock.httpGets["http://127.0.0.1:3000/control/dns_info"] = struct {

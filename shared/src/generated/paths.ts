@@ -5,6 +5,7 @@ export type ApiPath =
   | '/api/v1/adguard/dns'
   | '/api/v1/adguard/dns-mode'
   | '/api/v1/adguard/password'
+  | '/api/v1/adguard/repair'
   | '/api/v1/auth/login'
   | '/api/v1/auth/logout'
   | '/api/v1/auth/password'

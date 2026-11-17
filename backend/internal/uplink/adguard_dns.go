@@ -76,7 +76,9 @@ func (s *AdGuardService) GetDNSStatus() (models.AdGuardDNSStatus, error) {
 		DNSPort:              port,
 		DnsmasqForwardTarget: forwardTarget,
 		AdguardListenerReady: s.probeAdGuardDNSListener(port),
+		ConfigPresent:        s.checker.FileExists(s.newAdGuardConfigPath()),
 	}
+	status.RepairNeeded = enabled && (!status.ConfigPresent || !status.AdguardListenerReady)
 	if status.AdguardListenerReady {
 		status.ResolverProbeOk = s.probeResolver(port)
 	}

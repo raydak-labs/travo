@@ -8,8 +8,10 @@
 
 export interface AdGuardDNSStatus {
   adguard_listener_ready: boolean;
+  config_present: boolean;
   dns_port: number;
   dnsmasq_forward_target: string;
   enabled: boolean;
+  repair_needed: boolean;
   resolver_probe_ok: boolean;
 }
