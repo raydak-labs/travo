@@ -34,7 +34,7 @@ expect_refusal() {
 }
 
 expect_luci() {
-  # dnsmasq can report running before uhttpd and the boot firewall settle.
+  # uhttpd can take a moment to listen again after install or uninstall restarts it.
   attempts=0
   until dx "wget -T 2 -qO- http://127.0.0.1:$1/" 2>/dev/null | grep -q cgi-bin/luci; do
     attempts=$((attempts + 1))
