@@ -9,6 +9,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 ## 0. UCI reads
 
 - [HW] `uci show` prints a one-element LIST exactly like an option (`dhcp.cfg01411c.server='127.0.0.1#5353'`). dnsmasq's init script reads `server` only as a list (`config_list_foreach`), so writing it back as `option server` silently drops it: no `server=` line, `noresolv=1`, every query REFUSED, config "looks" unchanged. Read with `uci export` (keeps `list`/`option`) or `ubus call uci get` (JSON array).
+- [HW] Option order: `uci set` on an existing option keeps its place in the section; a deleted then re-added option or list, or a new one, is appended at the end (checked on AXT1800 25.12.6, 2026-11-17). Restoring a section byte-for-byte therefore needs the original order: `device.Section.Order` carries it from `uci export`, and the DNS layer stack re-appends owned options in base order (#157).
 - [HW] `reload_config` hands changes to procd triggers asynchronously: wireless live ~1.4 s, dnsmasq ~2–4 s after commit. Probes must wait, not read once.
 
 ## 1. Routes and netifd

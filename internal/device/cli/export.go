@@ -50,6 +50,9 @@ func ParseExport(config, out string) ([]device.Section, error) {
 				return nil, fmt.Errorf("uci export: line %d: bad %s %q", n+1, kw, line)
 			}
 			s := &secs[len(secs)-1]
+			if _, opt := s.Options[vals[0]]; !opt && s.Lists[vals[0]] == nil {
+				s.Order = append(s.Order, vals[0])
+			}
 			if kw == "option" {
 				s.Options[vals[0]] = vals[1]
 			} else {

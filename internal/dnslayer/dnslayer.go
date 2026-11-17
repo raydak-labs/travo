@@ -44,6 +44,9 @@ type State struct {
 	Server           List `json:"server"`
 	NoResolv         Opt  `json:"noresolv"`
 	RebindProtection Opt  `json:"rebind_protection"`
+	// Order is the owned options' order in the section when read. Restore rewrites
+	// options so base comes back in this order (#157). Empty: order unknown.
+	Order []string `json:"order,omitempty"`
 }
 
 // Layer is what one feature wants. Replace layers override servers/noresolv (highest
@@ -201,6 +204,7 @@ func sortLayers(ls []Layer) {
 
 func cloneState(s State) State {
 	s.Server.Values = slices.Clone(s.Server.Values)
+	s.Order = slices.Clone(s.Order)
 	return s
 }
 

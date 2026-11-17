@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -63,5 +64,28 @@ func TestParseExportRejectsGarbage(t *testing.T) {
 		if _, err := ParseExport("dhcp", bad); err == nil {
 			t.Errorf("accepted %q", bad)
 		}
+	}
+}
+
+func TestParseExportRecordsOptionOrder(t *testing.T) {
+	b, err := os.ReadFile("../../../testdata/device/axt1800-25.12.6/uci-export-dhcp.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secs, err := ParseExport("dhcp", string(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var owned []string
+	for _, n := range secs[0].Order {
+		if n == "server" || n == "noresolv" || n == "rebind_protection" {
+			owned = append(owned, n)
+		}
+	}
+	if want := []string{"rebind_protection", "noresolv", "server"}; !slices.Equal(owned, want) {
+		t.Fatalf("order %v, want %v (full %v)", owned, want, secs[0].Order)
+	}
+	if n := len(secs[0].Order); n != len(secs[0].Options)+len(secs[0].Lists) {
+		t.Fatalf("order names %d options, section has %d", n, len(secs[0].Options)+len(secs[0].Lists))
 	}
 }

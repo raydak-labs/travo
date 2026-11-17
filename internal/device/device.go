@@ -15,6 +15,9 @@ type Section struct {
 	Type    string              `json:"type"`
 	Options map[string]string   `json:"options"`
 	Lists   map[string][]string `json:"lists"`
+	// Order names each option and list once, in `uci export` order. Empty when the
+	// adapter cannot tell (the mock).
+	Order []string `json:"order,omitempty"`
 }
 
 // ErrNotFound is returned when a config, section or ubus object does not exist.

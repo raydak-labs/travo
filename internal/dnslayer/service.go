@@ -200,11 +200,11 @@ func (s *Service) mutate(ctx context.Context, f func(*Record, State) (*Record, e
 // Any failure keeps the guard.
 func (s *Service) applyAndFinish(ctx context.Context, target State, restoreBase bool) error {
 	err := s.Apply.Apply(ctx, []string{"dhcp"}, func(lctx context.Context) error {
-		sec, _, err := ReadState(lctx, s.Device)
+		sec, cur, err := ReadState(lctx, s.Device)
 		if err != nil {
 			return err
 		}
-		return Stage(lctx, s.Device, sec, target)
+		return Stage(lctx, s.Device, sec, cur, target)
 	})
 	if s.AfterApply != nil {
 		s.AfterApply()
@@ -248,37 +248,42 @@ func ReadState(ctx context.Context, d device.Device) (string, State, error) {
 	if v, ok := s.Options["rebind_protection"]; ok {
 		st.RebindProtection = Opt{Set: true, Value: v}
 	}
+	for _, n := range s.Order {
+		if slices.Contains(owned, n) {
+			st.Order = append(st.Order, n)
+		}
+	}
 	return s.Name, st, nil
 }
 
-// Stage writes st into the section without committing. Absent options are deleted.
-func Stage(ctx context.Context, d device.Device, sec string, st State) error {
-	if err := d.DeleteOption(ctx, "dhcp", sec, "server"); err != nil && !errors.Is(err, device.ErrNotFound) {
-		return err
-	}
-	switch {
-	case st.Server.Set && st.Server.Scalar && len(st.Server.Values) == 1:
-		if err := d.Set(ctx, "dhcp", sec, "server", st.Server.Values[0]); err != nil {
-			return err
-		}
-	case st.Server.Set:
-		for _, v := range st.Server.Values {
-			if err := d.AddToList(ctx, "dhcp", sec, "server", v); err != nil {
-				return err
-			}
-		}
-	}
-	for _, o := range []struct {
-		name string
-		opt  Opt
-	}{{"noresolv", st.NoResolv}, {"rebind_protection", st.RebindProtection}} {
+// Stage writes want into the section without committing, touching only what planStage
+// says. Absent options are deleted.
+func Stage(ctx context.Context, d device.Device, sec string, cur, want State) error {
+	for _, op := range planStage(cur, want) {
 		var err error
-		if o.opt.Set {
-			err = d.Set(ctx, "dhcp", sec, o.name, o.opt.Value)
-		} else {
-			err = d.DeleteOption(ctx, "dhcp", sec, o.name)
+		switch {
+		case op.kind == opDelete:
+			err = d.DeleteOption(ctx, "dhcp", sec, op.name)
+		case op.name == "server":
+			err = writeServer(ctx, d, sec, want.Server)
+		case op.name == "noresolv":
+			err = d.Set(ctx, "dhcp", sec, op.name, want.NoResolv.Value)
+		default:
+			err = d.Set(ctx, "dhcp", sec, op.name, want.RebindProtection.Value)
 		}
 		if err != nil && !errors.Is(err, device.ErrNotFound) {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeServer(ctx context.Context, d device.Device, sec string, l List) error {
+	if l.Scalar && len(l.Values) == 1 {
+		return d.Set(ctx, "dhcp", sec, "server", l.Values[0])
+	}
+	for _, v := range l.Values {
+		if err := d.AddToList(ctx, "dhcp", sec, "server", v); err != nil {
 			return err
 		}
 	}
