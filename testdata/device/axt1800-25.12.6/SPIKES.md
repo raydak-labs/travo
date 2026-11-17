@@ -273,3 +273,16 @@ are byte-identical. `network` differs only in the option order of the wg0 peer, 
 `travo_vpn`/`travo_vpn_lan`, and `dhcp` by the AdGuard `server`/`noresolv`.
 The exclusive lock `/tmp/agent-lock` lives on tmpfs: the step-8 reboot removed it, and it was not
 re-taken for the rest of the run. No other writer showed up in `logread`.
+
+### Re-test after #156 and #159, 2026-11-17 (main `c25579a`)
+
+Build: `mise run package` of main `c25579a`, installed with `install.sh --insecure --force`; health reports `0.0.0-dev`. Driven over Ethernet through the API, router lock held.
+
+**VPN on the guest zone (#89 / #156): pass (config and nft; guest-client egress is operator).**
+- (1) Guest AP created and confirmed, then tunnel enabled and confirmed: `firewall.travo_vpn_guest` (src `guest`, dest `travo_vpn`) present.
+- (2) Kill switch enabled and confirmed: `travo_killswitch_wan` and `travo_killswitch_guest_wan`; `nft list chain inet fw4 forward_guest` jumps to `reject_to_wan` ("Travo VPN kill switch (guest to wan)") before `accept_to_wan`. With `ifdown wg0` the admin API on br-lan still answered.
+- (3) Baseline restored (no guest AP), tunnel and kill switch enabled first, then the guest AP created: that one transaction (configs dhcp, firewall, network, wireless) added `travo_vpn_guest` and `travo_killswitch_guest_wan`. Kill switch disabled: both kill switch rules gone, `travo_vpn_guest` kept.
+
+**Reconnect (#159): behaves as ADR 0014 describes.** A manual config restore (outside the daemon, so unguarded) left wwan without a kernel default route at the 19:26:51 tick; a sticky `DISCONNECT` at 19:27:23 was down at the 19:27:51 tick, so attempt 1 fired (`ifup wwan`) and healed the link in 6 s. Status `retrying` 1/5, back to `idle` 0/5 within 2 minutes. The guest, tunnel and kill switch transactions in between triggered no attempt.
+
+Restore: `uci import` of the saved firewall, network, wireless and dhcp, `ubus call network reload` and `ifup wwan` (the reload alone left wwan "up" in netifd with no default route until `ifup wwan`). Final `uci export` has the same lines as before; only `dhcp` `list server` / `noresolv` order differs (#157).
