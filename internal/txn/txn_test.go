@@ -188,6 +188,25 @@ func TestTimeoutRestoreIsReapedByNextBeginWithoutStatusCall(t *testing.T) {
 	}
 }
 
+// A window-expiry restore nobody polls must release the guard without another Begin,
+// or guarded workers (uplink reconnect, DNS layers) stay idle (found on the AXT1800).
+func TestReapReleasesGuardAfterUnpolledTimeoutRestore(t *testing.T) {
+	t.Parallel()
+	m, d := setup(t, 1*time.Second)
+	st, _ := m.Begin(ctx, "t", []string{"network"}, stageSet(d, "network"), nil)
+	waitFor(t, func() bool { _, err := os.Stat(filepath.Join(m.Dir, st.ID, "result")); return err == nil })
+	if !guarded(t, m) {
+		t.Fatal("precondition: guard held until reaped")
+	}
+	m.Reap(ctx)
+	if guarded(t, m) {
+		t.Fatal("guard kept after a finished restore")
+	}
+	if _, err := os.Stat(filepath.Join(m.Dir, st.ID)); !os.IsNotExist(err) {
+		t.Fatalf("transaction dir kept: %v", err)
+	}
+}
+
 func TestWindowStartsAfterArm(t *testing.T) {
 	t.Parallel()
 	m, d := setup(t, 1*time.Second)

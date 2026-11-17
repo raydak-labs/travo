@@ -162,6 +162,9 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 	}
 	limiter, provider := auth.NewRateLimiter(), &trust.Provider{}
 	workers.Go("rate-limit-sweep", lifecycle.Every(time.Minute, func(context.Context) { limiter.Sweep(clock.Now()) }))
+	if deps.Txn != nil {
+		workers.Go("txn-reap", lifecycle.Every(15*time.Second, deps.Txn.Reap))
+	}
 	workers.Go("session-sweep", lifecycle.Every(time.Minute, func(context.Context) { sessions.Sweep(clock.Now()) }))
 	workers.Go("trust-refresh", lifecycle.Every(30*time.Second, func(c context.Context) {
 		if err := provider.Refresh(c, deps.Device); err != nil && c.Err() == nil {

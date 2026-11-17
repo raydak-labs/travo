@@ -83,6 +83,15 @@ func (m *Manager) discardUnstarted(ctx context.Context, id string) error {
 	return os.RemoveAll(m.path(id))
 }
 
+// Reap clears transactions a detached watchdog finished restoring. Without it, a
+// window-expiry restore that no client polls keeps the txn guard, and every guarded
+// worker (uplink reconnect, DNS layers) stays idle until the next Begin.
+func (m *Manager) Reap(context.Context) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reapFinished()
+}
+
 // reapFinished clears restored transactions left by a detached watchdog, so a timeout
 // restore does not block the next Begin until restart. Failed ones keep the guard.
 func (m *Manager) reapFinished() {
