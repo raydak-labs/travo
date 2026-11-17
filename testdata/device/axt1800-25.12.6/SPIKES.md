@@ -191,3 +191,6 @@ addresses were compared by hash only.
 - Deleted both sections: LAN blocked again. Re-adding only the zone (`reload_config`, no wg0
   restart) restored LAN egress through the VPN. The wg0 link stayed present and the handshake
   stayed fresh, so the zone-only path does not need a tunnel restart.
+## Captive bypass and wwan renew (#130, #131, 2026-11-17)
+
+GL-AXT1800, OpenWrt 25.12.6, uplink wwan on phy0-sta0 (no AdGuard base: dnsmasq had no `server`, no `noresolv`, `rebind_protection 1`). `internal/captive/hardware_test.go` under the shared router lock: Enable pushed `list server` = the uplink DHCP resolver, `noresolv 0`, `rebind_protection 0`; resolution worked during the bypass (after the 2 to 4 s procd reload) and after restore; restore returned the base exactly. `RenewLease("wwan")` produced `udhcpc: sending renew` and an unchanged lease, no interface down; the default route via phy0-sta0 was proven after the 2 s settle (2.02 s total). `uci export` was identical before and after; no guard left. Not covered: a real portal (needs the simulator in testing.md).
