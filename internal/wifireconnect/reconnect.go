@@ -180,7 +180,9 @@ func (s *Service) Tick(ctx context.Context) {
 	}
 	obs := s.observe(ctx)
 	wasDown := s.wasDown
-	s.wasDown = obs.down()
+	// A down STA under a guard is a live change at work (a join or select takes wwan
+	// down for seconds), not an outage: it must not start the two-tick count.
+	s.wasDown = obs.down() && !s.guarded()
 	r, err := s.load()
 	if err != nil {
 		slog.Warn("wifi reconnect: counter unreadable, staying idle")
@@ -197,9 +199,15 @@ func (s *Service) Tick(ctx context.Context) {
 	}
 }
 
+// guarded fails closed: an unreadable guard dir counts as guarded.
+func (s *Service) guarded() bool {
+	active, err := s.guards.Stale()
+	return err != nil || len(active) > 0
+}
+
 // attempt persists the counter BEFORE acting, so a crash mid-recovery still counts.
 func (s *Service) attempt(ctx context.Context, r record) {
-	if active, err := s.guards.Stale(); err != nil || len(active) > 0 {
+	if s.guarded() {
 		return // another live-state operation (or a stuck reconnect) owns the router
 	}
 	r.Attempts++

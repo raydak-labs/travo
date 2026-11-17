@@ -221,6 +221,28 @@ func TestNoActionWhenStateUnreadableOrGuarded(t *testing.T) {
 	}
 }
 
+// A transaction takes the STA down while it applies (seen on the AXT1800: wwan down
+// for 5 s during a profile select). That tick must not count as the first disconnected
+// tick, or an outage of a single tick right after the change triggers an attempt.
+func TestGuardedDownTickDoesNotCountTowardsAttempt(t *testing.T) {
+	h := newHarness(t)
+	if err := h.guards.Acquire("txn-in-progress"); err != nil {
+		t.Fatal(err)
+	}
+	h.ticks(1)
+	if err := h.guards.Release("txn-in-progress"); err != nil {
+		t.Fatal(err)
+	}
+	h.ticks(1)
+	if h.reconnect.calls != 0 {
+		t.Fatalf("attempted after one unguarded disconnected tick")
+	}
+	h.ticks(1)
+	if h.reconnect.calls != 1 {
+		t.Fatalf("want an attempt after two unguarded disconnected ticks, got %d", h.reconnect.calls)
+	}
+}
+
 func TestTornCounterIsUnavailableNotEmpty(t *testing.T) {
 	h := newHarness(t)
 	if err := os.WriteFile(h.path, []byte(`{"attempts":-1}`), 0o600); err != nil {

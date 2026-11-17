@@ -29,7 +29,10 @@ Measured on the AXT1800 (OpenWrt 25.12.6, 2026-11-17, `SPIKES.md`):
   UCI has exactly one enabled managed `wwan` STA, that STA is proven disconnected
   (no carrier or no observed SSID/BSSID), `wwan` has no IPv4 address, and this
   was true on the previous tick too. The extra tick gives wpa_supplicant a full
-  interval to heal on its own. Unreadable state does nothing.
+  interval to heal on its own. A tick taken while any guard is held never counts
+  as the previous tick: a join or select takes `wwan` down for seconds while it
+  applies (seen on the AXT1800, 0.1.0 playbook), and that is not an outage.
+  Unreadable state does nothing.
 - The recovery is `ifup wwan` through the `device.UplinkReconnector` port. It writes
   no UCI and never runs `wifi`. Any guard present skips the attempt, and the
   attempt itself runs under the `wifi-reconnect-in-progress` guard. A failed
