@@ -114,8 +114,10 @@ type Deps struct {
 	AdGuard  AdGuard
 	Txns     Txns
 	Sessions *auth.Store
-	Limiter  *auth.RateLimiter
-	Clock    auth.Clock
+	// Tokens are the automation API tokens; nil disables bearer auth and answers 503 on management.
+	Tokens  APITokens
+	Limiter *auth.RateLimiter
+	Clock   auth.Clock
 	// WiFiReconnect is the capped auto-reconnect counter; nil answers 503 device_unavailable.
 	WiFiReconnect WiFiReconnectReader
 	WiFiAPs       WiFiAPEditor
@@ -152,11 +154,23 @@ type healthOutput struct {
 }
 
 // register is the only way to add a route: it records whether the route is public.
+// Protected routes take the cookie session or an API token (docs/adr/0008).
 func register[I, O any](s *server, public bool, op huma.Operation, a huma.API, h func(context.Context, *I) (*O, error)) {
-	op.Metadata = map[string]any{publicKey: public}
-	if !public {
-		op.Security = []map[string][]string{{"cookieAuth": {}}}
+	if op.Metadata == nil {
+		op.Metadata = map[string]any{}
 	}
+	op.Metadata[publicKey] = public
+	if !public {
+		op.Security = []map[string][]string{{"cookieAuth": {}}, {"bearerAuth": {}}}
+	}
+	huma.Register(a, op, h)
+}
+
+// registerSessionOnly adds a protected route that an API token may never call: managing
+// tokens, the password and the session itself needs the browser login.
+func registerSessionOnly[I, O any](s *server, op huma.Operation, a huma.API, h func(context.Context, *I) (*O, error)) {
+	op.Metadata = map[string]any{publicKey: false, sessionOnlyKey: true}
+	op.Security = []map[string][]string{{"cookieAuth": {}}}
 	huma.Register(a, op, h)
 }
 
@@ -172,6 +186,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	cfg.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", schemaNamer)
 	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 		"cookieAuth": {Type: "apiKey", In: "cookie", Name: cookieName},
+		"bearerAuth": {Type: "http", Scheme: "bearer", Description: "API token (tgt_...): read scope = GET only, admin = all but session-only routes"},
 	}
 	a := humago.New(mux, cfg)
 	a.UseMiddleware(s.gate)
@@ -189,6 +204,7 @@ func New(d Deps) (http.Handler, huma.API) {
 		return out, nil
 	})
 	s.registerAuth(a)
+	s.registerAPITokens(a)
 	s.registerSetup(a)
 	s.registerTxn(a)
 	s.registerSystem(a)

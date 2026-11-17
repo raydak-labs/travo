@@ -70,7 +70,7 @@ func (s *server) openDashboardEvents(ctx context.Context, _ *struct{}) (*huma.St
 	if err != nil {
 		return nil, fail(http.StatusServiceUnavailable, "stream_unavailable", "Dashboard event stream is stopping")
 	}
-	token := authedOf(ctx).token
+	cred := authedOf(ctx)
 	return &huma.StreamResponse{Body: func(hctx huma.Context) {
 		defer sub.close()
 		hctx.SetHeader("Content-Type", "text/event-stream")
@@ -78,19 +78,16 @@ func (s *server) openDashboardEvents(ctx context.Context, _ *struct{}) (*huma.St
 		_, w := humago.Unwrap(hctx)
 		heartbeat := time.NewTicker(dashboardHeartbeat)
 		defer heartbeat.Stop()
-		s.serveDashboardEvents(hctx.Context(), w, sub, token, heartbeat.C, dashboardWriteTimeout)
+		s.serveDashboardEvents(hctx.Context(), w, sub, cred, heartbeat.C, dashboardWriteTimeout)
 	}}, nil
 }
 
 // serveDashboardEvents owns exactly one subscriber until the request, session,
 // daemon or a bounded write ends it.
-func (s *server) serveDashboardEvents(ctx context.Context, w http.ResponseWriter, sub *dashboardSubscription, token string, heartbeat <-chan time.Time, timeout time.Duration) {
+func (s *server) serveDashboardEvents(ctx context.Context, w http.ResponseWriter, sub *dashboardSubscription, cred authed, heartbeat <-chan time.Time, timeout time.Duration) {
 	writer := dashboardSSEWriter{
 		writer: w, controller: http.NewResponseController(w), timeout: timeout,
-		sessionValid: func() bool {
-			_, ok := s.sessions.Lookup(token, s.clock.Now())
-			return ok
-		},
+		sessionValid: func() bool { return s.stillValid(cred) },
 	}
 	if !writer.write([]byte(dashboardInitialComment)) {
 		return

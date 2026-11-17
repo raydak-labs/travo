@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, CreateWiFiProfileData, CreateWiFiProfileErrors, CreateWiFiProfileResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, DeleteWiFiProfileData, DeleteWiFiProfileErrors, DeleteWiFiProfileResponses, EnableCaptiveDnsBypassData, EnableCaptiveDnsBypassErrors, EnableCaptiveDnsBypassResponses, GetAdGuardData, GetAdGuardErrors, GetAdGuardResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetVpndnsData, GetVpndnsErrors, GetVpndnsResponses, GetVpnKillSwitchData, GetVpnKillSwitchErrors, GetVpnKillSwitchResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnSplitData, GetVpnSplitErrors, GetVpnSplitResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiAccessPointsData, GetWiFiAccessPointsErrors, GetWiFiAccessPointsResponses, GetWiFiData, GetWiFiErrors, GetWiFiGuestData, GetWiFiGuestErrors, GetWiFiGuestResponses, GetWiFiProfilesData, GetWiFiProfilesErrors, GetWiFiProfilesResponses, GetWiFiReconnectData, GetWiFiReconnectErrors, GetWiFiReconnectResponses, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, GetWiFiUplinkMacData, GetWiFiUplinkMacErrors, GetWiFiUplinkMacResponses, InstallAdGuardData, InstallAdGuardErrors, InstallAdGuardResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RenewCaptiveDhcpData, RenewCaptiveDhcpErrors, RenewCaptiveDhcpResponses, ReorderWiFiProfilesData, ReorderWiFiProfilesErrors, ReorderWiFiProfilesResponses, RestoreCaptiveDnsData, RestoreCaptiveDnsErrors, RestoreCaptiveDnsResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses, SelectWiFiProfileData, SelectWiFiProfileErrors, SelectWiFiProfileResponses, SetAdGuardDnsData, SetAdGuardDnsErrors, SetAdGuardDnsResponses, SetAdGuardServiceData, SetAdGuardServiceErrors, SetAdGuardServiceResponses, SetVpnKillSwitchData, SetVpnKillSwitchErrors, SetVpnKillSwitchResponses, SetVpnSplitData, SetVpnSplitErrors, SetVpnSplitResponses, SetVpnTunnelData, SetVpnTunnelErrors, SetVpnTunnelResponses, SetWiFiGuestData, SetWiFiGuestErrors, SetWiFiGuestResponses, SetWiFiUplinkMacData, SetWiFiUplinkMacErrors, SetWiFiUplinkMacResponses, UpdateWiFiAccessPointData, UpdateWiFiAccessPointErrors, UpdateWiFiAccessPointResponses, VerifyVpndnsData, VerifyVpndnsErrors, VerifyVpndnsResponses } from './types.gen';
+import type { ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, CreateApiTokenData, CreateApiTokenErrors, CreateApiTokenResponses, CreateWiFiProfileData, CreateWiFiProfileErrors, CreateWiFiProfileResponses, DeleteApiTokenData, DeleteApiTokenErrors, DeleteApiTokenResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, DeleteWiFiProfileData, DeleteWiFiProfileErrors, DeleteWiFiProfileResponses, EnableCaptiveDnsBypassData, EnableCaptiveDnsBypassErrors, EnableCaptiveDnsBypassResponses, GetAdGuardData, GetAdGuardErrors, GetAdGuardResponses, GetApiTokensData, GetApiTokensErrors, GetApiTokensResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetVpndnsData, GetVpndnsErrors, GetVpndnsResponses, GetVpnKillSwitchData, GetVpnKillSwitchErrors, GetVpnKillSwitchResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnSplitData, GetVpnSplitErrors, GetVpnSplitResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiAccessPointsData, GetWiFiAccessPointsErrors, GetWiFiAccessPointsResponses, GetWiFiData, GetWiFiErrors, GetWiFiGuestData, GetWiFiGuestErrors, GetWiFiGuestResponses, GetWiFiProfilesData, GetWiFiProfilesErrors, GetWiFiProfilesResponses, GetWiFiReconnectData, GetWiFiReconnectErrors, GetWiFiReconnectResponses, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, GetWiFiUplinkMacData, GetWiFiUplinkMacErrors, GetWiFiUplinkMacResponses, InstallAdGuardData, InstallAdGuardErrors, InstallAdGuardResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RenewCaptiveDhcpData, RenewCaptiveDhcpErrors, RenewCaptiveDhcpResponses, ReorderWiFiProfilesData, ReorderWiFiProfilesErrors, ReorderWiFiProfilesResponses, RestoreCaptiveDnsData, RestoreCaptiveDnsErrors, RestoreCaptiveDnsResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses, SelectWiFiProfileData, SelectWiFiProfileErrors, SelectWiFiProfileResponses, SetAdGuardDnsData, SetAdGuardDnsErrors, SetAdGuardDnsResponses, SetAdGuardServiceData, SetAdGuardServiceErrors, SetAdGuardServiceResponses, SetVpnKillSwitchData, SetVpnKillSwitchErrors, SetVpnKillSwitchResponses, SetVpnSplitData, SetVpnSplitErrors, SetVpnSplitResponses, SetVpnTunnelData, SetVpnTunnelErrors, SetVpnTunnelResponses, SetWiFiGuestData, SetWiFiGuestErrors, SetWiFiGuestResponses, SetWiFiUplinkMacData, SetWiFiUplinkMacErrors, SetWiFiUplinkMacResponses, UpdateWiFiAccessPointData, UpdateWiFiAccessPointErrors, UpdateWiFiAccessPointResponses, VerifyVpndnsData, VerifyVpndnsErrors, VerifyVpndnsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -31,7 +31,7 @@ export const getAdGuard = <ThrowOnError extends boolean = false>(options?: Optio
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/adguard',
     ...options
 });
@@ -44,7 +44,7 @@ export const setAdGuardDns = <ThrowOnError extends boolean = false>(options: Opt
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/adguard/dns',
     ...options,
     headers: {
@@ -61,7 +61,7 @@ export const installAdGuard = <ThrowOnError extends boolean = false>(options?: O
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/adguard/install',
     ...options
 });
@@ -74,7 +74,7 @@ export const setAdGuardService = <ThrowOnError extends boolean = false>(options:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/adguard/service',
     ...options,
     headers: {
@@ -139,6 +139,49 @@ export const getSession = <ThrowOnError extends boolean = false>(options?: Optio
 });
 
 /**
+ * List API tokens
+ */
+export const getApiTokens = <ThrowOnError extends boolean = false>(options?: Options<GetApiTokensData, ThrowOnError>): RequestResult<GetApiTokensResponses, GetApiTokensErrors, ThrowOnError> => (options?.client ?? client).get<GetApiTokensResponses, GetApiTokensErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/tokens',
+    ...options
+});
+
+/**
+ * Create an API token (the secret is returned once)
+ */
+export const createApiToken = <ThrowOnError extends boolean = false>(options: Options<CreateApiTokenData, ThrowOnError>): RequestResult<CreateApiTokenResponses, CreateApiTokenErrors, ThrowOnError> => (options.client ?? client).post<CreateApiTokenResponses, CreateApiTokenErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/tokens',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Revoke an API token
+ */
+export const deleteApiToken = <ThrowOnError extends boolean = false>(options: Options<DeleteApiTokenData, ThrowOnError>): RequestResult<DeleteApiTokenResponses, DeleteApiTokenErrors, ThrowOnError> => (options.client ?? client).delete<DeleteApiTokenResponses, DeleteApiTokenErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/auth/tokens/{id}',
+    ...options
+});
+
+/**
  * Renew the wwan DHCP lease for a hotel portal
  */
 export const renewCaptiveDhcp = <ThrowOnError extends boolean = false>(options?: Options<RenewCaptiveDhcpData, ThrowOnError>): RequestResult<RenewCaptiveDhcpResponses, RenewCaptiveDhcpErrors, ThrowOnError> => (options?.client ?? client).post<RenewCaptiveDhcpResponses, RenewCaptiveDhcpErrors, ThrowOnError>({
@@ -146,7 +189,7 @@ export const renewCaptiveDhcp = <ThrowOnError extends boolean = false>(options?:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/captive/dhcp-renew',
     ...options
 });
@@ -159,7 +202,7 @@ export const enableCaptiveDnsBypass = <ThrowOnError extends boolean = false>(opt
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/captive/dns-bypass',
     ...options
 });
@@ -172,7 +215,7 @@ export const restoreCaptiveDns = <ThrowOnError extends boolean = false>(options?
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/captive/dns-restore',
     ...options
 });
@@ -185,7 +228,7 @@ export const getDashboardConnectivity = <ThrowOnError extends boolean = false>(o
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/dashboard/connectivity',
     ...options
 });
@@ -200,7 +243,7 @@ export const getDashboardEvents = <ThrowOnError extends boolean = false>(options
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/dashboard/events',
     ...options
 });
@@ -213,7 +256,7 @@ export const getDashboardThroughput = <ThrowOnError extends boolean = false>(opt
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/dashboard/throughput',
     ...options
 });
@@ -243,7 +286,7 @@ export const getSystemBackup = <ThrowOnError extends boolean = false>(options?: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/backup',
     ...options
 });
@@ -256,7 +299,7 @@ export const getSystemInfo = <ThrowOnError extends boolean = false>(options?: Op
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/info',
     ...options
 });
@@ -269,7 +312,7 @@ export const postSystemReboot = <ThrowOnError extends boolean = false>(options: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/reboot',
     ...options,
     headers: {
@@ -286,7 +329,7 @@ export const getSystemUpdateApply = <ThrowOnError extends boolean = false>(optio
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/update/apply',
     ...options
 });
@@ -299,7 +342,7 @@ export const postSystemUpdateApply = <ThrowOnError extends boolean = false>(opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/update/apply',
     ...options,
     headers: {
@@ -316,7 +359,7 @@ export const postSystemUpdateCheck = <ThrowOnError extends boolean = false>(opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/update/check',
     ...options,
     headers: {
@@ -333,7 +376,7 @@ export const postSystemUpdateRecover = <ThrowOnError extends boolean = false>(op
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/update/recover',
     ...options
 });
@@ -346,7 +389,7 @@ export const getSystemUpdateStage = <ThrowOnError extends boolean = false>(optio
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/update/stage',
     ...options
 });
@@ -359,7 +402,7 @@ export const postSystemUpdateStage = <ThrowOnError extends boolean = false>(opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/system/update/stage',
     ...options,
     headers: {
@@ -376,7 +419,7 @@ export const getTransaction = <ThrowOnError extends boolean = false>(options: Op
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/transactions/{id}',
     ...options
 });
@@ -389,7 +432,7 @@ export const confirmTransaction = <ThrowOnError extends boolean = false>(options
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/transactions/{id}/confirm',
     ...options
 });
@@ -402,7 +445,7 @@ export const rollbackTransaction = <ThrowOnError extends boolean = false>(option
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/transactions/{id}/rollback',
     ...options
 });
@@ -415,7 +458,7 @@ export const getVpndns = <ThrowOnError extends boolean = false>(options?: Option
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/dns',
     ...options
 });
@@ -428,7 +471,7 @@ export const verifyVpndns = <ThrowOnError extends boolean = false>(options?: Opt
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/dns/verify',
     ...options
 });
@@ -441,7 +484,7 @@ export const getVpnKillSwitch = <ThrowOnError extends boolean = false>(options?:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/killswitch',
     ...options
 });
@@ -454,7 +497,7 @@ export const setVpnKillSwitch = <ThrowOnError extends boolean = false>(options: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/killswitch',
     ...options,
     headers: {
@@ -471,7 +514,7 @@ export const getVpnProfiles = <ThrowOnError extends boolean = false>(options?: O
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/profiles',
     ...options
 });
@@ -484,7 +527,7 @@ export const postVpnProfile = <ThrowOnError extends boolean = false>(options: Op
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/profiles',
     ...options,
     headers: {
@@ -501,7 +544,7 @@ export const deleteVpnProfile = <ThrowOnError extends boolean = false>(options: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/profiles/{id}',
     ...options
 });
@@ -514,7 +557,7 @@ export const selectVpnProfile = <ThrowOnError extends boolean = false>(options: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/profiles/{id}/select',
     ...options
 });
@@ -527,7 +570,7 @@ export const getVpnSplit = <ThrowOnError extends boolean = false>(options?: Opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/split',
     ...options
 });
@@ -540,7 +583,7 @@ export const setVpnSplit = <ThrowOnError extends boolean = false>(options: Optio
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/split',
     ...options,
     headers: {
@@ -557,7 +600,7 @@ export const getVpnStatus = <ThrowOnError extends boolean = false>(options?: Opt
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/status',
     ...options
 });
@@ -570,7 +613,7 @@ export const setVpnTunnel = <ThrowOnError extends boolean = false>(options: Opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/vpn/tunnel',
     ...options,
     headers: {
@@ -587,7 +630,7 @@ export const getWiFi = <ThrowOnError extends boolean = false>(options?: Options<
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi',
     ...options
 });
@@ -600,7 +643,7 @@ export const getWiFiAccessPoints = <ThrowOnError extends boolean = false>(option
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/aps',
     ...options
 });
@@ -613,7 +656,7 @@ export const updateWiFiAccessPoint = <ThrowOnError extends boolean = false>(opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/aps/{section}',
     ...options,
     headers: {
@@ -630,7 +673,7 @@ export const getWiFiGuest = <ThrowOnError extends boolean = false>(options?: Opt
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/guest',
     ...options
 });
@@ -643,7 +686,7 @@ export const setWiFiGuest = <ThrowOnError extends boolean = false>(options: Opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/guest',
     ...options,
     headers: {
@@ -660,7 +703,7 @@ export const joinWiFi = <ThrowOnError extends boolean = false>(options: Options<
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/join',
     ...options,
     headers: {
@@ -677,7 +720,7 @@ export const getWiFiProfiles = <ThrowOnError extends boolean = false>(options?: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/profiles',
     ...options
 });
@@ -690,7 +733,7 @@ export const createWiFiProfile = <ThrowOnError extends boolean = false>(options:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/profiles',
     ...options,
     headers: {
@@ -707,7 +750,7 @@ export const reorderWiFiProfiles = <ThrowOnError extends boolean = false>(option
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/profiles/order',
     ...options,
     headers: {
@@ -724,7 +767,7 @@ export const deleteWiFiProfile = <ThrowOnError extends boolean = false>(options:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/profiles/{id}',
     ...options
 });
@@ -737,7 +780,7 @@ export const selectWiFiProfile = <ThrowOnError extends boolean = false>(options:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/profiles/{id}/select',
     ...options
 });
@@ -750,7 +793,7 @@ export const getWiFiReconnect = <ThrowOnError extends boolean = false>(options?:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/reconnect',
     ...options
 });
@@ -763,7 +806,7 @@ export const getWiFiScan = <ThrowOnError extends boolean = false>(options?: Opti
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/scan',
     ...options
 });
@@ -776,7 +819,7 @@ export const getWiFiUplinkMac = <ThrowOnError extends boolean = false>(options?:
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/uplink/mac',
     ...options
 });
@@ -789,7 +832,7 @@ export const setWiFiUplinkMac = <ThrowOnError extends boolean = false>(options: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }],
+        }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/wifi/uplink/mac',
     ...options,
     headers: {

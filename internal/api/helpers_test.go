@@ -156,6 +156,7 @@ type req struct {
 	method, path, body string
 	remote, host       string
 	cookie, csrf       string
+	auth               string // raw Authorization header
 	tls                bool
 }
 
@@ -184,6 +185,9 @@ func (e *env) do(r req) *httptest.ResponseRecorder {
 	}
 	if r.csrf != "" {
 		hr.Header.Set(csrfHeader, r.csrf)
+	}
+	if r.auth != "" {
+		hr.Header.Set("Authorization", r.auth)
 	}
 	if r.tls {
 		hr.TLS = &tlsState

@@ -131,7 +131,7 @@ func TestDashboardEventsIdleHeartbeat(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		s.serveDashboardEvents(ctx, w, sub, token, heartbeat, time.Second)
+		s.serveDashboardEvents(ctx, w, sub, authed{token: token}, heartbeat, time.Second)
 		close(done)
 	}()
 	heartbeat <- time.Now()
@@ -194,11 +194,11 @@ func TestDashboardEventsSlowSubscriberDoesNotBlockHealthy(t *testing.T) {
 	slowDone := make(chan struct{})
 	healthyDone := make(chan struct{})
 	go func() {
-		s.serveDashboardEvents(ctx, slow, slowSub, token, nil, 20*time.Millisecond)
+		s.serveDashboardEvents(ctx, slow, slowSub, authed{token: token}, nil, 20*time.Millisecond)
 		close(slowDone)
 	}()
 	go func() {
-		s.serveDashboardEvents(ctx, healthy, healthySub, token, nil, 20*time.Millisecond)
+		s.serveDashboardEvents(ctx, healthy, healthySub, authed{token: token}, nil, 20*time.Millisecond)
 		close(healthyDone)
 	}()
 	<-slow.changed

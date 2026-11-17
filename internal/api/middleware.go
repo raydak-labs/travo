@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
 	"github.com/blackdark-org/travo-greenfield/internal/auth"
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -18,6 +19,9 @@ const (
 	cookieName = "tg_session"
 	csrfHeader = "X-CSRF-Token"
 	publicKey  = "public"
+	// sessionOnlyKey marks routes an API token may never call (token management, password).
+	sessionOnlyKey = "session_only"
+	adminOnlyKey   = "admin_only"
 )
 
 type (
@@ -31,10 +35,12 @@ type reqInfo struct {
 	tls bool
 }
 
-// authed is the validated session of this request.
+// authed is the validated credential of this request: a cookie session, or an API
+// token (bearer set, token is then empty).
 type authed struct {
-	token string
-	sess  auth.Session
+	token  string
+	sess   auth.Session
+	bearer string
 }
 
 func infoOf(ctx context.Context) reqInfo { v, _ := ctx.Value(infoKey{}).(reqInfo); return v }
@@ -149,12 +155,17 @@ func isPublic(op *huma.Operation) bool {
 }
 
 // gate is the Huma middleware: request info, then auth, then CSRF. Routes are protected
-// unless registered as public.
+// unless registered as public. A bearer token is tried instead of the cookie when the
+// request carries an Authorization header.
 func (s *server) gate(ctx huma.Context, next func(huma.Context)) {
 	ip, _ := remoteAddr(ctx.RemoteAddr())
 	ctx = huma.WithValue(ctx, infoKey{}, reqInfo{ip: ip.String(), tls: ctx.TLS() != nil})
 	if isPublic(ctx.Operation()) {
 		next(ctx)
+		return
+	}
+	if h := ctx.Header("Authorization"); h != "" {
+		s.gateBearer(ctx, h, next)
 		return
 	}
 	c, err := huma.ReadCookie(ctx, cookieName)
@@ -172,6 +183,53 @@ func (s *server) gate(ctx huma.Context, next func(huma.Context)) {
 		return
 	}
 	next(huma.WithValue(ctx, authedKey{}, authed{token: c.Value, sess: sess}))
+}
+
+// gateBearer authenticates an API token. No CSRF check: a bearer header is never sent
+// by the browser on its own, so it is not an ambient credential. A read token may only
+// use safe methods; no token reaches a session-only route.
+func (s *server) gateBearer(ctx huma.Context, header string, next func(huma.Context)) {
+	raw, ok := strings.CutPrefix(header, "Bearer ")
+	if !ok || s.Tokens == nil {
+		writeError(ctx, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	tok, ok := s.Tokens.Authenticate(raw)
+	if !ok {
+		writeError(ctx, http.StatusUnauthorized, "unauthenticated", "login required")
+		return
+	}
+	if isSessionOnly(ctx.Operation()) {
+		writeError(ctx, http.StatusForbidden, "session_required", "this route needs a browser session, not an API token")
+		return
+	}
+	if tok.Scope != apitokens.ScopeAdmin && (isUnsafe(ctx.Method()) || isAdminOnly(ctx.Operation())) {
+		writeError(ctx, http.StatusForbidden, "insufficient_scope", "this API token may only read")
+		return
+	}
+	next(huma.WithValue(ctx, authedKey{}, authed{bearer: raw}))
+}
+
+// stillValid re-checks the credential of a long-lived request (the SSE stream).
+func (s *server) stillValid(a authed) bool {
+	if a.bearer != "" {
+		_, ok := s.Tokens.Authenticate(a.bearer)
+		return ok
+	}
+	_, ok := s.sessions.Lookup(a.token, s.clock.Now())
+	return ok
+}
+
+// isAdminOnly marks safe-method routes whose answer is a secret (the config backup holds
+// WiFi keys and the shadow file), so a read token may not fetch them.
+func isAdminOnly(op *huma.Operation) bool {
+	only, _ := op.Metadata[adminOnlyKey].(bool)
+	return only
+}
+
+func isSessionOnly(op *huma.Operation) bool {
+	only, _ := op.Metadata[sessionOnlyKey].(bool)
+	return only
 }
 
 // sessionCookie builds tg_session; Secure only when the request came over TLS (the

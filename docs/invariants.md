@@ -30,6 +30,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 
 - Admin login = root password validated via rpcd `session.login`. Mock mode: local check.
 - Cookie session (HttpOnly, SameSite=Strict) + CSRF header. Live push is SSE on the same cookie. No tokens in query strings.
+- API tokens (ADR 0008): bearer header only, never in a query string; stored as sha256 only; `read` scope never writes and never reads secrets; no token reaches token management, password, logout or session routes; tokens survive password change and die only by explicit revoke.
 - Session validity uses the MONOTONIC clock; the API returns only a relative `expires_in`; clients never compare server timestamps with their clock. Lifetime 24 h.
 - Protected routes default-DENY. The public list is a small explicit set (spec, health, login, first-run, time-sync). Adding a public route is a security change.
 - Routing is case-sensitive: `/API/v1/...` → 404 (a case-variant path once bypassed auth).

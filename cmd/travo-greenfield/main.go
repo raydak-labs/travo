@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/api"
+	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
 	"github.com/blackdark-org/travo-greenfield/internal/app"
 	"github.com/blackdark-org/travo-greenfield/internal/auth"
 	"github.com/blackdark-org/travo-greenfield/internal/auth/epochfile"
@@ -317,6 +318,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		Throughput:    sampler,
 		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,
+		Tokens:    apitokens.New(filepath.Join(deps.Paths.State, "api-tokens.json")),
 		Trusted:   provider.Allowed,
 		RouterIPs: provider.RouterIPs, HostAllow: hostAllow,
 		SaveEpoch: func(n uint64) error { return epochfile.Save(deps.Paths.EpochFile(), n) },

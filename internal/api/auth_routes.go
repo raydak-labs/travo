@@ -39,9 +39,9 @@ type passwordInput struct {
 
 func (s *server) registerAuth(a huma.API) {
 	register(s, true, op("postLogin", http.MethodPost, "/api/v1/auth/login", "Log in with the root password", "auth", 401, 409, 429, 503), a, s.login)
-	register(s, false, op("postLogout", http.MethodPost, "/api/v1/auth/logout", "Log out and revoke the session", "auth"), a, s.logout)
-	register(s, false, op("getSession", http.MethodGet, "/api/v1/auth/session", "Current session (recovers the CSRF token after a reload)", "auth"), a, s.session)
-	register(s, false, op("postPassword", http.MethodPost, "/api/v1/auth/password", "Change the root password and revoke all sessions", "auth", 400, 403, 429, 503), a, s.changePassword)
+	registerSessionOnly(s, op("postLogout", http.MethodPost, "/api/v1/auth/logout", "Log out and revoke the session", "auth"), a, s.logout)
+	registerSessionOnly(s, op("getSession", http.MethodGet, "/api/v1/auth/session", "Current session (recovers the CSRF token after a reload)", "auth"), a, s.session)
+	registerSessionOnly(s, op("postPassword", http.MethodPost, "/api/v1/auth/password", "Change the root password and revoke all sessions", "auth", 400, 403, 429, 503), a, s.changePassword)
 }
 
 // issue starts a session for this request and builds the response with its cookie.

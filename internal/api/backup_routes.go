@@ -27,6 +27,7 @@ func (s *server) registerBackup(a huma.API) {
 			backupMediaType: {Schema: &huma.Schema{Type: "string", Format: "binary"}},
 		}},
 	}
+	operation.Metadata = map[string]any{adminOnlyKey: true} // holds WiFi keys and the shadow file
 	register(s, false, operation, a, s.getSystemBackup)
 }
 

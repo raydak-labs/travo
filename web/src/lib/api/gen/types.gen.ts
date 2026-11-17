@@ -83,6 +83,38 @@ export type ApiError = {
     error: string;
 };
 
+export type ApiTokenCreateInputBody = {
+    /**
+     * Label shown in the token list
+     */
+    name: string;
+    /**
+     * read = GET only; admin = every route except session-only ones
+     */
+    scope: 'read' | 'admin';
+};
+
+export type ApiTokenCreated = {
+    /**
+     * Router wall clock at creation; display only
+     */
+    created_at: string;
+    /**
+     * Stable token id, used to revoke
+     */
+    id: string;
+    name: string;
+    scope: 'read' | 'admin';
+    /**
+     * The bearer token; shown once, only its hash is stored
+     */
+    token: string;
+};
+
+export type ApiTokenList = {
+    tokens: Array<Token>;
+};
+
 export type AppBody = {
     /**
      * Build time, RFC 3339; empty for unstamped builds
@@ -401,6 +433,19 @@ export type SystemInfoBody = {
 
 export type ThroughputBody = {
     interfaces: Array<Rate>;
+};
+
+export type Token = {
+    /**
+     * Router wall clock at creation; display only
+     */
+    created_at: string;
+    /**
+     * Stable token id, used to revoke
+     */
+    id: string;
+    name: string;
+    scope: 'read' | 'admin';
 };
 
 export type TunnelStatus = {
@@ -835,6 +880,115 @@ export type GetSessionResponses = {
 };
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type GetApiTokensData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/tokens';
+};
+
+export type GetApiTokensErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetApiTokensError = GetApiTokensErrors[keyof GetApiTokensErrors];
+
+export type GetApiTokensResponses = {
+    /**
+     * OK
+     */
+    200: ApiTokenList;
+};
+
+export type GetApiTokensResponse = GetApiTokensResponses[keyof GetApiTokensResponses];
+
+export type CreateApiTokenData = {
+    body: ApiTokenCreateInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/tokens';
+};
+
+export type CreateApiTokenErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type CreateApiTokenError = CreateApiTokenErrors[keyof CreateApiTokenErrors];
+
+export type CreateApiTokenResponses = {
+    /**
+     * Created
+     */
+    201: ApiTokenCreated;
+};
+
+export type CreateApiTokenResponse = CreateApiTokenResponses[keyof CreateApiTokenResponses];
+
+export type DeleteApiTokenData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/auth/tokens/{id}';
+};
+
+export type DeleteApiTokenErrors = {
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DeleteApiTokenError = DeleteApiTokenErrors[keyof DeleteApiTokenErrors];
+
+export type DeleteApiTokenResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type DeleteApiTokenResponse = DeleteApiTokenResponses[keyof DeleteApiTokenResponses];
 
 export type RenewCaptiveDhcpData = {
     body?: never;
