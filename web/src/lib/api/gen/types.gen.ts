@@ -149,6 +149,14 @@ export type GetSetupStateResponse = {
     password_set: boolean;
 };
 
+export type GuestConfig = {
+    configured: boolean;
+    enabled: boolean;
+    radio: string;
+    ssid: string;
+    subnet: string;
+};
+
 export type HealthOutputBody = {
     /**
      * Opaque id of the current boot; empty when unknown
@@ -293,6 +301,19 @@ export type SessionBody = {
      * Seconds until the session ends; relative on purpose
      */
     expires_in: number;
+};
+
+export type SetGuestInputBody = {
+    /**
+     * Apply even if the caller may lose its access point
+     */
+    acknowledge_lockout?: boolean;
+    enabled: boolean;
+    /**
+     * Radio for the guest AP; omitted keeps the current one or picks a radio without the uplink
+     */
+    radio?: string;
+    ssid: string;
 };
 
 export type SetupInputBody = {
@@ -442,6 +463,23 @@ export type JoinWiFiInputBodyWritable = {
     bssid?: string;
     key?: string;
     security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';
+    ssid: string;
+};
+
+export type SetGuestInputBodyWritable = {
+    /**
+     * Apply even if the caller may lose its access point
+     */
+    acknowledge_lockout?: boolean;
+    enabled: boolean;
+    /**
+     * WPA key; required on first setup, omitted keeps the current key
+     */
+    key?: string;
+    /**
+     * Radio for the guest AP; omitted keeps the current one or picks a radio without the uplink
+     */
+    radio?: string;
     ssid: string;
 };
 
@@ -1977,6 +2015,76 @@ export type UpdateWiFiAccessPointResponses = {
 };
 
 export type UpdateWiFiAccessPointResponse = UpdateWiFiAccessPointResponses[keyof UpdateWiFiAccessPointResponses];
+
+export type GetWiFiGuestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/guest';
+};
+
+export type GetWiFiGuestErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiGuestError = GetWiFiGuestErrors[keyof GetWiFiGuestErrors];
+
+export type GetWiFiGuestResponses = {
+    /**
+     * OK
+     */
+    200: GuestConfig;
+};
+
+export type GetWiFiGuestResponse = GetWiFiGuestResponses[keyof GetWiFiGuestResponses];
+
+export type SetWiFiGuestData = {
+    body: SetGuestInputBodyWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/guest';
+};
+
+export type SetWiFiGuestErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetWiFiGuestError = SetWiFiGuestErrors[keyof SetWiFiGuestErrors];
+
+export type SetWiFiGuestResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetWiFiGuestResponse = SetWiFiGuestResponses[keyof SetWiFiGuestResponses];
 
 export type JoinWiFiData = {
     body: JoinWiFiInputBodyWritable;

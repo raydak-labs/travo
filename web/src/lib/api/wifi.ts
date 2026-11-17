@@ -6,13 +6,16 @@ import {
   deleteWiFiProfile,
   getWiFi,
   getWiFiAccessPoints,
+  getWiFiGuest,
   getWiFiProfiles,
   getWiFiReconnect,
   getWiFiScan,
   type JoinWiFiData,
   joinWiFi,
   reorderWiFiProfiles,
+  type SetWiFiGuestData,
   selectWiFiProfile,
+  setWiFiGuest,
   type UpdateWiFiAccessPointData,
   updateWiFiAccessPoint,
 } from './gen';
@@ -79,4 +82,14 @@ export function updateAccessPoint(
   signal?: AbortSignal,
 ) {
   return updateWiFiAccessPoint({ path: { section }, body, signal });
+}
+
+export async function fetchGuest(signal?: AbortSignal) {
+  const response = await getWiFiGuest({ signal });
+  if (!response.data) throw new Error(m.wifi_unavailable());
+  return response.data;
+}
+
+export function updateGuest(body: SetWiFiGuestData['body'], signal?: AbortSignal) {
+  return setWiFiGuest({ body, signal });
 }

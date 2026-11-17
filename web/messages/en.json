@@ -359,5 +359,11 @@
   "wifi_ap_applying": "Applying {ssid}, this can take up to 30 seconds",
   "wifi_ap_radio_in_use": "This radio carries the uplink. Move the uplink first.",
   "wifi_ap_not_found": "This access point no longer exists.",
-  "wifi_ssid_invalid": "Enter a network name of 1–32 bytes."
+  "wifi_ssid_invalid": "Enter a network name of 1–32 bytes.",
+  "wifi_guest_title": "Guest network",
+  "wifi_guest_hint": "Separate network {subnet} with internet only: no access to your devices or this router.",
+  "wifi_guest_none": "Not set up",
+  "wifi_guest_setup": "Set up guest network",
+  "wifi_guest_overlap": "The guest subnet overlaps another network.",
+  "wifi_guest_conflict": "An existing guest configuration is not managed here."
 }

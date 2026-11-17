@@ -63,6 +63,12 @@ type WiFiAPEditor interface {
 	UpdateAP(context.Context, wifi.APRequest) (txn.Status, error)
 }
 
+// WiFiGuestEditor reads and applies the guest AP through guarded transactions.
+type WiFiGuestEditor interface {
+	Guest(context.Context) (wifi.GuestConfig, error)
+	SetGuest(context.Context, wifi.GuestRequest) (txn.Status, error)
+}
+
 type WiFiService interface {
 	Summary(context.Context) (wifi.Summary, error)
 	Scan(context.Context) (wifi.ScanResult, error)
@@ -107,6 +113,7 @@ type Deps struct {
 	// WiFiReconnect is the capped auto-reconnect counter; nil answers 503 device_unavailable.
 	WiFiReconnect WiFiReconnectReader
 	WiFiAPs       WiFiAPEditor
+	WiFiGuest     WiFiGuestEditor
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.

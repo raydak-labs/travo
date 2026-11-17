@@ -9,7 +9,6 @@ import {
   rollbackTransaction,
   type ScanResult,
   type TxnBody,
-  type UpdateWiFiAccessPointData,
   type WiFiProfileSummary,
 } from '../api/gen';
 import {
@@ -22,7 +21,6 @@ import {
   reorderWifiProfiles,
   saveWifiProfile,
   selectWifiProfile,
-  updateAccessPoint,
 } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
@@ -110,13 +108,9 @@ function selectProfile(profile: WiFiProfileSummary) {
   return submit(profile.ssid, () => selectWifiProfile(profile.id, request.signal));
 }
 
-function submitAP(section: string, body: UpdateWiFiAccessPointData['body']) {
-  return submit(
-    body.ssid,
-    () => updateAccessPoint(section, body, request.signal),
-    true,
-    () => submitAP(section, { ...body, acknowledge_lockout: true }),
-  );
+// AP and guest edits: send(acknowledge) builds the request; a lockout refusal offers a resend.
+function submitAP(ssid: string, send: (acknowledge: boolean) => Send) {
+  return submit(ssid, send(false), true, () => submit(ssid, send(true), true));
 }
 
 async function poll() {

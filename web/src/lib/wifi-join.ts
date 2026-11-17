@@ -50,6 +50,10 @@ export function joinError(code: string) {
       return m.wifi_ap_radio_in_use();
     case 'wifi_ap_not_found':
       return m.wifi_ap_not_found();
+    case 'wifi_guest_subnet_overlap':
+      return m.wifi_guest_overlap();
+    case 'wifi_guest_conflict':
+      return m.wifi_guest_conflict();
     case 'wifi_ssid_invalid':
       return m.wifi_ssid_invalid();
     case 'wifi_no_change':

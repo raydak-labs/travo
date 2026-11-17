@@ -193,7 +193,7 @@ func seedJoinDevice(t *testing.T, d *mock.Device) {
 func seedConfigs(t *testing.T, d *mock.Device, wirelessFile string, skip func(device.Section) bool) {
 	t.Helper()
 	ctx := context.Background()
-	for _, cfg := range []string{"wireless", "network", "firewall"} {
+	for _, cfg := range []string{"wireless", "network", "firewall", "dhcp"} {
 		filename := "uci-show-" + cfg + ".txt"
 		if cfg == "wireless" {
 			filename = wirelessFile
@@ -284,7 +284,7 @@ func fileTxnManager(t *testing.T, base *mock.Device, afterWirelessCommit func())
 	if err := os.Mkdir(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, config := range []string{"wireless", "network", "firewall"} {
+	for _, config := range []string{"wireless", "network", "firewall", "dhcp"} {
 		if err := os.WriteFile(filepath.Join(configDir, config), []byte("original "+config), 0o600); err != nil {
 			t.Fatal(err)
 		}
