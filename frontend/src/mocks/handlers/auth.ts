@@ -18,6 +18,10 @@ export const authHandlers = [
     return HttpResponse.json({ status: 'ok' });
   }),
 
+  http.post(API_ROUTES.ws.ticket, () => {
+    return HttpResponse.json({ ticket: 'test-ws-ticket', expires_in: 30 });
+  }),
+
   http.get(API_ROUTES.auth.session, () => {
     return HttpResponse.json({ valid: true, expires_in: 86400 });
   }),

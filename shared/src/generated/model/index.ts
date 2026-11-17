@@ -164,3 +164,4 @@ export * from './wireGuardProfile';
 export * from './wireGuardProfileRequest';
 export * from './wireGuardStatus';
 export * from './woLRequest';
+export * from './wSTicketResponse';

@@ -111,6 +111,7 @@ import type {
   UptimeEvent,
   VPNVerifyResult,
   VpnStatus,
+  WSTicketResponse,
   WanConfig,
   WanDetectResult,
   WiFiSchedule,
@@ -5057,5 +5058,29 @@ return apiFetch<Status>(getSetWiFiScheduleUrl(),
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(wiFiSchedule)
+  }
+);}
+
+
+
+export const getCreateWSTicketUrl = () => {
+
+
+
+
+  return `/api/v1/ws/ticket`
+}
+
+/**
+ * @summary Issue a single-use WebSocket upgrade ticket
+ */
+export const createWSTicket = async ( options?: Parameters<typeof apiFetch>[1]): Promise<WSTicketResponse> => {
+
+  return apiFetch<WSTicketResponse>(getCreateWSTicketUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
   }
 );}

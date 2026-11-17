@@ -23,6 +23,7 @@ type wsTestServer struct {
 	Auth    *auth.AuthService
 	Block   *auth.TokenBlocklist
 	Registr *auth.SessionRegistry
+	Tickets *TicketStore
 	Hub     *Hub
 	// done is closed when the test server is torn down, so a dial retry can
 	// bail out instead of waiting on a dead listener.
@@ -45,6 +46,7 @@ func newWSTestServer(t *testing.T, opts ...func(*wsTestServer)) *wsTestServer {
 		Auth:    auth.NewAuthService("admin", testSecret),
 		Block:   auth.NewTokenBlocklist(),
 		Registr: auth.NewSessionRegistry(time.Hour),
+		Tickets: NewTicketStore(0),
 	}
 	ts.Auth.SetBlocklist(ts.Block)
 	ts.Auth.SetSessionRegistry(ts.Registr)
@@ -57,7 +59,7 @@ func newWSTestServer(t *testing.T, opts ...func(*wsTestServer)) *wsTestServer {
 	ts.Hub.Start()
 
 	app := fiber.New()
-	app.Use("/api/v1/ws", UpgradeMiddleware(ts.Auth, nil))
+	app.Use("/api/v1/ws", UpgradeMiddleware(ts.Auth, ts.Tickets, nil))
 	app.Get("/api/v1/ws", Handler(ts.Hub, ts.Auth, fastKeepalive))
 
 	// A real listener is required: the upgrade hijacks the fasthttp
@@ -118,9 +120,10 @@ func TestUpgradeMiddleware_RejectsMissingToken(t *testing.T) {
 	}
 }
 
-func TestUpgradeMiddleware_RejectsInvalidToken(t *testing.T) {
+func TestUpgradeMiddleware_RejectsInvalidTicket(t *testing.T) {
 	ts := newWSTestServer(t)
-	_, resp, err := dialWS(t, ts, "/api/v1/ws?token=not-a-jwt", nil)
+	header := http.Header{"Sec-WebSocket-Protocol": []string{"travo-ws-ticket.not-a-ticket"}}
+	_, resp, err := dialWS(t, ts, "/api/v1/ws", header)
 	if err == nil {
 		t.Fatal("expected the upgrade to be rejected for a garbage token")
 	}
@@ -132,7 +135,7 @@ func TestUpgradeMiddleware_RejectsInvalidToken(t *testing.T) {
 func TestUpgradeMiddleware_RejectsExpiredToken(t *testing.T) {
 	ts := newWSTestServer(t)
 	expired := signToken(t, "expired-jti", time.Now().Add(-time.Hour))
-	_, resp, err := dialWS(t, ts, "/api/v1/ws?token="+expired, nil)
+	_, resp, err := dialWS(t, ts, "/api/v1/ws", ticketProtocol(t, ts, expired))
 	if err == nil {
 		t.Fatal("expected the upgrade to be rejected for an expired token")
 	}
@@ -147,7 +150,7 @@ func TestUpgradeMiddleware_RejectsRevokedToken(t *testing.T) {
 	ts.Auth.RevokeSession(token)
 	ts.Block.Block(token, time.Now().Add(time.Hour))
 
-	_, resp, err := dialWS(t, ts, "/api/v1/ws?token="+token, nil)
+	_, resp, err := dialWS(t, ts, "/api/v1/ws", ticketProtocol(t, ts, token))
 	if err == nil {
 		t.Fatal("expected the upgrade to be rejected for a revoked token")
 	}
@@ -156,9 +159,23 @@ func TestUpgradeMiddleware_RejectsRevokedToken(t *testing.T) {
 	}
 }
 
-func TestUpgradeMiddleware_AcceptsValidToken(t *testing.T) {
+func ticketProtocol(t *testing.T, ts *wsTestServer, sessionToken string) http.Header {
+	t.Helper()
+	ticket, _, err := ts.Tickets.Issue(sessionToken)
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+	return http.Header{"Sec-WebSocket-Protocol": []string{"travo-ws-ticket." + ticket}}
+}
+
+func loginProtocol(t *testing.T, ts *wsTestServer) http.Header {
+	t.Helper()
+	return ticketProtocol(t, ts, loginToken(t, ts))
+}
+
+func TestUpgradeMiddleware_AcceptsTicketProtocol(t *testing.T) {
 	ts := newWSTestServer(t)
-	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), nil)
+	conn, _, err := dialWS(t, ts, "/api/v1/ws", loginProtocol(t, ts))
 	if err != nil {
 		t.Fatalf("expected the upgrade to succeed, got %v", err)
 	}
@@ -169,13 +186,42 @@ func TestUpgradeMiddleware_AcceptsValidToken(t *testing.T) {
 	waitForClientCount(t, ts.Hub, 1)
 }
 
+func TestUpgradeMiddleware_TicketIsSingleUse(t *testing.T) {
+	ts := newWSTestServer(t)
+	header := loginProtocol(t, ts)
+	conn, _, err := dialWS(t, ts, "/api/v1/ws", header)
+	if err != nil {
+		t.Fatalf("first upgrade: %v", err)
+	}
+	conn.Close()
+	_, resp, err := dialWS(t, ts, "/api/v1/ws", header)
+	if err == nil {
+		t.Fatal("second upgrade with the same ticket must fail")
+	}
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("second upgrade status = %v, want 401", resp)
+	}
+}
+
+func TestUpgradeMiddleware_RejectsQueryToken(t *testing.T) {
+	ts := newWSTestServer(t)
+	_, resp, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), nil)
+	if err == nil {
+		t.Fatal("a JWT in the query string must not authenticate the upgrade")
+	}
+	if resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("query-token status = %v, want 401", resp)
+	}
+}
+
 // --- origin ----------------------------------------------------------------
 
 func TestUpgradeMiddleware_RejectsCrossSiteOrigin(t *testing.T) {
 	ts := newWSTestServer(t)
-	h := http.Header{"Origin": []string{"http://evil.example"}}
+	h := loginProtocol(t, ts)
+	h.Set("Origin", "http://evil.example")
 
-	_, resp, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), h)
+	_, resp, err := dialWS(t, ts, "/api/v1/ws", h)
 	if err == nil {
 		t.Fatal("expected a cross-site WebSocket upgrade to be rejected")
 	}
@@ -187,9 +233,10 @@ func TestUpgradeMiddleware_RejectsCrossSiteOrigin(t *testing.T) {
 func TestUpgradeMiddleware_AllowsSameOrigin(t *testing.T) {
 	ts := newWSTestServer(t)
 	host := strings.TrimPrefix(ts.URL, "ws://")
-	h := http.Header{"Origin": []string{"ws://" + host}}
+	h := loginProtocol(t, ts)
+	h.Set("Origin", "ws://"+host)
 
-	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), h)
+	conn, _, err := dialWS(t, ts, "/api/v1/ws", h)
 	if err != nil {
 		t.Fatalf("expected a same-origin upgrade to succeed, got %v", err)
 	}
@@ -262,7 +309,7 @@ func TestHandler_StopsStreamingAfterLogout(t *testing.T) {
 	ts := newWSTestServer(t)
 	token := loginToken(t, ts)
 
-	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+token, nil)
+	conn, _, err := dialWS(t, ts, "/api/v1/ws", ticketProtocol(t, ts, token))
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
@@ -294,7 +341,7 @@ func TestHandler_StopsStreamingAfterLogout(t *testing.T) {
 
 func TestHandler_SetsReadLimit(t *testing.T) {
 	ts := newWSTestServer(t)
-	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), nil)
+	conn, _, err := dialWS(t, ts, "/api/v1/ws", loginProtocol(t, ts))
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
@@ -329,7 +376,7 @@ func TestHandler_SetsReadLimit(t *testing.T) {
 // keepalive is live on an upgraded socket.
 func TestHandler_SendsPings(t *testing.T) {
 	ts := newWSTestServer(t)
-	conn, _, err := dialWS(t, ts, "/api/v1/ws?token="+loginToken(t, ts), nil)
+	conn, _, err := dialWS(t, ts, "/api/v1/ws", loginProtocol(t, ts))
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}

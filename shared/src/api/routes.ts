@@ -17,6 +17,9 @@ export const API_ROUTES = {
     session: '/api/v1/auth/session',
     password: '/api/v1/auth/password',
   },
+  ws: {
+    ticket: '/api/v1/ws/ticket',
+  },
   system: {
     info: '/api/v1/system/info',
     stats: '/api/v1/system/stats',

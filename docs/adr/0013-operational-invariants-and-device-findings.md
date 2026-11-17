@@ -3,7 +3,7 @@ title: "ADR 0013: Operational invariants and device findings"
 description: Cross-cutting operational invariants and the device findings behind them: VPN disable route recovery, push wiring, store cost, band switching, buttons, AdGuard.
 status: Accepted
 date: 2026-10-05
-updated: 2026-11-08
+updated: 2026-11-17
 tags: [adr, operations, invariants, vpn, wifi, hardware, findings]
 ---
 
@@ -87,17 +87,18 @@ a ~12.8 MB stripped binary and NAND-backed flash. That measurement is what
 selected bbolt (ADR 0009) and it has not been re-taken since; re-measure before
 adding any dependency that is not already in the module graph.
 
-### 4. WebSocket token transport is designed, not built
+### 4. WebSocket tickets replace query-string JWTs
 
-The browser cannot set headers on a WebSocket handshake, so the token currently
-travels in the query string. The designed replacement is a single-use,
-short-lived (~30 s) ticket from an authenticated `POST /api/v1/auth/ws-ticket`,
-passed as the ticket in the query string; accepting the token via
-`Sec-WebSocket-Protocol` is the smaller alternative. Neither exists in code, and
-moving the token to an `HttpOnly; SameSite=Strict; Secure` cookie is deliberately
-bundled with it — it changes CORS setup, WebSocket auth, and every
-`Authorization`-header consumer of the OpenAPI document, so it needs an
-API-versioning decision of its own (ADR 0007 tracks the auth contract).
+`POST /api/v1/ws/ticket` issues a random, single-use ticket with a 30-second TTL.
+The WebSocket upgrade carries it as `travo-ws-ticket.<ticket>` in
+`Sec-WebSocket-Protocol`, and `TicketStore.Consume` deletes it before session
+validation, so replay fails. Query-string `token` is not accepted. The browser
+uses the authenticated REST client and drops the response if its session changed
+while the ticket request was in flight.
+
+Moving the JWT itself to an `HttpOnly; SameSite=Strict; Secure` cookie remains a
+separate API-versioning decision because it changes CORS, CSRF handling and every
+`Authorization`-header consumer of the OpenAPI document (ADR 0007).
 
 ### 5. Band switching costs seconds, and scan results are grouped per SSID
 
@@ -218,7 +219,7 @@ convenience, the token in the query string forever) was cheaper and wrong.
 
 ## Deliberate ceilings
 
-- Rules 4 and 5 describe designs, one built and one planned. Rule 4 is explicitly
-  not implemented; do not read this ADR as a description of current auth behaviour.
+- The HttpOnly cookie + CSRF session migration remains unimplemented and needs an
+  API-versioning decision. WebSocket tickets do not change the REST Bearer contract.
 - Rule 6 documents detection only. Long-press vs short-press and user-configurable
   actions are still open backlog items, not decisions.
