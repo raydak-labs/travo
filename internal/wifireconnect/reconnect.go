@@ -182,7 +182,8 @@ func (s *Service) Tick(ctx context.Context) {
 	wasDown := s.wasDown
 	// A down STA under a guard is a live change at work (a join or select takes wwan
 	// down for seconds), not an outage: it must not start the two-tick count.
-	s.wasDown = obs.down() && !s.guarded()
+	guardedNow := s.guarded()
+	s.wasDown = obs.down() && !guardedNow
 	r, err := s.load()
 	if err != nil {
 		slog.Warn("wifi reconnect: counter unreadable, staying idle")
@@ -194,6 +195,9 @@ func (s *Service) Tick(ctx context.Context) {
 			slog.Warn("wifi reconnect: could not clear counter")
 		}
 	case ActionAttempt:
+		if guardedNow {
+			return // a guard seen this tick wins even if released before attempt re-checks
+		}
 		s.attempt(ctx, r)
 		s.wasDown = false // the next attempt waits two more ticks
 	}
