@@ -137,6 +137,9 @@ func (s *Service) Reconcile(ctx context.Context) error {
 	if !st.Installed {
 		return s.Install(ctx, false)
 	}
+	if _, err := os.Stat(s.Config); errors.Is(err, os.ErrNotExist) {
+		return s.SeedMissing(ctx)
+	}
 	if !st.Loopback && st.ConfigError == "" {
 		return s.Migrate(ctx)
 	}
@@ -252,6 +255,34 @@ func (s *Service) Install(ctx context.Context, explicit bool) error {
 		return fmt.Errorf("%s not answering after install: %w (guard %s kept)", Package, err, InstallGuard)
 	}
 	return s.Guards.Release(InstallGuard)
+}
+
+// SeedMissing gives a package that came without a config (preinstalled in the firmware
+// image) the loopback seed and restarts it. Without a config AGH serves its first-run
+// wizard on 0.0.0.0:3000 to every LAN client (invariants §8). Failure keeps the guard.
+func (s *Service) SeedMissing(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.idle(); err != nil {
+		return err
+	}
+	if _, err := os.Stat(s.Config); !errors.Is(err, os.ErrNotExist) {
+		return err // appeared meanwhile, or unreadable: nothing to seed
+	}
+	if err := s.Guards.Acquire(ConfigGuard); err != nil {
+		return err
+	}
+	err := s.prepareConfig()
+	if err == nil {
+		err = s.Services.ServiceAction(ctx, Package, "restart")
+	}
+	if err == nil {
+		err = s.waitReady(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("adguard: seed missing config: %w (guard %s kept)", err, ConfigGuard)
+	}
+	return s.Guards.Release(ConfigGuard)
 }
 
 // prepareConfig writes the seed, or migrates a config left over from an earlier install.

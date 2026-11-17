@@ -206,6 +206,44 @@ func TestReconcileMigratesALanBoundConfig(t *testing.T) {
 	}
 }
 
+// A firmware image can ship the package without a config; AGH then runs its wizard on
+// 0.0.0.0:3000 (seen on the AXT1800 after firstboot, 2026-11-17).
+func TestReconcileSeedsAPreinstalledPackageWithoutConfig(t *testing.T) {
+	r := newRig(t)
+	r.installed(t, nil)
+	if err := os.Remove(r.svc.Config); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(r.svc.Config)
+	if !bytes.Equal(got, Seed) {
+		t.Fatal("seed not written")
+	}
+	if !slices.Equal(r.dev.ServiceActions, []string{"adguardhome restart"}) {
+		t.Fatalf("actions = %v", r.dev.ServiceActions)
+	}
+	if g := r.guards(t); len(g) != 0 {
+		t.Fatalf("guards = %v", g)
+	}
+}
+
+func TestSeedMissingKeepsGuardWhenAGHDoesNotAnswer(t *testing.T) {
+	r := newRig(t)
+	r.installed(t, nil)
+	if err := os.Remove(r.svc.Config); err != nil {
+		t.Fatal(err)
+	}
+	r.svc.Ready = func(context.Context) error { return errors.New("connection refused") }
+	if err := r.svc.Reconcile(context.Background()); err == nil {
+		t.Fatal("want an error")
+	}
+	if g := r.guards(t); len(g) != 1 {
+		t.Fatalf("guards = %v, want the config guard kept", g)
+	}
+}
+
 func TestMigrationRestoresWhenAGHDoesNotAnswer(t *testing.T) {
 	r := newRig(t)
 	old := readFixture(t)

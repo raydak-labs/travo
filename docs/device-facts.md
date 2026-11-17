@@ -100,6 +100,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 
 ## 11. AdGuard Home
 
+- [HW, AXT1800 25.12.6 image, 2026-11-17] The firmware image can ship `adguardhome` preinstalled with an empty `/etc/adguardhome/`: after `firstboot` AGH ran its first-run wizard on `:::3000` for every LAN client. The init script `chown`s the config dir to the `adguardhome` user on each start. Reconcile therefore seeds the loopback config and restarts AGH whenever the package is installed but the config is missing.
 - [HW] Reinstall over a config written by a newer AdGuard: v0.107.54 crash-loops on `unknown current schema version 33`. dnsmasq kept forwarding to `127.0.0.1#5353` → ALL LAN DNS dead, uplink fine, Travo reported healthy. Cached answers hide it for minutes; test with a fresh name.
 - [HW] The init script read `/opt/AdGuardHome/AdGuardHome.yaml`; editing the path named in UCI `config_file` did nothing (relevant to the manual-binary install; the package route in ADR-0006 must be re-verified).
 - Open decision: refuse a downgrade on reinstall instead of silent breakage.
