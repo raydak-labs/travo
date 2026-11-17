@@ -98,6 +98,8 @@ type Deps struct {
 	Sessions *auth.Store
 	Limiter  *auth.RateLimiter
 	Clock    auth.Clock
+	// WiFiReconnect is the capped auto-reconnect counter; nil answers 503 device_unavailable.
+	WiFiReconnect WiFiReconnectReader
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -186,6 +188,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWiFi(a)
 	s.registerWiFiProfiles(a)
 	s.registerAdGuard(a)
+	s.registerWiFiReconnect(a)
 	s.registerDashboardEvents(a)
 	if d.UI != nil {
 		mux.Handle("/", d.UI)
@@ -207,6 +210,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		}
 	case "github.com/blackdark-org/travo-greenfield/internal/wifiprofiles":
 		return "WiFiProfile" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/wifireconnect":
+		return "WiFiReconnect" + name
 	}
 	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name

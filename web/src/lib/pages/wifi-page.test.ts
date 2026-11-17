@@ -1,20 +1,23 @@
 import { render } from 'svelte/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ScanResult, WiFiProfileList } from '../api/gen';
+import type { ScanResult, WiFiProfileList, WiFiReconnectStatus } from '../api/gen';
 import WiFi from './WiFi.svelte';
 
-const { createLoader, fetchWifi, fetchWifiProfiles, fetchWifiScan } = vi.hoisted(() => ({
-  createLoader: vi.fn(),
-  fetchWifi: vi.fn(),
-  fetchWifiProfiles: vi.fn(),
-  fetchWifiScan: vi.fn(),
-}));
+const { createLoader, fetchWifi, fetchWifiProfiles, fetchWifiReconnect, fetchWifiScan } =
+  vi.hoisted(() => ({
+    createLoader: vi.fn(),
+    fetchWifi: vi.fn(),
+    fetchWifiProfiles: vi.fn(),
+    fetchWifiReconnect: vi.fn(),
+    fetchWifiScan: vi.fn(),
+  }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
-vi.mock('../api/wifi', () => ({ fetchWifi, fetchWifiProfiles, fetchWifiScan }));
+vi.mock('../api/wifi', () => ({ fetchWifi, fetchWifiProfiles, fetchWifiReconnect, fetchWifiScan }));
 
 const summary = { radios: [], stas: [], aps: [] };
 // HomeUplink and Neighbor2 are the mock device's scan fixtures.
 let saved: WiFiProfileList = { profiles: [], connected_id: null };
+let reconnect: WiFiReconnectStatus = { state: 'idle', attempts: 0, max_attempts: 5 };
 const scan: ScanResult = {
   networks: [
     {
@@ -44,10 +47,12 @@ describe('WiFi page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saved = { profiles: [], connected_id: null };
+    reconnect = { state: 'idle', attempts: 0, max_attempts: 5 };
     createLoader.mockImplementation((fn) => ({
       status: { state: 'ready' },
-      data: fn === fetchWifiProfiles ? saved : summary,
+      data: fn === fetchWifiProfiles ? saved : fn === fetchWifiReconnect ? reconnect : summary,
       retry: vi.fn(),
+      stop: vi.fn(),
     }));
   });
 
@@ -107,5 +112,35 @@ describe('WiFi page', () => {
     expect(body).toContain('opacity-60');
     expect(body).toContain('Last known value');
     expect(body).toContain('Retry');
+  });
+
+  it('shows reconnect attempts while retrying', () => {
+    reconnect = { state: 'retrying', attempts: 2, max_attempts: 5 };
+    expect(render(WiFi).body).toContain('Uplink lost. Reconnecting, attempt 2 of 5.');
+    expect(createLoader).toHaveBeenCalledWith(fetchWifiReconnect, 30_000);
+  });
+
+  it('offers the highest-priority saved uplink in range once the cap is reached', () => {
+    reconnect = { state: 'exhausted', attempts: 5, max_attempts: 5 };
+    saved = {
+      profiles: [
+        { id: 'a'.repeat(32), ssid: 'Hotel', security: 'wpa2' },
+        { id: 'b'.repeat(32), ssid: 'HomeUplink', security: 'wpa2' },
+      ],
+      connected_id: null,
+    };
+    const body = render(WiFi, { props: { initialScanData: scan } }).body;
+    expect(body).toContain('Automatic reconnect stopped after 5 attempts.');
+    expect(body).toContain('HomeUplink is a saved uplink in range.');
+    expect(body).not.toContain('Hotel is a saved uplink in range.');
+  });
+
+  it('asks for a scan when the cap is reached and nothing was scanned', () => {
+    reconnect = { state: 'exhausted', attempts: 5, max_attempts: 5 };
+    expect(render(WiFi).body).toContain('Scan to find a saved uplink in range.');
+  });
+
+  it('shows no reconnect notice while idle', () => {
+    expect(render(WiFi).body).not.toContain('Uplink lost');
   });
 });

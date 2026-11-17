@@ -6,6 +6,7 @@ import {
   deleteWiFiProfile,
   getWiFi,
   getWiFiProfiles,
+  getWiFiReconnect,
   getWiFiScan,
   type JoinWiFiData,
   joinWiFi,
@@ -38,6 +39,12 @@ export function joinWifi(body: JoinWiFiData['body'], signal?: AbortSignal) {
 export async function fetchWifiProfiles(signal?: AbortSignal) {
   const response = await getWiFiProfiles({ signal });
   if (!response.data) throw new Error(m.wifi_saved_unavailable());
+  return response.data;
+}
+
+export async function fetchWifiReconnect(signal?: AbortSignal) {
+  const response = await getWiFiReconnect({ signal });
+  if (!response.data) throw new Error(m.wifi_reconnect_unavailable());
   return response.data;
 }
 

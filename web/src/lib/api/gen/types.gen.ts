@@ -396,6 +396,12 @@ export type WiFiProfileSummary = {
     ssid: string;
 };
 
+export type WiFiReconnectStatus = {
+    attempts: number;
+    max_attempts: number;
+    state: 'idle' | 'retrying' | 'exhausted';
+};
+
 export type WiFiSummary = {
     aps: Array<Ap>;
     radios: Array<RadioInfo>;
@@ -2091,6 +2097,35 @@ export type SelectWiFiProfileResponses = {
 };
 
 export type SelectWiFiProfileResponse = SelectWiFiProfileResponses[keyof SelectWiFiProfileResponses];
+
+export type GetWiFiReconnectData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/reconnect';
+};
+
+export type GetWiFiReconnectErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiReconnectError = GetWiFiReconnectErrors[keyof GetWiFiReconnectErrors];
+
+export type GetWiFiReconnectResponses = {
+    /**
+     * OK
+     */
+    200: WiFiReconnectStatus;
+};
+
+export type GetWiFiReconnectResponse = GetWiFiReconnectResponses[keyof GetWiFiReconnectResponses];
 
 export type GetWiFiScanData = {
     body?: never;

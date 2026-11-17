@@ -89,3 +89,33 @@ func TestAssociatedUplink(t *testing.T) {
 		t.Fatal("missing read dependencies must be unavailable", err)
 	}
 }
+
+func TestUplinkEnabled(t *testing.T) {
+	connected := configFixture(t, "wireless", "wifi-scan/connected/uci-show-wireless.txt")
+	disabled := configFixture(t, "wireless", "wifi-scan/connected/uci-show-wireless.txt")
+	for i := range disabled {
+		if disabled[i].Name == "wwan" {
+			disabled[i].Options["disabled"] = "1"
+		}
+	}
+	two := append(configFixture(t, "wireless", "wifi-scan/connected/uci-show-wireless.txt"),
+		device.Section{Name: "wwan2", Type: "wifi-iface", Options: map[string]string{"mode": "sta", "network": "wwan", "device": "radio1"}})
+	for _, tc := range []struct {
+		name     string
+		uci      showUCI
+		want     bool
+		wantFail bool
+	}{
+		{name: "enabled STA", uci: showUCI{sections: connected}, want: true},
+		{name: "disabled STA", uci: showUCI{sections: disabled}},
+		{name: "two enabled STAs", uci: showUCI{sections: two}, wantFail: true},
+		{name: "UCI unreadable", uci: showUCI{err: errInjected}, wantFail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := associationService(t, tc.uci, nil).UplinkEnabled(context.Background())
+			if got != tc.want || tc.wantFail != errors.Is(err, ErrUnavailable) {
+				t.Fatalf("got %v, %v", got, err)
+			}
+		})
+	}
+}

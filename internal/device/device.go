@@ -172,3 +172,10 @@ var ServiceActions = map[string]bool{"start": true, "stop": true, "restart": tru
 type WireGuardKeyWriter interface {
 	SetWireGuardKey(ctx context.Context, section, option, key string) error
 }
+
+// UplinkReconnector re-runs the managed STA uplink with `ifup wwan` (netifd: network
+// reload, interface down, interface up). It writes no UCI and never runs `wifi`
+// (device-facts §3); the capped auto-reconnect worker is its only caller (ADR 0014).
+type UplinkReconnector interface {
+	ReconnectUplink(context.Context) error
+}

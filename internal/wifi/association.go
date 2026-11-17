@@ -14,27 +14,14 @@ type Association struct{ SSID, BSSID string }
 // The configured SSID never counts: only carrier plus an observed SSID and BSSID do.
 // Ambiguous or unreadable state is ErrUnavailable, never a guess.
 func (s *Service) AssociatedUplink(ctx context.Context) (Association, error) {
-	if s.ubus == nil || s.join == nil || s.join.UCI == nil {
+	if s.ubus == nil {
 		return Association{}, ErrUnavailable
 	}
-	wireless, err := s.join.UCI.Show(ctx, "wireless")
-	if err != nil {
-		return Association{}, ErrUnavailable
+	section, err := s.enabledUplink(ctx)
+	if err != nil || section == "" {
+		return Association{}, err
 	}
-	var enabled []string
-	for _, section := range uplinkSections(wireless) {
-		if section.Options["disabled"] != "1" {
-			enabled = append(enabled, section.Name)
-		}
-	}
-	switch len(enabled) {
-	case 0:
-		return Association{}, nil
-	case 1:
-	default:
-		return Association{}, ErrUnavailable
-	}
-	ifname, err := s.runtimeSTA(ctx, enabled[0])
+	ifname, err := s.runtimeSTA(ctx, section)
 	if err != nil || ifname == "" {
 		return Association{}, err
 	}
@@ -64,6 +51,38 @@ func (s *Service) AssociatedUplink(ctx context.Context) (Association, error) {
 		return Association{}, ErrUnavailable
 	}
 	return Association{SSID: info.SSID, BSSID: info.BSSID}, nil
+}
+
+// UplinkEnabled reports whether UCI holds the one enabled managed wwan STA.
+// Several enabled STAs are ambiguous and ErrUnavailable.
+func (s *Service) UplinkEnabled(ctx context.Context) (bool, error) {
+	section, err := s.enabledUplink(ctx)
+	return section != "", err
+}
+
+// enabledUplink names the one enabled managed STA section, or "" when none is.
+func (s *Service) enabledUplink(ctx context.Context) (string, error) {
+	if s.join == nil || s.join.UCI == nil {
+		return "", ErrUnavailable
+	}
+	wireless, err := s.join.UCI.Show(ctx, "wireless")
+	if err != nil {
+		return "", ErrUnavailable
+	}
+	var enabled []string
+	for _, section := range uplinkSections(wireless) {
+		if section.Options["disabled"] != "1" {
+			enabled = append(enabled, section.Name)
+		}
+	}
+	switch len(enabled) {
+	case 0:
+		return "", nil
+	case 1:
+		return enabled[0], nil
+	default:
+		return "", ErrUnavailable
+	}
 }
 
 // runtimeSTA resolves a UCI section to its one running STA ifname. No runtime

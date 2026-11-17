@@ -13,6 +13,7 @@ import {
 import {
   fetchWifi,
   fetchWifiProfiles,
+  fetchWifiReconnect,
   fetchWifiScan,
   forgetWifiProfile,
   joinWifi,
@@ -30,6 +31,7 @@ import { savedChangeError, saveError } from '../wifi-profiles';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
 
+import WiFiReconnect from './WiFiReconnect.svelte';
 import WiFiSavedUplinks from './WiFiSavedUplinks.svelte';
 import WiFiScanList from './WiFiScanList.svelte';
 import WiFiSummary from './WiFiSummary.svelte';
@@ -44,6 +46,8 @@ let {
 
 const summary = createLoader(fetchWifi);
 const profiles = createLoader(fetchWifiProfiles);
+// The worker ticks every minute; a 30 s poll shows each attempt within one tick.
+const reconnect = createLoader(fetchWifiReconnect, 30_000);
 const request = new AbortController();
 // The optional initial values exist for deterministic SSR state tests; normal routes start idle.
 // svelte-ignore state_referenced_locally
@@ -52,6 +56,7 @@ let scanStatus = $state<LoadStatus>(initialScanStatus);
 let scanData = $state<ScanResult | undefined>(initialScanData);
 
 onDestroy(() => {
+  reconnect.stop();
   request.abort();
   activePoll?.abort();
 });
@@ -246,6 +251,8 @@ async function scan() {
   </Card>
 
   <Card title={m.wifi_saved_title()}>
+    <WiFiReconnect status={reconnect.status} data={reconnect.data} profiles={profiles.data?.profiles ?? []}
+      scan={scanData} joinBusy={busy} select={selectProfile} />
     <LoadState status={profiles.status} retry={profiles.retry} stale={profiles.data !== undefined}>
       {#if profiles.data}
         <WiFiSavedUplinks

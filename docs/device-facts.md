@@ -40,6 +40,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 - [HW greenfield] `iwinfo scan` can exceed `TierRead` (about 4.7 s on 5 GHz), so scan replies use `TierScan`.
 - [HW] Only enabled APs have a `hostapd.<ifname>` ubus object. `iwinfo assoclist` was empty while `hostapd.*` `get_clients` listed the station: use `get_clients`.
 - Join allows up to 30 s for STA carrier and its kernel default route, based on roughly 10 s each for association and DHCP. The transaction’s shared live apply deadline can end the probe sooner. On AXT1800, reload can return before replacing the old STA, while it still has carrier and the default route (#115). The replacement has a different kernel link index even when the interface name is reused.
+- [HW greenfield 2026-11-17] STA recovery without `wifi`: wpa_supplicant keeps scanning after the upstream goes away and re-associates on its own 2 to 4 s after it returns, with the DHCP address in the same 2 s sample. It does not leave `DISCONNECTED` (`wpa_supplicant.<ifname>` `control DISCONNECT`) or a runtime `bssid_filter` by itself. `ifup wwan` (= `ubus call network reload` plus interface down and up) recovered both in 6 to 8 s. It rebuilt the STA vif on radio0 (`wifi-scripts: Starting`), and hostapd logged `Reload all interfaces` / `Reloaded settings for phy phy1`. The AP on radio1 kept carrier in every 2 s sample, with no ath11k error and UCI unchanged. `iw dev <sta> disconnect` is refused (EPERM) while wpa_supplicant owns the STA. Basis of [ADR 0014](adr/0014-capped-uplink-reconnect.md).
 - [UNVERIFIED] WPA2/WPA3 mixed-mode join stages `sae-mixed`. Its behavior on the AXT1800 remains to be verified.
 
 ## 3. ath11k crash triggers
@@ -76,7 +77,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 - Cron is `/etc/crontabs/root`; `/etc/cron.d` does NOT exist (write → ENOENT; the UI then shows a schedule that never fires).
 - Buttons: detect from devicetree `/sys/firmware/devicetree/base/keys/*/label`; `/etc/rc.button` is generic stock scripts, not a source of truth. Hotplug button scripts run as root via procd.
 - The old toggle helper needed a stored rpcd login file; missing → every scheduled/button toggle silently no-opped. It also did uci set/commit/apply/confirm OUTSIDE in-process locks and could clobber the API's staged delta. In travo-greenfield helpers call the daemon instead.
-- [BUG] Auto-reconnect cron ran `wifi up` every minute with no uplink → radios flapping. Cap and guard.
+- [BUG] Auto-reconnect cron ran `wifi up` every minute with no uplink → radios flapping. Cap and guard. greenfield uses `ifup wwan`, capped at 5 (§2, ADR 0014).
 - [BUG] Radio switch via notification broke WiFi. Keep as a regression check.
 - [BUG] After an OpenWrt upgrade Travo did not start (see §10).
 

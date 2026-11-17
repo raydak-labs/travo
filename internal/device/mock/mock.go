@@ -21,6 +21,7 @@ type Device struct {
 	ReloadErr          error
 	Reboots            int
 	RebootErr          error
+	UplinkReconnects   int
 	BootIDErr          error
 	RotateBootOnReboot bool
 	mu                 sync.Mutex

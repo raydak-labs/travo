@@ -37,6 +37,8 @@ On the WiFi page, scan for an uplink, join it on a free radio, and confirm the c
 
 **Saved uplinks** keeps an ordered list of networks. Use **Save** in a network's dialog to store its credentials without changing the current connection. Move a network up or down to change its priority. **Select** joins a saved network with the same confirm or rollback flow as Join. **Forget** removes a saved network and leaves the current connection up.
 
+When the WiFi uplink drops, the router first lets the WiFi client reconnect on its own. If that fails, it retries the configured network up to 5 times, about two minutes apart. It never switches networks by itself. After the last attempt, the WiFi page says so. If a scan shows a saved network in range, the page offers the highest-priority one to **Select**. The attempt count survives restarts and resets once the uplink has an address again.
+
 ## UI components
 
 The Svelte UI uses locally owned shadcn-svelte components, with the same light/dark palette and offline assets. New controls compose these primitives through the existing app wrappers. See [ADR 0013](docs/adr/0013-shadcn-components.md) for the size tradeoffs and [migration evidence](docs/testing/shadcn-migration.md) for the inventory and keyboard checks.

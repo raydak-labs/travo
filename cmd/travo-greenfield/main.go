@@ -42,6 +42,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/vpntunnel"
 	"github.com/blackdark-org/travo-greenfield/internal/wifi"
 	"github.com/blackdark-org/travo-greenfield/internal/wifiprofiles"
+	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
 	"github.com/blackdark-org/travo-greenfield/packaging"
 )
 
@@ -227,6 +228,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 	var wireless api.WiFiService
 	var wirelessJoin api.WiFiJoiner
 	var association wifiprofiles.AssociationReader
+	var uplink wifireconnect.Uplink
 	if scanner, ok := deps.Device.(device.WirelessScanner); ok {
 		service := wifi.New(ctx, deps.Device, scanner)
 		wireless = service
@@ -235,10 +237,17 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		keys, hasKeys := deps.Device.(device.WirelessKeyWriter)
 		links, hasLinks := deps.Device.(device.LinkIndexReader)
 		if hasRoutes && hasKeys && hasLinks {
-			wirelessJoin = service.WithJoin(wifi.JoinDeps{UCI: deps.Device, Ubus: deps.Device, Routes: routes, Links: links, Keys: keys, Txns: deps.Txn})
+			joined := service.WithJoin(wifi.JoinDeps{UCI: deps.Device, Ubus: deps.Device, Routes: routes, Links: links, Keys: keys, Txns: deps.Txn})
+			wirelessJoin, uplink = joined, joined
 		}
 	}
 	savedUplinks := wifiprofiles.New(filepath.Join(deps.Paths.State, "wifi-profiles.json"), wirelessJoin, association)
+	var reconnect api.WiFiReconnectReader
+	if recovery, ok := deps.Device.(device.UplinkReconnector); ok && uplink != nil {
+		svc := wifireconnect.New(filepath.Join(deps.Paths.State, "wifi-reconnect.json"), uplink, deps.Device, deps.Guards, recovery, clock.Now)
+		reconnect = svc
+		workers.Go("wifi-reconnect", lifecycle.Every(wifireconnect.Interval, svc.Tick))
+	}
 
 	if useMock {
 		releaseSource = "off"
@@ -294,6 +303,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,
 		AdGuard:       adguardSvc,
+		WiFiReconnect: reconnect,
 		Throughput:    sampler,
 		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,

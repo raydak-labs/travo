@@ -194,3 +194,32 @@ addresses were compared by hash only.
 ## Captive bypass and wwan renew (#130, #131, 2026-11-17)
 
 GL-AXT1800, OpenWrt 25.12.6, uplink wwan on phy0-sta0 (no AdGuard base: dnsmasq had no `server`, no `noresolv`, `rebind_protection 1`). `internal/captive/hardware_test.go` under the shared router lock: Enable pushed `list server` = the uplink DHCP resolver, `noresolv 0`, `rebind_protection 0`; resolution worked during the bypass (after the 2 to 4 s procd reload) and after restore; restore returned the base exactly. `RenewLease("wwan")` produced `udhcpc: sending renew` and an unchanged lease, no interface down; the default route via phy0-sta0 was proven after the 2 s settle (2.02 s total). `uci export` was identical before and after; no guard left. Not covered: a real portal (needs the simulator in testing.md).
+## STA recovery without `wifi` (#73, 2026-11-17)
+
+Router shared under the agent lock; `uci export` before and after was byte-identical.
+Layout: STA `wwan` on radio0 (5 GHz), AP on radio1 (2.4 GHz). Sampled every 2 s:
+STA and AP `network.device status` carrier, `wwan` IPv4 present, and `wpa_state`
+from `ubus call wpa_supplicant.phy0-sta0 control '{"command":"STATUS"}'`.
+SSIDs, BSSIDs and addresses are not recorded.
+
+- `iw dev phy0-sta0 disconnect`: `Operation not permitted (-1)`. wpa_supplicant owns the STA.
+- Upstream hidden with `control "SET bssid_filter 02:00:00:00:00:01"` and then
+  `DISCONNECT`/`RECONNECT`: `SCANNING`, no STA carrier and no wwan IPv4 for 40 s.
+  After the filter was cleared, with no other action, the STA was `COMPLETED` with
+  carrier and IPv4 at the next sample (2 s). (`BSSID_IGNORE` is not a valid
+  stand-in: wpa_supplicant cleared it and re-associated within 4 s.)
+- `ifup wwan` while the filter was still set: the STA was `COMPLETED` with
+  IPv4 after 6 s. netifd rebuilt the STA, which reset the runtime filter.
+- Sticky `control DISCONNECT`: `DISCONNECTED` for 10 s with no self-recovery.
+  `ifup wwan` led to `SCANNING` at 4 s and `COMPLETED` with IPv4 at 8 s.
+- AP `phy1-ap0` carrier was true in every sample. logread for each `ifup` showed
+  `hostapd: Reload all interfaces`, `Reloaded settings for phy phy1`,
+  `radio0 ... wifi-scripts: Starting`, and `Interface 'wwan' is disabled/enabled`.
+  It also showed a harmless `rmdir[ctrl_interface=...]: Permission denied` from
+  wpa_supplicant. dmesg had no new ath11k lines.
+- `/sbin/ifup` on this firmware is `ubus call network reload` followed by
+  `network.interface down` and `up` for the named interface.
+
+Outcome: ADR 0014 adopts `ifup wwan`, capped at 5, after two disconnected
+60 s ticks. Plain `ubus call network.interface.wwan down/up` without the global
+reload was not measured; the lock was held by another agent.
