@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
@@ -52,6 +53,8 @@ type Status struct {
 	DNSStatus
 	// ConfigError says why the config could not be read as the canonical YAML shape.
 	ConfigError string `json:"config_error,omitempty"`
+	// MigrationFailed: the last loopback migration failed and was rolled back (#164).
+	MigrationFailed bool `json:"migration_failed" doc:"The last loopback migration failed and was rolled back; retried after an hour, on a config edit or on daemon restart"`
 }
 
 // Service is the only code that installs AGH or writes its config.
@@ -72,13 +75,16 @@ type Service struct {
 	Ready func(context.Context) error
 	// DNS owns the `adguard` layer; nil when the daemon has no DNS layer stack.
 	DNS *DNS
+	// Now is the clock for the migration back-off; nil means time.Now (monotonic).
+	Now func() time.Time
 
-	mu sync.Mutex
+	mu     sync.Mutex
+	failed atomic.Pointer[migrationFailure]
 }
 
 // Status never mutates.
 func (s *Service) Status(ctx context.Context) (Status, error) {
-	st := Status{}
+	st := Status{MigrationFailed: s.migrationFailed()}
 	busy, err := s.busy()
 	if err != nil {
 		return st, err
@@ -309,42 +315,6 @@ func (s *Service) prepareConfig() error {
 		return err
 	}
 	return atomicfile.Write(s.Config, out, 0o600)
-}
-
-// Migrate moves an installed AGH to the loopback topology as a guarded file swap: keep the
-// old file, write the new one, restart, prove the admin API answers, else restore and restart.
-// (txn snapshots UCI only; this YAML is not UCI, see ADR 0006.)
-func (s *Service) Migrate(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.idle(); err != nil {
-		return err
-	}
-	old, err := os.ReadFile(s.Config)
-	if err != nil {
-		return err
-	}
-	out, changed, err := Loopback(old)
-	if err != nil || !changed {
-		return err
-	}
-	if err := s.Guards.Acquire(ConfigGuard); err != nil {
-		return err
-	}
-	if err := atomicfile.Write(s.Backup, old, 0o600); err != nil {
-		return errors.Join(fmt.Errorf("adguard: keep old config: %w", err), s.Guards.Release(ConfigGuard))
-	}
-	err = atomicfile.Write(s.Config, out, 0o600)
-	if err == nil {
-		err = s.Services.ServiceAction(ctx, Package, "restart")
-	}
-	if err == nil {
-		err = s.waitReady(ctx)
-	}
-	if err != nil {
-		return s.restore(ctx, fmt.Errorf("adguard: loopback migration: %w", err))
-	}
-	return s.finishSwap()
 }
 
 // Recover finishes a swap a daemon crash interrupted: with a kept old file it is put back

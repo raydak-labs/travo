@@ -24,6 +24,7 @@ const installed: AdGuardStatus = {
   busy: false,
   default_dns: true,
   fail_open_since: null,
+  migration_failed: false,
 };
 
 function page(status: AdGuardStatus) {
@@ -76,6 +77,13 @@ describe('Services page: AdGuard Home', () => {
     expect(body).toContain('role="alert"');
     expect(body).toContain('AdGuard Home stopped answering');
     expect(body).toContain('Use AdGuard Home again now');
+  });
+
+  it('failed loopback migration: says it was undone and when it retries', () => {
+    expect(page(installed)).not.toContain('was undone');
+    const body = page({ ...installed, loopback: false, migration_failed: true });
+    expect(body).toContain('Moving AdGuard Home to loopback failed and was undone');
+    expect(body).not.toContain('Open AdGuard Home');
   });
 
   it('maps error codes, never message text', () => {

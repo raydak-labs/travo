@@ -336,6 +336,7 @@
   "adguard_err_not_answering": "AdGuard Home is not resolving yet. DNS stays at the uplink resolver.",
   "adguard_err_busy": "Another change is in progress. Try again shortly.",
   "adguard_err_config": "The AdGuard Home config has an unexpected format; Travo left it unchanged.",
+  "adguard_migration_failed": "Moving AdGuard Home to loopback failed and was undone; Travo retries in an hour or after the config changes.",
   "adguard_err_failed": "The change failed. See the system log.",
   "wifi_join_anyway": "Apply anyway",
   "wifi_join_moves_ap": "This network needs the radio of {ssid}. That access point moves to the other radio; devices on it reconnect.",

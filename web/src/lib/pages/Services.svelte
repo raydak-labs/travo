@@ -64,6 +64,7 @@ const proxy = adguardUrl(window.location);
         {#if st.installed}
           <p class="mt-2 text-muted">{m.adguard_version({ version: st.version })}</p>
           {#if st.config_error}<p class="mt-2 text-muted">{m.adguard_err_config()}</p>{/if}
+          {#if st.migration_failed}<p class="mt-2 text-muted">{m.adguard_migration_failed()}</p>{/if}
           <div class="mt-3 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('service', !st.running)}>{st.running ? m.adguard_stop() : m.adguard_start()}</Button>
             {#if st.running}
