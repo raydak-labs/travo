@@ -173,6 +173,10 @@ export type HealthOutputBody = {
 };
 
 export type JoinWiFiInputBody = {
+    /**
+     * Join even if moving the access point may disconnect the caller
+     */
+    acknowledge_lockout?: boolean;
     bssid?: string;
     security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';
     ssid: string;
@@ -483,6 +487,10 @@ export type WifiProfileOrderInputBody = {
 };
 
 export type JoinWiFiInputBodyWritable = {
+    /**
+     * Join even if moving the access point may disconnect the caller
+     */
+    acknowledge_lockout?: boolean;
     bssid?: string;
     key?: string;
     security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';

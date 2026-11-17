@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/netip"
 
 	"github.com/blackdark-org/travo-greenfield/internal/lockout"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
@@ -18,6 +19,8 @@ type joinWiFiInput struct {
 		BSSID    string        `json:"bssid,omitempty"`
 		Key      string        `json:"key,omitempty" writeOnly:"true"`
 		Security wifi.Security `json:"security" enum:"open,wpa2,wpa2_wpa3,other"`
+		// Only a join that moves the AP off the uplink radio can need it (invariants §2).
+		AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty" doc:"Join even if moving the access point may disconnect the caller"`
 	}
 }
 
@@ -25,7 +28,10 @@ func (s *server) joinWiFi(ctx context.Context, in *joinWiFiInput) (*txnOutput, e
 	if s.WiFiJoin == nil {
 		return nil, wifiDeviceUnavailable()
 	}
-	return joinResult(s.WiFiJoin.Join(ctx, in.request()))
+	req := in.request()
+	req.Acknowledge = in.Body.AcknowledgeLockout
+	req.Caller, _ = netip.ParseAddr(infoOf(ctx).ip)
+	return joinResult(s.WiFiJoin.Join(ctx, req))
 }
 
 func (in *joinWiFiInput) request() wifi.JoinRequest {

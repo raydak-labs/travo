@@ -3,6 +3,7 @@ package wifi
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"regexp"
 	"slices"
 	"strings"
@@ -27,7 +28,6 @@ type JoinDeps struct {
 	Neighbours              device.NeighbourReader
 	Txns                    Beginner
 	Clock                   func() time.Time
-	Caller                  func(context.Context) lockout.Caller
 	ProbeBudget, ProbeEvery time.Duration
 }
 
@@ -43,6 +43,9 @@ const (
 type JoinRequest struct {
 	SSID, BSSID, Key string
 	Security         Security
+	// Acknowledge overrides a lockout refusal (invariants §2); Caller is the client IP.
+	Acknowledge bool
+	Caller      netip.Addr
 }
 
 var (
@@ -126,19 +129,17 @@ func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error)
 	if len(bands) == 0 {
 		return txn.Status{}, ErrNetworkNotFound
 	}
-	if _, _, _, err = s.prepareJoin(ctx, req, radios, bands); err != nil {
+	if _, err = s.prepareJoin(ctx, req, radios, bands); err != nil {
 		return txn.Status{}, err
 	}
-	var radio, section string
+	var plan joinPlan
 	var oldLinks map[int]struct{}
 	st, err := s.join.Txns.Begin(ctx, "wifi: join "+req.SSID, []string{"wireless", "network", "firewall"}, func(ctx context.Context) error {
 		radios, err := s.joinRadios(ctx)
 		if err != nil {
 			return err
 		}
-		var writes []uciWrite
-		radio, section, writes, err = s.prepareJoin(ctx, req, radios, bands)
-		if err != nil {
+		if plan, err = s.prepareJoin(ctx, req, radios, bands); err != nil {
 			return err
 		}
 		links, err := s.join.Links.LinkIndices(ctx)
@@ -149,8 +150,8 @@ func (s *Service) Join(ctx context.Context, req JoinRequest) (txn.Status, error)
 		for _, index := range links {
 			oldLinks[index] = struct{}{}
 		}
-		return s.stageWrites(ctx, writes, req.Key)
-	}, func(ctx context.Context) error { return s.probe(radio, section, oldLinks)(ctx) })
+		return s.stageWrites(ctx, plan.writes, req.Key)
+	}, func(ctx context.Context) error { return s.probe(plan, oldLinks)(ctx) })
 	if errors.Is(err, txn.ErrActive) {
 		return st, ErrTransactionPending
 	}
@@ -186,70 +187,79 @@ func joinBands(scan ScanResult, req JoinRequest) []string {
 	return nil
 }
 
-func (s *Service) prepareJoin(ctx context.Context, req JoinRequest, radios []facts.Radio, bands []string) (string, string, []uciWrite, error) {
+// joinPlan is a staged join: the STA radio and section, the writes in an order that
+// never stages an enabled AP and STA on one radio, and the APs the probe must prove.
+type joinPlan struct {
+	radio, section string
+	writes         []uciWrite
+	expect         []apExpectation
+}
+
+func (s *Service) prepareJoin(ctx context.Context, req JoinRequest, radios []facts.Radio, bands []string) (joinPlan, error) {
 	wireless, err := s.join.UCI.Show(ctx, "wireless")
 	if err != nil {
-		return "", "", nil, ErrUnavailable
+		return joinPlan{}, ErrUnavailable
 	}
 	network, err := s.join.UCI.Show(ctx, "network")
 	if err != nil {
-		return "", "", nil, ErrUnavailable
+		return joinPlan{}, ErrUnavailable
 	}
 	firewall, err := s.join.UCI.Show(ctx, "firewall")
 	if err != nil {
-		return "", "", nil, ErrUnavailable
+		return joinPlan{}, ErrUnavailable
 	}
-	radio := pickRadio(radios, bands, wireless)
+	radio, target, moved := pickRadio(radios, bands, wireless), "", []string(nil)
 	if radio == "" {
-		return "", "", nil, ErrNoFreeRadio
+		if radio, target, moved = reconcileRadio(radios, bands, wireless); radio == "" {
+			return joinPlan{}, ErrNoFreeRadio
+		}
 	}
 	writes, before, after, err := planJoin(wireless, network, firewall, req, radio)
 	if err != nil {
-		return "", "", nil, err
+		return joinPlan{}, err
 	}
-	for _, r := range radios {
-		for _, iface := range r.Ifaces {
-			for i := range before {
-				if before[i].Section == iface.Section {
-					before[i].Ifname = iface.Ifname
-				}
+	if len(moved) > 0 {
+		writes = reconcileWrites(wireless, writes, moved, target)
+		// A moved AP drops its clients: it does not count as the caller's AP staying up.
+		for i := range after {
+			if slices.Contains(moved, after[i].Section) {
+				after[i].Enabled = false
 			}
 		}
 	}
-	caller := lockout.Caller{Method: lockout.Unknown}
-	if s.join.Caller != nil {
-		caller = s.join.Caller(ctx)
-	}
-	if err := checkJoinLockout(caller, before, after); err != nil {
-		return "", "", nil, err
+	caller := classifyCaller(ctx, s.join.Ubus, s.join.Neighbours, apNetworks(wireless), req.Caller)
+	if err := checkJoinLockout(caller, withIfnames(ctx, s.join.Ubus, before), after, req.Acknowledge); err != nil {
+		return joinPlan{}, err
 	}
 	section := "wwan"
 	if sta := uplinkSections(wireless); len(sta) > 0 {
 		section = sta[0].Name
 	}
-	return radio, section, writes, nil
+	return joinPlan{radio: radio, section: section, writes: writes, expect: apExpectations(wireless, "", false, "")}, nil
 }
 
-func checkJoinLockout(caller lockout.Caller, before, after []lockout.AP) error {
-	if !slices.ContainsFunc(before, func(ap lockout.AP) bool { return ap.Enabled }) {
+// checkJoinLockout runs only when the join takes an AP down (a move counts as down).
+func checkJoinLockout(caller lockout.Caller, before, after []lockout.AP, acknowledge bool) error {
+	if !disablesAP(before, after) {
 		return nil
 	}
-	return lockout.Check(caller, lockout.Plan{Before: before, After: after}, false)
+	return lockout.Check(caller, lockout.Plan{Before: before, After: after}, acknowledge)
 }
 
-func (s *Service) probe(radio, section string, oldLinks map[int]struct{}) txn.Probe {
+func (s *Service) probe(plan joinPlan, oldLinks map[int]struct{}) txn.Probe {
 	return func(ctx context.Context) error {
 		ctx, cancel := context.WithTimeout(ctx, s.join.ProbeBudget)
 		defer cancel()
 		ticker := time.NewTicker(s.join.ProbeEvery)
 		defer ticker.Stop()
 		for {
-			if ctx.Err() == nil && s.proven(ctx, radio, section, oldLinks) {
+			// Every enabled AP is proven individually too: a moved AP must come up.
+			if ctx.Err() == nil && s.proven(ctx, plan.radio, plan.section, oldLinks) && s.apsProven(ctx, plan.expect) {
 				return nil
 			}
 			select {
 			case <-ctx.Done():
-				return errors.New("fresh STA carrier and default route not proven")
+				return errors.New("fresh STA carrier, default route and access points not proven")
 			case <-ticker.C:
 			}
 		}

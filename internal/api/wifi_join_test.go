@@ -110,3 +110,17 @@ func TestWiFiJoinUnavailable(t *testing.T) {
 		t.Fatal(rec.Code, rec.Body)
 	}
 }
+
+func TestWiFiJoinDeliversAcknowledgeAndCaller(t *testing.T) {
+	var got wifi.JoinRequest
+	join := joinWiFiFunc(func(_ context.Context, r wifi.JoinRequest) (txn.Status, error) {
+		got = r
+		return txn.Status{State: txn.Pending}, nil
+	})
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.WiFiJoin = join })
+	cookie, csrf := e.login()
+	rec := e.do(req{method: http.MethodPost, path: "/api/v1/wifi/join", cookie: cookie, csrf: csrf, body: `{"ssid":"Network","security":"open","acknowledge_lockout":true}`})
+	if rec.Code != 202 || !got.Acknowledge || !got.Caller.IsValid() {
+		t.Fatal(rec.Code, got.Acknowledge, got.Caller)
+	}
+}

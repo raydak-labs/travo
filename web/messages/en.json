@@ -346,6 +346,7 @@
   "adguard_err_config": "The AdGuard Home config has an unexpected format; Travo left it unchanged.",
   "adguard_err_failed": "The change failed. See the system log.",
   "wifi_join_anyway": "Apply anyway",
+  "wifi_join_moves_ap": "This network needs the radio of {ssid}. That access point moves to the other radio; devices on it reconnect.",
   "wifi_aps_title": "Access point settings",
   "wifi_ap_edit": "Edit",
   "wifi_ap_edit_dialog": "Edit access point",

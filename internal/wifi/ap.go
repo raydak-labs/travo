@@ -230,9 +230,10 @@ func (s *Service) checkAPLockout(ctx context.Context, wireless []device.Section,
 	return lockout.Check(caller, lockout.Plan{Before: withIfnames(ctx, s.join.Ubus, before), After: after}, acknowledge)
 }
 
+// disablesAP: an AP enabled before is disabled or gone after (matched by section).
 func disablesAP(before, after []lockout.AP) bool {
-	for i := range before {
-		if before[i].Enabled && !after[i].Enabled {
+	for _, b := range before {
+		if b.Enabled && !slices.ContainsFunc(after, func(a lockout.AP) bool { return a.Section == b.Section && a.Enabled }) {
 			return true
 		}
 	}

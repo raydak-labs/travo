@@ -4,6 +4,7 @@
 - **STA**: WiFi client interface (`mode=sta`) bound to `wwan`; joins hotel/home WiFi.
 - **Scan**: the on-demand, read-only per-radio site survey.
 - **Join**: the guarded configuration and verification of an uplink STA, followed by explicit confirmation or rollback.
+- **AP move (reconcile)**: during a join, moving the APs off the only band-compatible radio to the other radio in the same transaction.
 - **Saved uplink**: one entry in the ordered list of stored uplink credentials (`wifi-profiles.json`). Saving or forgetting one never changes the STA; selecting one is a Join.
 - **AP**: WiFi access point serving the LAN; one `wifi-iface` section with `mode=ap`, edited per section ("per radio"). **Guest AP**: separate SSID, key, subnet (192.168.2.0/24) and zone.
 - **Caller**: the client making an API request. Classified as ethernet / wifi-ap / wifi-client / unknown.

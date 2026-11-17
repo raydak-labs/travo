@@ -96,10 +96,10 @@ func TestJoinRadioAndTripwire(t *testing.T) {
 	}
 	before := []lockout.AP{{Section: "default_radio1", Ifname: "phy1-ap0", Enabled: true}}
 	for _, caller := range []lockout.Caller{{Method: lockout.Ethernet}, {Method: lockout.WifiAP, AP: "phy1-ap0"}, {Method: lockout.Unknown}} {
-		if err := checkJoinLockout(caller, before, before); err != nil {
+		if err := checkJoinLockout(caller, before, before, false); err != nil {
 			t.Fatal(err)
 		}
-		err := checkJoinLockout(caller, before, nil)
+		err := checkJoinLockout(caller, before, nil, false)
 		if errors.Is(err, lockout.ErrLockoutRisk) != (caller.Method != lockout.Ethernet) {
 			t.Fatal(caller, err)
 		}
@@ -131,7 +131,7 @@ func TestJoinProbeRequiresCarrierAndSelectedDefaultRoute(t *testing.T) {
 			if tc.ifname == "phy1-ap0" {
 				radio = "radio1"
 			}
-			err := service.probe(radio, tc.section, map[int]struct{}{1: {}})(context.Background())
+			err := service.probe(joinPlan{radio: radio, section: tc.section}, map[int]struct{}{1: {}})(context.Background())
 			if (err == nil) != tc.pass {
 				t.Fatal(err)
 			}

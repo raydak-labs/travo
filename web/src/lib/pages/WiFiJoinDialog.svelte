@@ -3,12 +3,14 @@ import Button from '$lib/components/ui/button/button.svelte';
 import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
-import type { JoinWiFiData, Network } from '../api/gen';
+import type { JoinWiFiData, Network, WiFiSummary } from '../api/gen';
 import { m } from '../paraglide/messages.js';
 import Status from '../ui/Status.svelte';
+import { apsMovedByJoin } from '../wifi-move';
 
 let {
   network,
+  summary,
   busy = false,
   submit,
   save,
@@ -16,6 +18,7 @@ let {
   returnFocus = null,
 }: {
   network: Network;
+  summary?: WiFiSummary;
   busy?: boolean;
   submit: (body: JoinWiFiData['body']) => void;
   /** Stores the credentials without touching the uplink; resolves to an error message or nothing. */
@@ -24,6 +27,7 @@ let {
   returnFocus?: HTMLElement | null;
 } = $props();
 let open = $state(true);
+const moved = $derived(apsMovedByJoin(summary, network.bands));
 let key = $state('');
 let saving = $state(false);
 let saveError = $state('');
@@ -68,6 +72,9 @@ function onClose() {
  onCloseAutoFocus={(event) => { event.preventDefault(); if (returnFocus instanceof HTMLElement) returnFocus.focus(); onClose(); }} aria-label={m.wifi_join_dialog()} class="w-[min(90vw,26rem)] rounded-lg border border-border bg-surface p-5 text-fg">
   <form class="space-y-4" onsubmit={onSubmit} bind:this={form}>
     <Dialog.Title level={2} class="break-all text-lg font-semibold">{network.ssid}</Dialog.Title>
+    {#if moved.length > 0}
+      <p class="text-sm text-muted-foreground" role="note">{m.wifi_join_moves_ap({ ssid: moved.join(', ') })}</p>
+    {/if}
     {#if network.security !== 'open'}
       <Label class="grid gap-1">
         {m.wifi_join_key()}

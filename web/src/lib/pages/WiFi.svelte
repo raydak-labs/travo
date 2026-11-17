@@ -102,7 +102,13 @@ async function submit(ssid: string, send: Send, ap = false, acknowledge?: () => 
 }
 
 function submitJoin(body: JoinWiFiData['body']) {
-  return submit(body.ssid, () => joinWifi(body, request.signal));
+  // A join that moves the AP can be refused for lockout; "Apply anyway" resends acknowledged.
+  return submit(
+    body.ssid,
+    () => joinWifi(body, request.signal),
+    false,
+    () => submit(body.ssid, () => joinWifi({ ...body, acknowledge_lockout: true }, request.signal)),
+  );
 }
 
 function selectProfile(profile: WiFiProfileSummary) {
@@ -329,7 +335,7 @@ async function scan() {
 
 
 {#if selected}
-  <PageHost load={joinDialog} props={{ network: selected, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
+  <PageHost load={joinDialog} props={{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
 {/if}
 <div aria-live="polite" class="mt-4 space-y-2 text-sm">
   {#if joining.state === 'joining'}
