@@ -12,19 +12,11 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
-// The three mutators left out of the lockout guard when it was written —
-// POST /wifi/connect, POST /wifi/disconnect and POST /wifi/repeater/reconcile —
-// are pinned HERE as deliberately unguarded, because "it is safe" is only worth
-// something if a test says so.
-//
-// What these tests assert is the property the guard is built on (ADR 0002 §5.2:
-// refuse when the caller is on WiFi and no enabled mode=ap wifi-iface would be
-// left on an enabled radio), read back out of the configuration the caller would
-// actually be left with. They deliberately do NOT assert that a guard was
-// called, that a LockoutRequest exists, or that some error type is absent: none
-// of those is the property, and a test that could only pass against an
-// acknowledge-aware signature would be testing the fiction that these endpoints
-// are lockout vectors at all.
+// These service-level tests pin the AP-survival property, not caller identity:
+// ConnectWithLockout owns that separate HTTP preflight. Disconnect and reconcile
+// never remove the last AP; Connect may remove the caller's AP, but leaves one on
+// the other radio. The HTTP tests in internal/api assert refusal, acknowledgement,
+// and caller-to-radio mapping without duplicating it here.
 //
 // The reader is independent of the guard's own enabledAPRemains on purpose: a
 // test that reuses the implementation's definition of "an access point
@@ -170,14 +162,34 @@ func TestConnect_AllowAPOnSTARadioKeepsTheAccessPointEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := svc.Connect(models.WifiConfig{
+	if _, err := svc.ConnectWithLockout(models.WifiConfig{
 		SSID: "Cafe-WiFi", Band: "5g", Encryption: "psk2", Password: "cafepass1",
-	}); err != nil {
+	}, LockoutRequest{ClientIP: wifiAPIP}); err != nil {
 		t.Fatalf("connecting with allow_ap_on_sta_radio: %v", err)
 	}
 	left := enabledAPsLeft(t, u)
 	if !hasAP(left, "default_radio1") {
 		t.Errorf("enabled access points = %v, want default_radio1 (the uplink radio's) up", left)
+	}
+}
+
+func TestConnectWithLockout_SingleRadioKeepsAPWithoutAcknowledgement(t *testing.T) {
+	svc, u, _ := newLockoutService(t)
+	if err := u.DeleteSection("wireless", "default_radio1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.DeleteSection("wireless", "radio1"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := svc.ConnectWithLockout(models.WifiConfig{
+		SSID: "Cafe-WiFi", Band: "2g", Encryption: "psk2", Password: "cafepass1",
+	}, LockoutRequest{ClientIP: wifiAPIP})
+	if err != nil {
+		t.Fatalf("single-radio connect must not require acknowledgement: %v", err)
+	}
+	if disabled, _ := u.Get("wireless", "default_radio0", "disabled"); disabled == "1" {
+		t.Error("single-radio Connect must leave its AP enabled")
 	}
 }
 

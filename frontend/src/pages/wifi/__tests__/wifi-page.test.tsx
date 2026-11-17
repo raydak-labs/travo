@@ -181,6 +181,65 @@ describe('WifiPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('requires acknowledgement before Connect can disable the caller AP', async () => {
+    const requests: { acknowledge_lockout?: boolean }[] = [];
+    const applyToken = 'acknowledged-uplink';
+    let joined = false;
+    server.use(
+      http.get(API_ROUTES.wifi.connection, () =>
+        HttpResponse.json(
+          joined
+            ? { ...mockWifiConnection, mode: 'repeater', ssid: 'Airport_Free_WiFi' }
+            : { mode: 'ap', connected: false },
+        ),
+      ),
+      http.post(API_ROUTES.wifi.connect, async ({ request }) => {
+        const body = (await request.json()) as { acknowledge_lockout?: boolean };
+        requests.push(body);
+        if (body.acknowledge_lockout !== true) {
+          return HttpResponse.json(
+            { error: 'caller AP will be disabled', code: 'wifi_lockout_risk' },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json({
+          status: 'ok',
+          apply: { pending: true, token: applyToken, rollback_timeout_seconds: 30 },
+        });
+      }),
+      http.post(API_ROUTES.wifi.applyConfirm, async () => {
+        joined = true;
+        return HttpResponse.json({ status: 'ok' });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWifiPage();
+
+    await screen.findByRole('button', { name: /Access Point/ });
+    await user.click(await screen.findByRole('button', { name: 'Scan networks' }));
+    const dialog = screen.getByRole('dialog');
+    const network = await within(dialog).findByText('Airport_Free_WiFi');
+    const networkRow = within(dialog)
+      .getAllByRole('listitem')
+      .find((row) => row.contains(network));
+    await user.click(within(networkRow!).getByRole('button', { name: 'Connect' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Connect' }));
+
+    expect(await screen.findByText('This will disconnect you')).toBeInTheDocument();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.acknowledge_lockout).toBeUndefined();
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Apply anyway' }));
+
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]!.acknowledge_lockout).toBe(true);
+    expect(
+      await within(await screen.findByRole('region', { name: 'Current connection' })).findByText(
+        'Airport_Free_WiFi',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('scans again when reopened while the previous results are still fresh', async () => {
     server.use(http.get(API_ROUTES.wifi.scan, () => HttpResponse.json([])));
     const user = userEvent.setup();

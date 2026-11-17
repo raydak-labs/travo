@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   useWifiDisconnect,
-  useWifiConnect,
+  useWifiConnectLockout,
   useWifiConnection,
   useRadioStatus,
   useSetRadioEnabled,
@@ -19,7 +19,7 @@ export function QuickActions() {
   const { data: vpnStatusList } = useVpnStatus();
   const { data: radioStatus } = useRadioStatus();
   const wifiDisconnect = useWifiDisconnect();
-  const wifiReconnect = useWifiConnect();
+  const { mutation: wifiReconnect, connect, lockoutDialog } = useWifiConnectLockout();
   const toggleWireguard = useToggleWireguard();
   const setRadioEnabled = useSetRadioEnabled();
   const reboot = useReboot();
@@ -34,7 +34,7 @@ export function QuickActions() {
     wifiDisconnect.mutate(undefined, {
       onSuccess: () => {
         if (wifiConnection?.ssid) {
-          wifiReconnect.mutate({ ssid: wifiConnection.ssid, password: '' });
+          connect({ ssid: wifiConnection.ssid, password: '' });
         }
       },
     });
@@ -78,6 +78,8 @@ export function QuickActions() {
           />
         </CardContent>
       </Card>
+
+      {lockoutDialog}
 
       <ConfirmDialog
         open={showRebootDialog}

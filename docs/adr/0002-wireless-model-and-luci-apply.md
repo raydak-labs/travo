@@ -3,7 +3,7 @@ title: "ADR 0002: Wireless model, health, and LuCI-style UCI apply"
 description: The wireless model: configured vs live radio, role assignment, LuCI-style apply/rollback/confirm, and the health API that reports fragile layouts.
 status: Accepted
 date: 2026-05-14
-updated: 2026-11-14
+updated: 2026-11-17
 tags: [adr, wireless, wwan, repeater, uci, rpcd, openwrt]
 ---
 
@@ -319,13 +319,12 @@ the opposite direction. `unknown` is still an honest answer from the
 `GET /network/connection-method` endpoint; it is the *guard* that reads it as
 unsafe. Nothing was weakened to make a test pass.
 
-Why "no enabled AP left anywhere" and not "the caller's own AP goes away": it
-is conservative in the safe direction, it cannot strand anyone it does not
-refuse, and it does not fire when the operator is on the other radio and that
-radio's AP stays up — the everyday "turn 5G off while I am on 2.4G". A narrower
-rule would add a second thing to keep in agreement for no extra safety.
+The generic rule still fires only when no enabled AP remains anywhere. That
+keeps ordinary other-radio changes free of prompts. `POST /api/v1/wifi/connect`
+has an additional rule because it can disable the caller's current AP while the
+other band survives.
 
-**Endpoints covered.** All five mutators that can remove an access point:
+**Endpoints covered.** All six mutators that can remove an access point:
 
 | endpoint | removes the AP when |
 | --- | --- |
@@ -334,6 +333,16 @@ rule would add a second thing to keep in agreement for no extra safety.
 | `PUT /api/v1/wifi/radios/{name}/role` | role `none` / `sta` on that radio |
 | `PUT /api/v1/wifi/ap/{section}` | `enabled: false` on that section |
 | `PUT /api/v1/wifi/guest` | `enabled: false` |
+| `POST /api/v1/wifi/connect` | the selected uplink radio carries the caller's AP |
+
+The Connect preflight maps caller IP → neighbour MAC → AP ifname → UCI radio
+(`network.ClientAccessPoint` plus `network.wireless status`). On multi-radio
+layouts without `allow_ap_on_sta_radio`, it refuses when that radio is the uplink
+target, even if another AP survives. Proven Ethernet and callers on the other
+band proceed. Missing or unmappable association data fails closed with the same
+acknowledgement escape. The refusal happens before `ensureWwanNetwork` or any
+other write. Single-radio layouts and the explicit same-radio override do not
+fire because Connect leaves that AP enabled.
 
 Anything that cannot strand the caller — an SSID change, a key change, switching
 a radio off while the other radio's AP stays enabled — proceeds exactly as
@@ -356,7 +365,8 @@ assert the apply session count did not move.
 **Client.** The 409 raises a dialog that cannot be accepted without ticking a box
 (`frontend/src/components/wifi/wifi-lockout-dialog.tsx`); only then is the same
 request re-sent with `acknowledge_lockout: true`. Wired in the mode card, the
-per-radio access-point section and the radio-hardware disable path.
+per-radio access-point section, the radio-hardware disable path, and the shared
+Connect helper used by scan, hidden, saved, dashboard, and setup flows.
 
 ### 6. Scripts, packaging, and `wifi` commands
 

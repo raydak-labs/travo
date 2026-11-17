@@ -51,7 +51,7 @@ describe('WifiLockoutDialog', () => {
     render(<WifiLockoutDialog open isPending={false} onCancel={() => {}} onConfirm={() => {}} />);
 
     expect(screen.getByText(/You are connected over WiFi/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ethernet cable/i)).toBeInTheDocument();
+    expect(screen.getByText(/another router access point/i)).toBeInTheDocument();
   });
 
   it('cancelling reports that nothing was sent', async () => {

@@ -24,7 +24,7 @@ import {
   useSetNetworkPriority,
   useAutoReconnect,
   useSetAutoReconnect,
-  useWifiConnect,
+  useWifiConnectLockout,
   useWifiConnection,
 } from '@/hooks/use-wifi';
 
@@ -47,7 +47,7 @@ const STATUS_BADGE = {
 export function WifiSavedNetworksCard() {
   const { data: savedNetworks = [], isLoading: savedLoading } = useSavedNetworks();
   const { data: connection } = useWifiConnection();
-  const connectMutation = useWifiConnect();
+  const { mutation: connectMutation, connect, lockoutDialog } = useWifiConnectLockout();
   const deleteMutation = useWifiDelete();
   const priorityMutation = useSetNetworkPriority();
   const { data: autoReconnect } = useAutoReconnect();
@@ -76,7 +76,7 @@ export function WifiSavedNetworksCard() {
     const target = pendingConnect;
     if (!target) return;
     setPendingConnect(null);
-    connectMutation.mutate({ ssid: target.ssid, password: '', encryption: target.encryption });
+    connect({ ssid: target.ssid, password: '', encryption: target.encryption });
   }
 
   return (
@@ -289,6 +289,7 @@ export function WifiSavedNetworksCard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {lockoutDialog}
       </div>
     </section>
   );

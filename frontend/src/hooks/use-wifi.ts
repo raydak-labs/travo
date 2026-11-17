@@ -6,6 +6,8 @@
  * wireless surface. This module stays the single import path: every consumer
  * keeps importing from '@/hooks/use-wifi'.
  */
+export { useWifiConnectLockout } from './use-wifi-connect-lockout';
+
 export {
   useWifiScan,
   useWifiConnection,

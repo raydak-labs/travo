@@ -1,7 +1,7 @@
 ---
 title: Architecture decisions
 description: Stable runtime invariants, safety rules, subsystem contracts, deployment assumptions, footprint constraints.
-updated: 2026-11-14
+updated: 2026-11-17
 tags: [architecture, invariants, safety]
 ---
 
@@ -58,7 +58,10 @@ These rules are stable product behavior, not backlog notes. **Expanded wireless 
 ### 2.4 Lockout guard (no silent self-disconnect)
 
 - A mutating wireless request that would leave its caller with **no enabled `mode=ap` wifi-iface** is **refused (409, code `wifi_lockout_risk`) before anything is written** when the caller reached the router over WiFi; the same request from Ethernet, or one that leaves an access point up, proceeds unchanged.
-- The only way past it is the request body's explicit `acknowledge_lockout: true`. There is no implicit, "probably fine" path.
+- `POST /api/v1/wifi/connect` also refuses when its selected uplink radio carries
+  the caller's current AP, even if another band remains usable. Unknown mappings fail closed.
+- The only way past either guard is explicit `acknowledge_lockout: true` in the request body.
+  There is no implicit, "probably fine" path.
 
 ### 2.5 Health and recovery signals
 

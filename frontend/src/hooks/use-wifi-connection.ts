@@ -44,17 +44,21 @@ export function useWifiHealth() {
   });
 }
 
+export type WifiConnectParams = {
+  ssid: string;
+  password: string;
+  encryption?: string;
+  hidden?: boolean;
+  /** Preferred band for dual-band networks (2.4ghz, 5ghz, 6ghz) */
+  band?: string;
+  /** Explicit opt-in after the router refuses to disable the caller's AP. */
+  acknowledge_lockout?: boolean;
+};
+
 export function useWifiConnect() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: {
-      ssid: string;
-      password: string;
-      encryption?: string;
-      hidden?: boolean;
-      /** Preferred band for dual-band networks (2.4ghz, 5ghz, 6ghz) */
-      band?: string;
-    }) => finalizeWifiMutation(wiFiConnect(params)),
+    mutationFn: (params: WifiConnectParams) => finalizeWifiMutation(wiFiConnect(params)),
     onSuccess: (_data, variables) => {
       toast.success(`Connected to ${variables.ssid}`);
       wifiMutationSettled(queryClient, [

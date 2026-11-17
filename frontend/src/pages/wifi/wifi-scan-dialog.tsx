@@ -11,17 +11,17 @@ import {
 } from '@/components/ui/dialog';
 import { WifiScanList } from './wifi-scan-list';
 import { WifiConnectDialog } from './wifi-connect-dialog';
-import { useWifiScan, useWifiConnect, useWifiConnection } from '@/hooks/use-wifi';
+import { useWifiScan, useWifiConnectLockout, useWifiConnection } from '@/hooks/use-wifi';
 
 export function WifiScanDialog() {
   const [open, setOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<GroupedScanNetwork | null>(null);
   const { data: scanResults = [], isFetching, isError, refetch } = useWifiScan(open);
   const { data: connection } = useWifiConnection();
-  const connectMutation = useWifiConnect();
+  const { mutation: connectMutation, connect, lockoutDialog } = useWifiConnectLockout();
 
   function handleConnect(ssid: string, password: string, band?: string) {
-    connectMutation.mutate(
+    connect(
       {
         ssid,
         password,
@@ -93,6 +93,7 @@ export function WifiScanDialog() {
           )}
         </DialogContent>
       </Dialog>
+      {lockoutDialog}
     </>
   );
 }

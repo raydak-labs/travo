@@ -173,6 +173,8 @@ type Deps struct {
 	AutoReconnectFile string
 	ReconnectScript   string
 	ModeFile          string
+	// ARPFile overrides the neighbour table used by caller lockout checks.
+	ARPFile string
 }
 
 // New creates a wifi Service.
@@ -190,7 +192,7 @@ func New(d Deps) *Service {
 		reconnectScript:     or(d.ReconnectScript, defaultReconnectScript),
 		modeFile:            or(d.ModeFile, defaultWifiModeFile),
 		repeaterOptionsFile: defaultRepeaterOptionsFile,
-		arpFile:             network.ProcNetARP,
+		arpFile:             or(d.ARPFile, network.ProcNetARP),
 	}
 	if w.reloader == nil {
 		w.reloader = &NoopWifiReloader{}
