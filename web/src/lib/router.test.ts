@@ -28,7 +28,7 @@ describe('router', () => {
 });
 
 describe('guard', () => {
-  const routes: Route[] = ['dashboard', 'login', 'setup', 'wifi', 'vpn', 'system'];
+  const routes: Route[] = ['dashboard', 'login', 'setup', 'wifi', 'vpn', 'services', 'system'];
   const expected: Record<AuthState, Record<Route, Route>> = {
     unknown: {
       dashboard: 'dashboard',
@@ -36,6 +36,7 @@ describe('guard', () => {
       setup: 'setup',
       wifi: 'wifi',
       vpn: 'vpn',
+      services: 'services',
       system: 'system',
     },
     setup_required: {
@@ -44,6 +45,7 @@ describe('guard', () => {
       setup: 'setup',
       wifi: 'setup',
       vpn: 'setup',
+      services: 'setup',
       system: 'setup',
     },
     anonymous: {
@@ -52,6 +54,7 @@ describe('guard', () => {
       setup: 'login',
       wifi: 'login',
       vpn: 'login',
+      services: 'login',
       system: 'login',
     },
     authenticated: {
@@ -60,6 +63,7 @@ describe('guard', () => {
       setup: 'dashboard',
       wifi: 'wifi',
       vpn: 'vpn',
+      services: 'services',
       system: 'system',
     },
   };

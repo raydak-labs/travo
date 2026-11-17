@@ -1,4 +1,4 @@
-export type Route = 'dashboard' | 'login' | 'setup' | 'wifi' | 'vpn' | 'system';
+export type Route = 'dashboard' | 'login' | 'setup' | 'wifi' | 'vpn' | 'services' | 'system';
 
 const ROUTES: Record<string, Route> = {
   '/': 'dashboard',
@@ -6,6 +6,7 @@ const ROUTES: Record<string, Route> = {
   '/setup': 'setup',
   '/wifi': 'wifi',
   '/vpn': 'vpn',
+  '/services': 'services',
   '/system': 'system',
 };
 

@@ -10,6 +10,7 @@ import Shield from '@lucide/svelte/icons/shield';
 import Sun from '@lucide/svelte/icons/sun';
 import Wifi from '@lucide/svelte/icons/wifi';
 import Button from '$lib/components/ui/button/button.svelte';
+import { getAdGuard } from './lib/api/gen';
 import { ownDashboardEvents, restoreDashboardEvents } from './lib/app-dashboard-events';
 import { dashboardEvents } from './lib/dashboard-events.svelte';
 import { navigate } from './lib/navigate';
@@ -68,9 +69,26 @@ const nav: { route: Route | null; label: () => string; icon: typeof Wifi }[] = [
   { route: 'wifi', label: () => m.nav_wifi(), icon: Wifi },
   { route: null, label: () => m.nav_network(), icon: Network },
   { route: 'vpn', label: () => m.nav_vpn(), icon: Shield },
-  { route: null, label: () => m.nav_services(), icon: Server },
+  { route: 'services', label: () => m.nav_services(), icon: Server },
   { route: 'system', label: () => m.nav_system(), icon: Settings },
 ];
+
+// Services leaves the nav only when the daemon cannot supervise AdGuard Home at all (503).
+// An absent package stays visible: the page is the retry path for a failed install.
+let servicesUnavailable = $state(false);
+$effect(() => {
+  if (!authenticated) return;
+  const request = new AbortController();
+  getAdGuard({ signal: request.signal })
+    .then((r) => {
+      servicesUnavailable = r.response?.status === 503;
+    })
+    .catch(() => {});
+  return () => request.abort();
+});
+const shownNav = $derived(
+  nav.filter((item) => !(item.route === 'services' && servicesUnavailable)),
+);
 
 void session.bootstrap();
 
@@ -127,7 +145,7 @@ $effect(() => {
 {#snippet navigation()}
     <nav aria-label={m.nav_label()} class="flex-1 overflow-y-auto px-2 pb-4">
       <ul class="flex flex-col gap-1">
-        {#each nav as item (item.label())}
+        {#each shownNav as item (item.label())}
           {@const Icon = item.icon}
           <li>
             {#if item.route}
@@ -233,6 +251,8 @@ $effect(() => {
             <PageHost load={pages.wifi} />
           {:else if shown === 'vpn'}
             <PageHost load={pages.vpn} />
+          {:else if shown === 'services'}
+            <PageHost load={pages.services} />
           {:else if shown === 'system'}
             <PageHost load={pages.system} />
           {:else if shown === 'login'}

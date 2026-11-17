@@ -31,6 +31,8 @@ When System finds a newer release, **Verify package** checks the signed archive 
 
 Use **VPN** to import and select a WireGuard profile, then enable or disable the tunnel. Confirm the change once the router verifies connectivity, or roll it back. The page also shows the current tunnel state and handshake age.
 
+**Services** shows AdGuard Home. It installs once after the first Internet connection, listens on loopback only, and becomes the default DNS once it resolves. Start or stop it, turn "default DNS" on or off, and open its own UI through the login-protected port 3001. If AdGuard Home stops answering, DNS falls back to the uplink resolver and the page says so.
+
 On the WiFi page, scan for an uplink, join it on a free radio, and confirm the connection once it is verified.
 
 **Saved uplinks** keeps an ordered list of networks. Use **Save** in a network's dialog to store its credentials without changing the current connection. Move a network up or down to change its priority. **Select** joins a saved network with the same confirm or rollback flow as Join. **Forget** removes a saved network and leaves the current connection up.
