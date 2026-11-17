@@ -1,0 +1,6 @@
+dhcp.guest=dhcp
+dhcp.guest.interface='guest'
+dhcp.guest.start='100'
+dhcp.guest.limit='150'
+dhcp.guest.leasetime='1h'
+dhcp.guest.dhcpv4='server'

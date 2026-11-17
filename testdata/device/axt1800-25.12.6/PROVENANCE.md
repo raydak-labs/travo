@@ -48,3 +48,12 @@ Secrets, replaced with `REDACTED`: WiFi passphrases (`uci` `key`, and `"key"` in
 Location-identifying values, replaced with stable placeholders in every file (raw captures and spike logs alike): SSIDs (home uplink → `HomeUplink`, travel AP → `TravelAP`, other saved networks → `HomeNet`, `HotelA`, `HotelB`), DNS search domain → `home.lan`, WireGuard endpoint → `203.0.113.8` (RFC 5737). DHCP lease hostnames → `REDACTED-HOST`.
 Kept as captured: MAC addresses and private RFC1918 addresses. They are needed for classification tests and do not locate the user. Public keys are kept.
 Every other byte is verbatim. Placeholders were substituted after capture with exact string replacement.
+
+## guest/ (2026-11-17, 0.1.0 release playbook, #75)
+Captured while a `POST /api/v1/wifi/guest` transaction (radio1, SSID `TGPlaybookGuest`, a throwaway test key) was Pending, before it was rolled back:
+- uci-network-guest.txt: `uci show network | grep -E "^network\.(guest|travo_guest|br_guest|guest_dev)[.=]"`
+- uci-firewall-guest.txt: `uci show firewall | grep -iE "guest"`
+- uci-dhcp-guest.txt: `uci show dhcp | grep -E "^dhcp\.guest[.=]"`
+- uci-wireless-guest.txt: `uci show wireless | grep -iE "guest" | grep -v "\.key="` (the key line is omitted, not redacted)
+- interface-guest-status.json: `ubus call network.interface.guest status`
+No placeholders were needed: the SSID is a test name and the only address is the guest subnet `192.168.2.1/24`. Every byte is verbatim.

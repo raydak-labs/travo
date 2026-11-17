@@ -39,7 +39,7 @@ Test router: GL-AXT1800, OpenWrt 25.12.6, `ssh root@192.168.1.1` (key auth) when
 
 ## Hardware playbook (run before each release; console or Ethernet fallback ready)
 
-Done on 2026-11-09 (results: `testdata/device/axt1800-25.12.6/SPIKES.md`): payload captures; watchdog restore without confirm, after daemon kill and across reboot; wrong uplink password reads `carrier:false` and rolls back; DNS layer round trip with AdGuard and captive.
+Done on 2026-11-09 (results: `testdata/device/axt1800-25.12.6/SPIKES.md`): payload captures; watchdog restore without confirm, after daemon kill and across reboot; wrong uplink password reads `carrier:false` and rolls back; DNS layer round trip with AdGuard and captive. The 0.1.0 release run on 2026-11-17 (same file, "0.1.0 release playbook") lists each step as pass, partial or operator, with the operator-only remainder.
 
 Per release, each from Ethernet unless stated (issues with label `needs-hardware` add their step here when they merge):
 1. On clean OpenWrt, verify LuCI login on port 80 and record the uhttpd listener values. Install the release tarball without `--port`. Set up and log in to greenfield at `http://192.168.1.1/` and verify LuCI login on port 8080. Check that `sysupgrade -l | grep travo-greenfield` lists the keep paths, including `uhttpd.orig`. Reboot and verify both UIs still answer. Run `--uninstall` and verify the original uhttpd listener values, their order and option/list form, and LuCI login on port 80.
