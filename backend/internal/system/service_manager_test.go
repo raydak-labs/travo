@@ -106,6 +106,33 @@ func TestGetServiceStatus(t *testing.T) {
 	}
 }
 
+func TestAdGuardStandaloneDetectedWithoutPackage(t *testing.T) {
+	sm, _, probe := newTestServiceManager(t)
+	probe.scripts["adguardhome"] = true
+	probe.files["/opt/AdGuardHome/AdGuardHome"] = true
+
+	info, err := sm.GetServiceStatus("adguardhome")
+	if err != nil {
+		t.Fatalf("GetServiceStatus: %v", err)
+	}
+	if info.State != "stopped" {
+		t.Errorf("standalone AdGuard state = %q, want stopped", info.State)
+	}
+}
+
+func TestAdGuardInitScriptWithoutBinaryIsNotInstalled(t *testing.T) {
+	sm, _, probe := newTestServiceManager(t)
+	probe.scripts["adguardhome"] = true
+
+	info, err := sm.GetServiceStatus("adguardhome")
+	if err != nil {
+		t.Fatalf("GetServiceStatus: %v", err)
+	}
+	if info.State != "not_installed" {
+		t.Errorf("an init script without its binary must not count as installed: %q", info.State)
+	}
+}
+
 func TestGetServiceStatusNotFound(t *testing.T) {
 	sm, _, _ := newTestServiceManager(t)
 	_, err := sm.GetServiceStatus("nonexistent")

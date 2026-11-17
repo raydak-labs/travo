@@ -3,7 +3,7 @@ title: "ADR 0001: DNS resolution, VPN, captive portal, and restore semantics"
 description: Why DNS resolution, VPN tunnelling and captive-portal handling share one dnsmasq resolver layer stack instead of separate snapshots.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-25
+updated: 2026-11-17
 tags: [adr, dns, dnsmasq, adguard, vpn, wireguard, captive-portal, openwrt, luci]
 ---
 
@@ -47,11 +47,26 @@ We need:
 - Enabling and disabling forwarding does **not** touch UCI directly: both go through the
   shared dnsmasq resolver layer stack of §3.1, because VPN DNS forwarding writes the same
   two options of the same section.
-- On first install `AdGuardService.AutoConfigure` seeds `/opt/AdGuardHome/AdGuardHome.yaml`
-  (or `/etc/adguardhome/adguardhome.yaml`, if it exists) from the bundled template
-  **`/etc/travo/adguardhome.yaml`**, falling back to the embedded `defaultAdGuardConfig`.
-  That template path is **read only** — AdGuard's own YAML is the file Travo edits (§2.5
+- On first install `AdGuardService.AutoConfigure` seeds the config path selected by the
+  installed layout. A standalone init script's explicit `-c` path wins over stale package
+  UCI; otherwise UCI `adguardhome.config.config_file` selects the package path. The package
+  uses `/etc/adguardhome/adguardhome.yaml`; standalone uses `/opt/AdGuardHome/AdGuardHome.yaml`.
+  Only that active path counts for seeding and `config_present`, so an old file in the other
+  layout cannot mask an outage. The package file is owned by `adguardhome:adguardhome`,
+  mode `0600`. Seeding restarts AdGuard because a missing config
+  may already have started the first-run wizard instead of the DNS listener. The source is
+  the bundled **`/etc/travo/adguardhome.yaml`**, falling back to `defaultAdGuardConfig`;
+  that template path is **read only** — AdGuard's own YAML is the file Travo edits (§2.5
   covers its credentials).
+- `GET /api/v1/adguard/dns` reports `config_present` and `repair_needed` beside the listener
+  and resolver probes. When dnsmasq forwards to an unavailable AdGuard listener,
+  `POST /api/v1/adguard/repair` restores a missing config, restarts the installed service,
+  and succeeds only after its DNS listener answers. `/etc/trafo/adguard-repair-in-progress`
+  remains after an interrupted or failed repair and is cleared by the standard redeploy path
+  (ADR 0003 §2). The Services page exposes the health state and repair action. Repair never
+  reinstalls a removed package: the UI offers reinstall or disabling forwarding instead.
+- Travo's sysupgrade keep list preserves both supported config paths. The package's own keep
+  list remains the canonical preservation contract for its other package-owned state.
 
 **2.3 AdGuard Home — “direct” / primary on port 53 (advanced)**
 

@@ -6,4 +6,6 @@
 /etc/rc.d/S99travo
 /etc/config/travo
 /etc/travo
+/etc/adguardhome/adguardhome.yaml
+/opt/AdGuardHome/AdGuardHome.yaml
 /www/travo

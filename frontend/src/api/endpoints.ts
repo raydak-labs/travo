@@ -315,6 +315,30 @@ return apiFetch<Status>(getSetAdGuardPasswordUrl(),
 
 
 
+export const getRepairAdGuardUrl = () => {
+
+
+
+
+  return `/api/v1/adguard/repair`
+}
+
+/**
+ * @summary Restore missing config and restart AdGuard Home
+ */
+export const repairAdGuard = async ( options?: Parameters<typeof apiFetch>[1]): Promise<AdGuardDNSStatus> => {
+
+  return apiFetch<AdGuardDNSStatus>(getRepairAdGuardUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
 export const getLoginUrl = () => {
 
 

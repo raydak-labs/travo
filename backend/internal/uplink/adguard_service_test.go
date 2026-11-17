@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 )
 
@@ -33,7 +34,8 @@ type mockAdGuardChecker struct {
 	// exercise SetConfig's "came up late" path.
 	tcpProbeSeq map[string][]bool
 	// writeErr, when set, makes WriteFile fail for the matching path.
-	writeErr map[string]error
+	writeErr   map[string]error
+	writePaths []string
 	// addListRecorder, when set, captures every `uci add_list
 	// dhcp.@dnsmasq[0].server=<entry>` value. The entries are dynamic, so they
 	// cannot be pre-registered in the commands map.
@@ -122,6 +124,21 @@ func (m *mockAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMod
 	}
 	m.fileContents[path] = string(data)
 	m.files[path] = true
+	m.writePaths = append(m.writePaths, path)
+	return nil
+}
+
+func (m *mockAdGuardChecker) RenameFile(oldPath, newPath string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	content, ok := m.fileContents[oldPath]
+	if !ok {
+		return os.ErrNotExist
+	}
+	m.fileContents[newPath] = content
+	m.files[newPath] = true
+	delete(m.fileContents, oldPath)
+	delete(m.files, oldPath)
 	return nil
 }
 
@@ -287,31 +304,200 @@ func TestIsInstalled_ViaInitScript(t *testing.T) {
 	}
 }
 
-func TestAutoConfigureWritesDefaultConfig(t *testing.T) {
+func TestAutoConfigureWritesPackageConfigAndRestarts(t *testing.T) {
 	mock := newMockAdGuardChecker()
-	// No binary, no config file — fresh install.
-	svc := NewAdGuardService(mock)
-
-	// mkdir and AdGuard start commands must not fail.
-	mock.commands["mkdir -p /opt/AdGuardHome"] = struct {
+	mock.files[adguardInitd] = true
+	mock.commands["uci -q get adguardhome.config.config_file"] = struct {
 		output string
 		err    error
-	}{"", nil}
+	}{adguardYAMLPathUCI, nil}
+	for _, command := range []string{
+		"mkdir -p /etc/adguardhome",
+		"chown adguardhome:adguardhome " + adguardYAMLPathUCI + ".travo-new",
+		adguardInitd + " enable",
+		adguardInitd + " restart",
+	} {
+		mock.commands[command] = struct {
+			output string
+			err    error
+		}{"", nil}
+	}
+	svc := NewAdGuardService(mock)
 
-	err := svc.AutoConfigure()
-	if err != nil {
+	if err := svc.AutoConfigure(); err != nil {
 		t.Fatalf("AutoConfigure: %v", err)
 	}
 
-	content, ok := mock.fileContents[adguardYAMLPathOpt]
+	content, ok := mock.fileContents[adguardYAMLPathUCI]
 	if !ok {
-		t.Fatal("expected AdGuardHome.yaml to be written")
+		t.Fatalf("expected %s to be written; calls: %v", adguardYAMLPathUCI, mock.recordedCalls())
+	}
+	if _, exists := mock.fileContents[adguardYAMLPathOpt]; exists {
+		t.Errorf("package install must not seed the standalone path %s", adguardYAMLPathOpt)
+	}
+	if slices.Contains(mock.writePaths, adguardYAMLPathUCI) {
+		t.Error("config must be written to a temporary file and renamed, not exposed partially")
 	}
 	if !strings.Contains(content, "port: 5353") {
 		t.Errorf("expected port 5353 in default config, got: %s", content)
 	}
 	if !strings.Contains(content, "bind_port: 3000") {
 		t.Errorf("expected bind_port 3000 in default config, got: %s", content)
+	}
+	if !slices.Contains(mock.recordedCalls(), adguardInitd+" restart") {
+		t.Errorf("a first-run wizard already listening must reload the seeded config; calls: %v", mock.recordedCalls())
+	}
+}
+
+func TestAutoConfigurePackageConfigIgnoresStandaloneLeftover(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardInitd] = true
+	mock.files[adguardYAMLPathOpt] = true
+	mock.fileContents[adguardYAMLPathOpt] = defaultAdGuardConfig
+	mock.commands["uci -q get adguardhome.config.config_file"] = struct {
+		output string
+		err    error
+	}{adguardYAMLPathUCI, nil}
+	for _, command := range []string{
+		"mkdir -p /etc/adguardhome",
+		"chown adguardhome:adguardhome " + adguardYAMLPathUCI + ".travo-new",
+		adguardInitd + " enable",
+		adguardInitd + " restart",
+	} {
+		mock.commands[command] = struct {
+			output string
+			err    error
+		}{"", nil}
+	}
+	svc := NewAdGuardService(mock)
+
+	if err := svc.AutoConfigure(); err != nil {
+		t.Fatalf("AutoConfigure: %v", err)
+	}
+	if mock.fileContents[adguardYAMLPathUCI] == "" {
+		t.Errorf("active package config was masked by stale standalone YAML; calls: %v", mock.recordedCalls())
+	}
+}
+
+func TestAutoConfigureStandaloneInitPathWinsOverPackageUCI(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardInitd] = true
+	mock.files[adguardBinary] = true
+	mock.fileContents[adguardInitd] = "procd_set_param command /opt/AdGuardHome/AdGuardHome -c /opt/AdGuardHome/AdGuardHome.yaml"
+	mock.commands["uci -q get adguardhome.config.config_file"] = struct {
+		output string
+		err    error
+	}{adguardYAMLPathUCI, nil}
+	for _, command := range []string{
+		"mkdir -p /opt/AdGuardHome",
+		adguardInitd + " enable",
+		adguardInitd + " restart",
+	} {
+		mock.commands[command] = struct {
+			output string
+			err    error
+		}{"", nil}
+	}
+	svc := NewAdGuardService(mock)
+
+	if err := svc.AutoConfigure(); err != nil {
+		t.Fatalf("AutoConfigure: %v", err)
+	}
+	if mock.fileContents[adguardYAMLPathOpt] == "" {
+		t.Errorf("standalone init path was ignored; calls: %v", mock.recordedCalls())
+	}
+	if _, exists := mock.fileContents[adguardYAMLPathUCI]; exists {
+		t.Errorf("standalone install must not seed the package path %s", adguardYAMLPathUCI)
+	}
+}
+
+func TestAutoConfigureWritesStandaloneConfig(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardBinary] = true
+	mock.commands["mkdir -p /opt/AdGuardHome"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	svc := NewAdGuardService(mock)
+
+	if err := svc.AutoConfigure(); err != nil {
+		t.Fatalf("AutoConfigure: %v", err)
+	}
+	if _, ok := mock.fileContents[adguardYAMLPathOpt]; !ok {
+		t.Fatalf("standalone install must use %s; calls: %v", adguardYAMLPathOpt, mock.recordedCalls())
+	}
+	if _, exists := mock.fileContents[adguardYAMLPathUCI]; exists {
+		t.Errorf("standalone install must not seed the package path %s", adguardYAMLPathUCI)
+	}
+}
+
+func TestRepairRestartsExistingConfig(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardInitd] = true
+	mock.files[adguardYAMLPathUCI] = true
+	mock.fileContents[adguardYAMLPathUCI] = defaultAdGuardConfig
+	mock.tcpProbes["127.0.0.1:5353"] = true
+	for _, command := range []string{adguardInitd + " enable", adguardInitd + " restart"} {
+		mock.commands[command] = struct {
+			output string
+			err    error
+		}{"", nil}
+	}
+	svc := NewAdGuardService(mock)
+	svc.repairGuard = guard.In(t.TempDir(), "adguard-repair")
+
+	if err := svc.Repair(); err != nil {
+		t.Fatalf("Repair: %v", err)
+	}
+	if svc.repairGuard.Present() {
+		t.Error("successful repair must clear its crash guard")
+	}
+	if !slices.Contains(mock.recordedCalls(), adguardInitd+" restart") {
+		t.Errorf("repair must restart AdGuard even when its config exists; calls: %v", mock.recordedCalls())
+	}
+}
+
+func TestRepairFailsWhenDNSListenerDoesNotStart(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardInitd] = true
+	mock.files[adguardYAMLPathUCI] = true
+	mock.fileContents[adguardYAMLPathUCI] = defaultAdGuardConfig
+	mock.commands[adguardInitd+" enable"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	mock.commands[adguardInitd+" restart"] = struct {
+		output string
+		err    error
+	}{"", nil}
+	oldTimeout := adguardConfigVerifyTimeout
+	adguardConfigVerifyTimeout = 0
+	t.Cleanup(func() { adguardConfigVerifyTimeout = oldTimeout })
+	svc := NewAdGuardService(mock)
+	svc.repairGuard = guard.In(t.TempDir(), "adguard-repair")
+
+	if err := svc.Repair(); err == nil {
+		t.Fatal("repair must not report success while the DNS listener is down")
+	}
+	if !svc.repairGuard.Present() {
+		t.Error("failed repair must keep its crash guard for the documented recovery path")
+	}
+}
+
+func TestRepairRefusesAnInterruptedRun(t *testing.T) {
+	mock := newMockAdGuardChecker()
+	mock.files[adguardInitd] = true
+	svc := NewAdGuardService(mock)
+	svc.repairGuard = guard.In(t.TempDir(), "adguard-repair")
+	if err := svc.repairGuard.Create("interrupted"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.Repair(); err == nil || !strings.Contains(err.Error(), "interrupted") {
+		t.Fatalf("Repair should refuse the existing guard, got %v", err)
+	}
+	if calls := mock.recordedCalls(); len(calls) != 0 {
+		t.Errorf("a refused repair must not touch AdGuard; calls: %v", calls)
 	}
 }
 

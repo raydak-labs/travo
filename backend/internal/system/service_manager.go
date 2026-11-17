@@ -206,7 +206,14 @@ func (sm *ServiceManager) buildInfo(def serviceDefinition) models.ServiceInfo {
 		}
 	}
 	if !installed {
-		return info
+		// The standalone AdGuard installer has no package record. Require both
+		// its binary and init script so a removed installation does not reappear.
+		standaloneAdGuard := def.ID == "adguardhome" && def.InitName != "" &&
+			sm.probe.HasInitScript(def.InitName) &&
+			sm.probe.FileExists("/opt/AdGuardHome/AdGuardHome")
+		if !standaloneAdGuard {
+			return info
+		}
 	}
 
 	info.State = "stopped"

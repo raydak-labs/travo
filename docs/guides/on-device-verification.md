@@ -3,7 +3,7 @@ title: On-device verification
 description: Standing device playbook: what to run, in what order, which defect classes local suites cannot catch, and the multi-WAN failover playbook.
 status: standing — run whenever a change touches wireless, DNS/VPN layering, guards, install or failover
 last-verified-against: 192.168.1.1 (GL.iNet GL-AXT1800, OpenWrt 25.12.3), commit 3634ea6
-updated: 2026-11-14
+updated: 2026-11-17
 tags: [testing, on-device, playbook, failover, mwan3]
 ---
 
@@ -288,6 +288,10 @@ ls -la /tmp/resolv.conf.d /tmp/dnsmasq.d 2>/dev/null && cat /tmp/resolv.conf.d/*
 | C.6 | VPN healthy, then yank the uplink Wi-Fi.                | LAN DNS recovers to the pre-VPN resolvers within the debounce window, with no operator action, and the VPN still shows disabled.                                            |
 | C.7 | VPN healthy; reload the dashboard repeatedly.           | LAN DNS keeps using the VPN. A single transient `wg show` failure must not delete the snapshot.                                                                             |
 | C.8 | Repeat C.1–C.5 **with a captive portal** in the middle. | Known composition gap: captive bypass and the layer stack are separate owners of `server`/`noresolv`. See §7.                                                               |
+| C.9 | Hide the AdGuard YAML; use **Repair**. | DNS recovers. |
+
+For C.9, confirm the restored file uses the init script's path and expected owner/mode.
+A successful repair leaves no `/etc/trafo/adguard-repair-in-progress`; a failed one keeps it.
 
 ---
 
@@ -306,6 +310,9 @@ ls -la /etc/trafo/    # the RIGHT directory. Not /etc/travo.
 | D.4  | Stuck guard present, then a scheduled toggle fires.                                   | Behaviour is documented per ADR 0003 §1.4; a stuck guard disables the schedule until `deploy-local.sh` clears it. Confirm you can actually reach that retry path. |
 | D.5  | On the **spare** device: run the published one-liner with `--password`.               | Succeeds; health probe hits the **configured** port (80), not AdGuard's 3000.                                                                                     |
 | D.6  | On the spare device: run it with no password, and with a password under 8 characters. | Both refuse **before** touching state — no `/etc/config/travo`, no LuCI port change.                                                                              |
+| D.7 | Spare device: sysupgrade with both AdGuard layouts. | YAML and LAN DNS survive. |
+
+For D.7, also verify the package user/group and enable links; the YAML alone is insufficient.
 
 ---
 

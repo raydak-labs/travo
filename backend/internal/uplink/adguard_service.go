@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 
 	"github.com/openwrt-travel-gui/backend/internal/execx"
+	"github.com/openwrt-travel-gui/backend/internal/guard"
 	"github.com/openwrt-travel-gui/backend/internal/models"
 )
 
@@ -40,6 +42,8 @@ type AdGuardChecker interface {
 	ReadFile(path string) ([]byte, error)
 	// WriteFile writes contents to a file.
 	WriteFile(path string, data []byte, perm os.FileMode) error
+	// RenameFile atomically replaces a file within one filesystem.
+	RenameFile(oldPath, newPath string) error
 	// RemoveFile deletes a file. Returns nil when it is already gone.
 	RemoveFile(path string) error
 	// TCPProbe returns true if a TCP connection to addr (host:port) succeeds within timeout.
@@ -88,6 +92,10 @@ func (r *RealAdGuardChecker) WriteFile(path string, data []byte, perm os.FileMod
 	return os.WriteFile(path, data, perm)
 }
 
+func (r *RealAdGuardChecker) RenameFile(oldPath, newPath string) error {
+	return os.Rename(oldPath, newPath)
+}
+
 func (r *RealAdGuardChecker) RemoveFile(path string) error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
@@ -120,6 +128,7 @@ type AdGuardService struct {
 	// rather than a bare constant so the stack lifecycle can be exercised
 	// without touching /etc/trafo.
 	dnsStackPath string
+	repairGuard  guard.Guard
 }
 
 type adguardYAMLTop struct {
@@ -210,7 +219,11 @@ func NewAdGuardService(c AdGuardChecker) *AdGuardService {
 	if c == nil {
 		c = NewRealAdGuardChecker()
 	}
-	s := &AdGuardService{checker: c, dnsStackPath: dnsmasqLayerStackPath}
+	s := &AdGuardService{
+		checker:      c,
+		dnsStackPath: dnsmasqLayerStackPath,
+		repairGuard:  guard.New("adguard-repair"),
+	}
 	s.refreshEndpointsFromYAML()
 	return s
 }
@@ -271,6 +284,48 @@ log_file: ""
 verbose: false
 `
 
+func adGuardConfigPathFromInit(script string) string {
+	fields := strings.Fields(script)
+	for i, field := range fields {
+		if field != "-c" && field != "--config" || i+1 >= len(fields) {
+			continue
+		}
+		candidate := strings.Trim(fields[i+1], "\"'")
+		switch candidate {
+		case adguardYAMLPathUCI, adguardYAMLPathOpt:
+			return candidate
+		}
+	}
+	return ""
+}
+
+// newAdGuardConfigPath selects the path used by the installed init script.
+// The standalone script names /opt explicitly; the package reads UCI. Never
+// seed the other layout's path: AdGuard would keep running unconfigured.
+func (s *AdGuardService) newAdGuardConfigPath() string {
+	if script, err := s.checker.ReadFile(adguardInitd); err == nil {
+		if configPath := adGuardConfigPathFromInit(string(script)); configPath != "" {
+			return configPath
+		}
+	}
+	if out, err := s.checker.RunCommand("uci", "-q", "get", "adguardhome.config.config_file"); err == nil {
+		switch strings.TrimSpace(out) {
+		case adguardYAMLPathUCI, adguardYAMLPathOpt:
+			return strings.TrimSpace(out)
+		}
+	}
+	if s.checker.FileExists(adguardBinary) {
+		return adguardYAMLPathOpt
+	}
+	if s.checker.FileExists(adguardYAMLPathUCI) {
+		return adguardYAMLPathUCI
+	}
+	if s.checker.FileExists(adguardYAMLPathOpt) {
+		return adguardYAMLPathOpt
+	}
+	return adguardYAMLPathUCI
+}
+
 // AutoConfigure writes a default AdGuardHome.yaml (if the file doesn't already exist)
 // and enables + starts the adguardhome service.
 // Registered as ServiceManager's post-install hook for "adguardhome" (main.go), so
@@ -281,8 +336,49 @@ verbose: false
 // dnsmasq layer record. An earlier comment here claimed it enabled forwarding;
 // it never did.
 func (s *AdGuardService) AutoConfigure() error {
-	if !s.checker.FileExists(adguardYAMLPathUCI) && !s.checker.FileExists(adguardYAMLPathOpt) {
-		_, _ = s.checker.RunCommand("mkdir", "-p", "/opt/AdGuardHome")
+	return s.autoConfigure(false)
+}
+
+// Repair restores a missing config and restarts the installed service. Unlike
+// the post-install hook, it also restarts when the config already exists: the
+// operator invokes it because the DNS listener is unhealthy.
+func (s *AdGuardService) Repair() error {
+	if !s.checker.FileExists(adguardInitd) {
+		return fmt.Errorf("AdGuard Home init script not found; reinstall AdGuard Home first")
+	}
+	if err := s.repairGuard.Create("AdGuard Home repair"); err != nil {
+		return err
+	}
+	if err := s.autoConfigure(true); err != nil {
+		return err
+	}
+	if !s.waitForAdGuardDNSListener() {
+		return fmt.Errorf("AdGuard Home restarted, but its DNS listener did not become ready")
+	}
+	return s.repairGuard.Clear()
+}
+
+func (s *AdGuardService) waitForAdGuardDNSListener() bool {
+	if s.probeAdGuardDNSListener(s.getDNSPort()) {
+		return true
+	}
+	deadline := time.Now().Add(adguardConfigVerifyTimeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(adguardConfigVerifyPollDuration)
+		if s.probeAdGuardDNSListener(s.getDNSPort()) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *AdGuardService) autoConfigure(restart bool) error {
+	seeded := false
+	configPath := s.newAdGuardConfigPath()
+	if !s.checker.FileExists(configPath) {
+		if _, err := s.checker.RunCommand("mkdir", "-p", filepath.Dir(configPath)); err != nil {
+			return fmt.Errorf("creating AdGuard config directory: %w", err)
+		}
 		// Prefer the bundled template shipped with the tarball; fall back to the
 		// embedded constant so AutoConfigure works in non-tarball environments too.
 		var configBytes []byte
@@ -291,15 +387,32 @@ func (s *AdGuardService) AutoConfigure() error {
 		} else {
 			configBytes = []byte(defaultAdGuardConfig)
 		}
-		if err := s.checker.WriteFile(adguardYAMLPathOpt, configBytes, 0600); err != nil {
+		tempPath := configPath + ".travo-new"
+		if err := s.checker.WriteFile(tempPath, configBytes, 0600); err != nil {
 			return fmt.Errorf("writing default AdGuard config: %w", err)
 		}
+		if configPath == adguardYAMLPathUCI {
+			if _, err := s.checker.RunCommand("chown", "adguardhome:adguardhome", tempPath); err != nil {
+				_ = s.checker.RemoveFile(tempPath)
+				return fmt.Errorf("setting AdGuard config ownership: %w", err)
+			}
+		}
+		if err := s.checker.RenameFile(tempPath, configPath); err != nil {
+			return fmt.Errorf("activating default AdGuard config: %w", err)
+		}
+		seeded = true
 	}
 
 	if s.checker.FileExists(adguardInitd) {
 		_, _ = s.checker.RunCommand(adguardInitd, "enable")
-		if _, err := s.checker.RunCommand(adguardInitd, "start"); err != nil {
-			return fmt.Errorf("starting AdGuard Home: %w", err)
+		action := "start"
+		if seeded || restart {
+			// A missing config already starts the first-run wizard. Restart so the
+			// newly seeded DNS listener replaces it instead of leaving it running.
+			action = "restart"
+		}
+		if _, err := s.checker.RunCommand(adguardInitd, action); err != nil {
+			return fmt.Errorf("%s AdGuard Home: %w", action+"ing", err)
 		}
 	}
 

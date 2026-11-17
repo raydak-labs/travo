@@ -31,6 +31,7 @@ type PackageManager interface {
 // SystemProbe abstracts init.d and process checks.
 type SystemProbe interface {
 	HasInitScript(name string) bool
+	FileExists(path string) bool
 	IsRunning(initName string) bool
 	Start(initName string) (string, error)
 	Stop(initName string) (string, error)
@@ -146,6 +147,11 @@ type RealSystemProbe struct{}
 func (r *RealSystemProbe) HasInitScript(name string) bool {
 	_, err := os.Stat("/etc/init.d/" + name)
 	return err == nil
+}
+
+func (r *RealSystemProbe) FileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func (r *RealSystemProbe) IsRunning(initName string) bool {
