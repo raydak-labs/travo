@@ -41,27 +41,38 @@ func (m *Manager) recordWireGuardBaseline(ctx context.Context, id string) error 
 var uplinkName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_-]*$`)
 
 func (m *Manager) recordWireGuardUplink(ctx context.Context, id string) error {
+	marker, err := m.uplinkMarker(ctx)
+	if err != nil || marker == "" {
+		return err
+	}
+	return atomicfile.Write(m.path(id, "restore-uplink"), []byte(marker), 0o600)
+}
+
+// uplinkMarker names the logical interface and device that carry the kernel default
+// route now, as the watchdog's uplink markers expect. Empty when there is no default
+// route or it goes via wg0.
+func (m *Manager) uplinkMarker(ctx context.Context) (string, error) {
 	reader, ok := m.Device.(device.DefaultRouteReader)
 	if !ok {
-		return errors.New("default route reader unavailable")
+		return "", errors.New("default route reader unavailable")
 	}
 	route, found, err := reader.DefaultIPv4Route(ctx)
 	if err != nil {
-		return errors.New("cannot read the original default route")
+		return "", errors.New("cannot read the original default route")
 	}
 	if !found || route.Device == "wg0" {
-		return nil
+		return "", nil
 	}
 	if len(route.Device) > 15 || !uplinkName.MatchString(route.Device) {
-		return errors.New("invalid underlying route device")
+		return "", errors.New("invalid underlying route device")
 	}
 	raw, err := m.Device.Call(ctx, "network.interface", "dump", nil)
 	if err != nil {
-		return errors.New("cannot read underlying uplink mapping")
+		return "", errors.New("cannot read underlying uplink mapping")
 	}
 	interfaces, err := facts.ParseInterfaceDump(raw)
 	if err != nil {
-		return errors.New("cannot parse underlying uplink mapping")
+		return "", errors.New("cannot parse underlying uplink mapping")
 	}
 	logical := ""
 	for _, candidate := range interfaces {
@@ -69,12 +80,12 @@ func (m *Manager) recordWireGuardUplink(ctx context.Context, id string) error {
 			continue
 		}
 		if logical != "" || !uplinkName.MatchString(candidate.Name) || candidate.Name == "wg0" {
-			return errors.New("ambiguous or invalid underlying uplink")
+			return "", errors.New("ambiguous or invalid underlying uplink")
 		}
 		logical = candidate.Name
 	}
 	if logical == "" {
-		return errors.New("underlying uplink mapping unavailable")
+		return "", errors.New("underlying uplink mapping unavailable")
 	}
-	return atomicfile.Write(m.path(id, "restore-uplink"), []byte(logical+"\n"+route.Device+"\n"), 0o600)
+	return logical + "\n" + route.Device + "\n", nil
 }
