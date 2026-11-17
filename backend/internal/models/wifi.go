@@ -57,6 +57,8 @@ type WifiConfig struct {
 	Band       string `json:"band,omitempty"`
 	Hidden     bool   `json:"hidden,omitempty"`
 	Channel    *int   `json:"channel,omitempty"`
+	// AcknowledgeLockout accepts disabling the caller's current access point.
+	AcknowledgeLockout bool `json:"acknowledge_lockout,omitempty"`
 }
 
 // SavedNetwork represents a saved WiFi network.

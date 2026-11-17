@@ -186,6 +186,18 @@ func classifyLanClient(deps ClassifyDeps, clientIP string) string {
 	return "ethernet"
 }
 
+// ClientAccessPoint returns the AP interface this client is associated with.
+// The boolean is false when the neighbour table or any station dump cannot be
+// read, so a wireless guard can fail closed instead of guessing the caller is wired.
+func ClientAccessPoint(deps ClassifyDeps, clientIP string) (string, bool) {
+	mac, ok := arpMACForIP(deps.ARPFile, clientIP)
+	if !ok {
+		return "", false
+	}
+	stations, complete := apStationInterfaces(deps.Cmd)
+	return stations[mac], complete
+}
+
 // arpMACForIP resolves one client address to its MAC through the neighbour table.
 func arpMACForIP(arpFile, ip string) (string, bool) {
 	ipToARP, macToIP := parseArpTable(readArpFile(arpFile))

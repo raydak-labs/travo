@@ -78,12 +78,12 @@ function WifiLockoutContent({
         <div className="space-y-3">
           <div className="rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-surface)] p-4">
             <p className="text-sm text-[var(--status-danger-text)]">
-              Your device will lose its connection to this router and will not be able to rejoin.
+              Your device will lose its current Wi-Fi connection to this router.
             </p>
             <p className="mt-2 text-sm text-[var(--status-danger-text)]">
-              <strong>Before you continue:</strong> connect this device to the router with an
-              Ethernet cable. If you have no cable, do not continue — you will need physical access
-              to the router to turn WiFi back on.
+              <strong>Before you continue:</strong> connect over Ethernet, or make sure another
+              router access point is available. Otherwise you will need physical access to restore
+              Wi-Fi.
             </p>
           </div>
 
@@ -99,8 +99,8 @@ function WifiLockoutContent({
               htmlFor="wifi-lockout-acknowledge"
               className="text-sm font-medium text-gray-900 dark:text-white"
             >
-              I am not connected over WiFi, or I accept that this will disconnect me and leave me
-              without a way back in.
+              I accept losing this Wi-Fi connection and will reconnect over Ethernet or another
+              available access point.
             </Label>
           </div>
         </div>

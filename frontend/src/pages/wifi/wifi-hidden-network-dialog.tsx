@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { useWifiConnect } from '@/hooks/use-wifi';
+import { useWifiConnectLockout } from '@/hooks/use-wifi';
 import {
   wifiHiddenNetworkFormSchema,
   type WifiHiddenNetworkFormValues,
@@ -21,7 +21,7 @@ import { WifiHiddenNetworkDialogForm } from './wifi-hidden-network-dialog-form';
 export function WifiHiddenNetworkDialog() {
   const [open, setOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const connectMutation = useWifiConnect();
+  const { mutation: connectMutation, connect, lockoutDialog } = useWifiConnectLockout();
 
   const {
     register,
@@ -51,7 +51,7 @@ export function WifiHiddenNetworkDialog() {
   }
 
   const onValidSubmit = (data: WifiHiddenNetworkFormValues) => {
-    connectMutation.mutate(
+    connect(
       {
         ssid: data.ssid.trim(),
         password: data.password,
@@ -116,6 +116,7 @@ export function WifiHiddenNetworkDialog() {
           />
         </DialogContent>
       </Dialog>
+      {lockoutDialog}
     </>
   );
 }

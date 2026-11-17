@@ -149,7 +149,7 @@ func registerWifi(api *API, d *Dependencies) {
 	get(api, "/api/v1/wifi/scan", "WiFiScan", "Scan for networks (SSID, signal, encryption, band)",
 		func(context.Context, *none) (*Body[[]models.WifiScanResult], error) { return replyOrFail(svc.Scan()) })
 	post(api, "/api/v1/wifi/connect", "WiFiConnect", "Connect the uplink to a network",
-		func(_ context.Context, in *Body[models.WifiConfig]) (*Body[WifiMutationResponse], error) {
+		func(ctx context.Context, in *Body[models.WifiConfig]) (*Body[WifiMutationResponse], error) {
 			cfg := in.Body
 			if strings.TrimSpace(cfg.SSID) == "" {
 				return nil, badRequest("SSID must not be empty")
@@ -157,7 +157,7 @@ func registerWifi(api *API, d *Dependencies) {
 			if cfg.Encryption != "none" && cfg.Password != "" && len(cfg.Password) < 8 {
 				return nil, badRequest("password must be at least 8 characters for WPA networks")
 			}
-			apply, err := svc.Connect(cfg)
+			apply, err := svc.ConnectWithLockout(cfg, lockout(ctx, cfg.AcknowledgeLockout))
 			if errors.Is(err, wifi.ErrPasswordRequiredForNewSTA) || errors.Is(err, wifi.ErrEncryptionRequiredForNewSTA) {
 				return nil, badRequest(ErrInvalidRequestBody + ": " + err.Error())
 			}

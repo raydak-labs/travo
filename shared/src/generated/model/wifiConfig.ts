@@ -7,6 +7,7 @@
  */
 
 export interface WifiConfig {
+  acknowledge_lockout?: boolean;
   band?: string;
   channel?: number;
   encryption?: string;

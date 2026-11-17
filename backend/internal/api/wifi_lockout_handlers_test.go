@@ -493,22 +493,29 @@ func TestGuardRefusal_IsNotAboutTheConfigAlone(t *testing.T) {
 	}
 }
 
-// Connect moves the uplink onto the 5 GHz radio, which carries default_radio1,
-// so that access point goes. The other one has to be left up, or the caller who
-// cannot be proven wired has no way back into the router.
-func TestWifiConnect_KeepsAnAccessPointUpForAnUnclassifiedCaller(t *testing.T) {
+// An unclassified caller may be using default_radio1, which Connect disables.
+// It must acknowledge first; the acknowledged split still leaves the other AP up.
+func TestWifiConnect_UnclassifiedCallerMustAcknowledgeButKeepsOtherAP(t *testing.T) {
 	app := fiber.New()
 	svc, u := serviceForFixture(t, "br-lan", nil)
 	registerWifi(NewAPI(app), &Dependencies{Wifi: svc})
 	before := enabledAPs(t, u)
 
-	// The uplink moves to the 5 GHz radio, the split path's usual target.
-	resp, body := postFromIP(t, app, "/api/v1/wifi/connect", map[string]any{
+	request := map[string]any{
 		"ssid": "Cafe-WiFi", "band": "5g", "encryption": "psk2", "password": "cafepass1",
-	})
+	}
+	resp, body := postFromIP(t, app, "/api/v1/wifi/connect", request)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("unacknowledged connect answered %d, want 409: %s", resp.StatusCode, body)
+	}
+	if got := codeOf(t, body); got != wifi.LockoutErrorCode {
+		t.Errorf("code = %q, want %q", got, wifi.LockoutErrorCode)
+	}
 
+	request["acknowledge_lockout"] = true
+	resp, body = postFromIP(t, app, "/api/v1/wifi/connect", request)
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("connect answered %d: %s", resp.StatusCode, body)
+		t.Fatalf("acknowledged connect answered %d: %s", resp.StatusCode, body)
 	}
 	assertNotLockoutRefusal(t, body)
 	if got := uplinkRadio(t, u); got != "radio1" {

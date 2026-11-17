@@ -240,21 +240,35 @@ func parseStationMACs(output string) map[string]struct{} {
 // this answer can be wrong; the caller below narrows that by treating an
 // unreadable radio as unprovable rather than as wired.
 func apStationMACs(cmd platform.CommandRunner) map[string]struct{} {
+	byInterface, _ := apStationInterfaces(cmd)
 	macs := make(map[string]struct{})
+	for mac := range byInterface {
+		macs[mac] = struct{}{}
+	}
+	return macs
+}
+
+// apStationInterfaces maps associated client MACs to their AP ifname. The
+// boolean is false when any station dump could not be read, so callers can
+// distinguish "not associated" from "association state unavailable".
+func apStationInterfaces(cmd platform.CommandRunner) (map[string]string, bool) {
+	byInterface := make(map[string]string)
+	complete := true
 	iwDev, err := cmd.Run("iw", "dev")
 	if err != nil {
-		return macs
+		return byInterface, false
 	}
 	for _, iface := range parseIwDev(string(iwDev)) {
 		dump, err := cmd.Run("iw", "dev", iface, "station", "dump")
 		if err != nil {
+			complete = false
 			continue
 		}
 		for mac := range parseStationMACs(string(dump)) {
-			macs[mac] = struct{}{}
+			byInterface[mac] = iface
 		}
 	}
-	return macs
+	return byInterface, complete
 }
 
 // parseIfaceIPv4Prefixes extracts an interface's IPv4 prefixes from one entry of

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useWifiScan, useWifiConnect } from '@/hooks/use-wifi';
+import { useWifiScan, useWifiConnectLockout } from '@/hooks/use-wifi';
 import { SetupWifiNetworkList } from '@/pages/setup/setup-wifi-network-list';
 import { setupWifiFormSchema, type SetupWifiFormValues } from '@/pages/setup/setup-schema';
 import { WifiStepIntro } from '@/pages/setup/wifi-step-intro';
@@ -11,7 +11,7 @@ import { WifiStepPasswordField } from '@/pages/setup/wifi-step-password-field';
 
 export function WifiStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const { data: networks, isLoading: scanning, refetch: rescan } = useWifiScan();
-  const connectMutation = useWifiConnect();
+  const { mutation: connectMutation, connect, lockoutDialog } = useWifiConnectLockout();
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -34,7 +34,7 @@ export function WifiStep({ onNext, onBack }: { onNext: () => void; onBack: () =>
   const selectedNetwork = networks?.find((n) => n.ssid === selectedSsid);
 
   const onConnect = (data: SetupWifiFormValues) => {
-    connectMutation.mutate(
+    connect(
       {
         ssid: data.selectedSsid.trim(),
         password: data.wifiPassword,
@@ -94,6 +94,7 @@ export function WifiStep({ onNext, onBack }: { onNext: () => void; onBack: () =>
       >
         Skip for now
       </button>
+      {lockoutDialog}
     </div>
   );
 }
