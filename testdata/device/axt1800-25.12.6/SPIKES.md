@@ -143,3 +143,24 @@ transaction guard remained. The temporary listener was stopped after testing.
 Mixed WPA2/WPA3 was not tested. The AP lockout-refusal case is not applicable
 to Join because it does not edit APs. `mise run check` passed with unchanged
 limits (WiFi chunk 5,210 bytes gzip).
+
+## VPN kill switch firewall (#89), 2026-11-17
+
+AXT1800 25.12.6 over Ethernet, uplink STA `wwan`, operator WireGuard profile already in
+`network.wg0` (one peer, `allowed_ips=0.0.0.0/0`, `route_allowed_ips=1`). Lock held,
+`uci export firewall`/`network` saved before and restored byte for byte after (cmp), wg0
+back to `disabled=1`. The LAN client was a laptop on `br-lan` bound to its router-facing NIC
+(`curl --interface`); egress addresses compared by hash only.
+
+- Stock firewall (zones `lan`, `wan` with `wan wan6 wwan`, forwarding lan -> wan), wg0
+  enabled, handshake within 1 s, kernel `default dev wg0`: the LAN client had NO internet.
+  wg0 is in no zone, so fw4 rejects lan -> wg0 forwards. The router itself was online.
+- Added zone `travo_vpn` (network wg0, masq, mtu_fix) and forwarding `travo_vpn_lan`
+  exactly as `vpnkill.VPNZone()` writes them: `forward_lan` gained
+  `jump accept_to_travo_vpn`; the LAN client egressed with the VPN address.
+- Added rule `travo_killswitch_wan` (src lan, dest wan, proto all, REJECT): fw4 placed
+  `jump reject_to_wan` FIRST in `forward_lan`, before `accept_to_wan`. Tunnel up: LAN
+  egress still via VPN. `ifdown wg0` removed every default route (device-facts §1); after
+  `ifup wwan` the kernel default used the STA and the router was online, but the LAN
+  client stayed blocked and the rule counter increased. The admin UI answered 200.
+- Deleted the rule only: LAN egress returned via the uplink address.
