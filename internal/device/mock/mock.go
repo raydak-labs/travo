@@ -33,6 +33,9 @@ type Device struct {
 	staLinkIndex       int
 	wirelessChanged    bool
 	DefaultRoute       bool
+	// RenewErr makes RenewLease fail; renews records the interfaces renewed.
+	RenewErr error
+	renews   []string
 	// AccountsErr makes every Accounts call fail (shadow unreadable).
 	AccountsErr error
 	// ServiceErr makes every ServiceAction fail; ServiceActions records "name action".

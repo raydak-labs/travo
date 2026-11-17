@@ -87,7 +87,11 @@ export type ApplyStatus = {
     version?: string;
 };
 
-export type BypassStatus = {
+export type CaptiveState = {
+    /**
+     * blocked: an earlier renew is unproven; renewing again is its retry
+     */
+    dhcp_renew: 'available' | 'not_applicable' | 'blocked';
     /**
      * The captive DNS layer is on the stack
      */
@@ -119,7 +123,7 @@ export type DnsVerification = {
 
 export type DashboardConnectivity = {
     active_interface: string | null;
-    captive: BypassStatus;
+    captive: CaptiveState;
     carrier: boolean | null;
     internet: 'online' | 'offline' | 'captive' | 'unknown';
     /**
@@ -717,6 +721,39 @@ export type GetSessionResponses = {
 };
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type RenewCaptiveDhcpData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/captive/dhcp-renew';
+};
+
+export type RenewCaptiveDhcpErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type RenewCaptiveDhcpError = RenewCaptiveDhcpErrors[keyof RenewCaptiveDhcpErrors];
+
+export type RenewCaptiveDhcpResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type RenewCaptiveDhcpResponse = RenewCaptiveDhcpResponses[keyof RenewCaptiveDhcpResponses];
 
 export type EnableCaptiveDnsBypassData = {
     body?: never;

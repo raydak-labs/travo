@@ -7,6 +7,7 @@ export function captiveCardVisible(info: DashboardConnectivity): boolean {
     info.internet === 'captive' ||
     info.captive.dns_bypass ||
     info.captive.pending ||
+    info.captive.dhcp_renew === 'blocked' ||
     (info.carrier === true && info.internet === 'offline')
   );
 }
@@ -29,5 +30,18 @@ export function captiveError(code: string | undefined): string {
       return m.captive_error_foreign_staged();
     default:
       return m.captive_error_failed();
+  }
+}
+
+export function renewError(code: string | undefined): string {
+  switch (code) {
+    case 'captive_renew_not_applicable':
+      return m.captive_error_renew_not_applicable();
+    case 'captive_renew_busy':
+      return m.captive_error_renew_busy();
+    case 'captive_renew_unproven':
+      return m.captive_error_renew_unproven();
+    default:
+      return m.captive_error_renew_failed();
   }
 }

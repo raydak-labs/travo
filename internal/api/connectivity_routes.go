@@ -13,7 +13,13 @@ import (
 // DashboardConnectivity is the probe result plus the captive assist state the card acts on.
 type DashboardConnectivity struct {
 	connectivity.Status
-	Captive captive.BypassStatus `json:"captive"`
+	Captive CaptiveState `json:"captive"`
+}
+
+// CaptiveState is what the hotel card can offer: the DNS bypass and the wwan DHCP renew.
+type CaptiveState struct {
+	captive.BypassStatus
+	DHCPRenew captive.RenewState `json:"dhcp_renew" enum:"available,not_applicable,blocked" doc:"blocked: an earlier renew is unproven; renewing again is its retry"`
 }
 
 type connectivityOutput struct {
@@ -31,7 +37,11 @@ func (s *server) getDashboardConnectivity(ctx context.Context, _ *struct{}) (*co
 		out.Status = s.Connectivity.Status(ctx)
 	}
 	if s.Captive != nil {
-		out.Captive = s.Captive.Status()
+		out.Captive.BypassStatus = s.Captive.Status()
+	}
+	out.Captive.DHCPRenew = captive.RenewNotApplicable
+	if s.CaptiveRenew != nil {
+		out.Captive.DHCPRenew = s.CaptiveRenew.Availability(ctx, out.Status)
 	}
 	return &connectivityOutput{Body: out}, nil
 }

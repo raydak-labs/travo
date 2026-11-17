@@ -30,7 +30,13 @@ function dashboard(status: LoadStatus, data: Snapshot | undefined) {
   dashboardEvents.connectivity.status = status;
   dashboardEvents.connectivity.data = data && {
     ...data,
-    captive: { dns_bypass: false, pending: false, restore_in_seconds: null, ...data.captive },
+    captive: {
+      dns_bypass: false,
+      pending: false,
+      restore_in_seconds: null,
+      dhcp_renew: 'not_applicable',
+      ...data.captive,
+    },
   };
   return render(Dashboard, { props: { events: dashboardEvents as never } }).body;
 }
@@ -159,5 +165,24 @@ describe('Dashboard connectivity', () => {
     expect(body).toContain('Retry DNS restore');
     expect(body).not.toContain('Use hotel DNS for 5 min');
     expect(body).not.toContain('Restore DNS now');
+  });
+
+  it('offers the wwan renew only when the daemon says it applies', () => {
+    const snapshot = {
+      active_interface: 'phy0-sta0',
+      carrier: true,
+      internet: 'captive',
+      portal_url: null,
+    } as const;
+    expect(dashboard({ state: 'ready' }, snapshot)).not.toContain('Renew hotel connection');
+    expect(
+      dashboard({ state: 'ready' }, { ...snapshot, captive: { dhcp_renew: 'available' } }),
+    ).toContain('Renew hotel connection');
+    const blocked = dashboard(
+      { state: 'ready' },
+      { ...snapshot, internet: 'online', captive: { dhcp_renew: 'blocked' } },
+    );
+    expect(blocked).toContain('An earlier renew could not prove');
+    expect(blocked).toContain('Retry renew');
   });
 });

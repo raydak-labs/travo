@@ -1,8 +1,13 @@
 <script lang="ts">
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import { type DashboardConnectivity, enableCaptiveDnsBypass, restoreCaptiveDns } from '../api/gen';
-import { captiveError, formatCountdown } from '../captive';
+import {
+  type DashboardConnectivity,
+  enableCaptiveDnsBypass,
+  renewCaptiveDhcp,
+  restoreCaptiveDns,
+} from '../api/gen';
+import { captiveError, formatCountdown, renewError } from '../captive';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import Status from '../ui/Status.svelte';
@@ -13,15 +18,23 @@ let { info, refresh }: { info: DashboardConnectivity; refresh: () => void } = $p
 let busy = $state(false);
 let error = $state('');
 
-async function run(action: () => Promise<{ data?: unknown; error?: { code?: string } }>) {
+let notice = $state('');
+
+async function run(
+  action: () => Promise<{ data?: unknown; error?: { code?: string } }>,
+  describe = captiveError,
+  done = '',
+) {
   if (busy) return;
   busy = true;
   error = '';
+  notice = '';
   try {
     const response = await action();
-    if (!response.data) error = captiveError(response.error?.code);
+    if (response.data) notice = done;
+    else error = describe(response.error?.code);
   } catch {
-    error = captiveError(undefined);
+    error = describe(undefined);
   } finally {
     busy = false;
     refresh();
@@ -48,6 +61,9 @@ async function run(action: () => Promise<{ data?: unknown; error?: { code?: stri
           : m.captive_dns_restores_in({ time: formatCountdown(info.captive.restore_in_seconds) })}
       </p>
     {/if}
+    {#if info.captive.dhcp_renew === 'blocked'}
+      <Status kind="warn">{m.captive_renew_blocked()}</Status>
+    {/if}
     <div class="flex flex-wrap gap-2">
       {#if info.portal_url}
         <Button size="sm" href={info.portal_url} target="_blank" rel="noopener noreferrer">
@@ -67,7 +83,13 @@ async function run(action: () => Promise<{ data?: unknown; error?: { code?: stri
           {m.captive_dns_bypass()}
         </Button>
       {/if}
+      {#if info.captive.dhcp_renew !== 'not_applicable'}
+        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => renewCaptiveDhcp(), renewError, m.captive_renew_done())}>
+          {info.captive.dhcp_renew === 'blocked' ? m.captive_renew_retry() : m.captive_renew()}
+        </Button>
+      {/if}
     </div>
+    {#if notice}<p>{notice}</p>{/if}
     {#if error}<Alert class="text-danger">{error}</Alert>{/if}
   </div>
 </Card>

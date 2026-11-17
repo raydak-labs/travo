@@ -8,6 +8,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/blackdark-org/travo-greenfield/internal/captive"
+	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 )
@@ -19,6 +20,12 @@ type CaptiveAssist interface {
 	Status() captive.BypassStatus
 }
 
+// CaptiveRenewer is the guarded wwan DHCP renew (internal/captive).
+type CaptiveRenewer interface {
+	Renew(context.Context) error
+	Availability(context.Context, connectivity.Status) captive.RenewState
+}
+
 type okOutput struct {
 	Body okBody
 }
@@ -28,6 +35,28 @@ func (s *server) registerCaptive(a huma.API) {
 		"Resolve through the uplink's DNS for 5 minutes so a hotel portal can load", "captive", 409, 503), a, s.enableCaptiveDNSBypass)
 	register(s, false, op("restoreCaptiveDNS", http.MethodPost, "/api/v1/captive/dns-restore",
 		"End the captive DNS bypass now", "captive", 409, 503), a, s.restoreCaptiveDNS)
+	register(s, false, op("renewCaptiveDHCP", http.MethodPost, "/api/v1/captive/dhcp-renew",
+		"Renew the wwan DHCP lease for a hotel portal", "captive", 409, 503), a, s.renewCaptiveDHCP)
+}
+
+func (s *server) renewCaptiveDHCP(ctx context.Context, _ *struct{}) (*okOutput, error) {
+	if s.CaptiveRenew == nil {
+		return nil, captiveUnavailable()
+	}
+	err := s.CaptiveRenew.Renew(ctx)
+	switch {
+	case errors.Is(err, captive.ErrRenewNotApplicable):
+		return nil, fail(409, "captive_renew_not_applicable", "Renewing applies only to a WiFi uplink without internet")
+	case errors.Is(err, captive.ErrRenewBusy):
+		return nil, fail(409, "captive_renew_busy", "A renew is already running")
+	case errors.Is(err, captive.ErrRenewUnproven):
+		return nil, fail(503, "captive_renew_unproven", "The uplink did not come back after the renew")
+	case err != nil:
+		return nil, fail(503, "captive_renew_failed", "The DHCP renew failed")
+	}
+	out := &okOutput{}
+	out.Body.Status = "ok"
+	return out, nil
 }
 
 func (s *server) enableCaptiveDNSBypass(ctx context.Context, _ *struct{}) (*okOutput, error) {

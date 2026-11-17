@@ -88,6 +88,7 @@ type Deps struct {
 	Connectivity ConnectivityReader
 	// Captive is the portal DNS bypass; nil answers 503 captive_unavailable.
 	Captive      CaptiveAssist
+	CaptiveRenew CaptiveRenewer
 	WiFi         WiFiService
 	WiFiJoin     WiFiJoiner
 	WiFiProfiles WiFiProfileService

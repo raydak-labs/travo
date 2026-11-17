@@ -143,6 +143,12 @@ type ReleaseVerifier interface {
 	VerifyRelease(ctx context.Context, manifest, signature, key string) error
 }
 
+// LeaseRenewer asks netifd to renew a logical interface's DHCP lease
+// (`ubus call network.interface.<name> renew`). It never takes the interface down.
+type LeaseRenewer interface {
+	RenewLease(ctx context.Context, logical string) error
+}
+
 // WireGuardControl changes netifd state inside a guarded tunnel transaction.
 type WireGuardControl interface {
 	ReloadNetwork(context.Context) error

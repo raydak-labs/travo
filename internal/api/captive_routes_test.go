@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/blackdark-org/travo-greenfield/internal/captive"
@@ -84,10 +85,59 @@ func TestCaptiveUnavailableAndDashboardState(t *testing.T) {
 	if got.Code != 200 || json.Unmarshal(got.Body.Bytes(), &body) != nil {
 		t.Fatal(got.Code, got.Body)
 	}
-	if string(body["internet"]) != `"captive"` || string(body["captive"]) != `{"dns_bypass":true,"restore_in_seconds":42,"pending":false}` {
+	if string(body["internet"]) != `"captive"` || string(body["captive"]) != `{"dns_bypass":true,"restore_in_seconds":42,"pending":false,"dhcp_renew":"not_applicable"}` {
 		t.Fatalf("body %s", got.Body)
 	}
 	if len(fake.calls) != 0 {
 		t.Fatal("GET mutated", fake.calls)
+	}
+}
+
+type fakeRenew struct {
+	err   error
+	calls int
+	state captive.RenewState
+	seen  connectivity.Status
+}
+
+func (f *fakeRenew) Renew(context.Context) error { f.calls++; return f.err }
+func (f *fakeRenew) Availability(_ context.Context, st connectivity.Status) captive.RenewState {
+	f.seen = st
+	return f.state
+}
+
+func TestCaptiveDHCPRenewRoute(t *testing.T) {
+	fake := &fakeRenew{state: captive.RenewAvailable}
+	snapshot := &connectivitySnapshot{Internet: connectivity.Captive}
+	e := newEnvWithDashboard(t, nil, nil, snapshot, func(d *Deps) { d.CaptiveRenew = fake })
+	const path = "/api/v1/captive/dhcp-renew"
+	if got := e.do(req{method: "POST", path: path}); got.Code != 401 {
+		t.Fatal(got.Code)
+	}
+	cookie, csrf := e.login()
+	got := e.do(req{method: "POST", path: path, cookie: cookie, csrf: csrf})
+	if got.Code != 200 || fake.calls != 1 {
+		t.Fatal(got.Code, got.Body)
+	}
+	for _, tc := range []struct {
+		err  error
+		code int
+		want string
+	}{
+		{captive.ErrRenewNotApplicable, 409, "captive_renew_not_applicable"},
+		{captive.ErrRenewBusy, 409, "captive_renew_busy"},
+		{fmt.Errorf("%w (guard kept)", captive.ErrRenewUnproven), 503, "captive_renew_unproven"},
+		{errors.New("guard write failed"), 503, "captive_renew_failed"},
+	} {
+		fake.err = tc.err
+		got := e.do(req{method: "POST", path: path, cookie: cookie, csrf: csrf})
+		if got.Code != tc.code || bodyField(t, got, "code") != tc.want {
+			t.Fatal(tc.err, got.Code, got.Body)
+		}
+	}
+	calls := fake.calls
+	got = e.do(req{method: "GET", path: "/api/v1/dashboard/connectivity", cookie: cookie})
+	if got.Code != 200 || !strings.Contains(got.Body.String(), `"dhcp_renew":"available"`) || fake.calls != calls || fake.seen.Internet != connectivity.Captive {
+		t.Fatal(got.Code, got.Body, fake.calls)
 	}
 }

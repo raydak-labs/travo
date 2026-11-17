@@ -174,6 +174,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 	}
 	var connection api.ConnectivityReader
 	var captiveAssist api.CaptiveAssist
+	var captiveRenew api.CaptiveRenewer
 	// One DNS layer stack for every feature (ADR 0010); applies invalidate the shared probe.
 	dnsLayers := &dnslayer.Service{Device: deps.Device, Guards: deps.Guards, Apply: deps.Txn,
 		RecordPath: filepath.Join(deps.Paths.State, "dns-layers.json")}
@@ -187,6 +188,9 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		bypass := captive.NewBypass(dnsLayers, deps.Device, routes, clock.Now)
 		captiveAssist = bypass
 		workers.Go("captive-dns-restore", lifecycle.Every(15*time.Second, bypass.Tick))
+		if lease, ok := deps.Device.(device.LeaseRenewer); ok {
+			captiveRenew = captive.NewRenewer(deps.Guards, deps.Device, lease, routes, shared, clock.Now, captive.Sleep)
+		}
 	}
 	backup, _ := deps.Device.(device.ConfigBackupper)
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))
@@ -285,6 +289,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		Updates:       updates,
 		Connectivity:  connection,
 		Captive:       captiveAssist,
+		CaptiveRenew:  captiveRenew,
 		WiFi:          wireless,
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,
