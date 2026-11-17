@@ -203,7 +203,7 @@ const tunnelStates = {
           {#if snapshot.stale}<Status kind="stale">{m.load_stale()}</Status>{/if}
         </div>
         {#if snapshot.handshake_age_seconds !== null}
-          <p class="mt-2 text-muted">{m.vpn_handshake_age({ age: formatUptime(snapshot.handshake_age_seconds) })}</p>
+          <p class="mt-2 text-muted-foreground">{m.vpn_handshake_age({ age: formatUptime(snapshot.handshake_age_seconds) })}</p>
         {/if}
       {/if}
     </LoadState>
@@ -235,7 +235,7 @@ const tunnelStates = {
     <LoadState status={profiles.status} retry={profiles.retry}>
       {#if profiles.data}
         {#if profiles.data.profiles.length === 0}
-          <p class="text-muted">{m.vpn_no_profiles()}</p>
+          <p class="text-muted-foreground">{m.vpn_no_profiles()}</p>
         {:else}
           <ul class="space-y-3">
             {#each profiles.data.profiles as profile (profile.id)}
@@ -243,7 +243,7 @@ const tunnelStates = {
                 <span class="break-all">{profile.name}</span>
                 <div class="flex flex-wrap items-center gap-2">
                   {#if profile.id === profiles.data.selected_id}
-                    <span class="text-muted">{m.vpn_selected()}</span>
+                    <span class="text-muted-foreground">{m.vpn_selected()}</span>
                   {:else}
                     <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('select', profile.id)}>{m.vpn_select()}</Button>
                   {/if}

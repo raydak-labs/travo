@@ -14,7 +14,7 @@ let {
 </script>
 
 {#snippet accessPoints(aps: AccessPoint[])}
-  <ul class="mb-3 space-y-1 pl-4 text-sm text-muted">
+  <ul class="mb-3 space-y-1 pl-4 text-sm text-muted-foreground">
     {#each aps as ap, index (accessPointKey(ap, index))}
       <li>
         <span class="break-all">{ap.bssid}</span> · {bandLabel(ap.band)} · {m.wifi_channel({ channel: ap.channel })} · {signalLabel(ap.signal_dbm)} · {securityLabel(ap.security)}
@@ -29,7 +29,7 @@ let {
       <Collapsible.Trigger class="flex cursor-pointer flex-wrap items-center gap-2">
         <span class="break-all font-medium">{network.ssid}</span>
         <Status kind="info">{bandsBadge(network.bands)}</Status>
-        <span class="text-sm text-muted">{signalLabel(network.best_signal_dbm)} · {securityLabel(network.security)}</span>
+        <span class="text-sm text-muted-foreground">{signalLabel(network.best_signal_dbm)} · {securityLabel(network.security)}</span>
       </Collapsible.Trigger><Collapsible.Content forceMount>
       {@render accessPoints(network.access_points)}
     </Collapsible.Content></Collapsible.Root>
@@ -45,7 +45,7 @@ let {
   {/each}
 
   {#if result.networks.length === 0 && result.hidden.length === 0 && result.radios.every((radio) => radio.status === 'ok')}
-    <p class="text-muted">{m.wifi_no_networks()}</p>
+    <p class="text-muted-foreground">{m.wifi_no_networks()}</p>
   {/if}
 
   <div class="mt-2 space-y-2">

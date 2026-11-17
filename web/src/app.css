@@ -58,7 +58,6 @@
   --color-surface: var(--surface);
   --color-border: var(--border);
   --color-fg: var(--text);
-  --color-muted: var(--text-muted);
   --color-accent: var(--accent);
   --color-accent-contrast: var(--accent-contrast);
 }

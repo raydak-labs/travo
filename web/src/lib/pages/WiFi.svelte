@@ -268,7 +268,7 @@ async function scan() {
       {#if scanData}
         <WiFiScanList result={scanData} join={(network) => { joinTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null; selected = network; }} {busy} />
       {:else}
-        <p class="text-muted">{m.wifi_scan_idle()}</p>
+        <p class="text-muted-foreground">{m.wifi_scan_idle()}</p>
       {/if}
     </LoadState>
     {#if scanStatus.state !== 'error'}

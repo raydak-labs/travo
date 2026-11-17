@@ -138,7 +138,7 @@ $effect(() => {
                 ><Icon aria-hidden="true" size={18} />{item.label()}</Button
               >
             {:else}
-              <span class="flex items-center gap-3 rounded-md px-3 py-2 text-muted"
+              <span class="flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground"
                 ><Icon aria-hidden="true" size={18} />{item.label()}</span
               >
             {/if}

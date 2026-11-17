@@ -45,9 +45,9 @@ function formatRate(rate: number | null): string {
         {@const info = connectivity.data}
         {@const internet = internetStatus[info.internet]}
         <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-          <dt class="text-muted">{m.dashboard_active_uplink()}</dt>
+          <dt class="text-muted-foreground">{m.dashboard_active_uplink()}</dt>
           <dd class="break-all">{info.active_interface ?? m.dashboard_connectivity_unknown()}</dd>
-          <dt class="text-muted">{m.dashboard_carrier()}</dt>
+          <dt class="text-muted-foreground">{m.dashboard_carrier()}</dt>
           <dd>
             {#if info.carrier === null}
               <Status kind="neutral">{m.dashboard_connectivity_unknown()}</Status>
@@ -57,7 +57,7 @@ function formatRate(rate: number | null): string {
               <Status kind="danger">{m.dashboard_carrier_down()}</Status>
             {/if}
           </dd>
-          <dt class="text-muted">{m.dashboard_internet()}</dt>
+          <dt class="text-muted-foreground">{m.dashboard_internet()}</dt>
           <dd><Status kind={internet.kind}>{internet.label()}</Status></dd>
         </dl>
         {#if connectivity.status.state === 'ready'}
@@ -78,7 +78,7 @@ function formatRate(rate: number | null): string {
   <Card title={m.dashboard_daemon()}>
     <LoadState status={health.status} retry={health.retry}>
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
-        <dt class="text-muted">{m.dashboard_status()}</dt>
+        <dt class="text-muted-foreground">{m.dashboard_status()}</dt>
         <dd><Status kind="ok">{m.status_ok()}</Status></dd>
       </dl>
     </LoadState>
@@ -89,9 +89,9 @@ function formatRate(rate: number | null): string {
       {#if resources.data}
         {@const info = resources.data}
         <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-          <dt class="text-muted">{m.dashboard_cpu_load()}</dt>
+          <dt class="text-muted-foreground">{m.dashboard_cpu_load()}</dt>
           <dd>{formatLoad([info.load[0]])}</dd>
-          <dt class="text-muted">{m.system_memory()}</dt>
+          <dt class="text-muted-foreground">{m.system_memory()}</dt>
           <dd>
             {#if info.memory.total_bytes === 0}
               <Status kind="neutral">{m.dashboard_unavailable()}</Status>
@@ -102,9 +102,9 @@ function formatRate(rate: number | null): string {
               })}
             {/if}
           </dd>
-          <dt class="text-muted">{m.system_uptime()}</dt>
+          <dt class="text-muted-foreground">{m.system_uptime()}</dt>
           <dd>{formatUptime(info.uptime_seconds)}</dd>
-          <dt class="text-muted">{m.dashboard_version()}</dt>
+          <dt class="text-muted-foreground">{m.dashboard_version()}</dt>
           <dd class="break-all">{info.app.version}</dd>
         </dl>
         {#if resources.status.state === 'ready'}
@@ -123,7 +123,7 @@ function formatRate(rate: number | null): string {
     <LoadState status={throughput.status} retry={throughput.retry} stale={throughput.data !== undefined}>
       {#if throughput.data?.interfaces.length}
         <Table.Root class="w-full table-fixed text-left">
-          <Table.Header class="text-muted">
+          <Table.Header class="text-muted-foreground">
             <Table.Row>
               <Table.Head scope="col" class="font-normal">{m.dashboard_interface()}</Table.Head>
               <Table.Head scope="col" class="text-right font-normal">{m.dashboard_rx()}</Table.Head>
@@ -141,7 +141,7 @@ function formatRate(rate: number | null): string {
           </Table.Body>
         </Table.Root>
       {:else}
-        <p class="text-muted">{m.dashboard_no_interfaces()}</p>
+        <p class="text-muted-foreground">{m.dashboard_no_interfaces()}</p>
       {/if}
     </LoadState>
   </Card>

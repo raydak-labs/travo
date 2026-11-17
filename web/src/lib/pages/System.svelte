@@ -132,35 +132,35 @@ async function logout() {
       {#if info.data}
         {@const d = info.data}
         <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
-          <dt class="text-muted">{m.system_model()}</dt>
+          <dt class="text-muted-foreground">{m.system_model()}</dt>
           <dd>{d.model}</dd>
-          <dt class="text-muted">{m.system_hostname()}</dt>
+          <dt class="text-muted-foreground">{m.system_hostname()}</dt>
           <dd>{d.hostname}</dd>
-          <dt class="text-muted">{m.system_openwrt()}</dt>
-          <dd>{d.openwrt} <span class="text-muted">{d.revision}</span></dd>
-          <dt class="text-muted">{m.system_kernel()}</dt>
+          <dt class="text-muted-foreground">{m.system_openwrt()}</dt>
+          <dd>{d.openwrt} <span class="text-muted-foreground">{d.revision}</span></dd>
+          <dt class="text-muted-foreground">{m.system_kernel()}</dt>
           <dd>{d.kernel}</dd>
-          <dt class="text-muted">{m.system_uptime()}</dt>
+          <dt class="text-muted-foreground">{m.system_uptime()}</dt>
           <dd>{formatUptime(d.uptime_seconds)}</dd>
-          <dt class="text-muted">{m.system_load()}</dt>
+          <dt class="text-muted-foreground">{m.system_load()}</dt>
           <dd>{formatLoad(d.load)}</dd>
-          <dt class="text-muted">{m.system_memory()}</dt>
+          <dt class="text-muted-foreground">{m.system_memory()}</dt>
           <dd>
             {m.system_used_of({
               used: formatBytes(d.memory.total_bytes - d.memory.available_bytes),
               total: formatBytes(d.memory.total_bytes),
             })}
           </dd>
-          <dt class="text-muted">{m.system_storage()}</dt>
+          <dt class="text-muted-foreground">{m.system_storage()}</dt>
           <dd>
             {m.system_used_of({
               used: formatBytes(d.storage.total_bytes - d.storage.available_bytes),
               total: formatBytes(d.storage.total_bytes),
             })}
           </dd>
-          <dt class="text-muted">{m.system_app_version()}</dt>
+          <dt class="text-muted-foreground">{m.system_app_version()}</dt>
           <dd>{d.app.version}</dd>
-          <dt class="text-muted">{m.system_build_time()}</dt>
+          <dt class="text-muted-foreground">{m.system_build_time()}</dt>
           <dd>{d.app.build_time || '—'}</dd>
         </dl>
       {/if}

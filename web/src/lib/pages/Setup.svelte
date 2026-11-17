@@ -36,7 +36,7 @@ async function submit(event?: SubmitEvent) {
 
 <Card title={m.setup_title()}>
   <form class="flex flex-col gap-4" onsubmit={submit}>
-    <p class="text-muted">{m.setup_body()}</p>
+    <p class="text-muted-foreground">{m.setup_body()}</p>
     <PasswordField
       id="setup-password"
       label={m.setup_password()}

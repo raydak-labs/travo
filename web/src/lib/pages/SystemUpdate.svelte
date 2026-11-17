@@ -148,7 +148,7 @@ onMount(() => {
 
 <Card title={m.update_title()}>
   <div class="flex flex-wrap items-center gap-3">
-    <p aria-live="polite" class="text-muted">
+    <p aria-live="polite" class="text-muted-foreground">
       {#if pending}
         {m.update_checking()}
       {:else if result?.status === 'available'}
@@ -180,7 +180,7 @@ onMount(() => {
   </div>
   <div aria-live="polite">
     {#if verifying || stage?.status === 'verifying'}
-      <p class="mt-2 text-muted">{m.update_verifying()}</p>
+      <p class="mt-2 text-muted-foreground">{m.update_verifying()}</p>
     {:else if stage?.status === 'verified' && stage.version}
       <p class="mt-2">{m.update_verified({ version: stage.version })}</p>
     {/if}
