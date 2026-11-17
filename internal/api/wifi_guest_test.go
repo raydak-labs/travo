@@ -8,6 +8,7 @@ import (
 
 	"github.com/blackdark-org/travo-greenfield/internal/lockout"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
 	"github.com/blackdark-org/travo-greenfield/internal/wifi"
 )
 
@@ -45,6 +46,7 @@ func TestWiFiGuestRoutes(t *testing.T) {
 		{wifi.ValidationError{Code: "wifi_key_required"}, 400, "wifi_key_required"},
 		{wifi.ErrGuestOverlap, 409, "wifi_guest_subnet_overlap"},
 		{wifi.ErrGuestConflict, 409, "wifi_guest_conflict"},
+		{vpnkill.ErrUnsupported, 409, "vpn_killswitch_unsupported"},
 		{wifi.ErrNoGuestRadio, 409, "wifi_no_free_radio"},
 		{wifi.ErrRadioInUse, 409, "wifi_radio_in_use"},
 		{lockout.ErrLockoutRisk, 409, "wifi_lockout_risk"},

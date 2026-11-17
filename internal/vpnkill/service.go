@@ -140,10 +140,10 @@ func (s *Service) write(ctx context.Context, x device.Section) error {
 	return writeSection(ctx, s.UCI, x)
 }
 
-// ZoneMissing reports whether the VPN zone or its lan forwarding is absent or differs.
-// A foreign section on one of their names is ErrUnsupported.
+// ZoneMissing reports whether the VPN zone or one of its forwardings is absent or differs,
+// or a guest forwarding outlived the guest zone. A foreign section on an owned name is ErrUnsupported.
 func ZoneMissing(current []device.Section) (bool, error) {
-	want := VPNZone()
+	want := VPNZone(current)
 	if err := checkOwnedTypes(current, want); err != nil {
 		return false, err
 	}
@@ -153,13 +153,22 @@ func ZoneMissing(current []device.Section) (bool, error) {
 			return true, nil
 		}
 	}
-	return false, nil
+	return staleGuestForward(current), nil
 }
 
-// StageZone (re)writes the VPN zone and lan forwarding, nothing else. The caller holds the
+func staleGuestForward(current []device.Section) bool {
+	return !HasGuestZone(current) && slices.ContainsFunc(current, func(x device.Section) bool { return x.Name == GuestForward })
+}
+
+// StageZone (re)writes the VPN zone and its forwardings, nothing else. The caller holds the
 // firewall lock inside its transaction (wg0 enable stages it with the tunnel).
 func StageZone(ctx context.Context, uci device.UCI, current []device.Section) error {
-	for _, w := range VPNZone() {
+	if staleGuestForward(current) {
+		if err := uci.DeleteSection(ctx, "firewall", GuestForward); err != nil {
+			return err
+		}
+	}
+	for _, w := range VPNZone(current) {
 		if slices.ContainsFunc(current, func(x device.Section) bool { return x.Name == w.Name }) {
 			if err := uci.DeleteSection(ctx, "firewall", w.Name); err != nil {
 				return err

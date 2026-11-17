@@ -306,3 +306,28 @@ func TestEnableAddsOnlyMissingZoneToRunningTunnel(t *testing.T) {
 		t.Fatalf("firewall-only change must not restart wg0: %v", err)
 	}
 }
+
+// Guest clients use the tunnel like LAN when the Travo guest zone exists (#89).
+func TestEnableForwardsTheGuestZone(t *testing.T) {
+	s, d, _ := splitService(t, "disabled")
+	s.profiles = enableProfile(t)
+	ctx := context.Background()
+	// The zone shape internal/wifi planGuest writes.
+	if err := d.SetType(ctx, "firewall", "guest", "zone"); err != nil {
+		t.Fatal(err)
+	}
+	for option, value := range map[string]string{"name": "guest", "network": "guest", "input": "REJECT", "output": "ACCEPT", "forward": "REJECT"} {
+		if err := d.Set(ctx, "firewall", "guest", option, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := d.Commit(ctx, "firewall"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Set(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if !firewallHas(t, d, "travo_vpn_guest") || firewallHas(t, d, "travo_killswitch_guest_wan") {
+		t.Fatal("want the guest forwarding, no kill switch rule")
+	}
+}

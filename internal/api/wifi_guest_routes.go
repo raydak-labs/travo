@@ -10,6 +10,7 @@ import (
 
 	"github.com/blackdark-org/travo-greenfield/internal/lockout"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
 	"github.com/blackdark-org/travo-greenfield/internal/wifi"
 )
 
@@ -62,6 +63,8 @@ func (s *server) setWiFiGuest(ctx context.Context, in *setGuestInput) (*txnOutpu
 		return nil, fail(http.StatusConflict, "wifi_guest_subnet_overlap", "The guest subnet overlaps another network")
 	case errors.Is(err, wifi.ErrGuestConflict):
 		return nil, fail(http.StatusConflict, "wifi_guest_conflict", "An existing guest configuration is not managed here")
+	case errors.Is(err, vpnkill.ErrUnsupported): // the kill switch is on but cannot cover the guest zone
+		return nil, fail(http.StatusConflict, "vpn_killswitch_unsupported", vpnkill.ErrUnsupported.Error())
 	case errors.Is(err, wifi.ErrNoGuestRadio):
 		return nil, fail(http.StatusConflict, "wifi_no_free_radio", "No radio can carry the guest access point")
 	case errors.Is(err, wifi.ErrRadioInUse):

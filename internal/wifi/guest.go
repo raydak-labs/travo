@@ -3,6 +3,7 @@ package wifi
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/netip"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/lockout"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
 )
 
 // Guest AP layout (invariants §10): own subnet, own zone, no access to lan or the admin.
@@ -177,6 +179,9 @@ func planGuest(c guestConfigs, live []facts.Interface, req GuestRequest) (writes
 	w.section(c.firewall, "firewall", "guest_wan", "forwarding", [][2]string{{"src", guestName}, {"dest", "wan"}})
 	w.section(c.firewall, "firewall", "guest_dhcp", "rule", [][2]string{{"name", "Allow-Guest-DHCP"}, {"src", guestName}, {"proto", "udp"}, {"dest_port", "67-68"}, {"family", "ipv4"}, {"target", "ACCEPT"}})
 	w.section(c.firewall, "firewall", "guest_dns", "rule", [][2]string{{"name", "Allow-Guest-DNS"}, {"src", guestName}, {"proto", "tcp udp"}, {"dest_port", "53"}, {"target", "ACCEPT"}})
+	if err := w.vpnGuest(c.firewall); err != nil {
+		return nil, nil, nil, err
+	}
 	encryption := "psk2"
 	if existing >= 0 && req.Key == "" && c.wireless[existing].Options["key"] == "" {
 		encryption = "none"
@@ -187,6 +192,31 @@ func planGuest(c guestConfigs, live []facts.Interface, req GuestRequest) (writes
 	}
 	w.section(c.wireless, "wireless", guestName, "wifi-iface", [][2]string{{"disabled", map[bool]string{true: "0", false: "1"}[req.Enabled]}})
 	return w.writes, before, after, nil
+}
+
+// vpnGuest extends the tunnel and kill switch to the guest zone in the same transaction
+// (invariants §11): with the tunnel zone present guests forward into travo_vpn, with the kill
+// switch on they get its REJECT rules, so guest_wan never leaks while the switch is on.
+func (p *planner) vpnGuest(firewall []device.Section) error {
+	projected := firewall
+	if !vpnkill.HasGuestZone(firewall) {
+		projected = append(slices.Clone(firewall), device.Section{Name: guestName, Type: "zone", Options: map[string]string{"name": guestName}})
+	}
+	owned, err := vpnkill.GuestSections(projected)
+	if err != nil {
+		return err
+	}
+	for _, x := range owned {
+		if i := slices.IndexFunc(firewall, func(s device.Section) bool { return s.Name == x.Name }); i >= 0 && firewall[i].Type != x.Type {
+			return ErrGuestConflict // never repurpose a foreign section on a Travo-owned name
+		}
+		var options [][2]string
+		for _, k := range slices.Sorted(maps.Keys(x.Options)) {
+			options = append(options, [2]string{k, x.Options[k]})
+		}
+		p.section(firewall, "firewall", x.Name, x.Type, options)
+	}
+	return nil
 }
 
 // planner emits set-if-different writes, creating a named section when absent, so a
