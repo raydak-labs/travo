@@ -164,3 +164,17 @@ back to `disabled=1`. The LAN client was a laptop on `br-lan` bound to its route
   `ifup wwan` the kernel default used the STA and the router was online, but the LAN
   client stayed blocked and the rule counter increased. The admin UI answered 200.
 - Deleted the rule only: LAN egress returned via the uplink address.
+
+## WireGuard split tunnel UCI shape (#90), 2026-11-17
+
+Same session and restore as the kill switch spike above. Starting from a connected full
+tunnel, I set every `wireguard_wg0` peer to `route_allowed_ips=0` and added
+`network.travo_split_<n>` route sections (`interface=wg0`, `target=<a.b.c.d>/32`) for the
+echo service and both profile resolvers, as `vpntunnel.SetSplit` stages them, then ran
+`reload_config`, `ifdown wg0` and `ifup wg0`. The handshake came back within 1 s, and
+`ip -4 route show dev wg0` listed the three /32 routes (netifd accepts CIDR in `target`).
+No default route remained, so leaving full mode dropped the uplink default (device-facts §1).
+After `ifup wwan` the default used the STA. The LAN client reached the echo service with the
+VPN address, and other sites answered (HTTP 204) via the uplink. With
+`travo_killswitch_wan` added, the echo service still answered through the tunnel and other
+sites were blocked.

@@ -73,6 +73,16 @@ func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
 		if err := checkPeerNames(current, desired[1:]); err != nil {
 			return err
 		}
+		split, err := currentSplit(current)
+		if err != nil {
+			return err
+		}
+		if len(split) > 0 { // the split selection survives a profile (re)apply
+			desired = withRouteAll(desired, "0")
+			if matches(current, desired, wasEnabled) {
+				return txn.ErrNoChanges
+			}
+		}
 
 		proof.started = s.now().Unix()
 		proof.wasEnabled = wasEnabled

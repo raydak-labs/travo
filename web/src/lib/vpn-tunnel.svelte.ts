@@ -28,6 +28,30 @@ export function tunnelRefusal(code: string | undefined): { message?: string; err
   }
 }
 
+/** Splits the routes textarea into prefixes: one per line or comma, blanks dropped. */
+export function parseRoutes(text: string): string[] {
+  return text
+    .split(/[\s,]+/)
+    .map((route) => route.trim())
+    .filter((route) => route !== '');
+}
+
+/** Maps a refused POST /vpn/split to its message. */
+export function splitRefusal(code: string | undefined): { message?: string; error?: string } {
+  switch (code) {
+    case 'validation':
+      return { error: m.vpn_split_invalid() };
+    case 'vpn_profile_required':
+      return { error: m.vpn_split_profile_required() };
+    case 'vpn_no_change':
+      return { message: m.vpn_split_no_change() };
+    case 'transaction_pending':
+      return { error: m.vpn_tunnel_busy() };
+    default:
+      return { error: m.vpn_split_failed() };
+  }
+}
+
 /** Maps a refused POST /vpn/killswitch to its message. */
 export function killSwitchRefusal(code: string | undefined): { message?: string; error?: string } {
   switch (code) {

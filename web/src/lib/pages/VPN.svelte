@@ -14,6 +14,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { createTunnelControl, tunnelEnabled } from '../vpn-tunnel.svelte';
 import VPNKillSwitchCard from './VPNKillSwitchCard.svelte';
+import VPNSplitCard from './VPNSplitCard.svelte';
 import VPNTunnelPanel from './VPNTunnelPanel.svelte';
 
 const request = new AbortController();
@@ -86,6 +87,8 @@ async function change(action: 'import' | 'select' | 'delete', id = '') {
   </Card>
 
   <VPNKillSwitchCard tunnel={status.data} />
+
+  <VPNSplitCard />
 
   <Card title={m.vpn_saved_profiles()}>
     <LoadState status={profiles.status} retry={profiles.retry}>

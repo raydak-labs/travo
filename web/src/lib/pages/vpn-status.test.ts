@@ -1,7 +1,7 @@
 import { render } from 'svelte/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TunnelStatus } from '../api/gen';
-import { fetchKillSwitch, fetchVpnStatus } from '../api/vpn-status';
+import { fetchKillSwitch, fetchSplit, fetchVpnStatus } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
 import VPN from './VPN.svelte';
 
@@ -42,7 +42,11 @@ describe('VPN tunnel status', () => {
     vi.clearAllMocks();
     tunnel.status = { state: 'ready' };
     createLoader.mockImplementation((fn: unknown) =>
-      fn === fetchVpnStatus ? tunnel : fn === fetchKillSwitch ? kill : profiles,
+      fn === fetchVpnStatus
+        ? tunnel
+        : fn === fetchKillSwitch || fn === fetchSplit
+          ? kill
+          : profiles,
     );
   });
 

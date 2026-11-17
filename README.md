@@ -29,7 +29,7 @@ System can check GitHub for a newer stable release. An automatic attempt occurs 
 
 When System finds a newer release, **Verify package** checks the signed archive and stages it for up to 30 minutes. Verification leaves the installed version running.
 
-Use **VPN** to import and select a WireGuard profile, then enable or disable the tunnel. Confirm the change once the router verifies connectivity, or roll it back. The page also shows the current tunnel state and handshake age. The **Kill switch** (enable it while the tunnel is connected, then confirm) blocks LAN devices from reaching the internet outside the tunnel, also while the tunnel is down or off, until you disable it.
+Use **VPN** to import and select a WireGuard profile, then enable or disable the tunnel. Confirm the change once the router verifies connectivity, or roll it back. The page also shows the current tunnel state and handshake age. **Split tunnel** sends only the IPv4 prefixes you list through the VPN (the profile's DNS servers are added automatically); leave it empty for a full tunnel. The **Kill switch** (enable it while the tunnel is connected, then confirm) blocks LAN devices from reaching the internet outside the tunnel, also while the tunnel is down or off, until you disable it.
 
 **Services** shows AdGuard Home. It installs once after the first Internet connection, listens on loopback only, and becomes the default DNS once it resolves. Start or stop it, turn "default DNS" on or off, and open its own UI through the login-protected port 3001. If AdGuard Home stops answering, DNS falls back to the uplink resolver and the page says so.
 

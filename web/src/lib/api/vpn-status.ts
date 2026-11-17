@@ -1,6 +1,6 @@
 import { m } from '../paraglide/messages.js';
 import { client } from './client';
-import { getVpnKillSwitch, getVpnStatus } from './gen';
+import { getVpnKillSwitch, getVpnSplit, getVpnStatus } from './gen';
 import type { Client } from './gen/client';
 import { APIRequestError } from './request';
 
@@ -18,4 +18,12 @@ export async function fetchKillSwitch(signal?: AbortSignal, requestClient: Clien
     throw new APIRequestError(m.vpn_kill_unavailable(), response?.status);
   }
   return data;
+}
+
+export async function fetchSplit(signal?: AbortSignal, requestClient: Client = client) {
+  const { data, response } = await getVpnSplit({ signal, client: requestClient });
+  if (!data) {
+    throw new APIRequestError(m.vpn_split_unavailable(), response?.status);
+  }
+  return { routes: data.routes ?? [] };
 }

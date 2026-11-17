@@ -195,3 +195,15 @@ func (s *Service) writeOption(ctx context.Context, old, next device.Section, key
 	}
 	return nil
 }
+
+// withRouteAll returns desired with every peer's route_allowed_ips set to value.
+func withRouteAll(desired []device.Section, value string) []device.Section {
+	out := slices.Clone(desired)
+	for i := range out {
+		if out[i].Type == peerType {
+			out[i].Options = maps.Clone(out[i].Options)
+			out[i].Options["route_allowed_ips"] = value
+		}
+	}
+	return out
+}

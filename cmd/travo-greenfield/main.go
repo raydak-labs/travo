@@ -192,6 +192,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))
 	var vpnStatus api.VPNStatusReader
 	var vpnTunnel api.VPNTunnelSetter
+	var vpnSplit api.VPNSplit
 	var vpnKill api.VPNKillSwitch
 	if wg, ok := deps.Device.(device.WireGuardReader); ok {
 		statusStart := time.Now()
@@ -199,7 +200,8 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		control, hasControl := deps.Device.(device.WireGuardControl)
 		routes, hasRoutes := deps.Device.(device.DefaultRouteReader)
 		if hasKeys && hasControl && hasRoutes && deps.Txn != nil {
-			vpnTunnel = vpntunnel.New(deps.Device, keys, deps.Device, control, wg, routes, profiles, deps.Txn, clock.Now)
+			tunnel := vpntunnel.New(deps.Device, keys, deps.Device, control, wg, routes, profiles, deps.Txn, clock.Now)
+			vpnTunnel, vpnSplit = tunnel, tunnel
 		}
 		vpnStatus = vpnstatus.New(deps.Device, deps.Device, wg, profiles, clock.Now, func() time.Duration {
 			return time.Since(statusStart)
@@ -262,6 +264,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		VPNProfiles:   profiles,
 		VPNStatus:     vpnStatus,
 		VPNTunnel:     vpnTunnel,
+		VPNSplit:      vpnSplit,
 		VPNKillSwitch: vpnKill,
 		UpdateApply:   updater,
 		UpdateStage:   updateStage,

@@ -270,6 +270,13 @@ export type SetupInputBody = {
     password: string;
 };
 
+export type SplitBody = {
+    /**
+     * IPv4 prefixes routed through the tunnel; empty = full tunnel
+     */
+    routes: Array<string> | null;
+};
+
 export type StageInputBody = {
     version: string;
 };
@@ -1567,6 +1574,76 @@ export type SelectVpnProfileResponses = {
 };
 
 export type SelectVpnProfileResponse = SelectVpnProfileResponses[keyof SelectVpnProfileResponses];
+
+export type GetVpnSplitData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/split';
+};
+
+export type GetVpnSplitErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetVpnSplitError = GetVpnSplitErrors[keyof GetVpnSplitErrors];
+
+export type GetVpnSplitResponses = {
+    /**
+     * OK
+     */
+    200: SplitBody;
+};
+
+export type GetVpnSplitResponse = GetVpnSplitResponses[keyof GetVpnSplitResponses];
+
+export type SetVpnSplitData = {
+    body: SplitBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/split';
+};
+
+export type SetVpnSplitErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetVpnSplitError = SetVpnSplitErrors[keyof SetVpnSplitErrors];
+
+export type SetVpnSplitResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetVpnSplitResponse = SetVpnSplitResponses[keyof SetVpnSplitResponses];
 
 export type GetVpnStatusData = {
     body?: never;
