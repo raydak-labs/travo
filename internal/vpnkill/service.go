@@ -137,17 +137,53 @@ func checkOwnedTypes(current, want []device.Section) error {
 }
 
 func (s *Service) write(ctx context.Context, x device.Section) error {
-	if err := s.UCI.SetType(ctx, "firewall", x.Name, x.Type); err != nil {
+	return writeSection(ctx, s.UCI, x)
+}
+
+// ZoneMissing reports whether the VPN zone or its lan forwarding is absent or differs.
+// A foreign section on one of their names is ErrUnsupported.
+func ZoneMissing(current []device.Section) (bool, error) {
+	want := VPNZone()
+	if err := checkOwnedTypes(current, want); err != nil {
+		return false, err
+	}
+	for _, w := range want {
+		i := slices.IndexFunc(current, func(x device.Section) bool { return x.Name == w.Name })
+		if i < 0 || !Matches([]device.Section{current[i]}, []device.Section{w}) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// StageZone (re)writes the VPN zone and lan forwarding, nothing else. The caller holds the
+// firewall lock inside its transaction (wg0 enable stages it with the tunnel).
+func StageZone(ctx context.Context, uci device.UCI, current []device.Section) error {
+	for _, w := range VPNZone() {
+		if slices.ContainsFunc(current, func(x device.Section) bool { return x.Name == w.Name }) {
+			if err := uci.DeleteSection(ctx, "firewall", w.Name); err != nil {
+				return err
+			}
+		}
+		if err := writeSection(ctx, uci, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeSection(ctx context.Context, uci device.UCI, x device.Section) error {
+	if err := uci.SetType(ctx, "firewall", x.Name, x.Type); err != nil {
 		return err
 	}
 	for _, k := range slices.Sorted(maps.Keys(x.Options)) {
-		if err := s.UCI.Set(ctx, "firewall", x.Name, k, x.Options[k]); err != nil {
+		if err := uci.Set(ctx, "firewall", x.Name, k, x.Options[k]); err != nil {
 			return err
 		}
 	}
 	for _, k := range slices.Sorted(maps.Keys(x.Lists)) {
 		for _, v := range x.Lists[k] {
-			if err := s.UCI.AddToList(ctx, "firewall", x.Name, k, v); err != nil {
+			if err := uci.AddToList(ctx, "firewall", x.Name, k, v); err != nil {
 				return err
 			}
 		}

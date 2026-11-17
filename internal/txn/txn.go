@@ -136,6 +136,12 @@ func (m *Manager) BeginWireGuard(ctx context.Context, summary string, stage func
 	return m.begin(ctx, summary, []string{"network"}, true, stage, probe)
 }
 
+// BeginWireGuardWith is BeginWireGuard with more configs in the same snapshot and lock set
+// (e.g. firewall for the VPN zone), so one confirm or restore covers them all.
+func (m *Manager) BeginWireGuardWith(ctx context.Context, summary string, extra []string, stage func(context.Context) error, probe Probe) (Status, error) {
+	return m.begin(ctx, summary, append([]string{"network"}, extra...), true, stage, probe)
+}
+
 func (m *Manager) begin(ctx context.Context, summary string, configs []string, restoreWireGuard bool, stage func(context.Context) error, probe Probe) (Status, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

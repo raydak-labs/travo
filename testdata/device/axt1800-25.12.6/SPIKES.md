@@ -178,3 +178,16 @@ After `ifup wwan` the default used the STA. The LAN client reached the echo serv
 VPN address, and other sites answered (HTTP 204) via the uplink. With
 `travo_killswitch_wan` added, the echo service still answered through the tunnel and other
 sites were blocked.
+
+## VPN zone on tunnel enable (#87 follow-up), 2026-11-17
+
+AXT1800 25.12.6, lock held, `uci export firewall`/`network` restored byte for byte after (cmp),
+wg0 back to `disabled=1`, router and LAN egress via the uplink afterwards. Kill switch OFF
+throughout (no `travo_killswitch_*`). The LAN client was bound to its `br-lan` NIC, and egress
+addresses were compared by hash only.
+- wg0 enabled, handshake within 1 s, `default dev wg0`, no `travo_vpn`: LAN client BLOCKED.
+- Added `travo_vpn` + `travo_vpn_lan`, the sections tunnel enable now stages: LAN egress used the
+  VPN address.
+- Deleted both sections: LAN blocked again. Re-adding only the zone (`reload_config`, no wg0
+  restart) restored LAN egress through the VPN. The wg0 link stayed present and the handshake
+  stayed fresh, so the zone-only path does not need a tunnel restart.

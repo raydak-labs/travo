@@ -8,6 +8,7 @@ import (
 
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
 )
 
@@ -22,6 +23,7 @@ type ProfileStore interface {
 
 type Transactions interface {
 	BeginWireGuard(context.Context, string, func(context.Context) error, txn.Probe) (txn.Status, error)
+	BeginWireGuardWith(context.Context, string, []string, func(context.Context) error, txn.Probe) (txn.Status, error)
 }
 
 type Service struct {
@@ -58,17 +60,25 @@ func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
 		return txn.Status{}, errUnavailable
 	}
 	var proof enableProof
-	return s.txns.BeginWireGuard(ctx, "Enable WireGuard tunnel", stageBounded(func(ctx context.Context) error {
+	networkChanged := true
+	// The VPN zone lets LAN clients use wg0 (device-facts §1, #87): it is staged with the
+	// tunnel in one transaction, independent of the kill switch.
+	return s.txns.BeginWireGuardWith(ctx, "Enable WireGuard tunnel", []string{"firewall"}, stageBounded(func(ctx context.Context) error {
 		current, err := s.uci.Show(ctx, "network")
+		if err != nil {
+			return errUnavailable
+		}
+		firewall, err := s.uci.Show(ctx, "firewall")
+		if err != nil {
+			return errUnavailable
+		}
+		zoneMissing, err := vpnkill.ZoneMissing(firewall)
 		if err != nil {
 			return errUnavailable
 		}
 		wasEnabled, err := configuredEnabled(current)
 		if err != nil {
 			return err
-		}
-		if matches(current, desired, wasEnabled) {
-			return txn.ErrNoChanges
 		}
 		if err := checkPeerNames(current, desired[1:]); err != nil {
 			return err
@@ -79,9 +89,18 @@ func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
 		}
 		if len(split) > 0 { // the split selection survives a profile (re)apply
 			desired = withRouteAll(desired, "0")
-			if matches(current, desired, wasEnabled) {
-				return txn.ErrNoChanges
+		}
+		networkChanged = !matches(current, desired, wasEnabled)
+		if !networkChanged && !zoneMissing {
+			return txn.ErrNoChanges
+		}
+		if zoneMissing {
+			if err := vpnkill.StageZone(ctx, s.uci, firewall); err != nil {
+				return errUnavailable
 			}
+		}
+		if !networkChanged {
+			return nil // tunnel already as wanted: only the zone was missing
 		}
 
 		proof.started = s.now().Unix()
@@ -100,6 +119,9 @@ func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
 		}
 		return s.stageEnable(ctx, current, desired)
 	}), func(ctx context.Context) error {
+		if !networkChanged {
+			return nil // a firewall-only change leaves wg0 untouched
+		}
 		return s.proveEnabled(ctx, proof)
 	})
 }
