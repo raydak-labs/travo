@@ -341,7 +341,10 @@ func (s *Service) Migrate(ctx context.Context) error {
 }
 
 // Recover finishes a swap a daemon crash interrupted: with a kept old file it is put back
-// (the next Reconcile migrates again); without one nothing was written or it already finished.
+// (the next Reconcile migrates again). Without one, either a seed was written but AGH not
+// yet restarted, or a migration stopped before writing anything: restarting AGH and
+// proving it answers is right for both, so a seeded config is never left unapplied while
+// the old process serves its wizard. Restart or readiness failure keeps the guard.
 func (s *Service) Recover(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -350,6 +353,12 @@ func (s *Service) Recover(ctx context.Context) error {
 		return err
 	}
 	if _, err := os.Stat(s.Backup); errors.Is(err, os.ErrNotExist) {
+		if err := s.Services.ServiceAction(ctx, Package, "restart"); err != nil {
+			return fmt.Errorf("adguard: restart after interrupted config write: %w (guard %s kept)", err, ConfigGuard)
+		}
+		if err := s.waitReady(ctx); err != nil {
+			return fmt.Errorf("adguard: not answering after interrupted config write: %w (guard %s kept)", err, ConfigGuard)
+		}
 		return s.Guards.Release(ConfigGuard)
 	}
 	return s.restore(ctx, nil)

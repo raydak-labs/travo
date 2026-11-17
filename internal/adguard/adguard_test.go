@@ -292,6 +292,33 @@ func TestMigrationKeepsGuardWhenRestoreFails(t *testing.T) {
 	}
 }
 
+// A daemon stop between writing the seed and restarting AGH leaves the guard without a
+// kept file; Recover must apply the seed before it releases the guard (#169 review).
+func TestRecoverRestartsAGHAfterInterruptedSeed(t *testing.T) {
+	r := newRig(t)
+	r.installed(t, Seed)
+	if err := r.svc.Guards.Acquire(ConfigGuard); err != nil {
+		t.Fatal(err)
+	}
+	r.svc.Ready = func(context.Context) error { return errors.New("connection refused") }
+	if err := r.svc.Recover(context.Background()); err == nil {
+		t.Fatal("want an error while AGH does not answer")
+	}
+	if g := r.guards(t); !slices.Equal(g, []string{ConfigGuard}) {
+		t.Fatalf("guards = %v, want kept", g)
+	}
+	r.svc.Ready = func(context.Context) error { return nil }
+	if err := r.svc.Recover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(r.dev.ServiceActions, []string{"adguardhome restart", "adguardhome restart"}) {
+		t.Fatalf("actions = %v", r.dev.ServiceActions)
+	}
+	if g := r.guards(t); len(g) != 0 {
+		t.Fatalf("guards = %v", g)
+	}
+}
+
 func TestMigrationRefusesUnknownShapeWithoutWriting(t *testing.T) {
 	r := newRig(t)
 	odd := []byte("http:\n  address: \"0.0.0.0:3000\"\n")
