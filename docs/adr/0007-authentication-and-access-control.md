@@ -3,7 +3,7 @@ title: "ADR 0007: Authentication, JWT, and LAN access control"
 description: Authentication and access control: clock-independent sessions, the token revocation set, and the access-control rules around it.
 status: Accepted
 date: 2026-05-14
-updated: 2026-10-04
+updated: 2026-11-17
 tags: [adr, auth, jwt, rpcd, security, openwrt, sessions]
 ---
 
@@ -53,7 +53,14 @@ On device, the administrative password is the **root** password shared with **Lu
 - **Blocklist persistence shipped.** With a store attached (`NewTokenBlocklistWithStore`) revocations are written through to the `blocklist` bucket and reloaded on startup, so a logout or a password change survives a backend restart instead of resurrecting the token for the rest of its 24 h TTL. Only `sha256(token)` (and `sha256(jti)`, under a `jti:` prefix) ever reaches flash — never a raw token. See [ADR 0009](./0009-persistent-store-bbolt.md). This closed the item previously tracked in the auth-hardening plan (removed; see git history).
 - **Password change revokes every session and rotates the caller's token.** `ChangePassword` ends in `rotateSessions()`: every `jti` in the monotonic registry is revoked (and persisted via `BlockJTI`), and a **replacement token** is returned so the operator stays logged in. The policy floor is the named constant `MinPasswordLength = 8` (a `len(newPassword) < 8` request is rejected).
 - **No fallback JWT signing secret.** `randomSecretHex()` returns an error if `crypto/rand` fails instead of degrading to a hard-coded constant, and the caller refuses to start. A predictable HS256 key would let anyone who has read the source forge an admin token, so entropy failure must be fatal, not a default.
-- Remaining transport hardening (**WS token transport** — it still travels in the query string) is tracked in [issue #259](https://github.com/raydak-labs/travo/issues/259).
+- **WebSocket tickets shipped.** `POST /api/v1/ws/ticket` returns a random 256-bit
+  ticket with a 30-second TTL. `TicketStore` hashes the ticket, bounds pending
+  tickets to 1024, and consumes it atomically exactly once. The upgrade carries
+  `travo-ws-ticket.<ticket>` in `Sec-WebSocket-Protocol`; the middleware consumes
+  the ticket before validating and revoking the associated JWT. Query-string
+  `token` is not accepted. The browser discards the response if its session
+  changed during the request. Cookie + CSRF migration remains a separate
+  API-versioning decision.
 
 ### 5. Storage paths
 

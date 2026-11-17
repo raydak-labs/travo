@@ -134,4 +134,5 @@ export type ApiPath =
   | '/api/v1/wifi/saved/:section'
   | '/api/v1/wifi/saved/priority'
   | '/api/v1/wifi/scan'
-  | '/api/v1/wifi/schedule';
+  | '/api/v1/wifi/schedule'
+  | '/api/v1/ws/ticket';

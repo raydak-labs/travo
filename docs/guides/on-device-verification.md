@@ -3,7 +3,7 @@ title: On-device verification
 description: Standing device playbook: what to run, in what order, which defect classes local suites cannot catch, and the multi-WAN failover playbook.
 status: standing — run whenever a change touches wireless, DNS/VPN layering, guards, install or failover
 last-verified-against: 192.168.1.1 (GL.iNet GL-AXT1800, OpenWrt 25.12.3), commit 3634ea6
-updated: 2026-11-14
+updated: 2026-11-17
 tags: [testing, on-device, playbook, failover, mwan3]
 ---
 
@@ -160,7 +160,8 @@ Expected:
 > reachability with GET-only probes first.
 
 Also confirm, in a browser, that live stats keep ticking (the WebSocket must open) and that the
-pre-login clock-recovery path still responds with no token.
+pre-login clock-recovery path still responds with no token. The WebSocket handshake URL must not
+carry `token`; its `travo-ws-ticket.<ticket>` subprotocol must be single-use, with replay rejected.
 
 ---
 

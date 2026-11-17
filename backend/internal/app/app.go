@@ -448,11 +448,14 @@ func New(cfg config.Config, build Build) (*fiber.App, *Lifecycle, error) {
 		})
 	})
 
+	wsTickets := ws.NewTicketStore(0)
+
 	// API routes
 	deps := &api.Dependencies{
 		Auth:           authSvc,
 		Blocklist:      blocklist,
 		RateLimiter:    rateLimiter,
+		WSTickets:      wsTickets,
 		System:         systemSvc,
 		Network:        networkSvc,
 		SQM:            sqmSvc,
@@ -478,9 +481,9 @@ func New(cfg config.Config, build Build) (*fiber.App, *Lifecycle, error) {
 	}
 	api.SetupRoutes(app, deps)
 
-	// WebSocket (with auth from query parameter)
+	// WebSocket (single-use ticket carried as a subprotocol, never a query JWT)
 	hub := ws.NewHub(systemSvc, alertSvc, netWatcher.Ch(), trafficHistory)
-	app.Use("/api/v1/ws", ws.UpgradeMiddleware(authSvc, splitCORSOrigins(cfg.CorsOrigins)))
+	app.Use("/api/v1/ws", ws.UpgradeMiddleware(authSvc, wsTickets, splitCORSOrigins(cfg.CorsOrigins)))
 	app.Get("/api/v1/ws", ws.Handler(hub, authSvc, ws.HandlerOptions{}))
 	hub.Start()
 	alertSvc.Start()

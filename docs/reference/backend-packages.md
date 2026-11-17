@@ -1,7 +1,7 @@
 ---
 title: Backend packages
 description: What each Go package under backend/internal owns and which way the imports go.
-updated: 2026-10-25
+updated: 2026-11-17
 tags: [docs, backend, go, packages]
 ---
 
@@ -15,7 +15,7 @@ else lives under `backend/internal/`.
 | `app`         | Wiring: builds every service, the Fiber app, the routes and the background workers (`app.New`, `app.Lifecycle`)                                                                               |
 | `api`         | HTTP handlers, request validation, the OpenAPI contract                                                                                                                                       |
 | `auth`        | Login, JWT sessions, token blocklist, rate limits, IP allowlist                                                                                                                               |
-| `ws`          | The WebSocket hub that pushes live status                                                                                                                                                     |
+| `ws`          | WebSocket hub and single-use upgrade tickets
 | `network`     | Interfaces, WAN, DHCP, DNS, clients and their classification, port forwards, DDNS, SQM, USB tethering, data usage, traffic history, uptime                                                    |
 | `wifi`        | Radios, access points, uplink STA, repeater, guest WiFi, MAC, schedules, band switching, the lockout guard                                                                                    |
 | `uplink`      | VPN (WireGuard, Tailscale), AdGuard Home DNS and the captive-portal bypass, plus the dnsmasq resolver layer stack they share ([ADR 0001](../adr/0001-dns-vpn-captive-portal-architecture.md)) |

@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WsProvider } from '@/lib/ws-context';
 import { useWebSocket } from '../use-websocket';
 
-vi.mock('@/lib/api-client', () => ({
-  getToken: () => 'test-token',
-  TOKEN_CHANGE_EVENT: 'openwrt-travel-gui:token-change',
-}));
+vi.mock('@/lib/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-client')>();
+  return {
+    ...actual,
+    getToken: () => 'test-token',
+    TOKEN_CHANGE_EVENT: 'openwrt-travel-gui:token-change',
+  };
+});
 
 let mockWsInstance: {
   onopen: ((e: Event) => void) | null;
@@ -61,8 +65,9 @@ const statsMsg = {
 };
 
 describe('useWebSocket (after WsContext migration)', () => {
-  it('accumulates dataPoints when system_stats messages arrive', () => {
+  it('accumulates dataPoints when system_stats messages arrive', async () => {
     const { result } = renderHook(() => useWebSocket(), { wrapper });
+    await waitFor(() => expect(mockWsInstance).toBeDefined());
 
     act(() => {
       mockWsInstance.onmessage?.({
@@ -76,6 +81,7 @@ describe('useWebSocket (after WsContext migration)', () => {
 
   it('clears dataPoints when WS disconnects', async () => {
     const { result } = renderHook(() => useWebSocket(), { wrapper });
+    await waitFor(() => expect(mockWsInstance).toBeDefined());
 
     // Establish connection so connected transitions true → false on close
     act(() => {

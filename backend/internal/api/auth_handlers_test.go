@@ -19,6 +19,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/uci"
 	"github.com/openwrt-travel-gui/backend/internal/uplink"
 	"github.com/openwrt-travel-gui/backend/internal/wifi"
+	"github.com/openwrt-travel-gui/backend/internal/ws"
 )
 
 func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
@@ -65,6 +66,7 @@ func setupTestApp(t *testing.T) (*fiber.App, *Dependencies) {
 		Auth:        authSvc,
 		Blocklist:   blocklist,
 		RateLimiter: rateLimiter,
+		WSTickets:   ws.NewTicketStore(0),
 		System:      systemSvc,
 		Network:     networkSvc,
 		Wifi:        wifiSvc,

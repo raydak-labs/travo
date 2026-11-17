@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createWSTicket } from '@/api/endpoints';
 import { getToken, TOKEN_CHANGE_EVENT } from './api-client';
 
 type MessageHandler = (data: unknown) => void;
@@ -22,6 +23,8 @@ const WsContext = createContext<WsContextValue>({
 });
 
 const RECONNECT_DELAY = 3000;
+const TICKET_REQUEST_TIMEOUT_MS = 5000;
+const TICKET_PROTOCOL_PREFIX = 'travo-ws-ticket.';
 
 export function WsProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
@@ -33,7 +36,9 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
-  const connectRef = useRef<() => void>(() => {});
+  const connectionAttempt = useRef(0);
+  const ticketAbortController = useRef<AbortController | null>(null);
+  const connectRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     const syncToken = () => setToken(getToken());
@@ -72,6 +77,10 @@ export function WsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const teardown = useCallback(() => {
+    // Also invalidate and cancel a ticket request that is still in flight.
+    connectionAttempt.current += 1;
+    ticketAbortController.current?.abort();
+    ticketAbortController.current = null;
     closeSocket();
     setConnected(false);
   }, [closeSocket]);
@@ -81,11 +90,11 @@ export function WsProvider({ children }: { children: ReactNode }) {
     if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
     reconnectTimer.current = setTimeout(() => {
       reconnectTimer.current = null;
-      connectRef.current();
+      void connectRef.current();
     }, RECONNECT_DELAY);
   }, []);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (!mountedRef.current) return;
     const authToken = getToken();
     if (!authToken) {
@@ -94,14 +103,25 @@ export function WsProvider({ children }: { children: ReactNode }) {
       setConnected(false);
       return;
     }
-    // Never run two sockets at once.
+    // Never run two sockets or two ticket exchanges at once.
     teardown();
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/api/v1/ws?token=${encodeURIComponent(authToken)}`;
+    const attempt = ++connectionAttempt.current;
+    const controller = new AbortController();
+    ticketAbortController.current = controller;
+    const ticketTimeout = setTimeout(() => controller.abort(), TICKET_REQUEST_TIMEOUT_MS);
 
     try {
-      const ws = new WebSocket(url);
+      const { ticket } = await createWSTicket({ signal: controller.signal });
+      if (
+        !mountedRef.current ||
+        attempt !== connectionAttempt.current ||
+        getToken() !== authToken
+      ) {
+        return;
+      }
+      const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const url = `${scheme}//${window.location.host}/api/v1/ws`;
+      const ws = new WebSocket(url, [`${TICKET_PROTOCOL_PREFIX}${ticket}`]);
       wsRef.current = ws;
       const isCurrent = () => wsRef.current === ws;
 
@@ -134,7 +154,12 @@ export function WsProvider({ children }: { children: ReactNode }) {
         }
       };
     } catch {
-      scheduleReconnect();
+      if (attempt === connectionAttempt.current) scheduleReconnect();
+    } finally {
+      clearTimeout(ticketTimeout);
+      if (ticketAbortController.current === controller) {
+        ticketAbortController.current = null;
+      }
     }
   }, [scheduleReconnect, teardown]);
 
@@ -145,7 +170,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     if (token) {
-      connectRef.current();
+      void connectRef.current();
     } else {
       // Logged out (or never logged in): drop any socket left over. `connected`
       // is already false here — the cleanup below is what clears it.

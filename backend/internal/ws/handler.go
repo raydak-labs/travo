@@ -12,6 +12,9 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/auth"
 )
 
+const ticketProtocolPrefix = "travo-ws-ticket."
+const sessionTokenKey = "travo_session_token"
+
 // readLimit caps a single inbound frame. The protocol is server → client
 // push; the browser client never sends anything, so a few KiB is generous.
 // Without a limit a single multi-GB frame is buffered on a 128 MB router.
@@ -54,9 +57,9 @@ func (o HandlerOptions) withDefaults() HandlerOptions {
 func Handler(hub *Hub, authSvc *auth.AuthService, opts HandlerOptions) fiber.Handler {
 	opts = opts.withDefaults()
 	return websocket.New(func(c *websocket.Conn) {
-		// The middleware already validated the token; the handler keeps it
-		// so the session can be re-validated while the socket is open.
-		token := c.Query("token")
+		// The middleware already consumed the one-time ticket; the handler keeps
+		// the associated session token for revalidation while the socket is open.
+		token, _ := c.Locals(sessionTokenKey).(string)
 		if token == "" {
 			closeWithPolicyViolation(c, "missing session token")
 			return
@@ -131,12 +134,20 @@ func closeWithPolicyViolation(c *websocket.Conn, reason string) {
 	_ = c.Close()
 }
 
-// UpgradeMiddleware checks if the request is a WebSocket upgrade and validates
-// the JWT token. allowedOrigins is the same list the CORS middleware was built
-// from (cfg.CorsOrigins, split and passed in by the caller), so the two
-// policies cannot disagree; a mismatch would let a UI load and then fail to
-// open a socket. An empty list means same-origin only.
-func UpgradeMiddleware(authSvc *auth.AuthService, allowedOrigins []string) fiber.Handler {
+func ticketUpgradeProtocol(header string) string {
+	for _, protocol := range strings.Split(header, ",") {
+		protocol = strings.TrimSpace(protocol)
+		if strings.HasPrefix(protocol, ticketProtocolPrefix) && len(protocol) > len(ticketProtocolPrefix) {
+			return protocol
+		}
+	}
+	return ""
+}
+
+// UpgradeMiddleware consumes a single-use ticket carried as a WebSocket
+// subprotocol. This keeps the long-lived JWT out of URLs, logs and browser history.
+// Origin policy matches the REST CORS configuration.
+func UpgradeMiddleware(authSvc *auth.AuthService, tickets *TicketStore, allowedOrigins []string) fiber.Handler {
 	origins := normalizeOrigins(allowedOrigins)
 	return func(c fiber.Ctx) error {
 		if !websocket.IsWebSocketUpgrade(c) {
@@ -151,31 +162,38 @@ func UpgradeMiddleware(authSvc *auth.AuthService, allowedOrigins []string) fiber
 			})
 		}
 
-		// Validate JWT from query parameter. NOTE: a query token lands in
-		// access logs, browser history and Referer headers; the frontend
-		// still uses it, so it stays for now and should move to a header or
-		// Sec-WebSocket-Protocol in a follow-up.
-		token := c.Query("token")
-		if token == "" {
+		protocol := ticketUpgradeProtocol(c.Get("Sec-WebSocket-Protocol"))
+		if protocol == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "missing token",
+				"error": "missing WebSocket ticket",
 			})
 		}
-
+		if tickets == nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "WebSocket ticket store unavailable",
+			})
+		}
+		token, ok := tickets.Consume(strings.TrimPrefix(protocol, ticketProtocolPrefix))
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "invalid or expired WebSocket ticket",
+			})
+		}
 		if err := authSvc.ValidateToken(token); err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "invalid token",
 			})
 		}
 
-		// Check blocklist
 		bl := authSvc.Blocklist()
 		if bl != nil && bl.IsBlocked(token) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "token has been revoked",
 			})
 		}
-
+		c.Locals(sessionTokenKey, token)
+		// Browsers require the server to select one offered subprotocol.
+		c.Set("Sec-WebSocket-Protocol", protocol)
 		return c.Next()
 	}
 }

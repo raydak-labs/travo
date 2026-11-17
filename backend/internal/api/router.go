@@ -11,6 +11,7 @@ import (
 	"github.com/openwrt-travel-gui/backend/internal/system"
 	"github.com/openwrt-travel-gui/backend/internal/uplink"
 	"github.com/openwrt-travel-gui/backend/internal/wifi"
+	"github.com/openwrt-travel-gui/backend/internal/ws"
 )
 
 // Dependencies holds all service dependencies for API handlers.
@@ -18,6 +19,7 @@ type Dependencies struct {
 	Auth           *auth.AuthService
 	Blocklist      *auth.TokenBlocklist
 	RateLimiter    *auth.RateLimiter
+	WSTickets      *ws.TicketStore
 	System         *system.Service
 	Network        *network.Service
 	SQM            *network.SQMService
@@ -58,6 +60,7 @@ var PublicRoutes = auth.PublicPaths
 func SetupRoutes(app *fiber.App, deps *Dependencies) *API {
 	api := NewAPI(app)
 	registerAuth(api, deps)
+	registerWS(api, deps)
 	registerSystem(api, deps)
 	registerServices(api, deps.ServiceManager)
 	registerUpdates(api, deps.Updates)
