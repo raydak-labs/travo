@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -75,6 +76,9 @@ func New(o Options) (Deps, error) {
 		mock.SeedConnectivity(dev)
 		mock.SeedWiFi(dev)
 		dev.SetService("adguardhome", false, false) // absent package; the mock install adds it
+		if secs, err := cli.ParseExport("dhcp", string(mock.DHCPExport)); err == nil {
+			_ = dev.Load(context.Background(), "dhcp", secs) // the embedded capture always parses (seed test)
+		}
 		if o.FirstRun {
 			dev.SetPassword("")
 		}

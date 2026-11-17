@@ -248,7 +248,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		}
 	}
 	var adguardSvc api.AdGuard
-	if svc := startAdGuard(ctx, deps, workers, connection); svc != nil {
+	if svc := startAdGuard(ctx, deps, dnsLayers, workers, connection); svc != nil {
 		adguardSvc = svc
 	}
 	h, _ := api.New(api.Deps{

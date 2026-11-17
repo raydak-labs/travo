@@ -49,6 +49,7 @@ type Status struct {
 	Running   bool   `json:"running" doc:"procd reports a running instance"`
 	Loopback  bool   `json:"loopback" doc:"The config binds the admin UI and DNS to loopback only (ADR 0006)"`
 	Busy      bool   `json:"busy" doc:"An install or config change is in progress or was interrupted"`
+	DNSStatus
 	// ConfigError says why the config could not be read as the canonical YAML shape.
 	ConfigError string `json:"config_error,omitempty"`
 }
@@ -66,6 +67,8 @@ type Service struct {
 	Online    func(context.Context) bool
 	// Ready returns nil once AGH's admin API answers on loopback; it waits until ctx ends.
 	Ready func(context.Context) error
+	// DNS owns the `adguard` layer; nil when the daemon has no DNS layer stack.
+	DNS *DNS
 
 	mu sync.Mutex
 }
@@ -78,6 +81,11 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return st, err
 	}
 	st.Busy = busy
+	if s.DNS != nil {
+		if st.DNSStatus, err = s.DNS.Status(); err != nil {
+			return st, err
+		}
+	}
 	v, err := s.Packages.Version(ctx, Package)
 	if errors.Is(err, pkgmgr.ErrNotInstalled) {
 		return st, nil
@@ -131,6 +139,57 @@ func (s *Service) Reconcile(ctx context.Context) error {
 	}
 	if !st.Loopback && st.ConfigError == "" {
 		return s.Migrate(ctx)
+	}
+	return nil
+}
+
+// ErrNoDNS means the daemon runs without a DNS layer stack (no default-DNS toggle).
+var ErrNoDNS = errors.New("DNS layers unavailable")
+
+// SetDefaultDNS is the user's "default DNS" toggle.
+func (s *Service) SetDefaultDNS(ctx context.Context, on bool) error {
+	if s.DNS == nil {
+		return ErrNoDNS
+	}
+	if _, err := s.Packages.Version(ctx, Package); err != nil {
+		return err
+	}
+	return s.DNS.SetDefault(ctx, on)
+}
+
+// SetEnabled is the user's on/off. Off pops the layer BEFORE stopping AGH, so LAN DNS never
+// points at a stopped resolver; on clears that choice and Tick re-adds the layer once AGH resolves.
+func (s *Service) SetEnabled(ctx context.Context, on bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.idle(); err != nil {
+		return err
+	}
+	if _, err := s.Packages.Version(ctx, Package); err != nil {
+		return err
+	}
+	actions := []string{"enable", "start"}
+	if !on {
+		if s.DNS != nil {
+			if err := s.DNS.SetDefault(ctx, false); err != nil {
+				return err
+			}
+		}
+		actions = []string{"stop", "disable"}
+	}
+	for _, a := range actions {
+		if err := s.Services.ServiceAction(ctx, Package, a); err != nil {
+			return fmt.Errorf("%s %s: %w", Package, a, err)
+		}
+	}
+	if !on {
+		return nil
+	}
+	if err := s.waitReady(ctx); err != nil {
+		return fmt.Errorf("%s not answering: %w", Package, err)
+	}
+	if s.DNS != nil {
+		return s.DNS.Allow()
 	}
 	return nil
 }

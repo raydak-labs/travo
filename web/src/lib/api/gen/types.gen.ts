@@ -32,6 +32,14 @@ export type AdGuardStatus = {
      */
     busy: boolean;
     config_error?: string;
+    /**
+     * dnsmasq forwards to AdGuard Home (the adguard DNS layer is active)
+     */
+    default_dns: boolean;
+    /**
+     * Set while the layer is off because AdGuard Home stopped resolving
+     */
+    fail_open_since: string | null;
     installed: boolean;
     /**
      * The config binds the admin UI and DNS to loopback only (ADR 0006)
@@ -45,6 +53,10 @@ export type AdGuardStatus = {
      * Installed package version; empty when absent
      */
     version: string;
+};
+
+export type AdguardToggleInputBody = {
+    enabled: boolean | null;
 };
 
 export type ApiError = {
@@ -417,6 +429,47 @@ export type GetAdGuardResponses = {
 
 export type GetAdGuardResponse = GetAdGuardResponses[keyof GetAdGuardResponses];
 
+export type SetAdGuardDnsData = {
+    body: AdguardToggleInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard/dns';
+};
+
+export type SetAdGuardDnsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetAdGuardDnsError = SetAdGuardDnsErrors[keyof SetAdGuardDnsErrors];
+
+export type SetAdGuardDnsResponses = {
+    /**
+     * OK
+     */
+    200: AdGuardStatus;
+};
+
+export type SetAdGuardDnsResponse = SetAdGuardDnsResponses[keyof SetAdGuardDnsResponses];
+
 export type InstallAdGuardData = {
     body?: never;
     path?: never;
@@ -449,6 +502,47 @@ export type InstallAdGuardResponses = {
 };
 
 export type InstallAdGuardResponse = InstallAdGuardResponses[keyof InstallAdGuardResponses];
+
+export type SetAdGuardServiceData = {
+    body: AdguardToggleInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard/service';
+};
+
+export type SetAdGuardServiceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetAdGuardServiceError = SetAdGuardServiceErrors[keyof SetAdGuardServiceErrors];
+
+export type SetAdGuardServiceResponses = {
+    /**
+     * OK
+     */
+    200: AdGuardStatus;
+};
+
+export type SetAdGuardServiceResponse = SetAdGuardServiceResponses[keyof SetAdGuardServiceResponses];
 
 export type PostLoginData = {
     body: LoginInputBody;
