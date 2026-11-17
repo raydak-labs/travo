@@ -69,6 +69,12 @@ type WiFiGuestEditor interface {
 	SetGuest(context.Context, wifi.GuestRequest) (txn.Status, error)
 }
 
+// WiFiMACEditor reads and applies the uplink STA MAC policy.
+type WiFiMACEditor interface {
+	UplinkMAC(context.Context) (wifi.MACPolicy, error)
+	SetUplinkMAC(context.Context, wifi.MACRequest) (txn.Status, error)
+}
+
 type WiFiService interface {
 	Summary(context.Context) (wifi.Summary, error)
 	Scan(context.Context) (wifi.ScanResult, error)
@@ -114,6 +120,7 @@ type Deps struct {
 	WiFiReconnect WiFiReconnectReader
 	WiFiAPs       WiFiAPEditor
 	WiFiGuest     WiFiGuestEditor
+	WiFiMAC       WiFiMACEditor
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.

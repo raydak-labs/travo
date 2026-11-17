@@ -365,5 +365,16 @@
   "wifi_guest_none": "Not set up",
   "wifi_guest_setup": "Set up guest network",
   "wifi_guest_overlap": "The guest subnet overlaps another network.",
-  "wifi_guest_conflict": "An existing guest configuration is not managed here."
+  "wifi_guest_conflict": "An existing guest configuration is not managed here.",
+  "wifi_mac_title": "Uplink MAC address",
+  "wifi_mac_mode_default": "Factory",
+  "wifi_mac_mode_random": "Random",
+  "wifi_mac_mode_custom": "Custom",
+  "wifi_mac_current": "Policy: {mode}. In use: {mac}",
+  "wifi_mac_clone": "Use this device's MAC",
+  "wifi_mac_custom_label": "Custom MAC",
+  "wifi_mac_set": "Set",
+  "wifi_mac_no_uplink": "Join an uplink first.",
+  "wifi_mac_invalid": "Enter a unicast MAC like 02:11:22:33:44:55.",
+  "wifi_mac_clone_unavailable": "The router does not know this device's MAC. Connect directly and try again."
 }

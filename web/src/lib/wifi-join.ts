@@ -54,6 +54,12 @@ export function joinError(code: string) {
       return m.wifi_guest_overlap();
     case 'wifi_guest_conflict':
       return m.wifi_guest_conflict();
+    case 'wifi_mac_invalid':
+      return m.wifi_mac_invalid();
+    case 'wifi_mac_clone_unavailable':
+      return m.wifi_mac_clone_unavailable();
+    case 'wifi_no_uplink':
+      return m.wifi_mac_no_uplink();
     case 'wifi_ssid_invalid':
       return m.wifi_ssid_invalid();
     case 'wifi_no_change':

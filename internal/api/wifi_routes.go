@@ -23,6 +23,7 @@ func (s *server) registerWiFi(a huma.API) {
 	register(s, false, join, a, s.joinWiFi)
 	s.registerWiFiAPs(a)
 	s.registerWiFiGuest(a)
+	s.registerWiFiMAC(a)
 
 }
 

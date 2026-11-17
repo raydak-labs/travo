@@ -198,6 +198,18 @@ export type LoginInputBody = {
     password: string;
 };
 
+export type MacPolicy = {
+    /**
+     * Custom MAC (custom mode only)
+     */
+    configured?: string;
+    /**
+     * Live STA MAC; null = could not read
+     */
+    effective: string | null;
+    mode: 'default' | 'random' | 'custom';
+};
+
 export type MemoryBody = {
     available_bytes: number;
     total_bytes: number;
@@ -314,6 +326,17 @@ export type SetGuestInputBody = {
      */
     radio?: string;
     ssid: string;
+};
+
+export type SetMacInputBody = {
+    /**
+     * Unicast MAC for custom
+     */
+    macaddr?: string;
+    /**
+     * clone copies the caller's MAC from the neighbour table
+     */
+    mode: 'default' | 'random' | 'custom' | 'clone';
 };
 
 export type SetupInputBody = {
@@ -2381,3 +2404,77 @@ export type GetWiFiScanResponses = {
 };
 
 export type GetWiFiScanResponse = GetWiFiScanResponses[keyof GetWiFiScanResponses];
+
+export type GetWiFiUplinkMacData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/uplink/mac';
+};
+
+export type GetWiFiUplinkMacErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiUplinkMacError = GetWiFiUplinkMacErrors[keyof GetWiFiUplinkMacErrors];
+
+export type GetWiFiUplinkMacResponses = {
+    /**
+     * OK
+     */
+    200: MacPolicy;
+};
+
+export type GetWiFiUplinkMacResponse = GetWiFiUplinkMacResponses[keyof GetWiFiUplinkMacResponses];
+
+export type SetWiFiUplinkMacData = {
+    body: SetMacInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/uplink/mac';
+};
+
+export type SetWiFiUplinkMacErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetWiFiUplinkMacError = SetWiFiUplinkMacErrors[keyof SetWiFiUplinkMacErrors];
+
+export type SetWiFiUplinkMacResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetWiFiUplinkMacResponse = SetWiFiUplinkMacResponses[keyof SetWiFiUplinkMacResponses];

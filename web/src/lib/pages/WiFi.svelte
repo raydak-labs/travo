@@ -39,6 +39,7 @@ import WiFiSummary from './WiFiSummary.svelte';
 
 const joinDialog = lazyPage(() => import('./WiFiJoinDialog.svelte'));
 const accessPoints = lazyPage(() => import('./WiFiAccessPoints.svelte'));
+const uplinkMAC = lazyPage(() => import('./WiFiUplinkMAC.svelte'));
 
 const idle: LoadStatus = { state: 'ready' };
 let {
@@ -106,6 +107,11 @@ function submitJoin(body: JoinWiFiData['body']) {
 
 function selectProfile(profile: WiFiProfileSummary) {
   return submit(profile.ssid, () => selectWifiProfile(profile.id, request.signal));
+}
+
+// A guarded change without lockout risk, e.g. the uplink MAC policy.
+function submitChange(label: string, send: Send) {
+  return submit(label, send, true);
 }
 
 // AP and guest edits: send(acknowledge) builds the request; a lockout refusal offers a resend.
@@ -281,6 +287,12 @@ async function scan() {
     {#if profileError}
       <p class="mt-2 text-sm text-danger" role="alert">{profileError}</p>
     {/if}
+  </Card>
+
+  <Card title={m.wifi_mac_title()}>
+    {#key apVersion}
+      <PageHost load={uplinkMAC} props={{ busy, apply: submitChange }} />
+    {/key}
   </Card>
 
   <Card title={m.wifi_aps_title()}>

@@ -131,7 +131,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Scan: one row per SSID, dual-band badge, per-AP disclosure. Scan must not commit the uplink onto an AP radio.
 - Scan is read-only, one radio at a time, target = first interface ifname else radio name, concurrent requests join the in-flight scan.
 - Wireless scan replies use `TierScan`, not `TierRead`.
-- MAC clone/randomize; per-client MAC policies.
+- MAC clone/randomize; per-client MAC policies. The uplink policy is `macaddr` on the enabled `wwan` STA: absent = default, `random`, or a unicast MAC (clone stores the caller's neighbour-table MAC). The probe needs a new STA kernel link, carrier, the kernel default route via it and the effective MAC from `network.device status`: exact for custom, locally administered for random, universally administered for default (assumes a factory MAC is universally administered; verified per device in the playbook).
 - Radio hardware status is CONFIGURED state, labelled as such.
 - Post-apply probe proves each enabled AP/STA interface individually (see device-facts §2). Failure → rollback. "Could not read netifd" is distinct from "AP not up".
 - AP edit stages SSID, key (via the key writer, never argv) and `disabled` for one AP section in one transaction. Enabling an AP on a radio with an enabled STA → 409 `wifi_radio_in_use`, no write. Only disabling an enabled AP runs the lockout check, with the caller classified from live facts (`network.interface dump`, `ip -j -4 neigh show`, `hostapd.<ifname> get_clients`); any unreadable input classifies Unknown. The probe proves every AP expected enabled individually, the edited AP broadcasting the new SSID (`iwinfo info`), and a disabled AP gone from `network.wireless status`.

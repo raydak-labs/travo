@@ -125,14 +125,16 @@ type Link struct {
 	Present bool
 	Up      bool
 	Carrier bool
+	MAC     string // lower case; empty when the reply has no macaddr
 }
 
 // ParseDeviceStatus requires all three fields; a missing one is "cannot verify".
 func ParseDeviceStatus(b []byte) (Link, error) {
 	var raw struct {
-		Present *bool `json:"present"`
-		Up      *bool `json:"up"`
-		Carrier *bool `json:"carrier"`
+		Present *bool  `json:"present"`
+		Up      *bool  `json:"up"`
+		Carrier *bool  `json:"carrier"`
+		MAC     string `json:"macaddr"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return Link{}, fmt.Errorf("device status: %w", err)
@@ -140,7 +142,7 @@ func ParseDeviceStatus(b []byte) (Link, error) {
 	if raw.Present == nil || raw.Up == nil || raw.Carrier == nil {
 		return Link{}, fmt.Errorf("device status: %w: need present, up, carrier", ErrShape)
 	}
-	return Link{Present: *raw.Present, Up: *raw.Up, Carrier: *raw.Carrier}, nil
+	return Link{Present: *raw.Present, Up: *raw.Up, Carrier: *raw.Carrier, MAC: strings.ToLower(raw.MAC)}, nil
 }
 
 // RadioIface is one entry of network.wireless status.

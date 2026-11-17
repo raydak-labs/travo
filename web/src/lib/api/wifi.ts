@@ -10,12 +10,15 @@ import {
   getWiFiProfiles,
   getWiFiReconnect,
   getWiFiScan,
+  getWiFiUplinkMac,
   type JoinWiFiData,
   joinWiFi,
   reorderWiFiProfiles,
   type SetWiFiGuestData,
+  type SetWiFiUplinkMacData,
   selectWiFiProfile,
   setWiFiGuest,
+  setWiFiUplinkMac,
   type UpdateWiFiAccessPointData,
   updateWiFiAccessPoint,
 } from './gen';
@@ -92,4 +95,16 @@ export async function fetchGuest(signal?: AbortSignal) {
 
 export function updateGuest(body: SetWiFiGuestData['body'], signal?: AbortSignal) {
   return setWiFiGuest({ body, signal });
+}
+
+export async function fetchUplinkMAC(signal?: AbortSignal) {
+  const response = await getWiFiUplinkMac({ signal });
+  if (response.data) return response.data;
+  const code = (response.error as { code?: string } | undefined)?.code;
+  if (code === 'wifi_no_uplink') return undefined;
+  throw new Error(m.wifi_unavailable());
+}
+
+export function updateUplinkMAC(body: SetWiFiUplinkMacData['body'], signal?: AbortSignal) {
+  return setWiFiUplinkMac({ body, signal });
 }
