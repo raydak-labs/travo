@@ -91,6 +91,7 @@ func (f fakeTxns) Rollback(id string) (txn.Status, error) {
 
 type env struct {
 	t     *testing.T
+	deps  Deps
 	h     http.Handler
 	api   huma.API
 	clock *fakeClock
@@ -146,6 +147,7 @@ func newEnvWithDashboard(t *testing.T, backup device.ConfigBackupper, throughput
 	for _, fn := range configure {
 		fn(&deps)
 	}
+	e.deps = deps
 	e.h, e.api = New(deps)
 	return e
 }

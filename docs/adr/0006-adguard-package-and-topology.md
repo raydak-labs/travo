@@ -23,3 +23,7 @@ Verified facts: package 0.107.79-r1, config `/etc/adguardhome/adguardhome.yaml` 
 - **Probe**: a raw UDP query for `travo-<random>.example.com` to `127.0.0.1:5353`, 5 s timeout, every 15 s. NOERROR/NXDOMAIN pass; SERVFAIL, REFUSED and timeouts fail. Ticks are skipped without a kernel default route and while the `captive` layer is active (the portal hides the Internet; captive wins anyway).
 - **Fail-open**: 3 consecutive failures pop the layer and persist `fail_open_since` in `/etc/travo-greenfield/adguard-dns.json`. Re-enable: the user's `POST /api/v1/adguard/dns {"enabled":true}` (needs a passing probe) or 10 minutes of continuously passing probes. A user "off" persists there too and is never undone by the probe.
 - **Default on**: without a user "off", the first passing probe after install pushes the layer (DNS stays at base until then). Turning AGH off pops the layer before `stop`.
+
+## Implementation notes (#134)
+
+- The proxy listens on the daemon's `--listen` host, port 3001 (`--adguard-proxy-listen` overrides, `off` disables; off by default in mock mode). Gate: LAN source and Host check as for the API, a valid `tg_session` cookie (cookies are not port-scoped, so the Travo login carries over), and for unsafe methods an `Origin` equal to the proxy's own origin instead of the CSRF header. The session cookie is stripped before forwarding; the incoming Host is kept. Unauthenticated requests get 401 JSON (no redirect).

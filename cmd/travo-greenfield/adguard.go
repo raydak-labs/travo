@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -16,6 +18,46 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 )
+
+// adguardProxyAddr picks the gated proxy's listener: the explicit flag, else the daemon's
+// host on port 3001 (ADR 0006). Mock mode has no AGH and runs beside dev servers: off
+// unless asked for.
+func adguardProxyAddr(flagValue, listen string, mock bool) string {
+	switch {
+	case flagValue == "off":
+		return ""
+	case flagValue != "":
+		return flagValue
+	case mock:
+		return ""
+	}
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return ""
+	}
+	return net.JoinHostPort(host, "3001")
+}
+
+// serveAdGuardProxy runs the gated AGH proxy until the returned stop is called. A listen
+// failure is logged, not fatal: the admin UI must not depend on AGH.
+func serveAdGuardProxy(addr string, deps api.Deps) (stop func()) {
+	if addr == "" {
+		return func() {}
+	}
+	target, _ := url.Parse(adguard.AdminURL)
+	srv := &http.Server{Addr: addr, Handler: api.NewAdGuardProxy(deps, target), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	go func() {
+		slog.Info("adguard proxy listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Warn("adguard proxy", "err", err)
+		}
+	}()
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	}
+}
 
 // startAdGuard builds the AdGuard Home supervisor, its reconcile worker and the liveness
 // worker that owns the `adguard` DNS layer (ADR 0006, invariants §8).

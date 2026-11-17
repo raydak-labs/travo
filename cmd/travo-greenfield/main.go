@@ -53,6 +53,7 @@ func main() {
 	releaseSource := flag.String("release-source", updatecheck.DefaultSource, "GitHub release source OWNER/REPO or off")
 	worker := flag.Bool("update-worker", false, "internal detached update worker")
 	awaitAck := flag.Bool("update-await-ack", false, "internal worker activation handshake")
+	proxyListen := flag.String("adguard-proxy-listen", "", "AdGuard Home proxy address; empty = --listen host on port 3001, off disables")
 	recoverUpdate := flag.Bool("recover-update", false, "recover an interrupted update locally")
 	flag.Parse()
 	if *worker || *recoverUpdate {
@@ -66,7 +67,7 @@ func main() {
 	if *useMock && !flagGiven("static-dir") {
 		dir = "web/dist"
 	}
-	if err := run(*addr, *useMock, *firstRun, splitList(*hostAllow), dir, *releaseSource); err != nil {
+	if err := run(*addr, *proxyListen, *useMock, *firstRun, splitList(*hostAllow), dir, *releaseSource); err != nil {
 		slog.Error("startup", "err", err)
 		os.Exit(1)
 	}
@@ -115,7 +116,7 @@ func splitList(s string) []string {
 	return out
 }
 
-func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, releaseSource string) error {
+func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, staticDir, releaseSource string) error {
 	if !updatecheck.ValidSource(releaseSource) {
 		return errors.New("invalid release source: expected OWNER/REPO or off")
 	}
@@ -251,7 +252,7 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 	if svc := startAdGuard(ctx, deps, dnsLayers, workers, connection); svc != nil {
 		adguardSvc = svc
 	}
-	h, _ := api.New(api.Deps{
+	apiDeps := api.Deps{
 		DaemonContext: ctx,
 		VPNProfiles:   profiles,
 		VPNStatus:     vpnStatus,
@@ -275,7 +276,10 @@ func run(addr string, useMock, firstRun bool, hostAllow []string, staticDir, rel
 		RouterIPs: provider.RouterIPs, HostAllow: hostAllow,
 		SaveEpoch: func(n uint64) error { return epochfile.Save(deps.Paths.EpochFile(), n) },
 		UI:        uiHandler(staticDir),
-	})
+	}
+	h, _ := api.New(apiDeps)
+	stopProxy := serveAdGuardProxy(adguardProxyAddr(proxyListen, addr, useMock), apiDeps)
+	defer stopProxy()
 	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 
 	drained := make(chan struct{})
