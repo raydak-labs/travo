@@ -138,6 +138,14 @@ export type JoinWiFiInputBody = {
     ssid: string;
 };
 
+export type KillSwitchState = {
+    /**
+     * Kill switch rules are configured
+     */
+    enabled: boolean;
+    zone: boolean;
+};
+
 export type List = {
     profiles: Array<Summary>;
     selected_id: string | null;
@@ -340,6 +348,10 @@ export type UpdateCheckInputBody = {
 export type VpnImportInputBody = {
     config: string;
     name: string;
+};
+
+export type VpnKillSwitchInputBody = {
+    enabled: boolean | null;
 };
 
 export type VpnTunnelInputBody = {
@@ -1325,6 +1337,76 @@ export type RollbackTransactionResponses = {
 };
 
 export type RollbackTransactionResponse = RollbackTransactionResponses[keyof RollbackTransactionResponses];
+
+export type GetVpnKillSwitchData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/killswitch';
+};
+
+export type GetVpnKillSwitchErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetVpnKillSwitchError = GetVpnKillSwitchErrors[keyof GetVpnKillSwitchErrors];
+
+export type GetVpnKillSwitchResponses = {
+    /**
+     * OK
+     */
+    200: KillSwitchState;
+};
+
+export type GetVpnKillSwitchResponse = GetVpnKillSwitchResponses[keyof GetVpnKillSwitchResponses];
+
+export type SetVpnKillSwitchData = {
+    body: VpnKillSwitchInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/vpn/killswitch';
+};
+
+export type SetVpnKillSwitchErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetVpnKillSwitchError = SetVpnKillSwitchErrors[keyof SetVpnKillSwitchErrors];
+
+export type SetVpnKillSwitchResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetVpnKillSwitchResponse = SetVpnKillSwitchResponses[keyof SetVpnKillSwitchResponses];
 
 export type GetVpnProfilesData = {
     body?: never;

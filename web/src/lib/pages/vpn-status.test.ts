@@ -1,11 +1,12 @@
 import { render } from 'svelte/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TunnelStatus } from '../api/gen';
-import { fetchVpnStatus } from '../api/vpn-status';
+import { fetchKillSwitch, fetchVpnStatus } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
 import VPN from './VPN.svelte';
 
-const { createLoader, profiles, tunnel } = vi.hoisted(() => ({
+const { createLoader, kill, profiles, tunnel } = vi.hoisted(() => ({
+  kill: { status: { state: 'loading' }, data: undefined, retry: vi.fn(), stop: vi.fn() },
   createLoader: vi.fn(),
   profiles: {
     status: { state: 'ready' },
@@ -40,7 +41,9 @@ describe('VPN tunnel status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tunnel.status = { state: 'ready' };
-    createLoader.mockImplementation((fn: unknown) => (fn === fetchVpnStatus ? tunnel : profiles));
+    createLoader.mockImplementation((fn: unknown) =>
+      fn === fetchVpnStatus ? tunnel : fn === fetchKillSwitch ? kill : profiles,
+    );
   });
 
   it.each([

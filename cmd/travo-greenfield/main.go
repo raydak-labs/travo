@@ -36,6 +36,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/updatecheck"
 	"github.com/blackdark-org/travo-greenfield/internal/updatestage"
 	"github.com/blackdark-org/travo-greenfield/internal/version"
+	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
 	"github.com/blackdark-org/travo-greenfield/internal/vpntunnel"
@@ -191,6 +192,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))
 	var vpnStatus api.VPNStatusReader
 	var vpnTunnel api.VPNTunnelSetter
+	var vpnKill api.VPNKillSwitch
 	if wg, ok := deps.Device.(device.WireGuardReader); ok {
 		statusStart := time.Now()
 		keys, hasKeys := deps.Device.(device.WireGuardKeyWriter)
@@ -202,6 +204,9 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		vpnStatus = vpnstatus.New(deps.Device, deps.Device, wg, profiles, clock.Now, func() time.Duration {
 			return time.Since(statusStart)
 		})
+		if deps.Txn != nil {
+			vpnKill = &vpnkill.Service{UCI: deps.Device, Tunnel: vpnStatus, Txns: deps.Txn}
+		}
 	}
 	var wireless api.WiFiService
 	var wirelessJoin api.WiFiJoiner
@@ -257,6 +262,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		VPNProfiles:   profiles,
 		VPNStatus:     vpnStatus,
 		VPNTunnel:     vpnTunnel,
+		VPNKillSwitch: vpnKill,
 		UpdateApply:   updater,
 		UpdateStage:   updateStage,
 		Rebooter:      rebooter,

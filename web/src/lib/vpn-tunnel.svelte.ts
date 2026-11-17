@@ -28,11 +28,48 @@ export function tunnelRefusal(code: string | undefined): { message?: string; err
   }
 }
 
+/** Maps a refused POST /vpn/killswitch to its message. */
+export function killSwitchRefusal(code: string | undefined): { message?: string; error?: string } {
+  switch (code) {
+    case 'vpn_not_connected':
+      return { error: m.vpn_kill_not_connected() };
+    case 'vpn_killswitch_unsupported':
+      return { error: m.vpn_kill_unsupported() };
+    case 'vpn_no_change':
+      return { message: m.vpn_kill_no_change() };
+    case 'transaction_pending':
+      return { error: m.vpn_tunnel_busy() };
+    default:
+      return { error: m.vpn_kill_failed() };
+  }
+}
+
+type Submit = (
+  enabled: boolean,
+  signal: AbortSignal,
+) => Promise<{ data?: TxnBody; error?: { code?: string } }>;
+
+export type ToggleOptions = {
+  submit: Submit;
+  refusal: (code: string | undefined) => { message?: string; error?: string };
+  confirmed: () => string;
+  rolledBack: () => string;
+  rollbackFailed: () => string;
+};
+
+const tunnelToggle: ToggleOptions = {
+  submit: (enabled, signal) => setVpnTunnel({ body: { enabled }, signal }),
+  refusal: tunnelRefusal,
+  confirmed: m.vpn_tunnel_confirmed,
+  rolledBack: m.vpn_tunnel_rolled_back,
+  rollbackFailed: m.vpn_tunnel_rollback_failed,
+};
+
 /**
- * One guarded WireGuard toggle: request, poll the transaction, confirm or roll back.
- * `refresh` reloads authoritative tunnel status after every settled outcome.
+ * One guarded toggle (WireGuard tunnel by default): request, poll the transaction, confirm or
+ * roll back. `refresh` reloads authoritative status after every settled outcome.
  */
-export function createTunnelControl(refresh: () => unknown) {
+export function createTunnelControl(refresh: () => unknown, options: ToggleOptions = tunnelToggle) {
   const request = new AbortController();
   let applying = $state(false);
   let settling = $state(false);
@@ -47,9 +84,9 @@ export function createTunnelControl(refresh: () => unknown) {
 
   function accept(result: TxnBody) {
     transaction = result;
-    if (result.state === 'confirmed') message = m.vpn_tunnel_confirmed();
-    if (result.state === 'rolled_back') message = m.vpn_tunnel_rolled_back();
-    if (result.state === 'rollback_failed') error = m.vpn_tunnel_rollback_failed();
+    if (result.state === 'confirmed') message = options.confirmed();
+    if (result.state === 'rolled_back') message = options.rolledBack();
+    if (result.state === 'rollback_failed') error = options.rollbackFailed();
     if (result.state !== 'pending' && result.state !== 'restoring') void refresh();
   }
 
@@ -61,11 +98,11 @@ export function createTunnelControl(refresh: () => unknown) {
     message = '';
     error = '';
     try {
-      const response = await setVpnTunnel({ body: { enabled }, signal: request.signal });
+      const response = await options.submit(enabled, request.signal);
       if (request.signal.aborted) return;
       if (response.data) accept(response.data);
       else {
-        const refusal = tunnelRefusal(response.error?.code);
+        const refusal = options.refusal(response.error?.code);
         message = refusal.message ?? '';
         error = refusal.error ?? '';
         void refresh();
