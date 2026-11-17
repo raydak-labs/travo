@@ -190,15 +190,21 @@ valid_uplink_name() {
 	esac
 }
 
-restore_uplink() {
-	[ -f "$uplink_marker" ] && [ ! -L "$uplink_marker" ] || return 1
+# read_uplink_marker sets uplink_logical and uplink_device from marker $1.
+read_uplink_marker() {
+	[ -f "$1" ] && [ ! -L "$1" ] || return 1
 	{
 		IFS= read -r uplink_logical && IFS= read -r uplink_device
-	} < "$uplink_marker" || return 1
+	} < "$1" || return 1
 	valid_uplink_name "$uplink_logical" && valid_uplink_name "$uplink_device" || return 1
 	[ "$uplink_logical" != wg0 ] && [ "$uplink_device" != wg0 ] && [ "${#uplink_device}" -le 15 ] || return 1
-	printf '%s\n%s\n' "$uplink_logical" "$uplink_device" | cmp -s - "$uplink_marker" || return 1
+	printf '%s\n%s\n' "$uplink_logical" "$uplink_device" | cmp -s - "$1"
+}
 
+# restore_uplink brings the uplink in marker $1 back to the default route, cycling the
+# logical interface once if the route is missing.
+restore_uplink() {
+	read_uplink_marker "$1" || return 1
 	rc=0
 	uplink_default || rc=$?
 	[ "$rc" -ne 0 ] || return 0
@@ -218,6 +224,38 @@ restore_uplink() {
 		[ "$rc" -eq 1 ] || return 1
 	done
 	return 1
+}
+
+# radio_up succeeds when netifd reports radio $1 up and not pending.
+radio_up() {
+	valid_uplink_name "$1" || return 1
+	info=$(ubus -t 3 call network.wireless status 2>/dev/null) || return 1
+	[ "$(printf '%s\n' "$info" | jsonfilter -e "@['$1'].up")" = true ] &&
+		[ "$(printf '%s\n' "$info" | jsonfilter -e "@['$1'].pending")" = false ]
+}
+
+# settle_live waits for the live state the restored configs describe: the default route
+# via the uplink and every radio that was up before (#158). reload_config returns before
+# netifd and hostapd act on it. Best effort: the configs are restored either way.
+settle_live() {
+	settle_uplink=$dir/settle-uplink
+	settle_radios=
+	[ -f "$dir/settle-radios" ] && [ ! -L "$dir/settle-radios" ] && settle_radios=$(cat "$dir/settle-radios")
+	has_uplink=0
+	read_uplink_marker "$settle_uplink" && has_uplink=1
+	[ "$has_uplink" = 1 ] || [ -n "$settle_radios" ] || return 0
+	sleep 2 # procd hands reload_config to netifd after ~1.4 s (device-facts §0)
+	for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do
+		settled=1
+		[ "$has_uplink" = 0 ] || uplink_default || settled=0
+		for radio in $settle_radios; do
+			radio_up "$radio" || settled=0
+		done
+		[ "$settled" = 0 ] || return 0
+		sleep 1
+	done
+	# a STA that is associated but left without a lease (seen on AXT1800) needs one ifup
+	[ "$has_uplink" = 0 ] || restore_uplink "$settle_uplink" || true
 }
 
 # noclobber makes claiming atomic: the first claimant (confirm or another restorer) wins,
@@ -261,8 +299,9 @@ if [ "$status" = restored ] && [ -n "$baseline" ]; then
 fi
 uplink_marker=$dir/restore-uplink
 if [ "$status" = restored ] && { [ -e "$uplink_marker" ] || [ -L "$uplink_marker" ]; }; then
-	{ [ -n "$baseline" ] && restore_uplink; } || status=failed
+	{ [ -n "$baseline" ] && restore_uplink "$uplink_marker"; } || status=failed
 fi
+[ "$status" != restored ] || settle_live
 echo "$status" > "$dir/result.tmp" && mv -f "$dir/result.tmp" "$dir/result"
 sync
 [ "$status" = restored ]

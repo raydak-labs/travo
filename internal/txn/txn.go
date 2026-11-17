@@ -186,6 +186,8 @@ func (m *Manager) begin(ctx context.Context, summary string, configs []string, r
 		if err := m.recordWireGuardBaseline(lctx, id); err != nil {
 			return abort(fmt.Errorf("txn: record wg0 baseline: %w", err))
 		}
+	} else {
+		m.recordSettle(lctx, id, cs)
 	}
 	if err := stage(lctx); err != nil {
 		return abort(fmt.Errorf("txn: stage: %w", err))

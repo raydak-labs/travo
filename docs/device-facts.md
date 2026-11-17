@@ -53,6 +53,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 
 - [HW, AXT1800 25.12.3] rpcd `uci apply` with `rollback:true` snapshots at APPLY time. If the change was already committed, rollback restores the CHANGED config (30 s expired → broken profile still enabled, working uplink disabled). `uci revert` after commit is a no-op.
 - Requirement: snapshot BEFORE the commit; restore explicitly; reload via `uci reload_config` + `network reload`. Never `wifi`.
+- [HW, AXT1800 25.12.6] `reload_config` returns before netifd and hostapd act: after a wireless restore the STA route came back 4–6 s and hostapd's restored config ~2 s after it returned (#158). The watchdog therefore reports `restored` only after the default route via the pre-change uplink and every radio that was up before (`up`, not `pending`) are back, waiting up to ~20 s and cycling the uplink once if it stays without a route. Best effort: a missing route or radio does not turn a config restore into `failed`.
 - rpcd `uci apply/confirm` REQUIRE an rpcd session id that bare ubus CLI cannot supply; login needs the real root password (anonymous login works only with NO root password). Travo does not use them (ADR-0005).
 
 ## 5. Caller classification (lockout)
