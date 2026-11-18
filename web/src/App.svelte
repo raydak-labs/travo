@@ -17,7 +17,7 @@ import { navigate } from './lib/navigate';
 import { lazyPage, pages } from './lib/pages/lazy';
 import PageHost from './lib/pages/PageHost.svelte';
 import { m } from './lib/paraglide/messages.js';
-import { guard, href, type Route } from './lib/router';
+import { guard, href, type Route, section } from './lib/router';
 import { router } from './lib/router.svelte';
 import { session } from './lib/session.svelte';
 import { theme } from './lib/theme.svelte';
@@ -151,7 +151,7 @@ $effect(() => {
             {#if item.route}
               <Button variant="ghost"
                 href={href(item.route)}
-                aria-current={shown === item.route ? 'page' : undefined}
+                aria-current={section(shown) === item.route ? 'page' : undefined}
                 class="w-full justify-start gap-3 text-base font-normal aria-[current=page]:bg-bg aria-[current=page]:font-semibold"
                 ><Icon aria-hidden="true" size={18} />{item.label()}</Button
               >
@@ -255,6 +255,8 @@ $effect(() => {
             <PageHost load={pages.services} />
           {:else if shown === 'system'}
             <PageHost load={pages.system} />
+          {:else if shown === 'system-tokens'}
+            <PageHost load={pages.systemTokens} />
           {:else if shown === 'login'}
             <PageHost load={pages.login} />
           {:else if shown === 'setup'}

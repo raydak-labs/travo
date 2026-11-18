@@ -13,6 +13,7 @@ import { formatBytes, formatLoad, formatUptime } from '../format';
 import { navigate } from '../navigate';
 import { m } from '../paraglide/messages.js';
 import { passwordRulesOk } from '../password-rules';
+import { href } from '../router';
 import { session } from '../session.svelte';
 import { theme } from '../theme.svelte';
 import Card from '../ui/Card.svelte';
@@ -183,6 +184,13 @@ async function logout() {
     {#if backupError}
       <Alert class="status status-danger self-start">{m.system_backup_failed()}</Alert>
     {/if}
+  </Card>
+
+  <Card title={m.tokens_title()}>
+    <p class="text-muted-foreground">{m.tokens_intro()}</p>
+    <div class="mt-3">
+      <Button variant="outline" href={href('system-tokens')}>{m.tokens_open()}</Button>
+    </div>
   </Card>
 
   <Card title={m.reboot_title()}>
