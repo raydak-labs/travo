@@ -91,7 +91,7 @@ func setup(t *testing.T) (*Service, *mock.Device, *fakeTxns) {
 	d.SetLeases(read(t, "with-ap-client/dhcp-leases.txt"))
 	f := &fakeTxns{d: d}
 	dir := t.TempDir()
-	return &Service{UCI: d, Ubus: d, Neigh: d, Leases: d, Kicker: d, Txns: f,
+	return &Service{UCI: d, Ubus: d, Neigh: d, Leases: d, Kicker: d, Reload: d, Txns: f,
 		Guards:  guard.Dir{Path: filepath.Join(dir, "guards"), Now: time.Now},
 		Aliases: &AliasStore{Path: filepath.Join(dir, "clients.json")},
 		Now:     func() time.Time { return now }}, d, f

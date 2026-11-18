@@ -37,11 +37,13 @@ type Guards interface {
 
 // Service reads and changes clients. Every port is required; New-style wiring lives in cmd.
 type Service struct {
-	UCI     device.UCI
-	Ubus    device.Ubus
-	Neigh   device.NeighbourReader
-	Leases  device.DHCPLeaseReader
-	Kicker  device.StationKicker
+	UCI    device.UCI
+	Ubus   device.Ubus
+	Neigh  device.NeighbourReader
+	Leases device.DHCPLeaseReader
+	Kicker device.StationKicker
+	// Reload finishes a dhcp commit whose reload failed (idempotent reload_config).
+	Reload  device.Reloader
 	Txns    Transactions
 	Guards  Guards
 	Aliases *AliasStore
@@ -95,8 +97,9 @@ func (s *Service) leases(ctx context.Context) ([]facts.Lease, error) {
 	return facts.ParseLeases(string(raw))
 }
 
-// lanNeighbours keeps neighbours whose address lies in a non-uplink interface's prefix, so
-// the uplink's gateway and hotel neighbours never show as clients.
+// lanNeighbours keeps neighbours on a non-uplink interface's device (br-lan, br-guest), so the
+// uplink's gateway and hotel neighbours never show as clients, even when a hotel network
+// uses the same prefix as the LAN.
 func (s *Service) lanNeighbours(ctx context.Context) ([]facts.Neighbour, error) {
 	raw, err := s.Ubus.Call(ctx, "network.interface", "dump", nil)
 	if err != nil {
@@ -106,12 +109,10 @@ func (s *Service) lanNeighbours(ctx context.Context) ([]facts.Neighbour, error) 
 	if err != nil {
 		return nil, err
 	}
-	var lan []netip.Prefix
+	var lanDevs []string
 	for _, it := range ifaces {
-		if !slices.Contains(uplinkInterfaces, it.Name) {
-			for _, p := range it.IPv4 {
-				lan = append(lan, p.Masked())
-			}
+		if !slices.Contains(uplinkInterfaces, it.Name) && it.L3Device != "" {
+			lanDevs = append(lanDevs, it.L3Device)
 		}
 	}
 	if raw, err = s.Neigh.Neighbours(ctx); err != nil {
@@ -121,9 +122,7 @@ func (s *Service) lanNeighbours(ctx context.Context) ([]facts.Neighbour, error) 
 	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(all, func(n facts.Neighbour) bool {
-		return !slices.ContainsFunc(lan, func(p netip.Prefix) bool { return p.Contains(n.IP) })
-	}), nil
+	return slices.DeleteFunc(all, func(n facts.Neighbour) bool { return !slices.Contains(lanDevs, n.Dev) }), nil
 }
 
 // stations reads get_clients of every AP in network.wireless status. An AP whose station
@@ -176,16 +175,22 @@ func (s *Service) callerMAC(ctx context.Context, caller netip.Addr) (string, err
 		return "", nil
 	}
 	caller = caller.Unmap()
-	raw, err := s.Neigh.Neighbours(ctx)
+	neigh, err := s.lanNeighbours(ctx)
 	if err != nil {
 		return "", ErrUnavailable
 	}
-	neigh, err := facts.ParseNeighJSON(raw)
-	if err != nil {
-		return "", ErrUnavailable
+	var macs []string
+	for _, n := range neigh {
+		if n.IP == caller && !slices.Contains(macs, n.MAC) {
+			macs = append(macs, n.MAC)
+		}
 	}
-	if at := slices.IndexFunc(neigh, func(n facts.Neighbour) bool { return n.IP == caller }); at >= 0 {
-		return neigh[at].MAC, nil
+	switch len(macs) {
+	case 1:
+		return macs[0], nil
+	case 0:
+	default:
+		return "", ErrUnavailable // two LAN devices claim the caller's address: cannot tell
 	}
 	leases, err := s.leases(ctx)
 	if err != nil {

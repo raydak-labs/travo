@@ -58,7 +58,7 @@ func (s *AliasStore) read() (map[string]string, error) {
 		}
 	}
 	if f.Aliases == nil {
-		f.Aliases = map[string]string{}
+		return nil, ErrStoreCorrupt // null, {} or {"aliases":null}: never read as empty
 	}
 	return f.Aliases, nil
 }

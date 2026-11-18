@@ -19,7 +19,7 @@ func newClients(deps app.Deps) api.Clients {
 	if !hasLeases || !hasNeigh || !hasKicker || deps.Txn == nil {
 		return nil
 	}
-	return &clients.Service{UCI: deps.Device, Ubus: deps.Device, Neigh: neigh, Leases: leases, Kicker: kicker,
+	return &clients.Service{UCI: deps.Device, Ubus: deps.Device, Neigh: neigh, Leases: leases, Kicker: kicker, Reload: deps.Device,
 		Txns: deps.Txn, Guards: deps.Guards, Now: time.Now,
 		Aliases: &clients.AliasStore{Path: filepath.Join(deps.Paths.State, "clients.json")}}
 }

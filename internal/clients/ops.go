@@ -27,23 +27,20 @@ func (s *Service) ListReservations(ctx context.Context) ([]Reservation, error) {
 
 // Reserve stores a DHCP reservation through the direct dhcp path (txn.Apply): dhcp cannot cut
 // the caller off at once; the new address applies on the client's next lease renewal.
-// It returns the stored reservation; an unchanged one writes nothing.
+// It returns the stored reservation. An unchanged one commits nothing but still runs the
+// idempotent reload, so a retry finishes an earlier commit whose reload failed.
 func (s *Service) Reserve(ctx context.Context, req Reservation) (Reservation, error) {
-	network, err := s.UCI.Show(ctx, "network")
-	if err != nil {
-		return Reservation{}, ErrUnavailable
-	}
-	lan, err := LANPrefix(network)
-	if err != nil {
-		return Reservation{}, err
-	}
 	var stored Reservation
-	err = s.Txns.Apply(ctx, []string{"dhcp"}, func(ctx context.Context) error {
+	err := s.Txns.Apply(ctx, []string{"dhcp"}, func(ctx context.Context) error {
+		lan, err := s.committedLAN(ctx)
+		if err != nil {
+			return err
+		}
 		dhcp, err := s.UCI.Show(ctx, "dhcp")
 		if err != nil {
 			return ErrUnavailable
 		}
-		r, err := ValidateReservation(req, lan, Reservations(dhcp))
+		r, err := ValidateReservation(req, lan, dhcp)
 		if err != nil {
 			return err
 		}
@@ -58,7 +55,7 @@ func (s *Service) Reserve(ctx context.Context, req Reservation) (Reservation, er
 		return nil
 	})
 	if errors.Is(err, errUnchanged) {
-		err = nil
+		err = s.reloadLive(ctx)
 	}
 	if err != nil {
 		return Reservation{}, err
@@ -66,8 +63,39 @@ func (s *Service) Reserve(ctx context.Context, req Reservation) (Reservation, er
 	return s.find(ctx, stored.MAC)
 }
 
-// errUnchanged aborts Apply before commit when nothing differs (no reload, no dnsmasq restart).
+// errUnchanged aborts Apply before commit when nothing differs.
 var errUnchanged = errors.New("reservation unchanged")
+
+// committedLAN reads the lan prefix, refusing while network has staged changes: uci reads
+// include them, and a reservation must match the committed subnet. The network lock is not
+// held (Apply refuses network), so a commit between this read and the dhcp commit is a
+// residual window (invariants §16).
+func (s *Service) committedLAN(ctx context.Context) (netip.Prefix, error) {
+	pending, err := s.UCI.Pending(ctx, "network")
+	if err != nil {
+		return netip.Prefix{}, ErrUnavailable
+	}
+	if pending {
+		return netip.Prefix{}, txn.ErrForeignStaged
+	}
+	network, err := s.UCI.Show(ctx, "network")
+	if err != nil {
+		return netip.Prefix{}, ErrUnavailable
+	}
+	return LANPrefix(network)
+}
+
+// reloadLive runs reload_config, which procd turns into a no-op when dnsmasq already runs the
+// committed config: a retry finishes an earlier commit whose reload failed.
+func (s *Service) reloadLive(ctx context.Context) error {
+	if s.Reload == nil {
+		return nil
+	}
+	if err := s.Reload.Reload(ctx); err != nil {
+		return fmt.Errorf("reload: %w", err)
+	}
+	return nil
+}
 
 func (s *Service) find(ctx context.Context, mac string) (Reservation, error) {
 	all, err := s.ListReservations(ctx)
@@ -82,19 +110,26 @@ func (s *Service) find(ctx context.Context, mac string) (Reservation, error) {
 	return Reservation{}, ErrReservationNotFound
 }
 
-// Unreserve removes mac from its host section (txn.Apply).
+// Unreserve removes mac from its host section (txn.Apply). An absent reservation still runs
+// the idempotent reload before the 404, so a retry finishes a removal whose reload failed.
 func (s *Service) Unreserve(ctx context.Context, mac string) error {
 	m, ok := NormalizeMAC(mac)
 	if !ok {
 		return &FieldError{"mac", "not a unicast MAC address"}
 	}
-	return s.Txns.Apply(ctx, []string{"dhcp"}, func(ctx context.Context) error {
+	err := s.Txns.Apply(ctx, []string{"dhcp"}, func(ctx context.Context) error {
 		dhcp, err := s.UCI.Show(ctx, "dhcp")
 		if err != nil {
 			return ErrUnavailable
 		}
 		return StageUnreserve(ctx, s.UCI, dhcp, m)
 	})
+	if errors.Is(err, ErrReservationNotFound) {
+		if rerr := s.reloadLive(ctx); rerr != nil {
+			return rerr
+		}
+	}
+	return err
 }
 
 // SetBlocked adds or removes the block rule in a firewall transaction the user confirms.

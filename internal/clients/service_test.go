@@ -56,6 +56,67 @@ func TestListFailsClosedOnACorruptAliasStore(t *testing.T) {
 	}
 }
 
+func TestAliasStoreWithoutAnAliasesObjectIsCorrupt(t *testing.T) {
+	s, _, _ := setup(t)
+	for _, body := range []string{"null", "{}", `{"aliases":null}`} {
+		if err := os.WriteFile(s.Aliases.Path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Aliases.All(); !errors.Is(err, ErrStoreCorrupt) {
+			t.Fatal(body, err)
+		}
+	}
+	if err := os.WriteFile(s.Aliases.Path, []byte(`{"aliases":{}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Aliases.All(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A hotel network on the LAN's prefix: its neighbours sit on the STA device and never count,
+// neither as clients nor as the caller.
+func TestNeighboursOnTheUplinkDeviceAreNeverClients(t *testing.T) {
+	s, d, _ := setup(t)
+	d.SetNeighbours([]byte(`[{"dst":"192.168.1.2","dev":"phy0-sta0","lladdr":"98:9b:cb:c0:3e:60","state":["REACHABLE"]},` +
+		`{"dst":"192.168.1.2","dev":"br-lan","lladdr":"9c:eb:e8:d3:f8:d1","state":["DELAY"]}]`))
+	got, _ := s.List(t.Context())
+	if slices.ContainsFunc(got.Clients, func(c Client) bool { return c.MAC == "98:9b:cb:c0:3e:60" }) {
+		t.Fatalf("%+v", got.Clients)
+	}
+	if _, err := s.SetBlocked(t.Context(), "9c:eb:e8:d3:f8:d1", true, netip.MustParseAddr("192.168.1.2")); !errors.Is(err, ErrIsCaller) {
+		t.Fatal(err)
+	}
+	d.SetNeighbours([]byte(`[{"dst":"192.168.1.2","dev":"br-lan","lladdr":"9c:eb:e8:d3:f8:d1","state":["DELAY"]},` +
+		`{"dst":"192.168.1.2","dev":"br-lan","lladdr":"9c:eb:e8:d3:f8:d2","state":["DELAY"]}]`))
+	if _, err := s.SetBlocked(t.Context(), "22:4e:76:6c:2d:62", true, netip.MustParseAddr("192.168.1.2")); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("ambiguous caller MAC accepted", err)
+	}
+}
+
+func TestReserveRefusesAStagedNetworkAndRetriesTheReload(t *testing.T) {
+	s, d, f := setup(t)
+	if err := d.Set(t.Context(), "network", "lan", "ipaddr", "192.168.2.1/24"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Reserve(t.Context(), Reservation{MAC: "22:4e:76:6c:2d:62", IP: "192.168.2.50"}); !errors.Is(err, txn.ErrForeignStaged) {
+		t.Fatal(err)
+	}
+	if err := d.Revert(t.Context(), "network"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Reserve(t.Context(), Reservation{MAC: "22:4e:76:6c:2d:62", IP: "192.168.1.50"}); err != nil {
+		t.Fatal(err)
+	}
+	before := d.Reloads
+	if _, err := s.Reserve(t.Context(), Reservation{MAC: "22:4e:76:6c:2d:62", IP: "192.168.1.50"}); err != nil || f.applies != 1 || d.Reloads != before+1 {
+		t.Fatal("an unchanged retry must reload without committing", err, f.applies, d.Reloads-before)
+	}
+	if err := s.Unreserve(t.Context(), "aa:bb:cc:00:00:09"); !errors.Is(err, ErrReservationNotFound) || d.Reloads != before+2 {
+		t.Fatal(err, d.Reloads-before)
+	}
+}
+
 func TestAliasRoundTrip(t *testing.T) {
 	s, _, _ := setup(t)
 	if err := s.SetAlias("22:4E:76:6C:2D:62", " Phone "); err != nil {

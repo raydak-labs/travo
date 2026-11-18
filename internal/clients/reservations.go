@@ -41,14 +41,30 @@ type Reservation struct {
 	Section string `json:"-"`
 }
 
-// hostMACs reads a host section's MACs: a list, or an option holding space-separated MACs.
-func hostMACs(s device.Section) []string {
+// hostSelectors reads a host section's raw MAC selectors (exact MACs and dnsmasq wildcards
+// like `00:20:e0:3b:13:*`): a list, or an option holding space-separated values.
+func hostSelectors(s device.Section) []string {
 	raw := slices.Clone(s.Lists["mac"])
 	if v := s.Options["mac"]; v != "" {
 		raw = append(raw, strings.Fields(v)...)
 	}
+	return raw
+}
+
+// exclusiveTo reports whether every selector of s is exactly mac: only then may Travo edit
+// or delete the section without changing what another device gets.
+func exclusiveTo(s device.Section, mac string) bool {
+	sel := hostSelectors(s)
+	return len(sel) > 0 && !slices.ContainsFunc(sel, func(v string) bool {
+		m, ok := NormalizeMAC(v)
+		return !ok || m != mac
+	})
+}
+
+// hostMACs lists a host section's exact unicast MACs (wildcards left out).
+func hostMACs(s device.Section) []string {
 	out := []string{}
-	for _, m := range raw {
+	for _, m := range hostSelectors(s) {
 		if mac, ok := NormalizeMAC(m); ok && !slices.Contains(out, mac) {
 			out = append(out, mac)
 		}
@@ -114,9 +130,9 @@ func maskBits(mask netip.Addr) (int, bool) {
 
 var label = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$`)
 
-// ValidateReservation checks one request against the lan prefix and the existing hosts.
-// It returns the normalised request.
-func ValidateReservation(r Reservation, lan netip.Prefix, existing []Reservation) (Reservation, error) {
+// ValidateReservation checks one request against the lan prefix and every dhcp host section
+// (also MAC-less ones, which dnsmasq serves by name). It returns the normalised request.
+func ValidateReservation(r Reservation, lan netip.Prefix, dhcp []device.Section) (Reservation, error) {
 	mac, ok := NormalizeMAC(r.MAC)
 	if !ok {
 		return Reservation{}, &FieldError{"mac", "not a unicast MAC address"}
@@ -133,7 +149,9 @@ func ValidateReservation(r Reservation, lan netip.Prefix, existing []Reservation
 	if name != "" && !label.MatchString(name) {
 		return Reservation{}, &FieldError{"name", "must be one DNS label (letters, digits, hyphen)"}
 	}
-	if slices.ContainsFunc(existing, func(x Reservation) bool { return x.MAC != mac && x.IP == ip.String() }) {
+	if slices.ContainsFunc(dhcp, func(x device.Section) bool {
+		return x.Type == "host" && x.Options["ip"] == ip.String() && !exclusiveTo(x, mac)
+	}) {
 		return Reservation{}, ErrIPTaken
 	}
 	return Reservation{MAC: mac, IP: ip.String(), Name: name}, nil
@@ -152,7 +170,7 @@ func StageReservation(ctx context.Context, uci device.UCI, dhcp []device.Section
 	section := HostSection(r.MAC)
 	at := slices.IndexFunc(dhcp, func(s device.Section) bool { return s.Type == "host" && slices.Contains(hostMACs(s), r.MAC) })
 	if at >= 0 {
-		if len(hostMACs(dhcp[at])) > 1 {
+		if !exclusiveTo(dhcp[at], r.MAC) {
 			return false, ErrReservationShared
 		}
 		section = dhcp[at].Name
@@ -191,14 +209,18 @@ func stageNewHost(ctx context.Context, uci device.UCI, section, mac string) erro
 	return uci.AddToList(ctx, "dhcp", section, "mac", mac)
 }
 
-// StageUnreserve removes mac from its host section; a section left without MACs is deleted.
+// StageUnreserve removes mac from its host section, keeping every other selector (wildcards
+// included); a section left without selectors is deleted.
 func StageUnreserve(ctx context.Context, uci device.UCI, dhcp []device.Section, mac string) error {
 	at := slices.IndexFunc(dhcp, func(s device.Section) bool { return s.Type == "host" && slices.Contains(hostMACs(s), mac) })
 	if at < 0 {
 		return ErrReservationNotFound
 	}
 	s := dhcp[at]
-	rest := slices.DeleteFunc(hostMACs(s), func(m string) bool { return m == mac })
+	rest := slices.DeleteFunc(hostSelectors(s), func(v string) bool {
+		m, ok := NormalizeMAC(v)
+		return ok && m == mac
+	})
 	if len(rest) == 0 {
 		return uci.DeleteSection(ctx, "dhcp", s.Name)
 	}

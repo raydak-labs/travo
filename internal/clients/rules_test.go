@@ -68,7 +68,10 @@ func TestLANPrefixReadsCIDRAndNetmask(t *testing.T) {
 
 func TestValidateReservation(t *testing.T) {
 	lan := netip.MustParsePrefix("192.168.1.1/24")
-	existing := []Reservation{{MAC: "aa:bb:cc:00:00:01", IP: "192.168.1.50"}}
+	existing := []device.Section{
+		{Name: "a", Type: "host", Options: map[string]string{"ip": "192.168.1.50"}, Lists: map[string][]string{"mac": {"aa:bb:cc:00:00:01"}}},
+		{Name: "nas", Type: "host", Options: map[string]string{"ip": "192.168.1.60", "name": "nas"}}, // MAC-less: dnsmasq still serves it
+	}
 	ok, err := ValidateReservation(Reservation{MAC: "AA:BB:CC:00:00:02", IP: " 192.168.1.51 ", Name: "nas-1"}, lan, existing)
 	if err != nil || ok.MAC != "aa:bb:cc:00:00:02" || ok.IP != "192.168.1.51" {
 		t.Fatal(ok, err)
@@ -90,8 +93,33 @@ func TestValidateReservation(t *testing.T) {
 			t.Errorf("%+v: %v", tc.r, err)
 		}
 	}
-	if _, err := ValidateReservation(Reservation{MAC: "aa:bb:cc:00:00:02", IP: "192.168.1.50"}, lan, existing); !errors.Is(err, ErrIPTaken) {
+	for _, ip := range []string{"192.168.1.50", "192.168.1.60"} {
+		if _, err := ValidateReservation(Reservation{MAC: "aa:bb:cc:00:00:02", IP: ip}, lan, existing); !errors.Is(err, ErrIPTaken) {
+			t.Fatal(ip, err)
+		}
+	}
+	// The section the request updates does not conflict with itself.
+	if _, err := ValidateReservation(Reservation{MAC: "aa:bb:cc:00:00:01", IP: "192.168.1.50"}, lan, existing); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestWildcardSelectorsAreNeverEditedAway(t *testing.T) {
+	d := mock.New()
+	wild := device.Section{Name: "cfg02", Type: "host", Options: map[string]string{"ip": "192.168.1.9"},
+		Lists: map[string][]string{"mac": {"aa:bb:cc:00:00:01", "00:20:e0:3b:13:*"}}}
+	if err := d.Load(t.Context(), "dhcp", []device.Section{wild}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := StageReservation(t.Context(), d, []device.Section{wild}, Reservation{MAC: "aa:bb:cc:00:00:01", IP: "192.168.1.10"}); !errors.Is(err, ErrReservationShared) {
+		t.Fatal(err)
+	}
+	if err := StageUnreserve(t.Context(), d, []device.Section{wild}, "aa:bb:cc:00:00:01"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := d.Show(t.Context(), "dhcp")
+	if len(got) != 1 || !reflect.DeepEqual(hostSelectors(got[0]), []string{"00:20:e0:3b:13:*"}) {
+		t.Fatalf("%+v", got)
 	}
 }
 
