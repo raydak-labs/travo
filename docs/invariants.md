@@ -194,4 +194,4 @@ Accept; do not "fix" silently.
 - Hardware button = detection only until actions are designed.
 - External writers (cron/hotplug) outside the lock model.
 - Reboot exclusion has a residual ~2 s window where `txn.Begin` can start after the second guard check; boot-time `txn.Recover` restores that transaction.
-- AdGuard sees all queries from 127.0.0.1 (no per-client stats) under the default topology.
+- AdGuard sees all queries from 127.0.0.1 (no per-client stats) under the default topology; the opt-in expert topology ([adr/0021](adr/0021-adguard-expert-topology.md)) is designed, not built.
