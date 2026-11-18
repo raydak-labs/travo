@@ -8,11 +8,11 @@ import (
 
 func TestInterfaceStatusFromDevice(t *testing.T) {
 	up, err := ParseInterfaceStatus(read(t, "interface-wwan-status.json"))
-	if err != nil || !up.Up || len(up.IPv4) != 1 || up.IPv4[0] != netip.MustParsePrefix("192.168.90.241/24") {
+	if err != nil || !up.Up || up.Uptime != 195 || len(up.IPv4) != 1 || up.IPv4[0] != netip.MustParsePrefix("192.168.90.241/24") {
 		t.Fatalf("up %+v, %v", up, err)
 	}
 	down, err := ParseInterfaceStatus(read(t, "wwan-down/interface-wwan-status-down.json"))
-	if err != nil || down.Up || len(down.IPv4) != 0 {
+	if err != nil || down.Up || down.Uptime != 0 || len(down.IPv4) != 0 {
 		t.Fatalf("down %+v, %v", down, err)
 	}
 }

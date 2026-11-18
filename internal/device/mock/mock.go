@@ -17,11 +17,14 @@ type config struct{ sections map[string]*device.Section }
 
 // Device implements device.Device.
 type Device struct {
-	Reloads            int
-	ReloadErr          error
-	Reboots            int
-	RebootErr          error
-	UplinkReconnects   int
+	Reloads          int
+	ReloadErr        error
+	Reboots          int
+	RebootErr        error
+	UplinkReconnects int
+	// Restarts records RestartInterface names; RestartErr makes it fail.
+	Restarts           []string
+	RestartErr         error
 	BootIDErr          error
 	RotateBootOnReboot bool
 	// FactoryResets counts scheduled wipes; FactoryResetErr makes scheduling fail.

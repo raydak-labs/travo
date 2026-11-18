@@ -17,4 +17,18 @@ func (d *Device) ReconnectUplink(ctx context.Context) error {
 	return nil
 }
 
-var _ device.UplinkReconnector = (*Device)(nil)
+// RestartInterface records the name; RestartErr makes it fail after recording.
+func (d *Device) RestartInterface(ctx context.Context, name string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.Restarts = append(d.Restarts, name)
+	return d.RestartErr
+}
+
+var (
+	_ device.UplinkReconnector  = (*Device)(nil)
+	_ device.InterfaceRestarter = (*Device)(nil)
+)

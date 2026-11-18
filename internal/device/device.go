@@ -183,6 +183,13 @@ type UplinkReconnector interface {
 	ReconnectUplink(context.Context) error
 }
 
+// InterfaceRestarter restarts one netifd interface with `ifup <name>` (network reload,
+// interface down, interface up). It writes no UCI and never runs `wifi` (device-facts §3);
+// internal/ifrestart limits it to uplinks.
+type InterfaceRestarter interface {
+	RestartInterface(ctx context.Context, name string) error
+}
+
 // NeighbourReader returns the kernel IPv4 neighbour table as `ip -j -4 neigh show` JSON.
 // Lockout classification maps the caller's IP to a MAC with it (ADR 0011).
 type NeighbourReader interface {
