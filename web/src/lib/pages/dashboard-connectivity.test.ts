@@ -16,7 +16,8 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
 vi.mock('../dashboard-events.svelte', () => ({ dashboardEvents }));
 
-type Snapshot = Omit<DashboardConnectivity, 'captive'> & {
+type Snapshot = Omit<DashboardConnectivity, 'captive' | 'medium'> & {
+  medium?: DashboardConnectivity['medium'];
   captive?: Partial<DashboardConnectivity['captive']>;
 };
 
@@ -29,6 +30,7 @@ function dashboard(status: LoadStatus, data: Snapshot | undefined) {
   });
   dashboardEvents.connectivity.status = status;
   dashboardEvents.connectivity.data = data && {
+    medium: null,
     ...data,
     captive: {
       dns_bypass: false,
@@ -50,12 +52,34 @@ describe('Dashboard connectivity', () => {
   it('shows active uplink and link up even when the internet is offline', () => {
     const body = dashboard(
       { state: 'ready' },
-      { active_interface: 'phy0-sta0', carrier: true, internet: 'offline', portal_url: null },
+      {
+        active_interface: 'phy0-sta0',
+        medium: 'wifi',
+        carrier: true,
+        internet: 'offline',
+        portal_url: null,
+      },
     );
     expect(body).toContain('phy0-sta0');
+    expect(body).toContain('· WiFi');
     expect(body).toContain('Link up');
     expect(body).toContain('Offline');
     expect(createLoader).toHaveBeenCalledWith(fetchHealth);
+  });
+
+  it('names a USB tether uplink by its medium', () => {
+    const body = dashboard(
+      { state: 'ready' },
+      {
+        active_interface: 'eth0',
+        medium: 'usb',
+        carrier: true,
+        internet: 'online',
+        portal_url: null,
+      },
+    );
+    expect(body).toContain('eth0');
+    expect(body).toContain('· USB tethering');
   });
 
   it('distinguishes unknown and down carrier', () => {
@@ -75,7 +99,13 @@ describe('Dashboard connectivity', () => {
   it('retains the last connectivity snapshot on failed refresh', () => {
     const body = dashboard(
       { state: 'error', message: 'Connectivity unavailable' },
-      { active_interface: 'phy0-sta0', carrier: true, internet: 'captive', portal_url: null },
+      {
+        active_interface: 'phy0-sta0',
+        medium: 'wifi',
+        carrier: true,
+        internet: 'captive',
+        portal_url: null,
+      },
     );
     expect(body).toContain('Last known value');
     expect(body).toContain('phy0-sta0');
@@ -95,7 +125,13 @@ describe('Dashboard connectivity', () => {
   it('shows no hotel login card unless a portal is detected', () => {
     const body = dashboard(
       { state: 'ready' },
-      { active_interface: 'phy0-sta0', carrier: true, internet: 'online', portal_url: null },
+      {
+        active_interface: 'phy0-sta0',
+        medium: 'wifi',
+        carrier: true,
+        internet: 'online',
+        portal_url: null,
+      },
     );
     expect(body).not.toContain('Hotel WiFi login');
     expect(body).not.toContain('Open hotel login');
@@ -121,14 +157,26 @@ describe('Dashboard connectivity', () => {
   it('offers the DNS bypass when connected but offline, and hides it when online', () => {
     const offline = dashboard(
       { state: 'ready' },
-      { active_interface: 'phy0-sta0', carrier: true, internet: 'offline', portal_url: null },
+      {
+        active_interface: 'phy0-sta0',
+        medium: 'wifi',
+        carrier: true,
+        internet: 'offline',
+        portal_url: null,
+      },
     );
     expect(offline).toContain('Hotel WiFi login');
     expect(offline).toContain('Use hotel DNS for 5 min');
     expect(offline).not.toContain('Open hotel login');
     const noLink = dashboard(
       { state: 'ready' },
-      { active_interface: 'phy0-sta0', carrier: false, internet: 'offline', portal_url: null },
+      {
+        active_interface: 'phy0-sta0',
+        medium: 'wifi',
+        carrier: false,
+        internet: 'offline',
+        portal_url: null,
+      },
     );
     expect(noLink).not.toContain('Hotel WiFi login');
   });

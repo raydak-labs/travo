@@ -32,6 +32,7 @@ type Device struct {
 	ubus               map[string]json.RawMessage
 	scanReplies        map[string]json.RawMessage
 	staLinkIndex       int
+	netLinks           []device.NetLink
 	neighbours         json.RawMessage
 	wirelessChanged    bool
 	DefaultRoute       bool

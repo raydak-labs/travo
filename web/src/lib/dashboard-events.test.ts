@@ -11,6 +11,7 @@ const GETS = [CONNECTIVITY, RESOURCES, THROUGHPUT];
 
 const connectivityBody = {
   active_interface: 'wan',
+  medium: 'ethernet',
   carrier: true,
   internet: 'online',
 };

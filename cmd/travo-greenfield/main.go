@@ -189,6 +189,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 			probe = func(context.Context) connectivity.Result { return connectivity.Result{Internet: connectivity.Online} }
 		}
 		shared := connectivity.New(ctx, routes, deps.Device, probe, clock.Now)
+		shared.Links, _ = deps.Device.(device.NetLinkReader)
 		connection, dnsLayers.AfterApply = shared, shared.Invalidate
 		bypass := captive.NewBypass(dnsLayers, deps.Device, routes, clock.Now)
 		captiveAssist = bypass
@@ -315,6 +316,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		WiFiAPs:       wirelessAPs,
 		WiFiGuest:     wirelessGuest,
 		WiFiMAC:       wirelessMAC,
+		USBTether:     newUSBTether(deps),
 		Throughput:    sampler,
 		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,

@@ -1,0 +1,70 @@
+kmod-usb-net-cdc-ether-6.12.112-r1 - Kernel support for USB CDC Ethernet devices
+kmod-usb-net-cdc-ncm-6.12.112-r1 - Kernel support for CDC NCM connections
+kmod-usb-net-ipheth-6.12.112-r1 - Kernel support for Apple iPhone USB Ethernet driver
+kmod-usb-net-rndis-6.12.112-r1 - Kernel support for RNDIS connections
+libusbmuxd-2.1.1-r1 - This daemon is in charge of multiplexing connections over USB to an iPhone or iPod touch. To users, it means you can sync your music, contacts, photos, etc. over USB. To developers, it means you can connect to any listening localhost socket on the device. usbmuxd is not used for tethering data transfer, which uses a dedicated USB interface as a virtual network device. This package contains the libusbmuxd shared library.
+libusbmuxd-utils-2.1.1-r1 - This daemon is in charge of multiplexing connections over USB to an iPhone or iPod touch. To users, it means you can sync your music, contacts, photos, etc. over USB. To developers, it means you can connect to any listening localhost socket on the device. usbmuxd is not used for tethering data transfer, which uses a dedicated USB interface as a virtual network device. This package contains the libusbmuxd utilities.
+usbmuxd-2025.02.01~523f7004-r1 - This daemon is in charge of multiplexing connections over USB to an iPhone or iPod touch. To users, it means you can sync your music, contacts, photos, etc. over USB. To developers, it means you can connect to any listening localhost socket on the device. usbmuxd is not used for tethering data transfer, which uses a dedicated USB interface as a virtual network device.
+
+kmod-usb-net-rndis-6.12.112-r1 depends on:
+kernel=6.12.112~b5fefb5a894e3008353ac9f988245f52-r1
+kmod-usb-net
+kmod-usb-net-cdc-ether
+
+kmod-usb-net-cdc-ncm-6.12.112-r1 depends on:
+kernel=6.12.112~b5fefb5a894e3008353ac9f988245f52-r1
+kmod-usb-net
+kmod-usb-net-cdc-ether
+
+kmod-usb-net-ipheth-6.12.112-r1 depends on:
+kernel=6.12.112~b5fefb5a894e3008353ac9f988245f52-r1
+kmod-usb-net
+
+usbmuxd-2025.02.01~523f7004-r1 depends on:
+libc
+libimobiledevice
+libopenssl3
+libusb-1.0-0
+libusbmuxd
+usbutils
+
+
+kmod-usb-net-6.12.112-r1 installed size:
+41 KiB
+
+kmod-usb-net-cdc-ether-6.12.112-r1 installed size:
+14 KiB
+
+kmod-usb-net-cdc-ncm-6.12.112-r1 installed size:
+33 KiB
+
+kmod-usb-net-ipheth-6.12.112-r1 installed size:
+15 KiB
+
+kmod-usb-net-rndis-6.12.112-r1 installed size:
+15 KiB
+
+libimobiledevice-2025.07.29~c269d7e3-r2 installed size:
+256 KiB
+
+libimobiledevice-glue-1.3.2-r1 installed size:
+68 KiB
+
+libopenssl3-3.5.9-r1 installed size:
+4878 KiB
+
+libplist-2.7.0-r1 installed size:
+80 KiB
+
+libusb-1.0-0-1.0.29-r1 installed size:
+76 KiB
+
+libusbmuxd-2.1.1-r1 installed size:
+32 KiB
+
+usbmuxd-2025.02.01~523f7004-r1 installed size:
+77 KiB
+
+usbutils-019-r1 installed size:
+160 KiB
+

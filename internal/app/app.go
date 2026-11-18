@@ -75,6 +75,9 @@ func New(o Options) (Deps, error) {
 		mock.SeedSystem(dev)
 		mock.SeedConnectivity(dev)
 		mock.SeedWiFi(dev)
+		if err := mock.SeedNetLinks(dev); err != nil {
+			return Deps{}, fmt.Errorf("mock links: %w", err)
+		}
 		dev.SetService("adguardhome", false, false) // absent package; the mock install adds it
 		if secs, err := cli.ParseExport("dhcp", string(mock.DHCPExport)); err == nil {
 			_ = dev.Load(context.Background(), "dhcp", secs) // the embedded capture always parses (seed test)

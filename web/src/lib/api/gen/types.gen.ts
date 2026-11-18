@@ -171,6 +171,7 @@ export type DashboardConnectivity = {
     captive: CaptiveState;
     carrier: boolean | null;
     internet: 'online' | 'offline' | 'captive' | 'unknown';
+    medium: 'ethernet' | 'wifi' | 'usb' | 'virtual';
     /**
      * Captive portal login URL; null unless internet is captive
      */
@@ -471,6 +472,46 @@ export type TxnBody = {
      * Confirm window, counted from when the change was armed
      */
     window_seconds: number;
+};
+
+export type UsbTetherDriver = {
+    package: string;
+    phone: 'android' | 'ios';
+    state: 'installed' | 'absent' | 'unknown';
+};
+
+export type UsbTetherLink = {
+    carrier: boolean | null;
+    /**
+     * Tether protocol from the kernel driver
+     */
+    kind: 'rndis' | 'ncm' | 'ecm' | 'ipheth';
+    /**
+     * Kernel netdev name (usb0, or eth* for iPhones and some Android phones)
+     */
+    name: string;
+};
+
+export type UsbTetherStatus = {
+    configured: boolean;
+    /**
+     * Netdev network.usbtether binds; empty when not configured
+     */
+    device: string;
+    drivers: Array<UsbTetherDriver> | null;
+    /**
+     * The wan firewall zone lists usbtether
+     */
+    in_wan_zone: boolean;
+    /**
+     * First IPv4 address in CIDR form; empty when none
+     */
+    ipv4: string;
+    links: Array<UsbTetherLink> | null;
+    /**
+     * netifd reports usbtether up
+     */
+    up: boolean;
 };
 
 export type UpdateApInputBody = {
@@ -1664,6 +1705,35 @@ export type RollbackTransactionResponses = {
 };
 
 export type RollbackTransactionResponse = RollbackTransactionResponses[keyof RollbackTransactionResponses];
+
+export type GetUsbTetherData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/usbtether';
+};
+
+export type GetUsbTetherErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetUsbTetherError = GetUsbTetherErrors[keyof GetUsbTetherErrors];
+
+export type GetUsbTetherResponses = {
+    /**
+     * OK
+     */
+    200: UsbTetherStatus;
+};
+
+export type GetUsbTetherResponse = GetUsbTetherResponses[keyof GetUsbTetherResponses];
 
 export type GetVpndnsData = {
     body?: never;

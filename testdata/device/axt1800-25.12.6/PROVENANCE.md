@@ -57,3 +57,18 @@ Captured while a `POST /api/v1/wifi/guest` transaction (radio1, SSID `TGPlaybook
 - uci-wireless-guest.txt: `uci show wireless | grep -iE "guest" | grep -v "\.key="` (the key line is omitted, not redacted)
 - interface-guest-status.json: `ubus call network.interface.guest status`
 No placeholders were needed: the SSID is a test name and the only address is the guest subnet `192.168.2.1/24`. Every byte is verbatim.
+
+## sysfs-net/ (2026-11-18, #175)
+- links.tsv: `cd /sys/class/net && for n in *; do printf "%s\t%s\t%s\t%s\t%s\n" "$n" "$(readlink $n/device)" "$(readlink $n/device/driver)" "$(readlink $n/device/subsystem)" "$(grep ^DEVTYPE= $n/uevent | cut -d= -f2)"; done`. Columns: name, device link, driver link, subsystem link, uevent `DEVTYPE`. Taken with wg0 disabled (absent) and no USB device attached. Verbatim; nothing needed redaction.
+
+## usbtether/ (2026-11-18, 25.12.6 package feed and UCI, #175)
+- apk-packages.txt: after `apk update`, `apk search -v kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net-ipheth usbmuxd`, then `apk info -R` for each tether package and `apk info -s` for them and their dependencies. None was installed. Verbatim.
+- uci-export-firewall.txt, uci-export-network.txt: `uci export firewall`, `uci export network` (router state after the 0.1.0 install: wwan uplink, guest AP, VPN profile stored, tunnel off). The wan zone is the anonymous `@zone[1]` with `list network`. Redacted: `wg0` `private_key` → `REDACTED`, peer `endpoint_host` → `203.0.113.8`.
+No phone was attached: the tether link payloads (sysfs, `network.device status`, `network.interface.usbtether status`) are a hardware playbook capture step (docs/testing.md).
+
+## sysfs-net/ (2026-11-18, OpenWrt 25.12.6, #175)
+- links.tsv: `cd /sys/class/net && for n in *; do printf "%s\t%s\t%s\t%s\t%s\n" "$n" "$(readlink $n/device)" "$(readlink $n/device/driver)" "$(readlink $n/device/subsystem)" "$(grep ^DEVTYPE= $n/uevent | cut -d= -f2)"; done`. Columns: name, device link, driver link, subsystem link, uevent DEVTYPE. Taken with wg0 disabled (absent) and no USB device attached. Every byte is verbatim; nothing needed redaction.
+
+## usbtether/ (2026-11-18, OpenWrt 25.12.6 feed, #176)
+- apk-packages.txt: after `apk update`, `apk search -v kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net-ipheth usbmuxd`, `apk info -R` for each tether package, and `apk info -s` for the packages and their dependencies. None was installed. Verbatim.
+No phone was attached: the USB tether link payloads (sysfs, `network.device status`) are a hardware playbook capture step.

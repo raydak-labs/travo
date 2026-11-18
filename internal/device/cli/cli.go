@@ -24,6 +24,8 @@ type Device struct {
 	// RunInput carries stdin (passwd); ReadFile reads /etc/shadow. Nil ReadFile means os.ReadFile.
 	RunInput runner.InputRunner
 	ReadFile func(string) ([]byte, error)
+	// SysNet overrides /sys/class/net (tests).
+	SysNet string
 }
 
 func New() *Device { return &Device{Run: runner.Exec, RunInput: runner.RunInput} }

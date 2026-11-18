@@ -1,6 +1,8 @@
 # Glossary
 
 - **Uplink**: the connection to the internet. One of `wan` (Ethernet), `wwan` (WiFi STA), `usbtether`.
+- **Medium**: what carries a netdev, read from sysfs, never from its name: `ethernet`, `wifi`, `usb` or `virtual` (no backing device).
+- **Tether link**: a USB netdev whose driver is a phone tethering driver (`rndis_host`, `cdc_ncm`, `cdc_ether`, `ipheth`); `network.usbtether` binds one.
 - **STA**: WiFi client interface (`mode=sta`) bound to `wwan`; joins hotel/home WiFi.
 - **Scan**: the on-demand, read-only per-radio site survey.
 - **Join**: the guarded configuration and verification of an uplink STA, followed by explicit confirmation or rollback.

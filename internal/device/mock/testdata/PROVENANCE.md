@@ -10,3 +10,5 @@ net-counters.txt is a byte-identical copy of testdata/device/axt1800-25.12.6/wwa
 The WiFi seeds use the connected summary with one scan per radio. Per-interface `network.device status` continues to use `SeedConnectivity`'s connected STA capture for every name, including the AP.
 
 - `uci-export-dhcp.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/uci-export-dhcp.txt`; mock mode loads it as the `dhcp` config so the DNS layer stack has a real dnsmasq section.
+
+- `sysfs-net-links.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/sysfs-net/links.tsv`; mock mode lists these netdevs. No phone capture exists yet, so mock mode has no tether link until `AddNetLink` adds one (tests).

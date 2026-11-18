@@ -123,6 +123,8 @@ type Deps struct {
 	WiFiAPs       WiFiAPEditor
 	WiFiGuest     WiFiGuestEditor
 	WiFiMAC       WiFiMACEditor
+	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
+	USBTether USBTether
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -226,6 +228,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWiFiProfiles(a)
 	s.registerAdGuard(a)
 	s.registerWiFiReconnect(a)
+	s.registerUSBTether(a)
 	s.registerDashboardEvents(a)
 	if d.UI != nil {
 		mux.Handle("/", d.UI)
@@ -249,6 +252,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "WiFiProfile" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/wifireconnect":
 		return "WiFiReconnect" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/usbtether":
+		return "USBTether" + name
 	}
 	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name

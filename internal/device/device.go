@@ -188,3 +188,20 @@ type UplinkReconnector interface {
 type NeighbourReader interface {
 	Neighbours(context.Context) (json.RawMessage, error)
 }
+
+// NetLink is one kernel netdev as sysfs describes it (`/sys/class/net/<name>`). Bus and
+// Driver are the basenames of the `device/subsystem` and `device/driver` links, empty for a
+// netdev without a backing device (bridge, loopback, tunnel). DevType is `DEVTYPE` from
+// `uevent`, empty when absent. The uplink medium comes from these, never from the name
+// (device-facts §12).
+type NetLink struct {
+	Name    string
+	Bus     string
+	Driver  string
+	DevType string
+}
+
+// NetLinkReader lists the kernel netdevs. Read-only.
+type NetLinkReader interface {
+	NetLinks(context.Context) ([]NetLink, error)
+}

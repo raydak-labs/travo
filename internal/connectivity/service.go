@@ -20,9 +20,11 @@ const (
 )
 
 type Status struct {
-	ActiveInterface *string  `json:"active_interface" nullable:"true"`
-	Carrier         *bool    `json:"carrier" nullable:"true"`
-	Internet        Internet `json:"internet" enum:"online,offline,captive,unknown"`
+	ActiveInterface *string `json:"active_interface" nullable:"true"`
+	Carrier         *bool   `json:"carrier" nullable:"true"`
+	// Medium of the active interface from sysfs (device-facts §12); null when unknown.
+	Medium   *string  `json:"medium" nullable:"true" enum:"ethernet,wifi,usb,virtual"`
+	Internet Internet `json:"internet" enum:"online,offline,captive,unknown"`
 	// PortalURL is where a captive portal redirected the probe (http or https only).
 	PortalURL *string `json:"portal_url" nullable:"true" doc:"Captive portal login URL; null unless internet is captive"`
 }
@@ -41,6 +43,8 @@ type Service struct {
 	ubus   device.Ubus
 	probe  Probe
 	now    func() time.Time
+	// Links names the medium of the active interface; nil leaves medium null.
+	Links device.NetLinkReader
 
 	observe  chan struct{} // serialize kernel observations, not their probes
 	mu       sync.Mutex
@@ -60,7 +64,7 @@ func (s *Service) Status(ctx context.Context) Status {
 		return Status{Internet: initial}
 	}
 	carrier := s.carrier(ctx, route.Device)
-	st := Status{ActiveInterface: &route.Device, Carrier: carrier, Internet: initial}
+	st := Status{ActiveInterface: &route.Device, Carrier: carrier, Medium: s.medium(ctx, route.Device), Internet: initial}
 	select {
 	case <-ctx.Done():
 	case <-s.daemon.Done():
@@ -121,6 +125,23 @@ func (s *Service) carrier(ctx context.Context, iface string) *bool {
 		return nil
 	}
 	return &link.Carrier
+}
+
+func (s *Service) medium(ctx context.Context, iface string) *string {
+	if s.Links == nil {
+		return nil
+	}
+	links, err := s.Links.NetLinks(ctx)
+	if err != nil {
+		return nil
+	}
+	for _, l := range links {
+		if l.Name == iface {
+			m := string(facts.ClassifyMedium(l))
+			return &m
+		}
+	}
+	return nil
 }
 
 func (s *Service) runProbe(f *flight) {

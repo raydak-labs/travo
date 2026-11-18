@@ -40,6 +40,13 @@ const internetStatus = {
   unknown: { kind: 'neutral', label: m.dashboard_connectivity_unknown },
 } as const;
 
+const mediumLabel = {
+  ethernet: m.dashboard_medium_ethernet,
+  wifi: m.dashboard_medium_wifi,
+  usb: m.dashboard_medium_usb,
+  virtual: m.dashboard_medium_virtual,
+} as const;
+
 function formatRate(rate: number | null): string {
   if (rate === null) return m.dashboard_rate_unknown();
   const rounded = rate < 1024 ? Math.round(rate * 10) / 10 : rate;
@@ -58,7 +65,10 @@ function formatRate(rate: number | null): string {
         {@const internet = internetStatus[info.internet]}
         <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           <dt class="text-muted-foreground">{m.dashboard_active_uplink()}</dt>
-          <dd class="break-all">{info.active_interface ?? m.dashboard_connectivity_unknown()}</dd>
+          <dd class="break-all">
+            {info.active_interface ?? m.dashboard_connectivity_unknown()}
+            {#if info.medium}<span class="text-muted-foreground"> · {mediumLabel[info.medium]()}</span>{/if}
+          </dd>
           <dt class="text-muted-foreground">{m.dashboard_carrier()}</dt>
           <dd>
             {#if info.carrier === null}
