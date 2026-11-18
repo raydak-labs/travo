@@ -135,6 +135,8 @@ type Deps struct {
 	USBTether USBTether
 	// SystemSettings is hostname, time zone and NTP; nil answers 503.
 	SystemSettings SystemSettings
+	// Failover is nil without package and service ports; it answers 503 failover_unavailable.
+	Failover Failover
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -243,6 +245,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerTailscale(a)
 	s.registerWiFiReconnect(a)
 	s.registerUSBTether(a)
+	s.registerFailover(a)
 	s.registerDashboardEvents(a)
 	if d.UI != nil {
 		mux.Handle("/", d.UI)
@@ -270,6 +273,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "USBTether" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/tailscale":
 		return "Tailscale" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/failover":
+		return "Failover" + name
 	}
 	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name

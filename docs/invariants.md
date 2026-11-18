@@ -122,6 +122,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Failback hold-down 30 s; walk the priority list, first uplink past hold-down wins (not "keep current first").
 - Liveness from netifd interface status, not ping. `family: ipv4` explicit; no IPv6 policy until device-validated.
 - Guard during the apply window. Mocks must match real UCI semantics (`set` = create-or-update).
+- A fresh `mwan3` install is stopped and disabled at once (its stock catch-all rules must never run). mwan3 runs only while the settings say enabled and the committed config carries the stamped Travo rules; a reconciler (5 s) stops it otherwise and boot-enables it only after the user confirmed.
 
 ## 10. WiFi model
 

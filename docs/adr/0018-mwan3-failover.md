@@ -43,7 +43,21 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
 - Failback hold-down and the priority walk are mwan3's own: members in metric order, the
   lowest metric that is online wins; an interface comes back online on netifd `ifup`.
 
+- Lifecycle (#209): `mwan3` is installed through the `PackageManager` port under guard
+  `failover-install-in-progress` and immediately stopped and disabled, so its stock config never
+  runs. Enable (needs a real outbound probe online first) stages the plan in ONE `mwan3`
+  transaction; the probe restarts mwan3 and proves every managed section reads back stamped, the
+  Travo rules on top, mwan3 running and the outbound probe online, then the user confirms.
+  Disable stops and disables mwan3 under guard `failover-service-in-progress` and keeps the config.
+  A reconciler (every 5 s, lifecycle worker) keeps mwan3 running exactly while the settings say
+  enabled and the committed config is active: it stops mwan3 after a rollback restored the stock
+  config, and start/boot-enables it after the user confirmed. It does nothing while a transaction
+  awaits confirmation or a failover guard is kept.
+
 ## Consequences
+
+- A rollback of the FIRST apply restores the stock config while mwan3 runs; its catch-all rules
+  can be live for up to one reconciler tick (5 s) before mwan3 is stopped.
 
 - An operator's own mwan3 rules placed above Travo's by hand are moved below on the next
   apply. Their sections are not otherwise touched.

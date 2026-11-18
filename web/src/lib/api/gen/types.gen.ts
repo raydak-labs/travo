@@ -210,6 +210,43 @@ export type FactoryResetInputBody = {
     confirm: string;
 };
 
+export type FailoverEnableInputBody = {
+    /**
+     * Uplinks in priority order (wan, wwan, usbtether)
+     */
+    uplinks: Array<'wan' | 'wwan' | 'usbtether'> | null;
+};
+
+export type FailoverStatus = {
+    active: boolean;
+    /**
+     * An install or service change kept its guard; enabling again retries it
+     */
+    blocked: boolean;
+    enabled: boolean;
+    installed: boolean;
+    /**
+     * mwan3 is running
+     */
+    running: boolean;
+    states: Array<FailoverUplinkState>;
+    /**
+     * Uplinks in priority order (wan, wwan, usbtether)
+     */
+    uplinks: Array<string>;
+    warnings: Array<FailoverWarning>;
+};
+
+export type FailoverUplinkState = {
+    name: 'wan' | 'wwan' | 'usbtether';
+    up: boolean;
+};
+
+export type FailoverWarning = {
+    reason: 'adopted' | 'operator_edited' | 'stale_edited';
+    section: string;
+};
+
 export type GetSetupStateResponse = {
     password_set: boolean;
 };
@@ -1433,6 +1470,109 @@ export type GetDashboardThroughputResponses = {
 };
 
 export type GetDashboardThroughputResponse = GetDashboardThroughputResponses[keyof GetDashboardThroughputResponses];
+
+export type DisableFailoverData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/failover';
+};
+
+export type DisableFailoverErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DisableFailoverError = DisableFailoverErrors[keyof DisableFailoverErrors];
+
+export type DisableFailoverResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type DisableFailoverResponse = DisableFailoverResponses[keyof DisableFailoverResponses];
+
+export type GetFailoverData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/failover';
+};
+
+export type GetFailoverErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetFailoverError = GetFailoverErrors[keyof GetFailoverErrors];
+
+export type GetFailoverResponses = {
+    /**
+     * OK
+     */
+    200: FailoverStatus;
+};
+
+export type GetFailoverResponse = GetFailoverResponses[keyof GetFailoverResponses];
+
+export type EnableFailoverData = {
+    body: FailoverEnableInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/failover';
+};
+
+export type EnableFailoverErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type EnableFailoverError = EnableFailoverErrors[keyof EnableFailoverErrors];
+
+export type EnableFailoverResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type EnableFailoverResponse = EnableFailoverResponses[keyof EnableFailoverResponses];
 
 export type GetSetupStateData = {
     body?: never;

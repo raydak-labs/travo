@@ -350,6 +350,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		WiFiGuest:     wirelessGuest,
 		WiFiMAC:       wirelessMAC,
 		USBTether:     newUSBTether(deps),
+		Failover:      startFailover(deps, connection, workers),
 		Throughput:    sampler,
 		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,

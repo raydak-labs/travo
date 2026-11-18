@@ -13,5 +13,7 @@ The WiFi seeds use the connected summary with one scan per radio. Per-interface 
 
 - `uci-export-network.txt` and `uci-export-firewall.txt` are byte-identical copies from `testdata/device/axt1800-25.12.6/usbtether/` (already redacted there); mock mode loads them as the `network` and `firewall` configs.
 
+- `mwan3-stock-config.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/mwan3/stock-config-mwan3.txt`; mock mode loads it as the `mwan3` config (the parser gets a `package mwan3` line prepended, as `uci export` prints it).
+
 - `sysfs-net-links.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/sysfs-net/links.tsv`; mock mode lists these netdevs. No phone capture exists yet, so mock mode has no tether link until `AddNetLink` adds one (tests).
 - `uci-export-system.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/uci-export-system.txt`; mock mode loads it as the `system` config so the device settings card reads and writes the real section shapes.

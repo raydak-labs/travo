@@ -36,3 +36,9 @@ var NetworkExport []byte
 
 //go:embed testdata/uci-export-firewall.txt
 var FirewallExport []byte
+
+// MWAN3Stock is the mwan3 package's own /etc/config/mwan3 (25.12.6 feed); mock mode loads
+// it so failover plans against the stock sections a real install leaves.
+//
+//go:embed testdata/mwan3-stock-config.txt
+var MWAN3Stock []byte
