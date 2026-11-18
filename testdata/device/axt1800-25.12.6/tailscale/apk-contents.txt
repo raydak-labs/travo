@@ -1,0 +1,15 @@
+tailscale-1.104.1-r1 contains:
+etc/config/tailscale
+etc/init.d/tailscale
+lib/apk/packages/tailscale.conffiles
+lib/apk/packages/tailscale.conffiles_static
+lib/apk/packages/tailscale.list
+lib/upgrade/keep.d/tailscale
+usr/sbin/tailscale
+usr/sbin/tailscaled
+
+kmod-tun-6.12.112-r1 contains:
+etc/modules.d/30-tun
+lib/apk/packages/kmod-tun.list
+lib/modules/6.12.112/tun.ko
+

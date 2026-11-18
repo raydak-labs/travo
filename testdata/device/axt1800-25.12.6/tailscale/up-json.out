@@ -1,0 +1,5 @@
+{
+	"AuthURL": "https://login.tailscale.com/a/REDACTED",
+	"QR": "data:image/png;base64,REDACTED",
+	"BackendState": "NeedsLogin"
+}
