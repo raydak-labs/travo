@@ -15,7 +15,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Every shell-out has an explicit timeout tier. Exceptions: terminal ops (reboot, poweroff, sysupgrade, firstboot) and long-lived listeners (stopped by lifecycle signal, not timeout).
 - Every background worker is registered in one lifecycle. SIGTERM stops all; no UCI commit after stop.
 - Handler panic → 500; the process survives.
-- Wireless changes: snapshot → commit/apply → rollback watchdog → explicit user confirm, only after proof the device is still reachable. The backend NEVER self-confirms.
+- Wireless changes: snapshot → commit/apply → rollback watchdog → explicit user confirm, only after proof the device is still reachable. The backend NEVER self-confirms, with one exception: a saved WiFi schedule rule toggles an AP's `disabled` flag through the AP transaction and confirms after the AP probe passes ([adr/0027](adr/0027-wifi-schedule.md)).
 - Apply paths write UCI only. Never `wifi`, `wifi up/down/reload`, in any path. Auto-reconnect uses `ifup wwan` only. It is capped at 5 attempts, guarded, persists its counter, writes no UCI and never switches saved uplinks ([ADR 0014](adr/0014-capped-uplink-reconnect.md)).
 
 ## 2. Lockout safety

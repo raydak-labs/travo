@@ -127,6 +127,8 @@ type Deps struct {
 	WiFiAPs       WiFiAPEditor
 	WiFiGuest     WiFiGuestEditor
 	WiFiMAC       WiFiMACEditor
+	// WiFiSchedule is the AP on/off schedule; nil answers 503.
+	WiFiSchedule WiFiSchedule
 	// SSHKeys is root's authorized_keys; nil answers 503.
 	SSHKeys SSHKeys
 	// FactoryReset wipes the router; nil answers 503.
@@ -250,6 +252,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerAdGuard(a)
 	s.registerTailscale(a)
 	s.registerWiFiReconnect(a)
+	s.registerWiFiSchedule(a)
 	s.registerUSBTether(a)
 	s.registerFailover(a)
 	s.registerDashboardEvents(a)
@@ -277,6 +280,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "WiFiReconnect" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/usbtether":
 		return "USBTether" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/wifischedule":
+		return "WiFiSchedule" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/tailscale":
 		return "Tailscale" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/failover":

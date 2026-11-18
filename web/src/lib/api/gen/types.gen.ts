@@ -844,6 +844,56 @@ export type WiFiReconnectStatus = {
     state: 'idle' | 'retrying' | 'exhausted';
 };
 
+export type WiFiScheduleRule = {
+    /**
+     * Allow turning off the last non-guest AP (invariants §2)
+     */
+    acknowledge_lockout: boolean;
+    /**
+     * Weekdays, 0 = Sunday; both times apply on each
+     */
+    days: Array<number>;
+    enabled: boolean;
+    /**
+     * 8 hex characters; empty on PUT assigns one
+     */
+    id: string;
+    /**
+     * Router local time HH:MM to turn the AP off
+     */
+    off: string;
+    /**
+     * Router local time HH:MM to turn the AP back on
+     */
+    on: string;
+    /**
+     * UCI section of the access point
+     */
+    section: string;
+};
+
+export type WiFiScheduleRules = {
+    rules: Array<WiFiScheduleRule>;
+};
+
+export type WiFiScheduleRun = {
+    action: 'on' | 'off';
+    /**
+     * Router wall clock, unix seconds
+     */
+    at: number;
+    id: string;
+    outcome: 'applied' | 'unchanged' | 'rolled_back' | 'skipped_guard' | 'skipped_busy' | 'skipped_lockout' | 'failed';
+};
+
+export type WiFiScheduleStatus = {
+    /**
+     * null when unreadable
+     */
+    cron_running: boolean | null;
+    runs: Array<WiFiScheduleRun>;
+};
+
 export type WiFiSummary = {
     aps: Array<Ap>;
     radios: Array<RadioInfo>;
@@ -3665,6 +3715,109 @@ export type GetWiFiScanResponses = {
 };
 
 export type GetWiFiScanResponse = GetWiFiScanResponses[keyof GetWiFiScanResponses];
+
+export type GetWiFiScheduleData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/schedule';
+};
+
+export type GetWiFiScheduleErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiScheduleError = GetWiFiScheduleErrors[keyof GetWiFiScheduleErrors];
+
+export type GetWiFiScheduleResponses = {
+    /**
+     * OK
+     */
+    200: WiFiScheduleRules;
+};
+
+export type GetWiFiScheduleResponse = GetWiFiScheduleResponses[keyof GetWiFiScheduleResponses];
+
+export type SetWiFiScheduleData = {
+    body: WiFiScheduleRules;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/schedule';
+};
+
+export type SetWiFiScheduleErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetWiFiScheduleError = SetWiFiScheduleErrors[keyof SetWiFiScheduleErrors];
+
+export type SetWiFiScheduleResponses = {
+    /**
+     * OK
+     */
+    200: WiFiScheduleRules;
+};
+
+export type SetWiFiScheduleResponse = SetWiFiScheduleResponses[keyof SetWiFiScheduleResponses];
+
+export type GetWiFiScheduleStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/schedule/status';
+};
+
+export type GetWiFiScheduleStatusErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWiFiScheduleStatusError = GetWiFiScheduleStatusErrors[keyof GetWiFiScheduleStatusErrors];
+
+export type GetWiFiScheduleStatusResponses = {
+    /**
+     * OK
+     */
+    200: WiFiScheduleStatus;
+};
+
+export type GetWiFiScheduleStatusResponse = GetWiFiScheduleStatusResponses[keyof GetWiFiScheduleStatusResponses];
 
 export type GetWiFiUplinkMacData = {
     body?: never;

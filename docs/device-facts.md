@@ -77,6 +77,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 ## 8. Scheduled and button WiFi toggle (post-0.1)
 
 - Cron is `/etc/crontabs/root`; `/etc/cron.d` does NOT exist (write → ENOENT; the UI then shows a schedule that never fires).
+- [HW] 25.12.6: no zoneinfo. `/etc/TZ` holds the POSIX string (`GMT0`), `/etc/localtime` points to a missing `/tmp/localtime`, so Go's `time.Local` is UTC; crond (musl) applies the TZ. Schedules therefore fire from cron, not from a daemon timer (ADR 0027).
 - Buttons: detect from devicetree `/sys/firmware/devicetree/base/keys/*/label`; `/etc/rc.button` is generic stock scripts, not a source of truth. Hotplug button scripts run as root via procd.
 - The old toggle helper needed a stored rpcd login file; missing → every scheduled/button toggle silently no-opped. It also did uci set/commit/apply/confirm OUTSIDE in-process locks and could clobber the API's staged delta. In travo-greenfield helpers call the daemon instead (hook socket, ADR 0024).
 - [BUG] Auto-reconnect cron ran `wifi up` every minute with no uplink → radios flapping. Cap and guard. greenfield uses `ifup wwan`, capped at 5 (§2, ADR 0014).

@@ -187,7 +187,10 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		}
 	}
 
-	startHooks(deps, workers, func(*hook.Server) {})
+	// Actions may also be registered later (Register is safe while serving): the WiFi
+	// schedule adds one pair per rule once the AP editor exists.
+	var hooks *hook.Server
+	startHooks(deps, workers, func(s *hook.Server) { hooks = s })
 
 	sessions, err := startState(ctx, deps)
 	if err != nil {
@@ -369,6 +372,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		RouterIPs: provider.RouterIPs, HostAllow: hostAllow,
 		SaveEpoch: func(n uint64) error { return epochfile.Save(deps.Paths.EpochFile(), n) },
 		UI:        uiHandler(staticDir),
+	}
+	if svc := startWiFiSchedule(ctx, deps, hooks, wirelessAPs); svc != nil {
+		apiDeps.WiFiSchedule = svc
 	}
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	apiDeps.Alerts = newAlerts(deps, aghService, reconnect)
