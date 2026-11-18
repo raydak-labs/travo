@@ -12,6 +12,7 @@ describe('router', () => {
     ['#/system', 'system'],
     ['#/system?tab=x', 'system'],
     ['#/system/tokens', 'system-tokens'],
+    ['#/vpn/tailscale', 'vpn-tailscale'],
   ])('maps %j to %s', (hash, route) => {
     expect(parseHash(hash)).toBe(route);
   });
@@ -30,6 +31,7 @@ describe('router', () => {
       'vpn',
       'system',
       'system-tokens',
+      'vpn-tailscale',
     ] as const) {
       expect(parseHash(href(r))).toBe(r);
     }
@@ -42,6 +44,7 @@ describe('router', () => {
 
   it('highlights the parent section for a subpage', () => {
     expect(section('system-tokens')).toBe('system');
+    expect(section('vpn-tailscale')).toBe('vpn');
     expect(section('wifi')).toBe('wifi');
   });
 });
@@ -57,6 +60,7 @@ describe('guard', () => {
     'services',
     'system',
     'system-tokens',
+    'vpn-tailscale',
   ];
   const expected: Record<AuthState, Record<Route, Route>> = {
     unknown: {
@@ -69,6 +73,7 @@ describe('guard', () => {
       services: 'services',
       system: 'system',
       'system-tokens': 'system-tokens',
+      'vpn-tailscale': 'vpn-tailscale',
     },
     setup_required: {
       dashboard: 'setup',
@@ -80,6 +85,7 @@ describe('guard', () => {
       services: 'setup',
       system: 'setup',
       'system-tokens': 'setup',
+      'vpn-tailscale': 'setup',
     },
     anonymous: {
       dashboard: 'login',
@@ -91,6 +97,7 @@ describe('guard', () => {
       services: 'login',
       system: 'login',
       'system-tokens': 'login',
+      'vpn-tailscale': 'login',
     },
     authenticated: {
       dashboard: 'dashboard',
@@ -102,6 +109,7 @@ describe('guard', () => {
       services: 'services',
       system: 'system',
       'system-tokens': 'system-tokens',
+      'vpn-tailscale': 'vpn-tailscale',
     },
   };
   const cases = (Object.keys(expected) as AuthState[]).flatMap((state) =>

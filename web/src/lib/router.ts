@@ -7,7 +7,8 @@ export type Route =
   | 'vpn'
   | 'services'
   | 'system'
-  | 'system-tokens';
+  | 'system-tokens'
+  | 'vpn-tailscale';
 
 const ROUTES: Record<string, Route> = {
   '/': 'dashboard',
@@ -19,6 +20,7 @@ const ROUTES: Record<string, Route> = {
   '/services': 'services',
   '/system': 'system',
   '/system/tokens': 'system-tokens',
+  '/vpn/tailscale': 'vpn-tailscale',
 };
 
 const PATHS = Object.fromEntries(
@@ -27,7 +29,8 @@ const PATHS = Object.fromEntries(
 
 /** The nav entry a route belongs to: a subpage highlights its parent. */
 export function section(route: Route): Route {
-  return route === 'system-tokens' ? 'system' : route;
+  if (route === 'system-tokens') return 'system';
+  return route === 'vpn-tailscale' ? 'vpn' : route;
 }
 
 /** Maps a location hash (`#/wifi`) to a route; anything unknown is the dashboard. */

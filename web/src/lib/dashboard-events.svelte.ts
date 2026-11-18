@@ -1,9 +1,15 @@
 import { scopedAPIClient } from './api/client';
 import { fetchConnectivity } from './api/connectivity';
-import type { DashboardConnectivity, SystemInfoBody, ThroughputBody } from './api/gen';
+import type {
+  DashboardConnectivity,
+  SystemInfoBody,
+  TailscaleStatus,
+  ThroughputBody,
+} from './api/gen';
 import type { Client } from './api/gen/client';
 import { APIRequestError } from './api/request';
 import { fetchSystemInfo } from './api/system';
+import { fetchTailscale } from './api/tailscale';
 import { fetchThroughput } from './api/throughput';
 import {
   type DashboardSourceName,
@@ -29,6 +35,7 @@ const readers: Record<DashboardSourceName, Reader> = {
   connectivity: fetchConnectivity,
   resources: fetchSystemInfo,
   throughput: fetchThroughput,
+  tailscale: fetchTailscale,
 };
 
 type Ownership = {
@@ -64,10 +71,12 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
   const connectivity = $state(freshState());
   const resources = $state(freshState());
   const throughput = $state(freshState());
+  const tailscale = $state(freshState());
   const states: Record<DashboardSourceName, SourceState> = {
     connectivity,
     resources,
     throughput,
+    tailscale,
   };
   let streaming = $state(false);
   let active: Ownership | undefined;
@@ -220,8 +229,8 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
       controller: new AbortController(),
       client: clientFactory(),
       connected: false,
-      inFlight: { connectivity: false, resources: false, throughput: false },
-      versions: { connectivity: 0, resources: 0, throughput: 0 },
+      inFlight: { connectivity: false, resources: false, throughput: false, tailscale: false },
+      versions: { connectivity: 0, resources: 0, throughput: 0, tailscale: 0 },
     };
     active = owner;
     startFallback(owner);
@@ -233,6 +242,7 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
     connectivity: view<DashboardConnectivity>('connectivity'),
     resources: view<SystemInfoBody>('resources'),
     throughput: view<ThroughputBody>('throughput'),
+    tailscale: view<TailscaleStatus>('tailscale'),
     get streaming(): boolean {
       return streaming;
     },

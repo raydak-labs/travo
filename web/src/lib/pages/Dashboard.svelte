@@ -3,6 +3,7 @@ import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Table from '$lib/components/ui/table';
 import { fetchHealth } from '../api/health';
+import { tailscalePhase } from '../api/tailscale';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
@@ -19,12 +20,15 @@ import VPNTunnelPanel from './VPNTunnelPanel.svelte';
 
 let {
   events,
-}: { events: Pick<typeof dashboardEvents, 'connectivity' | 'resources' | 'throughput'> } = $props();
+}: {
+  events: Pick<typeof dashboardEvents, 'connectivity' | 'resources' | 'throughput' | 'tailscale'>;
+} = $props();
 
 const connectivity = $derived(events.connectivity);
 const health = createLoader(fetchHealth);
 const resources = $derived(events.resources);
 const throughput = $derived(events.throughput);
+const tailscale = $derived(events.tailscale);
 // Same status poll and guarded toggle as the VPN page: Enable, then Confirm (two taps).
 const vpn = createLoader(fetchVpnStatus, 10000);
 const tunnel = createTunnelControl(() => vpn.retry());
@@ -45,6 +49,15 @@ const mediumLabel = {
   wifi: m.dashboard_medium_wifi,
   usb: m.dashboard_medium_usb,
   virtual: m.dashboard_medium_virtual,
+} as const;
+
+const tailscaleLabel = {
+  absent: m.tailscale_state_absent,
+  stopped: m.tailscale_state_stopped,
+  login: m.tailscale_state_login,
+  connected: m.tailscale_state_connected,
+  off: m.tailscale_state_off,
+  starting: m.tailscale_state_starting,
 } as const;
 
 function formatRate(rate: number | null): string {
@@ -101,6 +114,21 @@ function formatRate(rate: number | null): string {
     <VPNTunnelPanel status={vpn} control={tunnel} canEnable={(snapshot) => snapshot.state === 'configured'} />
     <Button variant="link" size="sm" class="self-start px-0" href={href('vpn')}>{m.dashboard_vpn_settings()}</Button>
   </Card>
+  {#if tailscale.data?.installed}
+    {@const phase = tailscalePhase(tailscale.data)}
+    <Card title={m.tailscale_title()}>
+      <div class="flex flex-wrap items-center gap-2">
+        <Status kind={phase === 'connected' ? 'ok' : phase === 'login' || phase === 'stopped' ? 'warn' : 'neutral'}>{tailscaleLabel[phase]()}</Status>
+        {#if phase === 'connected' && tailscale.data.settings.exit_node}
+          <Status kind="info">{m.tailscale_exit_active()}</Status>
+        {/if}
+      </div>
+      {#if phase === 'connected'}
+        <p class="break-all text-muted-foreground">{(tailscale.data.self.ips ?? []).join(', ')}</p>
+      {/if}
+      <Button variant="link" size="sm" class="self-start px-0" href={href('vpn-tailscale')}>{m.tailscale_open()}</Button>
+    </Card>
+  {/if}
   <Card title={m.dashboard_daemon()}>
     <LoadState status={health.status} retry={health.retry}>
       <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">

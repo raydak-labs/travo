@@ -1,11 +1,13 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
@@ -191,4 +193,26 @@ func TestTailscaleRoutesWithoutService(t *testing.T) {
 	if got := e.do(req{method: "POST", path: "/api/v1/tailscale/login", cookie: cookie, csrf: csrf}); got.Code != 503 {
 		t.Fatalf("%d", got.Code)
 	}
+}
+
+func TestDashboardEventsCarryTailscale(t *testing.T) {
+	fake := &fakeTailscale{status: tailscale.Status{Installed: true, Backend: tailscale.Backend{State: tailscale.StateRunning}}}
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.Tailscale = fake })
+	cookie, _ := e.login()
+	server := httptest.NewServer(e.h)
+	defer server.Close()
+	resp := openEventStream(t, server.URL, cookie)
+	defer resp.Body.Close()
+	reader := bufio.NewReader(resp.Body)
+	_ = readSSEFrame(t, reader)
+	for range 10 {
+		name, data := parseSSEEvent(t, readSSEFrame(t, reader))
+		if name == "tailscale" {
+			if data["backend_state"] != "Running" {
+				t.Fatalf("data %v", data)
+			}
+			return
+		}
+	}
+	t.Fatal("no tailscale event")
 }

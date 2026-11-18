@@ -249,7 +249,7 @@ export const getDashboardConnectivity = <ThrowOnError extends boolean = false>(o
 /**
  * Live dashboard status
  *
- * Server-sent events named connectivity, resources, throughput and source_unavailable. Event data is the corresponding dashboard GET body; source_unavailable data identifies the failed source.
+ * Server-sent events named connectivity, resources, throughput, tailscale (only when the daemon supervises the package) and source_unavailable. Event data is the corresponding dashboard GET body; source_unavailable data identifies the failed source.
  */
 export const getDashboardEvents = <ThrowOnError extends boolean = false>(options?: Options<GetDashboardEventsData, ThrowOnError, GetDashboardEventsResponse>): Promise<ServerSentEventsResult<GetDashboardEventsResponses>> => (options?.client ?? client).sse.get<GetDashboardEventsResponses, GetDashboardEventsErrors, ThrowOnError>({
     security: [{

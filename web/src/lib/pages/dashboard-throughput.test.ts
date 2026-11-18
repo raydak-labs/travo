@@ -11,6 +11,7 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
     connectivity: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
     resources: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
     throughput: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
+    tailscale: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
@@ -61,5 +62,35 @@ describe('Dashboard throughput', () => {
     const body = dashboard({ state: 'ready' }, []);
     expect(body).toContain('No interfaces reported');
     expect(body).not.toContain('Last known value');
+  });
+});
+
+describe('Dashboard Tailscale', () => {
+  beforeEach(() => {
+    vi.stubGlobal('document', { documentElement: { getAttribute: () => null } });
+  });
+  afterEach(() => {
+    dashboardEvents.tailscale.data = undefined;
+    vi.unstubAllGlobals();
+  });
+
+  it('stays hidden while the package is absent', () => {
+    dashboardEvents.tailscale.data = { installed: false };
+    expect(dashboard({ state: 'ready' }, [])).not.toContain('Open Tailscale');
+  });
+
+  it('shows the pushed state, addresses and an active exit node', () => {
+    dashboardEvents.tailscale.data = {
+      installed: true,
+      running: true,
+      backend_state: 'Running',
+      self: { ips: ['100.64.0.1'] },
+      settings: { exit_node: 'nA', advertise_lan: false, ssh: false },
+    };
+    const body = dashboard({ state: 'ready' }, []);
+    expect(body).toContain('Connected');
+    expect(body).toContain('100.64.0.1');
+    expect(body).toContain('Exit node in use');
+    expect(body).toContain('#/vpn/tailscale');
   });
 });

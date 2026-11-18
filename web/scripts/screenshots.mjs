@@ -14,6 +14,7 @@ const SIGNED_IN_ROUTES = [
   '/system',
   '/system/tokens',
   '/vpn',
+  '/vpn/tailscale',
   '/services',
 ];
 const MOCK_PASSWORD = 'mock-password';

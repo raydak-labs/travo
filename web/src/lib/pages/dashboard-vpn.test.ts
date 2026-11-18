@@ -9,7 +9,12 @@ const { createLoader, dashboardEvents, vpn } = vi.hoisted(() => {
   const idle = () => ({ status: { state: 'ready' }, data: undefined, retry: () => {} });
   return {
     createLoader: vi.fn(),
-    dashboardEvents: { connectivity: idle(), resources: idle(), throughput: idle() },
+    dashboardEvents: {
+      connectivity: idle(),
+      resources: idle(),
+      throughput: idle(),
+      tailscale: idle(),
+    },
     vpn: {
       status: { state: 'ready' } as LoadStatus,
       data: undefined as TunnelStatus | undefined,

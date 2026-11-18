@@ -8,6 +8,7 @@ import '../api/client';
 import { deleteVpnProfile, getVpnProfiles, postVpnProfile, selectVpnProfile } from '../api/gen';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
+import { href } from '../router';
 import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
@@ -102,6 +103,11 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
         {/if}
       {/snippet}
     </VPNTunnelPanel>
+  </Card>
+
+  <Card title={m.tailscale_title()}>
+    <p class="text-muted-foreground">{m.tailscale_vpn_intro()}</p>
+    <Button variant="outline" size="sm" class="self-start" href={href('vpn-tailscale')}>{m.tailscale_open()}</Button>
   </Card>
 
   <VPNKillSwitchCard tunnel={status.data} />

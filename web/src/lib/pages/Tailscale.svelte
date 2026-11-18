@@ -1,0 +1,115 @@
+<script lang="ts">
+import { onDestroy } from 'svelte';
+import Alert from '$lib/components/ui/alert/alert.svelte';
+import Button from '$lib/components/ui/button/button.svelte';
+import type { TailscaleSettings } from '../api/gen';
+import {
+  changeTailscale,
+  fetchTailscale,
+  type TailscaleAction,
+  tailscalePhase,
+} from '../api/tailscale';
+import { m } from '../paraglide/messages.js';
+import { href } from '../router';
+import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
+import LoadState from '../ui/LoadState.svelte';
+import { createLoader } from '../ui/loader.svelte';
+import { notify } from '../ui/notify';
+import Status from '../ui/Status.svelte';
+import TailscaleOptions from './TailscaleOptions.svelte';
+
+const request = new AbortController();
+const ts = createLoader(fetchTailscale, 10000);
+const confirm = createConfirm();
+let pending = $state<TailscaleAction>();
+onDestroy(() => {
+  ts.stop();
+  request.abort();
+});
+
+async function change(action: TailscaleAction, settings?: TailscaleSettings) {
+  if (pending) return;
+  pending = action;
+  notify.progress(
+    action === 'install' ? m.tailscale_installing() : m.tailscale_applying(),
+    'tailscale',
+  );
+  const result = await changeTailscale(action, request.signal, settings);
+  if (request.signal.aborted) {
+    notify.dismiss('tailscale');
+    return;
+  }
+  pending = undefined;
+  if ('error' in result) notify.error(result.error, 'tailscale');
+  else notify.success(m.tailscale_done(), 'tailscale');
+  await ts.retry();
+}
+
+async function logout() {
+  const ok = await confirm.ask({
+    title: m.tailscale_logout_title(),
+    description: m.tailscale_logout_body(),
+    action: m.tailscale_logout(),
+    tone: 'danger',
+  });
+  if (ok) void change('logout');
+}
+
+const phaseStatus = {
+  absent: { kind: 'neutral', label: m.tailscale_state_absent },
+  stopped: { kind: 'warn', label: m.tailscale_state_stopped },
+  login: { kind: 'warn', label: m.tailscale_state_login },
+  connected: { kind: 'ok', label: m.tailscale_state_connected },
+  off: { kind: 'neutral', label: m.tailscale_state_off },
+  starting: { kind: 'info', label: m.tailscale_state_starting },
+} as const;
+</script>
+
+<div class="grid gap-4">
+  <Button variant="link" size="sm" class="justify-self-start px-0" href={href('vpn')}>{m.tailscale_back()}</Button>
+  <Card title={m.tailscale_title()}>
+    <LoadState status={ts.status} retry={ts.retry} stale={ts.data !== undefined}>
+      {#if ts.data}
+        {@const st = ts.data}
+        {@const phase = tailscalePhase(st)}
+        <div class="flex flex-wrap items-center gap-2">
+          <Status kind={phaseStatus[phase].kind}>{phaseStatus[phase].label()}</Status>
+          {#if st.busy}<Status kind="info">{m.tailscale_busy()}</Status>{/if}
+        </div>
+        {#if st.installed && st.prefs.accept_dns}
+          <Alert class="mt-3 text-danger" role="alert">{m.tailscale_accept_dns_warning()}</Alert>
+        {/if}
+        {#if phase === 'absent'}
+          <p class="mt-2 text-muted-foreground">{m.tailscale_absent_body()}</p>
+          <Button variant="outline" size="sm" type="button" class="mt-3 self-start" disabled={pending !== undefined || st.busy} onclick={() => change('install')}>{m.tailscale_install()}</Button>
+        {:else if phase === 'login' && st.auth_url}
+          <p class="mt-2 text-muted-foreground">{m.tailscale_login_body()}</p>
+          <Button size="sm" class="mt-3 self-start" href={st.auth_url} target="_blank" rel="noopener noreferrer">{m.tailscale_open_login()}</Button>
+        {:else if phase === 'login' || phase === 'off'}
+          <Button variant="outline" size="sm" type="button" class="mt-3 self-start" disabled={pending !== undefined || st.busy} onclick={() => change('login')}>{phase === 'login' ? m.tailscale_login() : m.tailscale_connect()}</Button>
+        {:else if phase === 'connected'}
+          <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+            <dt class="text-muted-foreground">{m.tailscale_name()}</dt>
+            <dd class="break-all">{st.self.dns_name.replace(/\.$/, '') || st.self.host_name}</dd>
+            <dt class="text-muted-foreground">{m.tailscale_addresses()}</dt>
+            <dd class="break-all">{(st.self.ips ?? []).join(', ')}</dd>
+            {#if st.magic_dns.enabled}
+              <dt class="text-muted-foreground">{m.tailscale_magic_dns()}</dt>
+              <dd class="break-all">{st.magic_dns.suffix}</dd>
+            {/if}
+          </dl>
+          <Button variant="outline" size="sm" type="button" class="mt-3 self-start" disabled={pending !== undefined || st.busy} onclick={logout}>{m.tailscale_logout()}</Button>
+        {/if}
+        {#if st.installed}<p class="mt-2 text-muted-foreground">{m.tailscale_version({ version: st.version })}</p>{/if}
+      {/if}
+    </LoadState>
+  </Card>
+
+  {#if ts.data && tailscalePhase(ts.data) === 'connected'}
+    <TailscaleOptions status={ts.data} disabled={pending !== undefined || ts.data.busy} {confirm} onchange={(settings) => change('settings', settings)} refresh={() => ts.retry()} />
+  {/if}
+</div>
+
+<ConfirmDialog {confirm} />
