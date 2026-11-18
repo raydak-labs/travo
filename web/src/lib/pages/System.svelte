@@ -22,7 +22,11 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import PasswordField from '../ui/PasswordField.svelte';
+import { lazyPage } from './lazy';
+import PageHost from './PageHost.svelte';
 import SystemUpdate from './SystemUpdate.svelte';
+
+const settingsCard = lazyPage(() => import('./SystemSettingsCard.svelte'));
 
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
@@ -173,6 +177,8 @@ async function logout() {
       {/if}
     </LoadState>
   </Card>
+
+  <PageHost load={settingsCard} />
 
   <SystemUpdate />
 

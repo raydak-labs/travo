@@ -22,6 +22,7 @@ The dashboard shows the active uplink, carrier, and internet reachability separa
 
 The **WiFi** page summarizes configured radios, uplink STA and access points, and its **Scan** button lists nearby networks without changing live state.
 
+**System → Device settings** changes the router's hostname, time zone and NTP time servers.
 Use **System → Download backup** to save the router configuration as `travo-config.tar.gz`.
 Use **System → Restart router** to restart the router after confirming; the page reconnects when it is back.
 

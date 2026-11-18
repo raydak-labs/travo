@@ -433,5 +433,20 @@
   "captive_bypass_body": "DNS filtering and VPN DNS pause for 5 minutes so the hotel login page can load. They restore automatically.",
   "captive_dns_restored": "DNS restored.",
   "captive_dns_bypassed": "Hotel DNS in use for 5 minutes.",
-  "adguard_done": "AdGuard Home updated."
+  "adguard_done": "AdGuard Home updated.",
+  "settings_title": "Device settings",
+  "settings_hostname": "Hostname",
+  "settings_hostname_invalid": "Use 1 to 63 letters, digits or '-', not starting or ending with '-'.",
+  "settings_zone": "Time zone",
+  "settings_zone_hint": "Start typing a city, for example Europe/Berlin.",
+  "settings_zone_invalid": "Pick a time zone from the list.",
+  "settings_ntp": "Sync the clock with time servers (NTP)",
+  "settings_ntp_servers": "Time servers",
+  "settings_ntp_servers_hint": "One host name or IP address per line, up to 8.",
+  "settings_save": "Save settings",
+  "settings_saved": "Saved",
+  "settings_unavailable": "Device settings are unavailable",
+  "settings_err_invalid": "The router rejected a value. Check the hostname, time zone and servers.",
+  "settings_err_busy": "Another change to the system configuration is in progress. Try again.",
+  "settings_err_failed": "Could not save the device settings. Try again."
 }

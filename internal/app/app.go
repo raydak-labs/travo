@@ -86,6 +86,9 @@ func New(o Options) (Deps, error) {
 		if secs, err := cli.ParseExport("dhcp", string(mock.DHCPExport)); err == nil {
 			_ = dev.Load(context.Background(), "dhcp", secs) // the embedded capture always parses (seed test)
 		}
+		if secs, err := cli.ParseExport("system", string(mock.SystemExport)); err == nil {
+			_ = dev.Load(context.Background(), "system", secs)
+		}
 		wireless, err := cli.ParseShow("wireless", string(mock.WirelessUCI))
 		if err != nil {
 			return Deps{}, fmt.Errorf("mock wireless: %w", err)

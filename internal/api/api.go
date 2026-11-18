@@ -127,6 +127,8 @@ type Deps struct {
 	WiFiMAC       WiFiMACEditor
 	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
 	USBTether USBTether
+	// SystemSettings is hostname, time zone and NTP; nil answers 503.
+	SystemSettings SystemSettings
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -212,6 +214,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerSetup(a)
 	s.registerTxn(a)
 	s.registerSystem(a)
+	s.registerSystemSettings(a)
 	s.registerReboot(a)
 	s.registerVPNProfiles(a)
 	s.registerVPNStatus(a)

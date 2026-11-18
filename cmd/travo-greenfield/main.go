@@ -33,6 +33,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
 	"github.com/blackdark-org/travo-greenfield/internal/static"
+	"github.com/blackdark-org/travo-greenfield/internal/syssettings"
 	"github.com/blackdark-org/travo-greenfield/internal/throughput"
 	"github.com/blackdark-org/travo-greenfield/internal/tlscert"
 	"github.com/blackdark-org/travo-greenfield/internal/trust"
@@ -351,6 +352,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		SaveEpoch: func(n uint64) error { return epochfile.Save(deps.Paths.EpochFile(), n) },
 		UI:        uiHandler(staticDir),
 	}
+	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source
 	if listenTLS != "" {

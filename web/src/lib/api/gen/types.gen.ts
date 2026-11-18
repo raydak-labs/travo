@@ -260,6 +260,17 @@ export type Network = {
     ssid: string;
 };
 
+export type NtpBody = {
+    /**
+     * Keep the clock in sync with the servers (sysntpd)
+     */
+    enabled: boolean;
+    /**
+     * NTP servers: host names or IP addresses, in order
+     */
+    servers: Array<string>;
+};
+
 export type OkBody = {
     status: 'ok';
 };
@@ -432,6 +443,22 @@ export type SystemInfoBody = {
     uptime_seconds: number;
 };
 
+export type SystemSettingsBody = {
+    /**
+     * Router host name (one DNS label)
+     */
+    hostname: string;
+    ntp: NtpBody;
+    /**
+     * POSIX TZ string derived from zonename; send it back unchanged or empty
+     */
+    timezone: string;
+    /**
+     * IANA time zone, e.g. Europe/Berlin; UTC is the OpenWrt default
+     */
+    zonename: string;
+};
+
 export type TailscaleExitNode = {
     /**
      * This router routes through this exit node now
@@ -511,6 +538,13 @@ export type TailscaleStatus = {
 
 export type ThroughputBody = {
     interfaces: Array<Rate>;
+};
+
+export type TimezonesOutputBody = {
+    /**
+     * Selectable IANA zones, UTC first
+     */
+    zonenames: Array<string>;
 };
 
 export type Token = {
@@ -1462,6 +1496,101 @@ export type PostSystemRebootResponses = {
 };
 
 export type PostSystemRebootResponse = PostSystemRebootResponses[keyof PostSystemRebootResponses];
+
+export type GetSystemSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/settings';
+};
+
+export type GetSystemSettingsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetSystemSettingsError = GetSystemSettingsErrors[keyof GetSystemSettingsErrors];
+
+export type GetSystemSettingsResponses = {
+    /**
+     * OK
+     */
+    200: SystemSettingsBody;
+};
+
+export type GetSystemSettingsResponse = GetSystemSettingsResponses[keyof GetSystemSettingsResponses];
+
+export type SetSystemSettingsData = {
+    body: SystemSettingsBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/settings';
+};
+
+export type SetSystemSettingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetSystemSettingsError = SetSystemSettingsErrors[keyof SetSystemSettingsErrors];
+
+export type SetSystemSettingsResponses = {
+    /**
+     * OK
+     */
+    200: SystemSettingsBody;
+};
+
+export type SetSystemSettingsResponse = SetSystemSettingsResponses[keyof SetSystemSettingsResponses];
+
+export type GetTimezonesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/timezones';
+};
+
+export type GetTimezonesErrors = {
+    /**
+     * Error
+     */
+    default: ApiError;
+};
+
+export type GetTimezonesError = GetTimezonesErrors[keyof GetTimezonesErrors];
+
+export type GetTimezonesResponses = {
+    /**
+     * OK
+     */
+    200: TimezonesOutputBody;
+};
+
+export type GetTimezonesResponse = GetTimezonesResponses[keyof GetTimezonesResponses];
 
 export type GetSystemUpdateApplyData = {
     body?: never;

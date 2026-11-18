@@ -72,3 +72,6 @@ No phone was attached: the tether link payloads (sysfs, `network.device status`,
 ## usbtether/ (2026-11-18, OpenWrt 25.12.6 feed, #176)
 - apk-packages.txt: after `apk update`, `apk search -v kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net-ipheth usbmuxd`, `apk info -R` for each tether package, and `apk info -s` for the packages and their dependencies. None was installed. Verbatim.
 No phone was attached: the USB tether link payloads (sysfs, `network.device status`) are a hardware playbook capture step.
+
+## uci-export-system.txt (2026-11-18, 0.2.0 system settings, #190)
+- uci-export-system.txt: `uci export system` on the firstboot 25.12.6 image (hostname, zonename/timezone POSIX pair, sysntpd `timeserver ntp` with its server list). No values needed redaction; every byte is verbatim.

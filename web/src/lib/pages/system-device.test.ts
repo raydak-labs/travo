@@ -23,10 +23,13 @@ describe('System Device card', () => {
     vi.doMock('../ui/loader.svelte', () => ({
       createLoader: () => ({ status: { state: 'ready' }, data: info, retry: async () => {} }),
     }));
+    // Lazy cards have their own tests; here the host would get the system info as a component.
+    vi.doMock('./PageHost.svelte', () => ({ default: () => {} }));
     const { default: System } = await import('./System.svelte');
     const { body } = render(System);
     vi.unstubAllGlobals();
     vi.doUnmock('../ui/loader.svelte');
+    vi.doUnmock('./PageHost.svelte');
     for (const text of [
       'Device',
       'GL.iNet GL-AXT1800',

@@ -21,3 +21,9 @@ func SeedSystem(d *Device) {
 //
 //go:embed testdata/uci-export-dhcp.txt
 var DHCPExport []byte
+
+// SystemExport is the router's `uci export system` (hostname, timezone, NTP); mock mode
+// loads it as the `system` config.
+//
+//go:embed testdata/uci-export-system.txt
+var SystemExport []byte
