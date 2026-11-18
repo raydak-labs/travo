@@ -27,3 +27,12 @@ var DHCPExport []byte
 //
 //go:embed testdata/uci-export-system.txt
 var SystemExport []byte
+
+// NetworkExport and FirewallExport are the router's `uci export network` / `firewall`
+// (wwan uplink, guest AP, VPN zone); mock mode loads them so uplink features read a real layout.
+//
+//go:embed testdata/uci-export-network.txt
+var NetworkExport []byte
+
+//go:embed testdata/uci-export-firewall.txt
+var FirewallExport []byte

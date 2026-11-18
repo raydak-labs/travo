@@ -59,8 +59,8 @@ type Driver struct {
 
 // Status is a read-only view; GET never mutates.
 type Status struct {
-	Links   []Link   `json:"links"`
-	Drivers []Driver `json:"drivers"`
+	Links   []Link   `json:"links" nullable:"false"`
+	Drivers []Driver `json:"drivers" nullable:"false"`
 	// Configured: `network.usbtether` exists.
 	Configured bool   `json:"configured"`
 	Device     string `json:"device" doc:"Netdev network.usbtether binds; empty when not configured"`

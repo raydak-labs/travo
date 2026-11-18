@@ -11,5 +11,7 @@ The WiFi seeds use the connected summary with one scan per radio. Per-interface 
 
 - `uci-export-dhcp.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/uci-export-dhcp.txt`; mock mode loads it as the `dhcp` config so the DNS layer stack has a real dnsmasq section.
 
+- `uci-export-network.txt` and `uci-export-firewall.txt` are byte-identical copies from `testdata/device/axt1800-25.12.6/usbtether/` (already redacted there); mock mode loads them as the `network` and `firewall` configs.
+
 - `sysfs-net-links.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/sysfs-net/links.tsv`; mock mode lists these netdevs. No phone capture exists yet, so mock mode has no tether link until `AddNetLink` adds one (tests).
 - `uci-export-system.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/uci-export-system.txt`; mock mode loads it as the `system` config so the device settings card reads and writes the real section shapes.
