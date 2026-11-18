@@ -319,7 +319,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		adguardSvc = svc
 	}
 	var tailscaleSvc api.Tailscale
-	if svc := startTailscale(deps, dnsLayers, workers, connection); svc != nil {
+	if svc := startTailscale(deps, dnsLayers, workers, connection, vpnStatus); svc != nil {
 		tailscaleSvc = svc
 	}
 	apiDeps := api.Deps{

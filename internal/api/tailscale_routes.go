@@ -11,6 +11,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
 	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
+	"github.com/blackdark-org/travo-greenfield/internal/txn"
 )
 
 // Tailscale is the slice of tailscale.Service the API needs.
@@ -20,6 +21,13 @@ type Tailscale interface {
 	Install(context.Context) error
 	Login(context.Context) (tailscale.Status, error)
 	Logout(context.Context) (tailscale.Status, error)
+	SetSettings(context.Context, tailscale.Settings) (tailscale.Status, error)
+	// ApplyFirewall begins the firewall transaction for the travo_ts zone.
+	ApplyFirewall(context.Context) (txn.Status, error)
+}
+
+type tailscaleSettingsInput struct {
+	Body tailscale.Settings
 }
 
 type tailscaleStatusOutput struct {
@@ -39,6 +47,44 @@ func (s *server) registerTailscale(a huma.API) {
 		x := op(o.id, http.MethodPost, o.path, o.summary, "tailscale", 409, 503)
 		x.MaxBodyBytes = 1024
 		register(s, false, x, a, o.h)
+	}
+	set := op("setTailscaleSettings", http.MethodPut, "/api/v1/tailscale/settings", "Set exit node, LAN advertisement and Tailscale SSH", "tailscale", 400, 409, 503)
+	set.MaxBodyBytes = 1024
+	register(s, false, set, a, s.setTailscaleSettings)
+	fw := op("applyTailscaleFirewall", http.MethodPost, "/api/v1/tailscale/firewall", "Stage the Tailscale firewall zone in a transaction", "tailscale", 409, 503)
+	fw.DefaultStatus = http.StatusAccepted
+	fw.MaxBodyBytes = 1024
+	register(s, false, fw, a, s.applyTailscaleFirewall)
+}
+
+func (s *server) setTailscaleSettings(ctx context.Context, in *tailscaleSettingsInput) (*tailscaleStatusOutput, error) {
+	return s.tailscaleChange(ctx, "settings", func(ctx context.Context) (tailscale.Status, error) {
+		return s.Tailscale.SetSettings(ctx, in.Body)
+	})
+}
+
+func (s *server) applyTailscaleFirewall(ctx context.Context, _ *struct{}) (*txnOutput, error) {
+	if s.Tailscale == nil {
+		return nil, tailscaleUnavailable()
+	}
+	st, err := s.Tailscale.ApplyFirewall(ctx)
+	if st.ID != "" {
+		switch st.State {
+		case txn.Pending, txn.RolledBack, txn.Restoring, txn.RollbackFailed:
+			return txnResponse(st), nil
+		}
+	}
+	switch {
+	case err == nil:
+		return txnResponse(st), nil
+	case errors.Is(err, txn.ErrActive):
+		return nil, fail(409, "transaction_pending", "A transaction is already pending")
+	case errors.Is(err, txn.ErrNoChanges):
+		return nil, fail(409, "tailscale_no_change", "The Tailscale firewall zone is already in place")
+	case errors.Is(err, tailscale.ErrFirewallConflict):
+		return nil, fail(409, "tailscale_firewall_conflict", err.Error())
+	default:
+		return nil, tailscaleError("firewall", err)
 	}
 }
 
@@ -105,6 +151,14 @@ func tailscaleError(what string, err error) error {
 		return fail(409, "tailscale_offline", "Tailscale installs once the router has Internet")
 	case errors.Is(err, tailscale.ErrNoSpace):
 		return fail(409, "tailscale_no_space", err.Error())
+	case errors.Is(err, tailscale.ErrExitNodeUnknown):
+		return fail(409, "tailscale_exit_node_unknown", tailscale.ErrExitNodeUnknown.Error())
+	case errors.Is(err, tailscale.ErrExitNodeConflict):
+		return fail(409, "tailscale_exit_node_conflict", tailscale.ErrExitNodeConflict.Error())
+	case errors.Is(err, tailscale.ErrExitNodeOffline):
+		return fail(409, "tailscale_exit_node_offline", tailscale.ErrExitNodeOffline.Error())
+	case errors.Is(err, tailscale.ErrNoLAN):
+		return fail(409, "tailscale_no_lan", tailscale.ErrNoLAN.Error())
 	default:
 		slog.Warn("tailscale "+what, "err", err)
 		return fail(503, "tailscale_failed", "Tailscale "+what+" failed; see the system log")

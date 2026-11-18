@@ -11,6 +11,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
 	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
+	"github.com/blackdark-org/travo-greenfield/internal/txn"
 )
 
 type fakeTailscale struct {
@@ -37,6 +38,83 @@ func (f *fakeTailscale) Login(context.Context) (tailscale.Status, error) {
 func (f *fakeTailscale) Logout(context.Context) (tailscale.Status, error) {
 	f.calls = append(f.calls, "logout")
 	return f.status, f.err
+}
+
+func (f *fakeTailscale) SetSettings(_ context.Context, in tailscale.Settings) (tailscale.Status, error) {
+	f.calls = append(f.calls, fmt.Sprintf("settings %+v", in))
+	return f.status, f.err
+}
+
+func (f *fakeTailscale) ApplyFirewall(context.Context) (txn.Status, error) {
+	f.calls = append(f.calls, "firewall")
+	if f.err != nil {
+		return txn.Status{}, f.err
+	}
+	return txn.Status{ID: "0123456789abcdef", State: txn.Pending, Configs: []string{"firewall"}}, nil
+}
+
+func TestTailscaleSettingsRoute(t *testing.T) {
+	fake := &fakeTailscale{}
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.Tailscale = fake })
+	cookie, csrf := e.login()
+	put := func(body string) int {
+		return e.do(req{method: "PUT", path: "/api/v1/tailscale/settings", body: body, cookie: cookie, csrf: csrf}).Code
+	}
+	for _, bad := range []string{`{}`, `{"exit_node":"","advertise_lan":true}`, `{"exit_node":null,"advertise_lan":true,"ssh":false}`,
+		`{"exit_node":"","advertise_lan":true,"ssh":false,"extra":1}`, `{"exit_node":"","advertise_lan":true,"ssh":false} {}`,
+		`{"Exit_Node":"","advertise_lan":true,"ssh":false}`} {
+		if code := put(bad); code != 400 {
+			t.Fatalf("%s: %d", bad, code)
+		}
+	}
+	if len(fake.calls) != 0 {
+		t.Fatalf("invalid bodies reached the service: %v", fake.calls)
+	}
+	if code := put(`{"exit_node":"nA","advertise_lan":true,"ssh":false}`); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if fake.calls[0] != "settings {ExitNode:nA AdvertiseLAN:true SSH:false}" {
+		t.Fatalf("calls %v", fake.calls)
+	}
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{tailscale.ErrExitNodeUnknown, "tailscale_exit_node_unknown"},
+		{tailscale.ErrExitNodeConflict, "tailscale_exit_node_conflict"},
+		{tailscale.ErrExitNodeOffline, "tailscale_exit_node_offline"},
+		{tailscale.ErrNoLAN, "tailscale_no_lan"},
+	} {
+		fake.err = tc.err
+		got := e.do(req{method: "PUT", path: "/api/v1/tailscale/settings", body: `{"exit_node":"","advertise_lan":false,"ssh":false}`, cookie: cookie, csrf: csrf})
+		if got.Code != 409 || errCode(t, got) != tc.want {
+			t.Fatalf("%v: %d %s", tc.err, got.Code, got.Body)
+		}
+	}
+}
+
+func TestTailscaleFirewallRoute(t *testing.T) {
+	fake := &fakeTailscale{}
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.Tailscale = fake })
+	cookie, csrf := e.login()
+	got := e.do(req{method: "POST", path: "/api/v1/tailscale/firewall", cookie: cookie, csrf: csrf})
+	if got.Code != http.StatusAccepted {
+		t.Fatalf("%d %s", got.Code, got.Body)
+	}
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{txn.ErrActive, "transaction_pending"},
+		{txn.ErrNoChanges, "tailscale_no_change"},
+		{tailscale.ErrFirewallConflict, "tailscale_firewall_conflict"},
+	} {
+		fake.err = tc.err
+		got := e.do(req{method: "POST", path: "/api/v1/tailscale/firewall", cookie: cookie, csrf: csrf})
+		if got.Code != 409 || errCode(t, got) != tc.want {
+			t.Fatalf("%v: %d %s", tc.err, got.Code, got.Body)
+		}
+	}
 }
 
 func TestTailscaleStatusRoute(t *testing.T) {

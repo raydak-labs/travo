@@ -598,6 +598,21 @@ export type TailscalePrefs = {
     want_running: boolean;
 };
 
+export type TailscaleSettings = {
+    /**
+     * Advertise the lan IPv4 prefix to the tailnet (subnet router)
+     */
+    advertise_lan: boolean;
+    /**
+     * Stable ID of a peer offered as exit node; empty = none
+     */
+    exit_node: string;
+    /**
+     * Tailscale SSH on this router
+     */
+    ssh: boolean;
+};
+
 export type TailscaleStatus = {
     /**
      * Login URL while the backend waits for the user; empty otherwise
@@ -612,6 +627,7 @@ export type TailscaleStatus = {
      */
     busy: boolean;
     exit_nodes: Array<TailscaleExitNode> | null;
+    firewall_in_sync: boolean;
     health: Array<string> | null;
     installed: boolean;
     magic_dns: TailscaleMagicDns;
@@ -621,6 +637,7 @@ export type TailscaleStatus = {
      */
     running: boolean;
     self: TailscaleNode;
+    settings: TailscaleSettings;
     /**
      * Installed package version; empty when absent
      */
@@ -2222,6 +2239,39 @@ export type GetTailscaleResponses = {
 
 export type GetTailscaleResponse = GetTailscaleResponses[keyof GetTailscaleResponses];
 
+export type ApplyTailscaleFirewallData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tailscale/firewall';
+};
+
+export type ApplyTailscaleFirewallErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ApplyTailscaleFirewallError = ApplyTailscaleFirewallErrors[keyof ApplyTailscaleFirewallErrors];
+
+export type ApplyTailscaleFirewallResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type ApplyTailscaleFirewallResponse = ApplyTailscaleFirewallResponses[keyof ApplyTailscaleFirewallResponses];
+
 export type InstallTailscaleData = {
     body?: never;
     path?: never;
@@ -2320,6 +2370,47 @@ export type LogoutTailscaleResponses = {
 };
 
 export type LogoutTailscaleResponse = LogoutTailscaleResponses[keyof LogoutTailscaleResponses];
+
+export type SetTailscaleSettingsData = {
+    body: TailscaleSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tailscale/settings';
+};
+
+export type SetTailscaleSettingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetTailscaleSettingsError = SetTailscaleSettingsErrors[keyof SetTailscaleSettingsErrors];
+
+export type SetTailscaleSettingsResponses = {
+    /**
+     * OK
+     */
+    200: TailscaleStatus;
+};
+
+export type SetTailscaleSettingsResponse = SetTailscaleSettingsResponses[keyof SetTailscaleSettingsResponses];
 
 export type GetTransactionData = {
     body?: never;

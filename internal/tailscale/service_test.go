@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
 	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
@@ -26,16 +27,25 @@ func newRig(t *testing.T) *rig {
 	t.Helper()
 	dev := mock.New()
 	dev.SetService(Package, false, false)
+	for _, c := range []string{"network", "firewall"} {
+		secs, err := cli.ParseShow(c, string(fixture(t, "../uci-show-"+c+".txt")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := dev.Load(context.Background(), c, secs); err != nil {
+			t.Fatal(err)
+		}
+	}
 	pkgs := pkgmgr.NewMock()
-	cli := NewMock()
+	ts := NewMock()
 	svc := &Service{
-		CLI: cli, Packages: pkgs, Services: dev,
+		CLI: ts, Packages: pkgs, Services: dev, UCI: dev,
 		Guards:    guard.Dir{Path: filepath.Join(t.TempDir(), "guards"), Now: time.Now},
 		FreeBytes: func() (uint64, error) { return 60 << 20, nil },
 		Online:    func(context.Context) bool { return true },
 		Every:     time.Millisecond,
 	}
-	return &rig{svc: svc, dev: dev, pkgs: pkgs, cli: cli}
+	return &rig{svc: svc, dev: dev, pkgs: pkgs, cli: ts}
 }
 
 func (r *rig) installed(t *testing.T) {

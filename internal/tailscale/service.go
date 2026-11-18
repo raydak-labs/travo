@@ -46,6 +46,9 @@ type Status struct {
 	Running   bool   `json:"running" doc:"procd reports a running tailscaled"`
 	Busy      bool   `json:"busy" doc:"An install or change is in progress or was interrupted"`
 	Backend
+	Settings Settings `json:"settings"`
+	// FirewallInSync: the travo_ts zone and forwardings match the settings (docs/adr/0017).
+	FirewallInSync bool `json:"firewall_in_sync"`
 }
 
 // Service is the only code that installs tailscale or changes its preferences.
@@ -57,8 +60,15 @@ type Service struct {
 	// FreeBytes reads free overlay space; Online is the real Internet probe.
 	FreeBytes func() (uint64, error)
 	Online    func(context.Context) bool
-	// Every is the poll interval while waiting for tailscaled after a restart.
+	// Every is the poll interval while waiting for tailscaled or the Internet probe.
 	Every time.Duration
+	// UCI reads network and firewall; Txns stages the firewall zone; Tunnel is the WireGuard
+	// state for the exit-node conflict check (nil: no WireGuard on this device).
+	UCI    device.UCI
+	Txns   Transactions
+	Tunnel Tunnel
+	// ProbeWait bounds the Internet proof after selecting an exit node.
+	ProbeWait time.Duration
 
 	mu sync.Mutex
 }
@@ -82,9 +92,19 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 	if st.Running, err = s.Services.ServiceRunning(ctx, Package); err != nil || !st.Running {
 		return st, err
 	}
-	st.Backend, err = s.backend(ctx)
+	if st.Backend, err = s.backend(ctx); err != nil {
+		return st, err
+	}
+	lan, err := s.lanPrefix(ctx)
+	if err != nil && !errors.Is(err, ErrNoLAN) {
+		return st, err
+	}
+	st.Settings = SettingsOf(st.Backend, lan)
+	st.FirewallInSync, err = s.firewallInSync(ctx, st.Settings.AdvertiseLAN)
 	return st, err
 }
+
+func errNotInstalled() error { return fmt.Errorf("%s: %w", Package, pkgmgr.ErrNotInstalled) }
 
 func emptyBackend() Backend {
 	return Backend{Self: Node{IPs: []string{}}, ExitNodes: []ExitNode{}, Health: []string{},
@@ -172,10 +192,7 @@ func (s *Service) install(ctx context.Context) error {
 func (s *Service) waitReady(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, ReadyTimeout)
 	defer cancel()
-	every := s.Every
-	if every <= 0 {
-		every = 500 * time.Millisecond
-	}
+	every := s.every()
 	for {
 		_, err := s.CLI.Status(ctx)
 		if err == nil {
@@ -187,6 +204,13 @@ func (s *Service) waitReady(ctx context.Context) error {
 		case <-time.After(every):
 		}
 	}
+}
+
+func (s *Service) every() time.Duration {
+	if s.Every <= 0 {
+		return 500 * time.Millisecond
+	}
+	return s.Every
 }
 
 // Login brings tailscaled up with Travo's prefs. Before login the CLI times out in
@@ -217,6 +241,12 @@ func (s *Service) Logout(ctx context.Context) (Status, error) {
 // change runs one user-initiated write under ChangeGuard. The user's action is the
 // explicit retry, so a guard left by an earlier failure is cleared by name first.
 func (s *Service) change(ctx context.Context, apply func(context.Context, Backend) error) error {
+	return s.changeChecked(ctx, nil, apply)
+}
+
+// changeChecked runs check before the guard is taken: a refusal writes nothing and leaves
+// no guard. An apply error wrapped in restored releases the guard (the old state is live).
+func (s *Service) changeChecked(ctx context.Context, check, apply func(context.Context, Backend) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if held, err := s.guardHeld(InstallGuard); err != nil || held {
@@ -226,6 +256,11 @@ func (s *Service) change(ctx context.Context, apply func(context.Context, Backen
 	if err != nil {
 		return err
 	}
+	if check != nil {
+		if err := check(ctx, b); err != nil {
+			return err
+		}
+	}
 	if err := s.Guards.Clear(ChangeGuard); err != nil {
 		return err
 	}
@@ -233,6 +268,10 @@ func (s *Service) change(ctx context.Context, apply func(context.Context, Backen
 		return err
 	}
 	if err := apply(ctx, b); err != nil {
+		var r restored
+		if errors.As(err, &r) {
+			return errors.Join(r.error, s.Guards.Release(ChangeGuard))
+		}
 		return fmt.Errorf("%w (guard %s kept)", err, ChangeGuard)
 	}
 	return s.Guards.Release(ChangeGuard)
