@@ -49,12 +49,14 @@ func TestZonesFromCapture(t *testing.T) {
 func TestZonesInheritDefaultsAndSkipUnnamedOrDisabled(t *testing.T) {
 	fw := []device.Section{
 		{Name: "@defaults[0]", Type: "defaults", Options: map[string]string{"input": "REJECT", "output": "ACCEPT"}},
-		{Name: "a", Type: "zone", Options: map[string]string{"name": "iot", "input": "drop"}},
+		{Name: "a", Type: "zone", Options: map[string]string{"name": "iot", "input": "drop", "masq": "on"}},
 		{Name: "b", Type: "zone", Options: map[string]string{"input": "ACCEPT"}},
-		{Name: "c", Type: "zone", Options: map[string]string{"name": "off", "enabled": "0"}},
-		{Name: "d", Type: "forwarding", Options: map[string]string{"src": "iot", "dest": "wan", "enabled": "0"}},
+		{Name: "c", Type: "zone", Options: map[string]string{"name": "off", "enabled": "false"}},
+		{Name: "d", Type: "forwarding", Options: map[string]string{"src": "iot", "dest": "wan", "enabled": "no"}},
+		{Name: "e", Type: "forwarding", Options: map[string]string{"src": "iot", "dest": "lan", "enabled": "yes"}},
 	}
-	want := []Zone{{Name: "iot", Input: "DROP", Output: "ACCEPT", Forward: "DROP", Networks: []string{}, ForwardsTo: []string{}}}
+	// fw4 parse_bool spellings count, not only 0 and 1.
+	want := []Zone{{Name: "iot", Input: "DROP", Output: "ACCEPT", Forward: "DROP", Masq: true, Networks: []string{}, ForwardsTo: []string{"lan"}}}
 	if got := Zones(fw); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}

@@ -106,24 +106,30 @@ func Zones(firewall []device.Section) []Zone {
 	out := []Zone{}
 	for _, s := range firewall {
 		name := s.Options["name"]
-		if s.Type != "zone" || name == "" || s.Options["enabled"] == "0" {
+		if s.Type != "zone" || name == "" || fw4False[s.Options["enabled"]] {
 			continue
 		}
 		out = append(out, Zone{Name: name,
 			Input:    policy(s, defaults, "input"),
 			Output:   policy(s, defaults, "output"),
 			Forward:  policy(s, defaults, "forward"),
-			Masq:     s.Options["masq"] == "1",
+			Masq:     fw4True[s.Options["masq"]],
 			Networks: values(s, "network"), ForwardsTo: forwardsTo(firewall, name)})
 	}
 	return out
 }
 
+// fw4True and fw4False are the spellings fw4's parse_bool accepts; anything else is unset.
+var (
+	fw4True  = map[string]bool{"1": true, "on": true, "true": true, "yes": true}
+	fw4False = map[string]bool{"0": true, "off": true, "false": true, "no": true}
+)
+
 func forwardsTo(firewall []device.Section, zone string) []string {
 	out := []string{}
 	for _, s := range firewall {
 		dest := s.Options["dest"]
-		if s.Type == "forwarding" && s.Options["src"] == zone && s.Options["enabled"] != "0" && dest != "" && !slices.Contains(out, dest) {
+		if s.Type == "forwarding" && s.Options["src"] == zone && !fw4False[s.Options["enabled"]] && dest != "" && !slices.Contains(out, dest) {
 			out = append(out, dest)
 		}
 	}
