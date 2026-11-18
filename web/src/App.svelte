@@ -8,6 +8,7 @@ import Server from '@lucide/svelte/icons/server';
 import Settings from '@lucide/svelte/icons/settings';
 import Shield from '@lucide/svelte/icons/shield';
 import Sun from '@lucide/svelte/icons/sun';
+import Users from '@lucide/svelte/icons/users';
 import Wifi from '@lucide/svelte/icons/wifi';
 import Button from '$lib/components/ui/button/button.svelte';
 import { Toaster } from '$lib/components/ui/sonner';
@@ -69,6 +70,7 @@ function onDrawerKey(event: KeyboardEvent) {
 const nav: { route: Route | null; label: () => string; icon: typeof Wifi }[] = [
   { route: 'dashboard', label: () => m.nav_dashboard(), icon: LayoutDashboard },
   { route: 'wifi', label: () => m.nav_wifi(), icon: Wifi },
+  { route: 'clients', label: () => m.nav_clients(), icon: Users },
   { route: 'network', label: () => m.nav_network(), icon: Network },
   { route: 'vpn', label: () => m.nav_vpn(), icon: Shield },
   { route: 'services', label: () => m.nav_services(), icon: Server },
@@ -256,6 +258,8 @@ $effect(() => {
             <PageHost load={pages.wifi} />
           {:else if shown === 'network'}
             <PageHost load={pages.network} />
+          {:else if shown === 'clients'}
+            <PageHost load={pages.clients} />
           {:else if shown === 'vpn'}
             <PageHost load={pages.vpn} />
           {:else if shown === 'services'}

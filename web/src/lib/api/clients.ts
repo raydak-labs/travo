@@ -1,9 +1,10 @@
+import type { ClientEdit } from '../clients';
 import { m } from '../paraglide/messages.js';
 import { client } from './client';
 import {
-  type Client as LanClient,
   deleteReservation,
   kickClient,
+  type Client as LanClient,
   listClients,
   listReservations,
   type Reservation,
@@ -70,7 +71,9 @@ export function clientError(code: string | undefined): string {
 
 /** A refused block as the guarded toggle expects it: "no change" is information, not an error. */
 export function blockRefusal(code: string | undefined): { message?: string; error?: string } {
-  return code === 'client_no_change' ? { message: clientError(code) } : { error: clientError(code) };
+  return code === 'client_no_change'
+    ? { message: clientError(code) }
+    : { error: clientError(code) };
 }
 
 type Outcome = { ok: true } | { error: string };
@@ -103,4 +106,18 @@ export function unreserve(mac: string): Promise<Outcome> {
 
 export function kick(mac: string): Promise<Outcome> {
   return outcome(() => kickClient({ path: { mac } }));
+}
+
+/** Runs the dialog's steps in order and stops at the first failure; resolves to its message. */
+export async function runClientEdit(edit: ClientEdit): Promise<string | undefined> {
+  for (const step of edit.steps) {
+    const result =
+      step.kind === 'alias'
+        ? await saveAlias(edit.mac, step.alias)
+        : step.kind === 'reserve'
+          ? await reserve(edit.mac, step.ip, step.name)
+          : await unreserve(edit.mac);
+    if ('error' in result) return result.error;
+  }
+  return undefined;
 }

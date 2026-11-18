@@ -4,6 +4,7 @@ export type Route =
   | 'setup'
   | 'wifi'
   | 'network'
+  | 'clients'
   | 'vpn'
   | 'services'
   | 'system'
@@ -17,6 +18,7 @@ const ROUTES: Record<string, Route> = {
   '/setup': 'setup',
   '/wifi': 'wifi',
   '/network': 'network',
+  '/clients': 'clients',
   '/vpn': 'vpn',
   '/services': 'services',
   '/system': 'system',
