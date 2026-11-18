@@ -60,7 +60,7 @@ func (s *Service) Set(ctx context.Context, req Request) (txn.Status, error) {
 			return txn.Status{}, txn.ErrNoChanges
 		}
 		return s.Txns.Begin(ctx, "Disable USB tethering uplink", uplinkConfigs,
-			func(c context.Context) error { return s.stageDisable(c, zone) }, s.proveDown)
+			s.stageDisable, s.proveDown)
 	}
 	dev, err := s.pickDevice(ctx, req.Device)
 	if err != nil {
@@ -161,8 +161,14 @@ func (s *Service) stageEnable(ctx context.Context, zone device.Section, dev stri
 
 // stageDisable deletes the interface and rewrites the zone's network list without
 // usbtether, keeping the other entries in order (the port has no del_list).
-func (s *Service) stageDisable(ctx context.Context, zone device.Section) error {
-	network, err := s.UCI.Show(ctx, "network")
+// It re-reads both configs under the transaction locks, so a list change made after
+// Set's early check is kept.
+func (s *Service) stageDisable(ctx context.Context) error {
+	network, firewall, err := s.read(ctx)
+	if err != nil {
+		return err
+	}
+	zone, err := wanZone(network, firewall)
 	if err != nil {
 		return err
 	}

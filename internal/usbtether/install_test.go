@@ -122,3 +122,27 @@ func TestInstallRefusesLowFlashBeforeTheGuard(t *testing.T) {
 		t.Fatalf("guard written: %v", stale)
 	}
 }
+
+func TestIOSRetryFinishesUsbmuxdSetupAfterPackagesLanded(t *testing.T) {
+	s, g := installService(t, pkgmgr.NewMock())
+	d := s.Services.(*mock.Device)
+	d.ServiceErr = errors.New("usbmuxd: start failed")
+	if _, err := s.InstallDrivers(context.Background(), IOS); err == nil {
+		t.Fatal("want service error")
+	}
+	if blocked, _ := s.Busy(); !blocked {
+		t.Fatal("guard not kept")
+	}
+	d.ServiceErr = nil
+	d.ServiceActions = nil
+	did, err := s.InstallDrivers(context.Background(), IOS)
+	if err != nil || did {
+		t.Fatalf("retry = %v, %v; want setup only, no package installed", did, err)
+	}
+	if !slices.Equal(d.ServiceActions, []string{"usbmuxd enable", "usbmuxd start"}) {
+		t.Fatalf("retry actions = %v", d.ServiceActions)
+	}
+	if stale, _ := g.Stale(); len(stale) != 0 {
+		t.Fatalf("guard left: %v", stale)
+	}
+}

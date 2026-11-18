@@ -34,9 +34,9 @@ func (f *fakeTxns) Begin(ctx context.Context, _ string, configs []string, stage 
 		}
 	}
 	if f.probeErr = probe(ctx); f.probeErr != nil {
-		return txn.Status{ID: "0123456789abcdef", State: txn.RolledBack}, txn.ErrProbeFailed
+		return txn.Status{Meta: txn.Meta{ID: "0123456789abcdef"}, State: txn.RolledBack}, txn.ErrProbeFailed
 	}
-	return txn.Status{ID: "0123456789abcdef", State: txn.Pending}, nil
+	return txn.Status{Meta: txn.Meta{ID: "0123456789abcdef"}, State: txn.Pending}, nil
 }
 
 func uplinkService(t *testing.T, d *mock.Device) (*Service, *fakeTxns) {

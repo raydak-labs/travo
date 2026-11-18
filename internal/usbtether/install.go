@@ -49,31 +49,41 @@ func (s *Service) InstallDrivers(ctx context.Context, phone Phone) (bool, error)
 		return false, err
 	}
 	missing, err := s.missing(ctx, pkgs)
-	if err != nil || len(missing) == 0 {
+	if err != nil {
 		return false, err
 	}
-	if free, err := s.FreeBytes(); err != nil {
-		return false, fmt.Errorf("free flash: %w", err)
-	} else if free < NeedFree[phone] {
-		return false, fmt.Errorf("%w: %d MiB free, %d MiB needed", ErrNoSpace, free>>20, NeedFree[phone]>>20)
+	// iOS always (re)runs the usbmuxd setup: a retry after a failed `start` finds every
+	// package present and must still finish it under the guard.
+	setup := phone == IOS
+	if len(missing) == 0 && !setup {
+		return false, nil
+	}
+	if len(missing) > 0 {
+		if free, err := s.FreeBytes(); err != nil {
+			return false, fmt.Errorf("free flash: %w", err)
+		} else if free < NeedFree[phone] {
+			return false, fmt.Errorf("%w: %d MiB free, %d MiB needed", ErrNoSpace, free>>20, NeedFree[phone]>>20)
+		}
 	}
 	if err := s.Guards.Acquire(InstallGuard); err != nil {
 		return false, fmt.Errorf("usbtether guard: %w", err) // never degrade to unguarded
 	}
-	if err := s.Packages.Update(ctx); err != nil {
-		slog.Warn("usbtether: package list refresh failed; installing from cached lists", "err", err)
+	if len(missing) > 0 {
+		if err := s.Packages.Update(ctx); err != nil {
+			slog.Warn("usbtether: package list refresh failed; installing from cached lists", "err", err)
+		}
 	}
 	for _, pkg := range missing {
 		if err := s.Packages.Install(ctx, pkg); err != nil {
 			return false, fmt.Errorf("install %s: %w (guard %s kept)", pkg, err, InstallGuard)
 		}
 	}
-	if slices.Contains(missing, usbmuxd) {
+	if setup {
 		if err := s.startUsbmuxd(ctx); err != nil {
 			return false, fmt.Errorf("%s: %w (guard %s kept)", usbmuxd, err, InstallGuard)
 		}
 	}
-	return true, s.Guards.Release(InstallGuard)
+	return len(missing) > 0, s.Guards.Release(InstallGuard)
 }
 
 // missing lists the absent packages. A failed query is not "absent" (invariants §13).
