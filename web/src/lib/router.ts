@@ -1,4 +1,12 @@
-export type Route = 'dashboard' | 'login' | 'setup' | 'wifi' | 'vpn' | 'services' | 'system';
+export type Route =
+  | 'dashboard'
+  | 'login'
+  | 'setup'
+  | 'wifi'
+  | 'vpn'
+  | 'services'
+  | 'system'
+  | 'system-tokens';
 
 const ROUTES: Record<string, Route> = {
   '/': 'dashboard',
@@ -8,7 +16,17 @@ const ROUTES: Record<string, Route> = {
   '/vpn': 'vpn',
   '/services': 'services',
   '/system': 'system',
+  '/system/tokens': 'system-tokens',
 };
+
+const PATHS = Object.fromEntries(
+  Object.entries(ROUTES).map(([path, route]) => [route, path]),
+) as Record<Route, string>;
+
+/** The nav entry a route belongs to: a subpage highlights its parent. */
+export function section(route: Route): Route {
+  return route === 'system-tokens' ? 'system' : route;
+}
 
 /** Maps a location hash (`#/wifi`) to a route; anything unknown is the dashboard. */
 export function parseHash(hash: string): Route {
@@ -17,7 +35,7 @@ export function parseHash(hash: string): Route {
 }
 
 export function href(route: Route): string {
-  return route === 'dashboard' ? '#/' : `#/${route}`;
+  return `#${PATHS[route]}`;
 }
 
 /** Auth state as the guard sees it; `session.svelte.ts` owns the transitions. */

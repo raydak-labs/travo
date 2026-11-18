@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type AuthState, guard, href, parseHash, type Route } from './router';
+import { type AuthState, guard, href, parseHash, type Route, section } from './router';
 
 describe('router', () => {
   it.each([
@@ -11,6 +11,7 @@ describe('router', () => {
     ['#/vpn', 'vpn'],
     ['#/system', 'system'],
     ['#/system?tab=x', 'system'],
+    ['#/system/tokens', 'system-tokens'],
   ])('maps %j to %s', (hash, route) => {
     expect(parseHash(hash)).toBe(route);
   });
@@ -21,14 +22,41 @@ describe('router', () => {
   });
 
   it('builds hrefs that parse back to the same route', () => {
-    for (const r of ['dashboard', 'login', 'setup', 'wifi', 'vpn', 'system'] as const) {
+    for (const r of [
+      'dashboard',
+      'login',
+      'setup',
+      'wifi',
+      'vpn',
+      'system',
+      'system-tokens',
+    ] as const) {
       expect(parseHash(href(r))).toBe(r);
     }
+  });
+
+  it('builds the subpage href as a nested path', () => {
+    expect(href('system-tokens')).toBe('#/system/tokens');
+    expect(href('dashboard')).toBe('#/');
+  });
+
+  it('highlights the parent section for a subpage', () => {
+    expect(section('system-tokens')).toBe('system');
+    expect(section('wifi')).toBe('wifi');
   });
 });
 
 describe('guard', () => {
-  const routes: Route[] = ['dashboard', 'login', 'setup', 'wifi', 'vpn', 'services', 'system'];
+  const routes: Route[] = [
+    'dashboard',
+    'login',
+    'setup',
+    'wifi',
+    'vpn',
+    'services',
+    'system',
+    'system-tokens',
+  ];
   const expected: Record<AuthState, Record<Route, Route>> = {
     unknown: {
       dashboard: 'dashboard',
@@ -38,6 +66,7 @@ describe('guard', () => {
       vpn: 'vpn',
       services: 'services',
       system: 'system',
+      'system-tokens': 'system-tokens',
     },
     setup_required: {
       dashboard: 'setup',
@@ -47,6 +76,7 @@ describe('guard', () => {
       vpn: 'setup',
       services: 'setup',
       system: 'setup',
+      'system-tokens': 'setup',
     },
     anonymous: {
       dashboard: 'login',
@@ -56,6 +86,7 @@ describe('guard', () => {
       vpn: 'login',
       services: 'login',
       system: 'login',
+      'system-tokens': 'login',
     },
     authenticated: {
       dashboard: 'dashboard',
@@ -65,6 +96,7 @@ describe('guard', () => {
       vpn: 'vpn',
       services: 'services',
       system: 'system',
+      'system-tokens': 'system-tokens',
     },
   };
   const cases = (Object.keys(expected) as AuthState[]).flatMap((state) =>
