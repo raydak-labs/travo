@@ -36,9 +36,29 @@ with `InsecureSkipVerify` and a regex form detector; we harvest only its lessons
   fetch once. Later steps never renew.
 - **Bounds.** 30 s per walk, 5 s per request, 5 redirects per request, 256 KiB per body.
 - **HTTP edge.** A fresh cookie jar per walk, no proxy, no keep-alive, TLS verified with
-  the system roots (no `InsecureSkipVerify`). Dials to loopback, unspecified,
-  link-local and multicast addresses are refused, so a portal page cannot make the
-  router post to its own services. Only http(s) targets are followed.
+  the system roots (no `InsecureSkipVerify`). Only http(s) targets are followed.
+- **Target policy** (`internal/captive/acceptguard.go`). A portal page must never make
+  the router reach itself or the networks behind it. At walk start (and again after a
+  step-0 renew, which may change the uplink address) the walker reads the kernel's
+  interfaces and addresses (all of them: lan, guest, wwan, wan, wg, tailscale, lo) and
+  names the uplink by the kernel default route's device. It refuses:
+  - every address on every router interface, the uplink's own address included;
+  - every subnet of every interface except the uplink (LAN, guest, VPN, loopback);
+  - loopback, unspecified, link-local and multicast addresses;
+  - any address the kernel would not route out of the uplink: a connected UDP socket
+    (sends nothing) returns the source address the kernel picks, and it must be one of
+    the uplink's own addresses. This catches static routes into the LAN, VPN routes and
+    tailnet peers that are not on a directly attached subnet.
+  It allows the uplink subnet (the hotel gateway or portal, e.g. `10.66.0.1` in the
+  simulator) and anything routed out of the uplink (public addresses, the hotel's other
+  private nets). The check runs in the dialer's `Control` hook on the address actually
+  dialed, for every connection, so redirects and DNS answers that change between lookups
+  (rebinding) cannot bypass it; literal-IP redirect targets are refused before dialing.
+  A refused target ends the walk as `failed` and never triggers the step-0 renew.
+  The kernel is read with Go's `net.Interfaces` and a UDP route lookup rather than a
+  `Device` port: the daemon runs on the router, the kernel is the truth (netifd route
+  state lies, device-facts §1), and both are passed in as functions so tests use
+  verbatim captures (`ip-addr.json`, the guest interface status).
 - **No router state changes** apart from the guarded renew: no UCI, no DNS. If the
   portal name does not resolve (AdGuard or DoH base), the walk fails at step 0 and the
   card still offers the DNS bypass (#130).

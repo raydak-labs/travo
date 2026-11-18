@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/http/cookiejar"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
@@ -60,28 +58,30 @@ type LeaseRenew interface {
 	Renew(context.Context) error
 }
 
+// PortalEdge is the walk's I/O: the router's interfaces and routes, read at walk time,
+// and the HTTP client built on the resulting TargetPolicy.
+type PortalEdge struct {
+	Interfaces  func() ([]IfaceAddrs, error)
+	RouteSource func(netip.Addr) (netip.Addr, error)
+	NewClient   func(TargetPolicy) *http.Client
+}
+
+// KernelPortalEdge is the production edge (the daemon runs on the router).
+func KernelPortalEdge() PortalEdge {
+	return PortalEdge{Interfaces: KernelInterfaces, RouteSource: KernelRouteSource, NewClient: NewPortalClient}
+}
+
 // Acceptor walks click-through portal pages for the user. It changes no router state
 // except the guarded step-0 renew, and sends only fields the portal page supplied.
 type Acceptor struct {
-	conn      Connectivity
-	renew     LeaseRenew // nil: no renew (no wwan support)
-	newClient func() *http.Client
-	inflight  sync.Mutex
+	conn     Connectivity
+	renew    LeaseRenew // nil: no renew (no wwan support)
+	edge     PortalEdge
+	inflight sync.Mutex
 }
 
-func NewAcceptor(conn Connectivity, renew LeaseRenew, newClient func() *http.Client) *Acceptor {
-	return &Acceptor{conn: conn, renew: renew, newClient: newClient}
-}
-
-// NewPortalClient is the production HTTP edge: a fresh cookie jar per walk, bounded
-// redirects and requests, verified TLS, no proxy, and never a loopback, link-local or
-// unspecified address (a portal page must not reach services on the router itself).
-func NewPortalClient() *http.Client {
-	jar, _ := cookiejar.New(nil) // never fails without options
-	dialer := &net.Dialer{Timeout: acceptRequest, Control: refuseLocal}
-	transport := &http.Transport{DialContext: dialer.DialContext, TLSHandshakeTimeout: acceptRequest,
-		ResponseHeaderTimeout: acceptRequest, DisableKeepAlives: true}
-	return &http.Client{Jar: jar, Transport: transport, Timeout: acceptRequest, CheckRedirect: limitRedirects}
+func NewAcceptor(conn Connectivity, renew LeaseRenew, edge PortalEdge) *Acceptor {
+	return &Acceptor{conn: conn, renew: renew, edge: edge}
 }
 
 func limitRedirects(_ *http.Request, via []*http.Request) error {
@@ -91,21 +91,15 @@ func limitRedirects(_ *http.Request, via []*http.Request) error {
 	return nil
 }
 
-var (
-	errLocalTarget  = errors.New("portal target is a local address")
-	errPortalStatus = errors.New("portal answered with a non-2xx status")
-)
+var errPortalStatus = errors.New("portal answered with a non-2xx status")
 
-func refuseLocal(_, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
+// client builds a fresh client whose policy allows only targets routed out of uplink.
+func (a *Acceptor) client(uplink string) (*http.Client, error) {
+	ifaces, err := a.edge.Interfaces()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("captive: interfaces: %w", err)
 	}
-	ip := net.ParseIP(host)
-	if ip == nil || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsMulticast() {
-		return errLocalTarget
-	}
-	return nil
+	return a.edge.NewClient(NewTargetPolicy(ifaces, uplink, a.edge.RouteSource)), nil
 }
 
 // Accept walks the portal the shared probe reports. Step 0 fetches the portal URL; only
@@ -120,17 +114,26 @@ func (a *Acceptor) Accept(ctx context.Context) (AcceptResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, AcceptBudget)
 	defer cancel()
 	st := a.conn.Status(ctx)
-	if st.Internet != connectivity.Captive || st.PortalURL == nil {
+	if st.Internet != connectivity.Captive || st.PortalURL == nil || st.ActiveInterface == nil {
 		return AcceptResult{}, ErrAcceptNotCaptive
 	}
 	start, ok := resolve(&url.URL{}, *st.PortalURL)
 	if !ok {
 		return AcceptResult{}, ErrAcceptNotCaptive
 	}
-	w := walk{client: a.newClient(), result: AcceptResult{Steps: []AcceptStep{}}}
+	client, err := a.client(*st.ActiveInterface)
+	if err != nil {
+		return AcceptResult{}, err
+	}
+	w := walk{client: client, result: AcceptResult{Steps: []AcceptStep{}}}
 	page, err := w.do(ctx, "fetch", Plan{Method: http.MethodGet, Target: start})
 	// Only a transport failure hints at a stale lease; a portal that answered does not.
-	if err != nil && !errors.Is(err, errPortalStatus) && a.renewStep0(ctx, &w, st) {
+	// A refused target is no transport failure either.
+	if err != nil && !errors.Is(err, errPortalStatus) && !errors.Is(err, ErrTargetRefused) && a.renewStep0(ctx, &w, st) {
+		// The renew may change the uplink address: rebuild the policy from the kernel.
+		if w.client, err = a.client(*st.ActiveInterface); err != nil {
+			return AcceptResult{}, err
+		}
 		page, err = w.do(ctx, "fetch", Plan{Method: http.MethodGet, Target: start})
 	}
 	if err != nil {

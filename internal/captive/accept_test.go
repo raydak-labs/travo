@@ -76,8 +76,8 @@ func (c *portalConn) Status(context.Context) connectivity.Status {
 	if c.portal.accepted.Load() {
 		return connectivity.Status{Internet: connectivity.Online}
 	}
-	u := c.url
-	return connectivity.Status{Internet: connectivity.Captive, PortalURL: &u}
+	u, uplink := c.url, "phy0-sta0"
+	return connectivity.Status{Internet: connectivity.Captive, PortalURL: &u, ActiveInterface: &uplink}
 }
 func (c *portalConn) Invalidate() { c.invalidated.Add(1) }
 
@@ -102,6 +102,12 @@ func testClient() *http.Client {
 	return &http.Client{Jar: jar, CheckRedirect: limitRedirects}
 }
 
+// plainEdge skips the target policy (acceptguard_test.go covers it).
+var plainEdge = PortalEdge{
+	Interfaces: func() ([]IfaceAddrs, error) { return nil, nil },
+	NewClient:  func(TargetPolicy) *http.Client { return testClient() },
+}
+
 func TestAcceptWalksClickThroughPortals(t *testing.T) {
 	for _, tc := range []struct {
 		mode, start string
@@ -117,7 +123,7 @@ func TestAcceptWalksClickThroughPortals(t *testing.T) {
 			p := newSimPortal(t, tc.mode)
 			conn := &portalConn{portal: p, url: p.server.URL + tc.start}
 			renew := &fakeRenew{state: RenewAvailable}
-			got, err := NewAcceptor(conn, renew, testClient).Accept(t.Context())
+			got, err := NewAcceptor(conn, renew, plainEdge).Accept(t.Context())
 			if err != nil || got.Outcome != tc.want || renew.calls != 0 || got.Renewed {
 				t.Fatalf("got %+v %v, renews %d", got, err, renew.calls)
 			}
@@ -133,13 +139,13 @@ func TestAcceptWalksClickThroughPortals(t *testing.T) {
 
 func TestAcceptNotCaptive(t *testing.T) {
 	conn := &fakeConn{internet: connectivity.Online}
-	if _, err := NewAcceptor(conn, nil, testClient).Accept(t.Context()); !errors.Is(err, ErrAcceptNotCaptive) {
+	if _, err := NewAcceptor(conn, nil, plainEdge).Accept(t.Context()); !errors.Is(err, ErrAcceptNotCaptive) {
 		t.Fatal(err)
 	}
 }
 
 func TestAcceptBusy(t *testing.T) {
-	a := NewAcceptor(&fakeConn{internet: connectivity.Captive}, nil, testClient)
+	a := NewAcceptor(&fakeConn{internet: connectivity.Captive}, nil, plainEdge)
 	a.inflight.Lock()
 	defer a.inflight.Unlock()
 	if _, err := a.Accept(t.Context()); !errors.Is(err, ErrAcceptBusy) {
@@ -154,7 +160,7 @@ func TestAcceptRenewsOnceAtStep0(t *testing.T) {
 	dead.Close()
 	conn := &portalConn{portal: &simPortal{}, url: dead.URL + "/login"}
 	renew := &fakeRenew{state: RenewAvailable}
-	got, err := NewAcceptor(conn, renew, testClient).Accept(t.Context())
+	got, err := NewAcceptor(conn, renew, plainEdge).Accept(t.Context())
 	if err != nil || got.Outcome != AcceptFailed || renew.calls != 1 || !got.Renewed {
 		t.Fatalf("got %+v %v renews %d", got, err, renew.calls)
 	}
@@ -176,7 +182,7 @@ func TestAcceptRenewThenLogin(t *testing.T) {
 	defer flaky.Close()
 	conn := &portalConn{portal: p, url: flaky.URL + "/generate_204"}
 	renew := &fakeRenew{state: RenewAvailable, after: func() { down.Store(false) }}
-	got, err := NewAcceptor(conn, renew, testClient).Accept(t.Context())
+	got, err := NewAcceptor(conn, renew, plainEdge).Accept(t.Context())
 	if err != nil || got.Outcome != AcceptOnline || renew.calls != 1 || !got.Renewed {
 		t.Fatalf("got %+v %v renews %d", got, err, renew.calls)
 	}
@@ -191,7 +197,7 @@ func TestAcceptSkipsRenew(t *testing.T) {
 		u := dead.URL
 		dead.Close()
 		conn := &portalConn{portal: &simPortal{}, url: u}
-		got, err := NewAcceptor(conn, renew, testClient).Accept(t.Context())
+		got, err := NewAcceptor(conn, renew, plainEdge).Accept(t.Context())
 		if err != nil || got.Outcome != AcceptFailed || renew.calls != 0 || got.Renewed {
 			t.Fatalf("%s: got %+v %v", renew.state, got, err)
 		}
@@ -203,7 +209,7 @@ func TestAcceptNoRenewOnPortalStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(503) }))
 	defer server.Close()
 	renew := &fakeRenew{state: RenewAvailable}
-	got, _ := NewAcceptor(&portalConn{portal: &simPortal{}, url: server.URL}, renew, testClient).Accept(t.Context())
+	got, _ := NewAcceptor(&portalConn{portal: &simPortal{}, url: server.URL}, renew, plainEdge).Accept(t.Context())
 	if got.Outcome != AcceptFailed || renew.calls != 0 || got.Steps[0].Status != 503 {
 		t.Fatalf("got %+v renews %d", got, renew.calls)
 	}
@@ -221,7 +227,7 @@ func TestAcceptNoRenewAfterStep0(t *testing.T) {
 	defer server.Close()
 	conn := &portalConn{portal: &simPortal{}, url: server.URL}
 	renew := &fakeRenew{state: RenewAvailable}
-	got, _ := NewAcceptor(conn, renew, testClient).Accept(t.Context())
+	got, _ := NewAcceptor(conn, renew, plainEdge).Accept(t.Context())
 	if got.Outcome != AcceptFailed || renew.calls != 0 {
 		t.Fatalf("got %+v renews %d", got, renew.calls)
 	}
@@ -233,18 +239,9 @@ func TestAcceptStepBound(t *testing.T) {
 	}))
 	defer server.Close()
 	conn := &portalConn{portal: &simPortal{}, url: server.URL}
-	got, _ := NewAcceptor(conn, nil, testClient).Accept(t.Context())
+	got, _ := NewAcceptor(conn, nil, plainEdge).Accept(t.Context())
 	if got.Outcome != AcceptFailed || len(got.Steps) != 1+acceptSteps || conn.invalidated.Load() != acceptSteps {
 		t.Fatalf("got %+v invalidated %d", got, conn.invalidated.Load())
-	}
-}
-
-func TestPortalClientRefusesLocalTargets(t *testing.T) {
-	server := httptest.NewServer(http.NotFoundHandler())
-	defer server.Close()
-	_, err := NewPortalClient().Get(server.URL)
-	if !errors.Is(err, errLocalTarget) {
-		t.Fatal(err)
 	}
 }
 

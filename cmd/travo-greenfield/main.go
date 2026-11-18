@@ -223,7 +223,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 			r := captive.NewRenewer(deps.Guards, deps.Device, lease, routes, shared, clock.Now, captive.Sleep)
 			captiveRenew, renewer = r, r
 		}
-		captiveAccept = captive.NewAcceptor(shared, renewer, captive.NewPortalClient)
+		captiveAccept = captive.NewAcceptor(shared, renewer, captive.KernelPortalEdge())
 	}
 	backup, _ := deps.Device.(device.ConfigBackupper)
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))

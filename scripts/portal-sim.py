@@ -11,6 +11,8 @@ Modes (--mode):
   room       like redirect, but the form also asks for a room number (auto-accept must stop)
   meta       like redirect, but /login is a meta refresh splash to /terms (the form)
   empty200   200 with an empty body on every path (a proxy that rewrote 204: online)
+  evil       /login redirects to --evil-target (default the router's LAN address): the
+             auto-accept walker must refuse it
 Restart the process to forget accepted clients.
 """
 import argparse
@@ -34,6 +36,7 @@ SPLASH = b'<html><head><meta http-equiv="refresh" content="0; url=/terms"></head
 
 class Portal(http.server.BaseHTTPRequestHandler):
     mode = 'redirect'
+    evil_target = 'http://192.168.1.1/'
 
     def send(self, code: int, body: bytes = b'', location: str = '') -> None:
         self.send_response(code)
@@ -54,6 +57,8 @@ class Portal(http.server.BaseHTTPRequestHandler):
             return self.send(200)
         if self.mode == 'intercept':
             return self.send(200, self.form())
+        if path == '/login' and self.mode == 'evil':
+            return self.send(302, location=self.evil_target)
         if path == '/login':
             return self.send(200, SPLASH if self.mode == 'meta' else self.form())
         if path == '/terms':
@@ -76,9 +81,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--bind', default='10.66.0.1')
     parser.add_argument('--port', type=int, default=80)
-    parser.add_argument('--mode', default='redirect', choices=['redirect', 'intercept', 'room', 'meta', 'empty200'])
+    parser.add_argument('--mode', default='redirect', choices=['redirect', 'intercept', 'room', 'meta', 'empty200', 'evil'])
+    parser.add_argument('--evil-target', default='http://192.168.1.1/')
     args = parser.parse_args()
     Portal.mode = args.mode
+    Portal.evil_target = args.evil_target
     http.server.ThreadingHTTPServer((args.bind, args.port), Portal).serve_forever()
 
 
