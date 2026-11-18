@@ -86,5 +86,8 @@ Verbatim; nothing needed redaction.
 ## clients/ (2026-11-18, #218, #219)
 Leases, neighbours, `network.lan` and hostapd method list, plus staged-only (reverted) block rule and host section captures. See `clients/PROVENANCE.md`.
 
+## diagnostics/ (2026-11-19, #236)
+BusyBox ping, traceroute and nslookup output with exit codes. See `diagnostics/PROVENANCE.md`.
+
 ## network/ (2026-11-18, #237)
 Interface dump with the guest interface and uptime, and `uci export firewall` with anonymous and named zones. See `network/PROVENANCE.md`.

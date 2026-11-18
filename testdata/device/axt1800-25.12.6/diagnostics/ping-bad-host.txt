@@ -1,0 +1,2 @@
+ping: bad address 'does-not-exist.invalid'
+exit=1

@@ -24,6 +24,11 @@ func TestSeedCopiesMatchCaptures(t *testing.T) {
 		"hostapd-phy1-ap0-get_clients.json": "with-ap-client/hostapd-phy1-ap0-get_clients.json",
 		"interface-dump.json":               "interface-dump.json",
 		"logread.txt":                       "logs/logread.txt",
+		"diag-ping-ok.txt":                  "diagnostics/ping-ok.txt",
+		"diag-ping-bad-host.txt":            "diagnostics/ping-bad-host.txt",
+		"diag-traceroute-ok.txt":            "diagnostics/traceroute-ok.txt",
+		"diag-lookup-ok.txt":                "diagnostics/lookup-ok.txt",
+		"diag-lookup-nxdomain.txt":          "diagnostics/lookup-nxdomain.txt",
 	} {
 		orig, err := os.ReadFile("../../../testdata/device/axt1800-25.12.6/" + capture)
 		if err != nil {
