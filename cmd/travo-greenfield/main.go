@@ -6,6 +6,8 @@ import (
 	"crypto/rand"
 	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/blackdark-org/travo-greenfield/internal/adguard"
 	"github.com/blackdark-org/travo-greenfield/internal/api"
 	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
 	"github.com/blackdark-org/travo-greenfield/internal/app"
@@ -60,7 +63,11 @@ func main() {
 	awaitAck := flag.Bool("update-await-ack", false, "internal worker activation handshake")
 	proxyListen := flag.String("adguard-proxy-listen", "", "AdGuard Home proxy address; empty = --listen host on port 3001, off disables")
 	recoverUpdate := flag.Bool("recover-update", false, "recover an interrupted update locally")
+	bundlePin := flag.Bool("adguard-bundle-pin", false, "print the offline AdGuard Home bundle pin (sha256 and file name) and exit")
 	flag.Parse()
+	if *bundlePin {
+		os.Exit(printBundlePin(os.Stdout))
+	}
 	if *worker || *recoverUpdate {
 		if err := runUpdateCommand(*worker, *awaitAck); err != nil {
 			slog.Error("update recovery", "err", err)
@@ -88,6 +95,17 @@ func runUpdateCommand(worker, awaitAck bool) error {
 		return svc.Work(awaitAck)
 	}
 	return svc.RecoverLocal()
+}
+
+// printBundlePin prints the pin in sha256sum format for install.sh (ADR 0017); 1 when this
+// build has none (a dev build, or a release without a bundle).
+func printBundlePin(w io.Writer) int {
+	if adguard.BundleSHA256 == "" || adguard.BundleName == "" {
+		fmt.Fprintln(os.Stderr, "this build has no AdGuard Home bundle pin")
+		return 1
+	}
+	fmt.Fprintf(w, "%s  %s\n", adguard.BundleSHA256, adguard.BundleName)
+	return 0
 }
 
 func flagGiven(name string) bool {

@@ -24,6 +24,14 @@ func (o *OPKG) Install(ctx context.Context, pkg string) error {
 	return err
 }
 
+func (o *OPKG) InstallFile(ctx context.Context, path string) error {
+	if err := validFile(path); err != nil {
+		return err
+	}
+	_, _, err := run(ctx, o.Run, TierInstall, "opkg", "install", path)
+	return err
+}
+
 func (o *OPKG) Remove(ctx context.Context, pkg string) error {
 	if err := validPkg(pkg); err != nil {
 		return err

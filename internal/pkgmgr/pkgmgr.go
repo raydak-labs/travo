@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // ErrNotInstalled means the package is absent. A failed query is a different error and
@@ -27,6 +28,9 @@ type PackageManager interface {
 	// Update refreshes package lists; they live in /tmp and vanish on reboot. Best effort for callers.
 	Update(ctx context.Context) error
 	Install(ctx context.Context, pkg string) error
+	// InstallFile installs a local package file whose integrity the CALLER verified
+	// (apk skips its signature check: feed packages are signed only through the index).
+	InstallFile(ctx context.Context, path string) error
 	Remove(ctx context.Context, pkg string) error
 	Installed(ctx context.Context) ([]Package, error)
 	// Version returns ErrNotInstalled when absent.
@@ -47,6 +51,14 @@ func Detect(lookPath func(string) (string, error), r Runner) (PackageManager, er
 
 // DetectSystem is Detect against the real PATH.
 func DetectSystem(r Runner) (PackageManager, error) { return Detect(exec.LookPath, r) }
+
+// validFile accepts an absolute path that cannot be read as an option.
+func validFile(path string) error {
+	if !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\x00\n") {
+		return fmt.Errorf("invalid package file %q", path)
+	}
+	return nil
+}
 
 func validPkg(name string) error {
 	if name == "" {

@@ -4,7 +4,8 @@
 # Flags: (none) install | --uninstall | --purge (with --uninstall: also config and state)
 #        | --port N (alternate port, keeps LuCI unchanged)
 #        | --force (skip the OS and architecture checks only)
-#        | --insecure (install without a signature check) | --rotate-key (accept a new signing key).
+#        | --insecure (install without a signature check) | --rotate-key (accept a new signing key)
+#        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0017).
 # Before installing it verifies $here/checksums.txt.sig over checksums.txt with usign (docs/adr/0007).
 # Test hooks: TRAVO_TEST_STOP_AFTER_SWAP=1 exits after moving LuCI.
 # TRAVO_TEST_HOLD_80=1 starts a listener that blocks greenfield from taking port 80.
@@ -22,7 +23,7 @@ die() {
 }
 
 usage() {
-  echo "usage: install.sh [--force] [--insecure] [--rotate-key] [--port N] | --uninstall [--purge]" >&2
+  echo "usage: install.sh [--force] [--insecure] [--rotate-key] [--port N] [--adguard-bundle FILE] | --uninstall [--purge]" >&2
   exit 2
 }
 
@@ -120,6 +121,24 @@ load_port80() {
   . "$here/port80.sh"
 }
 
+# Stages the offline AdGuard Home package for the daemon's first install (docs/adr/0017).
+# Its hash must equal the pin stamped into this release's (verified) binary. RAM only.
+stage_adguard_bundle() {
+  [ -n "$adguard_bundle" ] || return 0
+  [ -f "$adguard_bundle" ] && [ ! -L "$adguard_bundle" ] || die "$adguard_bundle is not a regular file"
+  pin=$("$here/root/usr/bin/$NAME" --adguard-bundle-pin) || die "this release has no AdGuard Home bundle pin"
+  want=${pin%% *}
+  got=$(sha256sum "$adguard_bundle") || die "cannot hash $adguard_bundle"
+  got=${got%% *}
+  [ "$got" = "$want" ] || die "$adguard_bundle does not match this release (want ${pin#*  })"
+  dir=/tmp/$NAME-bundle
+  if ! mkdir -p "$dir" || ! chmod 700 "$dir" || ! cp "$adguard_bundle" "$dir/adguardhome.apk.tmp" ||
+     ! mv "$dir/adguardhome.apk.tmp" "$dir/adguardhome.apk"; then
+    die "cannot stage the AdGuard Home bundle in $dir"
+  fi
+  echo "AdGuard Home bundle staged; it installs on first start without an uplink"
+}
+
 install() {
   [ "$force" = 1 ] || { check_os; check_arch; }
   check_space
@@ -141,6 +160,7 @@ install() {
   fi
   rm -f "$here/.on-disk" "$here/.listed"
   version=$(cat VERSION)
+  stage_adguard_bundle
 
   load_port80
   mkdir -p /etc/travo-greenfield-guards
@@ -224,6 +244,7 @@ uninstall() {
 
 force=0 purge=0 insecure=0 rotate=0 new_key=0 mode=install
 alternate_port=
+adguard_bundle=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --uninstall) mode=uninstall ;;
@@ -239,12 +260,17 @@ while [ "$#" -gt 0 ]; do
       [ -n "$alternate_port" ] && [ "${#alternate_port}" -le 5 ] &&
         [ "$alternate_port" -le 65535 ] && [ "$alternate_port" -ne 80 ] || usage
       ;;
+    --adguard-bundle)
+      shift
+      [ "$#" -gt 0 ] && [ -n "$1" ] || usage
+      adguard_bundle=$1
+      ;;
     *) usage ;;
   esac
   shift
 done
 [ "$purge" = 0 ] || [ "$mode" = uninstall ] || usage
-[ "$mode" = install ] || { [ "$insecure" = 0 ] && [ "$rotate" = 0 ] && [ -z "$alternate_port" ]; } || usage
+[ "$mode" = install ] || { [ "$insecure" = 0 ] && [ "$rotate" = 0 ] && [ -z "$alternate_port" ] && [ -z "$adguard_bundle" ]; } || usage
 
 [ "$(id -u)" = 0 ] || die "must run as root"
 mkdir -p /var/lock

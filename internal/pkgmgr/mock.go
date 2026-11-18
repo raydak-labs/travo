@@ -2,6 +2,8 @@ package pkgmgr
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -9,6 +11,8 @@ import (
 type Mock struct {
 	mu   sync.Mutex
 	pkgs map[string]string
+	// Files are the paths InstallFile was called with.
+	Files []string
 }
 
 func NewMock() *Mock {
@@ -25,6 +29,27 @@ func (m *Mock) Install(_ context.Context, pkg string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.pkgs[pkg] = "1.0-r1"
+	return nil
+}
+
+// InstallFile installs the package named by the file's base name up to the first '-'
+// followed by a digit (adguardhome-0.107.80-r1.apk -> adguardhome); Files records the call.
+func (m *Mock) InstallFile(_ context.Context, path string) error {
+	if err := validFile(path); err != nil {
+		return err
+	}
+	name := filepath.Base(path)
+	for i := 0; i+1 < len(name); i++ {
+		if name[i] == '-' && name[i+1] >= '0' && name[i+1] <= '9' {
+			name = name[:i]
+			break
+		}
+	}
+	name = strings.TrimSuffix(strings.TrimSuffix(name, ".apk"), ".ipk")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pkgs[name] = "1.0-r1"
+	m.Files = append(m.Files, path)
 	return nil
 }
 

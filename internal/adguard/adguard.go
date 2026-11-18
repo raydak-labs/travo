@@ -65,6 +65,9 @@ type Service struct {
 	// FreeBytes reads free overlay space; Online is the real Internet probe.
 	FreeBytes func() (uint64, error)
 	Online    func(context.Context) bool
+	// Bundle is the release's offline package (ADR 0017); a verified one replaces the
+	// online gate and the package list refresh for the first install.
+	Bundle Bundle
 	// Ready returns nil once AGH's admin API answers on loopback; it waits until ctx ends.
 	Ready func(context.Context) error
 	// DNS owns the `adguard` layer; nil when the daemon has no DNS layer stack.
@@ -197,7 +200,8 @@ func (s *Service) SetEnabled(ctx context.Context, on bool) error {
 	return nil
 }
 
-// Install adds the package once. Automatic attempts (explicit=false) happen only online,
+// Install adds the package once. Automatic attempts (explicit=false) happen only online
+// (or with a verified offline bundle),
 // once per router (Marker). explicit is the user's retry: it clears InstallGuard by name.
 func (s *Service) Install(ctx context.Context, explicit bool) error {
 	s.mu.Lock()
@@ -220,7 +224,8 @@ func (s *Service) Install(ctx context.Context, explicit bool) error {
 			return nil // the automatic attempt already ran; only the user retries
 		}
 	}
-	if !s.Online(ctx) {
+	bundled := s.bundled()
+	if !bundled && !s.Online(ctx) {
 		return ErrOffline
 	}
 	if free, err := s.FreeBytes(); err != nil {
@@ -235,7 +240,9 @@ func (s *Service) Install(ctx context.Context, explicit bool) error {
 	if err := atomicfile.Write(s.Marker, []byte("1\n"), 0o600); err != nil {
 		return release(fmt.Errorf("install marker: %w", err))
 	}
-	if err := s.Packages.Update(ctx); err != nil {
+	if bundled {
+		slog.Info("adguard: installing from the offline bundle", "file", s.Bundle.Path)
+	} else if err := s.Packages.Update(ctx); err != nil {
 		slog.Warn("adguard: package list refresh failed; installing from cached lists", "err", err)
 	}
 	// The config exists before the package does: AGH must never start its first-run
@@ -243,7 +250,7 @@ func (s *Service) Install(ctx context.Context, explicit bool) error {
 	if err := s.prepareConfig(); err != nil {
 		return release(err)
 	}
-	if err := s.Packages.Install(ctx, Package); err != nil {
+	if err := s.installPackage(ctx, bundled); err != nil {
 		return fmt.Errorf("install %s: %w (guard %s kept)", Package, err, InstallGuard)
 	}
 	for _, a := range []string{"enable", "restart"} {

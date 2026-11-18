@@ -35,7 +35,9 @@ trap 'cleanup; rm -rf "$tmp"' EXIT
 tarball=dist/travo-greenfield-$VERSION-aarch64.tar.gz
 minisign -G -W -p "$tmp/k1.pub" -s "$tmp/k1.key" >/dev/null
 minisign -G -W -p "$tmp/k2.pub" -s "$tmp/k2.key" >/dev/null
-build_pkg "$tmp/k1.pub" "$tmp/pkg"
+# A stand-in offline AdGuard bundle: only its hash matters to install.sh (docs/adr/0017).
+printf 'ADBd stand-in bundle\n' >"$tmp/adguardhome-0.0-r0-test.apk"
+ADGUARD_BUNDLE=$tmp/adguardhome-0.0-r0-test.apk build_pkg "$tmp/k1.pub" "$tmp/pkg"
 [ -f "$tarball" ] || fail "$tarball missing"
 cmp dist/checksums.txt "$tmp/pkg/checksums.txt" || fail "dist/checksums.txt differs from the one in the tarball"
 cmp "$tmp/k1.pub" "$tmp/pkg/minisign.pub" || fail "tarball minisign.pub is not the key given to PUBKEY"
@@ -150,6 +152,18 @@ want=$(dx 'uci -q get system.@system[0].hostname' | tr 'A-Z' 'a-z').lan
 got=$(dx 'uci -q get travo-greenfield.main.host_allow')
 [ "$got" = "$want" ] || fail "host_allow is '$got', want '$want'"
 dx 'sysupgrade -l 2>/dev/null' | grep -q travo-greenfield || fail "sysupgrade -l lists no travo-greenfield path"
+
+step "offline AdGuard bundle: a foreign file is refused, the pinned one is staged in RAM"
+docker cp "$tmp/adguardhome-0.0-r0-test.apk" "$NAME:/tmp/agh-good.apk"
+dx 'printf "other\n" >/tmp/agh-bad.apk'
+out=$(dx 'sh /tmp/tg/install.sh --adguard-bundle /tmp/agh-bad.apk 2>&1; echo rc=$?')
+echo "$out" | grep -qx 'rc=1' || fail "foreign bundle not refused: $out"
+echo "$out" | grep -q 'does not match this release' || fail "refusal does not name the mismatch: $out"
+dx '[ ! -e /tmp/travo-greenfield-bundle/adguardhome.apk ]' || fail "a refused bundle was staged"
+dx 'sh /tmp/tg/install.sh --adguard-bundle /tmp/agh-good.apk'
+dx 'cmp /tmp/agh-good.apk /tmp/travo-greenfield-bundle/adguardhome.apk' || fail "pinned bundle not staged"
+dx 'ls -ld /tmp/travo-greenfield-bundle' | grep -q '^drwx------' || fail "bundle dir is not root-only"
+echo "ok: bundle pin enforced by install.sh"
 
 step "restart the container (boot link)"
 docker restart "$NAME" >/dev/null

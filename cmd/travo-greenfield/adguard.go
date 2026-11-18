@@ -72,7 +72,8 @@ func startAdGuard(ctx context.Context, deps app.Deps, layers *dnslayer.Service, 
 		Online: func(ctx context.Context) bool {
 			return connection != nil && connection.Status(ctx).Internet == connectivity.Online
 		},
-		Ready: adguard.HTTPReady(&http.Client{Timeout: 2 * time.Second}, adguard.AdminURL, 500*time.Millisecond),
+		Ready:  adguard.HTTPReady(&http.Client{Timeout: 2 * time.Second}, adguard.AdminURL, 500*time.Millisecond),
+		Bundle: adguard.Bundle{Path: adguard.BundlePath, SHA256: adguard.BundleSHA256},
 	}
 	if deps.Mock { // the mock seeds the service; keep the config off the real path
 		svc.Config = filepath.Join(deps.Paths.State, "adguardhome", "adguardhome.yaml")

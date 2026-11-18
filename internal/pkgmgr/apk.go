@@ -24,6 +24,14 @@ func (a *APK) Install(ctx context.Context, pkg string) error {
 	return err
 }
 
+func (a *APK) InstallFile(ctx context.Context, path string) error {
+	if err := validFile(path); err != nil {
+		return err
+	}
+	_, _, err := run(ctx, a.Run, TierInstall, "apk", "add", "--allow-untrusted", path)
+	return err
+}
+
 func (a *APK) Remove(ctx context.Context, pkg string) error {
 	if err := validPkg(pkg); err != nil {
 		return err

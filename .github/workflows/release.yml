@@ -53,6 +53,8 @@ jobs:
         with:
           cache_save: false
       - run: mise run check
+      - name: Fetch the offline AdGuard Home bundle
+        run: echo "ADGUARD_BUNDLE=$(scripts/fetch-adguard-bundle.sh)" >> "$GITHUB_ENV"
       - name: Package
         env:
           TAG: ${{ inputs.tag }}
@@ -82,4 +84,5 @@ jobs:
           gh release upload "$TAG" \
             "dist/travo-greenfield-${TAG#v}-aarch64.tar.gz" \
             dist/checksums.txt dist/checksums.txt.sig \
+            "$ADGUARD_BUNDLE" \
             --clobber

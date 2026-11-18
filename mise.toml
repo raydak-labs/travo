@@ -69,8 +69,15 @@ VERSION=${VERSION:-0.0.0-dev}
 pnpm -C web build
 # BSD date takes -r <epoch>, GNU date takes -d @<epoch>
 build_time=$(date -u -r "$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
+# ADGUARD_BUNDLE (optional): the offline AdGuard Home package; its pin goes into the binary (docs/adr/0017)
+bundle_flags=
+if [ -n "${ADGUARD_BUNDLE:-}" ]; then
+  sum=$(sha256sum "$ADGUARD_BUNDLE" 2>/dev/null || shasum -a 256 "$ADGUARD_BUNDLE")
+  agh=github.com/blackdark-org/travo-greenfield/internal/adguard
+  bundle_flags="-X $agh.BundleSHA256=${sum%% *} -X $agh.BundleName=$(basename "$ADGUARD_BUNDLE")"
+fi
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
-  -ldflags "-s -w -X github.com/blackdark-org/travo-greenfield/internal/version.Version=$VERSION -X github.com/blackdark-org/travo-greenfield/internal/version.BuildTime=$build_time" \
+  -ldflags "-s -w -X github.com/blackdark-org/travo-greenfield/internal/version.Version=$VERSION -X github.com/blackdark-org/travo-greenfield/internal/version.BuildTime=$build_time $bundle_flags" \
   -o dist/travo-greenfield-arm64 ./cmd/travo-greenfield
 PUBKEY=${PUBKEY:-}
 [ -n "$PUBKEY" ] || ! [ -f packaging/minisign.pub ] || PUBKEY=packaging/minisign.pub
@@ -78,6 +85,10 @@ go run ./cmd/mkpkg -out "dist/travo-greenfield-$VERSION-aarch64.tar.gz" -version
   -binary dist/travo-greenfield-arm64 -web web/dist -files packaging/files -install packaging/install.sh -port80 packaging/port80.sh \
   ${PUBKEY:+-pubkey "$PUBKEY"}
 '''
+
+[tasks."adguard-bundle"]
+description = "Download the offline AdGuard Home package for the release into dist/ (docs/adr/0017); prints its path"
+run = "scripts/fetch-adguard-bundle.sh"
 
 [tasks."test:update"]
 description = "Apply and recover signed update payloads in a booted OpenWrt container"
