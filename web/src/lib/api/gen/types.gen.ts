@@ -334,6 +334,10 @@ export type FailoverWarning = {
     section: string;
 };
 
+export type FirewallZonesOutputBody = {
+    zones: Array<Zone>;
+};
+
 export type GetSetupStateResponse = {
     password_set: boolean;
 };
@@ -359,6 +363,46 @@ export type HealthOutputBody = {
      * Running build version
      */
     version: string;
+};
+
+export type Interface = {
+    /**
+     * Kernel device carrying layer 3 (l3_device); absent while down
+     */
+    device?: string;
+    /**
+     * Resolvers the interface learned, in netifd order
+     */
+    dns_servers: Array<string>;
+    /**
+     * IPv4 addresses in CIDR form
+     */
+    ipv4: Array<string>;
+    /**
+     * IPv6 addresses in CIDR form, including the router's address in delegated prefixes
+     */
+    ipv6: Array<string>;
+    /**
+     * netifd interface name
+     */
+    name: string;
+    /**
+     * netifd protocol (static, dhcp, dhcpv6, wireguard, ...)
+     */
+    proto: string;
+    up: boolean;
+    /**
+     * The interface is an uplink (wan, wan6, wwan, usbtether)
+     */
+    uplink: boolean;
+    /**
+     * Seconds since the interface came up; 0 while down
+     */
+    uptime_seconds: number;
+    /**
+     * Firewall zone whose network list holds the interface; absent for none
+     */
+    zone?: string;
 };
 
 export type JoinWiFiInputBody = {
@@ -445,6 +489,14 @@ export type Network = {
     best_signal_dbm: number;
     security: 'open' | 'wpa2' | 'wpa2_wpa3' | 'other';
     ssid: string;
+};
+
+export type NetworkInterfacesOutputBody = {
+    interfaces: Array<Interface>;
+    /**
+     * The firewall config could not be read; zones are missing
+     */
+    partial: boolean;
 };
 
 export type NtpBody = {
@@ -1033,6 +1085,34 @@ export type WifiApsOutputBody = {
 
 export type WifiProfileOrderInputBody = {
     ids: Array<string>;
+};
+
+export type Zone = {
+    /**
+     * Policy for traffic forwarded between the zone's own networks
+     */
+    forward: string;
+    /**
+     * Zones this zone may forward to (forwarding sections with src = this zone)
+     */
+    forwards_to: Array<string>;
+    /**
+     * Policy for traffic to the router (ACCEPT, REJECT, DROP); inherited from the defaults section when unset
+     */
+    input: string;
+    /**
+     * Masquerading (NAT) on egress
+     */
+    masq: boolean;
+    name: string;
+    /**
+     * netifd interfaces in the zone
+     */
+    networks: Array<string>;
+    /**
+     * Policy for traffic from the router
+     */
+    output: string;
 };
 
 export type JoinWiFiInputBodyWritable = {
@@ -2098,6 +2178,64 @@ export type EnableFailoverResponses = {
 };
 
 export type EnableFailoverResponse = EnableFailoverResponses[keyof EnableFailoverResponses];
+
+export type ListFirewallZonesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/firewall/zones';
+};
+
+export type ListFirewallZonesErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ListFirewallZonesError = ListFirewallZonesErrors[keyof ListFirewallZonesErrors];
+
+export type ListFirewallZonesResponses = {
+    /**
+     * OK
+     */
+    200: FirewallZonesOutputBody;
+};
+
+export type ListFirewallZonesResponse = ListFirewallZonesResponses[keyof ListFirewallZonesResponses];
+
+export type ListNetworkInterfacesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/interfaces';
+};
+
+export type ListNetworkInterfacesErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ListNetworkInterfacesError = ListNetworkInterfacesErrors[keyof ListNetworkInterfacesErrors];
+
+export type ListNetworkInterfacesResponses = {
+    /**
+     * OK
+     */
+    200: NetworkInterfacesOutputBody;
+};
+
+export type ListNetworkInterfacesResponse = ListNetworkInterfacesResponses[keyof ListNetworkInterfacesResponses];
 
 export type GetSetupStateData = {
     body?: never;

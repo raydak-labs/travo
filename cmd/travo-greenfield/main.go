@@ -33,6 +33,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/hook"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
+	"github.com/blackdark-org/travo-greenfield/internal/netview"
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
 	"github.com/blackdark-org/travo-greenfield/internal/sshkeys"
 	"github.com/blackdark-org/travo-greenfield/internal/static"
@@ -391,6 +392,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		apiDeps.SystemLog = &systemlog.Service{Log: r}
 	}
 	apiDeps.Clients = newClients(deps)
+	apiDeps.NetworkView = &netview.Service{UCI: deps.Device, Ubus: deps.Device}
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source
 	if listenTLS != "" {
