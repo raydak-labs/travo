@@ -137,7 +137,7 @@ func checkOwnedTypes(current, want []device.Section) error {
 }
 
 func (s *Service) write(ctx context.Context, x device.Section) error {
-	return writeSection(ctx, s.UCI, x)
+	return WriteSection(ctx, s.UCI, x)
 }
 
 // ZoneMissing reports whether the VPN zone or one of its forwardings is absent or differs,
@@ -174,14 +174,15 @@ func StageZone(ctx context.Context, uci device.UCI, current []device.Section) er
 				return err
 			}
 		}
-		if err := writeSection(ctx, uci, w); err != nil {
+		if err := WriteSection(ctx, uci, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func writeSection(ctx context.Context, uci device.UCI, x device.Section) error {
+// WriteSection stages one named section with its options and lists in a deterministic order.
+func WriteSection(ctx context.Context, uci device.UCI, x device.Section) error {
 	if err := uci.SetType(ctx, "firewall", x.Name, x.Type); err != nil {
 		return err
 	}
