@@ -112,8 +112,9 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 
 ## 9. Multi-WAN failover (mwan3, IPv4 only; post-0.1)
 
-- Source of truth is Travo's failover JSON, generated into `/etc/config/mwan3`. Generated sections are prefixed `travo_`.
-- Ownership = PROVENANCE (fingerprint stamped by this build and still matching), never content. A non-namespaced section is NEVER deleted.
+- Source of truth is Travo's failover JSON, generated into `/etc/config/mwan3`. Generated sections are prefixed `travo_`, except interface sections, which mwan3 keys by the netifd name (`wan`, `wwan`, `usbtether`): those are created or adopted (loud warning), Travo owns only `enabled`, `family`, `track_ip`, and they are never deleted ([ADR 0018](adr/0018-mwan3-failover.md)).
+- Ownership = PROVENANCE (`travo_fp` stamped over the owned values and still matching), never content. A non-namespaced section is NEVER deleted.
+- Rules `travo_v4` (→ `travo_failover`, `last_resort default`) and `travo_v6` (→ `default`, main table) sit at the top of the rule list; stock catch-all rules stay but never match first.
 - Operator-edited `travo_` section: overwrite Travo-owned options with a LOUD warning.
 - Back up EVERY section a save may write; restore on failure.
 - Staged apply: apply with rollback → verify every managed section → confirm (not confirm-then-verify).

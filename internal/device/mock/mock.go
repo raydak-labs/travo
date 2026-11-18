@@ -39,9 +39,11 @@ type Device struct {
 	scanReplies       map[string]json.RawMessage
 	staLinkIndex      int
 	netLinks          []device.NetLink
-	neighbours        json.RawMessage
-	wirelessChanged   bool
-	DefaultRoute      bool
+	// Reorders records `config.section=index` per Reorder call.
+	Reorders        []string
+	neighbours      json.RawMessage
+	wirelessChanged bool
+	DefaultRoute    bool
 	// RenewErr makes RenewLease fail; renews records the interfaces renewed.
 	RenewErr error
 	renews   []string

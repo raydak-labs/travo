@@ -205,3 +205,9 @@ type NetLink struct {
 type NetLinkReader interface {
 	NetLinks(context.Context) ([]NetLink, error)
 }
+
+// UCIReorderer moves a section to a position in its config (`uci reorder`, staged like
+// any other change). mwan3 evaluates rules in config order, so failover needs it.
+type UCIReorderer interface {
+	Reorder(ctx context.Context, config, section string, index int) error
+}

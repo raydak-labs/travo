@@ -66,12 +66,12 @@ No placeholders were needed: the SSID is a test name and the only address is the
 - uci-export-firewall.txt, uci-export-network.txt: `uci export firewall`, `uci export network` (router state after the 0.1.0 install: wwan uplink, guest AP, VPN profile stored, tunnel off). The wan zone is the anonymous `@zone[1]` with `list network`. Redacted: `wg0` `private_key` → `REDACTED`, peer `endpoint_host` → `203.0.113.8`.
 No phone was attached: the tether link payloads (sysfs, `network.device status`, `network.interface.usbtether status`) are a hardware playbook capture step (docs/testing.md).
 
-## sysfs-net/ (2026-11-18, OpenWrt 25.12.6, #175)
-- links.tsv: `cd /sys/class/net && for n in *; do printf "%s\t%s\t%s\t%s\t%s\n" "$n" "$(readlink $n/device)" "$(readlink $n/device/driver)" "$(readlink $n/device/subsystem)" "$(grep ^DEVTYPE= $n/uevent | cut -d= -f2)"; done`. Columns: name, device link, driver link, subsystem link, uevent DEVTYPE. Taken with wg0 disabled (absent) and no USB device attached. Every byte is verbatim; nothing needed redaction.
-
-## usbtether/ (2026-11-18, OpenWrt 25.12.6 feed, #176)
-- apk-packages.txt: after `apk update`, `apk search -v kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net-ipheth usbmuxd`, `apk info -R` for each tether package, and `apk info -s` for the packages and their dependencies. None was installed. Verbatim.
-No phone was attached: the USB tether link payloads (sysfs, `network.device status`) are a hardware playbook capture step.
-
 ## uci-export-system.txt (2026-11-18, 0.2.0 system settings, #190)
 - uci-export-system.txt: `uci export system` on the firstboot 25.12.6 image (hostname, zonename/timezone POSIX pair, sysntpd `timeserver ntp` with its server list). No values needed redaction; every byte is verbatim.
+
+## mwan3/ (2026-11-18, 25.12.6 package feed, #208)
+Packages fetched and extracted into `/tmp` on the router without installing them: `apk fetch mwan3 luci-app-mwan3`, `apk extract --allow-untrusted --destination <dir> <pkg>.apk`.
+- stock-config-mwan3.txt: `/etc/config/mwan3` of `mwan3-2.12.0-r3` (the conffile a fresh install writes).
+- mwan3-conffiles-init.txt: `lib/apk/packages/mwan3.conffiles`, a `---` line, then `/etc/init.d/mwan3`.
+- luci-app-mwan3-acl.json: `/usr/share/rpcd/acl.d/luci-app-mwan3.json` of `luci-app-mwan3-26.317.52279~1c75ea4`.
+Verbatim; nothing needed redaction.
