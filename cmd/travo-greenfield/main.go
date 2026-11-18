@@ -293,6 +293,10 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if svc := startAdGuard(ctx, deps, dnsLayers, workers, connection); svc != nil {
 		adguardSvc = svc
 	}
+	var tailscaleSvc api.Tailscale
+	if svc := startTailscale(deps, dnsLayers, workers, connection); svc != nil {
+		tailscaleSvc = svc
+	}
 	apiDeps := api.Deps{
 		DaemonContext: ctx,
 		VPNProfiles:   profiles,
@@ -314,6 +318,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,
 		AdGuard:       adguardSvc,
+		Tailscale:     tailscaleSvc,
 		WiFiReconnect: reconnect,
 		WiFiAPs:       wirelessAPs,
 		WiFiGuest:     wirelessGuest,

@@ -16,6 +16,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
 	"github.com/blackdark-org/travo-greenfield/internal/runner"
+	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
 	"github.com/blackdark-org/travo-greenfield/internal/uciwrite"
 )
@@ -50,10 +51,12 @@ type Deps struct {
 	Device   device.Device
 	Accounts device.Accounts
 	Packages pkgmgr.PackageManager
-	Txn      *txn.Manager
-	Guards   guard.Dir
-	Paths    Paths
-	Mock     bool
+	// Tailscale drives the tailscale CLI of the optional package.
+	Tailscale tailscale.CLI
+	Txn       *txn.Manager
+	Guards    guard.Dir
+	Paths     Paths
+	Mock      bool
 	// cleanup removes the mock temp dir; nil for the real adapters.
 	cleanup func() error
 }
@@ -79,6 +82,7 @@ func New(o Options) (Deps, error) {
 			return Deps{}, fmt.Errorf("mock links: %w", err)
 		}
 		dev.SetService("adguardhome", false, false) // absent package; the mock install adds it
+		dev.SetService(tailscale.Package, false, false)
 		if secs, err := cli.ParseExport("dhcp", string(mock.DHCPExport)); err == nil {
 			_ = dev.Load(context.Background(), "dhcp", secs) // the embedded capture always parses (seed test)
 		}
@@ -96,7 +100,7 @@ func New(o Options) (Deps, error) {
 		if err != nil {
 			return Deps{}, err
 		}
-		d = Deps{Device: dev, Accounts: dev, Packages: pkgmgr.NewMock(), Mock: true,
+		d = Deps{Device: dev, Accounts: dev, Packages: pkgmgr.NewMock(), Tailscale: tailscale.NewMock(), Mock: true,
 			Paths:   Paths{State: tmp, Guards: filepath.Join(tmp, "guards"), Txn: filepath.Join(tmp, "txn")},
 			cleanup: func() error { return os.RemoveAll(tmp) }}
 	} else {
@@ -105,7 +109,7 @@ func New(o Options) (Deps, error) {
 			return Deps{}, fmt.Errorf("package manager: %w", err)
 		}
 		dev := cli.New()
-		d = Deps{Device: dev, Accounts: dev, Packages: pm, Paths: RealPaths()}
+		d = Deps{Device: dev, Accounts: dev, Packages: pm, Tailscale: tailscale.Command{Run: runner.Exec}, Paths: RealPaths()}
 	}
 	d.Guards = guard.Dir{Path: d.Paths.Guards, Now: time.Now}
 	d.Txn = newTxn(d, o.StopCheck)

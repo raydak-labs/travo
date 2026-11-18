@@ -128,3 +128,13 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 - [HW] BusyBox `tr` has no character classes: `tr '[:upper:]' '[:lower:]'` turned `OpenWrt` into `wenrt`. Use explicit ranges (`tr A-Z a-z`).
 - BusyBox `sed` vs GNU `sed` escapes disagree: never escape JSON in sed; encode in code and write bytes verbatim. `wget -O` is required. Check signatures with `ubus -v list`; do not assume.
 - `iw event` is a long-running listener: stop via signal, not a timeout tier. The uplink medium (ethernet/WiFi/USB) drives caller classification and failover candidates.
+
+## 15. Tailscale (0.2)
+
+Captures: `testdata/device/axt1800-25.12.6/tailscale/` (AXT1800, 25.12.6, 2026-11-17, not logged in).
+- [HW] Package `tailscale` 1.104.1-r1 pulls `kmod-tun`; installed size 26 MiB, overlay grew 12.3 MiB. The post-install starts tailscaled at once (procd instance with `TS_DEBUG_FIREWALL_MODE=nftables`, port 41641, state `/etc/tailscale/tailscaled.state`). Settings in `/etc/config/tailscale` are daemon flags only; prefs live in the state file.
+- [HW] `tailscale up --timeout=N` before login prints the auth URL, exits 1 with `timeout waiting for Tailscale service to enter a Running state`, and the backend keeps `AuthURL` in `tailscale status --json`. `up --json` prints `{AuthURL, QR, BackendState}`.
+- [HW] `tailscale up` without every non-default pref is refused ("requires mentioning all non-default flags"); `tailscale set` is never refused and works while logged out (an exit node by IP is stored as `ExitNodeIP` until resolved).
+- [HW] `tailscale status` (text) exits 1 when logged out; `status --json` exits 0. `tailscale debug prefs` prints the prefs JSON.
+- [HW] After `up`, tailscaled adds `ip rule` 5210-5270 (`lookup 52`), the `tailscale0` link (MTU 1280, no address until login) and empty nft tables `ip filter` / `ip nat`.
+- [HW] `apk del tailscale` leaves `/etc/tailscale/` (state, `ssh/` host keys once `--ssh` was set), `/var/lib/tailscale/`, the empty nft tables and the loaded `tun` module.

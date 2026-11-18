@@ -2,7 +2,7 @@
 
 Status: accepted (property-tested, container-tested; device behaviour via spike S5)
 
-Features that touch dnsmasq `server`/`noresolv`/rebind push and pop layers on one ordered record (`captive`, `vpn`, `adguard`, reserved `tailscale`). Base is captured before the first layer. Reads never mutate. Built from day one because per-feature snapshots of the same options are how the old bugs happened. See [invariants §8](../invariants.md).
+Features that touch dnsmasq `server`/`noresolv`/rebind push and pop layers on one ordered record (`captive`, `vpn`, `adguard`, `tailscale`). Base is captured before the first layer. Reads never mutate. Built from day one because per-feature snapshots of the same options are how the old bugs happened. See [invariants §8](../invariants.md).
 
 Implementation (`internal/dnslayer`):
 - Precedence is fixed by layer name, not push order: captive > adguard > vpn. The highest replace layer sets `server`/`noresolv`; tailscale is additive by name and appends domain-scoped servers. Any rebind-disabling layer turns rebind protection off. Effective state depends only on the active layers (property test with random payloads).
@@ -16,6 +16,10 @@ Implementation (`internal/dnslayer`):
 ## Captive layer (#130)
 
 The `captive` layer carries the resolvers netifd learned on the interface whose `l3_device` carries the kernel default route, with `DisableRebind` (hotel portals answer with RFC1918, device-facts §7). No resolvers or no default route refuses before any write. It replaces whatever is below it (AdGuard, VPN) by precedence, so the old per-feature backups of WAN DNS fields and the AdGuard upstream are unnecessary: nothing outside dnsmasq is touched. The 5-minute auto-restore deadline is memory-only on the monotonic clock: no flash write per bypass, and wall-clock jumps (time sync) cannot shorten it. A daemon restart with the layer still on the stack arms a fresh 5 minutes on the first worker tick (15 s), so a bypass can outlive its deadline by at most one restart window, never indefinitely. A failed restore keeps the dnslayer guard; the dashboard shows it as pending and offers only "Retry DNS restore", which runs `Resume` and then pops the layer (an explicit POST; the worker never resumes).
+
+## Tailscale layer (#179)
+
+The additive `tailscale` layer carries `/<MagicDNSSuffix>/100.100.100.100`, owned by a reconciler in `internal/tailscale` on the same shared instance; see [ADR 0017](0017-tailscale.md).
 
 ## VPN layer (#88)
 

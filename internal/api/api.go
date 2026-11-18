@@ -111,9 +111,11 @@ type Deps struct {
 	WiFiJoin     WiFiJoiner
 	WiFiProfiles WiFiProfileService
 	// AdGuard is nil when the daemon cannot supervise the package (no service port).
-	AdGuard  AdGuard
-	Txns     Txns
-	Sessions *auth.Store
+	AdGuard AdGuard
+	// Tailscale is nil when the daemon cannot supervise the package (no service port).
+	Tailscale Tailscale
+	Txns      Txns
+	Sessions  *auth.Store
 	// Tokens are the automation API tokens; nil disables bearer auth and answers 503 on management.
 	Tokens  APITokens
 	Limiter *auth.RateLimiter
@@ -227,6 +229,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWiFi(a)
 	s.registerWiFiProfiles(a)
 	s.registerAdGuard(a)
+	s.registerTailscale(a)
 	s.registerWiFiReconnect(a)
 	s.registerUSBTether(a)
 	s.registerDashboardEvents(a)
@@ -237,7 +240,7 @@ func New(d Deps) (http.Handler, huma.API) {
 }
 
 // schemaNamer disambiguates the WiFi and saved-uplink models from the VPN profile models,
-// and the AdGuard status from the transaction Status.
+// the AdGuard and Tailscale models from the transaction Status.
 func schemaNamer(t reflect.Type, hint string) string {
 	name := huma.DefaultSchemaNamer(t, hint)
 	for t.Kind() == reflect.Pointer {
@@ -254,6 +257,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "WiFiReconnect" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/usbtether":
 		return "USBTether" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/tailscale":
+		return "Tailscale" + name
 	}
 	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name
