@@ -1,0 +1,4 @@
+dhcp.travo_host_46bae68d7d6b=host
+dhcp.travo_host_46bae68d7d6b.name='Watch'
+dhcp.travo_host_46bae68d7d6b.mac='46:ba:e6:8d:7d:6b'
+dhcp.travo_host_46bae68d7d6b.ip='192.168.1.119'

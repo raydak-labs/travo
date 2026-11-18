@@ -1,0 +1,4 @@
+config host 'travo_host_46bae68d7d6b'
+	option name 'Watch'
+	list mac '46:ba:e6:8d:7d:6b'
+	option ip '192.168.1.119'

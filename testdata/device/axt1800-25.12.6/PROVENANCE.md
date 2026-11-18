@@ -82,3 +82,6 @@ Verbatim; nothing needed redaction.
 
 ## system/ (2026-11-18, OpenWrt 25.12.6, #196)
 - system/proc-mounts.txt: `cat /proc/mounts` (GET-only) on the running router: ubifs `/overlay` (`/dev/ubi0_2`, rw) under the overlayfs root. Verbatim; nothing needed redaction. Alert tests derive the degraded shapes (tmpfs overlay, read-only overlay) by replacing only that line's file system type or `rw` flag.
+
+## clients/ (2026-11-18, #218, #219)
+Leases, neighbours, `network.lan` and hostapd method list, plus staged-only (reverted) block rule and host section captures. See `clients/PROVENANCE.md`.
