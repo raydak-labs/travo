@@ -93,6 +93,7 @@ func New(o Options) (Deps, error) {
 				return Deps{}, fmt.Errorf("mock %s: %w", config, err)
 			}
 		}
+		dev.SetService("cron", true, false) // like a fresh install: no crontab, crond not running
 		if secs, err := cli.ParseExport("dhcp", string(mock.DHCPExport)); err == nil {
 			_ = dev.Load(context.Background(), "dhcp", secs) // the embedded capture always parses (seed test)
 		}

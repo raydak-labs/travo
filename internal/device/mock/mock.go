@@ -30,15 +30,18 @@ type Device struct {
 	// AuthorizedKeysErr makes authorized_keys reads and writes fail.
 	AuthorizedKeysErr error
 	authorizedKeys    []byte
-	mu                sync.Mutex
-	bootID            string
-	bootSequence      int
-	committed         map[string]*config
-	staged            map[string]*config
-	ubus              map[string]json.RawMessage
-	scanReplies       map[string]json.RawMessage
-	staLinkIndex      int
-	netLinks          []device.NetLink
+	// CrontabErr makes crontab reads and writes fail.
+	CrontabErr   error
+	crontab      string
+	mu           sync.Mutex
+	bootID       string
+	bootSequence int
+	committed    map[string]*config
+	staged       map[string]*config
+	ubus         map[string]json.RawMessage
+	scanReplies  map[string]json.RawMessage
+	staLinkIndex int
+	netLinks     []device.NetLink
 	// Reorders records `config.section=index` per Reorder call.
 	Reorders        []string
 	neighbours      json.RawMessage

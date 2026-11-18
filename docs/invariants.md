@@ -70,7 +70,8 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - All writes go through one helper: lock the whole config set ONCE, revert the staged delta on failure, commit once.
 - Locks are keyed on CONFIG NAME (not service; `firewall`/`network` are shared). Global sorted lock order. Locks are NOT reentrant; a helper called inside a transaction must not lock.
 - Read paths are unlocked.
-- Known gap: external writers (cron/hotplug scripts) sit outside the model. Prefer helpers that call the daemon.
+- Travo's cron jobs and button scripts never write UCI: they call the daemon through the hook socket ([adr/0024](adr/0024-daemon-hooks-for-cron-and-buttons.md)). `/etc/crontabs/root` is written only by `internal/crontab`, one marked block per feature; foreign lines are kept byte for byte.
+- Known gap: other external writers (an operator's own cron or hotplug scripts) sit outside the model.
 
 ## 7. Network and routing
 
@@ -197,6 +198,6 @@ Accept; do not "fix" silently.
 - Dashboard rate = 2 s sample, not an average.
 - Config locks are held across blocking reload/apply; long holds queue all writers of that config.
 - Hardware button = detection only until actions are designed.
-- External writers (cron/hotplug) outside the lock model.
+- Operator-owned external writers (cron/hotplug) outside the lock model.
 - Reboot exclusion has a residual ~2 s window where `txn.Begin` can start after the second guard check; boot-time `txn.Recover` restores that transaction.
 - AdGuard sees all queries from 127.0.0.1 (no per-client stats) under the default topology; the opt-in expert topology ([adr/0021](adr/0021-adguard-expert-topology.md)) is designed, not built.

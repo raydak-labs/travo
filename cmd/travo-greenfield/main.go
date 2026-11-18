@@ -31,6 +31,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/blackdark-org/travo-greenfield/internal/hook"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
 	"github.com/blackdark-org/travo-greenfield/internal/sshkeys"
@@ -67,7 +68,12 @@ func main() {
 	proxyListen := flag.String("adguard-proxy-listen", "", "AdGuard Home proxy address; empty = --listen host on port 3001, off disables")
 	recoverUpdate := flag.Bool("recover-update", false, "recover an interrupted update locally")
 	bundlePin := flag.Bool("adguard-bundle-pin", false, "print the offline AdGuard Home bundle pin (sha256 and file name) and exit")
+	hookAction := flag.String("hook", "", "ask the running daemon to perform a hook action (cron jobs, button scripts) and exit")
+	hookSocketPath := flag.String("hook-socket", hook.SocketPath, "hook socket the --hook client connects to")
 	flag.Parse()
+	if *hookAction != "" {
+		os.Exit(runHook(*hookSocketPath, *hookAction))
+	}
 	if *bundlePin {
 		os.Exit(printBundlePin(os.Stdout))
 	}
@@ -179,6 +185,8 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 			return id
 		}
 	}
+
+	startHooks(deps, workers, func(*hook.Server) {})
 
 	sessions, err := startState(ctx, deps)
 	if err != nil {

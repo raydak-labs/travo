@@ -28,6 +28,8 @@ type Device struct {
 	AuthorizedKeysPath string
 	// SysNet overrides /sys/class/net (tests).
 	SysNet string
+	// CrontabPath overrides /etc/crontabs/root (tests).
+	CrontabPath string
 }
 
 func New() *Device { return &Device{Run: runner.Exec, RunInput: runner.RunInput} }

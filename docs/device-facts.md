@@ -78,7 +78,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 
 - Cron is `/etc/crontabs/root`; `/etc/cron.d` does NOT exist (write → ENOENT; the UI then shows a schedule that never fires).
 - Buttons: detect from devicetree `/sys/firmware/devicetree/base/keys/*/label`; `/etc/rc.button` is generic stock scripts, not a source of truth. Hotplug button scripts run as root via procd.
-- The old toggle helper needed a stored rpcd login file; missing → every scheduled/button toggle silently no-opped. It also did uci set/commit/apply/confirm OUTSIDE in-process locks and could clobber the API's staged delta. In travo-greenfield helpers call the daemon instead.
+- The old toggle helper needed a stored rpcd login file; missing → every scheduled/button toggle silently no-opped. It also did uci set/commit/apply/confirm OUTSIDE in-process locks and could clobber the API's staged delta. In travo-greenfield helpers call the daemon instead (hook socket, ADR 0024).
 - [BUG] Auto-reconnect cron ran `wifi up` every minute with no uplink → radios flapping. Cap and guard. greenfield uses `ifup wwan`, capped at 5 (§2, ADR 0014).
 - [BUG] Radio switch via notification broke WiFi. Keep as a regression check.
 - [BUG] After an OpenWrt upgrade Travo did not start (see §10).
@@ -122,6 +122,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 
 ## 14. Logs, cron, flash, shell
 
+- [HW] 25.12.6 ships no `/etc/crontabs/root` after firstboot and crond is not running: `/etc/init.d/cron` skips an empty `/etc/crontabs/`, so the first job needs a `cron restart`. The init script passes `-l ${cronloglevel:-7}`.
 - [HW] BusyBox crond logs every job start as `cron.err` at the default level; a per-minute job floods errors. Set level 9.
 - NAND overlayfs: writes = wear + stall. `/tmp` is RAM; staged UCI and package lists are lost on reboot.
 - [HW] BusyBox on 25.12.6 has no `timeout`, `diff`, `pkill`. Bound commands in Go, not in shell.
