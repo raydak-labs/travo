@@ -376,6 +376,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if svc := startWiFiSchedule(ctx, deps, hooks, wirelessAPs); svc != nil {
 		apiDeps.WiFiSchedule = svc
 	}
+	if history := startStatsHistory(deps, workers); history != nil {
+		apiDeps.StatsHistory = history
+	}
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	apiDeps.Alerts = newAlerts(deps, aghService, reconnect)
 	if f, ok := deps.Device.(sshkeys.File); ok {

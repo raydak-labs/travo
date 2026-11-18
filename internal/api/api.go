@@ -100,9 +100,11 @@ type Deps struct {
 	BootID   func(context.Context) string
 	Accounts device.Accounts
 	// Ubus feeds read-only system facts; nil answers 503 device_unavailable.
-	Ubus         device.Ubus
-	Backup       device.ConfigBackupper
-	Throughput   ThroughputReader
+	Ubus       device.Ubus
+	Backup     device.ConfigBackupper
+	Throughput ThroughputReader
+	// StatsHistory is the persisted dashboard history; nil answers 503.
+	StatsHistory StatsHistory
 	Connectivity ConnectivityReader
 	// Captive is the portal DNS bypass; nil answers 503 captive_unavailable.
 	Captive      CaptiveAssist
@@ -245,6 +247,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerUpdateApply(a)
 	s.registerBackup(a)
 	s.registerThroughput(a)
+	s.registerStatsHistory(a)
 	s.registerConnectivity(a)
 	s.registerCaptive(a)
 	s.registerWiFi(a)
@@ -282,6 +285,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "USBTether" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/wifischedule":
 		return "WiFiSchedule" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/statshistory":
+		return "StatsHistory" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/tailscale":
 		return "Tailscale" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/failover":

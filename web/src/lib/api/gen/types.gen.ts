@@ -545,6 +545,35 @@ export type StageStatus = {
     version: string | null;
 };
 
+export type StatsHistoryBody = {
+    interval_seconds: number;
+    /**
+     * degraded: the file was unreadable or a flush failed; history is RAM-only until reset
+     */
+    persistence: 'ok' | 'degraded';
+    points: Array<StatsHistoryPoint>;
+    retention_hours: number;
+};
+
+export type StatsHistoryPoint = {
+    /**
+     * Router wall clock at the end of the bucket, unix seconds
+     */
+    at: number;
+    /**
+     * Distinct LAN and guest neighbour MACs; null when unreadable
+     */
+    clients: number | null;
+    uplinks: Array<StatsHistoryUplinkBytes>;
+    uptime_seconds: number;
+};
+
+export type StatsHistoryUplinkBytes = {
+    name: 'wan' | 'wwan' | 'usbtether';
+    rx_bytes: number;
+    tx_bytes: number;
+};
+
 export type Summary = {
     id: string;
     name: string;
@@ -1758,6 +1787,73 @@ export type PostSetupPasswordResponses = {
 };
 
 export type PostSetupPasswordResponse = PostSetupPasswordResponses[keyof PostSetupPasswordResponses];
+
+export type ResetStatsHistoryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/stats/history';
+};
+
+export type ResetStatsHistoryErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ResetStatsHistoryError = ResetStatsHistoryErrors[keyof ResetStatsHistoryErrors];
+
+export type ResetStatsHistoryResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type ResetStatsHistoryResponse = ResetStatsHistoryResponses[keyof ResetStatsHistoryResponses];
+
+export type GetStatsHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * How far back, in hours of router wall clock
+         */
+        hours?: number;
+    };
+    url: '/api/v1/stats/history';
+};
+
+export type GetStatsHistoryErrors = {
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetStatsHistoryError = GetStatsHistoryErrors[keyof GetStatsHistoryErrors];
+
+export type GetStatsHistoryResponses = {
+    /**
+     * OK
+     */
+    200: StatsHistoryBody;
+};
+
+export type GetStatsHistoryResponse = GetStatsHistoryResponses[keyof GetStatsHistoryResponses];
 
 export type GetSystemAlertsData = {
     body?: never;

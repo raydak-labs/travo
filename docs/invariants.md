@@ -65,6 +65,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Degraded persistence must be visible in the UI: `/overlay` on tmpfs or mounted read-only raises the `persistence_degraded` alert; under 20 MB free raises `overlay_low` (`internal/alerts`, derived on read, pushed as the `alerts` event on the dashboard stream).
 - Backup/restore = config tarball; restore over `/` is guarded. Factory reset is guarded (`factory-reset-in-progress`, never removed by Travo; the wipe takes it with the overlay), refused while any other guard is held, requires the typed phrase `factory reset` and a browser session (no API token).
 - No embedded KV store in 0.1. Add one only with a retention rule for the data.
+- Stats history ([adr/0026](adr/0026-stats-history.md)): RAM ring of 10 min buckets, 7 days; flushed to `stats-history.json` at most every 6 h and on graceful shutdown, never per sample. A torn file or failed flush degrades persistence (visible, never overwritten) until the explicit reset.
 
 ## 6. UCI write discipline
 
@@ -194,7 +195,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 Accept; do not "fix" silently.
 
 - IPv6 failover deferred (IPv4 only). Needs a device matrix + decision record.
-- Traffic history ~10 min in memory; resets on restart.
+- Live throughput history ~10 min in memory; resets on restart. The 10 min bucket history survives restarts but loses up to 6 h on a crash or power cut (ADR 0026).
 - Session registry is memory-only (cross-restart revocation via epoch only).
 - Positional SSH key index (breaking to change).
 - Dashboard rate = 2 s sample, not an average.
