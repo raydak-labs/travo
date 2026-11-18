@@ -663,7 +663,7 @@ export type UsbTetherStatus = {
      * Netdev network.usbtether binds; empty when not configured
      */
     device: string;
-    drivers: Array<UsbTetherDriver> | null;
+    drivers: Array<UsbTetherDriver>;
     /**
      * The wan firewall zone lists usbtether
      */
@@ -676,7 +676,7 @@ export type UsbTetherStatus = {
      * First IPv4 address in CIDR form; empty when none
      */
     ipv4: string;
-    links: Array<UsbTetherLink> | null;
+    links: Array<UsbTetherLink>;
     /**
      * netifd reports usbtether up
      */

@@ -7,7 +7,15 @@ import { shootOverlays } from './screenshots-overlays.mjs';
 
 const BASE_URL = process.env.SCREENSHOT_URL ?? `http://localhost:${process.env.WEB_PORT ?? 18092}`;
 // Login and setup are only reachable signed out; the rest needs the session (see main).
-const SIGNED_IN_ROUTES = ['/', '/wifi', '/system', '/system/tokens', '/vpn', '/services'];
+const SIGNED_IN_ROUTES = [
+  '/',
+  '/wifi',
+  '/network',
+  '/system',
+  '/system/tokens',
+  '/vpn',
+  '/services',
+];
 const MOCK_PASSWORD = 'mock-password';
 const VIEWPORTS = [
   { width: 390, height: 844, mobile: true },

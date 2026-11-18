@@ -68,7 +68,7 @@ function onDrawerKey(event: KeyboardEvent) {
 const nav: { route: Route | null; label: () => string; icon: typeof Wifi }[] = [
   { route: 'dashboard', label: () => m.nav_dashboard(), icon: LayoutDashboard },
   { route: 'wifi', label: () => m.nav_wifi(), icon: Wifi },
-  { route: null, label: () => m.nav_network(), icon: Network },
+  { route: 'network', label: () => m.nav_network(), icon: Network },
   { route: 'vpn', label: () => m.nav_vpn(), icon: Shield },
   { route: 'services', label: () => m.nav_services(), icon: Server },
   { route: 'system', label: () => m.nav_system(), icon: Settings },
@@ -250,6 +250,8 @@ $effect(() => {
             <PageHost load={pages.dashboard} props={{ events: dashboardEvents }} />
           {:else if shown === 'wifi'}
             <PageHost load={pages.wifi} />
+          {:else if shown === 'network'}
+            <PageHost load={pages.network} />
           {:else if shown === 'vpn'}
             <PageHost load={pages.vpn} />
           {:else if shown === 'services'}

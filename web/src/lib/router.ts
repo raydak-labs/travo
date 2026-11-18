@@ -3,6 +3,7 @@ export type Route =
   | 'login'
   | 'setup'
   | 'wifi'
+  | 'network'
   | 'vpn'
   | 'services'
   | 'system'
@@ -13,6 +14,7 @@ const ROUTES: Record<string, Route> = {
   '/login': 'login',
   '/setup': 'setup',
   '/wifi': 'wifi',
+  '/network': 'network',
   '/vpn': 'vpn',
   '/services': 'services',
   '/system': 'system',
