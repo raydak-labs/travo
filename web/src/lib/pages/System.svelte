@@ -1,7 +1,5 @@
 <script lang="ts">
 import { onMount } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
-import Badge from '$lib/components/ui/badge/badge.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import { postSystemReboot } from '../api/gen';
 import '../api/client';
@@ -17,26 +15,22 @@ import { href } from '../router';
 import { session } from '../session.svelte';
 import { theme } from '../theme.svelte';
 import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 import FormMessage from '../ui/FormMessage.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import { notify } from '../ui/notify';
 import PasswordField from '../ui/PasswordField.svelte';
 import SystemUpdate from './SystemUpdate.svelte';
 
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
-let backupError = $state(false);
+const confirm = createConfirm();
 
-type RebootState =
-  | 'idle'
-  | 'confirming'
-  | 'requesting'
-  | 'restarting'
-  | 'back'
-  | 'timeout'
-  | 'failed';
+// Progress and outcome are toasts (id 'reboot'); the card only blocks a second request.
+type RebootState = 'idle' | 'requesting' | 'restarting' | 'done';
 let rebootState = $state<RebootState>('idle');
-let rebootFailure = $state<ReturnType<typeof rebootErrorKey>>('generic');
 let rebootController: AbortController | undefined;
 
 onMount(() => {
@@ -45,9 +39,24 @@ onMount(() => {
   return () => controller.abort();
 });
 
+async function askRestart() {
+  const ok = await confirm.ask({
+    title: m.reboot_confirm_title(),
+    description: m.reboot_confirm(),
+    action: m.reboot_router(),
+    tone: 'danger',
+  });
+  if (ok) void restartRouter();
+}
+
+function rebootFailed(key: ReturnType<typeof rebootErrorKey>) {
+  rebootState = 'idle';
+  notify.error(m.reboot_error({ key }), 'reboot');
+}
+
 async function restartRouter() {
   const controller = rebootController;
-  if (!controller || rebootState === 'requesting') return;
+  if (!controller || rebootState !== 'idle') return;
   rebootState = 'requesting';
   try {
     const { data, error } = await postSystemReboot({
@@ -56,33 +65,32 @@ async function restartRouter() {
     });
     if (controller.signal.aborted) return;
     if (!data) {
-      rebootFailure = rebootErrorKey((error as { code?: string } | undefined)?.code);
-      rebootState = 'failed';
+      rebootFailed(rebootErrorKey((error as { code?: string } | undefined)?.code));
       return;
     }
     rebootState = 'restarting';
+    notify.progress(m.reboot_restarting(), 'reboot');
     const result = await waitForBoot(data.boot_id, {
       health: fetchHealth,
       sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
       now: Date.now,
       signal: controller.signal,
     });
-    if (!controller.signal.aborted) rebootState = result === 'restarted' ? 'back' : 'timeout';
+    if (controller.signal.aborted) return;
+    rebootState = 'done';
+    if (result === 'restarted') notify.success(m.reboot_back(), 'reboot');
+    else notify.error(m.reboot_timeout(), 'reboot');
   } catch {
-    if (!controller.signal.aborted) {
-      rebootFailure = 'generic';
-      rebootState = 'failed';
-    }
+    if (!controller.signal.aborted) rebootFailed('generic');
   }
 }
 
 async function downloadBackup() {
   backupPending = true;
-  backupError = false;
   try {
     await downloadSystemBackup();
   } catch {
-    backupError = true;
+    notify.error(m.system_backup_failed());
   } finally {
     backupPending = false;
   }
@@ -90,22 +98,20 @@ async function downloadBackup() {
 
 let current = $state('');
 let next = $state('');
-let confirm = $state('');
+let repeat = $state('');
 let pending = $state(false);
 let failure = $state<AuthMessage | null>(null);
 let mismatch = $state(false);
-let changed = $state(false);
 
 async function submit(event?: SubmitEvent) {
   event?.preventDefault();
   failure = null;
   mismatch = false;
-  changed = false;
   if (!passwordRulesOk(next)) {
     failure = { text: m.password_rules(), field: 'new' };
     return;
   }
-  if (next !== confirm) {
+  if (next !== repeat) {
     mismatch = true;
     return;
   }
@@ -116,8 +122,8 @@ async function submit(event?: SubmitEvent) {
     failure = passwordMessage(result.code);
     return;
   }
-  current = next = confirm = '';
-  changed = true;
+  current = next = repeat = '';
+  notify.success(m.password_changed());
 }
 
 async function logout() {
@@ -181,9 +187,6 @@ async function logout() {
         {backupPending ? m.system_backup_pending() : m.system_backup_download()}
       </Button>
     </div>
-    {#if backupError}
-      <Alert class="status status-danger self-start">{m.system_backup_failed()}</Alert>
-    {/if}
   </Card>
 
   <Card title={m.tokens_title()}>
@@ -194,45 +197,12 @@ async function logout() {
   </Card>
 
   <Card title={m.reboot_title()}>
-    {#if rebootState === 'confirming' || rebootState === 'requesting'}
-      <p>{m.reboot_confirm()}</p>
-      <div class="mt-3 flex flex-wrap gap-2">
-        <Button variant="outline"
-          type="button"
-          disabled={rebootState === 'requesting'}
-          onclick={restartRouter}
-        >
-          {m.reboot_title()}
-        </Button>
-        <Button variant="outline"
-          type="button"
-          disabled={rebootState === 'requesting'}
-          onclick={() => { rebootState = 'idle'; }}
-        >
-          {m.update_cancel()}
-        </Button>
-      </div>
-    {:else if rebootState === 'restarting'}
-      <p aria-live="polite">{m.reboot_restarting()}</p>
-    {:else if rebootState === 'back'}
-      <p aria-live="polite">{m.reboot_back()}</p>
-    {:else if rebootState === 'timeout'}
-      <Alert class="status status-danger self-start">{m.reboot_timeout()}</Alert>
-    {:else}
-      <div>
-        <Button variant="outline"
-          type="button"
-          onclick={() => { rebootState = 'confirming'; }}
-        >
-          {m.reboot_router()}
-        </Button>
-      </div>
-      {#if rebootState === 'failed'}
-        <Alert class="status status-danger mt-3 self-start">
-          {m.reboot_error({ key: rebootFailure })}
-        </Alert>
-      {/if}
-    {/if}
+    <p class="text-muted-foreground">{m.reboot_confirm()}</p>
+    <div>
+      <Button variant="outline" type="button" disabled={rebootState !== 'idle'} onclick={askRestart}>
+        {m.reboot_router()}
+      </Button>
+    </div>
   </Card>
 
   <Card title={m.system_about()}>
@@ -269,14 +239,11 @@ async function logout() {
         id="password-confirm"
         label={m.setup_confirm()}
         autocomplete="new-password"
-        bind:value={confirm}
+        bind:value={repeat}
         error={mismatch ? m.password_mismatch() : null}
       />
       {#if failure && failure.field === null}
         <FormMessage message={failure} retry={() => submit()} />
-      {/if}
-      {#if changed}
-        <Badge role="status" class="status status-ok self-start">{m.password_changed()}</Badge>
       {/if}
       <div>
         <Button variant="default"
@@ -299,3 +266,5 @@ async function logout() {
     </Button>
   </div>
 </div>
+
+<ConfirmDialog {confirm} />

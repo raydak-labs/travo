@@ -149,8 +149,8 @@ try {
 
   await openWifi('light');
   await click('[aria-label="Select HomeUplink"]');
-  await wait(`document.body.textContent.includes('Confirm this connection')`);
-  await clickText('Rollback');
+  await wait(`document.body.textContent.includes('Keep this change?')`);
+  await clickText('Roll back');
   await wait(`document.body.textContent.includes('Rolled back')`);
   await check(`${savedOrder} === 'Neighbor2,HomeUplink'`, 'select keeps order');
   await chrome.screenshot(`${out}/select-rolled-back-390-light.png`);
@@ -161,7 +161,10 @@ try {
   await click('[aria-label="Forget Neighbor2"]');
   await wait(`document.body.textContent.includes('keeps the current connection up')`);
   await chrome.screenshot(`${out}/forget-connected-390-light.png`);
-  await clickText('Forget', `document.querySelector('[role="alert"]')`);
+  await clickText(
+    'Forget',
+    `(document.querySelector('[role="alertdialog"]') ?? document.createElement('div'))`,
+  );
   await wait(`${savedOrder} === 'HomeUplink'`);
   await shoot('forgot-one');
   console.log('saved uplinks 390 light/dark: pass');

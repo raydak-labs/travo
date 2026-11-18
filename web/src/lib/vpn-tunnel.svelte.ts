@@ -8,6 +8,7 @@ import {
   type TxnBody,
 } from './api/gen';
 import { m } from './paraglide/messages.js';
+import type { TxnPhase } from './ui/transaction-toast.svelte';
 
 /** Enabled means the tunnel is configured on, whether or not it is up yet. */
 export function tunnelEnabled(state: TunnelStatus['state']): boolean {
@@ -98,6 +99,8 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
   let applying = $state(false);
   let settling = $state(false);
   let transaction = $state<TxnBody>();
+  // performance.now() time the confirm window closes; set when a new transaction arrives.
+  let deadline = $state(0);
   let message = $state('');
   let error = $state('');
   let statusPoll: AbortController | undefined;
@@ -107,6 +110,9 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
   const busy = $derived(applying || settling || open);
 
   function accept(result: TxnBody) {
+    if (result.state === 'pending' && transaction?.id !== result.id) {
+      deadline = performance.now() + result.window_seconds * 1000;
+    }
     transaction = result;
     if (result.state === 'confirmed') message = options.confirmed();
     if (result.state === 'rolled_back') message = options.rolledBack();
@@ -197,6 +203,9 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
     get transaction() {
       return transaction;
     },
+    get deadline() {
+      return deadline;
+    },
     get message() {
       return message;
     },
@@ -214,6 +223,30 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
 }
 
 export type TunnelControl = ReturnType<typeof createTunnelControl>;
+
+type ControlView = Pick<
+  TunnelControl,
+  'applying' | 'settling' | 'transaction' | 'deadline' | 'message' | 'error'
+>;
+
+/** What the transaction toast shows for a guarded toggle; `applying` names the running step. */
+export function controlPhase(control: ControlView, applying: string): TxnPhase {
+  const state = control.transaction?.state;
+  if (control.applying) return { phase: 'applying', text: applying };
+  if (state === 'pending') {
+    return { phase: 'pending', deadline: control.deadline, settling: control.settling };
+  }
+  if (state === 'restoring') return { phase: 'restoring', text: m.txn_restoring() };
+  if (control.error) return { phase: 'done', tone: 'error', text: control.error };
+  if (control.message) {
+    return {
+      phase: 'done',
+      tone: state === 'confirmed' ? 'success' : 'info',
+      text: control.message,
+    };
+  }
+  return { phase: 'idle' };
+}
 
 export const tunnelStates = {
   disabled: { kind: 'neutral', label: m.vpn_state_disabled },

@@ -72,7 +72,7 @@ async function verify() {
       </dl>
     {/if}
   </LoadState>
-  <Button variant="outline" size="sm" type="button" class="mt-3 w-fit" disabled={verifying} onclick={verify}>{m.vpn_dns_verify()}</Button>
+  <Button variant="outline" size="sm" type="button" class="w-fit" disabled={verifying} onclick={verify}>{m.vpn_dns_verify()}</Button>
   {#if verifying}
     <p role="status" class="mt-2">{m.vpn_dns_verifying()}</p>
   {:else if verified}

@@ -59,7 +59,7 @@ async function click(selector) {
 }
 async function focusText(text) {
   await chrome.evaluate(
-    `Array.from((document.querySelector('[role="dialog"]') ?? document).querySelectorAll('button,a')).find(e=>e.textContent.trim()===${JSON.stringify(text)}).focus()`,
+    `Array.from((document.querySelector('[role="dialog"],[role="alertdialog"]') ?? document).querySelectorAll('button,a')).find(e=>e.textContent.trim()===${JSON.stringify(text)}).focus()`,
   );
 }
 async function activate(text, activation = 'Enter') {
@@ -154,6 +154,8 @@ async function wifi(width, scheme) {
   await key('Tab');
   await check(`document.activeElement.textContent.trim()==='Cancel'`, 'join Tab order');
   await key('Tab');
+  // Cancel, Save, Join, then back to the password field.
+  await key('Tab');
   await key('Tab');
   await check(
     `document.activeElement === document.querySelector('[role="dialog"] input')`,
@@ -197,8 +199,8 @@ async function wifi(width, scheme) {
   await wait(
     `${writeCount('/api/v1/wifi/join')} === 1 && !document.querySelector('[role="dialog"]')`,
   );
-  await wait(`document.body.textContent.includes('Confirm this change')`);
-  await activate('Confirm');
+  await wait(`document.body.textContent.includes('Keep this change?')`);
+  await activate('Keep change');
   await wait(`document.body.textContent.includes('Change confirmed')`);
   await noOverflow();
   await chrome.evaluate('history.back()');
@@ -234,12 +236,16 @@ async function wifi(width, scheme) {
 async function systemAndVpn(width, scheme) {
   await chrome.open(`${base}/#/system`, { width, height: 844, scheme });
   await activate('Restart router', ' ');
+  await wait(`!!document.querySelector('[role="alertdialog"]')`);
   await check(`${writeCount('/api/v1/system/reboot')} === 0`, 'reboot confirmation does not write');
   await chrome.screenshot(`${out}/reboot-confirm-${width}-${scheme}.png`);
   await activate('Cancel');
+  await wait(`!document.querySelector('[role="alertdialog"]')`);
   await check(`${writeCount('/api/v1/system/reboot')} === 0`, 'reboot Cancel does not write');
   await activate('Restart router');
-  await activate('Restart');
+  await wait(`!!document.querySelector('[role="alertdialog"]')`);
+  await activate('Restart router');
+  await wait(`!document.querySelector('[role="alertdialog"]')`);
   await wait(
     `document.body.textContent.includes('Confirm or roll back the pending change first.')`,
   );
@@ -248,15 +254,19 @@ async function systemAndVpn(width, scheme) {
     'reboot submits only after confirmation',
   );
   await activate('Apply update', ' ');
+  await wait(`!!document.querySelector('[role="alertdialog"]')`);
   await check(
     `${writeCount('/api/v1/system/update/apply')} === 0`,
     'update confirmation does not write',
   );
   await chrome.screenshot(`${out}/update-confirm-${width}-${scheme}.png`);
   await activate('Cancel');
+  await wait(`!document.querySelector('[role="alertdialog"]')`);
   await check(`${writeCount('/api/v1/system/update/apply')} === 0`, 'update Cancel does not write');
   await activate('Apply update');
+  await wait(`!!document.querySelector('[role="alertdialog"]')`);
   await activate('Apply update');
+  await wait(`!document.querySelector('[role="alertdialog"]')`);
   await wait(`document.body.textContent.includes('Version 0.1.1 installed.')`);
   await check(`${writeCount('/api/v1/system/update/apply')} === 1`, 'update submits exactly once');
   await noOverflow();
@@ -267,17 +277,17 @@ async function systemAndVpn(width, scheme) {
     'empty VPN import disabled',
   );
   await check(
-    `document.querySelector('textarea').required && document.querySelector('textarea').spellcheck === false`,
+    `(([t]) => t.required && t.spellcheck === false)([...document.querySelectorAll('textarea')].slice(-1))`,
     'VPN textarea contract',
   );
   await activate('Enable tunnel');
-  await wait(`document.body.textContent.includes('Confirm the change while')`);
+  await wait(`document.body.textContent.includes('Keep this change?')`);
   await chrome.screenshot(`${out}/vpn-pending-${width}-${scheme}.png`);
   await activate('Roll back', ' ');
   await wait(`document.body.textContent.includes('Tunnel change rolled back.')`);
   await activate('Enable tunnel');
-  await wait(`document.body.textContent.includes('Confirm the change while')`);
-  await activate('Confirm');
+  await wait(`document.body.textContent.includes('Keep this change?')`);
+  await activate('Keep change');
   await wait(`document.body.textContent.includes('Tunnel change confirmed.')`);
   await noOverflow();
   console.log(`reboot/update/VPN controls ${width} ${scheme}: pass`);

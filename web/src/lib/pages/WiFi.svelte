@@ -24,10 +24,14 @@ import {
 } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader, type LoadStatus } from '../ui/loader.svelte';
+import { notify } from '../ui/notify';
+import { transactionToast } from '../ui/transaction-toast.svelte';
 import { wifiScanErrorMessage } from '../wifi';
-import { type JoinState, joinError, reduceJoin } from '../wifi-join';
+import { type JoinState, joinPhase, reduceJoin } from '../wifi-join';
 import { savedChangeError, saveError } from '../wifi-profiles';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
@@ -70,12 +74,30 @@ let joining = $state<JoinState>({ state: 'idle' });
 let commandPending = $state(false);
 let activePoll: AbortController | undefined;
 let apVersion = $state(0);
-// Resends the last refused change with acknowledge_lockout (invariants §2).
-let anyway = $state<() => void>();
-let now = $state(0);
+// While the lockout dialog is open, the refusal is the dialog's to report.
+let askingLockout = $state(false);
+const dialog = createConfirm();
 const busy = $derived(
   joining.state === 'joining' || joining.state === 'pending' || joining.state === 'restoring',
 );
+transactionToast(
+  'wifi-change',
+  () => (askingLockout ? { phase: 'idle' } : joinPhase(joining, commandPending)),
+  (ok) => void settle(ok),
+);
+
+// A refused lockout risk can be resent with acknowledge_lockout (invariants §2).
+async function offerLockoutOverride(resend: () => void) {
+  askingLockout = true;
+  const ok = await dialog.ask({
+    title: m.wifi_lockout_title(),
+    description: m.wifi_lockout_body(),
+    action: m.wifi_join_anyway(),
+    tone: 'danger',
+  });
+  askingLockout = false;
+  if (ok && !request.signal.aborted) resend();
+}
 
 function failure(error: { code?: string } | undefined) {
   joining = reduceJoin(joining, { type: 'failure', code: error?.code ?? '' });
@@ -85,16 +107,17 @@ type Send = () => Promise<{ data?: TxnBody; error?: { code?: string } }>;
 
 async function submit(ssid: string, send: Send, ap = false, acknowledge?: () => void) {
   joining = reduceJoin(joining, { type: 'start', ssid, ap });
-  anyway = undefined;
   try {
     const response = await send();
     if (request.signal.aborted) return;
-    now = performance.now();
     if (response.data) {
+      const now = performance.now();
       joining = reduceJoin(joining, { type: 'transaction', transaction: response.data, now });
     } else {
+      if (response.error?.code === 'wifi_lockout_risk' && acknowledge) {
+        void offerLockoutOverride(acknowledge);
+      }
       failure(response.error);
-      if (response.error?.code === 'wifi_lockout_risk') anyway = acknowledge;
     }
   } catch {
     if (!request.signal.aborted) failure(undefined);
@@ -196,34 +219,29 @@ async function settle(confirm: boolean) {
 }
 
 onMount(() => {
-  const timer = setInterval(() => {
-    now = performance.now();
-  }, 1000);
   const statusTimer = setInterval(() => {
     void poll();
   }, 2000);
-  return () => {
-    clearInterval(timer);
-    clearInterval(statusTimer);
-  };
+  return () => clearInterval(statusTimer);
 });
 
 let profileBusy = $state(false);
-let profileError = $state('');
 
-async function changeProfiles(send: () => Promise<{ data?: unknown; error?: unknown }>) {
+async function changeProfiles(
+  send: () => Promise<{ data?: unknown; error?: unknown }>,
+  done?: string,
+) {
   if (profileBusy) return;
   profileBusy = true;
-  profileError = '';
   try {
     const response = await send();
     if (request.signal.aborted) return;
     if (!response.data) {
-      profileError = savedChangeError((response.error as { code?: string } | undefined)?.code);
-    }
+      notify.error(savedChangeError((response.error as { code?: string } | undefined)?.code));
+    } else if (done) notify.success(done);
     await profiles.retry();
   } catch {
-    if (!request.signal.aborted) profileError = savedChangeError(undefined);
+    if (!request.signal.aborted) notify.error(savedChangeError(undefined));
   } finally {
     profileBusy = false;
   }
@@ -267,7 +285,7 @@ async function scan() {
     {#if summary.status.state === 'ready'}
       <Button variant="outline" size="sm"
         type="button"
-        class="mt-3 text-sm"
+        class="w-fit text-sm"
         onclick={summary.retry}
       >
         {m.wifi_refresh()}
@@ -285,14 +303,15 @@ async function scan() {
           busy={profileBusy}
           joinBusy={busy}
           reorder={(ids) => changeProfiles(() => reorderWifiProfiles(ids, request.signal))}
-          forget={(profile) => changeProfiles(() => forgetWifiProfile(profile.id, request.signal))}
+          forget={(profile) =>
+            changeProfiles(
+              () => forgetWifiProfile(profile.id, request.signal),
+              m.wifi_saved_forgotten({ ssid: profile.ssid }),
+            )}
           select={selectProfile}
         />
       {/if}
     </LoadState>
-    {#if profileError}
-      <p class="mt-2 text-sm text-danger" role="alert">{profileError}</p>
-    {/if}
   </Card>
 
   <Card title={m.wifi_mac_title()}>
@@ -318,7 +337,7 @@ async function scan() {
     {#if scanStatus.state !== 'error'}
       <Button variant="outline" size="sm"
         type="button"
-        class="mt-3 text-sm"
+        class="w-fit text-sm"
         disabled={scanStatus.state === 'loading'}
         aria-busy={scanStatus.state === 'loading'}
         onclick={scan}
@@ -337,27 +356,4 @@ async function scan() {
 {#if selected}
   <PageHost load={joinDialog} props={{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
 {/if}
-<div aria-live="polite" class="mt-4 space-y-2 text-sm">
-  {#if joining.state === 'joining'}
-    <p>{joining.ap ? m.wifi_ap_applying({ ssid: joining.ssid }) : m.wifi_join_connecting({ ssid: joining.ssid })}</p>
-  {:else if joining.state === 'pending'}
-    <p>{m.wifi_join_pending({ seconds: Math.max(0, Math.ceil((joining.deadline - now) / 1000)) })}</p>
-    <div class="flex gap-2">
-      <Button variant="outline" type="button" disabled={commandPending} onclick={() => settle(true)}>{m.wifi_join_confirm()}</Button>
-      <Button variant="outline" type="button" disabled={commandPending} onclick={() => settle(false)}>{m.wifi_join_rollback()}</Button>
-    </div>
-  {:else if joining.state === 'restoring'}
-    <p>{m.wifi_join_restoring()}</p>
-  {:else if joining.state === 'confirmed'}
-    <p>{m.wifi_join_confirmed()}</p>
-  {:else if joining.state === 'rolled_back'}
-    <p>{m.wifi_join_rolled_back()}</p>
-  {:else if joining.state === 'rollback_failed'}
-    <p class="text-danger">{m.wifi_join_rollback_failed()}</p>
-  {:else if joining.state === 'failed'}
-    <p class="text-danger">{joinError(joining.code)}</p>
-    {#if anyway}
-      <Button variant="outline" type="button" onclick={anyway}>{m.wifi_join_anyway()}</Button>
-    {/if}
-  {/if}
-</div>
+<ConfirmDialog confirm={dialog} />

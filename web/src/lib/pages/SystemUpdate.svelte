@@ -12,6 +12,8 @@ import {
 import '../api/client';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 
 type Update = NonNullable<Awaited<ReturnType<typeof postSystemUpdateCheck>>['data']>;
 let result = $state<Update>();
@@ -22,7 +24,7 @@ let verifyFailed = $state(false);
 let stageRequest = 0;
 type Operation = NonNullable<Awaited<ReturnType<typeof getSystemUpdateApply>>['data']>;
 let operation = $state<Operation>();
-let confirming = $state(false);
+const confirm = createConfirm();
 let updating = $state(false);
 let applyFailed = $state(false);
 let operationRequest = 0;
@@ -46,7 +48,6 @@ async function readOperation(request: AbortController) {
 
 async function changeOperation(request: AbortController, version?: string) {
   updating = true;
-  confirming = false;
   applyFailed = false;
   operationRequest++;
   try {
@@ -67,6 +68,16 @@ async function changeOperation(request: AbortController, version?: string) {
     }
   }
 }
+async function askApply(version: string) {
+  const ok = await confirm.ask({
+    title: m.update_confirm_title({ version }),
+    description: m.update_confirm(),
+    action: m.update_apply(),
+    tone: 'danger',
+  });
+  if (ok && controller) void changeOperation(controller, version);
+}
+
 let pending = $state(true);
 let controller: AbortController | undefined;
 const labels = {
@@ -210,24 +221,12 @@ onMount(() => {
       {m.update_retry_recovery()}
     </Button>
   {:else if operation && operation.state !== 'applying' && stage?.status === 'verified' && stage.version}
-    {#if confirming}
-      <p class="mt-2">{m.update_confirm({ version: stage.version })}</p>
-      <div class="mt-2 flex flex-wrap gap-2">
-        <Button variant="outline" type="button"
-          disabled={updating}
-          onclick={() => { if (controller && stage?.version) void changeOperation(controller, stage.version); }}>
-          {m.update_apply()}
-        </Button>
-        <Button variant="outline" type="button"
-          onclick={() => { confirming = false; }}>
-          {m.update_cancel()}
-        </Button>
-      </div>
-    {:else}
-      <Button variant="outline" type="button" class="mt-2"
-        disabled={updating} onclick={() => { confirming = true; }}>
-        {m.update_apply()}
-      </Button>
-    {/if}
+    {@const version = stage.version}
+    <Button variant="outline" type="button" class="mt-2 w-fit"
+      disabled={updating} onclick={() => askApply(version)}>
+      {m.update_apply()}
+    </Button>
   {/if}
 </Card>
+
+<ConfirmDialog {confirm} />

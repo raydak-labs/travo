@@ -78,7 +78,8 @@ export async function launchChrome({ userDataDir } = {}) {
     } catch {
       // socket already closed
     }
-    const removeDir = () => ownDir && rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    const removeDir = () =>
+      ownDir && rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     if (chrome.exitCode === null && chrome.signalCode === null) {
       chrome.once('exit', removeDir);
       chrome.kill('SIGTERM');

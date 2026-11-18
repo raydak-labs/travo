@@ -85,14 +85,19 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  border-radius: 9999px;
+  border-radius: 0.75rem;
   padding: 0.125rem 0.625rem;
   font-size: 0.8125rem;
   font-weight: 500;
+  /* Long messages (load errors) wrap inside the pill instead of overflowing the card. */
+  height: auto;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .status::before {
   content: "";
+  flex-shrink: 0;
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 9999px;
@@ -143,8 +148,20 @@ body {
   --color-destructive: var(--danger);
   --color-destructive-foreground: var(--danger-contrast);
   --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
   --color-input: var(--border);
   --color-ring: var(--accent);
+}
+
+/* Tailwind 4 borders default to currentColor; copied primitives expect the border token. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
 }
 
 /* The native focus ring is shared by links, controls and copied primitives. */

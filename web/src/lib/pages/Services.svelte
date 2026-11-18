@@ -7,12 +7,12 @@ import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import { notify } from '../ui/notify';
 import Status from '../ui/Status.svelte';
 
 const request = new AbortController();
 const adguard = createLoader(fetchAdGuard, 10000);
 let pending = $state<AdGuardAction>();
-let error = $state('');
 onDestroy(() => {
   adguard.stop();
   request.abort();
@@ -21,11 +21,15 @@ onDestroy(() => {
 async function change(action: AdGuardAction, enabled: boolean) {
   if (pending) return;
   pending = action;
-  error = '';
+  notify.progress(action === 'install' ? m.adguard_installing() : m.adguard_applying(), 'adguard');
   const result = await changeAdGuard(action, enabled, request.signal);
-  if (request.signal.aborted) return;
+  if (request.signal.aborted) {
+    notify.dismiss('adguard');
+    return;
+  }
   pending = undefined;
-  if ('error' in result) error = result.error;
+  if ('error' in result) notify.error(result.error, 'adguard');
+  else notify.success(m.adguard_done(), 'adguard');
   await adguard.retry();
 }
 
@@ -75,8 +79,6 @@ const proxy = adguardUrl(window.location);
             <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('install', true)}>{m.adguard_install()}</Button>
           </div>
         {/if}
-        {#if pending}<p role="status" class="mt-2">{pending === 'install' ? m.adguard_installing() : m.adguard_applying()}</p>{/if}
-        {#if error}<Alert class="mt-2 text-danger">{error}</Alert>{/if}
       {/if}
     </LoadState>
   </Card>

@@ -1,6 +1,5 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
@@ -10,9 +9,11 @@ import { deleteVpnProfile, getVpnProfiles, postVpnProfile, selectVpnProfile } fr
 import { fetchVpnStatus } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
-import Status from '../ui/Status.svelte';
+import { notify } from '../ui/notify';
 import { createTunnelControl, tunnelEnabled } from '../vpn-tunnel.svelte';
 import VPNDNSCard from './VPNDNSCard.svelte';
 import VPNKillSwitchCard from './VPNKillSwitchCard.svelte';
@@ -29,8 +30,7 @@ const profiles = createLoader(async (signal) => {
 let name = $state('');
 let config = $state('');
 let pending = $state(false);
-let error = $state('');
-let removing = $state<string>();
+const confirm = createConfirm();
 const tunnel = createTunnelControl(() => status.retry());
 onDestroy(() => {
   status.stop();
@@ -40,10 +40,19 @@ onDestroy(() => {
   config = '';
 });
 
-async function change(action: 'import' | 'select' | 'delete', id = '') {
+async function remove(profile: { id: string; name: string }) {
+  const ok = await confirm.ask({
+    title: m.vpn_delete_title({ name: profile.name }),
+    description: m.vpn_delete_body(),
+    action: m.vpn_delete(),
+    tone: 'danger',
+  });
+  if (ok) void change('delete', profile.id, profile.name);
+}
+
+async function change(action: 'import' | 'select' | 'delete', id = '', label = name) {
   if (pending) return;
   pending = true;
-  error = '';
   try {
     const options = { signal: request.signal };
     const response =
@@ -55,22 +64,29 @@ async function change(action: 'import' | 'select' | 'delete', id = '') {
     if (request.signal.aborted) return;
     if (!response.data) {
       const code = (response.error as { code?: string } | undefined)?.code;
-      error =
+      notify.error(
         code === 'invalid_profile'
           ? m.vpn_invalid()
           : code === 'profile_limit'
             ? m.vpn_limit()
-            : m.vpn_save_failed();
+            : m.vpn_save_failed(),
+      );
       return;
     }
     if (action === 'import') {
       name = '';
       config = '';
     }
-    removing = undefined;
+    notify.success(
+      action === 'import'
+        ? m.vpn_imported({ name: label })
+        : action === 'select'
+          ? m.vpn_profile_selected({ name: label })
+          : m.vpn_profile_deleted({ name: label }),
+    );
     await profiles.retry();
   } catch {
-    if (!request.signal.aborted) error = m.vpn_save_failed();
+    if (!request.signal.aborted) notify.error(m.vpn_save_failed());
   } finally {
     if (!request.signal.aborted) pending = false;
   }
@@ -107,14 +123,9 @@ async function change(action: 'import' | 'select' | 'delete', id = '') {
                   {#if profile.id === profiles.data.selected_id}
                     <span class="text-muted-foreground">{m.vpn_selected()}</span>
                   {:else}
-                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('select', profile.id)}>{m.vpn_select()}</Button>
+                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('select', profile.id, profile.name)}>{m.vpn_select()}</Button>
                   {/if}
-                  {#if removing === profile.id}
-                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('delete', profile.id)}>{m.vpn_confirm_delete()}</Button>
-                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => { removing = undefined; }}>{m.vpn_cancel()}</Button>
-                  {:else}
-                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => { removing = profile.id; }}>{m.vpn_delete()}</Button>
-                  {/if}
+                  <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => remove(profile)}>{m.vpn_delete()}</Button>
                 </div>
               </li>
             {/each}
@@ -137,5 +148,6 @@ async function change(action: 'import' | 'select' | 'delete', id = '') {
       <Button variant="default" type="submit" class="w-fit" disabled={pending || !name.trim() || !config.trim()}>{m.vpn_import()}</Button>
     </form>
   </Card>
-  {#if error}<Alert class="text-danger">{error}</Alert>{/if}
 </div>
+
+<ConfirmDialog {confirm} />

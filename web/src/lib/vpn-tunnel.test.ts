@@ -70,6 +70,8 @@ describe('createTunnelControl', () => {
     });
     await control.set(true);
     expect(control.transaction?.state).toBe('pending');
+    // The toast counts down the 120 s window from when the transaction arrived.
+    expect(control.deadline).toBeGreaterThan(performance.now() + 119_000);
     expect(control.busy).toBe(true);
     expect(refresh).not.toHaveBeenCalled();
     await control.settle(true);

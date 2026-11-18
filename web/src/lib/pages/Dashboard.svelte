@@ -85,7 +85,7 @@ function formatRate(rate: number | null): string {
         {#if connectivity.status.state === 'ready'}
           <Button variant="outline" size="sm"
             type="button"
-            class="mt-3 text-sm"
+            class="w-fit text-sm"
             onclick={connectivity.retry}
           >
             {m.dashboard_refresh()}
@@ -93,7 +93,7 @@ function formatRate(rate: number | null): string {
         {/if}
       {/if}
     </LoadState>
-    <Button size="sm" class="mt-3" href={href('wifi')}>
+    <Button size="sm" class="w-fit" href={href('wifi')}>
       {m.dashboard_connect_to_wifi()}
     </Button>
   </Card>
@@ -136,7 +136,7 @@ function formatRate(rate: number | null): string {
         {#if resources.status.state === 'ready'}
           <Button variant="outline" size="sm"
             type="button"
-            class="mt-3 text-sm"
+            class="w-fit text-sm"
             onclick={resources.retry}
           >
             {m.dashboard_refresh()}

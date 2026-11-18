@@ -20,6 +20,7 @@ Deviations:
 - `docs/spec.md` product scope for 0.1.0.
 - `docs/invariants.md` MUST rules; read before touching live state, auth, DNS, WiFi. Breaking one needs an ADR.
 - `docs/device-facts.md` hardware lessons; `docs/testing.md` test layers and fixture rules.
+- `docs/web-ui.md` how pages confirm risky changes (dialog) and report results (toasts).
 - `docs/adr/` decisions; `GLOSSARY.md` terms (use them verbatim in code, tests, issues).
 - `testdata/device/<device>-<firmware>/` verbatim device captures with `PROVENANCE.md` and redaction policy; `SPIKES.md` there has hardware results.
 

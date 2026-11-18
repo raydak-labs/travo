@@ -1,5 +1,6 @@
 import type { TxnBody } from './api/gen';
 import { m } from './paraglide/messages.js';
+import type { TxnPhase } from './ui/transaction-toast.svelte';
 
 export type JoinState =
   | { state: 'idle' }
@@ -66,5 +67,32 @@ export function joinError(code: string) {
       return m.wifi_join_no_change();
     default:
       return m.wifi_join_unavailable();
+  }
+}
+
+/** What the transaction toast shows for a join or AP change; `settling` while confirm/rollback runs. */
+export function joinPhase(state: JoinState, settling: boolean): TxnPhase {
+  switch (state.state) {
+    case 'idle':
+      return { phase: 'idle' };
+    case 'joining':
+      return {
+        phase: 'applying',
+        text: state.ap
+          ? m.wifi_ap_applying({ ssid: state.ssid })
+          : m.wifi_join_connecting({ ssid: state.ssid }),
+      };
+    case 'pending':
+      return { phase: 'pending', deadline: state.deadline, settling };
+    case 'restoring':
+      return { phase: 'restoring', text: m.txn_restoring() };
+    case 'confirmed':
+      return { phase: 'done', tone: 'success', text: m.wifi_join_confirmed() };
+    case 'rolled_back':
+      return { phase: 'done', tone: 'info', text: m.wifi_join_rolled_back() };
+    case 'rollback_failed':
+      return { phase: 'done', tone: 'error', text: m.wifi_join_rollback_failed() };
+    case 'failed':
+      return { phase: 'done', tone: 'error', text: joinError(state.code) };
   }
 }

@@ -37,6 +37,7 @@ Planned work lives in GitHub issues (milestone `0.1.0`, project board "travo-gre
 - Responsive, mobile-first; route-level code split; vector assets; no CDN or external fonts (device is often offline).
 - Only the generated API client is called; no hand-typed endpoints.
 - One card surface; one status vocabulary (ok / warn / danger / info / neutral / stale), no raw colour classes; dark mode mandatory.
+- Risky changes ask in one confirmation dialog; transaction progress and results, and other action results, show as toasts, never as text at the end of a form ([web-ui.md](web-ui.md)).
 - One group-heading component. One load/error wrapper: skeleton / inline error+retry / content. A failed request NEVER renders as "absent".
 - Multi-status pages have a summary band of flat tiles that each degrade separately (WiFi is the reference).
 - `stale` = last known value shown dimmed and marked; never blank a known value.

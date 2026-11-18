@@ -10,6 +10,7 @@ import Shield from '@lucide/svelte/icons/shield';
 import Sun from '@lucide/svelte/icons/sun';
 import Wifi from '@lucide/svelte/icons/wifi';
 import Button from '$lib/components/ui/button/button.svelte';
+import { Toaster } from '$lib/components/ui/sonner';
 import { getAdGuard } from './lib/api/gen';
 import { ownDashboardEvents, restoreDashboardEvents } from './lib/app-dashboard-events';
 import { dashboardEvents } from './lib/dashboard-events.svelte';
@@ -269,3 +270,6 @@ $effect(() => {
     </main>
   </div>
 </div>
+
+<!-- The shell owns the one toast region; pages call notify / transactionToast (docs/web-ui.md). -->
+<Toaster theme={theme.value} containerAriaLabel={m.notifications()} />

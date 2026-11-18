@@ -1,5 +1,4 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import {
   type DashboardConnectivity,
@@ -10,35 +9,44 @@ import {
 import { captiveError, formatCountdown, renewError } from '../captive';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
+import { notify } from '../ui/notify';
 import Status from '../ui/Status.svelte';
 
 // Shown only when an action exists (captiveCardVisible); refresh re-reads connectivity.
 let { info, refresh }: { info: DashboardConnectivity; refresh: () => void } = $props();
 
 let busy = $state(false);
-let error = $state('');
-
-let notice = $state('');
+const confirm = createConfirm();
 
 async function run(
   action: () => Promise<{ data?: unknown; error?: { code?: string } }>,
+  done: string,
   describe = captiveError,
-  done = '',
 ) {
   if (busy) return;
   busy = true;
-  error = '';
-  notice = '';
   try {
     const response = await action();
-    if (response.data) notice = done;
-    else error = describe(response.error?.code);
+    if (response.data) notify.success(done);
+    else notify.error(describe(response.error?.code));
   } catch {
-    error = describe(undefined);
+    notify.error(describe(undefined));
   } finally {
     busy = false;
     refresh();
   }
+}
+
+// The bypass pauses filtering and VPN DNS, so it is asked first; restoring is the safe side.
+async function bypass() {
+  const ok = await confirm.ask({
+    title: m.captive_bypass_title(),
+    description: m.captive_bypass_body(),
+    action: m.captive_dns_bypass(),
+  });
+  if (ok) void run(() => enableCaptiveDnsBypass(), m.captive_dns_bypassed());
 }
 </script>
 
@@ -71,25 +79,25 @@ async function run(
         </Button>
       {/if}
       {#if info.captive.pending}
-        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => restoreCaptiveDns())}>
+        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => restoreCaptiveDns(), m.captive_dns_restored())}>
           {m.captive_dns_retry()}
         </Button>
       {:else if info.captive.dns_bypass}
-        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => restoreCaptiveDns())}>
+        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => restoreCaptiveDns(), m.captive_dns_restored())}>
           {m.captive_dns_restore()}
         </Button>
       {:else}
-        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => enableCaptiveDnsBypass())}>
+        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={bypass}>
           {m.captive_dns_bypass()}
         </Button>
       {/if}
       {#if info.captive.dhcp_renew !== 'not_applicable'}
-        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => renewCaptiveDhcp(), renewError, m.captive_renew_done())}>
+        <Button size="sm" variant="outline" type="button" disabled={busy} onclick={() => run(() => renewCaptiveDhcp(), m.captive_renew_done(), renewError)}>
           {info.captive.dhcp_renew === 'blocked' ? m.captive_renew_retry() : m.captive_renew()}
         </Button>
       {/if}
     </div>
-    {#if notice}<p>{notice}</p>{/if}
-    {#if error}<Alert class="text-danger">{error}</Alert>{/if}
   </div>
 </Card>
+
+<ConfirmDialog {confirm} />

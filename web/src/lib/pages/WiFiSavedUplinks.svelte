@@ -1,8 +1,9 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import type { WiFiProfileList, WiFiProfileSummary } from '../api/gen';
 import { m } from '../paraglide/messages.js';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 import Status from '../ui/Status.svelte';
 import { securityLabel } from '../wifi';
 import { moveProfile } from '../wifi-profiles';
@@ -23,7 +24,17 @@ let {
   select: (profile: WiFiProfileSummary) => void;
 } = $props();
 
-let confirming = $state<string>();
+const confirm = createConfirm();
+
+async function askForget(profile: WiFiProfileSummary, connected: boolean) {
+  const ok = await confirm.ask({
+    title: m.wifi_saved_forget_confirm({ ssid: profile.ssid }),
+    description: connected ? m.wifi_saved_forget_connected() : m.wifi_saved_forget_body(),
+    action: m.wifi_saved_forget(),
+    tone: 'danger',
+  });
+  if (ok) forget(profile);
+}
 </script>
 
 {#if list.profiles.length === 0}
@@ -56,21 +67,11 @@ let confirming = $state<string>();
             onclick={() => select(profile)}>{m.wifi_saved_select()}</Button>
           <Button variant="outline" size="sm" type="button" disabled={busy}
             aria-label={m.wifi_saved_forget_ssid({ ssid: profile.ssid })}
-            onclick={() => { confirming = profile.id; }}>{m.wifi_saved_forget()}</Button>
+            onclick={() => askForget(profile, connected)}>{m.wifi_saved_forget()}</Button>
         </div>
-        {#if confirming === profile.id}
-          <Alert class="mt-2 grid gap-2">
-            <p class="font-medium">{m.wifi_saved_forget_confirm({ ssid: profile.ssid })}</p>
-            {#if connected}<p class="text-sm">{m.wifi_saved_forget_connected()}</p>{/if}
-            <div class="flex gap-2">
-              <Button variant="destructive" size="sm" type="button" disabled={busy}
-                onclick={() => { confirming = undefined; forget(profile); }}>{m.wifi_saved_forget()}</Button>
-              <Button variant="outline" size="sm" type="button"
-                onclick={() => { confirming = undefined; }}>{m.wifi_saved_forget_cancel()}</Button>
-            </div>
-          </Alert>
-        {/if}
       </li>
     {/each}
   </ol>
 {/if}
+
+<ConfirmDialog {confirm} />

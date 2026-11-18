@@ -3,6 +3,7 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { launchChrome } from './cdp.mjs';
+import { shootOverlays } from './screenshots-overlays.mjs';
 
 const BASE_URL = process.env.SCREENSHOT_URL ?? `http://localhost:${process.env.WEB_PORT ?? 18092}`;
 // Login and setup are only reachable signed out; the rest needs the session (see main).
@@ -121,6 +122,13 @@ async function main() {
     await signIn(chrome);
     await shootAll(chrome, SIGNED_IN_ROUTES);
     await shootVpnStates(chrome);
+    await shootOverlays(
+      chrome,
+      BASE_URL,
+      VIEWPORTS,
+      SCHEMES,
+      (name, width, scheme) => `${OUT_DIR}${name}-${width}-${scheme}.png`,
+    );
   } finally {
     chrome.close();
   }

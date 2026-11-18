@@ -106,7 +106,7 @@ Per release, each from Ethernet unless stated (issues with label `needs-hardware
 
 `pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size budget. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR; attach screenshots to the PR.
 
-`mise run screenshots` writes PNGs for UI PRs to `web/screenshots/`; `web/scripts/cdp.mjs` is the shared headless-Chrome helper for browser checks.
+`mise run screenshots` writes PNGs for UI PRs to `web/screenshots/`, including the shared overlays (`system-reboot-dialog`, `wifi-ap-disable-dialog`, `wifi-pending-toast`, `vpn-error-toast`; responses stubbed in the page, see `web/scripts/screenshots-overlays.mjs`); `web/scripts/cdp.mjs` is the shared headless-Chrome helper for browser checks. Dialog and toast keyboard flows: build, then `scripts/with-mock.sh -- node web/scripts/e2e-components.mjs`.
 
 Saved uplinks (#72): build, then run `scripts/with-mock.sh -- node web/scripts/e2e-wifi-profiles.mjs`. It saves, reorders, selects (stubbed transaction) and forgets at 390 px in light and dark and writes ignored screenshots to `web/screenshots/wifi-profiles/`. Set `CDP_PORT` to run beside another headless Chrome.
 

@@ -6,6 +6,8 @@ import Label from '$lib/components/ui/label/label.svelte';
 import type { TxnBody } from '../api/gen';
 import { fetchAccessPoints, fetchGuest, updateAccessPoint, updateGuest } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Status from '../ui/Status.svelte';
@@ -45,6 +47,22 @@ function send(section: string, body: { ssid: string; enabled: boolean; key?: str
   apply(body.ssid, request);
 }
 
+const confirm = createConfirm();
+
+// Turning an AP off drops its clients; enabling, or editing an off AP, needs no question.
+async function toggle(section: string, current: string, enabled: boolean) {
+  if (enabled) {
+    const ok = await confirm.ask({
+      title: m.wifi_ap_disable_title({ ssid: current }),
+      description: m.wifi_ap_disable_body({ ssid: current }),
+      action: m.wifi_ap_disable(),
+      tone: 'danger',
+    });
+    if (!ok) return;
+  }
+  send(section, { ssid: current, enabled: !enabled });
+}
+
 function save(event: SubmitEvent) {
   event.preventDefault();
   if (!editing || busy) return;
@@ -68,7 +86,7 @@ function save(event: SubmitEvent) {
           <span class="ml-auto flex gap-2">
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit(ap.section, ap.ssid, ap.enabled)}>{m.wifi_ap_edit()}</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy}
-              onclick={() => send(ap.section, { ssid: ap.ssid, enabled: !ap.enabled })}>
+              onclick={() => toggle(ap.section, ap.ssid, ap.enabled)}>
               {ap.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
             </Button>
           </span>
@@ -91,7 +109,7 @@ function save(event: SubmitEvent) {
           <span class="ml-auto flex gap-2">
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit('guest', g.ssid, g.enabled)}>{m.wifi_ap_edit()}</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy}
-              onclick={() => send('guest', { ssid: g.ssid, enabled: !g.enabled })}>
+              onclick={() => toggle('guest', g.ssid, g.enabled)}>
               {g.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
             </Button>
           </span>
@@ -126,3 +144,5 @@ function save(event: SubmitEvent) {
   </form>
 </Dialog.Content>
 </Dialog.Root>
+
+<ConfirmDialog {confirm} />
