@@ -107,7 +107,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Captive bypass is the `captive` layer: the active uplink's resolvers with rebind protection off. It never edits WAN DNS fields or the AdGuard upstream, so the stack's base is the only backup; never record the dnsmasq server list outside the stack. Auto-restore after 5 min (monotonic, memory-only deadline; a daemon restart re-arms a full 5 min, see [adr/0010](adr/0010-dns-layer-stack.md)).
 - AdGuard: liveness probe resolves a fresh uncached name via `127.0.0.1:5353`. After M failures the `adguard` layer is popped (fail OPEN), a loud banner shows, and it does not re-enable until the user confirms or a probe passed for a hold-down period.
 - AdGuard: forwarding written outside the stack (old Travo's base) is adopted as the `adguard` layer before any pop; turning AGH off pops the layer before stopping it.
-- AdGuard offline bundle ([adr/0017](adr/0017-offline-adguard-bundle.md)): a local package is installed ONLY when its SHA-256 equals the pin stamped into the signed binary; a mismatch is never installed and falls back to the online path. The bundle lives in RAM (`/tmp/travo-greenfield-bundle/`), never on flash.
+- AdGuard offline bundle ([adr/0020](adr/0020-offline-adguard-bundle.md)): a local package is installed ONLY when its SHA-256 equals the pin stamped into the signed binary; a mismatch is never installed and falls back to the online path. The bundle lives in RAM (`/tmp/travo-greenfield-bundle/`), never on flash.
 - AdGuard binds loopback only, has no accounts, and is reached through the Travo-gated proxy. No first-run wizard is ever exposed on the LAN.
 
 ## 9. Multi-WAN failover (mwan3, IPv4 only; post-0.1)

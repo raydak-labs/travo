@@ -1,6 +1,6 @@
 #!/bin/sh
 # Downloads the adguardhome package of the pinned OpenWrt release feed into dist/ for the
-# offline bundle (docs/adr/0017) and prints its path. The feed's current version is used:
+# offline bundle (docs/adr/0020) and prints its path. The feed's current version is used:
 # OpenWrt removes superseded packages from release feeds, so a pinned version would vanish.
 # Trust: HTTPS from downloads.openwrt.org at build time; the pin stamped into the signed
 # binary then covers the file end to end.

@@ -97,7 +97,7 @@ func runUpdateCommand(worker, awaitAck bool) error {
 	return svc.RecoverLocal()
 }
 
-// printBundlePin prints the pin in sha256sum format for install.sh (ADR 0017); 1 when this
+// printBundlePin prints the pin in sha256sum format for install.sh (ADR 0020); 1 when this
 // build has none (a dev build, or a release without a bundle).
 func printBundlePin(w io.Writer) int {
 	if adguard.BundleSHA256 == "" || adguard.BundleName == "" {

@@ -35,7 +35,7 @@ trap 'cleanup; rm -rf "$tmp"' EXIT
 tarball=dist/travo-greenfield-$VERSION-aarch64.tar.gz
 minisign -G -W -p "$tmp/k1.pub" -s "$tmp/k1.key" >/dev/null
 minisign -G -W -p "$tmp/k2.pub" -s "$tmp/k2.key" >/dev/null
-# A stand-in offline AdGuard bundle: only its hash matters to install.sh (docs/adr/0017).
+# A stand-in offline AdGuard bundle: only its hash matters to install.sh (docs/adr/0020).
 printf 'ADBd stand-in bundle\n' >"$tmp/adguardhome-0.0-r0-test.apk"
 ADGUARD_BUNDLE=$tmp/adguardhome-0.0-r0-test.apk build_pkg "$tmp/k1.pub" "$tmp/pkg"
 [ -f "$tarball" ] || fail "$tarball missing"

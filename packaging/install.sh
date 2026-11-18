@@ -5,7 +5,7 @@
 #        | --port N (alternate port, keeps LuCI unchanged)
 #        | --force (skip the OS and architecture checks only)
 #        | --insecure (install without a signature check) | --rotate-key (accept a new signing key)
-#        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0017).
+#        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0020).
 # Before installing it verifies $here/checksums.txt.sig over checksums.txt with usign (docs/adr/0007).
 # Test hooks: TRAVO_TEST_STOP_AFTER_SWAP=1 exits after moving LuCI.
 # TRAVO_TEST_HOLD_80=1 starts a listener that blocks greenfield from taking port 80.
@@ -121,7 +121,7 @@ load_port80() {
   . "$here/port80.sh"
 }
 
-# Stages the offline AdGuard Home package for the daemon's first install (docs/adr/0017).
+# Stages the offline AdGuard Home package for the daemon's first install (docs/adr/0020).
 # Its hash must equal the pin stamped into this release's (verified) binary. RAM only.
 stage_adguard_bundle() {
   [ -n "$adguard_bundle" ] || return 0

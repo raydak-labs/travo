@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-// The offline bundle pin is stamped by the release build (-ldflags -X, ADR 0017): the
+// The offline bundle pin is stamped by the release build (-ldflags -X, ADR 0020): the
 // SHA-256 and file name of the adguardhome package the release ships beside the tarball.
 // The signed release covers the binary, so the pin is the bundle's trust anchor; apk
 // cannot check a feed package's signature on its own (it is signed only via the index).
@@ -54,7 +54,7 @@ func (b Bundle) Verify() error {
 }
 
 // bundled reports a bundle matching the release pin. A mismatch is logged and the online
-// path is used: a stray or stale file must never be installed (ADR 0017).
+// path is used: a stray or stale file must never be installed (ADR 0020).
 func (s *Service) bundled() bool {
 	err := s.Bundle.Verify()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

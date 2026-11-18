@@ -1,4 +1,4 @@
-# 0017 Offline AdGuard Home bundle
+# 0020 Offline AdGuard Home bundle
 
 Status: accepted (#184; unit- and container-tested, offline install on hardware in the playbook)
 

@@ -65,7 +65,7 @@ type Service struct {
 	// FreeBytes reads free overlay space; Online is the real Internet probe.
 	FreeBytes func() (uint64, error)
 	Online    func(context.Context) bool
-	// Bundle is the release's offline package (ADR 0017); a verified one replaces the
+	// Bundle is the release's offline package (ADR 0020); a verified one replaces the
 	// online gate and the package list refresh for the first install.
 	Bundle Bundle
 	// Ready returns nil once AGH's admin API answers on loopback; it waits until ctx ends.
