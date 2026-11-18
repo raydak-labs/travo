@@ -48,13 +48,13 @@ func TestZonesFromCapture(t *testing.T) {
 
 func TestZonesInheritDefaultsAndSkipUnnamedOrDisabled(t *testing.T) {
 	fw := []device.Section{
-		{Name: "@defaults[0]", Type: "defaults", Options: map[string]string{"input": "REJECT", "output": "ACCEPT", "forward": "REJECT"}},
+		{Name: "@defaults[0]", Type: "defaults", Options: map[string]string{"input": "REJECT", "output": "ACCEPT"}},
 		{Name: "a", Type: "zone", Options: map[string]string{"name": "iot", "input": "drop"}},
 		{Name: "b", Type: "zone", Options: map[string]string{"input": "ACCEPT"}},
 		{Name: "c", Type: "zone", Options: map[string]string{"name": "off", "enabled": "0"}},
 		{Name: "d", Type: "forwarding", Options: map[string]string{"src": "iot", "dest": "wan", "enabled": "0"}},
 	}
-	want := []Zone{{Name: "iot", Input: "DROP", Output: "ACCEPT", Forward: "REJECT", Networks: []string{}, ForwardsTo: []string{}}}
+	want := []Zone{{Name: "iot", Input: "DROP", Output: "ACCEPT", Forward: "DROP", Networks: []string{}, ForwardsTo: []string{}}}
 	if got := Zones(fw); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}

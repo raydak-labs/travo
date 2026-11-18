@@ -1097,7 +1097,7 @@ export type Zone = {
      */
     forwards_to: Array<string>;
     /**
-     * Policy for traffic to the router (ACCEPT, REJECT, DROP); inherited from the defaults section when unset
+     * Policy for traffic to the router (ACCEPT, REJECT, DROP); inherited from the defaults section, then DROP, when unset
      */
     input: string;
     /**

@@ -36,7 +36,7 @@ type Interface struct {
 // Zone is one named firewall zone.
 type Zone struct {
 	Name       string   `json:"name"`
-	Input      string   `json:"input" doc:"Policy for traffic to the router (ACCEPT, REJECT, DROP); inherited from the defaults section when unset"`
+	Input      string   `json:"input" doc:"Policy for traffic to the router (ACCEPT, REJECT, DROP); inherited from the defaults section, then DROP, when unset"`
 	Output     string   `json:"output" doc:"Policy for traffic from the router"`
 	Forward    string   `json:"forward" doc:"Policy for traffic forwarded between the zone's own networks"`
 	Masq       bool     `json:"masq" doc:"Masquerading (NAT) on egress"`
@@ -97,7 +97,7 @@ func Interfaces(dump []facts.Interface, zones []Zone) []Interface {
 
 // Zones lists zone sections by their name option, anonymous (@zone[n]) and named sections
 // alike, in config order. fw4 skips a zone without a name or with enabled '0', so it does here too. An unset
-// policy inherits the defaults section's, as fw4 does.
+// policy inherits the defaults section's, then DROP, as fw4 does.
 func Zones(firewall []device.Section) []Zone {
 	var defaults device.Section
 	if at := slices.IndexFunc(firewall, func(s device.Section) bool { return s.Type == "defaults" }); at >= 0 {
@@ -134,7 +134,10 @@ func policy(zone, defaults device.Section, key string) string {
 	if v := zone.Options[key]; v != "" {
 		return strings.ToUpper(v)
 	}
-	return strings.ToUpper(defaults.Options[key])
+	if v := defaults.Options[key]; v != "" {
+		return strings.ToUpper(v)
+	}
+	return "DROP" // fw4's built-in default for an unset defaults policy
 }
 
 // values reads an option that may be a list or a space-separated option (both occur in the
