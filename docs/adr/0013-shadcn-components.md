@@ -7,7 +7,11 @@ devDependency is 1.8.1. Reapply with
 `pnpm -C web exec shadcn-svelte add --overwrite --yes` and the component names.
 That writes the registry source into `web/src/lib/components/ui`. The installed
 set is button, input, label, textarea, card, badge, alert, skeleton, table,
-collapsible, dialog, and sheet.
+collapsible, dialog, sheet, alert-dialog, and sonner (#170). Adding a component
+re-offers `button`; keep the app's button (disabled anchor rule below) instead of
+overwriting it. The sonner wrapper takes the app's `data-theme` value as `theme`
+instead of `mode-watcher`, which is not installed. Pages use these through the
+confirm / toast pattern in [web-ui.md](../web-ui.md).
 
 Those files use `tailwind-variants` and `cn`. `web/src/lib/utils.ts` re-exports
 `cn`. An earlier probe at 95ecdf0 fit a 40 KB shell only by replacing that
@@ -26,6 +30,7 @@ The component source is not an npm package, so `package.json` does not carry
 its MIT notice. That notice ships once, as
 `web/public/shadcn-svelte-LICENSE.txt`, which the build copies into `dist`.
 
-Dialogs load on demand with their routes. Accessibility remains implemented by
+Dialogs load on demand with their routes; the toaster is part of the shell
+(79.7 KB shell gzip after #170). Accessibility remains implemented by
 Bits UI. No router or device behavior changes are part of adoption. The
 inventory lives in [the migration evidence](../testing/shadcn-migration.md).
