@@ -28,17 +28,20 @@ func (s *Service) Migrate(ctx context.Context) error {
 	if err != nil || !changed || s.migrationHeldOff(old) {
 		return err
 	}
-	err = s.swap(ctx, old, out)
-	s.recordMigration(old, err)
+	rolledBack, err := s.swap(ctx, old, out)
+	s.recordMigration(old, rolledBack, err)
 	return err
 }
 
-func (s *Service) swap(ctx context.Context, old, out []byte) error {
+// swap reports rolledBack only when a failed try fully restored the old config and released
+// the guard; any other failure (nothing written yet, or cleanup failed) is not a "failed and
+// undone" migration.
+func (s *Service) swap(ctx context.Context, old, out []byte) (rolledBack bool, _ error) {
 	if err := s.Guards.Acquire(ConfigGuard); err != nil {
-		return err
+		return false, err
 	}
 	if err := atomicfile.Write(s.Backup, old, 0o600); err != nil {
-		return errors.Join(fmt.Errorf("adguard: keep old config: %w", err), s.Guards.Release(ConfigGuard))
+		return false, errors.Join(fmt.Errorf("adguard: keep old config: %w", err), s.Guards.Release(ConfigGuard))
 	}
 	err := atomicfile.Write(s.Config, out, 0o600)
 	if err == nil {
@@ -48,9 +51,10 @@ func (s *Service) swap(ctx context.Context, old, out []byte) error {
 		err = s.waitReady(ctx)
 	}
 	if err != nil {
-		return s.restore(ctx, fmt.Errorf("adguard: loopback migration: %w", err))
+		rerr := s.restore(ctx, nil)
+		return rerr == nil, errors.Join(fmt.Errorf("adguard: loopback migration: %w", err), rerr)
 	}
-	return s.finishSwap()
+	return false, s.finishSwap()
 }
 
 // MigrationBackoff is how long a failed loopback migration is not retried while the
@@ -72,7 +76,8 @@ func (s *Service) now() time.Time {
 	return time.Now()
 }
 
-// migrationFailed reports a recorded failure, expired or not: the config still binds the LAN.
+// migrationFailed reports a recorded failure, expired or not. Status hides it once the config
+// is loopback (an operator may fix the YAML by hand); Reconcile then forgets it.
 func (s *Service) migrationFailed() bool { return s.failed.Load() != nil }
 
 // migrationHeldOff is true while the last failure is younger than MigrationBackoff and the
@@ -82,10 +87,11 @@ func (s *Service) migrationHeldOff(config []byte) bool {
 	return f != nil && f.config == sha256.Sum256(config) && s.now().Sub(f.at) < MigrationBackoff
 }
 
-func (s *Service) recordMigration(config []byte, err error) {
-	if err == nil {
+func (s *Service) recordMigration(config []byte, rolledBack bool, err error) {
+	switch {
+	case err == nil:
 		s.failed.Store(nil)
-		return
+	case rolledBack:
+		s.failed.Store(&migrationFailure{config: sha256.Sum256(config), at: s.now()})
 	}
-	s.failed.Store(&migrationFailure{config: sha256.Sum256(config), at: s.now()})
 }

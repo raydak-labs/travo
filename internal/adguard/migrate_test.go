@@ -47,6 +47,42 @@ func TestFailedMigrationBacksOffWhileTheConfigIsUnchanged(t *testing.T) {
 	}
 }
 
+// A config fixed by hand after a failed try must not keep reporting the failure.
+func TestHandFixedLoopbackConfigClearsTheFailure(t *testing.T) {
+	r := newRig(t)
+	r.installed(t, readFixture(t))
+	r.svc.Ready = func(context.Context) error { return errors.New("connection refused") }
+	ctx := context.Background()
+	if err := r.svc.Migrate(ctx); err == nil {
+		t.Fatal("want failure")
+	}
+	if err := os.WriteFile(r.svc.Config, Seed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := r.svc.Status(ctx); st.MigrationFailed {
+		t.Fatalf("loopback config still reports a failure: %+v", st)
+	}
+	if err := r.svc.Reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r.svc.migrationFailed() {
+		t.Fatal("reconcile must forget the failure once the config is loopback")
+	}
+}
+
+// Only a completed rollback counts as "failed and undone"; a kept guard is not.
+func TestUnfinishedRestoreIsNotReportedAsUndone(t *testing.T) {
+	r := newRig(t)
+	r.installed(t, readFixture(t))
+	r.dev.ServiceErr = errors.New("procd: timeout")
+	if err := r.svc.Migrate(context.Background()); err == nil {
+		t.Fatal("want error")
+	}
+	if r.svc.migrationFailed() {
+		t.Fatal("a restore that kept the guard must not be recorded as rolled back")
+	}
+}
+
 func TestEditedConfigIsMigratedAgainAtOnce(t *testing.T) {
 	r := newRig(t)
 	r.installed(t, readFixture(t))
