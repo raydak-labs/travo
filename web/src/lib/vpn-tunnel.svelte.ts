@@ -80,6 +80,10 @@ export type ToggleOptions = {
   confirmed: () => string;
   rolledBack: () => string;
   rollbackFailed: () => string;
+  /** Request failed without an answer; defaults to the tunnel message. */
+  failed?: () => string;
+  /** The transaction vanished before it settled; defaults to the tunnel message. */
+  unknown?: () => string;
 };
 
 const tunnelToggle: ToggleOptions = {
@@ -138,7 +142,7 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
         void refresh();
       }
     } catch {
-      if (!request.signal.aborted) error = m.vpn_tunnel_failed();
+      if (!request.signal.aborted) error = (options.failed ?? m.vpn_tunnel_failed)();
     } finally {
       applying = false;
     }
@@ -156,7 +160,7 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
       if (response.data) accept(response.data);
       else if (response.response?.status === 404) {
         transaction = undefined;
-        error = m.vpn_tunnel_unknown_result();
+        error = (options.unknown ?? m.vpn_tunnel_unknown_result)();
         void refresh();
       }
     } catch {
