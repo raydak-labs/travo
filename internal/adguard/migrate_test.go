@@ -83,6 +83,29 @@ func TestUnfinishedRestoreIsNotReportedAsUndone(t *testing.T) {
 	}
 }
 
+// An unfinished retry replaces an older rolled-back record: the status must not keep
+// promising a retry while the kept guard blocks it.
+func TestUnfinishedRetryClearsAnOlderFailure(t *testing.T) {
+	r := newRig(t)
+	r.installed(t, readFixture(t))
+	now := time.Unix(1_800_000_000, 0)
+	r.svc.Now = func() time.Time { return now }
+	r.svc.Ready = func(context.Context) error { return errors.New("connection refused") }
+	ctx := context.Background()
+	if err := r.svc.Migrate(ctx); err == nil || !r.svc.migrationFailed() {
+		t.Fatalf("first try must fail and be recorded: %v", err)
+	}
+	now = now.Add(MigrationBackoff)
+	r.dev.ServiceErr = errors.New("procd: timeout")
+	if err := r.svc.Migrate(ctx); err == nil {
+		t.Fatal("retry must fail")
+	}
+	st, err := r.svc.Status(ctx)
+	if err != nil || st.MigrationFailed || !st.Busy {
+		t.Fatalf("status = %+v %v, want busy without migration_failed", st, err)
+	}
+}
+
 func TestEditedConfigIsMigratedAgainAtOnce(t *testing.T) {
 	r := newRig(t)
 	r.installed(t, readFixture(t))

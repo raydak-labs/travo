@@ -87,11 +87,12 @@ func (s *Service) migrationHeldOff(config []byte) bool {
 	return f != nil && f.config == sha256.Sum256(config) && s.now().Sub(f.at) < MigrationBackoff
 }
 
+// recordMigration keeps only the latest outcome: a completed rollback starts the back-off;
+// success or any other failure (a kept guard shows as busy instead) clears an older record.
 func (s *Service) recordMigration(config []byte, rolledBack bool, err error) {
-	switch {
-	case err == nil:
-		s.failed.Store(nil)
-	case rolledBack:
+	if err != nil && rolledBack {
 		s.failed.Store(&migrationFailure{config: sha256.Sum256(config), at: s.now()})
+		return
 	}
+	s.failed.Store(nil)
 }
