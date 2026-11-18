@@ -98,6 +98,42 @@ func TestExitNodeWithoutInternetRestoresPrefs(t *testing.T) {
 	}
 }
 
+// The restore must run even when the request was cancelled during the probe, and the
+// probe must not reuse a cached result from before the route change (#201 review).
+func TestExitNodeRestoreSurvivesCancelAndProbeIsFresh(t *testing.T) {
+	r := loggedIn(t)
+	if _, err := r.svc.SetSettings(context.Background(), Settings{SSH: true}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	invalidated := false
+	r.svc.Invalidate = func() { invalidated = true }
+	r.svc.Online = func(context.Context) bool {
+		if !invalidated {
+			t.Error("probe ran before the cached result was dropped")
+		}
+		cancel()
+		return false
+	}
+	r.svc.ProbeWait = 5 * r.svc.Every
+	_, err := r.svc.SetSettings(ctx, Settings{ExitNode: "nMock1CNTRL", SSH: true})
+	if !errors.Is(err, ErrExitNodeOffline) {
+		t.Fatalf("got %v", err)
+	}
+	if !slices.Contains(lastCall(r), "--exit-node=") {
+		t.Fatalf("not restored after cancel: %v", lastCall(r))
+	}
+}
+
+func TestApplyFirewallRefusesWhileStopped(t *testing.T) {
+	r := loggedIn(t)
+	r.svc.Txns = &stageNow{}
+	r.dev.SetService(Package, true, false)
+	if _, err := r.svc.ApplyFirewall(context.Background()); !errors.Is(err, ErrNotRunning) {
+		t.Fatalf("got %v", err)
+	}
+}
+
 type fakeTunnel struct {
 	state vpnstatus.State
 	err   error

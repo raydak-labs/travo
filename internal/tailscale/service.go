@@ -60,6 +60,9 @@ type Service struct {
 	// FreeBytes reads free overlay space; Online is the real Internet probe.
 	FreeBytes func() (uint64, error)
 	Online    func(context.Context) bool
+	// Invalidate drops a cached Online result, so the probe after an exit-node change
+	// runs through the new route (nil: Online is never cached).
+	Invalidate func()
 	// Every is the poll interval while waiting for tailscaled or the Internet probe.
 	Every time.Duration
 	// UCI reads network and firewall; Txns stages the firewall zone; Tunnel is the WireGuard

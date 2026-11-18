@@ -30,6 +30,9 @@ func startTailscale(deps app.Deps, layers *dnslayer.Service, workers *lifecycle.
 			return connection != nil && connection.Status(ctx).Internet == connectivity.Online
 		},
 	}
+	if inv, ok := connection.(interface{ Invalidate() }); ok {
+		svc.Invalidate = inv.Invalidate
+	}
 	if deps.Txn != nil {
 		svc.Txns = deps.Txn
 	}

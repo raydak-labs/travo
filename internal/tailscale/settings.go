@@ -83,10 +83,19 @@ func (s *Service) SetSettings(ctx context.Context, in Settings) (Status, error) 
 		if err := s.CLI.Set(ctx, Flags(want)); err != nil {
 			return err
 		}
-		if want.ExitNodeIP == "" || want.ExitNodeIP == old.ExitNodeIP || s.waitOnline(ctx) {
+		if want.ExitNodeIP == "" || want.ExitNodeIP == old.ExitNodeIP {
 			return nil
 		}
-		if err := s.CLI.Set(ctx, Flags(old)); err != nil {
+		if s.Invalidate != nil {
+			s.Invalidate()
+		}
+		if s.waitOnline(ctx) {
+			return nil
+		}
+		// The restore must finish even if the caller went away: the new exit node is offline.
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if err := s.CLI.Set(rctx, Flags(old)); err != nil {
 			return errors.Join(ErrExitNodeOffline, fmt.Errorf("restore previous prefs: %w", err))
 		}
 		return restored{ErrExitNodeOffline}
@@ -171,6 +180,9 @@ func (s *Service) ApplyFirewall(ctx context.Context) (txn.Status, error) {
 	}
 	if !st.Installed {
 		return txn.Status{}, errNotInstalled()
+	}
+	if !st.Running { // Settings are zero without the backend: advertise_lan would read false
+		return txn.Status{}, ErrNotRunning
 	}
 	want := FirewallSections(st.Settings.AdvertiseLAN)
 	current, err := s.UCI.Show(ctx, "firewall")
