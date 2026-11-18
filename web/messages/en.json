@@ -444,7 +444,7 @@
   "settings_ntp_servers": "Time servers",
   "settings_ntp_servers_hint": "One host name or IP address per line, up to 8.",
   "settings_save": "Save settings",
-  "settings_saved": "Saved",
+  "settings_saved": "Device settings saved.",
   "settings_unavailable": "Device settings are unavailable",
   "settings_err_invalid": "The router rejected a value. Check the hostname, time zone and servers.",
   "settings_err_busy": "Another change to the system configuration is in progress. Try again.",

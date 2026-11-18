@@ -9,7 +9,7 @@ import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
-import Status from '../ui/Status.svelte';
+import { notify } from '../ui/notify';
 
 const loader = createLoader(fetchDeviceSettings);
 let hostname = $state('');
@@ -19,7 +19,6 @@ let servers = $state('');
 let filled = false;
 let busy = $state(false);
 let failure = $state<string>();
-let saved = $state(false);
 
 // Fill the form once from the first successful load; a later reload must not wipe edits.
 $effect(() => {
@@ -36,7 +35,6 @@ async function save(event: SubmitEvent) {
   event.preventDefault();
   const current = loader.data?.settings;
   if (!current || busy) return;
-  saved = false;
   if (!validHostname(hostname.trim())) {
     failure = m.settings_hostname_invalid();
     return;
@@ -50,11 +48,11 @@ async function save(event: SubmitEvent) {
   const result = await saveDeviceSettings(current, { hostname, zonename, ntpEnabled, servers });
   busy = false;
   if ('error' in result) {
-    failure = result.error;
+    notify.error(result.error);
     return;
   }
   filled = false;
-  saved = true;
+  notify.success(m.settings_saved());
   void loader.retry();
 }
 </script>
@@ -86,9 +84,6 @@ async function save(event: SubmitEvent) {
         </Label>
         {#if failure}
           <Alert class="status status-danger self-start" role="alert">{failure}</Alert>
-        {/if}
-        {#if saved}
-          <Status kind="ok">{m.settings_saved()}</Status>
         {/if}
         <div>
           <Button variant="default" type="submit" disabled={busy}>{m.settings_save()}</Button>
