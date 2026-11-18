@@ -132,6 +132,16 @@ done <"$tmp/listeners-before.txt"
 grep -q ':80$' "$tmp/listeners-after.txt" || fail "nothing listens on :80"
 grep -q ':8080$' "$tmp/listeners-after.txt" || fail "nothing listens on :8080"
 echo "ok: LuCI moved and the other pre-install listeners are still present"
+[ "$(dx 'uci -q get travo-greenfield.main.listen_tls')" = :443 ] || fail "install did not enable HTTPS on :443"
+attempts=0
+until dx 'wget --no-check-certificate -T 2 -qO- https://127.0.0.1/api/health' 2>/dev/null | grep -q '"status"'; do
+  attempts=$((attempts + 1))
+  [ "$attempts" -lt 15 ] || fail "no HTTPS health answer on :443"
+  sleep 1
+done
+dx '[ -s /etc/travo-greenfield/tls/cert.pem ] && ls -l /etc/travo-greenfield/tls/key.pem | grep -q "^-rw-------"' ||
+  fail "self-signed certificate not stored with a private key file"
+echo "ok: HTTPS answers on :443 with the generated certificate"
 dx '[ -L /etc/rc.d/S99travo-greenfield ] && [ -L /etc/rc.d/K10travo-greenfield ]' || fail "boot links missing"
 dx '[ ! -e /etc/uci-defaults/90-travo-greenfield ]' || fail "uci-defaults script not consumed"
 # BusyBox tr has no [:upper:] class: it once turned OpenWrt into wenrt.lan

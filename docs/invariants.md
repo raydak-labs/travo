@@ -38,6 +38,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - No fallback signing secret; entropy failure is fatal.
 - Rate-limit login and pre-login endpoints; periodically sweep per-IP state.
 - Optional IP allowlist (CIDR); health/login/time-sync bypass it.
+- HTTPS (self-signed, [adr/0016](adr/0016-self-signed-https.md)) serves the SAME handler as HTTP: no route, check or exemption may depend on the scheme except the cookie's `Secure` flag. TLS never redirects or sets HSTS. A TLS listen failure is never fatal.
 - Pre-login time-sync only while the router clock is implausible; sticky once plausible (a 1970 rewind once reopened it); bounded window; rate-limited. Authenticated callers unbounded.
 - Root SSH keys: write only dropbear `authorized_keys`; append exactly one validated line; reject `\n`/`\r`; strict key-type format; no options field (`command=`, `from=`); list/add/delete behind auth; not revoked by redeploy or password change.
 - Admin reachable on `br-lan` only (wired + AP WiFi). Uplink zones and guest get no admin access. Enforced by firewall AND daemon source check (by `RemoteAddr`, never forwarded headers). No reverse proxy on loopback in front of the daemon: loopback is trusted. No default password, ever. The `Host` header must name the router (its lan IP, loopback, `localhost`, or an allowlisted name), else 421: DNS rebinding must not reach the API.

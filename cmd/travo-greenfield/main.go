@@ -31,6 +31,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
 	"github.com/blackdark-org/travo-greenfield/internal/static"
 	"github.com/blackdark-org/travo-greenfield/internal/throughput"
+	"github.com/blackdark-org/travo-greenfield/internal/tlscert"
 	"github.com/blackdark-org/travo-greenfield/internal/trust"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
 	"github.com/blackdark-org/travo-greenfield/internal/updateapply"
@@ -49,6 +50,7 @@ import (
 
 func main() {
 	addr := flag.String("listen", "127.0.0.1:8081", "listen address")
+	listenTLS := flag.String("listen-tls", "", "HTTPS listen address with a self-signed certificate; empty = off (ADR 0016)")
 	useMock := flag.Bool("mock", false, "run against the mock device (no router needed)")
 	firstRun := flag.Bool("mock-firstrun", false, "with --mock: start without a root password")
 	hostAllow := flag.String("host-allow", "", "comma-separated extra Host names accepted (DNS-rebinding guard)")
@@ -70,7 +72,7 @@ func main() {
 	if *useMock && !flagGiven("static-dir") {
 		dir = "web/dist"
 	}
-	if err := run(*addr, *proxyListen, *useMock, *firstRun, splitList(*hostAllow), dir, *releaseSource); err != nil {
+	if err := run(*addr, *listenTLS, *proxyListen, *useMock, *firstRun, splitList(*hostAllow), dir, *releaseSource); err != nil {
 		slog.Error("startup", "err", err)
 		os.Exit(1)
 	}
@@ -119,7 +121,7 @@ func splitList(s string) []string {
 	return out
 }
 
-func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, staticDir, releaseSource string) error {
+func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow []string, staticDir, releaseSource string) error {
 	if !updatecheck.ValidSource(releaseSource) {
 		return errors.New("invalid release source: expected OWNER/REPO or off")
 	}
@@ -327,9 +329,18 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		UI:        uiHandler(staticDir),
 	}
 	h, _ := api.New(apiDeps)
-	stopProxy := serveAdGuardProxy(adguardProxyAddr(proxyListen, addr, useMock), apiDeps)
+	var certs *tlscert.Source
+	if listenTLS != "" {
+		certs = certSource(deps.Paths.State, provider, hostAllow)
+	}
+	proxyAddr := adguardProxyAddr(proxyListen, addr, useMock)
+	stopProxy := serveAdGuardProxy(proxyAddr, proxyTLSAddr(proxyAddr, listenTLS), certs, apiDeps)
 	defer stopProxy()
-	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	srv := newServer(addr, h)
+	stopTLS := func() {}
+	if certs != nil {
+		stopTLS = serveBackground("https", newServer(listenTLS, h), certs)
+	}
 
 	drained := make(chan struct{})
 	go func() {
@@ -337,6 +348,7 @@ func run(addr, proxyListen string, useMock, firstRun bool, hostAllow []string, s
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
+		stopTLS()
 		_ = srv.Shutdown(shutdown) // HTTP drains first; workers stop after (deferred)
 	}()
 	slog.Info("listening", "addr", addr, "version", version.Version)

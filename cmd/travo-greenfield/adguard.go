@@ -17,6 +17,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
+	"github.com/blackdark-org/travo-greenfield/internal/tlscert"
 )
 
 // adguardProxyAddr picks the gated proxy's listener: the explicit flag, else the daemon's
@@ -38,25 +39,20 @@ func adguardProxyAddr(flagValue, listen string, mock bool) string {
 	return net.JoinHostPort(host, "3001")
 }
 
-// serveAdGuardProxy runs the gated AGH proxy until the returned stop is called. A listen
-// failure is logged, not fatal: the admin UI must not depend on AGH.
-func serveAdGuardProxy(addr string, deps api.Deps) (stop func()) {
+// serveAdGuardProxy runs the gated AGH proxy, plain and (with certs) TLS, until the returned
+// stop is called. A listen failure is logged, not fatal: the admin UI must not depend on AGH.
+func serveAdGuardProxy(addr, tlsAddr string, certs *tlscert.Source, deps api.Deps) (stop func()) {
 	if addr == "" {
 		return func() {}
 	}
 	target, _ := url.Parse(adguard.AdminURL)
-	srv := &http.Server{Addr: addr, Handler: api.NewAdGuardProxy(deps, target), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
-	go func() {
-		slog.Info("adguard proxy listening", "addr", addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Warn("adguard proxy", "err", err)
-		}
-	}()
-	return func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(ctx)
+	h := api.NewAdGuardProxy(deps, target)
+	stopPlain := serveBackground("adguard proxy", newServer(addr, h), nil)
+	stopTLS := func() {}
+	if tlsAddr != "" && certs != nil {
+		stopTLS = serveBackground("adguard proxy", newServer(tlsAddr, h), certs)
 	}
+	return func() { stopPlain(); stopTLS() }
 }
 
 // startAdGuard builds the AdGuard Home supervisor, its reconcile worker and the liveness

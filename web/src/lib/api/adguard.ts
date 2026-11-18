@@ -60,8 +60,12 @@ export async function changeAdGuard(
   }
 }
 
-/** The gated proxy is the router's own address on port 3001 (ADR 0006). */
+/**
+ * The gated proxy is the router's own address on port 3001 (ADR 0006), or 3443 for a page
+ * loaded over HTTPS: its Secure session cookie never reaches the plain proxy (ADR 0016).
+ */
 export function adguardUrl(location: Pick<Location, 'protocol' | 'hostname'>): string {
   const host = location.hostname.includes(':') ? `[${location.hostname}]` : location.hostname;
-  return `${location.protocol}//${host}:3001/`;
+  const port = location.protocol === 'https:' ? 3443 : 3001;
+  return `${location.protocol}//${host}:${port}/`;
 }

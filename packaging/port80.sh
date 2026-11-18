@@ -88,7 +88,22 @@ wait_listen() (
 )
 
 set_greenfield_listen() {
-  uci set "travo-greenfield.main.listen=$1" && uci commit travo-greenfield
+  uci set "travo-greenfield.main.listen=$1" || return 1
+  # Off :80, uhttpd keeps or gets back :443: drop the HTTPS port enable_tls_listen set.
+  if [ "$1" != :80 ] && [ "$(uci -q get travo-greenfield.main.listen_tls)" = :443 ]; then
+    uci delete travo-greenfield.main.listen_tls || return 1
+  fi
+  uci commit travo-greenfield
+}
+
+# HTTPS on :443 (ADR 0016) once uhttpd no longer serves it. Succeeds only when it changed
+# the setting. Keeps any operator value, including `off`; skips a :443 held by another
+# process. A TLS listen failure is not fatal for the daemon, so this never blocks install.
+enable_tls_listen() {
+  [ -z "$(uci -q get travo-greenfield.main.listen_tls)" ] || return 1
+  ! uhttpd_listen_lines | grep -q " listen_https .*:443'$" || return 1
+  ! port_is_listening 443 || return 1
+  uci set travo-greenfield.main.listen_tls=:443 && uci commit travo-greenfield
 }
 
 clear_port_swap() {
@@ -244,7 +259,15 @@ install_ports() {
 
   holder=$(port80_holder)
   case "$holder" in
-    self) echo "$NAME $1 installed and healthy on port 80"; return ;;
+    self)
+      if enable_tls_listen; then
+        if ! /etc/init.d/travo-greenfield restart 9>&- || ! wait_healthy "$1"; then
+          die "greenfield did not answer after enabling HTTPS"
+        fi
+      fi
+      echo "$NAME $1 installed and healthy on port 80"
+      return
+      ;;
     other) die "port 80 is in use by something other than uhttpd" ;;
     uhttpd) swap_uhttpd "$1" ;;
   esac
@@ -259,6 +282,7 @@ install_ports() {
       die "test listener did not start"
     fi
   fi
+  enable_tls_listen || true
   if ! set_greenfield_listen :80 ||
      ! /etc/init.d/travo-greenfield restart 9>&- ||
      ! wait_healthy "$1"; then
@@ -278,5 +302,5 @@ install_ports() {
     clear_port_swap
     trap - INT TERM HUP
   fi
-  echo "travo-greenfield on http://${lan_ip%%/*}/, LuCI on http://${lan_ip%%/*}:8080/"
+  echo "travo-greenfield on http://${lan_ip%%/*}/ (and https://${lan_ip%%/*}/ with a self-signed certificate), LuCI on http://${lan_ip%%/*}:8080/"
 }

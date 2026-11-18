@@ -39,6 +39,8 @@ Test router: GL-AXT1800, OpenWrt 25.12.6, `ssh root@192.168.1.1` (key auth) when
 
 ## Hardware playbook (run before each release; console or Ethernet fallback ready)
 
+**Self-signed HTTPS (#183).** After `install.sh` on the router: `uci get travo-greenfield.main.listen_tls` is `:443`; `netstat -ltn` shows `:443` and `:3443` (Travo) and `:8443` (uhttpd). `logread -e travo-greenfield | grep tls` shows one "new self-signed certificate" line after the first `https://` request, with a fingerprint equal to the one the browser shows. In a phone and a laptop browser: `https://192.168.8.1/` warns once, then login, the dashboard, a confirm flow (e.g. AP edit cancelled) and live updates work; the session cookie has `Secure`. Services → "Open AdGuard Home" opens `https://<router>:3443/`. From the uplink side `:443` and `:3443` are not reachable. `/etc/init.d/travo-greenfield restart` keeps the same fingerprint. With the clock set to 1970 before the first request (`date -s 1970-01-02`, then restore time), the certificate is still valid today (`openssl s_client` from a laptop: notBefore ≥ build time − 1 day). Record pass or fail in SPIKES.md.
+
 Done on 2026-11-09 (results: `testdata/device/axt1800-25.12.6/SPIKES.md`): payload captures; watchdog restore without confirm, after daemon kill and across reboot; wrong uplink password reads `carrier:false` and rolls back; DNS layer round trip with AdGuard and captive. The 0.1.0 release run on 2026-11-17 (same file, "0.1.0 release playbook") lists each step as pass, partial or operator, with the operator-only remainder.
 
 Per release, each from Ethernet unless stated (issues with label `needs-hardware` add their step here when they merge):

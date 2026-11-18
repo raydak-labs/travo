@@ -87,4 +87,10 @@ describe('Services page: AdGuard Home', () => {
   it('builds the proxy URL for IPv6 hosts', () => {
     expect(adguardUrl({ protocol: 'http:', hostname: 'fd00::1' })).toBe('http://[fd00::1]:3001/');
   });
+
+  it('uses the TLS proxy port for a page loaded over HTTPS', () => {
+    expect(adguardUrl({ protocol: 'https:', hostname: '192.168.1.1' })).toBe(
+      'https://192.168.1.1:3443/',
+    );
+  });
 });
