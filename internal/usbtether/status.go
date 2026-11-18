@@ -6,9 +6,12 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
 )
 
@@ -64,6 +67,8 @@ type Status struct {
 	InWANZone  bool   `json:"in_wan_zone" doc:"The wan firewall zone lists usbtether"`
 	Up         bool   `json:"up" doc:"netifd reports usbtether up"`
 	IPv4       string `json:"ipv4" doc:"First IPv4 address in CIDR form; empty when none"`
+	// InstallBlocked: a driver install did not finish and kept its guard.
+	InstallBlocked bool `json:"install_blocked" doc:"A driver install did not finish; installing again is its retry"`
 }
 
 // Service reads detection and configuration state.
@@ -72,6 +77,17 @@ type Service struct {
 	Ubus     device.Ubus
 	Links    device.NetLinkReader
 	Packages pkgmgr.PackageManager
+	// Guards holds InstallGuard; Services starts usbmuxd after an iOS install.
+	Guards   guard.Dir
+	Services device.Services
+	// FreeBytes reads free overlay space before an install (invariants §13).
+	FreeBytes func() (uint64, error)
+	// Txns runs the uplink change (network + firewall) with watchdog and user confirm.
+	Txns Transactions
+	// ProbeWait overrides the enable/disable probe budget (tests); zero means ProbeWait.
+	ProbeWait time.Duration
+
+	installing sync.Mutex
 }
 
 // Status reads links, driver packages, UCI and netifd. A failed link, UCI or ubus read is
@@ -93,6 +109,11 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return Status{}, errors.Join(ErrUnavailable, err)
 	}
 	st := Status{Links: s.tetherLinks(ctx, links), Drivers: s.drivers(ctx)}
+	if s.Guards.Path != "" {
+		if st.InstallBlocked, err = s.Busy(); err != nil {
+			return Status{}, errors.Join(ErrUnavailable, err)
+		}
+	}
 	if sec, ok := find(network, Interface); ok && sec.Type == "interface" {
 		st.Configured, st.Device = true, sec.Options["device"]
 	}

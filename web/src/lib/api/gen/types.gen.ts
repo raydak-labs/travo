@@ -669,6 +669,10 @@ export type UsbTetherStatus = {
      */
     in_wan_zone: boolean;
     /**
+     * A driver install did not finish; installing again is its retry
+     */
+    install_blocked: boolean;
+    /**
      * First IPv4 address in CIDR form; empty when none
      */
     ipv4: string;
@@ -690,6 +694,25 @@ export type UpdateApInputBody = {
 
 export type UpdateCheckInputBody = {
     mode: 'automatic' | 'manual';
+};
+
+export type UsbTetherDriversInputBody = {
+    phone: 'android' | 'ios';
+};
+
+export type UsbTetherDriversOutputBody = {
+    /**
+     * Packages were installed; false when all were present
+     */
+    installed: boolean;
+};
+
+export type UsbTetherSetInputBody = {
+    /**
+     * Tether link to bind; omitted picks the only detected one
+     */
+    device?: string;
+    enabled: boolean | null;
 };
 
 export type VpnImportInputBody = {
@@ -2308,6 +2331,88 @@ export type GetUsbTetherResponses = {
 };
 
 export type GetUsbTetherResponse = GetUsbTetherResponses[keyof GetUsbTetherResponses];
+
+export type SetUsbTetherData = {
+    body: UsbTetherSetInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/usbtether';
+};
+
+export type SetUsbTetherErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetUsbTetherError = SetUsbTetherErrors[keyof SetUsbTetherErrors];
+
+export type SetUsbTetherResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetUsbTetherResponse = SetUsbTetherResponses[keyof SetUsbTetherResponses];
+
+export type InstallUsbTetherDriversData = {
+    body: UsbTetherDriversInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/usbtether/drivers';
+};
+
+export type InstallUsbTetherDriversErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type InstallUsbTetherDriversError = InstallUsbTetherDriversErrors[keyof InstallUsbTetherDriversErrors];
+
+export type InstallUsbTetherDriversResponses = {
+    /**
+     * OK
+     */
+    200: UsbTetherDriversOutputBody;
+};
+
+export type InstallUsbTetherDriversResponse = InstallUsbTetherDriversResponses[keyof InstallUsbTetherDriversResponses];
 
 export type GetVpndnsData = {
     body?: never;

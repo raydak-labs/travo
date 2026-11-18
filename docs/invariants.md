@@ -88,6 +88,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - WAN zone is resolved by name, never by index.
 - A new zone/forward/interface gets the full firewall surface (zone, masq, forwarding, input/output/forward policy) matching the `wan` pattern.
 - Direct firewall commits outside the apply flow are named exceptions, each with guard + rollback.
+- USB tethering ([ADR 0017](adr/0017-usb-tether-uplink.md)): a tether link is a `usb`-bus netdev with a phone driver (`rndis_host`, `cdc_ncm`, `cdc_ether`, `ipheth`), never matched by name. Enabling stages `network.usbtether` (dhcp, the chosen link, metric 10) and the `usbtether` entry of the wan zone's network list in ONE `network` + `firewall` transaction the user confirms; it is not a direct-commit exception and nothing rebinds it from hotplug. Travo owns only that interface and that list entry.
 - Wireless snapshot sets include firewall + dhcp.
 
 ## 8. DNS layering

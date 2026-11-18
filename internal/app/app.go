@@ -83,6 +83,7 @@ func New(o Options) (Deps, error) {
 		}
 		dev.SetService("adguardhome", false, false) // absent package; the mock install adds it
 		dev.SetService(tailscale.Package, false, false)
+		dev.SetService("usbmuxd", false, false) // absent until the iOS tether driver install
 		if secs, err := cli.ParseExport("dhcp", string(mock.DHCPExport)); err == nil {
 			_ = dev.Load(context.Background(), "dhcp", secs) // the embedded capture always parses (seed test)
 		}

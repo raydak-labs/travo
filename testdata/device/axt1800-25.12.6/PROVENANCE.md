@@ -64,6 +64,7 @@ No placeholders were needed: the SSID is a test name and the only address is the
 ## usbtether/ (2026-11-18, 25.12.6 package feed and UCI, #175)
 - apk-packages.txt: after `apk update`, `apk search -v kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net-ipheth usbmuxd`, then `apk info -R` for each tether package and `apk info -s` for them and their dependencies. None was installed. Verbatim.
 - uci-export-firewall.txt, uci-export-network.txt: `uci export firewall`, `uci export network` (router state after the 0.1.0 install: wwan uplink, guest AP, VPN profile stored, tunnel off). The wan zone is the anonymous `@zone[1]` with `list network`. Redacted: `wg0` `private_key` → `REDACTED`, peer `endpoint_host` → `203.0.113.8`.
+- usbmuxd-init.txt, usbmuxd-hotplug.txt: `/etc/init.d/usbmuxd` and `/etc/hotplug.d/usb/40-usbmuxd` from `apk fetch usbmuxd` + `apk extract` into `/tmp` (package not installed). Verbatim.
 No phone was attached: the tether link payloads (sysfs, `network.device status`, `network.interface.usbtether status`) are a hardware playbook capture step (docs/testing.md).
 
 ## uci-export-system.txt (2026-11-18, 0.2.0 system settings, #190)
