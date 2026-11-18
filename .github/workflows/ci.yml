@@ -111,6 +111,10 @@ jobs:
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
   # Container layer (docs/testing.md): one matrix job per OpenWrt image, same gate as `app`.
+  # arm64 (plus test:package/port80/update) runs only on release-please PRs for now: it is the
+  # slowest leg and blocked the sequential merge queue. Normal PRs and main run amd64 only.
+  # TODO(ci-speed): revisit CI speed someday (cache the OpenWrt images, split the arm64 suites,
+  # run them nightly or on main) and bring arm64 back to every PR once it is fast enough.
   integration:
     name: integration (${{ matrix.arch }})
     needs: changes
@@ -120,11 +124,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: arm64
-            runner: ubuntu-24.04-arm # aarch64_generic image runs natively, no QEMU
-          - arch: amd64
-            runner: ubuntu-latest
+        # arm64: aarch64_generic image runs natively (ubuntu-24.04-arm), no QEMU.
+        include: ${{ fromJSON(startsWith(github.head_ref, 'release-please--') && '[{"arch":"arm64","runner":"ubuntu-24.04-arm"},{"arch":"amd64","runner":"ubuntu-latest"}]' || '[{"arch":"amd64","runner":"ubuntu-latest"}]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
