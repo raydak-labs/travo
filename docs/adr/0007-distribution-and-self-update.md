@@ -4,7 +4,7 @@ Status: accepted
 
 Not a native package: a self-updating binary and apk/opkg would both own the same files and desync the package database. A tarball holds binary, UI, init script, `uci-defaults` and a `/lib/upgrade/keep.d/` entry (incl. `S99travo-greenfield` boot link). The installer targets a fresh OpenWrt installation and verifies the service answers before moving LuCI to :8080/:8443 (reversible on uninstall). Only `install.sh` moves the uhttpd ports. `internal/txn` has no uhttpd path. The install and uninstall port changes use a guard and a uhttpd snapshot. Restoration preserves each section’s listen values, their order, and whether they were an option or list. Settings live in UCI so backup/sysupgrade cover them.
 
-Update: GitHub release assets `<name>-<arch>.tar.gz`, `checksums.txt`, minisign signature (public key embedded). Download to /tmp, verify, keep `.old`, atomic swap, procd restart, post-restart health check, automatic rollback. No background polling: check on demand and at most daily when the UI opens. Release source configurable; disabled while the repo is private. Version via release-please, stamped with build time. A real `.apk` can come later.
+Update: GitHub release assets `<name>-<arch>.tar.gz`, `checksums.txt`, minisign signature (public key embedded). Download to /tmp, verify, keep `.old`, atomic swap, procd restart, post-restart health check, automatic rollback. No background polling: check on demand and at most daily when the UI opens. Release source configurable; disabled while the repo is private. Version via release-please, stamped with build time. A native `.apk` is deferred with conditions in [0015](0015-no-native-apk-yet.md).
 
 ## Signing key
 
