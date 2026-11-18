@@ -467,5 +467,17 @@
   "ssh_err_exists": "This key is already authorized.",
   "ssh_err_limit": "The key limit (32) is reached. Remove a key first.",
   "ssh_err_not_found": "This key no longer exists.",
-  "ssh_err_failed": "Could not change the SSH keys. Try again."
+  "ssh_err_failed": "Could not change the SSH keys. Try again.",
+  "reset_title": "Factory reset",
+  "reset_intro": "Erases every setting and installed package and restarts the router with OpenWrt defaults. Travo is removed too unless it is part of the firmware image. Afterwards the router has no root password and LuCI answers on port 80: set a password there first.",
+  "reset_type_phrase": "Type \"{phrase}\" to enable the button",
+  "reset_action": "Erase everything and restart",
+  "reset_confirm_title": "Erase all settings?",
+  "reset_confirm_body": "WiFi, VPN, AdGuard Home, saved uplinks and this interface are deleted. This cannot be undone. Download a configuration backup first if you may need it.",
+  "reset_started": "Factory reset started. The router restarts with OpenWrt defaults in about a minute; this page will not come back.",
+  "reset_err_busy": "Another change, restart or update is in progress. Finish it first.",
+  "reset_err_pending": "A factory reset was already requested.",
+  "reset_err_phrase": "Type the phrase exactly.",
+  "reset_err_session": "A factory reset needs a signed-in browser session.",
+  "reset_err_failed": "Could not start the factory reset."
 }

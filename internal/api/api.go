@@ -127,6 +127,8 @@ type Deps struct {
 	WiFiMAC       WiFiMACEditor
 	// SSHKeys is root's authorized_keys; nil answers 503.
 	SSHKeys SSHKeys
+	// FactoryReset wipes the router; nil answers 503.
+	FactoryReset FactoryResetter
 	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
 	USBTether USBTether
 	// SystemSettings is hostname, time zone and NTP; nil answers 503.
@@ -219,6 +221,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerSystemSettings(a)
 	s.registerSSHKeys(a)
 	s.registerReboot(a)
+	s.registerFactoryReset(a)
 	s.registerVPNProfiles(a)
 	s.registerVPNStatus(a)
 	s.registerVPNTunnel(a)

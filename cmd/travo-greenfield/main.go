@@ -29,6 +29,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
+	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
@@ -356,6 +357,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	if f, ok := deps.Device.(sshkeys.File); ok {
 		apiDeps.SSHKeys = &sshkeys.Service{File: f}
+	}
+	if r, ok := deps.Device.(factoryreset.Resetter); ok {
+		apiDeps.FactoryReset = &factoryreset.Service{Device: r, Guards: deps.Guards, Stopped: workers.Stopped}
 	}
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source

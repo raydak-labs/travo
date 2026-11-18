@@ -24,6 +24,9 @@ type Device struct {
 	UplinkReconnects   int
 	BootIDErr          error
 	RotateBootOnReboot bool
+	// FactoryResets counts scheduled wipes; FactoryResetErr makes scheduling fail.
+	FactoryResets   int
+	FactoryResetErr error
 	// AuthorizedKeysErr makes authorized_keys reads and writes fail.
 	AuthorizedKeysErr error
 	authorizedKeys    []byte

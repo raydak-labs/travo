@@ -182,6 +182,13 @@ export type DashboardConnectivity = {
     portal_url: string | null;
 };
 
+export type FactoryResetInputBody = {
+    /**
+     * Must be exactly "factory reset", typed by the operator
+     */
+    confirm: string;
+};
+
 export type GetSetupStateResponse = {
     password_set: boolean;
 };
@@ -1452,6 +1459,47 @@ export type GetSystemBackupResponses = {
 };
 
 export type GetSystemBackupResponse = GetSystemBackupResponses[keyof GetSystemBackupResponses];
+
+export type PostFactoryResetData = {
+    body: FactoryResetInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/factory-reset';
+};
+
+export type PostFactoryResetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type PostFactoryResetError = PostFactoryResetErrors[keyof PostFactoryResetErrors];
+
+export type PostFactoryResetResponses = {
+    /**
+     * Accepted
+     */
+    202: OkBody;
+};
+
+export type PostFactoryResetResponse = PostFactoryResetResponses[keyof PostFactoryResetResponses];
 
 export type GetSystemInfoData = {
     body?: never;

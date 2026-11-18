@@ -61,7 +61,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Flash is NAND overlayfs: per-sample/per-request writes FORBIDDEN; batch; rare event-driven writes may write through. Keep ~20 MB free.
 - Atomic writes for every state file (temp + fsync + rename). A torn file fails closed, never reads as "empty".
 - Degraded persistence must be visible in the UI.
-- Backup/restore = config tarball; restore over `/` is guarded. Factory reset is guarded.
+- Backup/restore = config tarball; restore over `/` is guarded. Factory reset is guarded (`factory-reset-in-progress`, never removed by Travo; the wipe takes it with the overlay), refused while any other guard is held, requires the typed phrase `factory reset` and a browser session (no API token).
 - No embedded KV store in 0.1. Add one only with a retention rule for the data.
 
 ## 6. UCI write discipline

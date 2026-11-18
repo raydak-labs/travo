@@ -28,6 +28,7 @@ import SystemUpdate from './SystemUpdate.svelte';
 
 const settingsCard = lazyPage(() => import('./SystemSettingsCard.svelte'));
 const sshKeysCard = lazyPage(() => import('./SystemSSHKeysCard.svelte'));
+const factoryResetCard = lazyPage(() => import('./SystemFactoryResetCard.svelte'));
 
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
@@ -264,6 +265,8 @@ async function logout() {
       </div>
     </form>
   </Card>
+
+  <PageHost load={factoryResetCard} />
 
   <div>
     <Button variant="outline"

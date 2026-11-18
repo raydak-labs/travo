@@ -97,6 +97,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 - After an upgrade the old binary may keep running: verify the running exe path; restart, not start.
 - Package manager: 25.x = apk, older = opkg; detect at runtime. Package lists live in `/tmp` and vanish on reboot.
 - Travo's own firmware upload drops installed packages; LuCI attended sysupgrade keeps them. Travo reports updates, LuCI flashes.
+- [HW, GET-only] On 25.12.6 `/sbin/firstboot` is a 2-line wrapper for `/sbin/factoryreset` (`jffs2reset` links to it); `setsid` is `/usr/bin/setsid`. Factory reset = `firstboot -y && reboot`; never run it on the shared router.
 
 ## 11. AdGuard Home
 
