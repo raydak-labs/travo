@@ -2,6 +2,7 @@ package connectivity
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"time"
 )
@@ -15,9 +16,11 @@ type Result struct {
 	Portal   string
 }
 
-// NewHTTPProbe classifies the reply of a 204 endpoint (invariants §12): 204 is online, a
-// redirect to an http(s) URL is a portal at that URL, and a 200 is a portal that intercepts
-// the request in place, so the probe URL itself opens its login page.
+// NewHTTPProbe classifies the reply of a 204 endpoint (invariants §12, ADR 0022): only the
+// expected answer means online, which is a 204 or a 200 with the endpoint's known empty
+// body (proxies that rewrite 204 to 200). A redirect to an http(s) URL is a portal at that
+// URL. A 200 with any body is a portal that intercepts the request in place, so the probe
+// URL itself opens its login page. Everything else is offline.
 func NewHTTPProbe(url string, timeout time.Duration) Probe {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
@@ -41,6 +44,9 @@ func NewHTTPProbe(url string, timeout time.Duration) Probe {
 		case res.StatusCode == http.StatusNoContent:
 			return Result{Internet: Online}
 		case res.StatusCode == http.StatusOK:
+			if emptyBody(res) {
+				return Result{Internet: Online}
+			}
 			return Result{Internet: Captive, Portal: url}
 		case res.StatusCode >= 300 && res.StatusCode < 400:
 			target, err := res.Location()
@@ -50,4 +56,14 @@ func NewHTTPProbe(url string, timeout time.Duration) Probe {
 		}
 		return Result{Internet: Offline}
 	}
+}
+
+// emptyBody reads at most one byte: the known body of a 204 endpoint is empty, and a
+// portal page is not.
+func emptyBody(res *http.Response) bool {
+	if res.ContentLength == 0 {
+		return true
+	}
+	n, err := io.ReadFull(res.Body, make([]byte, 1))
+	return n == 0 && (err == io.EOF || err == io.ErrUnexpectedEOF)
 }
