@@ -41,6 +41,8 @@ On the WiFi page, scan for an uplink, join it on a free radio, and confirm the c
 
 When the WiFi uplink drops, the router first lets the WiFi client reconnect on its own. If that fails, it retries the configured network up to 5 times, about two minutes apart. It never switches networks by itself. After the last attempt, the WiFi page says so. If a scan shows a saved network in range, the page offers the highest-priority one to **Select**. The attempt count survives restarts and resets once the uplink has an address again.
 
+On the Network page, **USB tethering** uses a phone as an uplink. Install the Android or iPhone drivers there, connect the phone by USB with USB tethering (Android) or Personal Hotspot (iPhone) on, and choose **Use as uplink**: the phone joins the wan zone with the usual confirm or rollback flow and carries traffic while Ethernet and WiFi have no connection. The dashboard names the medium of the active uplink (Ethernet, WiFi, USB tethering).
+
 ## Automation
 
 Scripts on the LAN use an API token instead of the browser login: create, list and revoke them under System → Manage API tokens (`#/system/tokens`), or create one with `POST /api/v1/auth/tokens` (`{"name":"ci","scope":"read"}` or `"admin"`) from a logged-in session, then send it as a bearer header. The token is shown once; revoke it with `DELETE /api/v1/auth/tokens/{id}`. `read` tokens only GET; no token can manage tokens or change the password ([ADR 0008](docs/adr/0008-auth-and-trust-boundary.md)).
