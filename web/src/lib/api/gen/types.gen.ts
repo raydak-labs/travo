@@ -290,6 +290,32 @@ export type DashboardConnectivity = {
     portal_url: string | null;
 };
 
+export type Diagnosis = {
+    /**
+     * The tool exited successfully (all replies, a route, an answer)
+     */
+    ok: boolean;
+    output: string;
+    target: string;
+    /**
+     * The run hit its time limit; the output is partial
+     */
+    timed_out: boolean;
+    tool: 'ping' | 'traceroute' | 'lookup';
+    /**
+     * Output was cut at 16 KiB
+     */
+    truncated: boolean;
+};
+
+export type DiagnosticsInputBody = {
+    /**
+     * Host name or IP address
+     */
+    target: string;
+    tool: 'ping' | 'traceroute' | 'lookup';
+};
+
 export type FactoryResetInputBody = {
     /**
      * Must be exactly "factory reset", typed by the operator
@@ -2197,6 +2223,51 @@ export type EnableFailoverResponses = {
 };
 
 export type EnableFailoverResponse = EnableFailoverResponses[keyof EnableFailoverResponses];
+
+export type RunNetworkDiagnosticData = {
+    body: DiagnosticsInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/diagnostics';
+};
+
+export type RunNetworkDiagnosticErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Too Many Requests
+     */
+    429: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type RunNetworkDiagnosticError = RunNetworkDiagnosticErrors[keyof RunNetworkDiagnosticErrors];
+
+export type RunNetworkDiagnosticResponses = {
+    /**
+     * OK
+     */
+    200: Diagnosis;
+};
+
+export type RunNetworkDiagnosticResponse = RunNetworkDiagnosticResponses[keyof RunNetworkDiagnosticResponses];
 
 export type ListFirewallZonesData = {
     body?: never;

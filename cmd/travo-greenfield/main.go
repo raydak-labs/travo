@@ -28,6 +28,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
+	"github.com/blackdark-org/travo-greenfield/internal/diagnostics"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
@@ -398,6 +399,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if r, ok := deps.Device.(device.InterfaceRestarter); ok {
 		apiDeps.InterfaceRestart = &ifrestart.Service{Device: r, Ubus: deps.Device, Guards: deps.Guards, Lockout: staLockout,
 			Now: clock.Now, Sleep: ifrestart.SleepContext, Wait: ifrestart.DefaultWait, Poll: ifrestart.DefaultPoll}
+	}
+	if d, ok := deps.Device.(device.Diagnoser); ok {
+		apiDeps.Diagnostics = &diagnostics.Service{Device: d}
 	}
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source

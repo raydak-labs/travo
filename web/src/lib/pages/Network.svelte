@@ -7,6 +7,7 @@ import PageHost from './PageHost.svelte';
 const usbTether = lazyPage(() => import('./USBTetherCard.svelte'));
 const failover = lazyPage(() => import('./FailoverCard.svelte'));
 const interfaces = lazyPage(() => import('./NetworkInterfacesCard.svelte'));
+const diagnostics = lazyPage(() => import('./DiagnosticsCard.svelte'));
 </script>
 
 <div class="grid gap-4">
@@ -14,4 +15,5 @@ const interfaces = lazyPage(() => import('./NetworkInterfacesCard.svelte'));
   <PageHost load={usbTether} />
   <PageHost load={failover} />
   <PageHost load={interfaces} />
+  <PageHost load={diagnostics} />
 </div>
