@@ -44,6 +44,27 @@ func TestInterfaceDumpFromDevice(t *testing.T) {
 	}
 }
 
+func TestInterfaceDumpProtoUptimeAndIPv6(t *testing.T) {
+	ifs, err := ParseInterfaceDump(read(t, "network/interface-dump.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]Interface{}
+	for _, i := range ifs {
+		by[i.Name] = i
+	}
+	// lan's only IPv6 is its own address in the delegated ULA prefix.
+	if l := by["lan"]; l.Proto != "static" || l.Uptime != 90242 || !slices.Equal(l.IPv6, []netip.Prefix{netip.MustParsePrefix("fd06:b820:5389::1/60")}) {
+		t.Fatalf("lan %+v", l)
+	}
+	if w := by["wwan"]; w.Proto != "dhcp" || w.Uptime != 90237 || len(w.IPv6) != 0 {
+		t.Fatalf("wwan %+v", w)
+	}
+	if w := by["wan6"]; w.Proto != "dhcpv6" || w.Up || w.Uptime != 0 {
+		t.Fatalf("wan6 (down, no uptime field) %+v", w)
+	}
+}
+
 func TestInterfaceDumpRejectsCIDRStrings(t *testing.T) {
 	// The shape that once made every caller "unknown": a CIDR string instead of {address, mask}.
 	bad := []byte(`{"interface":[{"interface":"lan","up":true,"ipv4-address":[{"address":"192.168.1.1/24"}]}]}`)

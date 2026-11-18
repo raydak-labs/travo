@@ -16,10 +16,15 @@ var ErrShape = errors.New("unexpected payload shape")
 
 // Interface is one netifd logical interface (network.interface dump).
 type Interface struct {
-	Name      string
-	Up        bool
-	L3Device  string
-	IPv4      []netip.Prefix
+	Name     string
+	Proto    string
+	Up       bool
+	Uptime   int64 // seconds since the interface came up; 0 while down (netifd omits it)
+	L3Device string
+	IPv4     []netip.Prefix
+	// IPv6 holds global and ULA addresses: "ipv6-address" plus the router's own address in
+	// each delegated prefix ("ipv6-prefix-assignment" local-address, how lan gets its ULA).
+	IPv6      []netip.Prefix
 	HasDefRte bool // netifd's view only; route truth is the kernel table (device-facts §1)
 	// DNSServers are the resolvers the interface learned (DHCP/static), in netifd order.
 	DNSServers []string
@@ -30,13 +35,16 @@ type Interface struct {
 func ParseInterfaceDump(b []byte) ([]Interface, error) {
 	var raw struct {
 		Interface []struct {
-			Interface string `json:"interface"`
-			Up        *bool  `json:"up"`
-			L3Device  string `json:"l3_device"`
-			IPv4      []struct {
-				Address string `json:"address"`
-				Mask    *int   `json:"mask"`
-			} `json:"ipv4-address"`
+			Interface string        `json:"interface"`
+			Proto     string        `json:"proto"`
+			Up        *bool         `json:"up"`
+			Uptime    int64         `json:"uptime"`
+			L3Device  string        `json:"l3_device"`
+			IPv4      []dumpAddress `json:"ipv4-address"`
+			IPv6      []dumpAddress `json:"ipv6-address"`
+			Assigned  []struct {
+				Local *dumpAddress `json:"local-address"`
+			} `json:"ipv6-prefix-assignment"`
 			Route []struct {
 				Target string `json:"target"`
 				Mask   *int   `json:"mask"`
@@ -55,26 +63,25 @@ func ParseInterfaceDump(b []byte) ([]Interface, error) {
 		if r.Interface == "" || r.Up == nil {
 			return nil, fmt.Errorf("interface dump: %w: entry without name or up", ErrShape)
 		}
-		it := Interface{Name: r.Interface, Up: *r.Up, L3Device: r.L3Device}
+		it := Interface{Name: r.Interface, Proto: r.Proto, Up: *r.Up, Uptime: r.Uptime, L3Device: r.L3Device}
 		for _, d := range r.DNSServer {
 			if _, err := netip.ParseAddr(d); err != nil {
 				return nil, fmt.Errorf("interface %s: dns-server: %w", r.Interface, err)
 			}
 			it.DNSServers = append(it.DNSServers, d)
 		}
-		for _, a := range r.IPv4 {
-			if a.Mask == nil {
-				return nil, fmt.Errorf("interface %s: %w: address without mask", r.Interface, ErrShape)
+		var err error
+		if it.IPv4, err = dumpPrefixes(r.Interface, r.IPv4); err != nil {
+			return nil, err
+		}
+		v6 := slices.Clone(r.IPv6)
+		for _, a := range r.Assigned {
+			if a.Local != nil {
+				v6 = append(v6, *a.Local)
 			}
-			ip, err := netip.ParseAddr(a.Address)
-			if err != nil {
-				return nil, fmt.Errorf("interface %s: %w", r.Interface, err)
-			}
-			pfx := netip.PrefixFrom(ip, *a.Mask)
-			if !pfx.IsValid() {
-				return nil, fmt.Errorf("interface %s: %w: bad mask %d", r.Interface, ErrShape, *a.Mask)
-			}
-			it.IPv4 = append(it.IPv4, pfx) // keeps the host address; Masked() gives the subnet
+		}
+		if it.IPv6, err = dumpPrefixes(r.Interface, v6); err != nil {
+			return nil, err
 		}
 		for _, rt := range r.Route {
 			if rt.Target == "0.0.0.0" && rt.Mask != nil && *rt.Mask == 0 {
@@ -82,6 +89,32 @@ func ParseInterfaceDump(b []byte) ([]Interface, error) {
 			}
 		}
 		out = append(out, it)
+	}
+	return out, nil
+}
+
+// dumpAddress is netifd's {"address", "mask"} pair for both families.
+type dumpAddress struct {
+	Address string `json:"address"`
+	Mask    *int   `json:"mask"`
+}
+
+// dumpPrefixes keeps each host address with its mask; Masked() gives the subnet.
+func dumpPrefixes(iface string, addrs []dumpAddress) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, a := range addrs {
+		if a.Mask == nil {
+			return nil, fmt.Errorf("interface %s: %w: address without mask", iface, ErrShape)
+		}
+		ip, err := netip.ParseAddr(a.Address)
+		if err != nil {
+			return nil, fmt.Errorf("interface %s: %w", iface, err)
+		}
+		pfx := netip.PrefixFrom(ip, *a.Mask)
+		if !pfx.IsValid() {
+			return nil, fmt.Errorf("interface %s: %w: bad mask %d", iface, ErrShape, *a.Mask)
+		}
+		out = append(out, pfx)
 	}
 	return out, nil
 }
