@@ -45,11 +45,13 @@ func (s *Service) InstallDrivers(ctx context.Context, phone Phone) (bool, error)
 		return false, ErrBusy
 	}
 	defer s.installing.Unlock()
-	if err := s.Guards.Clear(InstallGuard); err != nil {
-		return false, err
-	}
+	// Query before clearing a kept guard: a failed query must leave it, so Status keeps
+	// reporting the unfinished install.
 	missing, err := s.missing(ctx, pkgs)
 	if err != nil {
+		return false, err
+	}
+	if err := s.Guards.Clear(InstallGuard); err != nil {
 		return false, err
 	}
 	// iOS always (re)runs the usbmuxd setup: a retry after a failed `start` finds every

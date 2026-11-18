@@ -146,3 +146,18 @@ func TestIOSRetryFinishesUsbmuxdSetupAfterPackagesLanded(t *testing.T) {
 		t.Fatalf("guard left: %v", stale)
 	}
 }
+
+func TestFailedQueryOnRetryKeepsTheGuard(t *testing.T) {
+	pm := failingInstall{Mock: pkgmgr.NewMock(), fail: "kmod-usb-net-cdc-ncm"}
+	s, _ := installService(t, pm)
+	if _, err := s.InstallDrivers(context.Background(), Android); err == nil {
+		t.Fatal("want install error")
+	}
+	s.Packages = brokenPM{}
+	if _, err := s.InstallDrivers(context.Background(), Android); err == nil {
+		t.Fatal("want query error")
+	}
+	if blocked, err := s.Busy(); err != nil || !blocked {
+		t.Fatalf("guard kept = %v, %v; a failed query must not clear it", blocked, err)
+	}
+}

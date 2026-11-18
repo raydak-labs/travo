@@ -70,7 +70,7 @@ func (s *Service) Set(ctx context.Context, req Request) (txn.Status, error) {
 		return txn.Status{}, txn.ErrNoChanges
 	}
 	return s.Txns.Begin(ctx, "Enable USB tethering uplink on "+dev, uplinkConfigs,
-		func(c context.Context) error { return s.stageEnable(c, zone, dev) },
+		func(c context.Context) error { return s.stageEnable(c, dev) },
 		func(c context.Context) error { return s.proveUp(c, dev) })
 }
 
@@ -141,7 +141,17 @@ func enabledAs(network []device.Section, zone device.Section, dev string) bool {
 	return network[i].Options["disabled"] != "1"
 }
 
-func (s *Service) stageEnable(ctx context.Context, zone device.Section, dev string) error {
+// stageEnable re-reads both configs under the transaction locks like stageDisable, so a
+// zone list change made after Set's early check neither duplicates nor loses an entry.
+func (s *Service) stageEnable(ctx context.Context, dev string) error {
+	network, firewall, err := s.read(ctx)
+	if err != nil {
+		return err
+	}
+	zone, err := wanZone(network, firewall)
+	if err != nil {
+		return err
+	}
 	if err := s.UCI.SetType(ctx, "network", Interface, "interface"); err != nil {
 		return err
 	}

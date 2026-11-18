@@ -18,10 +18,16 @@ type fakeTxns struct {
 	d        *mock.Device
 	configs  []string
 	probeErr error
+	// beforeStage runs after Set's early read and before stage, like a concurrent writer
+	// that commits while Begin waits for the locks.
+	beforeStage func()
 }
 
 func (f *fakeTxns) Begin(ctx context.Context, _ string, configs []string, stage func(context.Context) error, probe txn.Probe) (txn.Status, error) {
 	f.configs = configs
+	if f.beforeStage != nil {
+		f.beforeStage()
+	}
 	if err := stage(ctx); err != nil {
 		for _, c := range configs {
 			_ = f.d.Revert(ctx, c)
@@ -161,5 +167,28 @@ func TestDisableRemovesOnlyOwnedState(t *testing.T) {
 	}
 	if _, err := s.Set(context.Background(), Request{Enabled: false}); !errors.Is(err, txn.ErrNoChanges) {
 		t.Fatalf("second disable = %v, want ErrNoChanges", err)
+	}
+}
+
+func TestEnableRereadsTheZoneUnderTheLocks(t *testing.T) {
+	d := router(t)
+	d.AddNetLink(device.NetLink{Name: "usb0", Bus: "usb", Driver: "rndis_host"})
+	d.SetUbusReply("network.interface."+Interface, "status", read(t, "interface-wwan-status.json"))
+	s, f := uplinkService(t, d)
+	f.beforeStage = func() {
+		ctx := context.Background()
+		if err := d.AddToList(ctx, "firewall", "@zone[1]", "network", Interface); err != nil {
+			t.Fatal(err)
+		}
+		if err := d.Commit(ctx, "firewall"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Set(context.Background(), Request{Enabled: true}); err != nil {
+		t.Fatalf("Set = %v (probe %v)", err, f.probeErr)
+	}
+	zone, _ := section(t, d, "firewall", "@zone[1]")
+	if !slices.Equal(zone.Lists["network"], []string{"wan", "wan6", "wwan", "usbtether"}) {
+		t.Fatalf("wan zone networks = %v; want usbtether once", zone.Lists["network"])
 	}
 }
