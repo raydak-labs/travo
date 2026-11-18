@@ -199,28 +199,15 @@ func ParseKernelDefaultRoute(out string) bool {
 	return false
 }
 
-// ParseHostapdClients parses `ubus call hostapd.<ifname> get_clients`: clients is a map
-// keyed by MAC. Only associated and authorized stations count.
+// ParseHostapdClients lists the MACs of ParseHostapdStations.
 func ParseHostapdClients(b []byte) ([]string, error) {
-	var raw struct {
-		Freq    *int `json:"freq"`
-		Clients map[string]struct {
-			Assoc      bool `json:"assoc"`
-			Authorized bool `json:"authorized"`
-		} `json:"clients"`
+	stations, err := ParseHostapdStations(b)
+	if err != nil {
+		return nil, err
 	}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return nil, fmt.Errorf("get_clients: %w", err)
+	out := make([]string, len(stations))
+	for i, s := range stations {
+		out[i] = s.MAC
 	}
-	if raw.Freq == nil || raw.Clients == nil {
-		return nil, fmt.Errorf("get_clients: %w: need freq and clients", ErrShape)
-	}
-	out := []string{}
-	for mac, c := range raw.Clients {
-		if c.Assoc && c.Authorized {
-			out = append(out, strings.ToLower(mac))
-		}
-	}
-	slices.Sort(out)
 	return out, nil
 }
