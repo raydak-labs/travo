@@ -17,3 +17,4 @@ The WiFi seeds use the connected summary with one scan per radio. Per-interface 
 
 - `sysfs-net-links.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/sysfs-net/links.tsv`; mock mode lists these netdevs. No phone capture exists yet, so mock mode has no tether link until `AddNetLink` adds one (tests).
 - `uci-export-system.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/uci-export-system.txt`; mock mode loads it as the `system` config so the device settings card reads and writes the real section shapes.
+- `logread.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/logs/logread.txt`; mock mode answers `logread` with it.

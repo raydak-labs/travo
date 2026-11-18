@@ -76,3 +76,6 @@ Packages fetched and extracted into `/tmp` on the router without installing them
 - mwan3-conffiles-init.txt: `lib/apk/packages/mwan3.conffiles`, a `---` line, then `/etc/init.d/mwan3`.
 - luci-app-mwan3-acl.json: `/usr/share/rpcd/acl.d/luci-app-mwan3.json` of `luci-app-mwan3-26.317.52279~1c75ea4`.
 Verbatim; nothing needed redaction.
+
+## logs/ (2026-11-18, OpenWrt 25.12.6, #192)
+- logs/logread.txt: `logread` (GET-only) after the 0.1.0 install, firstboot plus a day of uptime; then, in file order, at most 3 lines per (facility.level, program) were kept so every line shape appears once without the repetitive bulk (AdGuard probe errors, odhcpd RA warnings). Lines carrying a Tailscale login URL were dropped. Placeholders: the uplink SSID → `HomeUplink`, its BSSID → `REDACTED-BSSID`, the Tailscale `LogID` → `REDACTED`, a DHCPACK client hostname → `REDACTED-HOST`. Every kept line is otherwise verbatim, including the empty program in `user.notice : ...`, programs without a pid (`kernel:`, `netifd:`, `hostapd:`) and the kernel uptime brackets.

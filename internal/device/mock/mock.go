@@ -27,6 +27,8 @@ type Device struct {
 	// FactoryResets counts scheduled wipes; FactoryResetErr makes scheduling fail.
 	FactoryResets   int
 	FactoryResetErr error
+	// LogErr makes ReadSystemLog fail.
+	LogErr error
 	// AuthorizedKeysErr makes authorized_keys reads and writes fail.
 	AuthorizedKeysErr error
 	authorizedKeys    []byte

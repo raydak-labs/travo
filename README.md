@@ -24,6 +24,7 @@ The **WiFi** page summarizes configured radios, uplink STA and access points, an
 
 **System → Device settings** changes the router's hostname, time zone and NTP time servers.
 **System → SSH keys** lists, adds and removes the public keys that may log in to the router as root (dropbear `authorized_keys`); lines it does not manage stay untouched.
+**System → System log** shows the router's log (newest first) with a level and text filter.
 Use **System → Download backup** to save the router configuration as `travo-config.tar.gz`.
 Use **System → Restart router** to restart the router after confirming; the page reconnects when it is back.
 

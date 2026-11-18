@@ -206,6 +206,13 @@ async function logout() {
 
   <PageHost load={sshKeysCard} />
 
+  <Card title={m.logs_title()}>
+    <p class="text-muted-foreground">{m.logs_intro()}</p>
+    <div class="mt-3">
+      <Button variant="outline" href={href('system-logs')}>{m.logs_open()}</Button>
+    </div>
+  </Card>
+
   <Card title={m.reboot_title()}>
     <p class="text-muted-foreground">{m.reboot_confirm()}</p>
     <div>

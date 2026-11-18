@@ -305,6 +305,29 @@ export type List = {
     selected_id: string | null;
 };
 
+export type LogEntry = {
+    facility: string;
+    /**
+     * emerg, alert, crit, err, warn, notice, info, debug; empty when unknown
+     */
+    level: string;
+    message: string;
+    pid?: number;
+    program: string;
+    /**
+     * Router-local time, 2006-01-02T15:04:05; empty when the line did not parse
+     */
+    time: string;
+};
+
+export type LogPage = {
+    entries: Array<LogEntry>;
+    /**
+     * Older matching lines exist beyond the limit
+     */
+    truncated: boolean;
+};
+
 export type LoginInputBody = {
     /**
      * Root password
@@ -1763,6 +1786,52 @@ export type GetSystemInfoResponses = {
 };
 
 export type GetSystemInfoResponse = GetSystemInfoResponses[keyof GetSystemInfoResponses];
+
+export type GetSystemLogData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Newest matching lines to return
+         */
+        lines?: number;
+        /**
+         * Keep this level and more severe ones; omit for all
+         */
+        level?: 'emerg' | 'alert' | 'crit' | 'err' | 'warn' | 'notice' | 'info' | 'debug';
+        /**
+         * Case-insensitive text in the program or message
+         */
+        filter?: string;
+    };
+    url: '/api/v1/system/logs';
+};
+
+export type GetSystemLogErrors = {
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetSystemLogError = GetSystemLogErrors[keyof GetSystemLogErrors];
+
+export type GetSystemLogResponses = {
+    /**
+     * OK
+     */
+    200: LogPage;
+};
+
+export type GetSystemLogResponse = GetSystemLogResponses[keyof GetSystemLogResponses];
 
 export type PostSystemRebootData = {
     body: RebootInputBody;

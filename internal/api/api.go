@@ -131,6 +131,8 @@ type Deps struct {
 	SSHKeys SSHKeys
 	// FactoryReset wipes the router; nil answers 503.
 	FactoryReset FactoryResetter
+	// SystemLog reads logread; nil answers 503.
+	SystemLog SystemLog
 	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
 	USBTether USBTether
 	// SystemSettings is hostname, time zone and NTP; nil answers 503.
@@ -224,6 +226,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerSystem(a)
 	s.registerSystemSettings(a)
 	s.registerSSHKeys(a)
+	s.registerSystemLog(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
 	s.registerVPNProfiles(a)

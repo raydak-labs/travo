@@ -632,5 +632,17 @@
   "tailscale_err_exit_conflict": "Turn off the WireGuard tunnel before using an exit node.",
   "tailscale_err_exit_offline": "No Internet through that exit node. The previous setting is back.",
   "tailscale_err_no_lan": "The LAN has no IPv4 network to share.",
-  "tailscale_err_failed": "The change failed. See the system log."
+  "tailscale_err_failed": "The change failed. See the system log.",
+  "logs_title": "System log",
+  "logs_intro": "The router's log since the last restart (kept in memory, newest first). It may show LAN addresses and device names.",
+  "logs_open": "Open system log",
+  "logs_level": "Level",
+  "logs_level_all": "All levels",
+  "logs_level_at_least": "{level} and worse",
+  "logs_filter": "Contains",
+  "logs_filter_hint": "For example dropbear or wwan",
+  "logs_refresh": "Show",
+  "logs_empty": "No log lines match.",
+  "logs_truncated": "Showing the newest {count} matching lines.",
+  "logs_unavailable": "The system log is unavailable"
 }

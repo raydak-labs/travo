@@ -262,6 +262,8 @@ $effect(() => {
             <PageHost load={pages.systemTokens} />
           {:else if shown === 'vpn-tailscale'}
             <PageHost load={pages.vpnTailscale} />
+          {:else if shown === 'system-logs'}
+            <PageHost load={pages.systemLogs} />
           {:else if shown === 'login'}
             <PageHost load={pages.login} />
           {:else if shown === 'setup'}

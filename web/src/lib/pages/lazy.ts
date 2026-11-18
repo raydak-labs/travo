@@ -30,6 +30,7 @@ export const pages = {
   system: lazyPage(() => import('./System.svelte')),
   systemTokens: lazyPage(() => import('./SystemTokens.svelte')),
   vpnTailscale: lazyPage(() => import('./Tailscale.svelte')),
+  systemLogs: lazyPage(() => import('./SystemLogs.svelte')),
   login: lazyPage(() => import('./Login.svelte')),
   setup: lazyPage(() => import('./Setup.svelte')),
   notYet: lazyPage(() => import('./NotYet.svelte')),

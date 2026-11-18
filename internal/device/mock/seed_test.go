@@ -18,6 +18,7 @@ func TestSeedCopiesMatchCaptures(t *testing.T) {
 		"iwinfo-scan-phy1-ap0.json":  "wifi-scan/no-sta/iwinfo-scan-phy1-ap0.json",
 		"uci-export-dhcp.txt":        "uci-export-dhcp.txt",
 		"uci-export-system.txt":      "uci-export-system.txt",
+		"logread.txt":                "logs/logread.txt",
 		"uci-show-wireless.txt":      "wifi-scan/connected/uci-show-wireless.txt",
 	} {
 		orig, err := os.ReadFile("../../../testdata/device/axt1800-25.12.6/" + capture)
