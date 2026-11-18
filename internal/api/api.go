@@ -149,6 +149,8 @@ type Deps struct {
 	Clients Clients
 	// NetworkView is the read-only interface and zone view; nil answers 503 network_unavailable.
 	NetworkView NetworkView
+	// InterfaceRestart restarts uplinks; nil answers 503 interface_restart_unavailable.
+	InterfaceRestart InterfaceRestarter
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -240,6 +242,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerSystemLog(a)
 	s.registerClients(a)
 	s.registerNetworkView(a)
+	s.registerInterfaceRestart(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
 	s.registerVPNProfiles(a)

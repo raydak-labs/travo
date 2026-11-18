@@ -405,6 +405,13 @@ export type Interface = {
     zone?: string;
 };
 
+export type InterfaceRestartInputBody = {
+    /**
+     * Restart the WiFi uplink even if the caller's access point shares its radio
+     */
+    acknowledge_lockout?: boolean;
+};
+
 export type JoinWiFiInputBody = {
     /**
      * Join even if moving the access point may disconnect the caller
@@ -512,6 +519,18 @@ export type NtpBody = {
 
 export type OkBody = {
     status: 'ok';
+};
+
+export type Outcome = {
+    /**
+     * Seconds from the restart until up, or the whole wait
+     */
+    elapsed_seconds: number;
+    interface: string;
+    /**
+     * The interface came up again within the wait
+     */
+    up: boolean;
 };
 
 export type PasswordInputBody = {
@@ -2236,6 +2255,56 @@ export type ListNetworkInterfacesResponses = {
 };
 
 export type ListNetworkInterfacesResponse = ListNetworkInterfacesResponses[keyof ListNetworkInterfacesResponses];
+
+export type RestartNetworkInterfaceData = {
+    body?: InterfaceRestartInputBody;
+    path: {
+        /**
+         * Uplink interface
+         */
+        name: 'wan' | 'wwan' | 'usbtether';
+    };
+    query?: never;
+    url: '/api/v1/network/interfaces/{name}/restart';
+};
+
+export type RestartNetworkInterfaceErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type RestartNetworkInterfaceError = RestartNetworkInterfaceErrors[keyof RestartNetworkInterfaceErrors];
+
+export type RestartNetworkInterfaceResponses = {
+    /**
+     * OK
+     */
+    200: Outcome;
+};
+
+export type RestartNetworkInterfaceResponse = RestartNetworkInterfaceResponses[keyof RestartNetworkInterfaceResponses];
 
 export type GetSetupStateData = {
     body?: never;

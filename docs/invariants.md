@@ -19,6 +19,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Automated self-confirm exceptions (each confirms only after its probe passes, never on a timer alone):
   1. WiFi schedule: a saved schedule rule toggles an AP's `disabled` flag through the AP transaction and confirms after the AP probe passes; lockout-risky rules need the acknowledgement saved with the rule ([adr/0027](adr/0027-wifi-schedule.md)).
 - Apply paths write UCI only. Never `wifi`, `wifi up/down/reload`, in any path. Auto-reconnect uses `ifup wwan` only. It is capped at 5 attempts, guarded, persists its counter, writes no UCI and never switches saved uplinks ([ADR 0014](adr/0014-capped-uplink-reconnect.md)).
+- Manual uplink restart (`POST /api/v1/network/interfaces/{name}/restart`) runs `ifup <name>` for `wan`, `wwan`, `usbtether` only, never `lan`/guest and never a stop. It writes no UCI, holds `interface-restart-in-progress` until the interface reports up with a fresh uptime or 30 s pass, refuses while a transaction or any other guard is held, and keeps the guard if `ifup` fails (the next explicit restart clears it). `wwan` drops every AP on the STA's radio (device-facts §2), so it is lockout-checked (§2) when one shares it.
 
 ## 2. Lockout safety
 

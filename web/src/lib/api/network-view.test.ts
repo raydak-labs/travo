@@ -1,9 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listFirewallZones, listNetworkInterfaces } from './gen';
-import { fetchInterfaces, fetchZones, interfaceAddresses, interfaceStatus } from './network-view';
+import { listFirewallZones, listNetworkInterfaces, restartNetworkInterface } from './gen';
+import {
+  fetchInterfaces,
+  fetchZones,
+  interfaceAddresses,
+  interfaceStatus,
+  restartable,
+  restartUplink,
+} from './network-view';
 
 vi.mock('./client', () => ({ client: {} }));
-vi.mock('./gen', () => ({ listNetworkInterfaces: vi.fn(), listFirewallZones: vi.fn() }));
+vi.mock('./gen', () => ({
+  listNetworkInterfaces: vi.fn(),
+  listFirewallZones: vi.fn(),
+  restartNetworkInterface: vi.fn(),
+}));
 
 afterEach(() => vi.resetAllMocks());
 
@@ -12,6 +23,14 @@ const reply = (data: unknown, status = 200) =>
     data,
     request: new Request('http://localhost'),
     response: new Response(null, { status }),
+  }) as never;
+
+const refused = (code: string) =>
+  ({
+    data: undefined,
+    error: { code },
+    request: new Request('http://localhost'),
+    response: new Response(null, { status: 409 }),
   }) as never;
 
 describe('network view', () => {
@@ -40,5 +59,31 @@ describe('network view', () => {
     await expect(fetchInterfaces()).rejects.toMatchObject({ status: 503 });
     vi.mocked(listFirewallZones).mockResolvedValueOnce(reply(undefined, 503));
     await expect(fetchZones()).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('offers restart for uplinks only, never wan6, lan or guest', () => {
+    expect(['wan', 'wan6', 'wwan', 'usbtether', 'lan', 'guest'].filter(restartable)).toEqual([
+      'wan',
+      'wwan',
+      'usbtether',
+    ]);
+  });
+
+  it('restarts with the acknowledgement only when asked and separates a lockout refusal', async () => {
+    const restart = vi.mocked(restartNetworkInterface);
+    restart.mockResolvedValueOnce(reply({ interface: 'wwan', up: false, elapsed_seconds: 30 }));
+    await expect(restartUplink('wwan')).resolves.toEqual({ up: false });
+    expect(restart.mock.calls[0]?.[0]?.body).toBeUndefined();
+    restart.mockResolvedValueOnce(refused('wifi_lockout_risk'));
+    await expect(restartUplink('wwan', true)).resolves.toEqual({ lockout: true });
+    expect(restart.mock.calls[1]?.[0]?.body).toEqual({ acknowledge_lockout: true });
+    restart.mockResolvedValueOnce(refused('transaction_pending'));
+    await expect(restartUplink('wan')).resolves.toEqual({
+      error: 'A change is waiting for confirmation; confirm or roll it back first.',
+    });
+    restart.mockRejectedValueOnce(new Error('offline'));
+    await expect(restartUplink('wan')).resolves.toEqual({
+      error: 'The interface could not be restarted.',
+    });
   });
 });

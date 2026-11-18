@@ -32,6 +32,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/hook"
+	"github.com/blackdark-org/travo-greenfield/internal/ifrestart"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/netview"
 	"github.com/blackdark-org/travo-greenfield/internal/reboot"
@@ -277,6 +278,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	var wirelessAPs api.WiFiAPEditor
 	var wirelessGuest api.WiFiGuestEditor
 	var wirelessMAC api.WiFiMACEditor
+	var staLockout ifrestart.STALockout
 	if scanner, ok := deps.Device.(device.WirelessScanner); ok {
 		service := wifi.New(ctx, deps.Device, scanner)
 		wireless = service
@@ -287,7 +289,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		neighbours, hasNeighbours := deps.Device.(device.NeighbourReader)
 		if hasRoutes && hasKeys && hasLinks && hasNeighbours {
 			joined := service.WithJoin(wifi.JoinDeps{UCI: deps.Device, Ubus: deps.Device, Routes: routes, Links: links, Keys: keys, Neighbours: neighbours, Txns: deps.Txn})
-			wirelessJoin, uplink, wirelessAPs, wirelessGuest, wirelessMAC = joined, joined, joined, joined, joined
+			wirelessJoin, uplink, wirelessAPs, wirelessGuest, wirelessMAC, staLockout = joined, joined, joined, joined, joined, joined
 		}
 	}
 	savedUplinks := wifiprofiles.New(filepath.Join(deps.Paths.State, "wifi-profiles.json"), wirelessJoin, association)
@@ -393,6 +395,10 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	apiDeps.Clients = newClients(deps)
 	apiDeps.NetworkView = &netview.Service{UCI: deps.Device, Ubus: deps.Device}
+	if r, ok := deps.Device.(device.InterfaceRestarter); ok {
+		apiDeps.InterfaceRestart = &ifrestart.Service{Device: r, Ubus: deps.Device, Guards: deps.Guards, Lockout: staLockout,
+			Now: clock.Now, Sleep: ifrestart.SleepContext, Wait: ifrestart.DefaultWait, Poll: ifrestart.DefaultPoll}
+	}
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source
 	if listenTLS != "" {
