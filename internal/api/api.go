@@ -153,6 +153,8 @@ type Deps struct {
 	InterfaceRestart InterfaceRestarter
 	// Diagnostics runs ping/traceroute/lookup; nil answers 503 diagnostics_unavailable.
 	Diagnostics Diagnostics
+	// WakeOnLAN sends magic packets; nil answers 503 wol_unavailable.
+	WakeOnLAN WakeOnLAN
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -246,6 +248,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerNetworkView(a)
 	s.registerInterfaceRestart(a)
 	s.registerDiagnostics(a)
+	s.registerWakeOnLAN(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
 	s.registerVPNProfiles(a)

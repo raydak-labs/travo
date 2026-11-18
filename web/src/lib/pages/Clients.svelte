@@ -13,6 +13,7 @@ import {
   unreserve,
 } from '../api/clients';
 import { setClientBlocked } from '../api/gen';
+import { wake } from '../api/wol';
 import type { ClientEdit } from '../clients';
 import { connectionStatus } from '../clients';
 import { m } from '../paraglide/messages.js';
@@ -105,6 +106,15 @@ async function disconnect(c: LanClient) {
   refresh();
 }
 
+// Wake-on-LAN sends one packet and changes nothing: no confirm, no refresh.
+async function wakeUp(mac: string, name: string) {
+  busy = true;
+  const result = await wake(mac);
+  busy = false;
+  if ('error' in result) notify.error(result.error);
+  else notify.success(m.wol_sent({ target: name, interfaces: result.wake.interfaces.join(', ') }));
+}
+
 async function save(edit: ClientEdit): Promise<string | undefined> {
   const error = await runClientEdit(edit);
   refresh();
@@ -166,6 +176,11 @@ async function removeReservation(r: Reservation) {
                   <Button variant="outline" size="sm" type="button" disabled={busy}
                     onclick={() => disconnect(c)}>{m.clients_kick()}</Button>
                 {/if}
+                {#if c.connection === 'offline'}
+                  <Button variant="outline" size="sm" type="button" disabled={busy}
+                    aria-label={m.clients_wake_name({ name: clientName(c) })}
+                    onclick={() => wakeUp(c.mac, clientName(c))}>{m.clients_wake()}</Button>
+                {/if}
               </div>
             </li>
           {/each}
@@ -186,6 +201,9 @@ async function removeReservation(r: Reservation) {
               <span class="break-all font-medium">{reservationName(r)}</span>
               <span class="break-all font-mono text-sm text-muted-foreground">{r.ip ? m.clients_details({ ip: r.ip, mac: r.mac }) : r.mac}</span>
               <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy}
+                aria-label={m.clients_wake_name({ name: reservationName(r) })}
+                onclick={() => wakeUp(r.mac, reservationName(r))}>{m.clients_wake()}</Button>
+              <Button variant="outline" size="sm" type="button" disabled={busy}
                 aria-label={m.clients_reservation_remove_name({ name: reservationName(r) })}
                 onclick={() => removeReservation(r)}>{m.clients_reservation_remove()}</Button>
             </li>

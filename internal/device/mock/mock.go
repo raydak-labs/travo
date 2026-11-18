@@ -36,8 +36,11 @@ type Device struct {
 	AuthorizedKeysErr error
 	authorizedKeys    []byte
 	// CrontabErr makes crontab reads and writes fail.
-	CrontabErr   error
-	crontab      string
+	CrontabErr error
+	crontab    string
+	// Wakes records SendWake calls; WakeErr makes it fail. The mock never sends a packet.
+	Wakes        []Wake
+	WakeErr      error
 	mu           sync.Mutex
 	bootID       string
 	bootSequence int

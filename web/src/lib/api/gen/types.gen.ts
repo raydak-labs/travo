@@ -1050,6 +1050,17 @@ export type VpnTunnelInputBody = {
     enabled: boolean | null;
 };
 
+export type Wake = {
+    /**
+     * netifd interfaces the magic packet was broadcast on
+     */
+    interfaces: Array<string>;
+    /**
+     * Target MAC, lower case with colons
+     */
+    mac: string;
+};
+
 export type WiFiProfileList = {
     connected_id: string | null;
     profiles: Array<WiFiProfileSummary>;
@@ -1130,6 +1141,17 @@ export type WifiApsOutputBody = {
 
 export type WifiProfileOrderInputBody = {
     ids: Array<string>;
+};
+
+export type WolInputBody = {
+    /**
+     * netifd LAN interface (lan, guest); all up LAN bridges when absent
+     */
+    interface?: string;
+    /**
+     * Unicast MAC, colon or hyphen separated
+     */
+    mac: string;
 };
 
 export type Zone = {
@@ -2376,6 +2398,51 @@ export type RestartNetworkInterfaceResponses = {
 };
 
 export type RestartNetworkInterfaceResponse = RestartNetworkInterfaceResponses[keyof RestartNetworkInterfaceResponses];
+
+export type WakeOnLanData = {
+    body: WolInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/wol';
+};
+
+export type WakeOnLanErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Too Many Requests
+     */
+    429: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type WakeOnLanError = WakeOnLanErrors[keyof WakeOnLanErrors];
+
+export type WakeOnLanResponses = {
+    /**
+     * OK
+     */
+    200: Wake;
+};
+
+export type WakeOnLanResponse = WakeOnLanResponses[keyof WakeOnLanResponses];
 
 export type GetSetupStateData = {
     body?: never;

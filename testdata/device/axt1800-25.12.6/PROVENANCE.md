@@ -89,5 +89,8 @@ Leases, neighbours, `network.lan` and hostapd method list, plus staged-only (rev
 ## diagnostics/ (2026-11-19, #236)
 BusyBox ping, traceroute and nslookup output with exit codes. See `diagnostics/PROVENANCE.md`.
 
+## wol/ (2026-11-19, #247)
+No Wake-on-LAN tool or package on the image. See `wol/PROVENANCE.md`.
+
 ## network/ (2026-11-18, #237)
 Interface dump with the guest interface and uptime, and `uci export firewall` with anonymous and named zones. See `network/PROVENANCE.md`.

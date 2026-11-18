@@ -8,6 +8,7 @@ const usbTether = lazyPage(() => import('./USBTetherCard.svelte'));
 const failover = lazyPage(() => import('./FailoverCard.svelte'));
 const interfaces = lazyPage(() => import('./NetworkInterfacesCard.svelte'));
 const diagnostics = lazyPage(() => import('./DiagnosticsCard.svelte'));
+const wakeOnLan = lazyPage(() => import('./WakeOnLanCard.svelte'));
 </script>
 
 <div class="grid gap-4">
@@ -16,4 +17,5 @@ const diagnostics = lazyPage(() => import('./DiagnosticsCard.svelte'));
   <PageHost load={failover} />
   <PageHost load={interfaces} />
   <PageHost load={diagnostics} />
+  <PageHost load={wakeOnLan} />
 </div>

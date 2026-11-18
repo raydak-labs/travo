@@ -56,6 +56,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/wifi"
 	"github.com/blackdark-org/travo-greenfield/internal/wifiprofiles"
 	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
+	"github.com/blackdark-org/travo-greenfield/internal/wol"
 	"github.com/blackdark-org/travo-greenfield/packaging"
 )
 
@@ -402,6 +403,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	if d, ok := deps.Device.(device.Diagnoser); ok {
 		apiDeps.Diagnostics = &diagnostics.Service{Device: d}
+	}
+	if w, ok := deps.Device.(device.WakeSender); ok {
+		apiDeps.WakeOnLAN = &wol.Service{Ubus: deps.Device, Sender: w}
 	}
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source
