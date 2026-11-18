@@ -51,6 +51,8 @@ type dashboardEventService struct {
 	mu   sync.Mutex
 	subs map[*dashboardSubscription]struct{}
 	run  *dashboardProducerRun
+	// latest holds the current run's last event per source; a late subscriber starts with it.
+	latest []pendingDashboardEvent
 }
 
 func newDashboardEventService(daemon context.Context, limit int, sources []dashboardEventSource) *dashboardEventService {
@@ -72,16 +74,32 @@ func (s *dashboardEventService) subscribe() (*dashboardSubscription, error) {
 	sub := &dashboardSubscription{service: s, wake: make(chan struct{}, 1), slots: make([]pendingDashboardEvent, len(s.sources))}
 	s.subs[sub] = struct{}{}
 	if (s.run == nil || s.run.ctx.Err() != nil) && len(s.sources) > 0 {
-		previous := s.run
-		run := &dashboardProducerRun{}
-		run.ctx, run.cancel = context.WithCancel(s.daemon)
-		s.run = run
-		for i, source := range s.sources {
-			run.wg.Add(1)
-			go s.produce(run, previous, i, source)
+		s.startRun()
+		return sub, nil
+	}
+	// Joining a running stream: replay the last value per source instead of waiting a tick.
+	copy(sub.slots, s.latest)
+	for _, slot := range sub.slots {
+		if slot.set {
+			sub.wake <- struct{}{}
+			break
 		}
 	}
 	return sub, nil
+}
+
+// startRun starts one producer per source; a stopped run's values are not replayed.
+// The caller holds s.mu.
+func (s *dashboardEventService) startRun() {
+	previous := s.run
+	run := &dashboardProducerRun{}
+	run.ctx, run.cancel = context.WithCancel(s.daemon)
+	s.run = run
+	s.latest = make([]pendingDashboardEvent, len(s.sources))
+	for i, source := range s.sources {
+		run.wg.Add(1)
+		go s.produce(run, previous, i, source)
+	}
 }
 
 func (s *dashboardEventService) produce(run, previous *dashboardProducerRun, index int, source dashboardEventSource) {
@@ -121,6 +139,7 @@ func (s *dashboardEventService) publish(run *dashboardProducerRun, index int, ev
 	if s.run != run || run.ctx.Err() != nil {
 		return
 	}
+	s.latest[index] = pendingDashboardEvent{event: event, set: true}
 	for sub := range s.subs {
 		sub.slots[index] = pendingDashboardEvent{event: event, set: true}
 		select {
