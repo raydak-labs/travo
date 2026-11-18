@@ -135,6 +135,8 @@ type Deps struct {
 	SystemLog SystemLog
 	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
 	USBTether USBTether
+	// Alerts are derived operator alerts; nil answers 503.
+	Alerts Alerts
 	// SystemSettings is hostname, time zone and NTP; nil answers 503.
 	SystemSettings SystemSettings
 	// Failover is nil without package and service ports; it answers 503 failover_unavailable.
@@ -225,6 +227,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerTxn(a)
 	s.registerSystem(a)
 	s.registerSystemSettings(a)
+	s.registerSystemAlerts(a)
 	s.registerSSHKeys(a)
 	s.registerSystemLog(a)
 	s.registerReboot(a)

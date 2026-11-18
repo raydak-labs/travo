@@ -23,8 +23,12 @@ The dashboard shows the active uplink, carrier, and internet reachability separa
 The **WiFi** page summarizes configured radios, uplink STA and access points, and its **Scan** button lists nearby networks without changing live state.
 
 **System → Device settings** changes the router's hostname, time zone and NTP time servers.
+
 **System → SSH keys** lists, adds and removes the public keys that may log in to the router as root (dropbear `authorized_keys`); lines it does not manage stay untouched.
 **System → System log** shows the router's log (newest first) with a level and text filter.
+
+**Alerts**: a banner above every page names conditions that need you (a guard left behind by an interrupted operation, settings kept in memory only, AdGuard Home bypassed after it stopped answering) and links to the page that fixes them; `GET /api/v1/system/alerts` also lists warnings such as low flash space or an exhausted uplink reconnect.
+
 Use **System → Download backup** to save the router configuration as `travo-config.tar.gz`.
 Use **System → Restart router** to restart the router after confirming; the page reconnects when it is back.
 

@@ -644,5 +644,13 @@
   "logs_refresh": "Show",
   "logs_empty": "No log lines match.",
   "logs_truncated": "Showing the newest {count} matching lines.",
-  "logs_unavailable": "The system log is unavailable"
+  "logs_unavailable": "The system log is unavailable",
+  "alerts_unavailable": "Alerts are unavailable",
+  "alerts_region": "Alerts",
+  "alert_open": "Open",
+  "alert_stale_guard": "An interrupted operation ({name}) left its guard behind. The feature stays off until you retry it on its page.",
+  "alert_overlay_low": "Flash storage is almost full (under 20 MB free). Settings may fail to save.",
+  "alert_persistence_degraded": "Settings are kept in memory only: the flash overlay is unavailable, so every change is lost on restart.",
+  "alert_adguard_fail_open": "AdGuard Home stopped answering. DNS bypasses it until you turn it back on.",
+  "alert_uplink_reconnect_exhausted": "Automatic uplink reconnect gave up after 5 attempts. Reconnect on the WiFi page."
 }

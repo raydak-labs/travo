@@ -1,4 +1,5 @@
 import type {
+  AlertList,
   DashboardConnectivity,
   SystemInfoBody,
   TailscaleStatus,
@@ -6,15 +7,27 @@ import type {
 } from './api/gen';
 import type { LoadStatus } from './ui/loader.svelte';
 
-export const SOURCE_NAMES = ['connectivity', 'resources', 'throughput', 'tailscale'] as const;
+export const SOURCE_NAMES = [
+  'connectivity',
+  'resources',
+  'throughput',
+  'tailscale',
+  'alerts',
+] as const;
 export type DashboardSourceName = (typeof SOURCE_NAMES)[number];
-export type SourceData = DashboardConnectivity | SystemInfoBody | ThroughputBody | TailscaleStatus;
+export type SourceData =
+  | DashboardConnectivity
+  | SystemInfoBody
+  | ThroughputBody
+  | TailscaleStatus
+  | AlertList;
 
 export const sourceLabels: Record<DashboardSourceName, string> = {
   connectivity: 'Connectivity',
   resources: 'Resources',
   throughput: 'Throughput',
   tailscale: 'Tailscale',
+  alerts: 'Alerts',
 };
 
 /** What one SSE event means for the dashboard state. */

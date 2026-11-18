@@ -97,6 +97,27 @@ export type AdguardToggleInputBody = {
     enabled: boolean | null;
 };
 
+export type Alert = {
+    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted';
+    /**
+     * Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress
+     */
+    id: string;
+    severity: 'warning' | 'danger';
+    /**
+     * When the condition started; null when unknown
+     */
+    since: string | null;
+    /**
+     * What the alert is about, e.g. the guard name
+     */
+    subject?: string;
+};
+
+export type AlertList = {
+    alerts: Array<Alert>;
+};
+
 export type ApiError = {
     /**
      * Stable error code
@@ -1687,6 +1708,35 @@ export type PostSetupPasswordResponses = {
 };
 
 export type PostSetupPasswordResponse = PostSetupPasswordResponses[keyof PostSetupPasswordResponses];
+
+export type GetSystemAlertsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/alerts';
+};
+
+export type GetSystemAlertsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetSystemAlertsError = GetSystemAlertsErrors[keyof GetSystemAlertsErrors];
+
+export type GetSystemAlertsResponses = {
+    /**
+     * OK
+     */
+    200: AlertList;
+};
+
+export type GetSystemAlertsResponse = GetSystemAlertsResponses[keyof GetSystemAlertsResponses];
 
 export type GetSystemBackupData = {
     body?: never;

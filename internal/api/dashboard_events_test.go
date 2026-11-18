@@ -249,7 +249,7 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 	carrier := true
 	snapshot := &connectivitySnapshot{ActiveInterface: &link, Carrier: &carrier, Internet: connectivity.Online}
 	rates := &throughputSnapshot{ready: true, rates: []throughput.Rate{{Name: "phy0-sta0"}}}
-	e := newEnvWithDashboard(t, nil, rates, snapshot)
+	e := newEnvWithDashboard(t, nil, rates, snapshot, func(d *Deps) { d.Alerts = fakeAlerts{} })
 	mock.SeedSystem(e.dev)
 	if rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/events"}); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("events before login: %d %s", rec.Code, rec.Body)
@@ -271,7 +271,7 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 	}
 
 	events := map[string]map[string]any{}
-	for len(events) < 3 {
+	for len(events) < 4 {
 		frame := readSSEFrame(t, reader)
 		name, data := parseSSEEvent(t, frame)
 		events[name] = data
@@ -283,6 +283,7 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 		{name: "connectivity", path: "/api/v1/dashboard/connectivity"},
 		{name: "resources", path: "/api/v1/system/info"},
 		{name: "throughput", path: "/api/v1/dashboard/throughput"},
+		{name: "alerts", path: "/api/v1/system/alerts"},
 	} {
 		rec := e.do(req{method: http.MethodGet, path: tc.path, cookie: cookie})
 		var want map[string]any
@@ -296,7 +297,7 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 }
 
 func TestDashboardEventsSourceUnavailable(t *testing.T) {
-	e := newEnv(t) // resources and throughput are unavailable
+	e := newEnv(t) // resources, throughput and alerts are unavailable
 	cookie, _ := e.login()
 	ts := httptest.NewServer(e.h)
 	defer ts.Close()
@@ -304,7 +305,7 @@ func TestDashboardEventsSourceUnavailable(t *testing.T) {
 	reader := bufio.NewReader(resp.Body)
 	_ = readSSEFrame(t, reader)
 	unavailable := map[string]bool{}
-	for len(unavailable) < 2 {
+	for len(unavailable) < 3 {
 		name, data := parseSSEEvent(t, readSSEFrame(t, reader))
 		if name != "source_unavailable" {
 			continue
@@ -313,7 +314,7 @@ func TestDashboardEventsSourceUnavailable(t *testing.T) {
 		unavailable[source] = true
 	}
 	resp.Body.Close()
-	if !unavailable["resources"] || !unavailable["throughput"] {
+	if !unavailable["resources"] || !unavailable["throughput"] || !unavailable["alerts"] {
 		t.Fatalf("source_unavailable events = %v", unavailable)
 	}
 }

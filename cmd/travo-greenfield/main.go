@@ -324,8 +324,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		}
 	}
 	var adguardSvc api.AdGuard
-	if svc := startAdGuard(ctx, deps, dnsLayers, workers, connection); svc != nil {
-		adguardSvc = svc
+	aghService := startAdGuard(ctx, deps, dnsLayers, workers, connection)
+	if aghService != nil {
+		adguardSvc = aghService
 	}
 	var tailscaleSvc api.Tailscale
 	if svc := startTailscale(deps, dnsLayers, workers, connection, vpnStatus); svc != nil {
@@ -370,6 +371,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		UI:        uiHandler(staticDir),
 	}
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
+	apiDeps.Alerts = newAlerts(deps, aghService, reconnect)
 	if f, ok := deps.Device.(sshkeys.File); ok {
 		apiDeps.SSHKeys = &sshkeys.Service{File: f}
 	}

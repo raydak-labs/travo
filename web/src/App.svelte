@@ -22,6 +22,7 @@ import { guard, href, type Route, section } from './lib/router';
 import { router } from './lib/router.svelte';
 import { session } from './lib/session.svelte';
 import { theme } from './lib/theme.svelte';
+import AlertBanner from './lib/ui/AlertBanner.svelte';
 import LoadState from './lib/ui/LoadState.svelte';
 import type { LoadStatus } from './lib/ui/loader.svelte';
 
@@ -241,6 +242,9 @@ $effect(() => {
 
     <main class="flex-1 overflow-y-auto p-4">
       <div class="mx-auto max-w-3xl">
+        {#if authenticated}
+          <AlertBanner list={dashboardEvents.alerts.data} />
+        {/if}
         {#key shown}
           {#if session.state === 'unknown'}
             <LoadState status={bootstrapStatus} retry={() => session.bootstrap()}>

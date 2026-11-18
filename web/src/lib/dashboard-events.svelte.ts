@@ -1,6 +1,8 @@
+import { fetchAlerts } from './api/alerts';
 import { scopedAPIClient } from './api/client';
 import { fetchConnectivity } from './api/connectivity';
 import type {
+  AlertList,
   DashboardConnectivity,
   SystemInfoBody,
   TailscaleStatus,
@@ -36,6 +38,7 @@ const readers: Record<DashboardSourceName, Reader> = {
   resources: fetchSystemInfo,
   throughput: fetchThroughput,
   tailscale: fetchTailscale,
+  alerts: fetchAlerts,
 };
 
 type Ownership = {
@@ -72,11 +75,13 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
   const resources = $state(freshState());
   const throughput = $state(freshState());
   const tailscale = $state(freshState());
+  const alerts = $state(freshState());
   const states: Record<DashboardSourceName, SourceState> = {
     connectivity,
     resources,
     throughput,
     tailscale,
+    alerts,
   };
   let streaming = $state(false);
   let active: Ownership | undefined;
@@ -229,8 +234,14 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
       controller: new AbortController(),
       client: clientFactory(),
       connected: false,
-      inFlight: { connectivity: false, resources: false, throughput: false, tailscale: false },
-      versions: { connectivity: 0, resources: 0, throughput: 0, tailscale: 0 },
+      inFlight: {
+        connectivity: false,
+        resources: false,
+        throughput: false,
+        tailscale: false,
+        alerts: false,
+      },
+      versions: { connectivity: 0, resources: 0, throughput: 0, tailscale: 0, alerts: 0 },
     };
     active = owner;
     startFallback(owner);
@@ -243,6 +254,7 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
     resources: view<SystemInfoBody>('resources'),
     throughput: view<ThroughputBody>('throughput'),
     tailscale: view<TailscaleStatus>('tailscale'),
+    alerts: view<AlertList>('alerts'),
     get streaming(): boolean {
       return streaming;
     },

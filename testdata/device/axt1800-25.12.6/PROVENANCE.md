@@ -79,3 +79,6 @@ Verbatim; nothing needed redaction.
 
 ## logs/ (2026-11-18, OpenWrt 25.12.6, #192)
 - logs/logread.txt: `logread` (GET-only) after the 0.1.0 install, firstboot plus a day of uptime; then, in file order, at most 3 lines per (facility.level, program) were kept so every line shape appears once without the repetitive bulk (AdGuard probe errors, odhcpd RA warnings). Lines carrying a Tailscale login URL were dropped. Placeholders: the uplink SSID → `HomeUplink`, its BSSID → `REDACTED-BSSID`, the Tailscale `LogID` → `REDACTED`, a DHCPACK client hostname → `REDACTED-HOST`. Every kept line is otherwise verbatim, including the empty program in `user.notice : ...`, programs without a pid (`kernel:`, `netifd:`, `hostapd:`) and the kernel uptime brackets.
+
+## system/ (2026-11-18, OpenWrt 25.12.6, #196)
+- system/proc-mounts.txt: `cat /proc/mounts` (GET-only) on the running router: ubifs `/overlay` (`/dev/ubi0_2`, rw) under the overlayfs root. Verbatim; nothing needed redaction. Alert tests derive the degraded shapes (tmpfs overlay, read-only overlay) by replacing only that line's file system type or `rw` flag.
