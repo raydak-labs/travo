@@ -154,6 +154,22 @@ describe('Dashboard connectivity', () => {
     expect(link).toContain('rel="noopener noreferrer"');
   });
 
+  it('offers the automatic login only while a portal is detected', () => {
+    const snapshot = {
+      active_interface: 'phy0-sta0',
+      carrier: true,
+      internet: 'captive',
+      portal_url: 'http://portal.example/login',
+    } as const;
+    expect(dashboard({ state: 'ready' }, snapshot)).toContain('Try automatic login');
+    const offline = dashboard(
+      { state: 'ready' },
+      { ...snapshot, internet: 'offline', portal_url: null },
+    );
+    expect(offline).toContain('Hotel WiFi login');
+    expect(offline).not.toContain('Try automatic login');
+  });
+
   it('offers the DNS bypass when connected but offline, and hides it when online', () => {
     const offline = dashboard(
       { state: 'ready' },

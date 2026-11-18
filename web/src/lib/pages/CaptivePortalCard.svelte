@@ -1,12 +1,13 @@
 <script lang="ts">
 import Button from '$lib/components/ui/button/button.svelte';
 import {
+  autoAcceptCaptivePortal,
   type DashboardConnectivity,
   enableCaptiveDnsBypass,
   renewCaptiveDhcp,
   restoreCaptiveDns,
 } from '../api/gen';
-import { captiveError, formatCountdown, renewError } from '../captive';
+import { acceptError, acceptMessage, captiveError, formatCountdown, renewError } from '../captive';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
@@ -33,6 +34,26 @@ async function run(
     else notify.error(describe(response.error?.code));
   } catch {
     notify.error(describe(undefined));
+  } finally {
+    busy = false;
+    refresh();
+  }
+}
+
+// The walk can take up to 30 s: one toast turns from progress into its result.
+async function autoLogin() {
+  if (busy) return;
+  busy = true;
+  const id = 'captive-accept';
+  notify.progress(m.captive_accept_running(), id);
+  try {
+    const response = await autoAcceptCaptivePortal();
+    if (response.data) {
+      const result = acceptMessage(response.data.outcome);
+      notify[result.kind](result.text, id);
+    } else notify.error(acceptError(response.error?.code), id);
+  } catch {
+    notify.error(acceptError(undefined), id);
   } finally {
     busy = false;
     refresh();
@@ -73,8 +94,11 @@ async function bypass() {
       <Status kind="warn">{m.captive_renew_blocked()}</Status>
     {/if}
     <div class="flex flex-wrap gap-2">
+      {#if info.internet === 'captive'}
+        <Button size="sm" type="button" disabled={busy} onclick={autoLogin}>{m.captive_accept()}</Button>
+      {/if}
       {#if info.portal_url}
-        <Button size="sm" href={info.portal_url} target="_blank" rel="noopener noreferrer">
+        <Button size="sm" variant="outline" href={info.portal_url} target="_blank" rel="noopener noreferrer">
           {m.captive_open_login()}
         </Button>
       {/if}

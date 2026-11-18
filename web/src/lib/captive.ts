@@ -1,4 +1,4 @@
-import type { DashboardConnectivity } from './api/gen';
+import type { AcceptResult, DashboardConnectivity } from './api/gen';
 import { m } from './paraglide/messages.js';
 
 /** The captive card shows only when it offers an action (invariants §12). */
@@ -43,5 +43,33 @@ export function renewError(code: string | undefined): string {
       return m.captive_error_renew_unproven();
     default:
       return m.captive_error_renew_failed();
+  }
+}
+
+/** How the card reports a finished automatic login: every outcome is an expected answer. */
+export function acceptMessage(outcome: AcceptResult['outcome']): {
+  kind: 'success' | 'info' | 'error';
+  text: string;
+} {
+  switch (outcome) {
+    case 'online':
+      return { kind: 'success', text: m.captive_accept_online() };
+    case 'needs_user':
+      return { kind: 'info', text: m.captive_accept_needs_user() };
+    case 'no_form':
+      return { kind: 'error', text: m.captive_accept_no_form() };
+    default:
+      return { kind: 'error', text: m.captive_accept_failed() };
+  }
+}
+
+export function acceptError(code: string | undefined): string {
+  switch (code) {
+    case 'captive_accept_not_captive':
+      return m.captive_error_accept_not_captive();
+    case 'captive_accept_busy':
+      return m.captive_error_accept_busy();
+    default:
+      return m.captive_accept_failed();
   }
 }
