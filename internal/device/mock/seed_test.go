@@ -10,16 +10,20 @@ import (
 // The embed cannot reach outside the package, so the copies must not drift from the captures.
 func TestSeedCopiesMatchCaptures(t *testing.T) {
 	for name, capture := range map[string]string{
-		"system-board.json":          "system-board.json",
-		"system-info.json":           "system-info.json",
-		"net-counters.txt":           "wwan-down/net-counters.txt",
-		"wireless-status.json":       "wifi-scan/connected/wireless-status.json",
-		"iwinfo-scan-phy0-sta0.json": "wifi-scan/connected/iwinfo-scan-phy0-sta0.json",
-		"iwinfo-scan-phy1-ap0.json":  "wifi-scan/no-sta/iwinfo-scan-phy1-ap0.json",
-		"uci-export-dhcp.txt":        "uci-export-dhcp.txt",
-		"uci-export-system.txt":      "uci-export-system.txt",
-		"logread.txt":                "logs/logread.txt",
-		"uci-show-wireless.txt":      "wifi-scan/connected/uci-show-wireless.txt",
+		"system-board.json":                 "system-board.json",
+		"system-info.json":                  "system-info.json",
+		"net-counters.txt":                  "wwan-down/net-counters.txt",
+		"wireless-status.json":              "wifi-scan/connected/wireless-status.json",
+		"iwinfo-scan-phy0-sta0.json":        "wifi-scan/connected/iwinfo-scan-phy0-sta0.json",
+		"iwinfo-scan-phy1-ap0.json":         "wifi-scan/no-sta/iwinfo-scan-phy1-ap0.json",
+		"uci-export-dhcp.txt":               "uci-export-dhcp.txt",
+		"uci-export-system.txt":             "uci-export-system.txt",
+		"uci-show-wireless.txt":             "wifi-scan/connected/uci-show-wireless.txt",
+		"dhcp-leases.txt":                   "with-ap-client/dhcp-leases.txt",
+		"ip-neigh-clients.json":             "with-ap-client/ip-neigh.json",
+		"hostapd-phy1-ap0-get_clients.json": "with-ap-client/hostapd-phy1-ap0-get_clients.json",
+		"interface-dump.json":               "interface-dump.json",
+		"logread.txt":                       "logs/logread.txt",
 	} {
 		orig, err := os.ReadFile("../../../testdata/device/axt1800-25.12.6/" + capture)
 		if err != nil {

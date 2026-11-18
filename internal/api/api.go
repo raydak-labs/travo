@@ -145,6 +145,8 @@ type Deps struct {
 	SystemSettings SystemSettings
 	// Failover is nil without package and service ports; it answers 503 failover_unavailable.
 	Failover Failover
+	// Clients is the LAN client list and its actions; nil answers 503 clients_unavailable.
+	Clients Clients
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -234,6 +236,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerSystemAlerts(a)
 	s.registerSSHKeys(a)
 	s.registerSystemLog(a)
+	s.registerClients(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
 	s.registerVPNProfiles(a)

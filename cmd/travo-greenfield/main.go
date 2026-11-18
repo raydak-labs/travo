@@ -390,6 +390,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if r, ok := deps.Device.(systemlog.Reader); ok {
 		apiDeps.SystemLog = &systemlog.Service{Log: r}
 	}
+	apiDeps.Clients = newClients(deps)
 	h, _ := api.New(apiDeps)
 	var certs *tlscert.Source
 	if listenTLS != "" {

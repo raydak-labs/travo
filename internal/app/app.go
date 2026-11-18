@@ -78,6 +78,7 @@ func New(o Options) (Deps, error) {
 		mock.SeedSystem(dev)
 		mock.SeedConnectivity(dev)
 		mock.SeedWiFi(dev)
+		mock.SeedClients(dev)
 		if err := mock.SeedNetLinks(dev); err != nil {
 			return Deps{}, fmt.Errorf("mock links: %w", err)
 		}

@@ -58,8 +58,14 @@ type Device struct {
 	ServiceErr     error
 	ServiceActions []string
 	services       map[string]serviceState
-	password       string
-	passwordInit   bool
+	leases         []byte
+	// LeasesErr makes DHCPLeases fail; KickErr makes KickStation fail after recording.
+	LeasesErr error
+	KickErr   error
+	// Kicks records "ifname mac" per KickStation call.
+	Kicks        []string
+	password     string
+	passwordInit bool
 }
 
 func New() *Device {

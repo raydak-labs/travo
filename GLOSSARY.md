@@ -10,6 +10,7 @@
 - **Saved uplink**: one entry in the ordered list of stored uplink credentials (`wifi-profiles.json`). Saving or forgetting one never changes the STA; selecting one is a Join.
 - **AP**: WiFi access point serving the LAN; one `wifi-iface` section with `mode=ap`, edited per section ("per radio"). **Guest AP**: separate SSID, key, subnet (192.168.2.0/24) and zone.
 - **Caller**: the client making an API request. Classified as ethernet / wifi-ap / wifi-client / unknown.
+- **Client (LAN)**: a device on the router's LAN side, keyed by MAC; `wifi` (on an AP's station list), `lan` (in the LAN neighbour table only) or `offline` (known from a lease, reservation, alias or block). **Reservation**: a `dhcp` `host` section pinning a MAC to an address. **Block**: the `travo_block_<mac>` firewall rule rejecting the client's forwarded traffic. **Kick**: a one-time deauthentication through hostapd.
 - **Lockout**: a change that would leave the caller without a way to reach the router.
 - **Device port**: the interface through which all `uci`/`ubus`/netifd access happens. Adapters: CLI (real), mock.
 - **Tunnel state**: the five WireGuard states `disabled`, `configured`, `enabled_not_up`, `no_handshake`, `connected`; only a recent handshake means connected.

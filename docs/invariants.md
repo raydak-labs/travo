@@ -190,6 +190,14 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Contract tests: scripts parse, guard paths under `/etc/travo-greenfield-guards/`, every route in the spec, auth covers every route (walk the live route table), strict PUT coverage, spec field names match models, no feature writes UCI outside the transaction module.
 - Record a decision with evidence (firmware version + captured payload) for every device finding.
 
+## 16. Clients
+
+- The client list merges `/tmp/dhcp.leases`, the LAN-side kernel neighbour table (addresses inside a non-uplink interface prefix; never the uplink gateway) and `hostapd.<ifname> get_clients` of every AP (never assoclist, device-facts §2). A neighbour on no AP's station list is `lan`, not "wired": br-lan carries both (device-facts §5). An unreadable lease file, neighbour table, station list or firewall drops out with `partial: true`; GET never mutates.
+- Aliases live in `clients.json` in the state dir (ADR 0009): not device config, no transaction. An unreadable file fails closed and is never overwritten.
+- Reservations are `dhcp` `host` sections through `txn.Apply` (dhcp cannot cut the caller off; the address applies on the next renewal). Travo creates `travo_host_<mac>`, edits a user section in place only when it holds that MAC alone (shared → 409 `reservation_shared`), never touches the dnsmasq section the DNS layer stack owns, and commits nothing when the reservation is unchanged. The IP must be a host address of the lan prefix other than the router and not reserved for another MAC.
+- Block is the firewall rule `travo_block_<mac>` (`src '*'`, `dest '*'`, `src_mac`, `proto all`, REJECT): fw4 renders it in the global forward chain before the zone dispatch, so it is forward only and the blocked device still reaches the admin UI. It is a `firewall` transaction the user confirms. Blocking the caller's own MAC (neighbour table, then leases) → 409 `client_is_caller` before any write; an unreadable neighbour table fails closed. Only a section of exactly that shape on that name counts as blocked; a non-rule section on the name → 409 `client_block_conflict`.
+- Kick is a named exception to the transaction rule: `hostapd.<ifname> del_client` (deauth, reason 5, no ban) changes no config and the station may rejoin at once. It runs under guard `client-kick-in-progress`, released on every return because hostapd's call is atomic; a guard left by a crash is cleared by the user's next kick (its retry path). The caller's own MAC → 409 `client_is_caller`; a MAC on no AP → 404 `client_not_associated`.
+
 ## Deliberate ceilings
 
 Accept; do not "fix" silently.

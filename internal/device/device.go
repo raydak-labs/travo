@@ -211,3 +211,15 @@ type NetLinkReader interface {
 type UCIReorderer interface {
 	Reorder(ctx context.Context, config, section string, index int) error
 }
+
+// DHCPLeaseReader reads dnsmasq's IPv4 lease file (`/tmp/dhcp.leases`, device-facts §14).
+// An absent file is an empty table, not an error. Read-only.
+type DHCPLeaseReader interface {
+	DHCPLeases(context.Context) ([]byte, error)
+}
+
+// StationKicker deauthenticates one station from one AP (`hostapd.<ifname> del_client`).
+// It changes no config and the station may rejoin at once. ErrNotFound: no such AP or station.
+type StationKicker interface {
+	KickStation(ctx context.Context, ifname, mac string) error
+}

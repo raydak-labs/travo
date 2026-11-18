@@ -118,6 +118,13 @@ export type AlertList = {
     alerts: Array<Alert>;
 };
 
+export type AliasInputBody = {
+    /**
+     * Name for the client; empty clears it
+     */
+    alias: string;
+};
+
 export type ApiError = {
     /**
      * Stable error code
@@ -178,6 +185,13 @@ export type ApplyStatus = {
     version?: string;
 };
 
+export type BlockInputBody = {
+    /**
+     * true rejects the client's forwarded traffic; false removes the rule
+     */
+    blocked: boolean;
+};
+
 export type CaptiveState = {
     /**
      * blocked: an earlier renew is unproven; renewing again is its retry
@@ -195,6 +209,58 @@ export type CaptiveState = {
      * Seconds until the bypass is restored automatically; null when not armed
      */
     restore_in_seconds: number | null;
+};
+
+export type Client = {
+    /**
+     * Name the admin gave the client
+     */
+    alias?: string;
+    /**
+     * AP interface the station is associated with
+     */
+    ap?: string;
+    /**
+     * A Travo block rule rejects this MAC's forwarded traffic
+     */
+    blocked: boolean;
+    connection: 'wifi' | 'lan' | 'offline';
+    /**
+     * Name the client sent with its DHCP request
+     */
+    hostname?: string;
+    /**
+     * Current IPv4 address (neighbour table, else lease)
+     */
+    ip?: string;
+    /**
+     * Seconds until the DHCP lease expires; absent for no or an infinite lease
+     */
+    lease_expires_in?: number;
+    /**
+     * Lower-case colon MAC
+     */
+    mac: string;
+    /**
+     * A DHCP reservation holds this MAC
+     */
+    reserved: boolean;
+    /**
+     * Station signal in dBm
+     */
+    signal?: number;
+    /**
+     * SSID of that AP
+     */
+    ssid?: string;
+};
+
+export type ClientsOutputBody = {
+    clients: Array<Client>;
+    /**
+     * A source (leases, neighbours, AP stations, firewall) could not be read; rows may lack details
+     */
+    partial: boolean;
 };
 
 export type DnsStatus = {
@@ -445,6 +511,38 @@ export type RebootInputBody = {
      * Must be true: the caller has shown the operator a confirmation
      */
     confirm: boolean;
+};
+
+export type Reservation = {
+    /**
+     * Reserved IPv4 address; empty for a name-only host entry
+     */
+    ip?: string;
+    mac: string;
+    /**
+     * Host name dnsmasq hands out and resolves
+     */
+    name?: string;
+    /**
+     * Created by Travo (section travo_host_<mac>)
+     */
+    owned: boolean;
+};
+
+export type ReservationInputBody = {
+    /**
+     * IPv4 address inside the lan subnet
+     */
+    ip: string;
+    mac: string;
+    /**
+     * Host name (one DNS label); empty for none
+     */
+    name?: string;
+};
+
+export type ReservationsOutputBody = {
+    reservations: Array<Reservation>;
 };
 
 export type Result = {
@@ -1527,6 +1625,293 @@ export type RestoreCaptiveDnsResponses = {
 };
 
 export type RestoreCaptiveDnsResponse = RestoreCaptiveDnsResponses[keyof RestoreCaptiveDnsResponses];
+
+export type ListClientsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/clients';
+};
+
+export type ListClientsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ListClientsError = ListClientsErrors[keyof ListClientsErrors];
+
+export type ListClientsResponses = {
+    /**
+     * OK
+     */
+    200: ClientsOutputBody;
+};
+
+export type ListClientsResponse = ListClientsResponses[keyof ListClientsResponses];
+
+export type ListReservationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/clients/reservations';
+};
+
+export type ListReservationsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ListReservationsError = ListReservationsErrors[keyof ListReservationsErrors];
+
+export type ListReservationsResponses = {
+    /**
+     * OK
+     */
+    200: ReservationsOutputBody;
+};
+
+export type ListReservationsResponse = ListReservationsResponses[keyof ListReservationsResponses];
+
+export type ReserveClientData = {
+    body: ReservationInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/clients/reservations';
+};
+
+export type ReserveClientErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ReserveClientError = ReserveClientErrors[keyof ReserveClientErrors];
+
+export type ReserveClientResponses = {
+    /**
+     * OK
+     */
+    200: Reservation;
+};
+
+export type ReserveClientResponse = ReserveClientResponses[keyof ReserveClientResponses];
+
+export type DeleteReservationData = {
+    body?: never;
+    path: {
+        /**
+         * Client MAC
+         */
+        mac: string;
+    };
+    query?: never;
+    url: '/api/v1/clients/reservations/{mac}';
+};
+
+export type DeleteReservationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DeleteReservationError = DeleteReservationErrors[keyof DeleteReservationErrors];
+
+export type DeleteReservationResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type DeleteReservationResponse = DeleteReservationResponses[keyof DeleteReservationResponses];
+
+export type SetClientAliasData = {
+    body: AliasInputBody;
+    path: {
+        /**
+         * Client MAC
+         */
+        mac: string;
+    };
+    query?: never;
+    url: '/api/v1/clients/{mac}/alias';
+};
+
+export type SetClientAliasErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetClientAliasError = SetClientAliasErrors[keyof SetClientAliasErrors];
+
+export type SetClientAliasResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type SetClientAliasResponse = SetClientAliasResponses[keyof SetClientAliasResponses];
+
+export type SetClientBlockedData = {
+    body: BlockInputBody;
+    path: {
+        /**
+         * Client MAC
+         */
+        mac: string;
+    };
+    query?: never;
+    url: '/api/v1/clients/{mac}/block';
+};
+
+export type SetClientBlockedErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetClientBlockedError = SetClientBlockedErrors[keyof SetClientBlockedErrors];
+
+export type SetClientBlockedResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetClientBlockedResponse = SetClientBlockedResponses[keyof SetClientBlockedResponses];
+
+export type KickClientData = {
+    body?: never;
+    path: {
+        /**
+         * Client MAC
+         */
+        mac: string;
+    };
+    query?: never;
+    url: '/api/v1/clients/{mac}/kick';
+};
+
+export type KickClientErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type KickClientError = KickClientErrors[keyof KickClientErrors];
+
+export type KickClientResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type KickClientResponse = KickClientResponses[keyof KickClientResponses];
 
 export type GetDashboardConnectivityData = {
     body?: never;

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddSshKeyData, AddSshKeyErrors, AddSshKeyResponses, ApplyTailscaleFirewallData, ApplyTailscaleFirewallErrors, ApplyTailscaleFirewallResponses, AutoAcceptCaptivePortalData, AutoAcceptCaptivePortalErrors, AutoAcceptCaptivePortalResponses, ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, CreateApiTokenData, CreateApiTokenErrors, CreateApiTokenResponses, CreateWiFiProfileData, CreateWiFiProfileErrors, CreateWiFiProfileResponses, DeleteApiTokenData, DeleteApiTokenErrors, DeleteApiTokenResponses, DeleteSshKeyData, DeleteSshKeyErrors, DeleteSshKeyResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, DeleteWiFiProfileData, DeleteWiFiProfileErrors, DeleteWiFiProfileResponses, DisableFailoverData, DisableFailoverErrors, DisableFailoverResponses, EnableCaptiveDnsBypassData, EnableCaptiveDnsBypassErrors, EnableCaptiveDnsBypassResponses, EnableFailoverData, EnableFailoverErrors, EnableFailoverResponses, GetAdGuardData, GetAdGuardErrors, GetAdGuardResponses, GetApiTokensData, GetApiTokensErrors, GetApiTokensResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetFailoverData, GetFailoverErrors, GetFailoverResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSshKeysData, GetSshKeysErrors, GetSshKeysResponses, GetStatsHistoryData, GetStatsHistoryErrors, GetStatsHistoryResponses, GetSystemAlertsData, GetSystemAlertsErrors, GetSystemAlertsResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemLogData, GetSystemLogErrors, GetSystemLogResponses, GetSystemSettingsData, GetSystemSettingsErrors, GetSystemSettingsResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTailscaleData, GetTailscaleErrors, GetTailscaleResponses, GetTimezonesData, GetTimezonesErrors, GetTimezonesResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetUsbTetherData, GetUsbTetherErrors, GetUsbTetherResponses, GetVpndnsData, GetVpndnsErrors, GetVpndnsResponses, GetVpnKillSwitchData, GetVpnKillSwitchErrors, GetVpnKillSwitchResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnSplitData, GetVpnSplitErrors, GetVpnSplitResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiAccessPointsData, GetWiFiAccessPointsErrors, GetWiFiAccessPointsResponses, GetWiFiData, GetWiFiErrors, GetWiFiGuestData, GetWiFiGuestErrors, GetWiFiGuestResponses, GetWiFiProfilesData, GetWiFiProfilesErrors, GetWiFiProfilesResponses, GetWiFiReconnectData, GetWiFiReconnectErrors, GetWiFiReconnectResponses, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, GetWiFiScheduleData, GetWiFiScheduleErrors, GetWiFiScheduleResponses, GetWiFiScheduleStatusData, GetWiFiScheduleStatusErrors, GetWiFiScheduleStatusResponses, GetWiFiUplinkMacData, GetWiFiUplinkMacErrors, GetWiFiUplinkMacResponses, InstallAdGuardData, InstallAdGuardErrors, InstallAdGuardResponses, InstallTailscaleData, InstallTailscaleErrors, InstallTailscaleResponses, InstallUsbTetherDriversData, InstallUsbTetherDriversErrors, InstallUsbTetherDriversResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, LoginTailscaleData, LoginTailscaleErrors, LoginTailscaleResponses, LogoutTailscaleData, LogoutTailscaleErrors, LogoutTailscaleResponses, PostFactoryResetData, PostFactoryResetErrors, PostFactoryResetResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RenewCaptiveDhcpData, RenewCaptiveDhcpErrors, RenewCaptiveDhcpResponses, ReorderWiFiProfilesData, ReorderWiFiProfilesErrors, ReorderWiFiProfilesResponses, ResetStatsHistoryData, ResetStatsHistoryErrors, ResetStatsHistoryResponses, RestoreCaptiveDnsData, RestoreCaptiveDnsErrors, RestoreCaptiveDnsResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses, SelectWiFiProfileData, SelectWiFiProfileErrors, SelectWiFiProfileResponses, SetAdGuardDnsData, SetAdGuardDnsErrors, SetAdGuardDnsResponses, SetAdGuardServiceData, SetAdGuardServiceErrors, SetAdGuardServiceResponses, SetSystemSettingsData, SetSystemSettingsErrors, SetSystemSettingsResponses, SetTailscaleSettingsData, SetTailscaleSettingsErrors, SetTailscaleSettingsResponses, SetUsbTetherData, SetUsbTetherErrors, SetUsbTetherResponses, SetVpnKillSwitchData, SetVpnKillSwitchErrors, SetVpnKillSwitchResponses, SetVpnSplitData, SetVpnSplitErrors, SetVpnSplitResponses, SetVpnTunnelData, SetVpnTunnelErrors, SetVpnTunnelResponses, SetWiFiGuestData, SetWiFiGuestErrors, SetWiFiGuestResponses, SetWiFiScheduleData, SetWiFiScheduleErrors, SetWiFiScheduleResponses, SetWiFiUplinkMacData, SetWiFiUplinkMacErrors, SetWiFiUplinkMacResponses, UpdateWiFiAccessPointData, UpdateWiFiAccessPointErrors, UpdateWiFiAccessPointResponses, VerifyVpndnsData, VerifyVpndnsErrors, VerifyVpndnsResponses } from './types.gen';
+import type { AddSshKeyData, AddSshKeyErrors, AddSshKeyResponses, ApplyTailscaleFirewallData, ApplyTailscaleFirewallErrors, ApplyTailscaleFirewallResponses, AutoAcceptCaptivePortalData, AutoAcceptCaptivePortalErrors, AutoAcceptCaptivePortalResponses, ConfirmTransactionData, ConfirmTransactionErrors, ConfirmTransactionResponses, CreateApiTokenData, CreateApiTokenErrors, CreateApiTokenResponses, CreateWiFiProfileData, CreateWiFiProfileErrors, CreateWiFiProfileResponses, DeleteApiTokenData, DeleteApiTokenErrors, DeleteApiTokenResponses, DeleteReservationData, DeleteReservationErrors, DeleteReservationResponses, DeleteSshKeyData, DeleteSshKeyErrors, DeleteSshKeyResponses, DeleteVpnProfileData, DeleteVpnProfileErrors, DeleteVpnProfileResponses, DeleteWiFiProfileData, DeleteWiFiProfileErrors, DeleteWiFiProfileResponses, DisableFailoverData, DisableFailoverErrors, DisableFailoverResponses, EnableCaptiveDnsBypassData, EnableCaptiveDnsBypassErrors, EnableCaptiveDnsBypassResponses, EnableFailoverData, EnableFailoverErrors, EnableFailoverResponses, GetAdGuardData, GetAdGuardErrors, GetAdGuardResponses, GetApiTokensData, GetApiTokensErrors, GetApiTokensResponses, GetDashboardConnectivityData, GetDashboardConnectivityErrors, GetDashboardConnectivityResponses, GetDashboardEventsData, GetDashboardEventsErrors, GetDashboardEventsResponse, GetDashboardEventsResponses, GetDashboardThroughputData, GetDashboardThroughputErrors, GetDashboardThroughputResponses, GetFailoverData, GetFailoverErrors, GetFailoverResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSetupStateData, GetSetupStateErrors, GetSetupStateResponses, GetSshKeysData, GetSshKeysErrors, GetSshKeysResponses, GetStatsHistoryData, GetStatsHistoryErrors, GetStatsHistoryResponses, GetSystemAlertsData, GetSystemAlertsErrors, GetSystemAlertsResponses, GetSystemBackupData, GetSystemBackupErrors, GetSystemBackupResponses, GetSystemInfoData, GetSystemInfoErrors, GetSystemInfoResponses, GetSystemLogData, GetSystemLogErrors, GetSystemLogResponses, GetSystemSettingsData, GetSystemSettingsErrors, GetSystemSettingsResponses, GetSystemUpdateApplyData, GetSystemUpdateApplyErrors, GetSystemUpdateApplyResponses, GetSystemUpdateStageData, GetSystemUpdateStageErrors, GetSystemUpdateStageResponses, GetTailscaleData, GetTailscaleErrors, GetTailscaleResponses, GetTimezonesData, GetTimezonesErrors, GetTimezonesResponses, GetTransactionData, GetTransactionErrors, GetTransactionResponses, GetUsbTetherData, GetUsbTetherErrors, GetUsbTetherResponses, GetVpndnsData, GetVpndnsErrors, GetVpndnsResponses, GetVpnKillSwitchData, GetVpnKillSwitchErrors, GetVpnKillSwitchResponses, GetVpnProfilesData, GetVpnProfilesErrors, GetVpnProfilesResponses, GetVpnSplitData, GetVpnSplitErrors, GetVpnSplitResponses, GetVpnStatusData, GetVpnStatusErrors, GetVpnStatusResponses, GetWiFiAccessPointsData, GetWiFiAccessPointsErrors, GetWiFiAccessPointsResponses, GetWiFiData, GetWiFiErrors, GetWiFiGuestData, GetWiFiGuestErrors, GetWiFiGuestResponses, GetWiFiProfilesData, GetWiFiProfilesErrors, GetWiFiProfilesResponses, GetWiFiReconnectData, GetWiFiReconnectErrors, GetWiFiReconnectResponses, GetWiFiResponses, GetWiFiScanData, GetWiFiScanErrors, GetWiFiScanResponses, GetWiFiScheduleData, GetWiFiScheduleErrors, GetWiFiScheduleResponses, GetWiFiScheduleStatusData, GetWiFiScheduleStatusErrors, GetWiFiScheduleStatusResponses, GetWiFiUplinkMacData, GetWiFiUplinkMacErrors, GetWiFiUplinkMacResponses, InstallAdGuardData, InstallAdGuardErrors, InstallAdGuardResponses, InstallTailscaleData, InstallTailscaleErrors, InstallTailscaleResponses, InstallUsbTetherDriversData, InstallUsbTetherDriversErrors, InstallUsbTetherDriversResponses, JoinWiFiData, JoinWiFiErrors, JoinWiFiResponses, KickClientData, KickClientErrors, KickClientResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListReservationsData, ListReservationsErrors, ListReservationsResponses, LoginTailscaleData, LoginTailscaleErrors, LoginTailscaleResponses, LogoutTailscaleData, LogoutTailscaleErrors, LogoutTailscaleResponses, PostFactoryResetData, PostFactoryResetErrors, PostFactoryResetResponses, PostLoginData, PostLoginErrors, PostLoginResponses, PostLogoutData, PostLogoutErrors, PostLogoutResponses, PostPasswordData, PostPasswordErrors, PostPasswordResponses, PostSetupPasswordData, PostSetupPasswordErrors, PostSetupPasswordResponses, PostSystemRebootData, PostSystemRebootErrors, PostSystemRebootResponses, PostSystemUpdateApplyData, PostSystemUpdateApplyErrors, PostSystemUpdateApplyResponses, PostSystemUpdateCheckData, PostSystemUpdateCheckErrors, PostSystemUpdateCheckResponses, PostSystemUpdateRecoverData, PostSystemUpdateRecoverErrors, PostSystemUpdateRecoverResponses, PostSystemUpdateStageData, PostSystemUpdateStageErrors, PostSystemUpdateStageResponses, PostVpnProfileData, PostVpnProfileErrors, PostVpnProfileResponses, RenewCaptiveDhcpData, RenewCaptiveDhcpErrors, RenewCaptiveDhcpResponses, ReorderWiFiProfilesData, ReorderWiFiProfilesErrors, ReorderWiFiProfilesResponses, ReserveClientData, ReserveClientErrors, ReserveClientResponses, ResetStatsHistoryData, ResetStatsHistoryErrors, ResetStatsHistoryResponses, RestoreCaptiveDnsData, RestoreCaptiveDnsErrors, RestoreCaptiveDnsResponses, RollbackTransactionData, RollbackTransactionErrors, RollbackTransactionResponses, SelectVpnProfileData, SelectVpnProfileErrors, SelectVpnProfileResponses, SelectWiFiProfileData, SelectWiFiProfileErrors, SelectWiFiProfileResponses, SetAdGuardDnsData, SetAdGuardDnsErrors, SetAdGuardDnsResponses, SetAdGuardServiceData, SetAdGuardServiceErrors, SetAdGuardServiceResponses, SetClientAliasData, SetClientAliasErrors, SetClientAliasResponses, SetClientBlockedData, SetClientBlockedErrors, SetClientBlockedResponses, SetSystemSettingsData, SetSystemSettingsErrors, SetSystemSettingsResponses, SetTailscaleSettingsData, SetTailscaleSettingsErrors, SetTailscaleSettingsResponses, SetUsbTetherData, SetUsbTetherErrors, SetUsbTetherResponses, SetVpnKillSwitchData, SetVpnKillSwitchErrors, SetVpnKillSwitchResponses, SetVpnSplitData, SetVpnSplitErrors, SetVpnSplitResponses, SetVpnTunnelData, SetVpnTunnelErrors, SetVpnTunnelResponses, SetWiFiGuestData, SetWiFiGuestErrors, SetWiFiGuestResponses, SetWiFiScheduleData, SetWiFiScheduleErrors, SetWiFiScheduleResponses, SetWiFiUplinkMacData, SetWiFiUplinkMacErrors, SetWiFiUplinkMacResponses, UpdateWiFiAccessPointData, UpdateWiFiAccessPointErrors, UpdateWiFiAccessPointResponses, VerifyVpndnsData, VerifyVpndnsErrors, VerifyVpndnsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -230,6 +230,109 @@ export const restoreCaptiveDns = <ThrowOnError extends boolean = false>(options?
             type: 'apiKey'
         }, { scheme: 'bearer', type: 'http' }],
     url: '/api/v1/captive/dns-restore',
+    ...options
+});
+
+/**
+ * LAN clients from leases, neighbours and AP stations
+ */
+export const listClients = <ThrowOnError extends boolean = false>(options?: Options<ListClientsData, ThrowOnError>): RequestResult<ListClientsResponses, ListClientsErrors, ThrowOnError> => (options?.client ?? client).get<ListClientsResponses, ListClientsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients',
+    ...options
+});
+
+/**
+ * DHCP reservations (dhcp host sections)
+ */
+export const listReservations = <ThrowOnError extends boolean = false>(options?: Options<ListReservationsData, ThrowOnError>): RequestResult<ListReservationsResponses, ListReservationsErrors, ThrowOnError> => (options?.client ?? client).get<ListReservationsResponses, ListReservationsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients/reservations',
+    ...options
+});
+
+/**
+ * Add or change a DHCP reservation
+ */
+export const reserveClient = <ThrowOnError extends boolean = false>(options: Options<ReserveClientData, ThrowOnError>): RequestResult<ReserveClientResponses, ReserveClientErrors, ThrowOnError> => (options.client ?? client).post<ReserveClientResponses, ReserveClientErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients/reservations',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove a DHCP reservation
+ */
+export const deleteReservation = <ThrowOnError extends boolean = false>(options: Options<DeleteReservationData, ThrowOnError>): RequestResult<DeleteReservationResponses, DeleteReservationErrors, ThrowOnError> => (options.client ?? client).delete<DeleteReservationResponses, DeleteReservationErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients/reservations/{mac}',
+    ...options
+});
+
+/**
+ * Name a client (stored by Travo, not in UCI)
+ */
+export const setClientAlias = <ThrowOnError extends boolean = false>(options: Options<SetClientAliasData, ThrowOnError>): RequestResult<SetClientAliasResponses, SetClientAliasErrors, ThrowOnError> => (options.client ?? client).put<SetClientAliasResponses, SetClientAliasErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients/{mac}/alias',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Block or unblock a client's internet access (guarded transaction)
+ */
+export const setClientBlocked = <ThrowOnError extends boolean = false>(options: Options<SetClientBlockedData, ThrowOnError>): RequestResult<SetClientBlockedResponses, SetClientBlockedErrors, ThrowOnError> => (options.client ?? client).post<SetClientBlockedResponses, SetClientBlockedErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients/{mac}/block',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Disconnect a WiFi client once (it may rejoin)
+ */
+export const kickClient = <ThrowOnError extends boolean = false>(options: Options<KickClientData, ThrowOnError>): RequestResult<KickClientResponses, KickClientErrors, ThrowOnError> => (options.client ?? client).post<KickClientResponses, KickClientErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'tg_session',
+            type: 'apiKey'
+        }, { scheme: 'bearer', type: 'http' }],
+    url: '/api/v1/clients/{mac}/kick',
     ...options
 });
 
