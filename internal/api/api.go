@@ -107,9 +107,11 @@ type Deps struct {
 	// Captive is the portal DNS bypass; nil answers 503 captive_unavailable.
 	Captive      CaptiveAssist
 	CaptiveRenew CaptiveRenewer
-	WiFi         WiFiService
-	WiFiJoin     WiFiJoiner
-	WiFiProfiles WiFiProfileService
+	// CaptiveAccept is the auto-accept walker; nil answers 503 captive_unavailable.
+	CaptiveAccept CaptiveAcceptor
+	WiFi          WiFiService
+	WiFiJoin      WiFiJoiner
+	WiFiProfiles  WiFiProfileService
 	// AdGuard is nil when the daemon cannot supervise the package (no service port).
 	AdGuard AdGuard
 	// Tailscale is nil when the daemon cannot supervise the package (no service port).

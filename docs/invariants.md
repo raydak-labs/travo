@@ -160,7 +160,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Detection: HTTP probe to a known 204 endpoint + redirect inspection. Only a 204 or a 200 with the known empty body means online; a 200 with a body or an http(s) redirect means captive (ADR 0022).
 - Probe skipped when no default route (instant offline). Concurrent callers share one probe; cache ~2 s; a DNS change invalidates the cache. DNS-layer composition wires `dnslayer.Service.AfterApply` to the shared connectivity service's `Invalidate`, including when an apply fails after changing live DNS.
 - DHCP renew (0.1) is user-triggered only: `netifd renew` on wwan (never ifdown/ifup, never `wifi`), only while wwan carries the kernel default route and the probe is not online, under guard `captive-dhcp-renew-in-progress`; released when nothing was sent or a default route via wwan is proven within 10 s. A kept guard shows as `blocked`; the user's next explicit renew is its retry path (no automatic renew exists to skip).
-- Auto-accept (post-0.1) walks portal steps. Only step 0 may renew the wwan DHCP lease, only when wwan is the active uplink, guarded, bounded waits.
+- Auto-accept (0.2, ADR 0023) is user-triggered and walks portal steps. Only step 0 may renew the wwan DHCP lease, only after its fetch failed, only when wwan is the active uplink and the renew guard is not kept, through the guarded `Renewer`; bounded waits (30 s per walk, 5 s per request). It submits only fields the portal page supplied, never user data, verifies TLS, refuses local addresses, and changes no UCI or DNS.
 - Warning card only when an action exists (login, DNS bypass active, connected-but-no-internet).
 
 ## 13. Package ops

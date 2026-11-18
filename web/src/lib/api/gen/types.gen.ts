@@ -28,6 +28,27 @@ export type ApConfig = {
     ssid: string;
 };
 
+export type AcceptResult = {
+    outcome: 'online' | 'needs_user' | 'no_form' | 'failed';
+    /**
+     * Step 0 renewed the wwan DHCP lease
+     */
+    renewed: boolean;
+    steps: Array<AcceptStep> | null;
+};
+
+export type AcceptStep = {
+    /**
+     * Host of the request; empty for renew
+     */
+    host: string;
+    kind: 'fetch' | 'renew' | 'follow' | 'submit';
+    /**
+     * HTTP status; 0 for a transport error or a renew
+     */
+    status: number;
+};
+
 export type AccessPoint = {
     band: '2g' | '5g' | '6g';
     bssid: string;
@@ -1174,6 +1195,39 @@ export type DeleteApiTokenResponses = {
 };
 
 export type DeleteApiTokenResponse = DeleteApiTokenResponses[keyof DeleteApiTokenResponses];
+
+export type AutoAcceptCaptivePortalData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/captive/auto-accept';
+};
+
+export type AutoAcceptCaptivePortalErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type AutoAcceptCaptivePortalError = AutoAcceptCaptivePortalErrors[keyof AutoAcceptCaptivePortalErrors];
+
+export type AutoAcceptCaptivePortalResponses = {
+    /**
+     * OK
+     */
+    200: AcceptResult;
+};
+
+export type AutoAcceptCaptivePortalResponse = AutoAcceptCaptivePortalResponses[keyof AutoAcceptCaptivePortalResponses];
 
 export type RenewCaptiveDhcpData = {
     body?: never;

@@ -26,6 +26,15 @@ type CaptiveRenewer interface {
 	Availability(context.Context, connectivity.Status) captive.RenewState
 }
 
+// CaptiveAcceptor walks click-through portal pages (internal/captive, ADR 0023).
+type CaptiveAcceptor interface {
+	Accept(context.Context) (captive.AcceptResult, error)
+}
+
+type acceptOutput struct {
+	Body captive.AcceptResult
+}
+
 type okOutput struct {
 	Body okBody
 }
@@ -37,6 +46,26 @@ func (s *server) registerCaptive(a huma.API) {
 		"End the captive DNS bypass now", "captive", 409, 503), a, s.restoreCaptiveDNS)
 	register(s, false, op("renewCaptiveDHCP", http.MethodPost, "/api/v1/captive/dhcp-renew",
 		"Renew the wwan DHCP lease for a hotel portal", "captive", 409, 503), a, s.renewCaptiveDHCP)
+	register(s, false, op("autoAcceptCaptivePortal", http.MethodPost, "/api/v1/captive/auto-accept",
+		"Accept a click-through hotel portal automatically", "captive", 409, 503), a, s.autoAcceptCaptivePortal)
+}
+
+// autoAcceptCaptivePortal reports every walk outcome as 200: needs_user, no_form and
+// failed are expected answers, not errors.
+func (s *server) autoAcceptCaptivePortal(ctx context.Context, _ *struct{}) (*acceptOutput, error) {
+	if s.CaptiveAccept == nil {
+		return nil, captiveUnavailable()
+	}
+	result, err := s.CaptiveAccept.Accept(ctx)
+	switch {
+	case errors.Is(err, captive.ErrAcceptNotCaptive):
+		return nil, fail(409, "captive_accept_not_captive", "No captive portal is detected")
+	case errors.Is(err, captive.ErrAcceptBusy):
+		return nil, fail(409, "captive_accept_busy", "An automatic login is already running")
+	case err != nil:
+		return nil, fail(503, "captive_accept_failed", "The automatic login failed")
+	}
+	return &acceptOutput{Body: result}, nil
 }
 
 func (s *server) renewCaptiveDHCP(ctx context.Context, _ *struct{}) (*okOutput, error) {

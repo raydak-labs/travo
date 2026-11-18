@@ -141,3 +141,53 @@ func TestCaptiveDHCPRenewRoute(t *testing.T) {
 		t.Fatal(got.Code, got.Body, fake.calls)
 	}
 }
+
+type fakeAccept struct {
+	result captive.AcceptResult
+	err    error
+	calls  int
+}
+
+func (f *fakeAccept) Accept(context.Context) (captive.AcceptResult, error) {
+	f.calls++
+	return f.result, f.err
+}
+
+func TestCaptiveAutoAcceptRoute(t *testing.T) {
+	fake := &fakeAccept{result: captive.AcceptResult{Outcome: captive.AcceptNeedsUser,
+		Steps: []captive.AcceptStep{{Kind: "fetch", Host: "portal.hotel.test", Status: 200}}}}
+	e := newEnvWithDashboard(t, nil, nil, &connectivitySnapshot{Internet: connectivity.Captive}, func(d *Deps) { d.CaptiveAccept = fake })
+	const path = "/api/v1/captive/auto-accept"
+	if got := e.do(req{method: "POST", path: path}); got.Code != 401 || fake.calls != 0 {
+		t.Fatal(got.Code)
+	}
+	cookie, csrf := e.login()
+	got := e.do(req{method: "POST", path: path, cookie: cookie, csrf: csrf})
+	if got.Code != 200 || bodyField(t, got, "outcome") != "needs_user" || !strings.Contains(got.Body.String(), `"host":"portal.hotel.test"`) {
+		t.Fatal(got.Code, got.Body)
+	}
+	for _, tc := range []struct {
+		err  error
+		code int
+		want string
+	}{
+		{captive.ErrAcceptNotCaptive, 409, "captive_accept_not_captive"},
+		{captive.ErrAcceptBusy, 409, "captive_accept_busy"},
+		{errors.New("boom"), 503, "captive_accept_failed"},
+	} {
+		fake.err = tc.err
+		got := e.do(req{method: "POST", path: path, cookie: cookie, csrf: csrf})
+		if got.Code != tc.code || bodyField(t, got, "code") != tc.want {
+			t.Fatal(tc.err, got.Code, got.Body)
+		}
+	}
+}
+
+func TestCaptiveAutoAcceptUnavailable(t *testing.T) {
+	e := newEnvWithDashboard(t, nil, nil, &connectivitySnapshot{Internet: connectivity.Captive}, func(*Deps) {})
+	cookie, csrf := e.login()
+	got := e.do(req{method: "POST", path: "/api/v1/captive/auto-accept", cookie: cookie, csrf: csrf})
+	if got.Code != 503 || bodyField(t, got, "code") != "captive_unavailable" {
+		t.Fatal(got.Code, got.Body)
+	}
+}

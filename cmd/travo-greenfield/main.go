@@ -203,6 +203,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	var connection api.ConnectivityReader
 	var captiveAssist api.CaptiveAssist
 	var captiveRenew api.CaptiveRenewer
+	var captiveAccept api.CaptiveAcceptor
 	// One DNS layer stack for every feature (ADR 0010); applies invalidate the shared probe.
 	dnsLayers := &dnslayer.Service{Device: deps.Device, Guards: deps.Guards, Apply: deps.Txn,
 		RecordPath: filepath.Join(deps.Paths.State, "dns-layers.json")}
@@ -217,9 +218,12 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		bypass := captive.NewBypass(dnsLayers, deps.Device, routes, clock.Now)
 		captiveAssist = bypass
 		workers.Go("captive-dns-restore", lifecycle.Every(15*time.Second, bypass.Tick))
+		var renewer captive.LeaseRenew // nil without a lease port: the walker never renews
 		if lease, ok := deps.Device.(device.LeaseRenewer); ok {
-			captiveRenew = captive.NewRenewer(deps.Guards, deps.Device, lease, routes, shared, clock.Now, captive.Sleep)
+			r := captive.NewRenewer(deps.Guards, deps.Device, lease, routes, shared, clock.Now, captive.Sleep)
+			captiveRenew, renewer = r, r
 		}
+		captiveAccept = captive.NewAcceptor(shared, renewer, captive.NewPortalClient)
 	}
 	backup, _ := deps.Device.(device.ConfigBackupper)
 	profiles := vpnprofiles.New(filepath.Join(deps.Paths.State, "vpn-profiles.json"))
@@ -335,6 +339,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		Connectivity:  connection,
 		Captive:       captiveAssist,
 		CaptiveRenew:  captiveRenew,
+		CaptiveAccept: captiveAccept,
 		WiFi:          wireless,
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,
