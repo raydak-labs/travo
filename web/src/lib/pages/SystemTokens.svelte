@@ -1,7 +1,6 @@
 <script lang="ts">
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import type { ApiTokenCreated, Token } from '../api/gen';
@@ -16,8 +15,11 @@ import {
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
 import Card from '../ui/Card.svelte';
+import ConfirmDialog from '../ui/ConfirmDialog.svelte';
+import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import { notify } from '../ui/notify';
 import Status from '../ui/Status.svelte';
 import TokenSecretDialog from './TokenSecretDialog.svelte';
 
@@ -27,7 +29,7 @@ let scope = $state<TokenScope>('read');
 let busy = $state(false);
 let failure = $state<string>();
 let created = $state<ApiTokenCreated>();
-let revoking = $state<Token>();
+const confirm = createConfirm();
 
 const scopes: { value: TokenScope; label: () => string; hint: () => string }[] = [
   { value: 'read', label: () => m.tokens_scope_read(), hint: () => m.tokens_scope_read_hint() },
@@ -58,7 +60,7 @@ async function create(event: SubmitEvent) {
   const result = await createToken(valid, scope);
   busy = false;
   if ('error' in result) {
-    failure = result.error;
+    notify.error(result.error);
     return;
   }
   name = '';
@@ -68,12 +70,18 @@ async function create(event: SubmitEvent) {
 }
 
 async function revoke(token: Token) {
-  revoking = undefined;
+  const ok = await confirm.ask({
+    title: m.tokens_revoke_title({ name: token.name }),
+    description: m.tokens_revoke_body(),
+    action: m.tokens_revoke(),
+    tone: 'danger',
+  });
+  if (!ok) return;
   busy = true;
-  failure = undefined;
   const result = await revokeToken(token.id);
   busy = false;
-  if ('error' in result) failure = result.error;
+  if ('error' in result) notify.error(result.error);
+  else notify.success(m.tokens_revoked({ name: token.name }));
   void tokens.retry();
 }
 </script>
@@ -99,7 +107,7 @@ async function revoke(token: Token) {
               </span>
               <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy}
                 aria-label={m.tokens_revoke_name({ name: token.name })}
-                onclick={() => { revoking = token; }}>{m.tokens_revoke()}</Button>
+                onclick={() => revoke(token)}>{m.tokens_revoke()}</Button>
             </li>
           {/each}
         </ul>
@@ -140,17 +148,4 @@ async function revoke(token: Token) {
 
 <TokenSecretDialog {created} close={() => { created = undefined; }} />
 
-<Dialog.Root open={revoking !== undefined} onOpenChange={(open) => { if (!open) revoking = undefined; }}>
-  <Dialog.Content portalProps={{ disabled: typeof window === 'undefined' }} showCloseButton={false}
-    class="w-[min(90vw,26rem)] rounded-lg border border-border bg-surface p-5 text-fg">
-    <Dialog.Title level={2} class="text-lg font-semibold">
-      {m.tokens_revoke_title({ name: revoking?.name ?? '' })}
-    </Dialog.Title>
-    <Dialog.Description>{m.tokens_revoke_body()}</Dialog.Description>
-    <div class="flex justify-end gap-2">
-      <Button variant="outline" type="button" onclick={() => { revoking = undefined; }}>{m.tokens_cancel()}</Button>
-      <Button variant="destructive" type="button" disabled={busy}
-        onclick={() => revoking && revoke(revoking)}>{m.tokens_revoke()}</Button>
-    </div>
-  </Dialog.Content>
-</Dialog.Root>
+<ConfirmDialog {confirm} />

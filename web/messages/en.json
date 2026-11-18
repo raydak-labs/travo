@@ -397,7 +397,7 @@
   "tokens_revoke_name": "Revoke {name}",
   "tokens_revoke_title": "Revoke {name}?",
   "tokens_revoke_body": "Anything using this token loses access immediately. This cannot be undone.",
-  "tokens_cancel": "Cancel",
+  "tokens_revoked": "Revoked {name}. Anything using it has lost access.",
   "tokens_unavailable": "API tokens are unavailable",
   "tokens_err_limit": "The token limit (16) is reached. Revoke a token first.",
   "tokens_err_invalid": "Enter a name of 1 to 256 characters.",
