@@ -198,6 +198,17 @@ func TestAcceptSkipsRenew(t *testing.T) {
 	}
 }
 
+// A portal that answers, even with an error status, is no stale lease: no renew.
+func TestAcceptNoRenewOnPortalStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(503) }))
+	defer server.Close()
+	renew := &fakeRenew{state: RenewAvailable}
+	got, _ := NewAcceptor(&portalConn{portal: &simPortal{}, url: server.URL}, renew, testClient).Accept(t.Context())
+	if got.Outcome != AcceptFailed || renew.calls != 0 || got.Steps[0].Status != 503 {
+		t.Fatalf("got %+v renews %d", got, renew.calls)
+	}
+}
+
 // A later step that fails at transport level never renews.
 func TestAcceptNoRenewAfterStep0(t *testing.T) {
 	var calls atomic.Int32

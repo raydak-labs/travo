@@ -3,6 +3,7 @@ package captive
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -90,7 +91,10 @@ func limitRedirects(_ *http.Request, via []*http.Request) error {
 	return nil
 }
 
-var errLocalTarget = errors.New("portal target is a local address")
+var (
+	errLocalTarget  = errors.New("portal target is a local address")
+	errPortalStatus = errors.New("portal answered with a non-2xx status")
+)
 
 func refuseLocal(_, address string, _ syscall.RawConn) error {
 	host, _, err := net.SplitHostPort(address)
@@ -125,7 +129,8 @@ func (a *Acceptor) Accept(ctx context.Context) (AcceptResult, error) {
 	}
 	w := walk{client: a.newClient(), result: AcceptResult{Steps: []AcceptStep{}}}
 	page, err := w.do(ctx, "fetch", Plan{Method: http.MethodGet, Target: start})
-	if err != nil && a.renewStep0(ctx, &w, st) {
+	// Only a transport failure hints at a stale lease; a portal that answered does not.
+	if err != nil && !errors.Is(err, errPortalStatus) && a.renewStep0(ctx, &w, st) {
 		page, err = w.do(ctx, "fetch", Plan{Method: http.MethodGet, Target: start})
 	}
 	if err != nil {
@@ -199,7 +204,7 @@ func (w *walk) do(ctx context.Context, kind string, p Plan) (page, error) {
 		return page{}, err
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return page{}, errors.New(res.Status)
+		return page{}, fmt.Errorf("%w: %s", errPortalStatus, res.Status)
 	}
 	return page{url: res.Request.URL, body: string(body)}, nil
 }
