@@ -1,27 +1,27 @@
 import { scopedAPIClient } from './api/client';
 import { fetchConnectivity } from './api/connectivity';
-import type {
-  DashboardConnectivity,
-  GetDashboardEventsData,
-  SystemInfoBody,
-  ThroughputBody,
-} from './api/gen';
+import type { DashboardConnectivity, SystemInfoBody, ThroughputBody } from './api/gen';
 import type { Client } from './api/gen/client';
-import { createSseClient } from './api/gen/core/serverSentEvents.gen';
 import { APIRequestError } from './api/request';
 import { fetchSystemInfo } from './api/system';
 import { fetchThroughput } from './api/throughput';
-import { normalizeEventBody } from './dashboard-sse';
+import {
+  type DashboardSourceName,
+  errorStatus,
+  reduceDashboardEvent,
+  SOURCE_NAMES,
+  type SourceData,
+  sourceLabels,
+  unavailableStatus,
+} from './dashboard-event-reducer';
+import { readEventStream } from './dashboard-sse';
 import { session } from './session.svelte';
 import type { LoadStatus } from './ui/loader.svelte';
 
+export type { DashboardSourceName } from './dashboard-event-reducer';
 export const DASHBOARD_RECONNECT_MS = 2_000;
 export const DASHBOARD_FALLBACK_MS = 5_000;
-const EVENTS_URL = '/api/v1/dashboard/events' satisfies GetDashboardEventsData['url'];
-const SOURCE_NAMES = ['connectivity', 'resources', 'throughput'] as const;
 
-export type DashboardSourceName = (typeof SOURCE_NAMES)[number];
-type SourceData = DashboardConnectivity | SystemInfoBody | ThroughputBody;
 type SourceState = { status: LoadStatus; data?: SourceData };
 type Reader = (signal: AbortSignal | undefined, client: Client) => Promise<SourceData>;
 
@@ -29,12 +29,6 @@ const readers: Record<DashboardSourceName, Reader> = {
   connectivity: fetchConnectivity,
   resources: fetchSystemInfo,
   throughput: fetchThroughput,
-};
-
-const sourceLabels: Record<DashboardSourceName, string> = {
-  connectivity: 'Connectivity',
-  resources: 'Resources',
-  throughput: 'Throughput',
 };
 
 type Ownership = {
@@ -58,17 +52,6 @@ export type DashboardEventsOptions = {
 
 function freshState(): SourceState {
   return { status: { state: 'loading' } };
-}
-
-function errorStatus(error: unknown, fallback: string): LoadStatus {
-  return {
-    state: 'error',
-    message: error instanceof Error && error.message !== '' ? error.message : fallback,
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** Owns the authenticated shell's one dashboard stream and its disconnected fallback. */
@@ -162,65 +145,30 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
 
   function applyEvent(owner: Ownership, name: string, data: unknown): void {
     if (!isCurrent(owner)) return;
-    if (name !== 'source_unavailable' && !SOURCE_NAMES.includes(name as DashboardSourceName))
-      return;
-    if (!isRecord(data)) throw new Error('Invalid event data');
-    if (name === 'source_unavailable') {
-      const source = data.source as DashboardSourceName;
-      if (!SOURCE_NAMES.includes(source)) throw new Error('Invalid event source');
-      owner.versions[source] += 1;
-      states[source].status = {
-        state: 'error',
-        message: `${sourceLabels[source]} unavailable`,
-      };
+    const update = reduceDashboardEvent(name, data);
+    if (update.kind === 'ignore') return;
+    // A pushed value supersedes any seed or fallback read still in flight.
+    owner.versions[update.source] += 1;
+    if (update.kind === 'unavailable') {
+      states[update.source].status = unavailableStatus(update.source);
       return;
     }
-    const source = name as DashboardSourceName;
-    owner.versions[source] += 1;
-    states[source].data = data as SourceData;
-    states[source].status = { state: 'ready' };
+    states[update.source].data = update.data;
+    states[update.source].status = { state: 'ready' };
   }
 
-  async function connect(owner: Ownership): Promise<'retry' | 'unauthorized'> {
-    const transport = owner.client.getConfig().fetch ?? globalThis.fetch;
-    let failure: unknown;
-    const { stream } = createSseClient({
-      url: owner.client.buildUrl({ url: EVENTS_URL }),
-      credentials: 'same-origin',
+  function connect(owner: Ownership): Promise<'retry' | 'unauthorized'> {
+    return readEventStream({
+      client: owner.client,
       signal: owner.controller.signal,
-      sseMaxRetryAttempts: 1, // reconnect below, with fresh ownership checks and no resume ID
-      fetch: async (request) => {
-        owner.controller.signal.throwIfAborted();
-        const response = await transport(request);
-        if (owner.controller.signal.aborted) {
-          await response.body?.cancel();
-          owner.controller.signal.throwIfAborted();
-        }
-        if (response.status === 401) throw new APIRequestError('Session expired', 401);
-        if (response.status !== 200) throw new Error(`Events HTTP ${response.status}`);
-        const contentType = response.headers
-          .get('Content-Type')
-          ?.split(';', 1)[0]
-          ?.trim()
-          .toLowerCase();
-        if (contentType !== 'text/event-stream') {
-          throw new Error(`Events content type: ${contentType ?? 'missing'}`);
-        }
-        if (!response.body) throw new Error('Events response has no body');
-        if (isCurrent(owner)) {
-          owner.connected = true;
-          streaming = true;
-          stopFallback(owner);
-        }
-        return new Response(normalizeEventBody(response.body), response);
+      onOpen: () => {
+        if (!isCurrent(owner)) return;
+        owner.connected = true;
+        streaming = true;
+        stopFallback(owner);
       },
-      onSseError: (error) => {
-        failure = error;
-      },
-      onSseEvent: (event) => applyEvent(owner, event.event ?? 'message', event.data),
+      onEvent: (name, data) => applyEvent(owner, name, data),
     });
-    for await (const event of stream) void event;
-    return failure instanceof APIRequestError && failure.status === 401 ? 'unauthorized' : 'retry';
   }
 
   function retryIn(owner: Ownership): Promise<boolean> {
