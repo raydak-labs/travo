@@ -19,7 +19,7 @@ API tokens (`internal/apitokens`, #172):
 - No rate limit on bearer attempts: 256-bit secrets are not guessable, and the trust boundary already limits who can try.
 - When the header is present it decides alone: a bad bearer is 401 even next to a valid cookie. Bearer requests skip the CSRF check (a browser never attaches the header by itself).
 - Scopes: `read` = GET only, and not admin-only reads (`getSystemBackup`: it holds WiFi keys and the shadow file) → 403 `insufficient_scope`; `admin` = every protected route except session-only ones.
-- Session-only routes (registered with `registerSessionOnly`): token management, password change, logout, session → 403 `session_required` for any token. A token cannot mint, list or revoke tokens.
+- Session-only routes (registered with `registerSessionOnly`): token management, password change, adding or removing a root SSH key (#191: a key is a root shell, like the password), logout, session → 403 `session_required` for any token. A token cannot mint, list or revoke tokens.
 - Trust and Host checks apply before auth, unchanged: tokens work from the LAN only. The AdGuard proxy stays cookie-only.
 - Password change does not revoke tokens (like root SSH keys); revocation is explicit `DELETE /api/v1/auth/tokens/{id}`, effective immediately and across restarts. An open SSE stream re-checks its token like a session.
 - `created_at` is the router wall clock, for display only; tokens do not expire.

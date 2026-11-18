@@ -27,6 +27,7 @@ import PageHost from './PageHost.svelte';
 import SystemUpdate from './SystemUpdate.svelte';
 
 const settingsCard = lazyPage(() => import('./SystemSettingsCard.svelte'));
+const sshKeysCard = lazyPage(() => import('./SystemSSHKeysCard.svelte'));
 
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
@@ -201,6 +202,8 @@ async function logout() {
       <Button variant="outline" href={href('system-tokens')}>{m.tokens_open()}</Button>
     </div>
   </Card>
+
+  <PageHost load={sshKeysCard} />
 
   <Card title={m.reboot_title()}>
     <p class="text-muted-foreground">{m.reboot_confirm()}</p>

@@ -219,6 +219,14 @@ export type JoinWiFiInputBody = {
     ssid: string;
 };
 
+export type KeyList = {
+    keys: Array<PublicKey>;
+    /**
+     * Lines kept verbatim that Travo cannot parse (options, comments)
+     */
+    unmanaged: number;
+};
+
 export type KillSwitchState = {
     /**
      * Kill switch rules are configured
@@ -285,6 +293,13 @@ export type PasswordInputBody = {
      * 8 to 128 bytes, no NUL or line breaks
      */
     new: string;
+};
+
+export type PublicKey = {
+    comment: string;
+    fingerprint: string;
+    id: string;
+    type: string;
 };
 
 export type RadioInfo = {
@@ -403,6 +418,13 @@ export type SplitBody = {
      * IPv4 prefixes routed through the tunnel; empty = full tunnel
      */
     routes: Array<string> | null;
+};
+
+export type SshKeyAddInputBody = {
+    /**
+     * One OpenSSH public key line: type, base64, optional comment; no options
+     */
+    key: string;
 };
 
 export type StageInputBody = {
@@ -1570,6 +1592,118 @@ export type SetSystemSettingsResponses = {
 };
 
 export type SetSystemSettingsResponse = SetSystemSettingsResponses[keyof SetSystemSettingsResponses];
+
+export type GetSshKeysData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/ssh-keys';
+};
+
+export type GetSshKeysErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetSshKeysError = GetSshKeysErrors[keyof GetSshKeysErrors];
+
+export type GetSshKeysResponses = {
+    /**
+     * OK
+     */
+    200: KeyList;
+};
+
+export type GetSshKeysResponse = GetSshKeysResponses[keyof GetSshKeysResponses];
+
+export type AddSshKeyData = {
+    body: SshKeyAddInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/ssh-keys';
+};
+
+export type AddSshKeyErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type AddSshKeyError = AddSshKeyErrors[keyof AddSshKeyErrors];
+
+export type AddSshKeyResponses = {
+    /**
+     * Created
+     */
+    201: PublicKey;
+};
+
+export type AddSshKeyResponse = AddSshKeyResponses[keyof AddSshKeyResponses];
+
+export type DeleteSshKeyData = {
+    body?: never;
+    path: {
+        /**
+         * Key id from the list (hex sha256 of the key)
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/system/ssh-keys/{id}';
+};
+
+export type DeleteSshKeyErrors = {
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DeleteSshKeyError = DeleteSshKeyErrors[keyof DeleteSshKeyErrors];
+
+export type DeleteSshKeyResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type DeleteSshKeyResponse = DeleteSshKeyResponses[keyof DeleteSshKeyResponses];
 
 export type GetTimezonesData = {
     body?: never;

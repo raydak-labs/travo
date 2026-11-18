@@ -99,7 +99,8 @@ func TestNoTokenReachesSessionOnlyRoutes(t *testing.T) {
 			t.Errorf("%s: %d %s", key, rec.Code, rec.Body)
 		}
 	}
-	want := map[string]bool{"getAPITokens": true, "createAPIToken": true, "deleteAPIToken": true, "postPassword": true, "postLogout": true, "getSession": true}
+	want := map[string]bool{"getAPITokens": true, "createAPIToken": true, "deleteAPIToken": true, "postPassword": true, "postLogout": true, "getSession": true,
+		"addSSHKey": true, "deleteSSHKey": true}
 	if sessionOnly != len(want) {
 		t.Fatalf("session-only routes: %d, want %d", sessionOnly, len(want))
 	}

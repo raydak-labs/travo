@@ -24,6 +24,8 @@ type Device struct {
 	// RunInput carries stdin (passwd); ReadFile reads /etc/shadow. Nil ReadFile means os.ReadFile.
 	RunInput runner.InputRunner
 	ReadFile func(string) ([]byte, error)
+	// AuthorizedKeysPath overrides /etc/dropbear/authorized_keys (tests).
+	AuthorizedKeysPath string
 	// SysNet overrides /sys/class/net (tests).
 	SysNet string
 }

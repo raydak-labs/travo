@@ -24,18 +24,21 @@ type Device struct {
 	UplinkReconnects   int
 	BootIDErr          error
 	RotateBootOnReboot bool
-	mu                 sync.Mutex
-	bootID             string
-	bootSequence       int
-	committed          map[string]*config
-	staged             map[string]*config
-	ubus               map[string]json.RawMessage
-	scanReplies        map[string]json.RawMessage
-	staLinkIndex       int
-	netLinks           []device.NetLink
-	neighbours         json.RawMessage
-	wirelessChanged    bool
-	DefaultRoute       bool
+	// AuthorizedKeysErr makes authorized_keys reads and writes fail.
+	AuthorizedKeysErr error
+	authorizedKeys    []byte
+	mu                sync.Mutex
+	bootID            string
+	bootSequence      int
+	committed         map[string]*config
+	staged            map[string]*config
+	ubus              map[string]json.RawMessage
+	scanReplies       map[string]json.RawMessage
+	staLinkIndex      int
+	netLinks          []device.NetLink
+	neighbours        json.RawMessage
+	wirelessChanged   bool
+	DefaultRoute      bool
 	// RenewErr makes RenewLease fail; renews records the interfaces renewed.
 	RenewErr error
 	renews   []string

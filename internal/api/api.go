@@ -125,6 +125,8 @@ type Deps struct {
 	WiFiAPs       WiFiAPEditor
 	WiFiGuest     WiFiGuestEditor
 	WiFiMAC       WiFiMACEditor
+	// SSHKeys is root's authorized_keys; nil answers 503.
+	SSHKeys SSHKeys
 	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
 	USBTether USBTether
 	// SystemSettings is hostname, time zone and NTP; nil answers 503.
@@ -215,6 +217,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerTxn(a)
 	s.registerSystem(a)
 	s.registerSystemSettings(a)
+	s.registerSSHKeys(a)
 	s.registerReboot(a)
 	s.registerVPNProfiles(a)
 	s.registerVPNStatus(a)
