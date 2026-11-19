@@ -12,6 +12,7 @@ const diagnostics = lazyPage(() => import('./DiagnosticsCard.svelte'));
 const wakeOnLan = lazyPage(() => import('./WakeOnLanCard.svelte'));
 const dhcpServer = lazyPage(() => import('./DHCPServerCard.svelte'));
 const dnsNames = lazyPage(() => import('./DNSNamesCard.svelte'));
+const portForwards = lazyPage(() => import('./PortForwardsCard.svelte'));
 </script>
 
 <div class="grid gap-4">
@@ -22,6 +23,7 @@ const dnsNames = lazyPage(() => import('./DNSNamesCard.svelte'));
   <PageHost load={interfaces} />
   <PageHost load={dhcpServer} />
   <PageHost load={dnsNames} />
+  <PageHost load={portForwards} />
   <PageHost load={diagnostics} />
   <PageHost load={wakeOnLan} />
 </div>

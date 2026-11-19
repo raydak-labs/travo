@@ -652,6 +652,71 @@ export type PasswordInputBody = {
     new: string;
 };
 
+export type PortForward = {
+    /**
+     * Destination zone
+     */
+    dest: string;
+    enabled: boolean;
+    /**
+     * src_dport: port or range a-b on the wan side
+     */
+    external_port: string;
+    /**
+     * UCI section
+     */
+    id: string;
+    name: string;
+    /**
+     * Created by Travo (travo_fwd_<n>); others are read-only
+     */
+    owned: boolean;
+    /**
+     * tcp, udp, both, or the raw fw4 value of a foreign section
+     */
+    proto: string;
+    /**
+     * Source zone
+     */
+    src: string;
+    /**
+     * DNAT or SNAT
+     */
+    target: string;
+    /**
+     * dest_ip; empty means the router itself
+     */
+    target_ip: string;
+    /**
+     * dest_port; empty means the external port
+     */
+    target_port: string;
+};
+
+export type PortForwardRequest = {
+    /**
+     * Port 1-65535 or range a-b
+     */
+    external_port: string;
+    /**
+     * Label; defaults to the external port
+     */
+    name?: string;
+    proto: 'tcp' | 'udp' | 'both';
+    /**
+     * IPv4 host in the lan subnet, not the router
+     */
+    target_ip: string;
+    /**
+     * Port or range; empty keeps the external port
+     */
+    target_port?: string;
+};
+
+export type PortForwardsOutputBody = {
+    forwards: Array<PortForward>;
+};
+
 export type PublicKey = {
     comment: string;
     fingerprint: string;
@@ -2731,6 +2796,122 @@ export type RestartNetworkInterfaceResponses = {
 };
 
 export type RestartNetworkInterfaceResponse = RestartNetworkInterfaceResponses[keyof RestartNetworkInterfaceResponses];
+
+export type ListPortForwardsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/port-forwards';
+};
+
+export type ListPortForwardsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ListPortForwardsError = ListPortForwardsErrors[keyof ListPortForwardsErrors];
+
+export type ListPortForwardsResponses = {
+    /**
+     * OK
+     */
+    200: PortForwardsOutputBody;
+};
+
+export type ListPortForwardsResponse = ListPortForwardsResponses[keyof ListPortForwardsResponses];
+
+export type AddPortForwardData = {
+    body: PortForwardRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/port-forwards';
+};
+
+export type AddPortForwardErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type AddPortForwardError = AddPortForwardErrors[keyof AddPortForwardErrors];
+
+export type AddPortForwardResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type AddPortForwardResponse = AddPortForwardResponses[keyof AddPortForwardResponses];
+
+export type DeletePortForwardData = {
+    body?: never;
+    path: {
+        /**
+         * UCI section of the forward
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/network/port-forwards/{id}';
+};
+
+export type DeletePortForwardErrors = {
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DeletePortForwardError = DeletePortForwardErrors[keyof DeletePortForwardErrors];
+
+export type DeletePortForwardResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type DeletePortForwardResponse = DeletePortForwardResponses[keyof DeletePortForwardResponses];
 
 export type GetWanSettingsData = {
     body?: never;
