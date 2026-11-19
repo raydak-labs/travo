@@ -16,7 +16,12 @@ import { createLoader } from '../ui/loader.svelte';
 import Status from '../ui/Status.svelte';
 import { createTunnelControl } from '../vpn-tunnel.svelte';
 import CaptivePortalCard from './CaptivePortalCard.svelte';
+import { lazyPage } from './lazy';
+import PageHost from './PageHost.svelte';
 import VPNTunnelPanel from './VPNTunnelPanel.svelte';
+
+// Own chunk: the history card loads after the live cards (#232).
+const historyCard = lazyPage(() => import('./StatsHistoryCard.svelte'));
 
 let {
   events,
@@ -199,4 +204,5 @@ function formatRate(rate: number | null): string {
       {/if}
     </LoadState>
   </Card>
+  <PageHost load={historyCard} />
 </div>

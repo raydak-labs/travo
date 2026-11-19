@@ -120,6 +120,46 @@ async function shootVpnStates(chrome) {
   }
 }
 
+// A fresh mock daemon has no history yet. Stub one day of 10 min buckets (one restart, an
+// uplink switch, a degraded file) so the history card's charts are visible; no router involved.
+const FAKE_HISTORY = `(() => {
+  const end = Date.UTC(2026, 10, 18, 12) / 1000;
+  const points = [];
+  for (let i = 0; i < 144; i++) {
+    const at = end - (143 - i) * 600;
+    const wave = Math.sin(i / 9) + 1;
+    const uplinks = i === 60 ? [] : [{ name: i < 100 ? 'wwan' : 'usbtether',
+      rx_bytes: Math.round(wave * 40e6 + (i % 7) * 3e6), tx_bytes: Math.round(wave * 6e6) }];
+    points.push({ at, uptime_seconds: i < 61 ? 86400 + i * 600 : (i - 61) * 600 + 120,
+      clients: 2 + Math.round(wave * 3), uplinks });
+  }
+  const body = { interval_seconds: 600, retention_hours: 168, persistence: 'degraded', points };
+  const real = window.fetch;
+  window.fetch = (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+    if (url.pathname === '/api/v1/stats/history') return Promise.resolve(Response.json(body));
+    return real(input, init);
+  };
+})()`;
+
+async function shootHistory(chrome) {
+  const { identifier } = await chrome.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: FAKE_HISTORY,
+  });
+  for (const vp of VIEWPORTS) {
+    for (const scheme of SCHEMES) {
+      await chrome.open(`${BASE_URL}/#/`, { ...vp, scheme });
+      await chrome.evaluate(
+        `document.querySelector('[aria-label="Time range"]')?.scrollIntoView(); window.scrollBy(0, -72)`,
+      );
+      const out = `${OUT_DIR}dashboard-history-${vp.width}-${scheme}.png`;
+      await chrome.screenshot(out);
+      console.log(`wrote ${out}`);
+    }
+  }
+  await chrome.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+}
+
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const chrome = await launchChrome();
@@ -133,6 +173,7 @@ async function main() {
     await signIn(chrome);
     await shootAll(chrome, SIGNED_IN_ROUTES);
     await shootVpnStates(chrome);
+    await shootHistory(chrome);
     await shootOverlays(
       chrome,
       BASE_URL,
