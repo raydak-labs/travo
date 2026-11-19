@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blackdark-org/travo-greenfield/internal/adguard"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
@@ -144,6 +145,11 @@ func (s *Service) inputs(ctx context.Context) (Inputs, error) {
 		}
 		*c.dst = secs
 	}
+	travo, err := s.UCI.Show(ctx, adguard.TopologyConfig)
+	if err != nil && !errors.Is(err, device.ErrNotFound) {
+		return Inputs{}, ErrUnavailable // the AdGuard topology gate fails closed
+	}
+	in.Travo = travo
 	live, err := s.live(ctx)
 	if err != nil {
 		return Inputs{}, ErrUnavailable // overlap must not be judged on a partial view

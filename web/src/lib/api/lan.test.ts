@@ -35,6 +35,7 @@ describe('moveOutcome', () => {
       kind: 'refused',
       error: expect.stringContaining('overlaps'),
     });
+    expect(lanRefusal('lan_adguard_expert').error).toContain('default DNS topology');
     expect(lanRefusal('lan_no_change').message).toBeTruthy();
     expect(lanRefusal('nope').error).toBeTruthy();
   });

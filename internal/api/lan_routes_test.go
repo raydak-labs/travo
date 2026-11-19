@@ -53,6 +53,7 @@ func TestLANRouteErrors(t *testing.T) {
 		"lan_dhcp_pool_outside":  lanaddress.ErrPoolOutside,
 		"lan_dependents_outside": &lanaddress.DependentsError{Sections: []string{"dhcp.x (192.168.1.5)"}},
 		"lan_foreign_config":     lanaddress.ErrForeign,
+		"lan_adguard_expert":     lanaddress.ErrAdGuardExpert,
 		"transaction_pending":    txn.ErrActive,
 		"lan_no_change":          txn.ErrNoChanges,
 		"uci_busy":               txn.ErrForeignStaged,

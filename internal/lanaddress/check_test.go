@@ -94,6 +94,9 @@ func TestPlanRefusals(t *testing.T) {
 			in.DHCP = append(in.DHCP, export(t, "dhcp", "clients/uci-export-dhcp-host-staged.txt")...)
 		}, ErrDependents},
 		"port forward": {"192.168.8.1/24", func(in *Inputs) { in.Firewall = append(in.Firewall, redirect("192.168.1.20")) }, ErrDependents},
+		"adguard expert": {"192.168.8.1/24", func(in *Inputs) {
+			in.Travo = []device.Section{{Type: "travo-greenfield", Name: "main", Options: map[string]string{"adguard_topology": "expert"}}}
+		}, ErrAdGuardExpert},
 		"router collides": {"192.168.1.119/24", func(in *Inputs) {
 			in.DHCP = append(in.DHCP, export(t, "dhcp", "clients/uci-export-dhcp-host-staged.txt")...)
 		}, ErrDependents},

@@ -32,6 +32,9 @@ var (
 	ErrPoolOutside = errors.New("the DHCP pool does not fit the new lan subnet")
 	// ErrDependents: reservations, DNS names or port forwards point outside the new subnet.
 	ErrDependents = errors.New("settings still point at addresses outside the new lan subnet")
+	// ErrAdGuardExpert: the AdGuard expert topology binds DNS to the current lan address
+	// (ADR 0021); switch back to the default topology before moving lan.
+	ErrAdGuardExpert = errors.New("switch AdGuard Home back to the default DNS topology before changing the lan address")
 )
 
 // FieldError is a validation failure on one request field.

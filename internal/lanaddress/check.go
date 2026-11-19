@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"github.com/blackdark-org/travo-greenfield/internal/adguard"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/dhcpserver"
@@ -16,7 +17,9 @@ import (
 // Inputs is everything the checks read: committed configs and netifd's live addresses.
 type Inputs struct {
 	Network, DHCP, Firewall []device.Section
-	Live                    []facts.Interface
+	// Travo is the travo-greenfield config; its AdGuard topology gates the change.
+	Travo []device.Section
+	Live  []facts.Interface
 }
 
 // OverlapError names the interface whose prefix the new subnet overlaps.
@@ -43,6 +46,11 @@ func Plan(in Inputs, next netip.Prefix) ([]Write, error) {
 	}
 	if cur.prefix == next {
 		return nil, txn.ErrNoChanges
+	}
+	// Expert mode pins the old lan address in dhcp.lan `dhcp_option 6,<addr>` and in
+	// AdGuard Home's bind_hosts; moving lan under it would leave LAN clients without DNS.
+	if adguard.Mode(in.Travo) == adguard.TopologyExpert {
+		return nil, ErrAdGuardExpert
 	}
 	if err := overlap(next, in.Network, in.Live); err != nil {
 		return nil, err

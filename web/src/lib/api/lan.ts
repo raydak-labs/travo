@@ -31,6 +31,8 @@ export function lanRefusal(code: string | undefined): { message?: string; error?
       return { error: m.lan_err_dependents() };
     case 'lan_foreign_config':
       return { error: m.lan_err_foreign() };
+    case 'lan_adguard_expert':
+      return { error: m.lan_err_adguard_expert() };
     case 'lan_no_change':
       return { message: m.lan_no_change() };
     case 'uci_busy':

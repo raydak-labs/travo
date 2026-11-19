@@ -75,6 +75,8 @@ func (s *server) setLAN(ctx context.Context, in *lanInput) (*txnOutput, error) {
 		return nil, fail(http.StatusConflict, "lan_dhcp_pool_outside", err.Error())
 	case errors.Is(err, lanaddress.ErrDependents):
 		return nil, fail(http.StatusConflict, "lan_dependents_outside", err.Error())
+	case errors.Is(err, lanaddress.ErrAdGuardExpert):
+		return nil, fail(http.StatusConflict, "lan_adguard_expert", err.Error())
 	case errors.Is(err, lanaddress.ErrForeign):
 		return nil, lanForeign()
 	case errors.Is(err, txn.ErrActive):
