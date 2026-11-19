@@ -286,6 +286,43 @@ export type ClientsOutputBody = {
     partial: boolean;
 };
 
+export type DdnsRequest = {
+    domain: string;
+    enabled: boolean;
+    /**
+     * Token or password; write-only, empty keeps the stored one
+     */
+    password?: string;
+    service: string;
+    username?: string;
+};
+
+export type DdnsView = {
+    domain: string;
+    enabled: boolean;
+    /**
+     * ddns-scripts is installed
+     */
+    installed: boolean;
+    /**
+     * A token or password is stored; it is never returned
+     */
+    password_set: boolean;
+    /**
+     * Address ddns-scripts last registered or looked up; empty when unknown
+     */
+    registered_ip: string;
+    /**
+     * ddns-scripts service_name, e.g. duckdns.org
+     */
+    service: string;
+    /**
+     * Providers ddns-scripts ships (/usr/share/ddns/default)
+     */
+    services: Array<string> | null;
+    username: string;
+};
+
 export type DhcpSettings = {
     /**
      * IPv4 DHCP server on (dhcp.lan has neither ignore nor dhcpv4 disabled)
@@ -2792,6 +2829,113 @@ export type EnableFailoverResponses = {
 };
 
 export type EnableFailoverResponse = EnableFailoverResponses[keyof EnableFailoverResponses];
+
+export type GetDdnsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/ddns';
+};
+
+export type GetDdnsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetDdnsError = GetDdnsErrors[keyof GetDdnsErrors];
+
+export type GetDdnsResponses = {
+    /**
+     * OK
+     */
+    200: DdnsView;
+};
+
+export type GetDdnsResponse = GetDdnsResponses[keyof GetDdnsResponses];
+
+export type SetDdnsData = {
+    body: DdnsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/ddns';
+};
+
+export type SetDdnsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetDdnsError = SetDdnsErrors[keyof SetDdnsErrors];
+
+export type SetDdnsResponses = {
+    /**
+     * OK
+     */
+    200: DdnsView;
+};
+
+export type SetDdnsResponse = SetDdnsResponses[keyof SetDdnsResponses];
+
+export type InstallDdnsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/ddns/install';
+};
+
+export type InstallDdnsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type InstallDdnsError = InstallDdnsErrors[keyof InstallDdnsErrors];
+
+export type InstallDdnsResponses = {
+    /**
+     * OK
+     */
+    200: DdnsView;
+};
+
+export type InstallDdnsResponse = InstallDdnsResponses[keyof InstallDdnsResponses];
 
 export type GetDhcpSettingsData = {
     body?: never;

@@ -9,6 +9,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/api"
 	"github.com/blackdark-org/travo-greenfield/internal/app"
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/blackdark-org/travo-greenfield/internal/ddns"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/failover"
 	"github.com/blackdark-org/travo-greenfield/internal/ipv6settings"
@@ -54,6 +55,24 @@ func newIPv6(deps app.Deps) api.IPv6Settings {
 		return nil
 	}
 	return &ipv6settings.Service{UCI: deps.Device, Routes: routes, Txns: deps.Txn}
+}
+
+// newDDNS wires dynamic DNS; nil (503) without the token writer, services or transactions.
+func newDDNS(deps app.Deps, connection api.ConnectivityReader) api.DDNS {
+	keys, hasKeys := deps.Device.(device.DDNSPasswordWriter)
+	services, hasServices := deps.Device.(device.Services)
+	if !hasKeys || !hasServices || deps.Txn == nil {
+		return nil
+	}
+	s := &ddns.Service{UCI: deps.Device, Keys: keys, Packages: deps.Packages, Services: services,
+		Guards: deps.Guards, Txns: deps.Txn, FreeBytes: adguard.FreeBytes("/overlay", "/"),
+		Online: func(ctx context.Context) bool {
+			return connection != nil && connection.Status(ctx).Internet == connectivity.Online
+		}}
+	if deps.Mock {
+		s.FreeBytes = func() (uint64, error) { return 64 << 20, nil }
+	}
+	return s
 }
 
 // startFailover wires multi-WAN failover and its mwan3 reconciler; nil without the ports

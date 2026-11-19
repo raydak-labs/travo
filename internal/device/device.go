@@ -116,6 +116,12 @@ type WANPasswordWriter interface {
 	SetWANPassword(ctx context.Context, password string) error
 }
 
+// DDNSPasswordWriter stages ddns.travo.password (the dynamic DNS token) like the WAN
+// password: never in process arguments, logs or errors.
+type DDNSPasswordWriter interface {
+	SetDDNSPassword(ctx context.Context, password string) error
+}
+
 // Rebooter schedules a router restart and returns before it happens, so the
 // caller can flush its HTTP response. The reboot itself is a terminal operation.
 type Rebooter interface {

@@ -160,6 +160,10 @@ func (d *Device) SetWANPassword(ctx context.Context, password string) error {
 	return d.Set(ctx, "network", "wan", "password", password)
 }
 
+func (d *Device) SetDDNSPassword(ctx context.Context, password string) error {
+	return d.Set(ctx, "ddns", "travo", "password", password)
+}
+
 func (d *Device) SetType(_ context.Context, cfg, sec, typ string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()

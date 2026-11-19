@@ -1,0 +1,6 @@
+ddns-scripts-2.8.4-r9 installed size:
+71 KiB
+
+ddns-scripts-services-2.8.4-r9 installed size:
+17 KiB
+

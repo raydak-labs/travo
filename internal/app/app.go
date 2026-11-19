@@ -85,6 +85,7 @@ func New(o Options) (Deps, error) {
 		dev.SetService("adguardhome", false, false) // absent package; the mock install adds it
 		dev.SetService(tailscale.Package, false, false)
 		dev.SetService("usbmuxd", false, false) // absent until the iOS tether driver install
+		dev.SetService("ddns", false, false)    // ddns-scripts' init script, after the mock install
 		for config, export := range map[string][]byte{"network": mock.NetworkExport, "firewall": mock.FirewallExport} {
 			secs, err := cli.ParseExport(config, string(export))
 			if err != nil {

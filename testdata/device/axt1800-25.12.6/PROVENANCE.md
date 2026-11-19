@@ -112,3 +112,6 @@ Devicetree key nodes (label, `linux,code`, `linux,input-type`) of the reset butt
 - sysupgrade/etc-apk-world.txt, sysupgrade/rom-etc-apk-world.txt: `cat /etc/apk/world` and `cat /rom/etc/apk/world` (GET-only) after firstboot plus the 0.1.0 install. Identical: the image was built with `adguardhome`, and Travo itself is not an apk package (ADR 0007), so no user-installed package exists. Verbatim; nothing needed redaction.
 - sysupgrade/keep.d-travo-greenfield.txt: `cat /lib/upgrade/keep.d/travo-greenfield` (GET-only) from the 0.1.0 install. Verbatim.
 - `which sysupgrade` → `/sbin/sysupgrade`; `ubus -v list system` lists `validate_firmware_image {path}` and `sysupgrade {path, force, backup, prefix, command, options}`. No image was uploaded, validated or flashed on the router.
+
+## ipv6/, ddns/ and adguard DoH captures (2026-11-19, #245)
+IPv6 defaults of the image, the `ddns-scripts` package files (installed and removed under the lock, router restored) and AGH's upstream test replies. See `ipv6/PROVENANCE.md`, `ddns/PROVENANCE.md` and `adguard/PROVENANCE.md`.
