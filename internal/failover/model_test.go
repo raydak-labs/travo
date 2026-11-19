@@ -109,8 +109,9 @@ func TestApplyOnStockConfigAdoptsWanAndKeepsStockSections(t *testing.T) {
 		}
 	}
 	wan, _ := get(after, "wan")
-	if wan.Options["enabled"] != "1" || wan.Options["family"] != "ipv4" || len(wan.Lists["track_ip"]) != 0 || wan.Options["reliability"] != "2" {
-		t.Fatalf("adopted wan = %+v (track_ip must go, reliability stays)", wan)
+	if wan.Options["enabled"] != "1" || wan.Options["family"] != "ipv4" || !slices.Equal(wan.Lists["track_ip"], TrackIPs) ||
+		wan.Options["reliability"] != "1" || wan.Options["up"] != "6" {
+		t.Fatalf("adopted wan = %+v (stock tracking must become Travo's)", wan)
 	}
 	m2, _ := get(after, MemberName("wwan"))
 	pol, _ := get(after, Policy)
@@ -214,12 +215,26 @@ func TestVerifyCatchesMissingAndUnorderedRules(t *testing.T) {
 
 func TestFingerprintIgnoresUnownedOptions(t *testing.T) {
 	s := Desired(Settings{Enabled: true, Uplinks: []string{"wan", "wwan"}})[0]
-	s.Options["reliability"] = "2"
+	s.Options["timeout"] = "2"
 	if !Stamped(s) {
 		t.Fatal("an unowned option broke the stamp")
 	}
 	s.Lists["track_ip"] = []string{"1.1.1.1"}
 	if Stamped(s) {
-		t.Fatal("an added track_ip kept the stamp")
+		t.Fatal("an edited track_ip kept the stamp")
+	}
+}
+
+// #277: without track_ip mwan3 never reports a member online, so the policy stays empty.
+func TestDesiredInterfacesTrack(t *testing.T) {
+	for _, s := range Desired(Settings{Enabled: true, Uplinks: []string{"wwan", "usbtether"}}) {
+		if s.Type != "interface" {
+			continue
+		}
+		want := map[string]string{"enabled": "1", "family": "ipv4", "reliability": "1", "count": "1",
+			"interval": "5", "down": "3", "up": "6", FingerprintOption: Fingerprint(s)}
+		if !maps.Equal(s.Options, want) || !slices.Equal(s.Lists["track_ip"], []string{"1.1.1.1", "8.8.8.8"}) {
+			t.Errorf("%s = %+v", s.Name, s)
+		}
 	}
 }

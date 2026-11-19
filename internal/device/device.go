@@ -180,6 +180,15 @@ type Services interface {
 	ServiceAction(ctx context.Context, name, action string) error
 }
 
+// MWAN3Reader reads mwan3's runtime state as raw text; internal/failover parses it.
+type MWAN3Reader interface {
+	// MWAN3Interfaces is `mwan3 interfaces` (tracking verdict per interface section).
+	MWAN3Interfaces(ctx context.Context) (string, error)
+	// MangleRules is `iptables -t mangle -S`, where mwan3 keeps its IPv4 marking rules.
+	// It fails when iptables-nft cannot read the table (a foreign native nft rule in it).
+	MangleRules(ctx context.Context) (string, error)
+}
+
 // ServiceAutostart reads whether an init script starts at boot.
 type ServiceAutostart interface {
 	// ServiceEnabled is `/etc/init.d/<name> enabled`: exit 0 true, exit 1 false

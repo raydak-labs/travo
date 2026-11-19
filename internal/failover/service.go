@@ -49,6 +49,8 @@ type Service struct {
 	Reorder  device.UCIReorderer
 	Ubus     device.Ubus
 	Services device.Services
+	// Runtime reads mwan3's tracking and mangle rules for the apply probe.
+	Runtime  device.MWAN3Reader
 	Packages pkgmgr.PackageManager
 	Guards   guard.Dir
 	Txns     Transactions
@@ -106,7 +108,7 @@ func (s *Service) saveSettings(st Settings) error {
 }
 
 func (s *Service) ready() bool {
-	return s.UCI != nil && s.Reorder != nil && s.Ubus != nil && s.Services != nil && s.Packages != nil &&
+	return s.UCI != nil && s.Reorder != nil && s.Ubus != nil && s.Services != nil && s.Runtime != nil && s.Packages != nil &&
 		s.Txns != nil && s.Online != nil && s.Guards.Path != "" && s.Path != ""
 }
 
@@ -260,7 +262,8 @@ func (s *Service) install(ctx context.Context) error {
 }
 
 // prove starts mwan3 on the committed config, then waits until every managed section reads
-// back as planned, mwan3 runs and a real outbound probe is online.
+// back as planned, mwan3 runs, tracks every uplink online, routes by travo_failover
+// (CheckRuntime) and a real outbound probe is online.
 func (s *Service) prove(ctx context.Context, plan *Plan) error {
 	if err := s.Services.ServiceAction(ctx, Package, "restart"); err != nil {
 		return err
@@ -297,10 +300,33 @@ func (s *Service) verified(ctx context.Context, plan *Plan) error {
 	if running, err := s.Services.ServiceRunning(ctx, Package); err != nil || !running {
 		return errors.Join(errors.New("mwan3 is not running"), err)
 	}
+	if err := s.runtimeVerified(ctx, plan); err != nil {
+		return err
+	}
 	if !s.Online(ctx) {
 		return errors.New("no internet through the failover policy")
 	}
 	return nil
+}
+
+func (s *Service) runtimeVerified(ctx context.Context, plan *Plan) error {
+	var uplinks []string
+	for _, w := range plan.Write {
+		if w.Type == "member" {
+			uplinks = append(uplinks, w.Options["interface"])
+		}
+	}
+	interfaces, err := s.Runtime.MWAN3Interfaces(ctx)
+	if err != nil {
+		return fmt.Errorf("mwan3 interfaces: %w", err)
+	}
+	mangle, err := s.Runtime.MangleRules(ctx)
+	if err != nil {
+		// iptables-nft refuses a mangle table holding a foreign native nft rule; mwan3
+		// cannot manage its policies then (ADR 0018).
+		return fmt.Errorf("mwan3 mangle rules unreadable: %w", err)
+	}
+	return CheckRuntime(interfaces, mangle, uplinks)
 }
 
 // Disable records the choice and stops mwan3 (guarded). The config stays: Travo's rules

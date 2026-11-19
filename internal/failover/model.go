@@ -29,7 +29,19 @@ const (
 	RuleV6 = "travo_v6"
 	// fingerprintSchema changes only when the owned option set changes; a build upgrade
 	// alone must not turn every section into "operator-edited".
-	fingerprintSchema = "travo-mwan3/1"
+	fingerprintSchema = "travo-mwan3/2"
+)
+
+// Tracking is what mwan3track uses to decide an uplink is online (ADR 0018). Without
+// track_ip mwan3 reports every interface "unknown and tracking is disabled" and its
+// policies never get an online member (#277).
+var (
+	// TrackIPs: two independent anycast resolvers, by address (no DNS during an outage).
+	TrackIPs = []string{"1.1.1.1", "8.8.8.8"}
+	// Tracking: one reply from either target per round is enough (reliability 1, count 1),
+	// a round every 5 s; 3 failed rounds take an uplink offline (~15 s), 6 good rounds
+	// bring it back (the 30 s failback hold-down of invariants §9).
+	Tracking = map[string]string{"reliability": "1", "count": "1", "interval": "5", "down": "3", "up": "6"}
 )
 
 // Candidates are the uplinks of invariants §7, in default priority.
@@ -66,7 +78,7 @@ func (s Settings) Validate() error {
 // owned lists the options and lists Travo owns per section type. Anything else in a
 // section (an adopted stock interface's `reliability`, say) is left alone.
 var owned = map[string][]string{
-	"interface": {"enabled", "family", "track_ip"},
+	"interface": {"enabled", "family", "track_ip", "reliability", "count", "interval", "down", "up"},
 	"member":    {"interface", "metric", "weight"},
 	"policy":    {"use_member", "last_resort"},
 	"rule":      {"dest_ip", "family", "use_policy", "proto", "dest_port", "sticky"},
@@ -75,13 +87,15 @@ var owned = map[string][]string{
 // MemberName is the generated member of one uplink.
 func MemberName(uplink string) string { return Prefix + "m_" + uplink }
 
-// Desired is the stamped section set for enabled settings. Interfaces carry no track_ip:
-// liveness comes from netifd ifup/ifdown, not ping (invariants §9).
+// Desired is the stamped section set for enabled settings. Interfaces carry the tracking
+// options: mwan3 marks an uplink online only through mwan3track (invariants §9).
 func Desired(s Settings) []device.Section {
 	var out []device.Section
 	members := make([]string, 0, len(s.Uplinks))
 	for i, u := range s.Uplinks {
-		out = append(out, section(u, "interface", map[string]string{"enabled": "1", "family": "ipv4"}, nil))
+		opts := maps.Clone(Tracking)
+		opts["enabled"], opts["family"] = "1", "ipv4"
+		out = append(out, section(u, "interface", opts, map[string][]string{"track_ip": slices.Clone(TrackIPs)}))
 		out = append(out, section(MemberName(u), "member", map[string]string{
 			"interface": u, "metric": fmt.Sprint(i + 1), "weight": "1",
 		}, nil))

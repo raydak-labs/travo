@@ -44,6 +44,9 @@ type Device struct {
 	// CrontabErr makes crontab reads and writes fail.
 	CrontabErr error
 	crontab    string
+	// MWAN3Offline names mwan3 interfaces tracked offline; MangleErr makes MangleRules fail.
+	MWAN3Offline []string
+	MangleErr    error
 	// Wakes records SendWake calls; WakeErr makes it fail. The mock never sends a packet.
 	Wakes        []Wake
 	WakeErr      error

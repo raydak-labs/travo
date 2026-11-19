@@ -28,9 +28,20 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
   matches first. Stock sections are never deleted or edited.
 - Interface sections are the one exception to the `travo_` prefix, forced by mwan3: Travo
   creates `wan`/`wwan`/`usbtether` when missing and ADOPTS an existing one (the stock `wan`),
-  owning only `enabled`, `family` and `track_ip` (removed: liveness from netifd ifup/ifdown,
-  not ping). Adopting is a loud warning. An interface section is never deleted; an uplink
-  dropped from the list gets `enabled 0`.
+  owning only `enabled`, `family` and the tracking options below. Adopting is a loud warning.
+  An interface section is never deleted; an uplink dropped from the list gets `enabled 0`.
+- Tracking (#277, supersedes "liveness from netifd, no `track_ip`"): mwan3 only puts a member
+  into a policy once mwan3track reports its interface online. Without `track_ip` no tracker
+  runs, `mwan3 interfaces` says "unknown and tracking is disabled" and `travo_failover` never
+  gets a member, so every packet takes the main table (seen live on the AXT1800). Every Travo
+  interface section therefore carries `track_ip 1.1.1.1` and `8.8.8.8` (two independent anycast
+  resolvers, by address so tracking needs no DNS during an outage), `reliability 1` (one reply
+  per round is enough: one target filtering ICMP does not flap the uplink), `count 1`,
+  `interval 5`, `down 3` (offline after 3 failed rounds, ~15 s; 12 s measured live) and `up 6`
+  (online after 6 good rounds, 30 s: the failback hold-down of invariants §9). These are
+  constants for now; making them configurable is a later settings change. The owned set grew,
+  so the fingerprint schema is `travo-mwan3/2`: sections stamped by a pre-release build read as
+  operator-edited once and are overwritten (failover never shipped in a release).
 - Provenance: every written section carries `travo_fp`, a hash of its name, type and owned
   values under a schema tag (not the build version, so an upgrade does not orphan sections).
   Owned = stamp present and still matching. A stamped section whose owned values were changed
@@ -48,6 +59,12 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
   runs. Enable (needs a real outbound probe online first) stages the plan in ONE `mwan3`
   transaction; the probe restarts mwan3 and proves every managed section reads back stamped, the
   Travo rules on top, mwan3 running and the outbound probe online, then the user confirms.
+- The probe also proves mwan3 routes by the policy (#277), since a request through the main
+  table succeeds without mwan3 doing anything: `mwan3 interfaces` reports every chosen uplink
+  "online and tracking is active", and `iptables -t mangle -S` shows `mwan3_hook` on PREROUTING
+  and OUTPUT, the first `mwan3_rules` jump going to `mwan3_policy_travo_failover`, and that
+  chain marking for the first uplink (comment `"<uplink> 1 1"`). Enabling therefore needs every
+  chosen uplink online. The probe reads through the `MWAN3Reader` device port.
   Disable stops and disables mwan3 under guard `failover-service-in-progress` and keeps the config.
   A reconciler (every 5 s, lifecycle worker) keeps mwan3 running exactly while the settings say
   enabled and the committed config is active: it stops mwan3 after a rollback restored the stock
@@ -55,6 +72,15 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
   awaits confirmation or a failover guard is kept.
 
 ## Consequences
+
+- mwan3 2.12.0 drives its state machine through `iptables -t mangle -S` (iptables-nft on fw4).
+  It works on 25.12.6 (container: tracking, policy switch and router-local failover with
+  masquerade), but iptables-nft refuses to list a table holding native nft rules ("table `mangle'
+  is incompatible, use 'nft' tool"). mwan3 then misreads its table as empty and its batches fail
+  ("Chain already exists"), at the latest on restart; `mwan3 status` fails. Tailscale's nftables
+  mode (the OpenWrt package default) writes native connmark rules into `ip`/`ip6 mangle`. With
+  such a rule present the probe fails and the apply rolls back; how the two coexist is open
+  (#277).
 
 - A rollback of the FIRST apply restores the stock config while mwan3 runs; its catch-all rules
   can be live for up to one reconciler tick (5 s) before mwan3 is stopped.

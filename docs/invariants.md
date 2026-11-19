@@ -134,14 +134,14 @@ dnsmasq is the single DNS authority for upstream choice; in expert mode AGH owns
 
 ## 9. Multi-WAN failover (mwan3, IPv4 only; post-0.1)
 
-- Source of truth is Travo's failover JSON, generated into `/etc/config/mwan3`. Generated sections are prefixed `travo_`, except interface sections, which mwan3 keys by the netifd name (`wan`, `wwan`, `usbtether`): those are created or adopted (loud warning), Travo owns only `enabled`, `family`, `track_ip`, and they are never deleted ([ADR 0018](adr/0018-mwan3-failover.md)).
+- Source of truth is Travo's failover JSON, generated into `/etc/config/mwan3`. Generated sections are prefixed `travo_`, except interface sections, which mwan3 keys by the netifd name (`wan`, `wwan`, `usbtether`): those are created or adopted (loud warning), Travo owns only `enabled`, `family` and the tracking options (`track_ip`, `reliability`, `count`, `interval`, `down`, `up`), and they are never deleted ([ADR 0018](adr/0018-mwan3-failover.md)).
 - Ownership = PROVENANCE (`travo_fp` stamped over the owned values and still matching), never content. A non-namespaced section is NEVER deleted.
 - Rules `travo_v4` (→ `travo_failover`, `last_resort default`) and `travo_v6` (→ `default`, main table) sit at the top of the rule list; stock catch-all rules stay but never match first.
 - Operator-edited `travo_` section: overwrite Travo-owned options with a LOUD warning.
 - Back up EVERY section a save may write; restore on failure.
-- Staged apply: apply with rollback → verify every managed section → confirm (not confirm-then-verify).
+- Staged apply: apply with rollback → verify every managed section → confirm (not confirm-then-verify). The verify includes mwan3's runtime: every chosen uplink "online and tracking is active" and the mangle rules marking for the first uplink through `travo_failover`; a request through the main table is no proof.
 - Failback hold-down 30 s; walk the priority list, first uplink past hold-down wins (not "keep current first").
-- Liveness from netifd interface status, not ping. `family: ipv4` explicit; no IPv6 policy until device-validated.
+- Liveness from mwan3track pings (`track_ip`, ADR 0018 tracking values): without a tracker mwan3 never marks a member online. `family: ipv4` explicit; no IPv6 policy until device-validated.
 - Guard during the apply window. Mocks must match real UCI semantics (`set` = create-or-update).
 - A fresh `mwan3` install is stopped and disabled at once (its stock catch-all rules must never run). mwan3 runs only while the settings say enabled and the committed config carries the stamped Travo rules; a reconciler (5 s) stops it otherwise and boot-enables it only after the user confirmed.
 

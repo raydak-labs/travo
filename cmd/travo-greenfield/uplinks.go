@@ -80,11 +80,12 @@ func newDDNS(deps app.Deps, connection api.ConnectivityReader) api.DDNS {
 func startFailover(deps app.Deps, connection api.ConnectivityReader, workers *lifecycle.Group) api.Failover {
 	reorder, hasReorder := deps.Device.(device.UCIReorderer)
 	services, hasServices := deps.Device.(device.Services)
-	if !hasReorder || !hasServices || connection == nil || deps.Txn == nil {
+	runtime, hasRuntime := deps.Device.(device.MWAN3Reader)
+	if !hasReorder || !hasServices || !hasRuntime || connection == nil || deps.Txn == nil {
 		return nil
 	}
 	svc := &failover.Service{
-		UCI: deps.Device, Reorder: reorder, Ubus: deps.Device, Services: services,
+		UCI: deps.Device, Reorder: reorder, Ubus: deps.Device, Services: services, Runtime: runtime,
 		Packages: deps.Packages, Guards: deps.Guards, Txns: deps.Txn,
 		Online: func(ctx context.Context) bool {
 			return connection.Status(ctx).Internet == connectivity.Online

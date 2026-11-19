@@ -65,7 +65,7 @@ func newRig(t *testing.T, installed bool) *rig {
 	g := guard.Dir{Path: filepath.Join(t.TempDir(), "guards"), Now: time.Now}
 	r := &rig{d: d, pm: pm, online: true}
 	r.txns = &fakeTxns{d: d, guards: g}
-	r.s = &Service{UCI: d, Reorder: d, Ubus: d, Services: d, Packages: pm, Guards: g, Txns: r.txns,
+	r.s = &Service{UCI: d, Reorder: d, Ubus: d, Services: d, Runtime: d, Packages: pm, Guards: g, Txns: r.txns,
 		Online: func(context.Context) bool { return r.online }, Path: filepath.Join(t.TempDir(), "failover.json"),
 		ProbeWait: 100 * time.Millisecond}
 	return r
@@ -127,6 +127,29 @@ func TestProbeFailureRollsBackAndReconcilerStopsMwan3(t *testing.T) {
 	}
 	if running, _ := r.d.ServiceRunning(context.Background(), Package); running {
 		t.Fatal("reconciler left mwan3 running on the stock config")
+	}
+}
+
+// #277: a request through the main table is no proof. The probe needs every uplink tracked
+// online and the mangle rules routing by travo_failover; otherwise the apply rolls back.
+func TestProbeNeedsMwan3RoutingByThePolicy(t *testing.T) {
+	for name, script := range map[string]func(*mock.Device){
+		"backup offline": func(d *mock.Device) { d.MWAN3Offline = []string{"wwan"} },
+		"mangle unreadable": func(d *mock.Device) {
+			d.MangleErr = errors.New("iptables v1.8.10 (nf_tables): table `mangle' is incompatible, use 'nft' tool.")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t, true)
+			script(r.d)
+			st, err := r.s.Enable(context.Background(), []string{"wan", "wwan"})
+			if !errors.Is(err, txn.ErrProbeFailed) || st.State != txn.RolledBack || !errors.Is(r.txns.probeErr, ErrNotUp) {
+				t.Fatalf("enable = %+v, %v (probe %v)", st, err, r.txns.probeErr)
+			}
+			if Active(show(t, r.d)) {
+				t.Fatal("rolled-back config still active")
+			}
+		})
 	}
 }
 
