@@ -262,7 +262,7 @@
   "failover_disable_failed": "Failover could not be disabled. Try again.",
   "failover_offline": "The router needs a working internet connection to verify failover.",
   "failover_conflict": "An existing mwan3 section uses a name failover needs. Remove it in LuCI first.",
-  "failover_tailscale_conflict": "Tailscale is running and cannot share the router with failover yet. Stop or remove Tailscale first.",
+  "failover_tailscale_conflict": "Tailscale is running or starts at boot and cannot share the router with failover yet. Stop it and turn off its autostart, or remove Tailscale, first.",
   "failover_invalid": "Choose two or three different uplinks.",
   "failover_no_change": "Failover already uses this order.",
   "failover_failed": "Failover could not be enabled. Enabling again retries it.",

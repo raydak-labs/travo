@@ -101,8 +101,10 @@ Chain already exists`), and its chains stay in `ip mangle` after it stops.
 
 Decision (operator, option b): for 0.2.0 failover and Tailscale are mutually exclusive.
 
-- Enabling failover while the `tailscale` package is installed and tailscaled runs answers 409
-  `failover_tailscale_conflict`. Installing Tailscale or bringing it up (login) while the failover
+- Enabling failover while the `tailscale` package is installed and tailscaled runs or is
+  boot-enabled (`/etc/init.d/tailscale enabled`) answers 409 `failover_tailscale_conflict`: a
+  stopped tailscaled with autostart on would come back after a reboot and break mwan3. The
+  user stops it and disables its autostart, or removes Tailscale. Installing Tailscale or bringing it up (login) while the failover
   settings say enabled answers 409 `tailscale_failover_conflict`. Both checks run under one mutex
   shared by the two services, held through the whole failover apply, so neither can start
   between the other's check and its settings write. A refusal writes nothing and keeps no guard.
@@ -120,7 +122,6 @@ mode, which needs its own hardware validation. Refusing the combination is safe 
 option (a), switching Tailscale to `fw_mode iptables` while failover is on, is tracked in the
 follow-up issue (#279).
 
-Limits: a Tailscale installed but stopped does not block failover, yet its init script is
-boot-enabled, so it starts again after a reboot and breaks mwan3; stop it for good
-(`/etc/init.d/tailscale disable`) or remove it. Tailscale installed outside Travo (LuCI, apk)
-is only seen by the failover check.
+Limits: only a Tailscale that is stopped AND boot-disabled lets failover enable. Starting
+or boot-enabling tailscaled by hand (LuCI, shell) while failover is on bypasses Travo's check
+and breaks mwan3 again; Travo's own install and login refuse it.

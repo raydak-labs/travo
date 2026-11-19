@@ -84,12 +84,13 @@ func startFailover(deps app.Deps, connection api.ConnectivityReader, workers *li
 	services, hasServices := deps.Device.(device.Services)
 	runtime, hasRuntime := deps.Device.(device.MWAN3Reader)
 	mangle, hasMangle := deps.Device.(device.MangleCleaner)
-	if !hasReorder || !hasServices || !hasRuntime || !hasMangle || connection == nil || deps.Txn == nil {
+	autostart, hasAutostart := deps.Device.(device.ServiceAutostart)
+	if !hasReorder || !hasServices || !hasRuntime || !hasMangle || !hasAutostart || connection == nil || deps.Txn == nil {
 		return nil
 	}
 	svc := &failover.Service{
 		UCI: deps.Device, Reorder: reorder, Ubus: deps.Device, Services: services, Runtime: runtime,
-		Mangle: mangle, Exclusive: exclusive, Packages: deps.Packages, Guards: deps.Guards, Txns: deps.Txn,
+		Mangle: mangle, Autostart: autostart, Exclusive: exclusive, Packages: deps.Packages, Guards: deps.Guards, Txns: deps.Txn,
 		Online: func(ctx context.Context) bool {
 			return connection.Status(ctx).Internet == connectivity.Online
 		},

@@ -37,7 +37,7 @@ var (
 	ErrBusy    = errors.New("a failover install or service change did not finish")
 	ErrNotUp   = errors.New("failover did not verify after apply")
 	// ErrTailscale: Tailscale's nftables rules in ip mangle break mwan3 (ADR 0018).
-	ErrTailscale = errors.New("Tailscale is running; stop or remove Tailscale before enabling failover")
+	ErrTailscale = errors.New("Tailscale is running or starts at boot; stop it and disable its autostart, or remove Tailscale, before enabling failover")
 )
 
 // Transactions is the slice of txn.Manager the apply needs.
@@ -54,10 +54,12 @@ type Service struct {
 	// Runtime reads mwan3's tracking and mangle rules for the apply probe.
 	Runtime device.MWAN3Reader
 	// Mangle removes what mwan3 left in ip/ip6 mangle when disabled (ADR 0018).
-	Mangle   device.MangleCleaner
-	Packages pkgmgr.PackageManager
-	Guards   guard.Dir
-	Txns     Transactions
+	Mangle device.MangleCleaner
+	// Autostart reads whether tailscaled starts at boot (the Tailscale conflict check).
+	Autostart device.ServiceAutostart
+	Packages  pkgmgr.PackageManager
+	Guards    guard.Dir
+	Txns      Transactions
 	// Online is the shared real outbound probe (connectivity.Online).
 	Online func(context.Context) bool
 	// Path is failover.json in the state dir.
@@ -115,7 +117,7 @@ func (s *Service) saveSettings(st Settings) error {
 }
 
 func (s *Service) ready() bool {
-	return s.UCI != nil && s.Reorder != nil && s.Ubus != nil && s.Services != nil && s.Runtime != nil && s.Mangle != nil && s.Packages != nil &&
+	return s.UCI != nil && s.Reorder != nil && s.Ubus != nil && s.Services != nil && s.Runtime != nil && s.Mangle != nil && s.Autostart != nil && s.Packages != nil &&
 		s.Txns != nil && s.Online != nil && s.Exclusive != nil && s.Guards.Path != "" && s.Path != ""
 }
 

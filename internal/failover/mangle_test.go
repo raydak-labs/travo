@@ -96,7 +96,7 @@ func TestDisableReportsAFailedCleanup(t *testing.T) {
 	}
 }
 
-func TestEnableRefusesWhileTailscaleRuns(t *testing.T) {
+func TestEnableRefusesWhileTailscaleRunsOrAutostarts(t *testing.T) {
 	r := newRig(t, true)
 	_ = r.pm.Install(context.Background(), TailscalePackage)
 	r.d.SetService(TailscalePackage, true, true)
@@ -106,7 +106,11 @@ func TestEnableRefusesWhileTailscaleRuns(t *testing.T) {
 	if on, _ := r.s.Enabled(); on || len(r.d.ServiceActions) != 0 {
 		t.Fatalf("refusal changed state: enabled %v, actions %v", on, r.d.ServiceActions)
 	}
-	r.d.SetService(TailscalePackage, true, false) // installed, stopped
+	r.d.SetService(TailscalePackage, true, false) // stopped, but starts again at boot
+	if _, err := r.s.Enable(context.Background(), []string{"wan", "wwan"}); !errors.Is(err, ErrTailscale) {
+		t.Fatalf("boot-enabled: err = %v", err)
+	}
+	r.d.SetService(TailscalePackage, false, false) // stopped, autostart disabled
 	if _, err := r.s.Enable(context.Background(), []string{"wan", "wwan"}); err != nil {
 		t.Fatal(err)
 	}
