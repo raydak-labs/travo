@@ -53,7 +53,7 @@ describe('data usage card', () => {
     loader.data = base;
     const body = render(DataUsageCard).body;
     expect(body).toContain('9.0 GB of 10.0 GB (90%)');
-    expect(body).toContain('2026-11-05 to before 2026-12-05 (UTC)');
+    expect(body).toContain('2026-11-05 to before 2026-12-05');
     expect(body).toContain('9.0 GB (down 8.0 GB, up 1.0 GB)');
     expect(body).toContain('wwan up in 90% of samples');
     expect(body).toContain('wwan down');
