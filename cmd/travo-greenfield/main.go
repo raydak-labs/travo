@@ -93,6 +93,7 @@ func main() {
 		}
 		return
 	}
+	applyMemoryLimit(os.Getenv)
 	dir := *staticDir
 	if *useMock && !flagGiven("static-dir") {
 		dir = "web/dist"
