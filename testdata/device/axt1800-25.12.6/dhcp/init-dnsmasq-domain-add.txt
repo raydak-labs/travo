@@ -1,0 +1,15 @@
+dhcp_domain_add() {
+	local cfg="$1"
+	local ip name names record
+
+	config_get names "$cfg" name "$2"
+	[ -n "$names" ] || return 0
+
+	config_get ip "$cfg" ip "$3"
+	[ -n "$ip" ] || return 0
+
+	for name in $names; do
+		record="${record:+$record }$name"
+	done
+
+	echo "$ip $record" >> "$HOSTFILE_TMP"

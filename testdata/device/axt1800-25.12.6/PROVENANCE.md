@@ -94,3 +94,6 @@ No Wake-on-LAN tool or package on the image. See `wol/PROVENANCE.md`.
 
 ## network/ (2026-11-18, #237)
 Interface dump with the guest interface and uptime, and `uci export firewall` with anonymous and named zones. See `network/PROVENANCE.md`.
+
+## dhcp/ (2026-11-19, #239)
+`uci export dhcp` with the guest network, `network.lan`/`network.guest`, and the dnsmasq init script's `dhcp_add` range and `dhcp_domain_add` hosts-file excerpts. See `dhcp/PROVENANCE.md`.

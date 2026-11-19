@@ -263,6 +263,76 @@ export type ClientsOutputBody = {
     partial: boolean;
 };
 
+export type DhcpSettings = {
+    /**
+     * IPv4 DHCP server on (dhcp.lan has neither ignore nor dhcpv4 disabled)
+     */
+    enabled: boolean;
+    /**
+     * <n>m, <n>h or <n>d (at least 2m), or infinite
+     */
+    leasetime: string;
+    /**
+     * Pool size
+     */
+    limit: number;
+    /**
+     * First pool address as an offset into the lan subnet
+     */
+    start: number;
+};
+
+export type DhcpView = {
+    /**
+     * The caller holds a lease from this router
+     */
+    callerLease: boolean;
+    /**
+     * IPv4 DHCP server on (dhcp.lan has neither ignore nor dhcpv4 disabled)
+     */
+    enabled: boolean;
+    /**
+     * First pool address
+     */
+    first?: string;
+    /**
+     * Last pool address
+     */
+    last?: string;
+    /**
+     * <n>m, <n>h or <n>d (at least 2m), or infinite
+     */
+    leasetime: string;
+    /**
+     * Pool size
+     */
+    limit: number;
+    /**
+     * First pool address as an offset into the lan subnet
+     */
+    start: number;
+    /**
+     * Committed lan IPv4 subnet; empty when unknown
+     */
+    subnet?: string;
+};
+
+export type DnsName = {
+    /**
+     * UCI section
+     */
+    id: string;
+    ip: string;
+    /**
+     * Host names answered with ip
+     */
+    names: Array<string>;
+    /**
+     * Created by Travo (travo_dns_<n>); others are read-only
+     */
+    owned: boolean;
+};
+
 export type DnsStatus = {
     effective: Array<string> | null;
     layer: 'active' | 'inactive' | 'failed';
@@ -314,6 +384,21 @@ export type DiagnosticsInputBody = {
      */
     target: string;
     tool: 'ping' | 'traceroute' | 'lookup';
+};
+
+export type DnsNameInputBody = {
+    /**
+     * IPv4 or IPv6 address
+     */
+    ip: string;
+    /**
+     * Host name, e.g. nas or nas.home
+     */
+    name: string;
+};
+
+export type DnsNamesOutputBody = {
+    names: Array<DnsName>;
 };
 
 export type FactoryResetInputBody = {
@@ -2246,6 +2331,80 @@ export type EnableFailoverResponses = {
 
 export type EnableFailoverResponse = EnableFailoverResponses[keyof EnableFailoverResponses];
 
+export type GetDhcpSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/dhcp';
+};
+
+export type GetDhcpSettingsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetDhcpSettingsError = GetDhcpSettingsErrors[keyof GetDhcpSettingsErrors];
+
+export type GetDhcpSettingsResponses = {
+    /**
+     * OK
+     */
+    200: DhcpView;
+};
+
+export type GetDhcpSettingsResponse = GetDhcpSettingsResponses[keyof GetDhcpSettingsResponses];
+
+export type SetDhcpSettingsData = {
+    body: DhcpSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/dhcp';
+};
+
+export type SetDhcpSettingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetDhcpSettingsError = SetDhcpSettingsErrors[keyof SetDhcpSettingsErrors];
+
+export type SetDhcpSettingsResponses = {
+    /**
+     * OK
+     */
+    200: DhcpView;
+};
+
+export type SetDhcpSettingsResponse = SetDhcpSettingsResponses[keyof SetDhcpSettingsResponses];
+
 export type RunNetworkDiagnosticData = {
     body: DiagnosticsInputBody;
     path?: never;
@@ -2290,6 +2449,122 @@ export type RunNetworkDiagnosticResponses = {
 };
 
 export type RunNetworkDiagnosticResponse = RunNetworkDiagnosticResponses[keyof RunNetworkDiagnosticResponses];
+
+export type ListDnsNamesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/dns-names';
+};
+
+export type ListDnsNamesErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ListDnsNamesError = ListDnsNamesErrors[keyof ListDnsNamesErrors];
+
+export type ListDnsNamesResponses = {
+    /**
+     * OK
+     */
+    200: DnsNamesOutputBody;
+};
+
+export type ListDnsNamesResponse = ListDnsNamesResponses[keyof ListDnsNamesResponses];
+
+export type AddDnsNameData = {
+    body: DnsNameInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/dns-names';
+};
+
+export type AddDnsNameErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type AddDnsNameError = AddDnsNameErrors[keyof AddDnsNameErrors];
+
+export type AddDnsNameResponses = {
+    /**
+     * OK
+     */
+    200: DnsName;
+};
+
+export type AddDnsNameResponse = AddDnsNameResponses[keyof AddDnsNameResponses];
+
+export type DeleteDnsNameData = {
+    body?: never;
+    path: {
+        /**
+         * UCI section of the entry
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/network/dns-names/{id}';
+};
+
+export type DeleteDnsNameErrors = {
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type DeleteDnsNameError = DeleteDnsNameErrors[keyof DeleteDnsNameErrors];
+
+export type DeleteDnsNameResponses = {
+    /**
+     * OK
+     */
+    200: OkBody;
+};
+
+export type DeleteDnsNameResponse = DeleteDnsNameResponses[keyof DeleteDnsNameResponses];
 
 export type ListFirewallZonesData = {
     body?: never;

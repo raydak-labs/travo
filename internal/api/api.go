@@ -155,6 +155,8 @@ type Deps struct {
 	Diagnostics Diagnostics
 	// WakeOnLAN sends magic packets; nil answers 503 wol_unavailable.
 	WakeOnLAN WakeOnLAN
+	// DHCP is the lan DHCP server and local DNS names; nil answers 503 dhcp_unavailable.
+	DHCP DHCPServer
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
 	Trusted func(netip.Addr) bool
 	// RouterIPs are the router's own lan addresses (internal/trust); nil before the first read.
@@ -249,6 +251,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerInterfaceRestart(a)
 	s.registerDiagnostics(a)
 	s.registerWakeOnLAN(a)
+	s.registerDHCP(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
 	s.registerVPNProfiles(a)

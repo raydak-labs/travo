@@ -28,6 +28,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
+	"github.com/blackdark-org/travo-greenfield/internal/dhcpserver"
 	"github.com/blackdark-org/travo-greenfield/internal/diagnostics"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
@@ -403,6 +404,10 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	if d, ok := deps.Device.(device.Diagnoser); ok {
 		apiDeps.Diagnostics = &diagnostics.Service{Device: d}
+	}
+	if deps.Txn != nil {
+		leases, _ := deps.Device.(device.DHCPLeaseReader)
+		apiDeps.DHCP = &dhcpserver.Service{UCI: deps.Device, Leases: leases, Reload: deps.Device, Txns: deps.Txn}
 	}
 	if w, ok := deps.Device.(device.WakeSender); ok {
 		apiDeps.WakeOnLAN = &wol.Service{Ubus: deps.Device, Sender: w}
