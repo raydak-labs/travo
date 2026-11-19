@@ -14,6 +14,9 @@ export function alertRoute(alert: Alert): Route {
       return 'services';
     case 'uplink_reconnect_exhausted':
       return 'wifi';
+    case 'data_budget_warning':
+    case 'data_budget_exceeded':
+      return 'network';
     case 'stale_guard': {
       const name = alert.subject ?? '';
       if (/^(wifi|wireless|uplink)/.test(name)) return 'wifi';
@@ -39,5 +42,9 @@ export function alertMessage(alert: Alert): string {
       return m.alert_adguard_fail_open();
     case 'uplink_reconnect_exhausted':
       return m.alert_uplink_reconnect_exhausted();
+    case 'data_budget_warning':
+      return m.alert_data_budget_warning();
+    case 'data_budget_exceeded':
+      return m.alert_data_budget_exceeded();
   }
 }

@@ -30,6 +30,23 @@ retention rule existed (#40).
   is the explicit reset: it removes the file and resumes flushing.
 - Read: `GET /api/v1/stats/history?hours=1..168`, and the Go `statshistory.Reader` for
   other pages.
+- Data usage (#246) needs months, not 7 days. The same file and flush keep day totals:
+  `days: [{date, uplinks}]`, one entry per UTC day with traffic, the sum of that day's point
+  deltas (a bucket crossing midnight counts for the later day), retention 93 days (three
+  billing months, about 100 bytes per uplink and day, under 30 KB). Days are UTC because
+  the router has no zoneinfo (device-facts §8); a billing period starts at 00:00 UTC on
+  its start day, so its edges are off by the zone offset. A point also carries `up`, the
+  candidate uplinks up with a readable device at the sample, so the uptime log can tell
+  "down" from "no delta" (a restarted chain). Both fields are additive in version 1: a file
+  without `days` rebuilds them from its points, a point without `up` is unknown (null),
+  and an older daemon ignores both. Reset clears them with the points.
+- Uptime log: derived on read from the points: a boot where `uptime_seconds` went down
+  (at `at - uptime_seconds`), an uplink up or down where `up` changed between two points
+  with a known list. Times are accurate to one bucket; an outage inside one bucket is not
+  seen. No event log is stored.
+- Data budget: `data-budget.json` (ADR 0009 rules: atomic, 0600, unreadable fails closed
+  and is never overwritten until `DELETE /api/v1/network/usage/budget`). It warns only,
+  through the alerts service on read; an automatic cut-off would need its own ADR.
 
 ## Consequences
 

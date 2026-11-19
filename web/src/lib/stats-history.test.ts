@@ -7,6 +7,7 @@ const point = (at: number, uptime: number, extra: Partial<StatsHistoryPoint> = {
   uptime_seconds: uptime,
   clients: 3,
   uplinks: [],
+  up: null,
   ...extra,
 });
 

@@ -1,7 +1,7 @@
 // Package alerts derives the operator alerts on read from live sources; it stores nothing.
 // Sources: stale guards (invariants §1: a stuck guard is silent feature death), low overlay
 // space and degraded persistence (§5), AdGuard fail-open (§8), the exhausted uplink
-// reconnect cap (ADR 0014). Codes are stable; the UI owns the text.
+// reconnect cap (ADR 0014), the data budget (internal/datausage). Codes are stable; the UI owns the text.
 package alerts
 
 import (
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blackdark-org/travo-greenfield/internal/datausage"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
 )
@@ -30,6 +31,8 @@ const (
 	CodePersistenceDegraded  = "persistence_degraded"
 	CodeAdGuardFailOpen      = "adguard_fail_open"
 	CodeUplinkReconnectLimit = "uplink_reconnect_exhausted"
+	CodeDataBudgetWarning    = "data_budget_warning"
+	CodeDataBudgetExceeded   = "data_budget_exceeded"
 )
 
 // StaleGuardAfter separates a guard of a running operation (the longest, a package install,
@@ -43,7 +46,7 @@ const OverlayMinFree = 20 << 20
 type Alert struct {
 	ID       string     `json:"id" doc:"Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress"`
 	Severity Severity   `json:"severity" enum:"warning,danger"`
-	Code     string     `json:"code" enum:"stale_guard,overlay_low,persistence_degraded,adguard_fail_open,uplink_reconnect_exhausted"`
+	Code     string     `json:"code" enum:"stale_guard,overlay_low,persistence_degraded,adguard_fail_open,uplink_reconnect_exhausted,data_budget_warning,data_budget_exceeded"`
 	Subject  string     `json:"subject,omitempty" doc:"What the alert is about, e.g. the guard name"`
 	Since    *time.Time `json:"since" nullable:"true" doc:"When the condition started; null when unknown"`
 }
@@ -63,6 +66,7 @@ type Inputs struct {
 	Mounts      *string
 	FailOpen    *time.Time
 	Reconnect   *wifireconnect.Status
+	DataBudget  datausage.State
 }
 
 // Derive is the pure mapping from inputs to alerts, danger first, then by id.
@@ -85,6 +89,12 @@ func Derive(in Inputs) []Alert {
 	}
 	if in.Reconnect != nil && in.Reconnect.State == wifireconnect.StateExhausted {
 		out = append(out, Alert{ID: CodeUplinkReconnectLimit, Severity: Warning, Code: CodeUplinkReconnectLimit})
+	}
+	switch in.DataBudget {
+	case datausage.StateWarning:
+		out = append(out, Alert{ID: CodeDataBudgetWarning, Severity: Warning, Code: CodeDataBudgetWarning})
+	case datausage.StateExceeded:
+		out = append(out, Alert{ID: CodeDataBudgetExceeded, Severity: Danger, Code: CodeDataBudgetExceeded})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Severity != out[j].Severity {
@@ -132,6 +142,7 @@ type Sources struct {
 	Mounts      func() (string, error)
 	FailOpen    func() (*time.Time, error)
 	Reconnect   func(context.Context) (wifireconnect.Status, error)
+	DataBudget  func(context.Context) (datausage.State, error)
 	Now         func() time.Time
 }
 
@@ -167,6 +178,11 @@ func (s *Service) List(ctx context.Context) (AlertList, error) {
 	if src.Reconnect != nil {
 		if st, err := src.Reconnect(ctx); err == nil {
 			in.Reconnect = &st
+		}
+	}
+	if src.DataBudget != nil {
+		if st, err := src.DataBudget(ctx); err == nil {
+			in.DataBudget = st
 		}
 	}
 	return AlertList{Alerts: Derive(in)}, nil

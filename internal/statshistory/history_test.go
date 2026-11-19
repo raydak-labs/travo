@@ -21,7 +21,7 @@ func obs(at time.Time, uptime time.Duration, uplinks map[string]Counter) Observa
 }
 
 func TestRecordComputesDeltasPerUplink(t *testing.T) {
-	h := NewHistory(time.Time{}, nil, PersistenceOK)
+	h := NewHistory(time.Time{}, nil, nil, PersistenceOK)
 	h.Record(obs(t0, time.Hour, map[string]Counter{"wwan": {"phy0-sta0", 100, 50}}))
 	h.Record(obs(t0.Add(Interval), time.Hour+Interval, map[string]Counter{
 		"wwan": {"phy0-sta0", 1100, 250},
@@ -48,7 +48,7 @@ func TestRecordDropsResetsDeviceChangesAndReboots(t *testing.T) {
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			h := NewHistory(time.Time{}, nil, PersistenceOK)
+			h := NewHistory(time.Time{}, nil, nil, PersistenceOK)
 			h.Record(obs(t0, time.Hour, map[string]Counter{"wwan": {"phy0-sta0", 100, 100}}))
 			h.Record(obs(t0.Add(Interval), c.uptime, map[string]Counter{"wwan": c.cur}))
 			points, _ := h.Points(time.Time{})
@@ -60,7 +60,7 @@ func TestRecordDropsResetsDeviceChangesAndReboots(t *testing.T) {
 }
 
 func TestRecordSkipsImplausibleAndRewoundClock(t *testing.T) {
-	h := NewHistory(t0, nil, PersistenceOK)
+	h := NewHistory(t0, nil, nil, PersistenceOK)
 	h.Record(obs(t0.Add(-time.Hour), time.Hour, nil)) // below the build-time floor
 	h.Record(obs(t0.Add(Interval), time.Hour, map[string]Counter{"wwan": {"d", 1, 1}}))
 	h.Record(obs(t0, time.Hour+Interval, map[string]Counter{"wwan": {"d", 9, 9}})) // rewound
@@ -75,7 +75,7 @@ func TestRecordSkipsImplausibleAndRewoundClock(t *testing.T) {
 }
 
 func TestSkipRestartsDeltaChain(t *testing.T) {
-	h := NewHistory(time.Time{}, nil, PersistenceOK)
+	h := NewHistory(time.Time{}, nil, nil, PersistenceOK)
 	h.Record(obs(t0, time.Hour, map[string]Counter{"wwan": {"d", 1, 1}}))
 	h.Skip()
 	h.Record(obs(t0.Add(2*Interval), time.Hour+2*Interval, map[string]Counter{"wwan": {"d", 9, 9}}))
@@ -86,7 +86,7 @@ func TestSkipRestartsDeltaChain(t *testing.T) {
 }
 
 func TestRetentionAndSince(t *testing.T) {
-	h := NewHistory(time.Time{}, nil, PersistenceOK)
+	h := NewHistory(time.Time{}, nil, nil, PersistenceOK)
 	end := t0.Add(Retention + 5*Interval)
 	for at := t0; !at.After(end); at = at.Add(Interval) {
 		h.Record(obs(at, at.Sub(t0)+time.Hour, nil))
@@ -241,16 +241,19 @@ func TestFlushFailureDegrades(t *testing.T) {
 
 func TestLoadRejectsForeignShapes(t *testing.T) {
 	for name, body := range map[string]string{
-		"interval": `{"version":1,"interval_seconds":60,"points":[]}`,
-		"order":    `{"version":1,"interval_seconds":600,"points":[{"at":2,"uptime_seconds":1,"clients":null,"uplinks":[]},{"at":1,"uptime_seconds":1,"clients":null,"uplinks":[]}]}`,
-		"uplink":   `{"version":1,"interval_seconds":600,"points":[{"at":2,"uptime_seconds":1,"clients":null,"uplinks":[{"name":"lan","rx_bytes":1,"tx_bytes":1}]}]}`,
+		"interval":  `{"version":1,"interval_seconds":60,"points":[]}`,
+		"order":     `{"version":1,"interval_seconds":600,"points":[{"at":2,"uptime_seconds":1,"clients":null,"uplinks":[]},{"at":1,"uptime_seconds":1,"clients":null,"uplinks":[]}]}`,
+		"uplink":    `{"version":1,"interval_seconds":600,"points":[{"at":2,"uptime_seconds":1,"clients":null,"uplinks":[{"name":"lan","rx_bytes":1,"tx_bytes":1}]}]}`,
+		"up":        `{"version":1,"interval_seconds":600,"points":[{"at":2,"uptime_seconds":1,"clients":null,"uplinks":[],"up":["lan"]}]}`,
+		"day order": `{"version":1,"interval_seconds":600,"points":[],"days":[{"date":"2026-11-02","uplinks":[]},{"date":"2026-11-01","uplinks":[]}]}`,
+		"day date":  `{"version":1,"interval_seconds":600,"points":[],"days":[{"date":"Nov 1","uplinks":[]}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "h.json")
 			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if _, p := load(path); p != PersistenceDegraded {
+			if _, _, p := load(path); p != PersistenceDegraded {
 				t.Fatalf("persistence = %v", p)
 			}
 		})

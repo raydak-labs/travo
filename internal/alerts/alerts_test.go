@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blackdark-org/travo-greenfield/internal/datausage"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
 )
@@ -60,6 +61,7 @@ func TestDeriveMapsEverySource(t *testing.T) {
 		Mounts:      &mounts,
 		FailOpen:    &failOpen,
 		Reconnect:   &wifireconnect.Status{State: wifireconnect.StateExhausted, Attempts: 5, MaxAttempts: 5},
+		DataBudget:  datausage.StateWarning,
 	})
 	ids := []string{}
 	for _, a := range got {
@@ -70,6 +72,7 @@ func TestDeriveMapsEverySource(t *testing.T) {
 		"danger persistence_degraded",
 		"danger stale_guard:adguard-install-in-progress",
 		"danger stale_guard:firmware-upgrade-in-progress",
+		"warning data_budget_warning",
 		"warning overlay_low",
 		"warning uplink_reconnect_exhausted",
 	}
@@ -78,6 +81,22 @@ func TestDeriveMapsEverySource(t *testing.T) {
 	}
 	if got[0].Since == nil || !got[0].Since.Equal(failOpen) || got[3].Since != nil {
 		t.Fatalf("since %v %v", got[0].Since, got[3].Since)
+	}
+}
+
+func TestDeriveDataBudget(t *testing.T) {
+	for state, want := range map[datausage.State]string{
+		datausage.StateExceeded: "danger data_budget_exceeded",
+		datausage.StateWarning:  "warning data_budget_warning",
+		datausage.StateOK:       "", datausage.StateOff: "", datausage.StateUnreadable: "",
+	} {
+		got := ""
+		for _, a := range Derive(Inputs{Now: time.Now(), DataBudget: state}) {
+			got = string(a.Severity) + " " + a.ID
+		}
+		if got != want {
+			t.Errorf("%s: %q, want %q", state, got, want)
+		}
 	}
 }
 
@@ -99,6 +118,7 @@ func TestListSkipsFailedSources(t *testing.T) {
 		Mounts:      func() (string, error) { return "", boom },
 		FailOpen:    func() (*time.Time, error) { return nil, boom },
 		Reconnect:   func(context.Context) (wifireconnect.Status, error) { return wifireconnect.Status{}, boom },
+		DataBudget:  func(context.Context) (datausage.State, error) { return datausage.StateExceeded, boom },
 	}}
 	l, err := s.List(context.Background())
 	if err != nil || len(l.Alerts) != 0 {

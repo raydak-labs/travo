@@ -105,6 +105,8 @@ type Deps struct {
 	Throughput ThroughputReader
 	// StatsHistory is the persisted dashboard history; nil answers 503.
 	StatsHistory StatsHistory
+	// DataUsage is usage per uplink, the data budget and the uptime log; nil answers 503.
+	DataUsage    DataUsage
 	Connectivity ConnectivityReader
 	// Captive is the portal DNS bypass; nil answers 503 captive_unavailable.
 	Captive      CaptiveAssist
@@ -295,6 +297,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerBackup(a)
 	s.registerThroughput(a)
 	s.registerStatsHistory(a)
+	s.registerDataUsage(a)
 	s.registerConnectivity(a)
 	s.registerCaptive(a)
 	s.registerWiFi(a)
@@ -335,6 +338,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "WiFiSchedule" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/statshistory":
 		return "StatsHistory" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/datausage":
+		return "DataUsage" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/tailscale":
 		return "Tailscale" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/failover":

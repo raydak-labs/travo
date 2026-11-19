@@ -9,11 +9,12 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/alerts"
 	"github.com/blackdark-org/travo-greenfield/internal/api"
 	"github.com/blackdark-org/travo-greenfield/internal/app"
+	"github.com/blackdark-org/travo-greenfield/internal/datausage"
 	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
 )
 
 // newAlerts wires the alert sources. Mock mode has no flash or mount table to read.
-func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectReader) *alerts.Service {
+func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectReader, usage *datausage.Service) *alerts.Service {
 	src := alerts.Sources{Now: time.Now, Guards: deps.Guards.Stale}
 	if !deps.Mock {
 		src.OverlayFree = adguard.FreeBytes("/overlay")
@@ -30,6 +31,9 @@ func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectR
 	}
 	if reconnect != nil {
 		src.Reconnect = func(ctx context.Context) (wifireconnect.Status, error) { return reconnect.Status(ctx) }
+	}
+	if usage != nil {
+		src.DataBudget = usage.BudgetState
 	}
 	return &alerts.Service{Sources: src}
 }

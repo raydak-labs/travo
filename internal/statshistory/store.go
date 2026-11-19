@@ -14,11 +14,14 @@ import (
 
 const fileVersion = 1
 
-// file is the persisted shape: compact JSON, oldest point first.
+// file is the persisted shape: compact JSON, oldest point and day first. Days and a
+// point's up list are additive: a file without them still loads (days are rebuilt from
+// the points), and an older daemon ignores them.
 type file struct {
 	Version         int     `json:"version"`
 	IntervalSeconds int64   `json:"interval_seconds"`
 	Points          []Point `json:"points"`
+	Days            []Day   `json:"days,omitempty"`
 }
 
 // Store is the History plus its file. Only Flush and Reset write; both are rare.
@@ -35,25 +38,28 @@ type Store struct {
 // closed: collection runs in RAM, persistence is degraded and the file is never overwritten
 // until the explicit Reset.
 func Open(path string, floor time.Time, now func() time.Time) *Store {
-	points, persistence := load(path)
-	return &Store{History: NewHistory(floor, points, persistence), path: path, now: now,
+	points, days, persistence := load(path)
+	return &Store{History: NewHistory(floor, points, days, persistence), path: path, now: now,
 		write: atomicfile.Write, remove: os.Remove, flushd: now()}
 }
 
-func load(path string) ([]Point, Persistence) {
+func load(path string) ([]Point, []Day, Persistence) {
 	var f file
 	err := atomicfile.ReadJSON(path, &f)
 	if errors.Is(err, os.ErrNotExist) {
-		return []Point{}, PersistenceOK
+		return []Point{}, []Day{}, PersistenceOK
 	}
 	if err == nil {
 		err = validate(f)
 	}
 	if err != nil {
 		slog.Warn("stats history unreadable: persistence degraded until reset", "path", path, "err", err)
-		return []Point{}, PersistenceDegraded
+		return []Point{}, []Day{}, PersistenceDegraded
 	}
-	return f.Points, PersistenceOK
+	if f.Days == nil {
+		f.Days = daysFromPoints(f.Points)
+	}
+	return f.Points, f.Days, PersistenceOK
 }
 
 func validate(f file) error {
@@ -67,13 +73,16 @@ func validate(f file) error {
 		if p.Uplinks == nil {
 			return fmt.Errorf("stats history: point without uplinks")
 		}
-		for _, u := range p.Uplinks {
-			if !slices.Contains(Uplinks, u.Name) {
-				return fmt.Errorf("stats history: unknown uplink %q", u.Name)
+		if err := validateUplinks(p.Uplinks); err != nil {
+			return err
+		}
+		for _, name := range p.Up {
+			if !slices.Contains(Uplinks, name) {
+				return fmt.Errorf("stats history: unknown uplink %q", name)
 			}
 		}
 	}
-	return nil
+	return validateDays(f.Days)
 }
 
 // MaybeFlush writes when there is news and FlushEvery passed since the last write.
@@ -92,7 +101,7 @@ func (s *Store) Flush() {
 	if !s.dirty || s.persistence != PersistenceOK {
 		return
 	}
-	b, err := json.Marshal(file{Version: fileVersion, IntervalSeconds: int64(Interval / time.Second), Points: s.points})
+	b, err := json.Marshal(file{Version: fileVersion, IntervalSeconds: int64(Interval / time.Second), Points: s.points, Days: s.days})
 	if err == nil {
 		err = s.write(s.path, append(b, '\n'), 0o600)
 	}
@@ -111,7 +120,7 @@ func (s *Store) Reset() error {
 	if err := s.remove(s.path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	s.points, s.last, s.dirty = []Point{}, nil, false
+	s.points, s.days, s.last, s.dirty = []Point{}, []Day{}, nil, false
 	s.persistence = PersistenceOK
 	return nil
 }

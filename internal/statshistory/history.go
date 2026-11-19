@@ -37,6 +37,7 @@ type Point struct {
 	UptimeSeconds int64         `json:"uptime_seconds"`
 	Clients       *int          `json:"clients" nullable:"true" doc:"Distinct LAN and guest neighbour MACs; null when unreadable"`
 	Uplinks       []UplinkBytes `json:"uplinks" nullable:"false"`
+	Up            []string      `json:"up" nullable:"true" enum:"wan,wwan,usbtether" doc:"Candidate uplinks up with a readable layer-3 device at the sample; null on points recorded before this field existed"`
 }
 
 // Counter is a cumulative kernel counter of an uplink's layer-3 device.
@@ -71,14 +72,18 @@ type History struct {
 	mu          sync.Mutex
 	floor       time.Time // clock-plausibility floor (build time)
 	points      []Point
+	days        []Day
 	last        *Observation
 	persistence Persistence
 	dirty       bool
 }
 
-// NewHistory starts with loaded points (oldest first) and their persistence state.
-func NewHistory(floor time.Time, points []Point, persistence Persistence) *History {
-	return &History{floor: floor, points: points, persistence: persistence}
+// NewHistory starts with loaded points and day totals (oldest first) and their persistence state.
+func NewHistory(floor time.Time, points []Point, days []Day, persistence Persistence) *History {
+	if days == nil {
+		days = []Day{}
+	}
+	return &History{floor: floor, points: points, days: days, persistence: persistence}
 }
 
 // Record turns an observation into a point. A clock below the floor or behind the newest
@@ -90,9 +95,11 @@ func (h *History) Record(o Observation) {
 		h.last = nil
 		return
 	}
-	h.points = append(h.points, pointFrom(h.last, o))
+	p := pointFrom(h.last, o)
+	h.points = append(h.points, p)
 	h.last = &o
 	h.points = prune(h.points, o.At)
+	h.days = pruneDays(addToDays(h.days, p), o.At)
 	h.dirty = true
 }
 
@@ -122,7 +129,11 @@ func (h *History) Points(since time.Time) ([]Point, Persistence) {
 
 // pointFrom computes the bucket deltas against the previous observation.
 func pointFrom(prev *Observation, cur Observation) Point {
-	p := Point{At: cur.At.Unix(), UptimeSeconds: int64(cur.Uptime.Seconds()), Clients: cur.Clients, Uplinks: []UplinkBytes{}}
+	p := Point{At: cur.At.Unix(), UptimeSeconds: int64(cur.Uptime.Seconds()), Clients: cur.Clients, Uplinks: []UplinkBytes{}, Up: []string{}}
+	for name := range cur.Uplinks {
+		p.Up = append(p.Up, name)
+	}
+	slices.Sort(p.Up)
 	if prev == nil || cur.Uptime < prev.Uptime {
 		return p // first sample or a reboot: counters restarted
 	}

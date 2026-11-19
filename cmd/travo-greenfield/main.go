@@ -26,6 +26,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/auth/epochfile"
 	"github.com/blackdark-org/travo-greenfield/internal/captive"
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/blackdark-org/travo-greenfield/internal/datausage"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
 	"github.com/blackdark-org/travo-greenfield/internal/dhcpserver"
@@ -395,12 +396,15 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if svc := startButtons(ctx, deps, hooks, vpnTunnel, wirelessGuest); svc != nil {
 		apiDeps.Buttons = svc
 	}
+	var usage *datausage.Service
 	if history := startStatsHistory(deps, workers); history != nil {
 		apiDeps.StatsHistory = history
+		usage = &datausage.Service{History: history, Path: filepath.Join(deps.Paths.State, "data-budget.json"), Now: time.Now}
+		apiDeps.DataUsage = usage
 	}
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	apiDeps.OpenWrtUpdates = newOpenWrtUpdates(deps)
-	apiDeps.Alerts = newAlerts(deps, aghService, reconnect)
+	apiDeps.Alerts = newAlerts(deps, aghService, reconnect, usage)
 	if f, ok := deps.Device.(sshkeys.File); ok {
 		apiDeps.SSHKeys = &sshkeys.Service{File: f}
 	}

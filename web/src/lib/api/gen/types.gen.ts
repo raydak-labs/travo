@@ -98,7 +98,7 @@ export type AdguardToggleInputBody = {
 };
 
 export type Alert = {
-    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted';
+    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted' | 'data_budget_warning' | 'data_budget_exceeded';
     /**
      * Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress
      */
@@ -418,6 +418,88 @@ export type DashboardConnectivity = {
      * Captive portal login URL; null unless internet is captive
      */
     portal_url: string | null;
+};
+
+export type DataUsageAvailability = {
+    name: 'wan' | 'wwan' | 'usbtether';
+    samples: number;
+    up_samples: number;
+};
+
+export type DataUsageBudget = {
+    enabled: boolean;
+    /**
+     * Allowance per billing period; at least 1 MiB while enabled
+     */
+    limit_bytes: number;
+    /**
+     * Day of the month (UTC) a billing period starts
+     */
+    start_day: number;
+    /**
+     * Uplinks whose traffic counts against the limit
+     */
+    uplinks: Array<'wan' | 'wwan' | 'usbtether'>;
+    /**
+     * Warn once this share of the limit is used
+     */
+    warn_percent: number;
+};
+
+export type DataUsageEvent = {
+    /**
+     * Unix seconds, router wall clock
+     */
+    at: number;
+    kind: 'boot' | 'up' | 'down';
+    /**
+     * Set for up and down
+     */
+    uplink?: 'wan' | 'wwan' | 'usbtether';
+};
+
+export type DataUsagePeriod = {
+    /**
+     * Day after the last, YYYY-MM-DD
+     */
+    end: string;
+    /**
+     * First UTC day, YYYY-MM-DD
+     */
+    start: string;
+    uplinks: Array<StatsHistoryUplinkBytes>;
+};
+
+export type DataUsageUptimeLog = {
+    availability: Array<DataUsageAvailability>;
+    /**
+     * Oldest first
+     */
+    events: Array<DataUsageEvent>;
+};
+
+export type DataUsageView = {
+    billing_period: DataUsagePeriod;
+    budget: DataUsageBudget;
+    budget_state: 'off' | 'ok' | 'warning' | 'exceeded' | 'unreadable';
+    /**
+     * Traffic of the budget's uplinks in the billing period
+     */
+    budget_used_bytes: number;
+    /**
+     * Day totals, oldest first, up to 93 days
+     */
+    days: Array<StatsHistoryDay>;
+    /**
+     * The stats history's state (ADR 0026)
+     */
+    persistence: 'ok' | 'degraded';
+    /**
+     * How far back the uptime log reaches
+     */
+    retention_hours: number;
+    today: DataUsagePeriod;
+    uptime: DataUsageUptimeLog;
 };
 
 export type Diagnosis = {
@@ -1200,6 +1282,14 @@ export type StatsHistoryBody = {
     retention_hours: number;
 };
 
+export type StatsHistoryDay = {
+    /**
+     * UTC calendar day, YYYY-MM-DD
+     */
+    date: string;
+    uplinks: Array<StatsHistoryUplinkBytes>;
+};
+
 export type StatsHistoryPoint = {
     /**
      * Router wall clock at the end of the bucket, unix seconds
@@ -1209,6 +1299,10 @@ export type StatsHistoryPoint = {
      * Distinct LAN and guest neighbour MACs; null when unreadable
      */
     clients: number | null;
+    /**
+     * Candidate uplinks up with a readable layer-3 device at the sample; null on points recorded before this field existed
+     */
+    up: Array<'wan' | 'wwan' | 'usbtether'> | null;
     uplinks: Array<StatsHistoryUplinkBytes>;
     uptime_seconds: number;
 };
@@ -3543,6 +3637,105 @@ export type DeletePortForwardResponses = {
 };
 
 export type DeletePortForwardResponse = DeletePortForwardResponses[keyof DeletePortForwardResponses];
+
+export type GetDataUsageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/usage';
+};
+
+export type GetDataUsageErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetDataUsageError = GetDataUsageErrors[keyof GetDataUsageErrors];
+
+export type GetDataUsageResponses = {
+    /**
+     * OK
+     */
+    200: DataUsageView;
+};
+
+export type GetDataUsageResponse = GetDataUsageResponses[keyof GetDataUsageResponses];
+
+export type ResetDataBudgetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/usage/budget';
+};
+
+export type ResetDataBudgetErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type ResetDataBudgetError = ResetDataBudgetErrors[keyof ResetDataBudgetErrors];
+
+export type ResetDataBudgetResponses = {
+    /**
+     * OK
+     */
+    200: DataUsageView;
+};
+
+export type ResetDataBudgetResponse = ResetDataBudgetResponses[keyof ResetDataBudgetResponses];
+
+export type SetDataBudgetData = {
+    body: DataUsageBudget;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/usage/budget';
+};
+
+export type SetDataBudgetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetDataBudgetError = SetDataBudgetErrors[keyof SetDataBudgetErrors];
+
+export type SetDataBudgetResponses = {
+    /**
+     * OK
+     */
+    200: DataUsageView;
+};
+
+export type SetDataBudgetResponse = SetDataBudgetResponses[keyof SetDataBudgetResponses];
 
 export type GetWanSettingsData = {
     body?: never;

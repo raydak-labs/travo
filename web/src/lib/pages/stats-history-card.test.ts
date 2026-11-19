@@ -30,12 +30,14 @@ describe('stats history card', () => {
           uptime_seconds: 7200,
           clients: 2,
           uplinks: [{ name: 'wwan', rx_bytes: 2048, tx_bytes: 1024 }],
+          up: ['wwan'],
         },
         {
           at: 1_000_600,
           uptime_seconds: 60,
           clients: 5,
           uplinks: [{ name: 'wwan', rx_bytes: 1024, tx_bytes: 0 }],
+          up: ['wwan'],
         },
       ],
     });
