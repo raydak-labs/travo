@@ -36,20 +36,46 @@ func (s *Service) migrate(ctx context.Context, running bool) (restarted bool, _ 
 	if err != nil {
 		return false, err
 	}
-	out, capped := Limits(out)
+	capped := false
+	if !s.capsApplied() {
+		out, capped = Limits(out)
+	}
 	if !loopback && !capped {
 		s.failed.Store(nil) // nothing left to do, e.g. fixed by hand after a failed try
-		return false, nil
+		return false, s.markCaps()
 	}
 	if s.migrationHeldOff(old) {
 		return false, nil
 	}
 	if !loopback && !running {
-		return false, atomicfile.Write(s.Config, out, 0o600)
+		return false, errors.Join(atomicfile.Write(s.Config, out, 0o600), s.markCaps())
 	}
 	rolledBack, err := s.swap(ctx, old, out)
 	s.recordMigration(old, rolledBack, err)
+	if err == nil {
+		err = s.markCaps()
+	}
 	return err == nil, err
+}
+
+// CapsVersion is written to CapsMarker once the YAML caps (Limits) were applied. The caps
+// apply once per router: a value the user raises later in AGH's UI stays (ADR 0006).
+const CapsVersion = "caps-v1\n"
+
+// capsApplied is true once the marker exists; an empty CapsMarker disables the caps.
+func (s *Service) capsApplied() bool {
+	if s.CapsMarker == "" {
+		return true
+	}
+	_, err := os.Stat(s.CapsMarker)
+	return err == nil
+}
+
+func (s *Service) markCaps() error {
+	if s.capsApplied() {
+		return nil
+	}
+	return atomicfile.Write(s.CapsMarker, []byte(CapsVersion), 0o600)
 }
 
 // swap reports rolledBack only when a failed try fully restored the old config and released

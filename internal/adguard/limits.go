@@ -13,7 +13,8 @@ import (
 
 // Memory caps for a 418 MB router whose kernel and WiFi leave ~80 MB available
 // (device-facts §11). AGH grew ~0.8 MB/h and was OOM-killed at 116 MB anon-rss; then the
-// router thrashed. The caps are ceilings: a smaller value a user picked is kept.
+// router thrashed. The caps are ceilings: a smaller value a user picked is kept. MemLimit is
+// reconciled on every tick; the YAML caps apply once per router (CapsMarker, migrate.go).
 const (
 	// MemLimit is AGH's Go soft memory limit (GOMEMLIMIT via the init script's memlimit,
 	// bytes). AGH's Go memory (RssAnon) is ~54 MB with the seed's filter list; 64 MiB

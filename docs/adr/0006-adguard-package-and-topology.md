@@ -31,7 +31,7 @@ Verified facts: package 0.107.79-r1, config `/etc/adguardhome/adguardhome.yaml` 
 
 ## Memory caps
 
-AGH grew until the OOM killer took it after ~1 day on the AXT1800 (device-facts §11: ~80 MB available once the kernel and WiFi settle; AGH 54 MB anon at 3 h, killed at 116 MB). Travo owns these keys and caps them; a smaller value a user picked is kept, a larger one is lowered again on the next reconcile tick:
+AGH grew until the OOM killer took it after ~1 day on the AXT1800 (device-facts §11: ~80 MB available once the kernel and WiFi settle; AGH 54 MB anon at 3 h, killed at 116 MB). Travo caps these keys; a smaller value a user picked is always kept. The memlimit is router safety and is reconciled on every tick. The YAML caps are a default, not a policy: they apply once per router (state-dir marker `adguard-caps-applied`, content `caps-v1`), and a value the user raises later in AGH's UI stays:
 
 - UCI `adguardhome.config.memlimit` = 67108864 (64 MiB `GOMEMLIMIT`, via `txn.Apply`). Above AGH's ~54 MB steady anon use, below the ~80 MB budget minus Travo's ~12 MB anon. It is a soft limit: the GC works harder near it, nothing fails an allocation, and the runtime bounds the GC's CPU share. `gc` and `maxprocs` stay unset.
 - YAML `querylog.size_memory` 100 (was 1000), `querylog.interval` 6h (was 90d; the file is in tmpfs), `statistics.interval` 1d, `dns.cache_size` 4 MiB. Other keys, including the filter lists, stay the user's.

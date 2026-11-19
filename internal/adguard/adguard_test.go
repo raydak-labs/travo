@@ -31,13 +31,14 @@ func newRig(t *testing.T) *rig {
 	pkgs := pkgmgr.NewMock()
 	svc := &Service{
 		Packages: pkgs, Services: dev,
-		Guards:    guard.Dir{Path: filepath.Join(dir, "guards"), Now: time.Now},
-		Config:    filepath.Join(dir, "etc", "adguardhome", "adguardhome.yaml"),
-		Backup:    filepath.Join(dir, "state", "adguardhome.yaml.old"),
-		Marker:    filepath.Join(dir, "state", "adguard-install-attempted"),
-		FreeBytes: func() (uint64, error) { return 70 << 20, nil },
-		Online:    func(context.Context) bool { return true },
-		Ready:     func(context.Context) error { return nil },
+		Guards:     guard.Dir{Path: filepath.Join(dir, "guards"), Now: time.Now},
+		Config:     filepath.Join(dir, "etc", "adguardhome", "adguardhome.yaml"),
+		Backup:     filepath.Join(dir, "state", "adguardhome.yaml.old"),
+		Marker:     filepath.Join(dir, "state", "adguard-install-attempted"),
+		CapsMarker: filepath.Join(dir, "state", "adguard-caps-applied"),
+		FreeBytes:  func() (uint64, error) { return 70 << 20, nil },
+		Online:     func(context.Context) bool { return true },
+		Ready:      func(context.Context) error { return nil },
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "state"), 0o700); err != nil {
 		t.Fatal(err)

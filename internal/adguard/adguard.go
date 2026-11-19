@@ -65,7 +65,8 @@ type Service struct {
 	Guards   guard.Dir
 	// Config is the AGH YAML; Backup holds the previous file during a swap (state dir);
 	// Marker records that the one automatic install attempt happened.
-	Config, Backup, Marker string
+	// CapsMarker records that the YAML memory caps were applied once (empty: never cap).
+	Config, Backup, Marker, CapsMarker string
 	// FreeBytes reads free overlay space; Online is the real Internet probe.
 	FreeBytes func() (uint64, error)
 	Online    func(context.Context) bool
@@ -133,7 +134,10 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return st, nil
 	}
 	st.Loopback = l.IsLoopback() || (st.Topology == TopologyExpert && l.HTTP == LoopbackHTTP)
-	_, capsPending := Limits(b)
+	capsPending := false
+	if !s.capsApplied() {
+		_, capsPending = Limits(b)
+	}
 	st.MigrationFailed = st.MigrationFailed && (!st.Loopback || (capsPending && st.Topology != TopologyExpert))
 	return st, nil
 }
@@ -368,11 +372,20 @@ func (s *Service) prepareConfig() error {
 	if err != nil {
 		return err
 	}
-	out, capped := Limits(out)
+	capped := false
+	if !s.capsApplied() {
+		out, capped = Limits(out)
+	}
 	if !loopback && !capped {
 		return nil
 	}
-	return atomicfile.Write(s.Config, out, 0o600)
+	if err := atomicfile.Write(s.Config, out, 0o600); err != nil {
+		return err
+	}
+	if capped {
+		return s.markCaps()
+	}
+	return nil
 }
 
 // Recover finishes a swap a daemon crash interrupted: with a kept old file it is put back

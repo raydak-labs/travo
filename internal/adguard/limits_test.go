@@ -171,3 +171,43 @@ func TestReconcileCapsAStoppedAGHWithoutStartingIt(t *testing.T) {
 		t.Fatalf("a stopped AGH must stay stopped: %v", r.dev.ServiceActions)
 	}
 }
+
+func TestReconcileCapsOnceKeepsUserRaiseAndReappliesMemLimit(t *testing.T) {
+	r := capsRig(t, true)
+	ctx := context.Background()
+	if err := r.svc.Reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(r.svc.CapsMarker); err != nil || string(b) != CapsVersion {
+		t.Fatalf("caps marker = %q %v", b, err)
+	}
+	raised := []byte(strings.Replace(string(Seed), "  interval: 6h\n  size_memory: 100\n", "  interval: 90d\n  size_memory: 1000\n", 1))
+	if err := os.WriteFile(r.svc.Config, raised, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.Reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(r.svc.Config); !bytes.Equal(got, raised) {
+		t.Fatal("a value the user raised after the caps were applied must stay")
+	}
+	if st, _ := r.svc.Status(ctx); st.MigrationFailed || len(r.dev.ServiceActions) != 1 {
+		t.Fatalf("no second restart: %+v %v", st, r.dev.ServiceActions)
+	}
+	// memlimit is router safety: reconciled on every tick.
+	if err := r.dev.Set(ctx, UCIConfig, UCISection, MemLimitOption, "0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.dev.Commit(ctx, UCIConfig); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.svc.Reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if secs, _ := r.dev.Show(ctx, UCIConfig); secs[0].Options[MemLimitOption] != "67108864" {
+		t.Fatalf("memlimit = %+v", secs)
+	}
+	if got, _ := os.ReadFile(r.svc.Config); !bytes.Equal(got, raised) || len(r.dev.ServiceActions) != 2 {
+		t.Fatalf("memlimit alone: yaml kept, one restart: %v", r.dev.ServiceActions)
+	}
+}

@@ -65,10 +65,12 @@ func startAdGuard(ctx context.Context, deps app.Deps, layers *dnslayer.Service, 
 	}
 	svc := &adguard.Service{
 		Packages: deps.Packages, Services: services, Guards: deps.Guards,
-		Config:    adguard.ConfigPath,
-		Backup:    filepath.Join(deps.Paths.State, "adguardhome.yaml.old"),
-		Marker:    filepath.Join(deps.Paths.State, "adguard-install-attempted"),
-		FreeBytes: adguard.FreeBytes("/overlay", "/"),
+		Config: adguard.ConfigPath,
+		Backup: filepath.Join(deps.Paths.State, "adguardhome.yaml.old"),
+		Marker: filepath.Join(deps.Paths.State, "adguard-install-attempted"),
+		// The YAML memory caps apply once; later user values in AGH's UI stay (ADR 0006).
+		CapsMarker: filepath.Join(deps.Paths.State, "adguard-caps-applied"),
+		FreeBytes:  adguard.FreeBytes("/overlay", "/"),
 		Online: func(ctx context.Context) bool {
 			return connection != nil && connection.Status(ctx).Internet == connectivity.Online
 		},
