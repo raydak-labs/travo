@@ -388,6 +388,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		apiDeps.StatsHistory = history
 	}
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
+	apiDeps.OpenWrtUpdates = newOpenWrtUpdates(deps)
 	apiDeps.Alerts = newAlerts(deps, aghService, reconnect)
 	if f, ok := deps.Device.(sshkeys.File); ok {
 		apiDeps.SSHKeys = &sshkeys.Service{File: f}

@@ -86,3 +86,16 @@ func TestParseSystemInfoShape(t *testing.T) {
 		}
 	}
 }
+
+func TestFirmwareURL(t *testing.T) {
+	b, err := os.ReadFile("../../../testdata/device/axt1800-25.12.6/system-board.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u, err := FirmwareURL(b); err != nil || u != "https://downloads.openwrt.org/" {
+		t.Fatalf("%q %v", u, err)
+	}
+	if _, err := FirmwareURL([]byte(`{"release":{}}`)); err == nil {
+		t.Fatal("missing url accepted")
+	}
+}

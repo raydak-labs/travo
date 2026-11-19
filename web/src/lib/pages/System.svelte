@@ -28,6 +28,7 @@ import SystemUpdate from './SystemUpdate.svelte';
 
 const settingsCard = lazyPage(() => import('./SystemSettingsCard.svelte'));
 const sshKeysCard = lazyPage(() => import('./SystemSSHKeysCard.svelte'));
+const openWrtCard = lazyPage(() => import('./SystemOpenWrtCard.svelte'));
 const factoryResetCard = lazyPage(() => import('./SystemFactoryResetCard.svelte'));
 
 const info = createLoader(fetchSystemInfo);
@@ -183,6 +184,8 @@ async function logout() {
   <PageHost load={settingsCard} />
 
   <SystemUpdate />
+
+  <PageHost load={openWrtCard} />
 
   <Card title={m.system_backup()}>
     <div>

@@ -669,6 +669,49 @@ export type OkBody = {
     status: 'ok';
 };
 
+export type OpenWrtCheck = {
+    /**
+     * When the last check ran; null before the first check since the daemon started
+     */
+    checked_at: string | null;
+    /**
+     * Running OpenWrt version
+     */
+    current: string;
+    /**
+     * Newest stable release of the running series that is newer, e.g. 25.12.7; empty when current
+     */
+    in_series: string;
+    /**
+     * The package lists were refreshed before listing (the user asked)
+     */
+    lists_refreshed: boolean;
+    /**
+     * Newest stable release of the next major series, e.g. 26.06.1; empty when none is out
+     */
+    next_series: string;
+    /**
+     * apk or opkg
+     */
+    package_manager: string;
+    packages: Array<Upgrade>;
+    /**
+     * False when listing upgradable packages failed
+     */
+    packages_read: boolean;
+    /**
+     * Firmware target, e.g. qualcommax/ipq60xx
+     */
+    target: string;
+};
+
+export type OpenWrtCheckInputBody = {
+    /**
+     * Refresh the package lists first (written to /tmp only)
+     */
+    refresh_lists?: boolean;
+};
+
 export type Outcome = {
     /**
      * Seconds from the restart until up, or the whole wait
@@ -1203,6 +1246,12 @@ export type UpdateApInputBody = {
 
 export type UpdateCheckInputBody = {
     mode: 'automatic' | 'manual';
+};
+
+export type Upgrade = {
+    available: string;
+    installed: string;
+    name: string;
 };
 
 export type UsbTetherDriversInputBody = {
@@ -3457,6 +3506,68 @@ export type GetSystemLogResponses = {
 };
 
 export type GetSystemLogResponse = GetSystemLogResponses[keyof GetSystemLogResponses];
+
+export type GetOpenWrtUpdatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/openwrt';
+};
+
+export type GetOpenWrtUpdatesErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetOpenWrtUpdatesError = GetOpenWrtUpdatesErrors[keyof GetOpenWrtUpdatesErrors];
+
+export type GetOpenWrtUpdatesResponses = {
+    /**
+     * OK
+     */
+    200: OpenWrtCheck;
+};
+
+export type GetOpenWrtUpdatesResponse = GetOpenWrtUpdatesResponses[keyof GetOpenWrtUpdatesResponses];
+
+export type CheckOpenWrtUpdatesData = {
+    body: OpenWrtCheckInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/openwrt/check';
+};
+
+export type CheckOpenWrtUpdatesErrors = {
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type CheckOpenWrtUpdatesError = CheckOpenWrtUpdatesErrors[keyof CheckOpenWrtUpdatesErrors];
+
+export type CheckOpenWrtUpdatesResponses = {
+    /**
+     * OK
+     */
+    200: OpenWrtCheck;
+};
+
+export type CheckOpenWrtUpdatesResponse = CheckOpenWrtUpdatesResponses[keyof CheckOpenWrtUpdatesResponses];
 
 export type PostSystemRebootData = {
     body: RebootInputBody;

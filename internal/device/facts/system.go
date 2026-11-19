@@ -34,6 +34,22 @@ func ParseBoard(b []byte) (Board, error) {
 		Release: raw.Release.Version, Revision: raw.Release.Revision, Target: raw.Release.Target}, nil
 }
 
+// FirmwareURL is `release.firmware_url` of `ubus call system board`, the release server.
+func FirmwareURL(b []byte) (string, error) {
+	var raw struct {
+		Release struct {
+			FirmwareURL string `json:"firmware_url"`
+		} `json:"release"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return "", fmt.Errorf("system board: %w", err)
+	}
+	if raw.Release.FirmwareURL == "" {
+		return "", fmt.Errorf("system board: %w: release.firmware_url missing", ErrShape)
+	}
+	return raw.Release.FirmwareURL, nil
+}
+
 // SystemInfo is `ubus call system info`. The router's localtime is ignored: no RTC, so it is
 // not truth (device-facts §13).
 type SystemInfo struct {

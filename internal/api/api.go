@@ -141,6 +141,8 @@ type Deps struct {
 	USBTether USBTether
 	// Alerts are derived operator alerts; nil answers 503.
 	Alerts Alerts
+	// OpenWrtUpdates is the OpenWrt release and package check; nil answers 503.
+	OpenWrtUpdates OpenWrtUpdates
 	// SystemSettings is hostname, time zone and NTP; nil answers 503.
 	SystemSettings SystemSettings
 	// Failover is nil without package and service ports; it answers 503 failover_unavailable.
@@ -249,6 +251,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerTxn(a)
 	s.registerSystem(a)
 	s.registerSystemSettings(a)
+	s.registerOpenWrtUpdates(a)
 	s.registerSystemAlerts(a)
 	s.registerSSHKeys(a)
 	s.registerSystemLog(a)
