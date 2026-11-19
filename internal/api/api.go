@@ -147,6 +147,8 @@ type Deps struct {
 	SystemSettings SystemSettings
 	// LEDs are the router LEDs and their night schedule; nil answers 503 leds_unavailable.
 	LEDs LEDs
+	// Buttons are the hardware buttons and the slide switch action; nil answers 503 buttons_unavailable.
+	Buttons Buttons
 	// Failover is nil without package and service ports; it answers 503 failover_unavailable.
 	Failover Failover
 	// Clients is the LAN client list and its actions; nil answers 503 clients_unavailable.
@@ -254,6 +256,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerSystem(a)
 	s.registerSystemSettings(a)
 	s.registerLEDs(a)
+	s.registerButtons(a)
 	s.registerOpenWrtUpdates(a)
 	s.registerSystemAlerts(a)
 	s.registerSSHKeys(a)
@@ -332,6 +335,11 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "LAN" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/leds":
 		return "LED" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/buttons":
+		if name == "Button" {
+			return "HardwareButton"
+		}
+		return "Button" + name
 	}
 	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name

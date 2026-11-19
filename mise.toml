@@ -20,7 +20,7 @@ go test ./...
 [tasks."check:sh"]
 description = "sh -n and shellcheck (POSIX sh) on install, init and helper scripts"
 run = '''
-set -- packaging/install.sh packaging/port80.sh packaging/files/etc/init.d/travo-greenfield packaging/files/etc/uci-defaults/90-travo-greenfield scripts/*.sh scripts/lib/*.sh
+set -- packaging/install.sh packaging/port80.sh packaging/files/etc/init.d/travo-greenfield packaging/files/etc/uci-defaults/90-travo-greenfield packaging/files/etc/hotplug.d/button/50-travo-greenfield scripts/*.sh scripts/lib/*.sh
 for f in "$@"; do sh -n "$f"; done
 shellcheck -s sh "$@"
 '''

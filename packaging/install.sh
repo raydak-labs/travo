@@ -213,7 +213,7 @@ uninstall() {
         echo "install.sh: skipping $path: contains .." >&2
         continue
         ;;
-      "/usr/bin/$NAME" | "/etc/init.d/$NAME" | "/etc/uci-defaults/90-$NAME" | "/lib/upgrade/keep.d/$NAME" | "/www/$NAME/"?*) ;;
+      "/usr/bin/$NAME" | "/etc/init.d/$NAME" | "/etc/uci-defaults/90-$NAME" | "/lib/upgrade/keep.d/$NAME" | "/etc/hotplug.d/button/50-$NAME" | "/www/$NAME/"?*) ;;
       *)
         echo "install.sh: skipping $path: not a $NAME path" >&2
         continue

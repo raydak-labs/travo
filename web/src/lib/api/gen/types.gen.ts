@@ -192,6 +192,29 @@ export type BlockInputBody = {
     blocked: boolean;
 };
 
+export type ButtonActionInputBody = {
+    /**
+     * Pressed position turns it on, released turns it off
+     */
+    action: 'none' | 'vpn' | 'guest_wifi';
+};
+
+export type ButtonRun = {
+    /**
+     * Router wall clock, unix seconds
+     */
+    at: number;
+    outcome: 'applied' | 'unchanged' | 'no_action' | 'rolled_back' | 'skipped_guard' | 'skipped_busy' | 'skipped_lockout' | 'failed';
+    /**
+     * Hotplug ACTION; pressed turns the action on
+     */
+    position: 'pressed' | 'released';
+};
+
+export type ButtonStatus = {
+    buttons: Array<HardwareButton>;
+};
+
 export type CaptiveState = {
     /**
      * blocked: an earlier renew is unproven; renewing again is its retry
@@ -459,6 +482,30 @@ export type GuestConfig = {
     radio: string;
     ssid: string;
     subnet: string;
+};
+
+export type HardwareButton = {
+    action: 'none' | 'vpn' | 'guest_wifi';
+    /**
+     * A slide switch Travo may map; push buttons keep their stock behaviour
+     */
+    configurable: boolean;
+    /**
+     * BUTTON value of its hotplug event; empty when unknown
+     */
+    hotplug: string;
+    /**
+     * Devicetree label
+     */
+    label: string;
+    /**
+     * Last slide since the daemon started
+     */
+    last?: ButtonRun;
+    /**
+     * Devicetree key node
+     */
+    name: string;
 };
 
 export type HealthOutputBody = {
@@ -3433,6 +3480,85 @@ export type GetSystemBackupResponses = {
 };
 
 export type GetSystemBackupResponse = GetSystemBackupResponses[keyof GetSystemBackupResponses];
+
+export type GetButtonsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/buttons';
+};
+
+export type GetButtonsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetButtonsError = GetButtonsErrors[keyof GetButtonsErrors];
+
+export type GetButtonsResponses = {
+    /**
+     * OK
+     */
+    200: ButtonStatus;
+};
+
+export type GetButtonsResponse = GetButtonsResponses[keyof GetButtonsResponses];
+
+export type SetButtonActionData = {
+    body: ButtonActionInputBody;
+    path: {
+        /**
+         * Devicetree key node
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/system/buttons/{name}';
+};
+
+export type SetButtonActionErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetButtonActionError = SetButtonActionErrors[keyof SetButtonActionErrors];
+
+export type SetButtonActionResponses = {
+    /**
+     * OK
+     */
+    200: ButtonStatus;
+};
+
+export type SetButtonActionResponse = SetButtonActionResponses[keyof SetButtonActionResponses];
 
 export type PostFactoryResetData = {
     body: FactoryResetInputBody;

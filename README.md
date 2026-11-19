@@ -26,6 +26,8 @@ The **WiFi** page summarizes configured radios, uplink STA and access points, an
 
 **System → LEDs** lists the router's LEDs (storage activity LEDs stay with the kernel), turns them all off and back to their default, and sets a daily night schedule (LEDs off and back on at set times, router local time) that the router's cron runs.
 
+**System → Buttons** lists the router's hardware buttons from the devicetree. The reset button keeps its stock OpenWrt behaviour (reboot, factory reset, failsafe). A slide switch can be set to turn the VPN tunnel or the guest WiFi on and off; the router runs the change through the same guarded transaction and lockout rules as the UI.
+
 **System → SSH keys** lists, adds and removes the public keys that may log in to the router as root (dropbear `authorized_keys`); lines it does not manage stay untouched.
 
 **System → OpenWrt updates** checks downloads.openwrt.org for a newer release in the running series and the next major release, lists packages with newer versions (optionally after refreshing the package lists in `/tmp`), and links LuCI attended sysupgrade, which upgrades while keeping installed packages. It installs nothing.

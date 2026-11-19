@@ -104,3 +104,6 @@ Interface dump with the guest interface and uptime, and `uci export firewall` wi
 
 ## leds/ (2026-11-19, #194)
 `/sys/class/leds` listings before and after a restored `system` led section write probe, and `led.state`. See `leds/PROVENANCE.md`.
+
+## buttons/ (2026-11-19, #195)
+Devicetree key nodes (label, `linux,code`, `linux,input-type`) of the reset button and the slide switch. See `buttons/PROVENANCE.md`.

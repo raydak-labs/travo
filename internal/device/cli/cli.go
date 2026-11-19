@@ -32,6 +32,8 @@ type Device struct {
 	CrontabPath string
 	// SysLEDs overrides /sys/class/leds (tests).
 	SysLEDs string
+	// SysKeys overrides /sys/firmware/devicetree/base/keys (tests).
+	SysKeys string
 }
 
 func New() *Device { return &Device{Run: runner.Exec, RunInput: runner.RunInput} }

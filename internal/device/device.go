@@ -251,3 +251,19 @@ type LED struct {
 type LEDReader interface {
 	LEDs(context.Context) ([]LED, error)
 }
+
+// Button is one devicetree `gpio-keys` node (`/sys/firmware/devicetree/base/keys/<node>`).
+// Code is `linux,code`; InputType is `linux,input-type` (1 = EV_KEY when absent, 5 = EV_SW
+// for a slide switch).
+type Button struct {
+	Node      string
+	Label     string
+	Code      uint32
+	InputType uint32
+}
+
+// ButtonReader lists the hardware buttons from the devicetree (device-facts §8). Read-only;
+// `/etc/rc.button` is generic stock scripts, not a source of truth.
+type ButtonReader interface {
+	Buttons(context.Context) ([]Button, error)
+}

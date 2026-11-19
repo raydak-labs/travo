@@ -388,6 +388,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if svc := startLEDs(deps, cron, hooks); svc != nil {
 		apiDeps.LEDs = svc
 	}
+	if svc := startButtons(ctx, deps, hooks, vpnTunnel, wirelessGuest); svc != nil {
+		apiDeps.Buttons = svc
+	}
 	if history := startStatsHistory(deps, workers); history != nil {
 		apiDeps.StatsHistory = history
 	}

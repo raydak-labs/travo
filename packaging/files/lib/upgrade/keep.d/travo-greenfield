@@ -5,3 +5,4 @@
 /etc/config/travo-greenfield
 /etc/travo-greenfield/
 /www/travo-greenfield/
+/etc/hotplug.d/button/50-travo-greenfield
