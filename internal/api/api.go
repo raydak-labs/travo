@@ -159,6 +159,8 @@ type Deps struct {
 	DHCP DHCPServer
 	// WAN is network.wan (DHCP, static, PPPoE); nil answers 503 wan_unavailable.
 	WAN WANSettings
+	// LAN is the router's lan address (ADR 0028); nil answers 503 lan_unavailable.
+	LAN LANAddress
 	// PortForwards is firewall redirects wan -> lan; nil answers 503 port_forwards_unavailable.
 	PortForwards PortForwards
 	// Trusted reports whether a source address may reach the admin API (internal/trust).
@@ -257,6 +259,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWakeOnLAN(a)
 	s.registerDHCP(a)
 	s.registerWAN(a)
+	s.registerLAN(a)
 	s.registerPortForwards(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
@@ -319,6 +322,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "WAN" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/portfwd":
 		return "Port" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/lanaddress":
+		return "LAN" + name
 	}
 	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name

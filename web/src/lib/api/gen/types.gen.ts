@@ -549,6 +549,43 @@ export type KillSwitchState = {
     zone: boolean;
 };
 
+export type LanPending = {
+    /**
+     * New lan address in CIDR form
+     */
+    address: string;
+    /**
+     * Transaction to confirm or roll back
+     */
+    id: string;
+    /**
+     * Seconds left in the confirm window
+     */
+    remaining_seconds: number;
+};
+
+export type LanRequest = {
+    /**
+     * New router lan address in CIDR form, e.g. 192.168.8.1/24 (private IPv4, /24 to /30)
+     */
+    address: string;
+};
+
+export type LanView = {
+    /**
+     * Router lan address in CIDR form (committed network.lan ipaddr)
+     */
+    address: string;
+    /**
+     * A lan change waiting for the confirm from the new address
+     */
+    pending?: LanPending;
+    /**
+     * The lan subnet
+     */
+    subnet: string;
+};
+
 export type List = {
     profiles: Array<Summary>;
     selected_id: string | null;
@@ -2796,6 +2833,80 @@ export type RestartNetworkInterfaceResponses = {
 };
 
 export type RestartNetworkInterfaceResponse = RestartNetworkInterfaceResponses[keyof RestartNetworkInterfaceResponses];
+
+export type GetLanAddressData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/lan';
+};
+
+export type GetLanAddressErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetLanAddressError = GetLanAddressErrors[keyof GetLanAddressErrors];
+
+export type GetLanAddressResponses = {
+    /**
+     * OK
+     */
+    200: LanView;
+};
+
+export type GetLanAddressResponse = GetLanAddressResponses[keyof GetLanAddressResponses];
+
+export type SetLanAddressData = {
+    body: LanRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/lan';
+};
+
+export type SetLanAddressErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetLanAddressError = SetLanAddressErrors[keyof SetLanAddressErrors];
+
+export type SetLanAddressResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetLanAddressResponse = SetLanAddressResponses[keyof SetLanAddressResponses];
 
 export type ListPortForwardsData = {
     body?: never;

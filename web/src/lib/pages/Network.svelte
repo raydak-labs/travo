@@ -13,6 +13,7 @@ const wakeOnLan = lazyPage(() => import('./WakeOnLanCard.svelte'));
 const dhcpServer = lazyPage(() => import('./DHCPServerCard.svelte'));
 const dnsNames = lazyPage(() => import('./DNSNamesCard.svelte'));
 const portForwards = lazyPage(() => import('./PortForwardsCard.svelte'));
+const lanAddress = lazyPage(() => import('./LANAddressCard.svelte'));
 </script>
 
 <div class="grid gap-4">
@@ -21,6 +22,7 @@ const portForwards = lazyPage(() => import('./PortForwardsCard.svelte'));
   <PageHost load={usbTether} />
   <PageHost load={failover} />
   <PageHost load={interfaces} />
+  <PageHost load={lanAddress} />
   <PageHost load={dhcpServer} />
   <PageHost load={dnsNames} />
   <PageHost load={portForwards} />

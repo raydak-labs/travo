@@ -35,6 +35,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/hook"
 	"github.com/blackdark-org/travo-greenfield/internal/ifrestart"
+	"github.com/blackdark-org/travo-greenfield/internal/lanaddress"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/netview"
 	"github.com/blackdark-org/travo-greenfield/internal/portfwd"
@@ -411,6 +412,8 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		apiDeps.DHCP = &dhcpserver.Service{UCI: deps.Device, Leases: leases, Reload: deps.Device, Txns: deps.Txn}
 		apiDeps.WAN = newWAN(deps)
 		apiDeps.PortForwards = &portfwd.Service{UCI: deps.Device, Txns: deps.Txn}
+		apiDeps.LAN = &lanaddress.Service{UCI: deps.Device, Ubus: deps.Device, Txns: deps.Txn, Now: time.Now,
+			OnMoved: func(c context.Context) { _ = provider.Refresh(c, deps.Device) }}
 	}
 	if w, ok := deps.Device.(device.WakeSender); ok {
 		apiDeps.WakeOnLAN = &wol.Service{Ubus: deps.Device, Sender: w}
