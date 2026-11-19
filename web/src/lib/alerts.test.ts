@@ -11,14 +11,19 @@ const alert = (over: Partial<Alert>): Alert => ({
 });
 
 describe('alerts', () => {
-  it('banners only danger alerts', () => {
+  it('banners danger and info alerts, never warnings', () => {
     const list = {
       alerts: [
         alert({ id: 'a', code: 'adguard_fail_open', severity: 'danger' }),
         alert({ id: 'b', code: 'overlay_low' }),
+        alert({ id: 'c', code: 'firmware_upgrade_completed', severity: 'info' }),
       ],
     };
-    expect(bannerAlerts(list).map((a) => a.id)).toEqual(['a']);
+    expect(bannerAlerts(list).map((a) => a.id)).toEqual(['a', 'c']);
+    expect(alertRoute(alert({ code: 'firmware_upgrade_completed' }))).toBe('system');
+    expect(alertMessage(alert({ code: 'firmware_upgrade_completed' }))).toContain(
+      'upgrade finished',
+    );
     expect(bannerAlerts(undefined)).toEqual([]);
   });
 

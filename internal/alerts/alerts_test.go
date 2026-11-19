@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -97,6 +98,22 @@ func TestDeriveDataBudget(t *testing.T) {
 		if got != want {
 			t.Errorf("%s: %q, want %q", state, got, want)
 		}
+	}
+}
+
+func TestDeriveFirmwareCompletedIsInfoAfterDanger(t *testing.T) {
+	at := time.Date(2026, 11, 19, 8, 0, 0, 0, time.UTC)
+	got := Derive(Inputs{Now: at, FirmwareCompleted: &at, DataBudget: datausage.StateWarning, FailOpen: &at})
+	var order []string
+	for _, a := range got {
+		order = append(order, string(a.Severity)+" "+a.ID)
+	}
+	want := []string{"danger adguard_fail_open", "info firmware_upgrade_completed", "warning data_budget_warning"}
+	if !slices.Equal(order, want) {
+		t.Fatalf("%v, want %v", order, want)
+	}
+	if got[1].Since == nil || !got[1].Since.Equal(at) {
+		t.Fatalf("since %v", got[1].Since)
 	}
 }
 

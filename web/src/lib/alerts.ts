@@ -2,9 +2,9 @@ import type { Alert, AlertList } from './api/gen';
 import { m } from './paraglide/messages.js';
 import type { Route } from './router';
 
-/** The shell banner shows danger alerts only; warnings stay on their pages. */
+/** The shell banner shows danger and info alerts; warnings stay on their pages. */
 export function bannerAlerts(list: AlertList | undefined): Alert[] {
-  return (list?.alerts ?? []).filter((a) => a.severity === 'danger');
+  return (list?.alerts ?? []).filter((a) => a.severity !== 'warning');
 }
 
 /** The page that owns the condition. A guard belongs to the feature its name starts with. */
@@ -46,5 +46,7 @@ export function alertMessage(alert: Alert): string {
       return m.alert_data_budget_warning();
     case 'data_budget_exceeded':
       return m.alert_data_budget_exceeded();
+    case 'firmware_upgrade_completed':
+      return m.alert_firmware_upgrade_completed();
   }
 }

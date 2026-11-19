@@ -13,7 +13,7 @@ const shown = $derived(bannerAlerts(list));
 {#if shown.length > 0}
   <section class="mb-4 flex flex-col gap-2" aria-label={m.alerts_region()}>
     {#each shown as alert (alert.id)}
-      <Alert class="status status-danger flex flex-wrap items-center justify-between gap-2">
+      <Alert class="status {alert.severity === 'info' ? 'status-ok' : 'status-danger'} flex flex-wrap items-center justify-between gap-2">
         <span class="min-w-0 flex-1">{alertMessage(alert)}</span>
         <Button variant="outline" size="sm" href={href(alertRoute(alert))}>{m.alert_open()}</Button>
       </Alert>

@@ -44,6 +44,9 @@ type Dir struct {
 type Info struct {
 	Name    string    `json:"name"`
 	Started time.Time `json:"started"`
+	// Detail is what the operation needs to judge its own guard after a reboot (the
+	// firmware upgrade records the boot and the revision it flashed from, ADR 0030).
+	Detail map[string]string `json:"detail,omitempty"`
 }
 
 func (d Dir) file(name string) (string, error) {
@@ -60,6 +63,11 @@ func (d Dir) Acquire(name string) error { return d.AcquireExclusive(name, nil) }
 // is held, conflicts' error when it refuses the others (nil conflicts refuses nothing).
 // conflicts runs under the process-wide guard lock: it must be pure and never touch guards.
 func (d Dir) AcquireExclusive(name string, conflicts func(held []Info) error) error {
+	return d.AcquireExclusiveWith(name, nil, conflicts)
+}
+
+// AcquireExclusiveWith is AcquireExclusive that also stores detail in the guard file.
+func (d Dir) AcquireExclusiveWith(name string, detail map[string]string, conflicts func(held []Info) error) error {
 	p, err := d.file(name)
 	if err != nil {
 		return err
@@ -67,7 +75,7 @@ func (d Dir) AcquireExclusive(name string, conflicts func(held []Info) error) er
 	if err := os.MkdirAll(d.Path, 0o700); err != nil {
 		return fmt.Errorf("guard dir: %w", err)
 	}
-	in := Info{Name: name, Started: d.Now().UTC()} // no injected callback runs under mu
+	in := Info{Name: name, Started: d.Now().UTC(), Detail: detail} // no injected callback runs under mu
 	mu.Lock()
 	defer mu.Unlock()
 	held, err := d.Stale()

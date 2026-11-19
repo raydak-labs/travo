@@ -48,6 +48,16 @@ type device struct {
 	upgradeErr error
 	stored     bool
 	info       []byte
+	bootID     string
+	board      []byte // nil: the verbatim capture
+	boardErr   error
+}
+
+func (d *device) BootID(context.Context) (string, error) {
+	if d.bootID == "" {
+		return "", errors.New("no boot id")
+	}
+	return d.bootID, nil
 }
 
 func (d *device) StoreFirmware(_ context.Context, src io.Reader, _ string) (Stored, error) {
@@ -86,6 +96,12 @@ func (d *device) Call(_ context.Context, object, method string, _ any) (json.Raw
 		}
 		return fixture(d.t, "device/axt1800-25.12.6/system-info.json"), nil
 	case "system.board":
+		if d.boardErr != nil {
+			return nil, d.boardErr
+		}
+		if d.board != nil {
+			return d.board, nil
+		}
 		return fixture(d.t, "device/axt1800-25.12.6/system-board.json"), nil
 	}
 	return nil, errors.New("unexpected ubus call")
@@ -94,7 +110,7 @@ func (d *device) Call(_ context.Context, object, method string, _ any) (json.Raw
 func setup(t *testing.T) (*Service, *device) {
 	t.Helper()
 	g := guard.Dir{Path: t.TempDir(), Now: time.Now}
-	d := &device{t: t, guards: g, validation: validReply(t)}
+	d := &device{t: t, guards: g, validation: validReply(t), bootID: "boot-before"}
 	return &Service{Device: d, Guards: g}, d
 }
 
@@ -254,7 +270,7 @@ func TestApplyKeepsTheGuardWhenSchedulingFails(t *testing.T) {
 
 type failingGuards struct{ guard.Dir }
 
-func (failingGuards) AcquireExclusive(string, func([]guard.Info) error) error {
+func (failingGuards) AcquireExclusiveWith(string, map[string]string, func([]guard.Info) error) error {
 	return errors.New("read-only file system")
 }
 

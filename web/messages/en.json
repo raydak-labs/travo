@@ -1234,5 +1234,6 @@
   "usage_event_down": "{uplink} down",
   "usage_uptime_note": "Read from the 10-minute samples: up and down times are accurate to one sample, and an outage between two samples is not seen.",
   "alert_data_budget_warning": "The data budget is almost used up.",
-  "alert_data_budget_exceeded": "The data budget for this billing period is used up."
+  "alert_data_budget_exceeded": "The data budget for this billing period is used up.",
+  "alert_firmware_upgrade_completed": "The firmware upgrade finished. Features paused during the upgrade are back on."
 }

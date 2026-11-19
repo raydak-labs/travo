@@ -113,12 +113,12 @@ export type AdguardTopologyInputBody = {
 };
 
 export type Alert = {
-    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted' | 'data_budget_warning' | 'data_budget_exceeded';
+    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted' | 'data_budget_warning' | 'data_budget_exceeded' | 'firmware_upgrade_completed';
     /**
      * Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress
      */
     id: string;
-    severity: 'warning' | 'danger';
+    severity: 'warning' | 'danger' | 'info';
     /**
      * When the condition started; null when unknown
      */

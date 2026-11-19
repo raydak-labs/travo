@@ -1,7 +1,8 @@
 // Package firmware stages an uploaded sysupgrade image in /tmp, validates it, and starts
-// the flash. Invariants §1: the guard is written FIRST, a failed guard write aborts, and
-// the guard is never removed (an interrupted flash must stay visible; the keep-list carries
-// it across a flash that keeps settings).
+// the flash. Invariants §1: the guard is written FIRST and a failed guard write aborts.
+// The keep-list carries the guard across a flash that keeps settings; only Complete
+// removes it, at the next daemon start, when the boot and the firmware revision both
+// changed (ADR 0030). An interrupted flash keeps it visible.
 package firmware
 
 import (
@@ -11,13 +12,15 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 )
 
 const (
-	// GuardName stays after the flash; reinstalling Travo clears it by name.
+	// GuardName stays after the flash until Complete sees the new firmware; reinstalling
+	// Travo clears it by name.
 	GuardName = "firmware-upgrade-in-progress"
 	// Phrase is what the operator types to confirm.
 	Phrase = "upgrade firmware"
@@ -65,11 +68,14 @@ type Device interface {
 	// A terminal operation: no timeout tier.
 	Sysupgrade(ctx context.Context, path string, keepSettings bool) error
 	Call(ctx context.Context, object, method string, args any) (json.RawMessage, error)
+	// BootID is the kernel's per-boot id, recorded in the guard and compared after it.
+	BootID(ctx context.Context) (string, error)
 }
 
 // Guards is the subset of guard.Dir the service needs.
 type Guards interface {
-	AcquireExclusive(name string, conflicts func(held []guard.Info) error) error
+	AcquireExclusiveWith(name string, detail map[string]string, conflicts func(held []guard.Info) error) error
+	Release(name string) error
 	Stale() ([]guard.Info, error)
 }
 
@@ -91,11 +97,14 @@ type Service struct {
 	Device  Device
 	Guards  Guards
 	Stopped func() bool
+	Now     func() time.Time // nil means time.Now
 	mu      sync.Mutex
 	staged  *Image
 	// uploading holds the one upload slot from Prepare until FinishUpload, so a second
 	// request cannot pass the room check against the same free memory.
 	uploading bool
+	// completed is when Complete released the guard of a finished upgrade.
+	completed *time.Time
 }
 
 // Prepare runs before the body is read, with the request size: it refuses a pending
@@ -233,7 +242,9 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 }
 
 // Apply checks the phrase, the staged image and every guard, writes its guard, then
-// schedules the flash. The guard is never released, also when scheduling fails.
+// schedules the flash. Apply never releases the guard, also when scheduling fails; the
+// guard records the boot, the running revision and the image so Complete can tell a
+// finished flash from an interrupted one.
 func (s *Service) Apply(ctx context.Context, sha string, keepSettings bool, phrase string) error {
 	if phrase != Phrase {
 		return ErrConfirm
@@ -252,8 +263,8 @@ func (s *Service) Apply(ctx context.Context, sha string, keepSettings bool, phra
 		return ErrNoBackup
 	}
 	// The scan and our guard are one step: a refusal writes nothing, and once our guard is
-	// written no other guarded operation can start. From here on it is never removed.
-	err := s.Guards.AcquireExclusive(GuardName, refuseOthers)
+	// written no other guarded operation can start.
+	err := s.Guards.AcquireExclusiveWith(GuardName, s.guardDetail(ctx, sha), refuseOthers)
 	switch {
 	case errors.Is(err, ErrBusy):
 		return ErrBusy

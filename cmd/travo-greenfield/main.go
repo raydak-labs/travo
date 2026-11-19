@@ -33,7 +33,6 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/diagnostics"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
-	"github.com/blackdark-org/travo-greenfield/internal/firmware"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/hook"
 	"github.com/blackdark-org/travo-greenfield/internal/ifrestart"
@@ -205,6 +204,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if err != nil {
 		return err
 	}
+	fw := startFirmware(ctx, deps, workers.Stopped)
 	limiter, provider := auth.NewRateLimiter(), &trust.Provider{}
 	workers.Go("rate-limit-sweep", lifecycle.Every(time.Minute, func(context.Context) { limiter.Sweep(clock.Now()) }))
 	if deps.Txn != nil {
@@ -407,15 +407,15 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	apiDeps.OpenWrtUpdates = newOpenWrtUpdates(deps)
-	apiDeps.Alerts = newAlerts(deps, aghService, reconnect, usage)
+	apiDeps.Alerts = newAlerts(deps, aghService, reconnect, usage, fw)
 	if f, ok := deps.Device.(sshkeys.File); ok {
 		apiDeps.SSHKeys = &sshkeys.Service{File: f}
 	}
 	if r, ok := deps.Device.(factoryreset.Resetter); ok {
 		apiDeps.FactoryReset = &factoryreset.Service{Device: r, Guards: deps.Guards, Stopped: workers.Stopped}
 	}
-	if f, ok := deps.Device.(firmware.Device); ok {
-		apiDeps.Firmware = &firmware.Service{Device: f, Guards: deps.Guards, Stopped: workers.Stopped}
+	if fw != nil {
+		apiDeps.Firmware = fw
 	}
 	if r, ok := deps.Device.(systemlog.Reader); ok {
 		apiDeps.SystemLog = &systemlog.Service{Log: r}
