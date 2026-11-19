@@ -171,12 +171,17 @@ func (s *Service) Install(ctx context.Context, id string) error {
 	if s.Online != nil && !s.Online(ctx) {
 		return ErrOffline
 	}
+	release, err := pkgmgr.Exclusive(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if free, err := s.FreeBytes(); err != nil {
 		return fmt.Errorf("free flash: %w", err)
 	} else if need := e.Size + Headroom; free < need {
 		return fmt.Errorf("%w: %d MiB free, %d MiB needed", ErrNoSpace, free/MiB, need/MiB)
 	}
-	if err := s.Guards.Acquire(Guard); err != nil {
+	if err := s.Guards.AcquireExclusive(Guard, guard.RefuseTerminal); err != nil {
 		return err
 	}
 	if err := s.Packages.Update(ctx); err != nil {
@@ -225,7 +230,12 @@ func (s *Service) Remove(ctx context.Context, id string) error {
 	if slices.ContainsFunc(e.Packages, func(p string) bool { return rom[p] }) {
 		return ErrBuiltIn
 	}
-	if err := s.Guards.Acquire(Guard); err != nil {
+	release, err := pkgmgr.Exclusive(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := s.Guards.AcquireExclusive(Guard, guard.RefuseTerminal); err != nil {
 		return err
 	}
 	for _, p := range slices.Backward(e.Packages) {

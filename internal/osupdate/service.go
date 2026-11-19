@@ -96,11 +96,7 @@ func (s *Service) Check(ctx context.Context, refresh bool) (OpenWrtCheck, error)
 	now := s.Now().UTC()
 	res := OpenWrtCheck{CheckedAt: &now, Target: board.Target, Releases: Compare(board.Release, ix), PackageManager: s.Packages.Name(), Packages: []pkgmgr.Upgrade{}}
 	if refresh {
-		if err := s.Packages.Update(ctx); err != nil {
-			slog.Warn("package lists refresh", "err", err) // best effort (invariants §13)
-		} else {
-			res.ListsRefreshed = true
-		}
+		res.ListsRefreshed = s.refreshLists(ctx)
 	}
 	if ups, err := s.Packages.Upgradable(ctx); err != nil {
 		slog.Warn("upgradable packages", "err", err)
@@ -111,6 +107,22 @@ func (s *Service) Check(ctx context.Context, refresh bool) (OpenWrtCheck, error)
 	s.last = res
 	s.mu.Unlock()
 	return res, nil
+}
+
+// refreshLists updates the package lists under the package-op lock, best effort
+// (invariants §13).
+func (s *Service) refreshLists(ctx context.Context) bool {
+	release, err := pkgmgr.Exclusive(ctx)
+	if err != nil {
+		slog.Warn("package lists refresh", "err", err)
+		return false
+	}
+	defer release()
+	if err := s.Packages.Update(ctx); err != nil {
+		slog.Warn("package lists refresh", "err", err)
+		return false
+	}
+	return true
 }
 
 // parseBoard reads the release and the firmware server, which must be an https URL.

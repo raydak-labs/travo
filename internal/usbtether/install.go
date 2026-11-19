@@ -60,6 +60,11 @@ func (s *Service) InstallDrivers(ctx context.Context, phone Phone) (bool, error)
 	if len(missing) == 0 && !setup {
 		return false, nil
 	}
+	release, err := pkgmgr.Exclusive(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
 	if len(missing) > 0 {
 		if free, err := s.FreeBytes(); err != nil {
 			return false, fmt.Errorf("free flash: %w", err)
@@ -67,7 +72,7 @@ func (s *Service) InstallDrivers(ctx context.Context, phone Phone) (bool, error)
 			return false, fmt.Errorf("%w: %d MiB free, %d MiB needed", ErrNoSpace, free>>20, NeedFree[phone]>>20)
 		}
 	}
-	if err := s.Guards.Acquire(InstallGuard); err != nil {
+	if err := s.Guards.AcquireExclusive(InstallGuard, guard.RefuseTerminal); err != nil {
 		return false, fmt.Errorf("usbtether guard: %w", err) // never degrade to unguarded
 	}
 	if len(missing) > 0 {

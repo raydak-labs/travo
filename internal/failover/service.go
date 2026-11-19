@@ -237,7 +237,12 @@ func (s *Service) install(ctx context.Context) error {
 	} else if !errors.Is(err, pkgmgr.ErrNotInstalled) {
 		return fmt.Errorf("query %s: %w", Package, err) // a failed query is not "absent"
 	}
-	if err := s.Guards.Acquire(InstallGuard); err != nil {
+	release, err := pkgmgr.Exclusive(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := s.Guards.AcquireExclusive(InstallGuard, guard.RefuseTerminal); err != nil {
 		return fmt.Errorf("failover guard: %w", err)
 	}
 	if err := s.Packages.Update(ctx); err != nil {

@@ -209,12 +209,17 @@ func (s *Service) Install(ctx context.Context) error {
 	if s.Online != nil && !s.Online(ctx) {
 		return ErrOffline
 	}
+	release, err := pkgmgr.Exclusive(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if free, err := s.FreeBytes(); err != nil {
 		return fmt.Errorf("free flash: %w", err)
 	} else if free < NeedFree {
 		return fmt.Errorf("%w: %d MiB free, %d MiB needed", ErrNoSpace, free>>20, NeedFree>>20)
 	}
-	if err := s.Guards.Acquire(InstallGuard); err != nil {
+	if err := s.Guards.AcquireExclusive(InstallGuard, guard.RefuseTerminal); err != nil {
 		return err
 	}
 	if err := s.Packages.Update(ctx); err != nil {
