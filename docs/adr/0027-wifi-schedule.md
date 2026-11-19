@@ -33,8 +33,9 @@ the time zone is a POSIX string in `/etc/TZ` that Go's `time` cannot load (devic
 - Confirm: the scheduler confirms the transaction itself once the AP probe proved every
   expected AP (the edited one gone or up, every other enabled AP up). The operator gave the
   confirmation in advance by saving the rule. A failed probe rolls back exactly as in a
-  user transaction. This is the only self-confirming path; it is limited to an AP's
-  `disabled` flag on a saved rule.
+  user transaction. It is limited to an AP's `disabled` flag on a saved rule. The
+  slide switch is the other named self-confirming path ([0029](0029-slide-switch-self-confirm.md));
+  invariants §1 lists every exception.
 - Outcomes (`applied`, `unchanged`, `rolled_back`, `skipped_guard`, `skipped_busy`,
   `skipped_lockout`, `failed`) stay in memory and show in
   `GET /api/v1/wifi/schedule/status` with whether crond runs. Anything but `applied` and

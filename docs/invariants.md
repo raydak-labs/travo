@@ -19,6 +19,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - The confirm window is the transaction manager's (60 s) for every change except the LAN address change (180 s, confirmed from the new address, [ADR 0028](adr/0028-lan-address-change.md)); a per-change window may only be longer.
 - Automated self-confirm exceptions (each confirms only after its probe passes, never on a timer alone):
   1. WiFi schedule: a saved schedule rule toggles an AP's `disabled` flag through the AP transaction and confirms after the AP probe passes; lockout-risky rules need the acknowledgement saved with the rule ([adr/0027](adr/0027-wifi-schedule.md)).
+  2. Slide switch: a hotplug `BTN_<n>` event runs the bound action (VPN tunnel or guest AP) through its own transaction and confirms after the feature's probe passes (fresh WireGuard handshake or uplink default route; guest AP probe); it runs as an unknown caller without acknowledgement, so lockout fails closed ([adr/0029](adr/0029-slide-switch-self-confirm.md)).
 - Apply paths write UCI only. Never `wifi`, `wifi up/down/reload`, in any path. Auto-reconnect uses `ifup wwan` only. It is capped at 5 attempts, guarded, persists its counter, writes no UCI and never switches saved uplinks ([ADR 0014](adr/0014-capped-uplink-reconnect.md)).
 - Manual uplink restart (`POST /api/v1/network/interfaces/{name}/restart`) runs `ifup <name>` for `wan`, `wwan`, `usbtether` only, never `lan`/guest and never a stop. It writes no UCI, holds `interface-restart-in-progress` until the interface reports up with a fresh uptime or 30 s pass, refuses while a transaction or any other guard is held, and keeps the guard if `ifup` fails (the next explicit restart clears it). `wwan` drops every AP on the STA's radio (device-facts §2), so it is lockout-checked (§2) when one shares it.
 
@@ -224,7 +225,7 @@ Accept; do not "fix" silently.
 - Positional SSH key index (breaking to change).
 - Dashboard rate = 2 s sample, not an average.
 - Config locks are held across blocking reload/apply; long holds queue all writers of that config.
-- Hardware button = detection only until actions are designed.
+- Push buttons and the reset button = detection only; slide switches run bound actions ([adr/0029](adr/0029-slide-switch-self-confirm.md)).
 - Operator-owned external writers (cron/hotplug) outside the lock model.
 - Reboot exclusion has a residual ~2 s window where `txn.Begin` can start after the second guard check; boot-time `txn.Recover` restores that transaction.
 - A client block stops NEW forwarded connections only: fw4 accepts established flows before the MAC rule (clients/fw4-print-block.txt) and the 25.12.6 image has no `conntrack` tool to flush them, so flows open before the block run until they close. The UI says so; disconnecting a WiFi client does not end them either.
