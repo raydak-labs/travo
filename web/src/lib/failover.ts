@@ -35,6 +35,8 @@ export function failoverRefusal(code: string | undefined): { message?: string; e
       return { error: m.failover_offline() };
     case 'failover_conflict':
       return { error: m.failover_conflict() };
+    case 'failover_tailscale_conflict':
+      return { error: m.failover_tailscale_conflict() };
     case 'validation':
       return { error: m.failover_invalid() };
     case 'failover_no_change':

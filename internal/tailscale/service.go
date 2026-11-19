@@ -37,6 +37,8 @@ var (
 	ErrOffline    = errors.New("no Internet uplink yet")
 	ErrNoSpace    = errors.New("not enough free flash for Tailscale")
 	ErrNotRunning = errors.New("tailscaled is not running")
+	// ErrFailover: mwan3 cannot manage its chains next to Tailscale's nftables rules (ADR 0018).
+	ErrFailover = errors.New("failover is enabled; disable failover before installing or starting Tailscale")
 )
 
 // Status is the read-only view. A failed presence check is an error, never "absent" (invariants §13).
@@ -72,6 +74,11 @@ type Service struct {
 	Tunnel Tunnel
 	// ProbeWait bounds the Internet proof after selecting an exit node.
 	ProbeWait time.Duration
+	// Exclusive is shared with failover.Service; FailoverEnabled reads its saved choice
+	// (both nil: no failover on this device). Install and Login refuse while failover is
+	// enabled, checked under Exclusive (docs/adr/0018).
+	Exclusive       *sync.Mutex
+	FailoverEnabled func() (bool, error)
 
 	mu sync.Mutex
 }
@@ -144,6 +151,10 @@ func (s *Service) guardHeld(name string) (bool, error) {
 func (s *Service) Install(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.exclusive()()
+	if err := s.failoverOff(); err != nil {
+		return err
+	}
 	if err := s.Guards.Clear(InstallGuard); err != nil {
 		return err
 	}
@@ -224,7 +235,8 @@ func (s *Service) every() time.Duration {
 // Login brings tailscaled up with Travo's prefs. Before login the CLI times out in
 // NeedsLogin by design; the returned status then carries the auth URL.
 func (s *Service) Login(ctx context.Context) (Status, error) {
-	err := s.change(ctx, func(ctx context.Context, b Backend) error {
+	off := func(context.Context, Backend) error { return s.failoverOff() }
+	err := s.changeChecked(ctx, off, func(ctx context.Context, b Backend) error {
 		err := s.CLI.Up(ctx, LoginArgs(CurrentDesired(b)))
 		if errors.Is(err, ErrUpTimeout) {
 			return nil
@@ -257,6 +269,7 @@ func (s *Service) change(ctx context.Context, apply func(context.Context, Backen
 func (s *Service) changeChecked(ctx context.Context, check, apply func(context.Context, Backend) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.exclusive()()
 	if held, err := s.guardHeld(InstallGuard); err != nil || held {
 		return errors.Join(err, busyIf(held))
 	}
@@ -298,6 +311,31 @@ func (s *Service) ready(ctx context.Context) (Backend, error) {
 		return Backend{}, ErrNotRunning
 	}
 	return s.backend(ctx)
+}
+
+// exclusive takes the lock shared with failover (a no-op without failover) and returns
+// its release; every change holds it, so a failover enable never interleaves with one.
+func (s *Service) exclusive() func() {
+	if s.Exclusive == nil {
+		return func() {}
+	}
+	s.Exclusive.Lock()
+	return s.Exclusive.Unlock
+}
+
+// failoverOff refuses Tailscale while failover is enabled; callers hold exclusive().
+func (s *Service) failoverOff() error {
+	if s.FailoverEnabled == nil {
+		return nil
+	}
+	on, err := s.FailoverEnabled()
+	if err != nil {
+		return fmt.Errorf("failover settings: %w", err)
+	}
+	if on {
+		return ErrFailover
+	}
+	return nil
 }
 
 func busyIf(held bool) error {

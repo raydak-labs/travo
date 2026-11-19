@@ -22,6 +22,7 @@ describe('tailscaleError', () => {
     expect(tailscaleError('tailscale_exit_node_conflict')).toBe(m.tailscale_err_exit_conflict());
     expect(tailscaleError('tailscale_exit_node_offline')).toBe(m.tailscale_err_exit_offline());
     expect(tailscaleError('tailscale_no_space')).toBe(m.tailscale_err_no_space());
+    expect(tailscaleError('tailscale_failover_conflict')).toBe(m.tailscale_err_failover());
     expect(tailscaleError(undefined)).toBe(m.tailscale_err_failed());
   });
 

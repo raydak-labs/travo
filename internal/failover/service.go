@@ -36,6 +36,8 @@ var (
 	ErrOffline = errors.New("enable failover while the router is online")
 	ErrBusy    = errors.New("a failover install or service change did not finish")
 	ErrNotUp   = errors.New("failover did not verify after apply")
+	// ErrTailscale: Tailscale's nftables rules in ip mangle break mwan3 (ADR 0018).
+	ErrTailscale = errors.New("Tailscale is running; stop or remove Tailscale before enabling failover")
 )
 
 // Transactions is the slice of txn.Manager the apply needs.
@@ -50,7 +52,9 @@ type Service struct {
 	Ubus     device.Ubus
 	Services device.Services
 	// Runtime reads mwan3's tracking and mangle rules for the apply probe.
-	Runtime  device.MWAN3Reader
+	Runtime device.MWAN3Reader
+	// Mangle removes what mwan3 left in ip/ip6 mangle when disabled (ADR 0018).
+	Mangle   device.MangleCleaner
 	Packages pkgmgr.PackageManager
 	Guards   guard.Dir
 	Txns     Transactions
@@ -61,6 +65,9 @@ type Service struct {
 	// Ordered: the UCI adapter reports `uci export` order (cli yes, mock no).
 	Ordered   bool
 	ProbeWait time.Duration
+	// Exclusive is shared with tailscale.Service: failover and Tailscale are mutually
+	// exclusive (ADR 0018), and each checks the other while holding it.
+	Exclusive *sync.Mutex
 
 	mu          sync.Mutex
 	bootEnabled bool
@@ -108,8 +115,8 @@ func (s *Service) saveSettings(st Settings) error {
 }
 
 func (s *Service) ready() bool {
-	return s.UCI != nil && s.Reorder != nil && s.Ubus != nil && s.Services != nil && s.Runtime != nil && s.Packages != nil &&
-		s.Txns != nil && s.Online != nil && s.Guards.Path != "" && s.Path != ""
+	return s.UCI != nil && s.Reorder != nil && s.Ubus != nil && s.Services != nil && s.Runtime != nil && s.Mangle != nil && s.Packages != nil &&
+		s.Txns != nil && s.Online != nil && s.Exclusive != nil && s.Guards.Path != "" && s.Path != ""
 }
 
 // Status reads settings, package, service, config and netifd.
@@ -188,6 +195,11 @@ func (s *Service) Enable(ctx context.Context, uplinks []string) (txn.Status, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.Exclusive.Lock() // held through the apply: Tailscale cannot start before the settings say enabled
+	defer s.Exclusive.Unlock()
+	if err := s.tailscaleOff(ctx); err != nil {
+		return txn.Status{}, err
+	}
 	for _, g := range []string{InstallGuard, ServiceGuard} {
 		if err := s.Guards.Clear(g); err != nil {
 			return txn.Status{}, err
@@ -329,8 +341,9 @@ func (s *Service) runtimeVerified(ctx context.Context, plan *Plan) error {
 	return CheckRuntime(interfaces, mangle, uplinks)
 }
 
-// Disable records the choice and stops mwan3 (guarded). The config stays: Travo's rules
-// do nothing while mwan3 is stopped, and the next enable reuses them.
+// Disable records the choice, stops mwan3 (guarded) and removes the mwan3 chains it left
+// in ip/ip6 mangle. The config stays: Travo's rules do nothing while mwan3 is stopped, and
+// the next enable reuses them.
 func (s *Service) Disable(ctx context.Context) error {
 	if !s.ready() {
 		return ErrUnavailable
@@ -348,10 +361,12 @@ func (s *Service) Disable(ctx context.Context) error {
 	if err := s.Guards.Clear(ServiceGuard); err != nil {
 		return err
 	}
-	if _, err := s.Packages.Version(ctx, Package); errors.Is(err, pkgmgr.ErrNotInstalled) {
-		return nil
+	if _, err := s.Packages.Version(ctx, Package); !errors.Is(err, pkgmgr.ErrNotInstalled) {
+		if err := s.serviceActions(ctx, "stop", "disable"); err != nil {
+			return err
+		}
 	}
-	return s.serviceActions(ctx, "stop", "disable")
+	return s.cleanMangle(ctx)
 }
 
 func (s *Service) serviceActions(ctx context.Context, actions ...string) error {

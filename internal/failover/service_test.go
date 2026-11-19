@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func newRig(t *testing.T, installed bool) *rig {
 	g := guard.Dir{Path: filepath.Join(t.TempDir(), "guards"), Now: time.Now}
 	r := &rig{d: d, pm: pm, online: true}
 	r.txns = &fakeTxns{d: d, guards: g}
-	r.s = &Service{UCI: d, Reorder: d, Ubus: d, Services: d, Runtime: d, Packages: pm, Guards: g, Txns: r.txns,
+	r.s = &Service{UCI: d, Reorder: d, Ubus: d, Services: d, Runtime: d, Mangle: d, Packages: pm, Guards: g, Txns: r.txns, Exclusive: new(sync.Mutex),
 		Online: func(context.Context) bool { return r.online }, Path: filepath.Join(t.TempDir(), "failover.json"),
 		ProbeWait: 100 * time.Millisecond}
 	return r

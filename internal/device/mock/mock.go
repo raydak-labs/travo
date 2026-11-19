@@ -47,6 +47,11 @@ type Device struct {
 	// MWAN3Offline names mwan3 interfaces tracked offline; MangleErr makes MangleRules fail.
 	MWAN3Offline []string
 	MangleErr    error
+	// NftRulesets holds `nft -j list ruleset <family>` captures by family; DeleteMangle
+	// edits them, counts in MangleDeletes and fails with DeleteMangleErr.
+	NftRulesets     map[string]string
+	MangleDeletes   int
+	DeleteMangleErr error
 	// Wakes records SendWake calls; WakeErr makes it fail. The mock never sends a packet.
 	Wakes        []Wake
 	WakeErr      error

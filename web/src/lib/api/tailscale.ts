@@ -51,6 +51,8 @@ export function tailscaleError(code: string | undefined): string {
       return m.tailscale_err_offline();
     case 'tailscale_no_space':
       return m.tailscale_err_no_space();
+    case 'tailscale_failover_conflict':
+      return m.tailscale_err_failover();
     case 'tailscale_busy':
       return m.tailscale_err_busy();
     case 'tailscale_not_running':

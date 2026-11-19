@@ -9,6 +9,7 @@ Tailscale is the OpenWrt `tailscale` package (1.104.1-r1 on 25.12.6, pulls `kmod
 - Explicit only, never automatic: Tailscale is opt-in. The install is guarded (`tailscale-install-in-progress`), needs the real Internet probe and 46 MiB free overlay (26 MiB installed size + 20 MB headroom); the measured overlay growth was 12.3 MiB (ubifs compression), so the check is conservative.
 - The package's post-install starts tailscaled on its own. Travo still runs `enable` and `restart`, waits until `tailscale status --json` answers, and pins `--accept-dns=false`. Any failure keeps the guard; the user's next install request clears it by name.
 - `apk del` leaves `/etc/tailscale/` (node key, state, SSH host keys) and `/var/lib/tailscale/`. Uninstall is not offered yet; when it is, it removes those explicitly (device-facts §15).
+- Install and login are refused (409 `tailscale_failover_conflict`) while failover is enabled: Tailscale's nftables rules in `ip mangle` break mwan3 ([ADR 0018](0018-mwan3-failover.md) "Failover and Tailscale"; running both together is #279).
 
 ## Preferences are owned by Travo
 

@@ -189,6 +189,22 @@ type MWAN3Reader interface {
 	MangleRules(ctx context.Context) (string, error)
 }
 
+// NftRule names one nft rule by its chain and handle.
+type NftRule struct {
+	Chain  string
+	Handle int
+}
+
+// MangleCleaner removes what mwan3 left in the iptables-nft mangle tables when its own
+// `iptables -S` reads failed (ADR 0018). internal/failover decides what goes.
+type MangleCleaner interface {
+	// NftRuleset is `nft -j list ruleset <family>` (ip or ip6): every table of the family.
+	NftRuleset(ctx context.Context, family string) (string, error)
+	// DeleteMangle deletes the rules, then flushes and deletes the chains, of table
+	// <family> mangle in one nft transaction: all of it applies or nothing does.
+	DeleteMangle(ctx context.Context, family string, rules []NftRule, chains []string) error
+}
+
 // ServiceAutostart reads whether an init script starts at boot.
 type ServiceAutostart interface {
 	// ServiceEnabled is `/etc/init.d/<name> enabled`: exit 0 true, exit 1 false

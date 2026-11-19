@@ -34,7 +34,7 @@ func (s *server) registerFailover(a huma.API) {
 	enable.DefaultStatus = http.StatusAccepted
 	enable.MaxBodyBytes = 1024
 	register(s, false, enable, a, s.enableFailover)
-	register(s, false, op("disableFailover", http.MethodDelete, "/api/v1/failover", "Disable failover (stops mwan3, keeps its config)", "uplinks", 409, 503), a, s.disableFailover)
+	register(s, false, op("disableFailover", http.MethodDelete, "/api/v1/failover", "Disable failover (stops mwan3, removes its leftover mangle chains, keeps its config)", "uplinks", 409, 503), a, s.disableFailover)
 }
 
 func (s *server) getFailover(ctx context.Context, _ *struct{}) (*failoverOutput, error) {
@@ -64,6 +64,8 @@ func (s *server) enableFailover(ctx context.Context, in *failoverEnableInput) (*
 		return nil, fail(http.StatusBadRequest, "validation", failover.ErrInvalid.Error())
 	case errors.Is(err, failover.ErrOffline):
 		return nil, fail(http.StatusConflict, "failover_offline", failover.ErrOffline.Error())
+	case errors.Is(err, failover.ErrTailscale):
+		return nil, fail(http.StatusConflict, "failover_tailscale_conflict", failover.ErrTailscale.Error())
 	case errors.Is(err, failover.ErrConflict):
 		return nil, fail(http.StatusConflict, "failover_conflict", failover.ErrConflict.Error())
 	case errors.Is(err, txn.ErrActive):

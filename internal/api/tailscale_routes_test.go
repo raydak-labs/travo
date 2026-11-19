@@ -168,6 +168,7 @@ func TestTailscaleActionRoutes(t *testing.T) {
 		{tailscale.ErrBusy, 409, "tailscale_busy"},
 		{fmt.Errorf("x: %w", guard.ErrActive), 409, "tailscale_busy"},
 		{tailscale.ErrOffline, 409, "tailscale_offline"},
+		{tailscale.ErrFailover, 409, "tailscale_failover_conflict"},
 		{fmt.Errorf("%w: 10 MiB free", tailscale.ErrNoSpace), 409, "tailscale_no_space"},
 		{errors.New("backend error"), 503, "tailscale_failed"},
 	} {
@@ -179,7 +180,7 @@ func TestTailscaleActionRoutes(t *testing.T) {
 			}
 		}
 	}
-	if len(fake.calls) != 3*8 {
+	if len(fake.calls) != 3*9 {
 		t.Fatalf("calls %d", len(fake.calls))
 	}
 }

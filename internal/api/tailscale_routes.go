@@ -163,6 +163,8 @@ func tailscaleError(what string, err error) error {
 		return fail(503, "tailscale_not_running", "tailscaled is not running")
 	case errors.Is(err, tailscale.ErrBusy), errors.Is(err, guard.ErrActive):
 		return fail(409, "tailscale_busy", "A Tailscale install or change is in progress or was interrupted")
+	case errors.Is(err, tailscale.ErrFailover):
+		return fail(409, "tailscale_failover_conflict", tailscale.ErrFailover.Error())
 	case errors.Is(err, tailscale.ErrOffline):
 		return fail(409, "tailscale_offline", "Tailscale installs once the router has Internet")
 	case errors.Is(err, tailscale.ErrNoSpace):

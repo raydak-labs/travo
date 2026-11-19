@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"sync"
 
 	"github.com/blackdark-org/travo-greenfield/internal/adguard"
 	"github.com/blackdark-org/travo-greenfield/internal/api"
@@ -76,17 +77,19 @@ func newDDNS(deps app.Deps, connection api.ConnectivityReader) api.DDNS {
 }
 
 // startFailover wires multi-WAN failover and its mwan3 reconciler; nil without the ports
-// it needs (reorder, services, the shared connectivity probe).
-func startFailover(deps app.Deps, connection api.ConnectivityReader, workers *lifecycle.Group) api.Failover {
+// it needs (reorder, services, the shared connectivity probe). exclusive is shared with
+// Tailscale: the two are mutually exclusive (docs/adr/0018).
+func startFailover(deps app.Deps, connection api.ConnectivityReader, workers *lifecycle.Group, exclusive *sync.Mutex) *failover.Service {
 	reorder, hasReorder := deps.Device.(device.UCIReorderer)
 	services, hasServices := deps.Device.(device.Services)
 	runtime, hasRuntime := deps.Device.(device.MWAN3Reader)
-	if !hasReorder || !hasServices || !hasRuntime || connection == nil || deps.Txn == nil {
+	mangle, hasMangle := deps.Device.(device.MangleCleaner)
+	if !hasReorder || !hasServices || !hasRuntime || !hasMangle || connection == nil || deps.Txn == nil {
 		return nil
 	}
 	svc := &failover.Service{
 		UCI: deps.Device, Reorder: reorder, Ubus: deps.Device, Services: services, Runtime: runtime,
-		Packages: deps.Packages, Guards: deps.Guards, Txns: deps.Txn,
+		Mangle: mangle, Exclusive: exclusive, Packages: deps.Packages, Guards: deps.Guards, Txns: deps.Txn,
 		Online: func(ctx context.Context) bool {
 			return connection.Status(ctx).Internet == connectivity.Online
 		},

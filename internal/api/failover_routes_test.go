@@ -53,12 +53,13 @@ func TestFailoverRoutes(t *testing.T) {
 	}
 	fake.tx = txn.Status{}
 	for err, code := range map[error]string{
-		failover.ErrOffline:  "failover_offline",
-		failover.ErrConflict: "failover_conflict",
-		failover.ErrInvalid:  "validation",
-		txn.ErrActive:        "transaction_pending",
-		txn.ErrNoChanges:     "failover_no_change",
-		errors.New("apk"):    "failover_failed",
+		failover.ErrOffline:   "failover_offline",
+		failover.ErrConflict:  "failover_conflict",
+		failover.ErrTailscale: "failover_tailscale_conflict",
+		failover.ErrInvalid:   "validation",
+		txn.ErrActive:         "transaction_pending",
+		txn.ErrNoChanges:      "failover_no_change",
+		errors.New("apk"):     "failover_failed",
 	} {
 		fake.enableErr = err
 		if got := post(`{"uplinks":["wan","wwan"]}`); errCode(t, got) != code {

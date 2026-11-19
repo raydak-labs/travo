@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -346,8 +347,14 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		adguardTopology = aghService
 		adguardDoH = &adguard.Upstreams{Client: &http.Client{Timeout: 15 * time.Second}, Base: adguard.AdminURL, Idle: aghService.Idle}
 	}
+	exclusive := new(sync.Mutex) // failover and Tailscale exclude each other (docs/adr/0018)
+	var failoverSvc api.Failover
+	fo := startFailover(deps, connection, workers, exclusive)
+	if fo != nil {
+		failoverSvc = fo
+	}
 	var tailscaleSvc api.Tailscale
-	if svc := startTailscale(deps, dnsLayers, workers, connection, vpnStatus); svc != nil {
+	if svc := startTailscale(deps, dnsLayers, workers, connection, vpnStatus, fo, exclusive); svc != nil {
 		tailscaleSvc = svc
 	}
 	apiDeps := api.Deps{
@@ -380,7 +387,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		WiFiGuest:       wirelessGuest,
 		WiFiMAC:         wirelessMAC,
 		USBTether:       newUSBTether(deps),
-		Failover:        startFailover(deps, connection, workers),
+		Failover:        failoverSvc,
 		Throughput:      sampler,
 		Version:         version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,

@@ -66,6 +66,7 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
   chain marking for the first uplink (comment `"<uplink> 1 1"`). Enabling therefore needs every
   chosen uplink online. The probe reads through the `MWAN3Reader` device port.
   Disable stops and disables mwan3 under guard `failover-service-in-progress` and keeps the config.
+  It then removes what mwan3 left in `ip`/`ip6 mangle` (see "Failover and Tailscale" below).
   A reconciler (every 5 s, lifecycle worker) keeps mwan3 running exactly while the settings say
   enabled and the committed config is active: it stops mwan3 after a rollback restored the stock
   config, and start/boot-enables it after the user confirmed. It does nothing while a transaction
@@ -79,8 +80,8 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
   is incompatible, use 'nft' tool"). mwan3 then misreads its table as empty and its batches fail
   ("Chain already exists"), at the latest on restart; `mwan3 status` fails. Tailscale's nftables
   mode (the OpenWrt package default) writes native connmark rules into `ip`/`ip6 mangle`. With
-  such a rule present the probe fails and the apply rolls back; how the two coexist is open
-  (#277).
+  such a rule present the probe fails and the apply rolls back.
+  Failover and Tailscale are therefore mutually exclusive (below).
 
 - A rollback of the FIRST apply restores the stock config while mwan3 runs; its catch-all rules
   can be live for up to one reconciler tick (5 s) before mwan3 is stopped.
@@ -89,3 +90,37 @@ IPv4 only). The mwan3 2.12.0 package of the 25.12.6 feed was inspected without i
   apply. Their sections are not otherwise touched.
 - The 30 s failback hold-down of invariants §9 relies on mwan3 hotplug timing; the hardware
   playbook measures it before the invariant is marked `[HW]`.
+
+## Failover and Tailscale (0.2.0, #277)
+
+Verified on the AXT1800: Tailscale runs with `fw_mode nftables` (package default) and writes
+native connmark rules (mask `0x00ff0000`) into `ip`/`ip6 mangle`. mwan3 2.12.0 reads its state
+only through `iptables -t mangle -S`, which then fails, so it can neither create nor delete its
+chains (router log: `create_policies_iptables (travo_failover): iptables-restore: line 2 failed:
+Chain already exists`), and its chains stay in `ip mangle` after it stops.
+
+Decision (operator, option b): for 0.2.0 failover and Tailscale are mutually exclusive.
+
+- Enabling failover while the `tailscale` package is installed and tailscaled runs answers 409
+  `failover_tailscale_conflict`. Installing Tailscale or bringing it up (login) while the failover
+  settings say enabled answers 409 `tailscale_failover_conflict`. Both checks run under one mutex
+  shared by the two services, held through the whole failover apply, so neither can start
+  between the other's check and its settings write. A refusal writes nothing and keeps no guard.
+  A failed presence or settings read is an error, never "absent".
+- Disable removes mwan3's leftovers through the `MangleCleaner` device port: it reads
+  `nft -j list ruleset ip|ip6`, takes the `mwan3_*` chains of table `mangle` and the rules in
+  PREROUTING/OUTPUT/POSTROUTING that jump into them, and deletes them in one `nft -f -`
+  transaction (rules, then flush every chain, then delete every chain). Every other chain and
+  rule stays; a foreign rule elsewhere that jumps into a `mwan3_` chain refuses the cleanup.
+  It is idempotent (nothing to delete, no nft call) and a re-read must find nothing left.
+  Container captures: `testdata/container/openwrt-25.12.6/mwan3/nft-ruleset-*.json`.
+
+Why: mwan3 has no nft backend, and teaching it to coexist means changing Tailscale's firewall
+mode, which needs its own hardware validation. Refusing the combination is safe and small;
+option (a), switching Tailscale to `fw_mode iptables` while failover is on, is tracked in the
+follow-up issue (#279).
+
+Limits: a Tailscale installed but stopped does not block failover, yet its init script is
+boot-enabled, so it starts again after a reboot and breaks mwan3; stop it for good
+(`/etc/init.d/tailscale disable`) or remove it. Tailscale installed outside Travo (LuCI, apk)
+is only seen by the failover check.

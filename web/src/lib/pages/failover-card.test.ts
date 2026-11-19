@@ -82,6 +82,9 @@ describe('failover helpers', () => {
 
   it('maps refusals and warnings', () => {
     expect(failoverRefusal('failover_offline').error).toContain('working internet connection');
+    expect(failoverRefusal('failover_tailscale_conflict').error).toContain(
+      'Stop or remove Tailscale',
+    );
     expect(failoverRefusal('failover_no_change').message).toBeDefined();
     expect(failoverRefusal('x').error).toContain('Enabling again retries it');
     expect(warningText({ section: 'travo_m_wwan', reason: 'stale_edited' })).toContain(

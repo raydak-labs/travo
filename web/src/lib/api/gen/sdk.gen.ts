@@ -425,7 +425,7 @@ export const getDashboardThroughput = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
- * Disable failover (stops mwan3, keeps its config)
+ * Disable failover (stops mwan3, removes its leftover mangle chains, keeps its config)
  */
 export const disableFailover = <ThrowOnError extends boolean = false>(options?: Options<DisableFailoverData, ThrowOnError>): RequestResult<DisableFailoverResponses, DisableFailoverErrors, ThrowOnError> => (options?.client ?? client).delete<DisableFailoverResponses, DisableFailoverErrors, ThrowOnError>({
     security: [{
