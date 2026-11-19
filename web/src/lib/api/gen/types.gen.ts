@@ -586,6 +586,49 @@ export type LanView = {
     subnet: string;
 };
 
+export type LedEntry = {
+    /**
+     * Kernel LED name (/sys/class/leds)
+     */
+    name: string;
+    /**
+     * Lit now, or driven by a trigger other than none
+     */
+    on: boolean;
+    /**
+     * Active kernel trigger, e.g. none, heartbeat, netdev
+     */
+    trigger: string;
+};
+
+export type LedSchedule = {
+    enabled: boolean;
+    /**
+     * Daily time the LEDs go off, HH:MM router local time
+     */
+    off_at: string;
+    /**
+     * Daily time the LEDs return to default, HH:MM router local time
+     */
+    on_at: string;
+};
+
+export type LedStatus = {
+    leds: Array<LedEntry>;
+    /**
+     * Travo holds the LEDs off (its led sections are committed)
+     */
+    off: boolean;
+    schedule: LedSchedule;
+};
+
+export type LedsOffInputBody = {
+    /**
+     * true holds every LED off; false returns them to the firmware default
+     */
+    off: boolean;
+};
+
 export type List = {
     profiles: Array<Summary>;
     selected_id: string | null;
@@ -3460,6 +3503,109 @@ export type GetSystemInfoResponses = {
 };
 
 export type GetSystemInfoResponse = GetSystemInfoResponses[keyof GetSystemInfoResponses];
+
+export type GetLedsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/leds';
+};
+
+export type GetLedsErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetLedsError = GetLedsErrors[keyof GetLedsErrors];
+
+export type GetLedsResponses = {
+    /**
+     * OK
+     */
+    200: LedStatus;
+};
+
+export type GetLedsResponse = GetLedsResponses[keyof GetLedsResponses];
+
+export type SetLedsData = {
+    body: LedsOffInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/leds';
+};
+
+export type SetLedsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetLedsError = SetLedsErrors[keyof SetLedsErrors];
+
+export type SetLedsResponses = {
+    /**
+     * OK
+     */
+    200: LedStatus;
+};
+
+export type SetLedsResponse = SetLedsResponses[keyof SetLedsResponses];
+
+export type SetLedScheduleData = {
+    body: LedSchedule;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/leds/schedule';
+};
+
+export type SetLedScheduleErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetLedScheduleError = SetLedScheduleErrors[keyof SetLedScheduleErrors];
+
+export type SetLedScheduleResponses = {
+    /**
+     * OK
+     */
+    200: LedStatus;
+};
+
+export type SetLedScheduleResponse = SetLedScheduleResponses[keyof SetLedScheduleResponses];
 
 export type GetSystemLogData = {
     body?: never;

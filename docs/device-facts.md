@@ -85,6 +85,7 @@ Greenfield captures and spike results (2026-11-09, AXT1800 25.12.6): `testdata/d
 - [BUG] Auto-reconnect cron ran `wifi up` every minute with no uplink → radios flapping. Cap and guard. greenfield uses `ifup wwan`, capped at 5 (§2, ADR 0014).
 - [BUG] Radio switch via notification broke WiFi. Keep as a regression check.
 - [BUG] After an OpenWrt upgrade Travo did not start (see §10).
+- [HW] AXT1800 25.12.6 LEDs (`/sys/class/leds`): `blue:run` (running LED, trigger `none`, brightness 1 after boot), `white:system`, `mmc0::` (trigger `mmc0`). `/etc/init.d/led` is an rc.common script, not procd: `reload_config` does not apply a `system` led section, `/etc/init.d/led restart` does (no radio effect). Its `load_led` records each LED's prior trigger and brightness in `/var/run/led.state`; the next start replays that file first, so deleting the section and restarting restores the LED exactly (captures: `testdata/device/axt1800-25.12.6/leds/`).
 
 ## 9. mwan3 (post-0.1)
 

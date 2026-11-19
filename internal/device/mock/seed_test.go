@@ -24,6 +24,7 @@ func TestSeedCopiesMatchCaptures(t *testing.T) {
 		"hostapd-phy1-ap0-get_clients.json": "with-ap-client/hostapd-phy1-ap0-get_clients.json",
 		"interface-dump.json":               "interface-dump.json",
 		"logread.txt":                       "logs/logread.txt",
+		"sysfs-leds.tsv":                    "leds/sysfs-default.tsv",
 		"diag-ping-ok.txt":                  "diagnostics/ping-ok.txt",
 		"diag-ping-bad-host.txt":            "diagnostics/ping-bad-host.txt",
 		"diag-traceroute-ok.txt":            "diagnostics/traceroute-ok.txt",

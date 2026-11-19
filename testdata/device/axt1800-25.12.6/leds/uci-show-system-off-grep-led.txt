@@ -1,0 +1,11 @@
+system.ntp.enabled='1'
+system.travo_led_blue_run=led
+system.travo_led_blue_run.name='blue:run'
+system.travo_led_blue_run.sysfs='blue:run'
+system.travo_led_blue_run.trigger='none'
+system.travo_led_blue_run.default='0'
+system.travo_led_white_system=led
+system.travo_led_white_system.name='white:system'
+system.travo_led_white_system.sysfs='white:system'
+system.travo_led_white_system.trigger='none'
+system.travo_led_white_system.default='0'

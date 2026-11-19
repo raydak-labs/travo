@@ -236,3 +236,18 @@ type DHCPLeaseReader interface {
 type StationKicker interface {
 	KickStation(ctx context.Context, ifname, mac string) error
 }
+
+// LED is one kernel LED as sysfs describes it (`/sys/class/leds/<name>`). Trigger is the
+// raw `trigger` file: every available trigger, the active one in brackets.
+type LED struct {
+	Name          string
+	Brightness    int
+	MaxBrightness int
+	Trigger       string
+}
+
+// LEDReader lists the kernel LEDs. Read-only: LED changes go through UCI `system` led
+// sections and `/etc/init.d/led restart` (internal/leds).
+type LEDReader interface {
+	LEDs(context.Context) ([]LED, error)
+}

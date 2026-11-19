@@ -13,7 +13,9 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/wifischedule"
 )
 
-// cronService is the one crontab writer (ADR 0024); nil when the device lacks a port.
+// cronService builds the one crontab writer (ADR 0024): call it once and share the result,
+// its lock keeps two features from overwriting each other's block. nil when the device
+// lacks a port.
 func cronService(deps app.Deps) *crontab.Service {
 	file, hasFile := deps.Device.(crontab.File)
 	services, hasServices := deps.Device.(device.Services)
@@ -25,8 +27,7 @@ func cronService(deps app.Deps) *crontab.Service {
 
 // startWiFiSchedule registers the stored rules' hook actions and re-renders their crontab
 // block (docs/adr/0027). nil when there is no crontab writer, hook server or AP editor.
-func startWiFiSchedule(ctx context.Context, deps app.Deps, hooks *hook.Server, aps api.WiFiAPEditor) *wifischedule.Service {
-	cron := cronService(deps)
+func startWiFiSchedule(ctx context.Context, deps app.Deps, cron *crontab.Service, hooks *hook.Server, aps api.WiFiAPEditor) *wifischedule.Service {
 	if cron == nil || hooks == nil || aps == nil {
 		return nil
 	}

@@ -381,8 +381,12 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		SaveEpoch: func(n uint64) error { return epochfile.Save(deps.Paths.EpochFile(), n) },
 		UI:        uiHandler(staticDir),
 	}
-	if svc := startWiFiSchedule(ctx, deps, hooks, wirelessAPs); svc != nil {
+	cron := cronService(deps)
+	if svc := startWiFiSchedule(ctx, deps, cron, hooks, wirelessAPs); svc != nil {
 		apiDeps.WiFiSchedule = svc
+	}
+	if svc := startLEDs(deps, cron, hooks); svc != nil {
+		apiDeps.LEDs = svc
 	}
 	if history := startStatsHistory(deps, workers); history != nil {
 		apiDeps.StatsHistory = history

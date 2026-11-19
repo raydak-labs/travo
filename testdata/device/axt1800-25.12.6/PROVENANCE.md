@@ -101,3 +101,6 @@ Interface dump with the guest interface and uptime, and `uci export firewall` wi
 ## updates/ (2026-11-18, OpenWrt 25.12.6, #193)
 - updates/versions.json: `wget -qO- https://downloads.openwrt.org/.versions.json` on the router (the release index under `release.firmware_url` of `ubus call system board`). Verbatim.
 - updates/apk-list-upgradable.txt: `apk list --upgradable` (apk-tools 3.0.5) with the package lists left in `/tmp` by earlier installs; nothing refreshed or installed. Verbatim; nothing needed redaction.
+
+## leds/ (2026-11-19, #194)
+`/sys/class/leds` listings before and after a restored `system` led section write probe, and `led.state`. See `leds/PROVENANCE.md`.

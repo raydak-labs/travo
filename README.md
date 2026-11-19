@@ -24,6 +24,8 @@ The **WiFi** page summarizes configured radios, uplink STA and access points, an
 
 **System → Device settings** changes the router's hostname, time zone and NTP time servers.
 
+**System → LEDs** lists the router's LEDs (storage activity LEDs stay with the kernel), turns them all off and back to their default, and sets a daily night schedule (LEDs off and back on at set times, router local time) that the router's cron runs.
+
 **System → SSH keys** lists, adds and removes the public keys that may log in to the router as root (dropbear `authorized_keys`); lines it does not manage stay untouched.
 
 **System → OpenWrt updates** checks downloads.openwrt.org for a newer release in the running series and the next major release, lists packages with newer versions (optionally after refreshing the package lists in `/tmp`), and links LuCI attended sysupgrade, which upgrades while keeping installed packages. It installs nothing.
