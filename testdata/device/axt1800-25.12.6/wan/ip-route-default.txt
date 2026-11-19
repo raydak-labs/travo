@@ -1,0 +1,1 @@
+default via 10.0.1.1 dev phy0-sta0 proto static src 10.0.1.195 

@@ -110,6 +110,12 @@ type WirelessKeyWriter interface {
 	SetWirelessKey(ctx context.Context, section, key string) error
 }
 
+// WANPasswordWriter stages network.wan.password (PPPoE) without passing it in process
+// arguments; the value never appears in logs or errors.
+type WANPasswordWriter interface {
+	SetWANPassword(ctx context.Context, password string) error
+}
+
 // Rebooter schedules a router restart and returns before it happens, so the
 // caller can flush its HTTP response. The reboot itself is a terminal operation.
 type Rebooter interface {

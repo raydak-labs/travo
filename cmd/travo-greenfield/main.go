@@ -408,6 +408,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if deps.Txn != nil {
 		leases, _ := deps.Device.(device.DHCPLeaseReader)
 		apiDeps.DHCP = &dhcpserver.Service{UCI: deps.Device, Leases: leases, Reload: deps.Device, Txns: deps.Txn}
+		apiDeps.WAN = newWAN(deps)
 	}
 	if w, ok := deps.Device.(device.WakeSender); ok {
 		apiDeps.WakeOnLAN = &wol.Service{Ubus: deps.Device, Sender: w}

@@ -1135,6 +1135,64 @@ export type VpnTunnelInputBody = {
     enabled: boolean | null;
 };
 
+export type WanRequest = {
+    /**
+     * static: DNS servers (IPv4)
+     */
+    dns?: Array<string> | null;
+    /**
+     * static: default gateway inside the subnet
+     */
+    gateway?: string;
+    /**
+     * static: IPv4 address with prefix
+     */
+    ipaddr?: string;
+    /**
+     * pppoe: password; omitted keeps the stored one (write-only)
+     */
+    password?: string;
+    /**
+     * WAN protocol
+     */
+    proto: 'dhcp' | 'static' | 'pppoe';
+    /**
+     * pppoe: user name
+     */
+    username?: string;
+};
+
+export type WanView = {
+    /**
+     * Kernel device the wan interface runs on (read-only)
+     */
+    device: string;
+    /**
+     * Static DNS servers; empty otherwise
+     */
+    dns: Array<string>;
+    /**
+     * Static default gateway; empty otherwise
+     */
+    gateway: string;
+    /**
+     * Static IPv4 address with prefix, e.g. 203.0.113.5/24; empty otherwise
+     */
+    ipaddr: string;
+    /**
+     * A PPPoE password is stored (it is never returned)
+     */
+    password_set: boolean;
+    /**
+     * WAN protocol
+     */
+    proto: 'dhcp' | 'static' | 'pppoe';
+    /**
+     * PPPoE user name; empty otherwise
+     */
+    username: string;
+};
+
 export type Wake = {
     /**
      * netifd interfaces the magic packet was broadcast on
@@ -2673,6 +2731,80 @@ export type RestartNetworkInterfaceResponses = {
 };
 
 export type RestartNetworkInterfaceResponse = RestartNetworkInterfaceResponses[keyof RestartNetworkInterfaceResponses];
+
+export type GetWanSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/wan';
+};
+
+export type GetWanSettingsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetWanSettingsError = GetWanSettingsErrors[keyof GetWanSettingsErrors];
+
+export type GetWanSettingsResponses = {
+    /**
+     * OK
+     */
+    200: WanView;
+};
+
+export type GetWanSettingsResponse = GetWanSettingsResponses[keyof GetWanSettingsResponses];
+
+export type SetWanSettingsData = {
+    body: WanRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/wan';
+};
+
+export type SetWanSettingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetWanSettingsError = SetWanSettingsErrors[keyof SetWanSettingsErrors];
+
+export type SetWanSettingsResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetWanSettingsResponse = SetWanSettingsResponses[keyof SetWanSettingsResponses];
 
 export type WakeOnLanData = {
     body: WolInputBody;

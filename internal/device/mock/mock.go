@@ -150,6 +150,10 @@ func (d *Device) SetWirelessKey(ctx context.Context, section, key string) error 
 	return d.Set(ctx, "wireless", section, "key", key)
 }
 
+func (d *Device) SetWANPassword(ctx context.Context, password string) error {
+	return d.Set(ctx, "network", "wan", "password", password)
+}
+
 func (d *Device) SetType(_ context.Context, cfg, sec, typ string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()

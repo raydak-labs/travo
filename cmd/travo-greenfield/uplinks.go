@@ -13,6 +13,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/failover"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/usbtether"
+	"github.com/blackdark-org/travo-greenfield/internal/wansettings"
 )
 
 // newUSBTether wires the USB tethering uplink; nil when the device cannot list netdevs.
@@ -33,6 +34,16 @@ func newUSBTether(deps app.Deps) api.USBTether {
 		s.Txns = deps.Txn
 	}
 	return s
+}
+
+// newWAN wires the wan settings; nil (503) without the password writer or route reader.
+func newWAN(deps app.Deps) api.WANSettings {
+	keys, hasKeys := deps.Device.(device.WANPasswordWriter)
+	routes, hasRoutes := deps.Device.(device.DefaultRouteReader)
+	if !hasKeys || !hasRoutes || deps.Txn == nil {
+		return nil
+	}
+	return &wansettings.Service{UCI: deps.Device, Keys: keys, Ubus: deps.Device, Routes: routes, Txns: deps.Txn}
 }
 
 // startFailover wires multi-WAN failover and its mwan3 reconciler; nil without the ports

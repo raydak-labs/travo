@@ -1,0 +1,47 @@
+}
+
+ppp_generic_init_config() {
+	proto_config_add_string username
+	proto_config_add_string password
+	proto_config_add_string keepalive
+	proto_config_add_boolean keepalive_adaptive
+	proto_config_add_int demand
+	proto_config_add_string pppd_options
+	proto_config_add_string 'connect:file'
+	proto_config_add_string 'disconnect:file'
+	[ -e /proc/sys/net/ipv6 ] && proto_config_add_string ipv6
+	proto_config_add_boolean authfail
+	proto_config_add_int mtu
+	proto_config_add_string pppname
+	proto_config_add_string unnumbered
+	proto_config_add_string reqprefix
+	fi
+	if [ -z "$maxfail" ]; then
+		[ "$persist" = "persist" ] && maxfail=0 || maxfail=1
+	fi
+	[ -n "$mtu" ] || json_get_var mtu mtu
+	[ -n "$pppname" ] || pppname="${proto:-ppp}-$config"
+	[ -n "$unnumbered" ] && {
+
+	proto_run_command "$config" /usr/sbin/pppd \
+		nodetach ipparam "$config" \
+		ifname "$pppname" \
+		${localip:+$localip:} \
+		${lcp_failure:+lcp-echo-interval $lcp_interval lcp-echo-failure $lcp_failure $lcp_adaptive} \
+		${ipv6:++ipv6} \
+		${autoipv6:+set AUTOIPV6=1} \
+		${reqprefix:+set REQPREFIX=$reqprefix} \
+		${norelease:+set NORELEASE=1} \
+		${ip6table:+set IP6TABLE=$ip6table} \
+		${peerdns:+set PEERDNS=$peerdns} \
+		${sourcefilter:+set NOSOURCEFILTER=1} \
+		${delegate:+set DELEGATE=0} \
+		nodefaultroute \
+		usepeerdns \
+		$demand $persist maxfail $maxfail \
+		${holdoff:+holdoff "$holdoff"} \
+		${username:+user "$username" password "$password"} \
+		${connect:+connect "$connect"} \
+		${disconnect:+disconnect "$disconnect"} \
+		ip-up-script /lib/netifd/ppp-up \
+		${ipv6:+ipv6-up-script /lib/netifd/ppp6-up} \
