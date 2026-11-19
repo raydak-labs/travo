@@ -222,11 +222,10 @@ Accept; do not "fix" silently.
 - IPv6 failover deferred (IPv4 only). Needs a device matrix + decision record.
 - Live throughput history ~10 min in memory; resets on restart. The 10 min bucket history survives restarts but loses up to 6 h on a crash or power cut (ADR 0026).
 - Session registry is memory-only (cross-restart revocation via epoch only).
-- Positional SSH key index (breaking to change).
 - Dashboard rate = 2 s sample, not an average.
 - Config locks are held across blocking reload/apply; long holds queue all writers of that config.
 - Push buttons and the reset button = detection only; slide switches run bound actions ([adr/0029](adr/0029-slide-switch-self-confirm.md)).
 - Operator-owned external writers (cron/hotplug) outside the lock model.
 - Reboot exclusion has a residual ~2 s window where `txn.Begin` can start after the second guard check; boot-time `txn.Recover` restores that transaction.
 - A client block stops NEW forwarded connections only: fw4 accepts established flows before the MAC rule (clients/fw4-print-block.txt) and the 25.12.6 image has no `conntrack` tool to flush them, so flows open before the block run until they close. The UI says so; disconnecting a WiFi client does not end them either.
-- AdGuard sees all queries from 127.0.0.1 (no per-client stats) under the default topology; the opt-in expert topology ([adr/0021](adr/0021-adguard-expert-topology.md)) is designed, not built.
+- AdGuard sees all queries from 127.0.0.1 (no per-client stats) under the default topology; the opt-in expert topology ([adr/0021](adr/0021-adguard-expert-topology.md), #270) answers on port 53 and sees client addresses.
