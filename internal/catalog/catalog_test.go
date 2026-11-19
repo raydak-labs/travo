@@ -136,6 +136,33 @@ func TestInstallIsGatedAndGuarded(t *testing.T) {
 	}
 }
 
+func TestInstallLeavesWatchcatOff(t *testing.T) {
+	s, _, dev := newService(t)
+	ctx := context.Background()
+	dev.SetService("watchcat", true, true) // postinst enables and starts it
+	dev.SetService("vnstat", true, true)
+	if err := s.Install(ctx, "watchcat"); err != nil {
+		t.Fatal(err)
+	}
+	if it := item(t, s, "watchcat"); !it.Installed || it.Autostart || it.Running {
+		t.Fatalf("watchcat %+v", it)
+	}
+	if err := s.Install(ctx, "vnstat"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(dev.ServiceActions, []string{"watchcat stop", "watchcat disable"}) {
+		t.Fatalf("actions %v", dev.ServiceActions)
+	}
+	dev.ServiceErr = errors.New("init script failed")
+	_ = s.Remove(ctx, "watchcat")
+	if err := s.Install(ctx, "watchcat"); err == nil {
+		t.Fatal("failed stop reported success")
+	}
+	if v, _ := s.List(ctx); !v.Busy {
+		t.Fatal("failed stop released the guard")
+	}
+}
+
 func TestRemove(t *testing.T) {
 	s, pkgs, _ := newService(t)
 	ctx := context.Background()

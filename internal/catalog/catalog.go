@@ -187,6 +187,13 @@ func (s *Service) Install(ctx context.Context, id string) error {
 			return fmt.Errorf("install %s: %w (guard %s kept)", p, err, Guard)
 		}
 	}
+	if e.OffAfterInstall {
+		for _, a := range []string{"stop", "disable"} {
+			if err := s.Services.ServiceAction(ctx, e.InitScript, a); err != nil {
+				return fmt.Errorf("%s %s: %w (guard %s kept)", e.InitScript, a, err, Guard)
+			}
+		}
+	}
 	return s.Guards.Release(Guard)
 }
 

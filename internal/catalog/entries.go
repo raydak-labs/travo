@@ -17,6 +17,9 @@ type Entry struct {
 	InitScript string
 	// Daemon is true when procd tracks a running instance (sqm only runs at start).
 	Daemon bool
+	// OffAfterInstall stops and disables the service the package's postinst started, for
+	// services whose defaults act on their own (watchcat's ping_reboot can reboot the router).
+	OffAfterInstall bool
 	// Size is the installed size with dependencies, rounded up to whole MiB.
 	Size uint64
 	// LuCIPath is the LuCI menu path for the settings, or empty.
@@ -33,7 +36,7 @@ var Entries = []Entry{
 	{ID: "vnstat", Packages: []string{"vnstat2", "luci-app-vnstat2"}, InitScript: "vnstat", Daemon: true,
 		Size: 3 * MiB, LuCIPath: "admin/status/vnstat2"},
 	{ID: "watchcat", Packages: []string{"watchcat", "luci-app-watchcat"}, InitScript: "watchcat", Daemon: true,
-		Size: 1 * MiB, LuCIPath: "admin/services/watchcat"},
+		OffAfterInstall: true, Size: 1 * MiB, LuCIPath: "admin/services/watchcat"},
 	{ID: "speedtest", Packages: []string{"speedtestcpp"}, Size: 3 * MiB},
 }
 

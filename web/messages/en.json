@@ -1106,7 +1106,7 @@
   "catalog_vnstat": "vnStat",
   "catalog_vnstat_about": "Traffic statistics per interface, kept across restarts.",
   "catalog_watchcat": "Watchcat",
-  "catalog_watchcat_about": "Restarts the router or an interface when pings fail. Check its settings in LuCI right after installing.",
+  "catalog_watchcat_about": "Restarts the router or an interface when pings fail. Stays off after installing: check its settings in LuCI, then turn it on.",
   "catalog_speedtest": "Speedtest",
   "catalog_speedtest_about": "The speedtestcpp command-line client for speedtest.net, run over SSH.",
   "catalog_absent": "Not installed",
