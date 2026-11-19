@@ -14,6 +14,8 @@ import (
 
 	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
+	"github.com/blackdark-org/travo-greenfield/internal/firmware"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
 	"github.com/blackdark-org/travo-greenfield/internal/updateapply"
@@ -26,11 +28,14 @@ const GuardName = "reboot-in-progress"
 const Grace = 2 * time.Minute
 
 var (
-	ErrPending     = errors.New("reboot already requested")
-	ErrTxnPending  = errors.New("transaction awaiting confirmation")
-	ErrUpdateBusy  = errors.New("update in progress")
-	ErrUnavailable = errors.New("reboot unavailable")
-	ErrFailed      = errors.New("reboot could not be scheduled")
+	ErrPending    = errors.New("reboot already requested")
+	ErrTxnPending = errors.New("transaction awaiting confirmation")
+	ErrUpdateBusy = errors.New("update in progress")
+	// ErrTerminalBusy: a firmware flash or factory reset holds its guard; a restart
+	// would interrupt it.
+	ErrTerminalBusy = errors.New("firmware upgrade or factory reset in progress")
+	ErrUnavailable  = errors.New("reboot unavailable")
+	ErrFailed       = errors.New("reboot could not be scheduled")
 )
 
 // Router is the narrow device port needed to schedule and verify a restart.
@@ -127,7 +132,15 @@ func (s *Service) checkBeforeAcquire(raw string) error {
 	return nil
 }
 
+// exclusionError runs before and again after the reboot guard is written. Firmware upgrade
+// and factory reset write their guard first and then scan too, so of two racing requests
+// at least one sees the other's guard.
 func exclusionError(stale []guard.Info) error {
+	for _, g := range stale {
+		if g.Name == firmware.GuardName || g.Name == factoryreset.GuardName {
+			return ErrTerminalBusy
+		}
+	}
 	for _, g := range stale {
 		if g.Name == updateapply.GuardName {
 			return ErrUpdateBusy

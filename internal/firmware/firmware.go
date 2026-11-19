@@ -25,6 +25,8 @@ const (
 	ImagePath = "/tmp/travo-firmware.bin"
 	// MaxImageBytes caps the upload; AXT1800 images are about 20 MB.
 	MaxImageBytes = 64 << 20
+	// MaxRequestBytes adds the multipart boundary and part headers around the image.
+	MaxRequestBytes = MaxImageBytes + 64<<10
 	// Headroom stays free in RAM and /tmp beside the image so the router keeps working
 	// while the image waits and sysupgrade has room for its ramfs.
 	Headroom = 32 << 20
@@ -38,6 +40,7 @@ var (
 	ErrInvalid     = errors.New("firmware: image failed validation")
 	ErrNoBackup    = errors.New("firmware: settings cannot be kept with this image")
 	ErrPending     = errors.New("firmware: upgrade already started")
+	ErrUploadBusy  = errors.New("firmware: another upload is in progress")
 	ErrBusy        = errors.New("firmware: another guarded operation is in progress")
 	ErrUnavailable = errors.New("firmware: unavailable")
 	ErrFailed      = errors.New("firmware: could not start the upgrade")
@@ -90,16 +93,24 @@ type Service struct {
 	Stopped func() bool
 	mu      sync.Mutex
 	staged  *Image
+	// uploading holds the one upload slot from Prepare until FinishUpload, so a second
+	// request cannot pass the room check against the same free memory.
+	uploading bool
 }
 
-// Prepare runs before the body is read: it refuses a pending flash or an oversized
-// image, drops the previous image and checks RAM and /tmp for size plus Headroom.
+// Prepare runs before the body is read, with the request size: it refuses a pending
+// flash, a second concurrent upload or an oversized request, drops the previous image and
+// checks RAM and /tmp for size plus Headroom. On success it holds the upload slot until
+// FinishUpload, which the caller must call once the request ends.
 func (s *Service) Prepare(ctx context.Context, size int64) error {
-	if size > MaxImageBytes {
+	if size > MaxRequestBytes {
 		return ErrTooLarge
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.uploading {
+		return ErrUploadBusy
+	}
 	if err := s.refuseOwn(); err != nil {
 		return err
 	}
@@ -119,7 +130,15 @@ func (s *Service) Prepare(ctx context.Context, size int64) error {
 	if info.MemAvailable < need || info.TmpAvail < need {
 		return ErrNoRoom
 	}
+	s.uploading = true
 	return nil
+}
+
+// FinishUpload frees the upload slot Prepare took; the body is staged or discarded.
+func (s *Service) FinishUpload() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.uploading = false
 }
 
 // Upload stores, validates and describes the image. An unparsable validation removes it.
@@ -140,6 +159,7 @@ func (s *Service) Upload(ctx context.Context, src io.Reader) (Image, error) {
 	}
 	if err != nil {
 		_ = s.Device.RemoveFirmware(ctx, ImagePath)
+		s.staged = nil // the file is gone; never let Apply flash a missing image
 		return Image{}, err
 	}
 	s.staged = &img

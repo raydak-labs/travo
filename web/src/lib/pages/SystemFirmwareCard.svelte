@@ -48,6 +48,9 @@ async function upload(event: SubmitEvent) {
   const result = await uploadFirmware(file);
   busy = false;
   if ('error' in result) {
+    // The daemon dropped the previous image before taking this one: show what it holds now.
+    uploaded = undefined;
+    status.retry();
     notify.error(result.error);
     return;
   }
@@ -127,7 +130,12 @@ async function flash(event: SubmitEvent) {
         {#if image.validation.valid}
           <form class="mt-3 flex flex-col gap-3" onsubmit={flash}>
             <label class="flex items-center gap-2">
-              <input type="checkbox" bind:checked={keepSettings} disabled={busy || !canKeep} />
+              <input
+                type="checkbox"
+                checked={keep}
+                onchange={(e) => (keepSettings = e.currentTarget.checked)}
+                disabled={busy || !canKeep}
+              />
               {m.firmware_keep()}
             </label>
             {#if !canKeep}<Status kind="warn">{m.firmware_no_backup()}</Status>{/if}

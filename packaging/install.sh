@@ -164,9 +164,6 @@ install() {
 
   load_port80
   mkdir -p /etc/travo-greenfield-guards
-  # Reinstalling is the explicit retry path after a firmware flash (invariants §1); the
-  # keep-list carried its guard across the flash. Cleared by name, never by glob.
-  rm -f /etc/travo-greenfield-guards/firmware-upgrade-in-progress
   recover_port_swap
   first_install=0
   [ -e /etc/init.d/$NAME ] || first_install=1
@@ -196,6 +193,9 @@ install() {
     logread -e "$NAME" | tail -20 >&2
     exit 1
   fi
+  # A healthy reinstall is the explicit retry path after a firmware flash (invariants §1);
+  # the keep-list carried its guard across the flash. Cleared by name, never by glob.
+  rm -f /etc/travo-greenfield-guards/firmware-upgrade-in-progress
   install_ports "$version"
 }
 

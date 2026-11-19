@@ -101,6 +101,7 @@ func staged(t *testing.T, s *Service) Image {
 	if err := s.Prepare(context.Background(), 1024); err != nil {
 		t.Fatal(err)
 	}
+	defer s.FinishUpload()
 	img, err := s.Upload(context.Background(), strings.NewReader("image"))
 	if err != nil {
 		t.Fatal(err)
@@ -167,6 +168,7 @@ func TestUploadDescribesTheImage(t *testing.T) {
 
 func TestUploadRemovesAnImageTheValidatorCannotDescribe(t *testing.T) {
 	s, d := setup(t)
+	first := staged(t, s)
 	d.validation = []byte(`{}`)
 	if _, err := s.Upload(context.Background(), strings.NewReader("x")); err == nil {
 		t.Fatal("unparsable validation accepted")
@@ -174,17 +176,38 @@ func TestUploadRemovesAnImageTheValidatorCannotDescribe(t *testing.T) {
 	if d.stored {
 		t.Fatal("image kept")
 	}
+	// The earlier image's file is gone too: Apply must not flash it.
+	if err := s.Apply(context.Background(), first.SHA256, true, Phrase); !errors.Is(err, ErrNotStaged) || len(d.upgrades) != 0 {
+		t.Fatalf("stale image: %v", err)
+	}
+}
+
+func TestPrepareHoldsOneUploadSlotUntilFinished(t *testing.T) {
+	s, _ := setup(t)
+	ctx := context.Background()
+	if err := s.Prepare(ctx, 1024); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Prepare(ctx, 1024); !errors.Is(err, ErrUploadBusy) {
+		t.Fatalf("second admission: %v", err)
+	}
+	s.FinishUpload()
+	if err := s.Prepare(ctx, 1024); err != nil {
+		t.Fatalf("after finish: %v", err)
+	}
 }
 
 func TestPrepareRefusesWhatCannotFit(t *testing.T) {
 	s, d := setup(t)
-	if err := s.Prepare(context.Background(), MaxImageBytes+1); !errors.Is(err, ErrTooLarge) {
+	if err := s.Prepare(context.Background(), MaxRequestBytes+1); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("%v", err)
 	}
-	// Verbatim capture: 149 MB RAM, 207 MB /tmp available; 60 MiB plus headroom fits.
-	if err := s.Prepare(context.Background(), 60<<20); err != nil {
+	// Verbatim capture: 149 MB RAM, 207 MB /tmp available; a full 64 MiB image with its
+	// multipart envelope plus headroom fits.
+	if err := s.Prepare(context.Background(), MaxRequestBytes); err != nil {
 		t.Fatal(err)
 	}
+	s.FinishUpload()
 	d.info = []byte(`{"uptime":1,"load":[1,2,3],"memory":{"total":100000000,"available":50000000},"root":{"total":8,"avail":4},"tmp":{"avail":200000}}`)
 	if err := s.Prepare(context.Background(), 20<<20); !errors.Is(err, ErrNoRoom) {
 		t.Fatalf("%v", err)

@@ -17,13 +17,11 @@ import (
 // Firmware stages and flashes a sysupgrade image (internal/firmware).
 type Firmware interface {
 	Prepare(ctx context.Context, size int64) error
+	FinishUpload()
 	Upload(ctx context.Context, src io.Reader) (firmware.Image, error)
 	Status(ctx context.Context) (firmware.Status, error)
 	Apply(ctx context.Context, sha string, keepSettings bool, phrase string) error
 }
-
-// firmwareFormSlack covers the multipart boundary and part headers around the image.
-const firmwareFormSlack = 64 << 10
 
 type firmwareUploadInput struct {
 	RawBody huma.MultipartFormFiles[struct {
@@ -47,7 +45,7 @@ func (s *server) registerFirmware(a huma.API) {
 	// Flashing the router is never something an API token may do; the image path stays private too.
 	registerSessionOnly(s, op("getFirmware", http.MethodGet, "/api/v1/system/firmware", "Staged firmware image and room for an upload", "system", 500, 503), a, s.firmwareStatus)
 	up := op("postFirmware", http.MethodPost, "/api/v1/system/firmware", "Upload and validate a sysupgrade image (never flashes)", "system", 400, 409, 411, 413, 500, 503, 507)
-	up.MaxBodyBytes = firmware.MaxImageBytes + firmwareFormSlack
+	up.MaxBodyBytes = firmware.MaxRequestBytes
 	up.BodyReadTimeout = 10 * time.Minute
 	up.Middlewares = huma.Middlewares{s.firmwarePrepare}
 	registerSessionOnly(s, up, a, s.firmwareUpload)
@@ -70,7 +68,7 @@ func (s *server) firmwarePrepare(ctx huma.Context, next func(huma.Context)) {
 		writeError(ctx, http.StatusLengthRequired, "length_required", "the upload needs a Content-Length")
 		return
 	}
-	if size > firmware.MaxImageBytes+firmwareFormSlack {
+	if size > firmware.MaxRequestBytes {
 		writeError(ctx, http.StatusRequestEntityTooLarge, "firmware_too_large", "the image is larger than 64 MiB")
 		return
 	}
@@ -84,6 +82,8 @@ func (s *server) firmwarePrepare(ctx huma.Context, next func(huma.Context)) {
 		writeError(ctx, http.StatusInternalServerError, "firmware_failed", "could not prepare the upload")
 		return
 	}
+	// The slot covers body staging (the framework parses it before the handler) and Upload.
+	defer s.Firmware.FinishUpload()
 	next(ctx)
 }
 
@@ -103,6 +103,9 @@ func (s *server) firmwareUpload(ctx context.Context, in *firmwareUploadInput) (*
 		return nil, fail(http.StatusServiceUnavailable, "firmware_unavailable", "firmware upgrade is unavailable")
 	}
 	f := in.RawBody.Data().Image
+	// Huma leaves the decoded part open; an open descriptor would pin the tmpfs space
+	// after the next Prepare removes the path.
+	defer f.File.Close()
 	img, err := s.Firmware.Upload(ctx, f.File)
 	if err != nil {
 		return nil, firmwareError(err)
@@ -133,6 +136,7 @@ func firmwareError(err error) error {
 		{firmware.ErrTooLarge, http.StatusRequestEntityTooLarge, "firmware_too_large", "the image is larger than 64 MiB"},
 		{firmware.ErrNoRoom, http.StatusInsufficientStorage, "firmware_no_room", "not enough free memory to hold the image"},
 		{firmware.ErrPending, http.StatusConflict, "firmware_upgrade_pending", "a firmware upgrade was already started"},
+		{firmware.ErrUploadBusy, http.StatusConflict, "firmware_upload_busy", "another image upload is in progress"},
 		{firmware.ErrBusy, http.StatusConflict, "operation_in_progress", "another change, restart or update is in progress"},
 		{firmware.ErrNotStaged, http.StatusConflict, "firmware_not_staged", "upload and validate the image again"},
 		{firmware.ErrInvalid, http.StatusConflict, "firmware_invalid", "the image failed validation"},

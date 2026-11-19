@@ -35,6 +35,8 @@ export function firmwareError(code: string | undefined): string {
       return m.firmware_err_no_room();
     case 'firmware_upgrade_pending':
       return m.firmware_err_pending();
+    case 'firmware_upload_busy':
+      return m.firmware_err_upload_busy();
     case 'operation_in_progress':
       return m.firmware_err_busy();
     case 'firmware_not_staged':

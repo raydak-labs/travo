@@ -16,6 +16,8 @@ import (
 
 	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
 	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
+	"github.com/blackdark-org/travo-greenfield/internal/firmware"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
 	"github.com/blackdark-org/travo-greenfield/internal/updateapply"
@@ -104,7 +106,7 @@ func TestRebootRepeatIsPending(t *testing.T) {
 	}
 }
 
-func TestRebootExcludedByTransactionAndUpdate(t *testing.T) {
+func TestRebootExcludedByOtherGuards(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		guard string
@@ -112,6 +114,8 @@ func TestRebootExcludedByTransactionAndUpdate(t *testing.T) {
 	}{
 		{name: "transaction", guard: txn.GuardName, want: ErrTxnPending},
 		{name: "update", guard: updateapply.GuardName, want: ErrUpdateBusy},
+		{name: "firmware upgrade", guard: firmware.GuardName, want: ErrTerminalBusy},
+		{name: "factory reset", guard: factoryreset.GuardName, want: ErrTerminalBusy},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc, dev, guards, _, _ := testService(t)

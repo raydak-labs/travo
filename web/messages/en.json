@@ -837,6 +837,7 @@
   "firmware_err_too_large": "The image is larger than 64 MiB.",
   "firmware_err_no_room": "Not enough free memory on the router for this image.",
   "firmware_err_pending": "A firmware upgrade was already started.",
+  "firmware_err_upload_busy": "Another image is being uploaded. Wait for it to finish.",
   "firmware_err_busy": "Another change, restart or update is in progress. Finish it first.",
   "firmware_err_not_staged": "The checked image is gone. Upload it again.",
   "firmware_err_invalid": "The image failed validation.",

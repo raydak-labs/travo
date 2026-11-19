@@ -50,6 +50,8 @@ func rebootRequestError(err error) error {
 		return fail(http.StatusConflict, "reboot_pending", "A router restart is already in progress")
 	case errors.Is(err, reboot.ErrTxnPending):
 		return fail(http.StatusConflict, "transaction_pending", "Confirm or roll back the pending change first")
+	case errors.Is(err, reboot.ErrTerminalBusy):
+		return fail(http.StatusConflict, "operation_in_progress", "A firmware upgrade or factory reset is in progress")
 	case errors.Is(err, reboot.ErrUpdateBusy):
 		return fail(http.StatusConflict, "update_busy", "An update is in progress")
 	case errors.Is(err, reboot.ErrUnavailable):
