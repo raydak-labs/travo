@@ -9,27 +9,28 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
 )
 
-// Period is a range of UTC days, end exclusive, with the traffic per uplink in it.
+// Period is a range of days in the router's timezone, end exclusive, with the traffic per
+// uplink in it.
 type Period struct {
-	Start   string                     `json:"start" doc:"First UTC day, YYYY-MM-DD"`
+	Start   string                     `json:"start" doc:"First day in the router's timezone, YYYY-MM-DD"`
 	End     string                     `json:"end" doc:"Day after the last, YYYY-MM-DD"`
 	Uplinks []statshistory.UplinkBytes `json:"uplinks" nullable:"false"`
 }
 
-// BillingPeriod is the period holding now that starts on startDay (1..28) of a month, UTC.
-func BillingPeriod(now time.Time, startDay int) (start, end time.Time) {
-	now = now.UTC()
-	start = time.Date(now.Year(), now.Month(), startDay, 0, 0, 0, 0, time.UTC)
+// BillingPeriod is the period holding now that starts on startDay (1..28) of a month in loc.
+func BillingPeriod(now time.Time, startDay int, loc *time.Location) (start, end time.Time) {
+	now = now.In(loc)
+	start = time.Date(now.Year(), now.Month(), startDay, 0, 0, 0, 0, loc)
 	if now.Day() < startDay {
 		start = start.AddDate(0, -1, 0)
 	}
 	return start, start.AddDate(0, 1, 0)
 }
 
-// Today is the UTC day holding now.
-func Today(now time.Time) (start, end time.Time) {
-	now = now.UTC()
-	start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+// Today is the day in loc holding now.
+func Today(now time.Time, loc *time.Location) (start, end time.Time) {
+	now = now.In(loc)
+	start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	return start, start.AddDate(0, 0, 1)
 }
 

@@ -76,6 +76,7 @@ type History struct {
 	last        *Observation
 	persistence Persistence
 	dirty       bool
+	loc         *time.Location // day boundaries; nil means UTC
 }
 
 // NewHistory starts with loaded points and day totals (oldest first) and their persistence state.
@@ -99,8 +100,29 @@ func (h *History) Record(o Observation) {
 	h.points = append(h.points, p)
 	h.last = &o
 	h.points = prune(h.points, o.At)
-	h.days = pruneDays(addToDays(h.days, p), o.At)
+	h.days = pruneDays(addToDays(h.days, p, h.location()), o.At, h.location())
 	h.dirty = true
+}
+
+// SetLocation sets the zone later points count their day in; nil means UTC.
+func (h *History) SetLocation(loc *time.Location) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.loc = loc
+}
+
+// Location is the zone days are counted in.
+func (h *History) Location() *time.Location {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.location()
+}
+
+func (h *History) location() *time.Location {
+	if h.loc == nil {
+		return time.UTC
+	}
+	return h.loc
 }
 
 // Skip drops the delta chain after a failed reading, so the next point never spans two buckets.

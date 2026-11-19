@@ -505,7 +505,7 @@ export type DataUsagePeriod = {
      */
     end: string;
     /**
-     * First UTC day, YYYY-MM-DD
+     * First day in the router's timezone, YYYY-MM-DD
      */
     start: string;
     uplinks: Array<StatsHistoryUplinkBytes>;
@@ -1325,7 +1325,7 @@ export type StatsHistoryBody = {
 
 export type StatsHistoryDay = {
     /**
-     * UTC calendar day, YYYY-MM-DD
+     * Calendar day in the router's timezone, YYYY-MM-DD
      */
     date: string;
     uplinks: Array<StatsHistoryUplinkBytes>;

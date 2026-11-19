@@ -29,6 +29,8 @@ type View struct {
 type History interface {
 	statshistory.Reader
 	Days() ([]statshistory.Day, statshistory.Persistence)
+	// Location is the zone the days were counted in; periods use the same.
+	Location() *time.Location
 }
 
 // Service reads the history and owns the budget file.
@@ -70,15 +72,16 @@ func (s *Service) View(context.Context) (View, error) {
 		RetentionHours: int64(statshistory.Retention / time.Hour),
 		Uptime:         DeriveUptime(points),
 	}
-	start, end := Today(now)
+	loc := s.History.Location()
+	start, end := Today(now, loc)
 	v.Today = Sum(days, start, end)
-	v.BillingPeriod, v.BudgetUsedBytes, v.BudgetState = evaluate(b, berr, days, now)
+	v.BillingPeriod, v.BudgetUsedBytes, v.BudgetState = evaluate(b, berr, days, now, loc)
 	return v, nil
 }
 
 // evaluate sums the billing period and compares the budget's share with its limit.
-func evaluate(b Budget, berr error, days []statshistory.Day, now time.Time) (Period, uint64, State) {
-	start, end := BillingPeriod(now, b.StartDay)
+func evaluate(b Budget, berr error, days []statshistory.Day, now time.Time, loc *time.Location) (Period, uint64, State) {
+	start, end := BillingPeriod(now, b.StartDay, loc)
 	period := Sum(days, start, end)
 	used := Used(period, b.Uplinks)
 	if berr != nil {
@@ -133,6 +136,6 @@ func (s *Service) BudgetState(context.Context) (State, error) {
 	b, berr := s.load()
 	s.mu.Unlock()
 	days, _ := s.History.Days()
-	_, _, state := evaluate(b, berr, days, s.Now())
+	_, _, state := evaluate(b, berr, days, s.Now(), s.History.Location())
 	return state, nil
 }

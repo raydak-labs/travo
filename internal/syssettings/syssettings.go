@@ -53,6 +53,9 @@ type Applier interface {
 type Service struct {
 	UCI   device.UCI
 	Apply Applier
+	// OnChange runs after Set wrote a change, with the settings read back (e.g. the stats
+	// history moves its day boundaries to the new timezone). Nil: nothing to notify.
+	OnChange func(Settings)
 }
 
 // Get reads the current settings.
@@ -89,7 +92,11 @@ func (s *Service) Set(ctx context.Context, want Settings) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	return s.Get(ctx)
+	got, err := s.Get(ctx)
+	if err == nil && s.OnChange != nil {
+		s.OnChange(got)
+	}
+	return got, err
 }
 
 // Parse finds the first `system` section (anonymous on stock images) and the `ntp` timeserver.

@@ -400,12 +400,14 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		apiDeps.Buttons = svc
 	}
 	var usage *datausage.Service
+	settings := &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
 	if history := startStatsHistory(deps, workers); history != nil {
+		followTimezone(ctx, settings, history)
 		apiDeps.StatsHistory = history
 		usage = &datausage.Service{History: history, Path: filepath.Join(deps.Paths.State, "data-budget.json"), Now: time.Now}
 		apiDeps.DataUsage = usage
 	}
-	apiDeps.SystemSettings = &syssettings.Service{UCI: deps.Device, Apply: deps.Txn}
+	apiDeps.SystemSettings = settings
 	apiDeps.OpenWrtUpdates = newOpenWrtUpdates(deps)
 	apiDeps.Alerts = newAlerts(deps, aghService, reconnect, usage, fw)
 	if f, ok := deps.Device.(sshkeys.File); ok {

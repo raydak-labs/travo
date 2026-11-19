@@ -1,6 +1,7 @@
 package statshistory
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,6 +26,30 @@ func TestRecordAddsDayTotalsAndUpList(t *testing.T) {
 	points, _ := h.Points(time.Time{})
 	if !slices.Equal(points[0].Up, []string{"wwan"}) || !slices.Equal(points[2].Up, []string{"wan", "wwan"}) {
 		t.Fatalf("up = %v %v", points[0].Up, points[2].Up)
+	}
+}
+
+// Days end at local midnight once the zone is set; a westward zone change never reorders.
+func TestRecordCountsDaysInTheRouterZone(t *testing.T) {
+	cet := time.FixedZone("CET", 3600)
+	h := NewHistory(time.Time{}, nil, nil, PersistenceOK)
+	h.SetLocation(cet)
+	at := time.Date(2026, 11, 18, 22, 50, 0, 0, time.UTC) // 23:50 CET
+	h.Record(obs(at, time.Hour, map[string]Counter{"wwan": {"phy0-sta0", 0, 0}}))
+	h.Record(obs(at.Add(5*time.Minute), time.Hour+5*time.Minute, map[string]Counter{"wwan": {"phy0-sta0", 100, 0}}))
+	h.Record(obs(at.Add(15*time.Minute), time.Hour+15*time.Minute, map[string]Counter{"wwan": {"phy0-sta0", 300, 0}}))
+	h.SetLocation(time.FixedZone("EST", -5*3600)) // 23:15 UTC is Nov 18 in EST
+	h.Record(obs(at.Add(25*time.Minute), time.Hour+25*time.Minute, map[string]Counter{"wwan": {"phy0-sta0", 350, 0}}))
+	days, _ := h.Days()
+	got := []string{}
+	for _, d := range days {
+		got = append(got, fmt.Sprintf("%s:%d", d.Date, d.Uplinks[0].RXBytes))
+	}
+	if want := []string{"2026-11-18:100", "2026-11-19:250"}; !slices.Equal(got, want) {
+		t.Fatalf("days = %v, want %v", got, want)
+	}
+	if err := validateDays(days); err != nil {
+		t.Fatal(err)
 	}
 }
 

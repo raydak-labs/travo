@@ -11,12 +11,14 @@ import (
 // period are always complete (docs/adr/0026). About 100 bytes per uplink and day.
 const DayRetention = 93 * 24 * time.Hour
 
-// DateLayout is a day's key. Days are UTC: the router ships no zoneinfo (device-facts §8).
+// DateLayout is a day's key. Days follow the router's timezone (system.@system[0].timezone,
+// syssettings.Location); UTC until it is known. Stored days keep the zone they were
+// recorded in: only the day the zone changes mixes both (docs/adr/0026).
 const DateLayout = time.DateOnly
 
-// Day is the traffic each uplink moved on one UTC calendar day: the sum of the day's points.
+// Day is the traffic each uplink moved on one local calendar day: the sum of the day's points.
 type Day struct {
-	Date    string        `json:"date" doc:"UTC calendar day, YYYY-MM-DD"`
+	Date    string        `json:"date" doc:"Calendar day in the router's timezone, YYYY-MM-DD"`
 	Uplinks []UplinkBytes `json:"uplinks" nullable:"false"`
 }
 
@@ -31,14 +33,15 @@ func (h *History) Days() ([]Day, Persistence) {
 	return out, h.persistence
 }
 
-// addToDays adds a point's bytes to the day its bucket ends on. A bucket that crosses
-// midnight counts for the later day.
-func addToDays(days []Day, p Point) []Day {
+// addToDays adds a point's bytes to the day in loc its bucket ends on. A bucket that
+// crosses midnight counts for the later day. A date before the newest day (the zone moved
+// west) counts for the newest day, so days stay in order.
+func addToDays(days []Day, p Point, loc *time.Location) []Day {
 	if len(p.Uplinks) == 0 {
 		return days
 	}
-	date := time.Unix(p.At, 0).UTC().Format(DateLayout)
-	if len(days) == 0 || days[len(days)-1].Date != date {
+	date := time.Unix(p.At, 0).In(loc).Format(DateLayout)
+	if len(days) == 0 || days[len(days)-1].Date < date {
 		days = append(days, Day{Date: date, Uplinks: []UplinkBytes{}})
 	}
 	d := &days[len(days)-1]
@@ -55,9 +58,9 @@ func addToDays(days []Day, p Point) []Day {
 	return days
 }
 
-// pruneDays drops days that ended before now-DayRetention.
-func pruneDays(days []Day, now time.Time) []Day {
-	cut := now.Add(-DayRetention).UTC().Format(DateLayout)
+// pruneDays drops days that ended before now-DayRetention in loc.
+func pruneDays(days []Day, now time.Time, loc *time.Location) []Day {
+	cut := now.Add(-DayRetention).In(loc).Format(DateLayout)
 	first := 0
 	for first < len(days) && days[first].Date < cut {
 		first++
@@ -68,11 +71,12 @@ func pruneDays(days []Day, now time.Time) []Day {
 	return days[:copy(days, days[first:])]
 }
 
-// daysFromPoints seeds day totals from a file written before they existed.
+// daysFromPoints seeds day totals from a file written before they existed, in UTC: the
+// zone is not known yet when the file loads.
 func daysFromPoints(points []Point) []Day {
 	days := []Day{}
 	for _, p := range points {
-		days = addToDays(days, p)
+		days = addToDays(days, p, time.UTC)
 	}
 	return days
 }

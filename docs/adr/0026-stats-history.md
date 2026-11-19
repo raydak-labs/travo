@@ -31,11 +31,17 @@ retention rule existed (#40).
 - Read: `GET /api/v1/stats/history?hours=1..168`, and the Go `statshistory.Reader` for
   other pages.
 - Data usage (#246) needs months, not 7 days. The same file and flush keep day totals:
-  `days: [{date, uplinks}]`, one entry per UTC day with traffic, the sum of that day's point
-  deltas (a bucket crossing midnight counts for the later day), retention 93 days (three
-  billing months, about 100 bytes per uplink and day, under 30 KB). Days are UTC because
-  the router has no zoneinfo (device-facts §8); a billing period starts at 00:00 UTC on
-  its start day, so its edges are off by the zone offset. A point also carries `up`, the
+  `days: [{date, uplinks}]`, one entry per local day with traffic, the sum of that day's
+  point deltas (a bucket crossing midnight counts for the later day), retention 93 days
+  (three billing months, about 100 bytes per uplink and day, under 30 KB). The router has no
+  zoneinfo (device-facts §8), but it stores the POSIX TZ string in
+  `system.@system[0].timezone`; `syssettings.Location` wraps it in a minimal TZif v2 blob
+  (no transitions, the rule as footer) for `time.LoadLocationFromTZData`, so days, today
+  and the billing period (from 00:00 local on its start day) follow the router's zone with
+  DST. The zone is read at start and after every System settings change; unreadable or
+  unusable counts in UTC. Stored days keep the zone they were counted in: only the day the
+  zone changes mixes both, and a date west of the newest stored day counts for that day so
+  days stay in order. (Amended by the timezone fix; until then days were UTC.) A point also carries `up`, the
   candidate uplinks up with a readable device at the sample, so the uptime log can tell
   "down" from "no delta" (a restarted chain). Both fields are additive in version 1: a file
   without `days` rebuilds them from its points, a point without `up` is unknown (null),

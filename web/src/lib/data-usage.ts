@@ -21,7 +21,7 @@ export function uplinkTotals(uplinks: readonly StatsHistoryUplinkBytes[]): Uplin
   }));
 }
 
-/** Unix seconds of a UTC day key (YYYY-MM-DD). */
+/** Unix seconds of a day key (YYYY-MM-DD) read as UTC midnight: a calendar position for the chart. */
 export function dayStart(date: string): number {
   return Date.parse(`${date}T00:00:00Z`) / 1000;
 }

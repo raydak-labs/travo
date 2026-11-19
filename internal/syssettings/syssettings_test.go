@@ -68,6 +68,7 @@ func TestGetReadsTheDeviceCapture(t *testing.T) {
 func TestPutBackTheGetBodyWritesNothing(t *testing.T) {
 	s, a := seeded(t)
 	cur, _ := s.Get(context.Background())
+	s.OnChange = func(Settings) { t.Fatal("notified without a change") }
 	if _, err := s.Set(context.Background(), cur); err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +79,8 @@ func TestPutBackTheGetBodyWritesNothing(t *testing.T) {
 
 func TestSetWritesHostnameZoneAndServers(t *testing.T) {
 	s, a := seeded(t)
+	var notified []string
+	s.OnChange = func(st Settings) { notified = append(notified, st.Timezone) }
 	got, err := s.Set(context.Background(), Settings{
 		Hostname: "travo", Zonename: "Europe/Berlin",
 		NTP: NTP{Enabled: false, Servers: []string{"192.168.1.10", "time.example.org"}},
@@ -93,6 +96,9 @@ func TestSetWritesHostnameZoneAndServers(t *testing.T) {
 	}
 	if got.NTP.Enabled || !slices.Equal(got.NTP.Servers, []string{"192.168.1.10", "time.example.org"}) {
 		t.Fatalf("ntp %+v", got.NTP)
+	}
+	if !slices.Equal(notified, []string{"CET-1CEST,M3.5.0,M10.5.0/3"}) {
+		t.Fatalf("OnChange got %v", notified)
 	}
 }
 

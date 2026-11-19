@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
+	"github.com/blackdark-org/travo-greenfield/internal/syssettings"
 )
 
 func day(d string, u ...statshistory.UplinkBytes) statshistory.Day {
@@ -34,10 +35,61 @@ func TestBillingPeriod(t *testing.T) {
 	}
 	for _, c := range cases {
 		now, _ := time.Parse(time.RFC3339, c.now)
-		s, e := BillingPeriod(now, c.start)
+		s, e := BillingPeriod(now, c.start, time.UTC)
 		if s.Format(time.DateOnly) != c.from || e.Format(time.DateOnly) != c.till {
 			t.Errorf("%s day %d: %s..%s", c.now, c.start, s, e)
 		}
+	}
+}
+
+func berlin(t *testing.T) *time.Location {
+	t.Helper()
+	tz, _ := syssettings.POSIXTimezone("Europe/Berlin")
+	loc, err := syssettings.Location(tz)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return loc
+}
+
+// Day and period edges follow the router's zone, also across the DST change.
+func TestPeriodsInTheRouterZone(t *testing.T) {
+	loc := berlin(t)
+	cases := []struct {
+		now                  string
+		start                int
+		today, from, till    string
+		todayHours, perHours int
+	}{
+		// 23:30 UTC on Nov 30 is 00:30 CET on Dec 1: a new day and a new period.
+		{"2026-11-30T23:30:00Z", 1, "2026-12-01", "2026-12-01", "2027-01-01", 24, 31 * 24},
+		{"2026-11-30T22:59:59Z", 1, "2026-11-30", "2026-11-01", "2026-12-01", 24, 30 * 24},
+		// Mar 29 is 23 hours long (CET → CEST); the period over it loses an hour.
+		{"2026-03-29T12:00:00Z", 15, "2026-03-29", "2026-03-15", "2026-04-15", 23, 31*24 - 1},
+		// Oct 25 is 25 hours long (CEST → CET).
+		{"2026-10-24T22:30:00Z", 25, "2026-10-25", "2026-10-25", "2026-11-25", 25, 31*24 + 1},
+		{"2026-10-24T21:59:59Z", 25, "2026-10-24", "2026-09-25", "2026-10-25", 24, 30 * 24},
+	}
+	for _, c := range cases {
+		now, _ := time.Parse(time.RFC3339, c.now)
+		ts, te := Today(now, loc)
+		ps, pe := BillingPeriod(now, c.start, loc)
+		if ts.Format(time.DateOnly) != c.today || int(te.Sub(ts).Hours()) != c.todayHours {
+			t.Errorf("%s today %s..%s", c.now, ts, te)
+		}
+		if ps.Format(time.DateOnly) != c.from || pe.Format(time.DateOnly) != c.till || int(pe.Sub(ps).Hours()) != c.perHours {
+			t.Errorf("%s period %s..%s", c.now, ps, pe)
+		}
+	}
+}
+
+func TestViewUsesTheHistoryZone(t *testing.T) {
+	now := time.Date(2026, 11, 30, 23, 30, 0, 0, time.UTC) // Dec 1 in Berlin
+	h := fakeHistory{days: []statshistory.Day{day("2026-11-30", bytes("wwan", 7, 0)), day("2026-12-01", bytes("wwan", 5, 0))}, loc: berlin(t)}
+	s := &Service{History: h, Path: filepath.Join(t.TempDir(), "b.json"), Now: func() time.Time { return now }}
+	v, err := s.View(context.Background())
+	if err != nil || v.Today.Start != "2026-12-01" || v.BillingPeriod.Start != "2026-12-01" || v.Today.Uplinks[0].RXBytes != 5 {
+		t.Fatalf("%+v %v", v.Today, err)
 	}
 }
 
@@ -47,7 +99,7 @@ func TestSumUsedAndEvaluate(t *testing.T) {
 		day("2026-11-01", bytes("wwan", 300, 100), bytes("usbtether", 50, 50)),
 		day("2026-11-19", bytes("wwan", 200, 0)),
 	}
-	start, end := BillingPeriod(time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC), 1)
+	start, end := BillingPeriod(time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC), 1, time.UTC)
 	p := Sum(days, start, end)
 	if !slices.Equal(p.Uplinks, []statshistory.UplinkBytes{bytes("usbtether", 50, 50), bytes("wwan", 500, 100)}) {
 		t.Fatalf("period = %+v", p)
@@ -116,7 +168,17 @@ func TestDeriveUptime(t *testing.T) {
 	}
 }
 
-type fakeHistory struct{ days []statshistory.Day }
+type fakeHistory struct {
+	days []statshistory.Day
+	loc  *time.Location
+}
+
+func (f fakeHistory) Location() *time.Location {
+	if f.loc == nil {
+		return time.UTC
+	}
+	return f.loc
+}
 
 func (f fakeHistory) Points(time.Time) ([]statshistory.Point, statshistory.Persistence) {
 	return []statshistory.Point{}, statshistory.PersistenceOK
