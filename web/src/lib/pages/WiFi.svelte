@@ -44,6 +44,7 @@ import WiFiSummary from './WiFiSummary.svelte';
 const joinDialog = lazyPage(() => import('./WiFiJoinDialog.svelte'));
 const accessPoints = lazyPage(() => import('./WiFiAccessPoints.svelte'));
 const uplinkMAC = lazyPage(() => import('./WiFiUplinkMAC.svelte'));
+const schedule = lazyPage(() => import('./WiFiScheduleCard.svelte'));
 
 const idle: LoadStatus = { state: 'ready' };
 let {
@@ -324,6 +325,10 @@ async function scan() {
     {#key apVersion}
       <PageHost load={accessPoints} props={{ busy, apply: submitAP }} />
     {/key}
+  </Card>
+
+  <Card title={m.wifi_schedule_title()}>
+    <PageHost load={schedule} />
   </Card>
 
   <Card title={m.wifi_scan_title()}>

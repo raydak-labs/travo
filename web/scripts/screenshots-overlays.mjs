@@ -76,6 +76,18 @@ async function apDisableFlow(chrome, base, vp, shoot) {
   await shoot('wifi-pending-toast');
 }
 
+async function scheduleLockout(chrome, base, vp, shoot) {
+  await chrome.open(`${base}/#/wifi`, vp);
+  await clickWhenReady(chrome, 'main', 'Add schedule');
+  await waitFor(chrome, `!!document.querySelector('[role="dialog"]')`, 'schedule dialog');
+  await sleep(300);
+  await shoot('wifi-schedule-dialog');
+  await clickWhenReady(chrome, '[role="dialog"]', 'Save');
+  await waitFor(chrome, `!!document.querySelector('${DIALOG}')`, 'lockout dialog');
+  await sleep(300);
+  await shoot('wifi-schedule-lockout-dialog');
+}
+
 async function resultToast(chrome, base, vp, shoot) {
   await chrome.open(`${base}/#/vpn`, vp);
   await chrome.evaluate(`(() => {
@@ -98,10 +110,11 @@ export async function shootOverlays(chrome, base, viewports, schemes, out) {
       ['POST', /^\/api\/v1\/wifi\/aps\/[^/]+$/, 202, PENDING_TXN],
       ['GET', /^\/api\/v1\/transactions\/screenshot-txn$/, 200, PENDING_TXN],
       ['POST', /^\/api\/v1\/vpn\/profiles$/, 422, { code: 'invalid_profile' }],
+      ['PUT', /^\/api\/v1\/wifi\/schedule$/, 409, { code: 'wifi_lockout_risk' }],
     ]),
   });
   try {
-    for (const flow of [rebootDialog, apDisableFlow, resultToast]) {
+    for (const flow of [rebootDialog, apDisableFlow, scheduleLockout, resultToast]) {
       for (const viewport of viewports) {
         for (const scheme of schemes) {
           await flow(chrome, base, { ...viewport, scheme }, async (name) => {
