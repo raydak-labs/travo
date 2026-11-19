@@ -472,6 +472,70 @@ export type FirewallZonesOutputBody = {
     zones: Array<Zone>;
 };
 
+export type FirmwareApplyInputBody = {
+    /**
+     * Must be exactly "upgrade firmware", typed by the operator
+     */
+    confirm: string;
+    /**
+     * Keep configuration (sysupgrade without -n)
+     */
+    keep_settings: boolean;
+    /**
+     * Checksum of the staged image
+     */
+    sha256: string;
+};
+
+export type FirmwareImage = {
+    /**
+     * This router's board_name; fwtool_device_match says whether the image is for it
+     */
+    board: string;
+    /**
+     * Packages installed after the running image; the new image does not keep them
+     */
+    dropped_packages: Array<string>;
+    model: string;
+    packages_known: boolean;
+    sha256: string;
+    size: number;
+    validation: FirmwareValidation;
+};
+
+export type FirmwareStatus = {
+    max_image_bytes: number;
+    /**
+     * A flash was started; the guard is held
+     */
+    pending: boolean;
+    /**
+     * Validated image waiting in /tmp; absent when none
+     */
+    staged?: FirmwareImage;
+};
+
+export type FirmwareValidation = {
+    /**
+     * Settings can be kept across this image
+     */
+    allow_backup: boolean;
+    /**
+     * OpenWrt would allow forcing an invalid image; Travo never forces
+     */
+    forceable: boolean;
+    /**
+     * Individual checks, e.g. fwtool_device_match (the image is for this board)
+     */
+    tests: {
+        [key: string]: boolean;
+    };
+    /**
+     * The image passed every check
+     */
+    valid: boolean;
+};
+
 export type GetSetupStateResponse = {
     password_set: boolean;
 };
@@ -3600,6 +3664,134 @@ export type PostFactoryResetResponses = {
 };
 
 export type PostFactoryResetResponse = PostFactoryResetResponses[keyof PostFactoryResetResponses];
+
+export type GetFirmwareData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/firmware';
+};
+
+export type GetFirmwareErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetFirmwareError = GetFirmwareErrors[keyof GetFirmwareErrors];
+
+export type GetFirmwareResponses = {
+    /**
+     * OK
+     */
+    200: FirmwareStatus;
+};
+
+export type GetFirmwareResponse = GetFirmwareResponses[keyof GetFirmwareResponses];
+
+export type PostFirmwareData = {
+    body?: {
+        /**
+         * OpenWrt sysupgrade image
+         */
+        image: Blob | File;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/firmware';
+};
+
+export type PostFirmwareErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Length Required
+     */
+    411: ApiError;
+    /**
+     * Request Entity Too Large
+     */
+    413: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+    /**
+     * Insufficient Storage
+     */
+    507: ApiError;
+};
+
+export type PostFirmwareError = PostFirmwareErrors[keyof PostFirmwareErrors];
+
+export type PostFirmwareResponses = {
+    /**
+     * OK
+     */
+    200: FirmwareImage;
+};
+
+export type PostFirmwareResponse = PostFirmwareResponses[keyof PostFirmwareResponses];
+
+export type PostFirmwareApplyData = {
+    body: FirmwareApplyInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/firmware/apply';
+};
+
+export type PostFirmwareApplyErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type PostFirmwareApplyError = PostFirmwareApplyErrors[keyof PostFirmwareApplyErrors];
+
+export type PostFirmwareApplyResponses = {
+    /**
+     * Accepted
+     */
+    202: OkBody;
+};
+
+export type PostFirmwareApplyResponse = PostFirmwareApplyResponses[keyof PostFirmwareApplyResponses];
 
 export type GetSystemInfoData = {
     body?: never;

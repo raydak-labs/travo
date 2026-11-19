@@ -32,6 +32,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/diagnostics"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
 	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
+	"github.com/blackdark-org/travo-greenfield/internal/firmware"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/hook"
 	"github.com/blackdark-org/travo-greenfield/internal/ifrestart"
@@ -402,6 +403,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	if r, ok := deps.Device.(factoryreset.Resetter); ok {
 		apiDeps.FactoryReset = &factoryreset.Service{Device: r, Guards: deps.Guards, Stopped: workers.Stopped}
+	}
+	if f, ok := deps.Device.(firmware.Device); ok {
+		apiDeps.Firmware = &firmware.Service{Device: f, Guards: deps.Guards, Stopped: workers.Stopped}
 	}
 	if r, ok := deps.Device.(systemlog.Reader); ok {
 		apiDeps.SystemLog = &systemlog.Service{Log: r}

@@ -107,3 +107,8 @@ Interface dump with the guest interface and uptime, and `uci export firewall` wi
 
 ## buttons/ (2026-11-19, #195)
 Devicetree key nodes (label, `linux,code`, `linux,input-type`) of the reset button and the slide switch. See `buttons/PROVENANCE.md`.
+
+## sysupgrade/ (2026-11-19, OpenWrt 25.12.6, #198)
+- sysupgrade/etc-apk-world.txt, sysupgrade/rom-etc-apk-world.txt: `cat /etc/apk/world` and `cat /rom/etc/apk/world` (GET-only) after firstboot plus the 0.1.0 install. Identical: the image was built with `adguardhome`, and Travo itself is not an apk package (ADR 0007), so no user-installed package exists. Verbatim; nothing needed redaction.
+- sysupgrade/keep.d-travo-greenfield.txt: `cat /lib/upgrade/keep.d/travo-greenfield` (GET-only) from the 0.1.0 install. Verbatim.
+- `which sysupgrade` → `/sbin/sysupgrade`; `ubus -v list system` lists `validate_firmware_image {path}` and `sysupgrade {path, force, backup, prefix, command, options}`. No image was uploaded, validated or flashed on the router.

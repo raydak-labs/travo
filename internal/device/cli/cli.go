@@ -34,6 +34,8 @@ type Device struct {
 	SysLEDs string
 	// SysKeys overrides /sys/firmware/devicetree/base/keys (tests).
 	SysKeys string
+	// TmpDir overrides /tmp, where firmware images are staged (tests).
+	TmpDir string
 }
 
 func New() *Device { return &Device{Run: runner.Exec, RunInput: runner.RunInput} }

@@ -157,6 +157,8 @@ type req struct {
 	remote, host       string
 	cookie, csrf       string
 	auth               string // raw Authorization header
+	contentType        string // replaces application/json
+	contentLength      int64  // replaces the body's length when set
 	tls                bool
 }
 
@@ -179,6 +181,12 @@ func (e *env) do(r req) *httptest.ResponseRecorder {
 	}
 	if r.body != "" {
 		hr.Header.Set("Content-Type", "application/json")
+	}
+	if r.contentType != "" {
+		hr.Header.Set("Content-Type", r.contentType)
+	}
+	if r.contentLength != 0 {
+		hr.ContentLength = r.contentLength
 	}
 	if r.cookie != "" {
 		hr.AddCookie(&http.Cookie{Name: cookieName, Value: r.cookie})

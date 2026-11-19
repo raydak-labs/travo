@@ -25,3 +25,5 @@ The WiFi seeds use the connected summary with one scan per radio. Per-interface 
 - `versions.json` is a byte-identical copy of `testdata/device/axt1800-25.12.6/updates/versions.json`; mock mode answers the OpenWrt release check with it.
 - `sysfs-leds.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/leds/sysfs-default.tsv`; mock mode lists these LEDs and shows one dark while a committed `system` led section holds it off (`default 0`, trigger `none`).
 - `devicetree-keys.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/buttons/devicetree-keys.tsv`; mock mode lists these buttons (reset key and slide switch).
+- `validate-firmware-zero-image.json` is a byte-identical copy of `testdata/container/openwrt-25.12.6/sysupgrade/validate-zero-image.json` (container capture, a zero file: `valid:false`); mock `ValidateFirmware` answers with it. Tests that need a valid image flip only the `valid` value.
+- `apk-world.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/sysupgrade/etc-apk-world.txt`; mock `PackageWorlds` returns it as both worlds (as on the router: nothing user-installed).

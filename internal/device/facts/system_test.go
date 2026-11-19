@@ -57,6 +57,9 @@ func TestParseSystemInfoFixture(t *testing.T) {
 	if got.Load != [3]float64{25408.0 / 65536, 15872.0 / 65536, 6816.0 / 65536} {
 		t.Errorf("load %v", got.Load)
 	}
+	if got.TmpAvail != 202480*1024 {
+		t.Errorf("tmp avail %d", got.TmpAvail)
+	}
 	if got.MemTotal != 428646400 || got.MemAvailable != 149295104 {
 		t.Errorf("memory %d %d", got.MemTotal, got.MemAvailable)
 	}

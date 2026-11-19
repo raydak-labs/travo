@@ -31,6 +31,8 @@ The **WiFi** page summarizes configured radios, uplink STA and access points, an
 **System → SSH keys** lists, adds and removes the public keys that may log in to the router as root (dropbear `authorized_keys`); lines it does not manage stay untouched.
 
 **System → OpenWrt updates** checks downloads.openwrt.org for a newer release in the running series and the next major release, lists packages with newer versions (optionally after refreshing the package lists in `/tmp`), and links LuCI attended sysupgrade, which upgrades while keeping installed packages. It installs nothing.
+
+**System → Firmware upgrade** flashes an OpenWrt sysupgrade image you downloaded yourself. Upload it (up to 64 MiB, as long as the router has the memory); the router checks it without flashing and shows whether it is valid, whether it is for this board, and which packages you installed after the current image (they are dropped: use LuCI attended sysupgrade to keep them). Choose whether to keep settings (configuration and Travo) and type `upgrade firmware` to flash. Without settings the router comes back with OpenWrt defaults and without Travo. Only a signed-in browser can do this, never an API token. Afterwards the alert banner names the `firmware-upgrade-in-progress` guard until you run `install.sh` again.
 **System → System log** shows the router's log (newest first) with a level and text filter.
 
 **Alerts**: a banner above every page names conditions that need you (a guard left behind by an interrupted operation, settings kept in memory only, AdGuard Home bypassed after it stopped answering) and links to the page that fixes them; `GET /api/v1/system/alerts` also lists warnings such as low flash space or an exhausted uplink reconnect.

@@ -1,0 +1,7 @@
+/usr/bin/travo-greenfield
+/etc/init.d/travo-greenfield
+/etc/rc.d/S99travo-greenfield
+/etc/rc.d/K10travo-greenfield
+/etc/config/travo-greenfield
+/etc/travo-greenfield/
+/www/travo-greenfield/

@@ -57,6 +57,7 @@ type SystemInfo struct {
 	Load                   [3]float64 // 1, 5, 15 minutes; already divided by 65536
 	MemTotal, MemAvailable uint64     // bytes
 	RootTotal, RootAvail   uint64     // bytes (ubus reports KiB)
+	TmpAvail               uint64     // bytes free on the /tmp tmpfs; 0 when the reply has no "tmp"
 }
 
 // ubusLoadScale is the fixed-point divisor of the load averages (SI_LOAD_SHIFT 16).
@@ -75,6 +76,9 @@ func ParseSystemInfo(b []byte) (SystemInfo, error) {
 			Total *uint64 `json:"total"`
 			Avail *uint64 `json:"avail"`
 		} `json:"root"`
+		Tmp struct {
+			Avail uint64 `json:"avail"`
+		} `json:"tmp"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return SystemInfo{}, fmt.Errorf("system info: %w", err)
@@ -97,6 +101,7 @@ func ParseSystemInfo(b []byte) (SystemInfo, error) {
 		Uptime:   time.Duration(*raw.Uptime) * time.Second,
 		MemTotal: *raw.Memory.Total, MemAvailable: *raw.Memory.Available,
 		RootTotal: *raw.Root.Total * 1024, RootAvail: *raw.Root.Avail * 1024,
+		TmpAvail: raw.Tmp.Avail * 1024,
 	}
 	for i, l := range raw.Load {
 		si.Load[i] = l / ubusLoadScale

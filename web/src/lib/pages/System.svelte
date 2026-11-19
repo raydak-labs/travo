@@ -31,6 +31,7 @@ const sshKeysCard = lazyPage(() => import('./SystemSSHKeysCard.svelte'));
 const openWrtCard = lazyPage(() => import('./SystemOpenWrtCard.svelte'));
 const ledsCard = lazyPage(() => import('./SystemLEDsCard.svelte'));
 const buttonsCard = lazyPage(() => import('./SystemButtonsCard.svelte'));
+const firmwareCard = lazyPage(() => import('./SystemFirmwareCard.svelte'));
 const factoryResetCard = lazyPage(() => import('./SystemFactoryResetCard.svelte'));
 
 const info = createLoader(fetchSystemInfo);
@@ -191,6 +192,7 @@ async function logout() {
   <SystemUpdate />
 
   <PageHost load={openWrtCard} />
+  <PageHost load={firmwareCard} />
 
   <Card title={m.system_backup()}>
     <div>

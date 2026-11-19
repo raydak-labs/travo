@@ -30,6 +30,12 @@ type Device struct {
 	// FactoryResets counts scheduled wipes; FactoryResetErr makes scheduling fail.
 	FactoryResets   int
 	FactoryResetErr error
+	// Sysupgrades records each scheduled flash's keep-settings flag; SysupgradeErr makes it fail.
+	Sysupgrades   []bool
+	SysupgradeErr error
+	// FirmwareValidation replaces the validator reply (nil: the zero-image capture).
+	FirmwareValidation []byte
+	firmwareStored     string
 	// LogErr makes ReadSystemLog fail.
 	LogErr error
 	// AuthorizedKeysErr makes authorized_keys reads and writes fail.

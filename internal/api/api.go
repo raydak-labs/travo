@@ -135,6 +135,8 @@ type Deps struct {
 	SSHKeys SSHKeys
 	// FactoryReset wipes the router; nil answers 503.
 	FactoryReset FactoryResetter
+	// Firmware uploads, validates and flashes a sysupgrade image; nil answers 503.
+	Firmware Firmware
 	// SystemLog reads logread; nil answers 503.
 	SystemLog SystemLog
 	// USBTether is nil when the device cannot list netdevs; it answers 503 usbtether_unavailable.
@@ -272,6 +274,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerPortForwards(a)
 	s.registerReboot(a)
 	s.registerFactoryReset(a)
+	s.registerFirmware(a)
 	s.registerVPNProfiles(a)
 	s.registerVPNStatus(a)
 	s.registerVPNTunnel(a)
@@ -335,6 +338,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "LAN" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/leds":
 		return "LED" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/firmware":
+		return "Firmware" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/buttons":
 		if name == "Button" {
 			return "HardwareButton"
