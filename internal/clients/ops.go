@@ -32,7 +32,7 @@ func (s *Service) ListReservations(ctx context.Context) ([]Reservation, error) {
 func (s *Service) Reserve(ctx context.Context, req Reservation) (Reservation, error) {
 	var stored Reservation
 	err := s.Txns.Apply(ctx, []string{"dhcp"}, func(ctx context.Context) error {
-		lan, err := s.committedLAN(ctx)
+		lan, err := CommittedLAN(ctx, s.UCI)
 		if err != nil {
 			return err
 		}
@@ -66,19 +66,19 @@ func (s *Service) Reserve(ctx context.Context, req Reservation) (Reservation, er
 // errUnchanged aborts Apply before commit when nothing differs.
 var errUnchanged = errors.New("reservation unchanged")
 
-// committedLAN reads the lan prefix, refusing while network has staged changes: uci reads
-// include them, and a reservation must match the committed subnet. The network lock is not
+// CommittedLAN reads the lan prefix, refusing while network has staged changes: uci reads
+// include them, and a dhcp change must match the committed subnet. The network lock is not
 // held (Apply refuses network), so a commit between this read and the dhcp commit is a
 // residual window (invariants §16).
-func (s *Service) committedLAN(ctx context.Context) (netip.Prefix, error) {
-	pending, err := s.UCI.Pending(ctx, "network")
+func CommittedLAN(ctx context.Context, uci device.UCI) (netip.Prefix, error) {
+	pending, err := uci.Pending(ctx, "network")
 	if err != nil {
 		return netip.Prefix{}, ErrUnavailable
 	}
 	if pending {
 		return netip.Prefix{}, txn.ErrForeignStaged
 	}
-	network, err := s.UCI.Show(ctx, "network")
+	network, err := uci.Show(ctx, "network")
 	if err != nil {
 		return netip.Prefix{}, ErrUnavailable
 	}
