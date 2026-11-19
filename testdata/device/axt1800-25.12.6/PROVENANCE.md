@@ -115,3 +115,6 @@ Devicetree key nodes (label, `linux,code`, `linux,input-type`) of the reset butt
 
 ## ipv6/, ddns/ and adguard DoH captures (2026-11-19, #245)
 IPv6 defaults of the image, the `ddns-scripts` package files (installed and removed under the lock, router restored) and AGH's upstream test replies. See `ipv6/PROVENANCE.md`, `ddns/PROVENANCE.md` and `adguard/PROVENANCE.md`.
+
+## catalog/ (2026-11-19, #268)
+Package names, sizes, the built-in SQM and init script states for the services catalog; one short install/remove probe under the lock, router restored. See `catalog/PROVENANCE.md`.

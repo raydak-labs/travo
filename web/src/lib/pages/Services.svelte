@@ -14,6 +14,8 @@ import PageHost from './PageHost.svelte';
 
 // The DoH card is its own chunk, shown once AdGuard Home runs.
 const doh = lazyPage(() => import('./DoHCard.svelte'));
+// The optional services catalog is its own chunk too.
+const catalog = lazyPage(() => import('./CatalogCard.svelte'));
 
 const request = new AbortController();
 const adguard = createLoader(fetchAdGuard, 10000);
@@ -91,4 +93,5 @@ const proxy = adguardUrl(window.location);
   {#if adguard.data?.running}
     <PageHost load={doh} />
   {/if}
+  <PageHost load={catalog} />
 </div>

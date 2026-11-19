@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"slices"
 	"testing"
@@ -42,5 +43,31 @@ func TestServiceActionRunsInitScriptAndRejectsOthers(t *testing.T) {
 	}
 	if len(calls) != 1 {
 		t.Fatalf("rejected actions ran: %v", calls)
+	}
+}
+
+func TestServiceEnabledReadsExitCode(t *testing.T) {
+	for code, want := range map[int]bool{0: true, 1: false} {
+		d := &Device{Run: func(_ context.Context, name string, args ...string) (string, int, error) {
+			if name != "/etc/init.d/sqm" || !slices.Equal(args, []string{"enabled"}) {
+				t.Fatalf("ran %s %v", name, args)
+			}
+			if code != 0 {
+				return "", code, errors.New("exit status 1")
+			}
+			return "", 0, nil
+		}}
+		if got, err := d.ServiceEnabled(context.Background(), "sqm"); err != nil || got != want {
+			t.Fatalf("exit %d: %v, %v", code, got, err)
+		}
+	}
+	d := &Device{Run: func(context.Context, string, ...string) (string, int, error) {
+		return "", -1, errors.New("no such file")
+	}}
+	if _, err := d.ServiceEnabled(context.Background(), "gone"); err == nil {
+		t.Fatal("missing script read as disabled")
+	}
+	if _, err := d.ServiceEnabled(context.Background(), "../x"); err == nil {
+		t.Fatal("bad name accepted")
 	}
 }

@@ -175,6 +175,8 @@ type Deps struct {
 	IPv6 IPv6Settings
 	// DDNS is dynamic DNS (ddns-scripts); nil answers 503 ddns_unavailable.
 	DDNS DDNS
+	// Catalog is the optional services catalog; nil answers 503 catalog_unavailable.
+	Catalog Catalog
 	// LAN is the router's lan address (ADR 0028); nil answers 503 lan_unavailable.
 	LAN LANAddress
 	// PortForwards is firewall redirects wan -> lan; nil answers 503 port_forwards_unavailable.
@@ -280,6 +282,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWAN(a)
 	s.registerIPv6(a)
 	s.registerDDNS(a)
+	s.registerCatalog(a)
 	s.registerLAN(a)
 	s.registerPortForwards(a)
 	s.registerReboot(a)
@@ -350,6 +353,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "IPv6" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/ddns":
 		return "DDNS" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/catalog":
+		return "Catalog" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/portfwd":
 		return "Port" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/lanaddress":

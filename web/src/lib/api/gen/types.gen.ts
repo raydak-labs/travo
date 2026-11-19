@@ -234,6 +234,32 @@ export type CaptiveState = {
     restore_in_seconds: number | null;
 };
 
+export type CatalogAutostartInputBody = {
+    /**
+     * Enable and start, or stop and disable, the init script
+     */
+    enabled: boolean;
+};
+
+export type CatalogItem = {
+    autostart: boolean;
+    autostart_supported: boolean;
+    built_in: boolean;
+    id: string;
+    installed: boolean;
+    luci_path?: string;
+    packages: Array<string> | null;
+    running: boolean;
+    running_supported: boolean;
+    size_bytes: number;
+    version?: string;
+};
+
+export type CatalogView = {
+    busy: boolean;
+    entries: Array<CatalogItem> | null;
+};
+
 export type Client = {
     /**
      * Name the admin gave the client
@@ -3855,6 +3881,177 @@ export type WakeOnLanResponses = {
 };
 
 export type WakeOnLanResponse = WakeOnLanResponses[keyof WakeOnLanResponses];
+
+export type GetServicesCatalogData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/services/catalog';
+};
+
+export type GetServicesCatalogErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetServicesCatalogError = GetServicesCatalogErrors[keyof GetServicesCatalogErrors];
+
+export type GetServicesCatalogResponses = {
+    /**
+     * OK
+     */
+    200: CatalogView;
+};
+
+export type GetServicesCatalogResponse = GetServicesCatalogResponses[keyof GetServicesCatalogResponses];
+
+export type SetCatalogAutostartData = {
+    body: CatalogAutostartInputBody;
+    path: {
+        /**
+         * Catalog entry id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/services/catalog/{id}/autostart';
+};
+
+export type SetCatalogAutostartErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetCatalogAutostartError = SetCatalogAutostartErrors[keyof SetCatalogAutostartErrors];
+
+export type SetCatalogAutostartResponses = {
+    /**
+     * OK
+     */
+    200: CatalogView;
+};
+
+export type SetCatalogAutostartResponse = SetCatalogAutostartResponses[keyof SetCatalogAutostartResponses];
+
+export type InstallCatalogServiceData = {
+    body?: never;
+    path: {
+        /**
+         * Catalog entry id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/services/catalog/{id}/install';
+};
+
+export type InstallCatalogServiceErrors = {
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type InstallCatalogServiceError = InstallCatalogServiceErrors[keyof InstallCatalogServiceErrors];
+
+export type InstallCatalogServiceResponses = {
+    /**
+     * OK
+     */
+    200: CatalogView;
+};
+
+export type InstallCatalogServiceResponse = InstallCatalogServiceResponses[keyof InstallCatalogServiceResponses];
+
+export type RemoveCatalogServiceData = {
+    body?: never;
+    path: {
+        /**
+         * Catalog entry id
+         */
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/services/catalog/{id}/remove';
+};
+
+export type RemoveCatalogServiceErrors = {
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type RemoveCatalogServiceError = RemoveCatalogServiceErrors[keyof RemoveCatalogServiceErrors];
+
+export type RemoveCatalogServiceResponses = {
+    /**
+     * OK
+     */
+    200: CatalogView;
+};
+
+export type RemoveCatalogServiceResponse = RemoveCatalogServiceResponses[keyof RemoveCatalogServiceResponses];
 
 export type GetSetupStateData = {
     body?: never;

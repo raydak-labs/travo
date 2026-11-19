@@ -186,6 +186,7 @@ dnsmasq on :53 is the single DNS authority. Features that change DNS push/pop a 
 - Package manager (apk on 25.x, opkg older) is detected at runtime behind a `PackageManager` port; never hardcoded. Package lists live in `/tmp`: refresh before install, best effort.
 - Install writes init scripts, `/etc/config`, kernel modules → guarded, with a flash-space warning.
 - Missing optional package → 503 naming it. A failed presence check is not "absent".
+- Services catalog (#268): packages listed in the firmware image's `/rom/etc/apk/world` are never removed (`catalog_built_in`); install and remove share the guard `catalog-package-in-progress`, which the next explicit install or remove clears; an `apk del` that keeps a package another one needs exits 0, so remove re-reads presence and reports `catalog_in_use`.
 
 ## 14. Updates and releases
 

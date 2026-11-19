@@ -55,4 +55,14 @@ func (d *Device) ServiceAction(_ context.Context, name, action string) error {
 	return nil
 }
 
-var _ device.Services = (*Device)(nil)
+// ServiceEnabled reads the scripted autostart; absent services read as disabled.
+func (d *Device) ServiceEnabled(_ context.Context, name string) (bool, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.services[name].enabled, nil
+}
+
+var (
+	_ device.Services         = (*Device)(nil)
+	_ device.ServiceAutostart = (*Device)(nil)
+)

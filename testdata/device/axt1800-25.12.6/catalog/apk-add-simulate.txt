@@ -1,0 +1,30 @@
+# apk add --simulate sqm-scripts
+OK: 57.6 MiB in 214 packages
+# apk add --simulate cloudflared luci-app-cloudflared
+(1/2) Installing cloudflared (2026.10.6-r1)
+(2/2) Installing luci-app-cloudflared (1.2-r1)
+OK: 82.2 MiB in 216 packages
+# apk add --simulate vnstat2 luci-app-vnstat2
+( 1/10) Installing liblua5.1.5 (5.1.5-r11)
+( 2/10) Installing luci-lib-jsonc (26.320.60423~5331286)
+( 3/10) Installing libsqlite3-0 (3.53.1-r1)
+( 4/10) Installing vnstat2 (2.13-r1)
+( 5/10) Installing libjpeg-turbo (3.1.1-r1)
+( 6/10) Installing libpng (1.6.50-r1)
+( 7/10) Installing libwebp (1.5.0-r1)
+( 8/10) Installing libgd (2.3.3-r1)
+( 9/10) Installing vnstati2 (2.13-r1)
+(10/10) Installing luci-app-vnstat2 (26.320.60423~5331286)
+OK: 60.5 MiB in 224 packages
+# apk add --simulate watchcat luci-app-watchcat
+(1/2) Installing watchcat (1-r25)
+(2/2) Installing luci-app-watchcat (26.320.60423~5331286)
+OK: 57.7 MiB in 216 packages
+# apk add --simulate speedtestcpp
+(1/3) Installing libstdcpp6 (14.3.0-r5)
+(2/3) Installing libspeedtestcpp (1.20.3-r1)
+(3/3) Installing speedtestcpp (1.20.3-r1)
+OK: 59.8 MiB in 217 packages
+# apk add --simulate speedtest-go
+(1/1) Installing speedtest-go (1.7.10-r1)
+OK: 82.2 MiB in 215 packages

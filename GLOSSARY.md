@@ -15,6 +15,7 @@
 - **Device port**: the interface through which all `uci`/`ubus`/netifd access happens. Adapters: CLI (real), mock.
 - **Tunnel state**: the five WireGuard states `disabled`, `configured`, `enabled_not_up`, `no_handshake`, `connected`; only a recent handshake means connected.
 - **PackageManager port**: `update`/`install`/`remove`/`list-installed`; adapters apk and opkg.
+- **Services catalog**: the data table of optional OpenWrt services Travo installs, removes and turns on or off (`internal/catalog`); their settings stay in LuCI. **Autostart**: the init script's boot link (`/etc/init.d/<name> enable`).
 - **Transaction**: snapshot → commit/apply → watchdog → probe → user confirm. The only way to change live state.
 - **Watchdog**: out-of-process procd-run script that restores the snapshot unless the confirm file appears in time.
 - **Confirm**: the user's explicit acknowledgement that the router is still reachable. Never issued by the backend.

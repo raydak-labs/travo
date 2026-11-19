@@ -55,4 +55,24 @@ func (d *Device) ServiceAction(ctx context.Context, name, action string) error {
 	return err
 }
 
-var _ device.Services = (*Device)(nil)
+// ServiceEnabled runs /etc/init.d/<name> enabled; exit 1 is "not enabled", not a failure.
+func (d *Device) ServiceEnabled(ctx context.Context, name string) (bool, error) {
+	if !serviceName.MatchString(name) {
+		return false, fmt.Errorf("invalid service name %q", name)
+	}
+	ctx, cancel := context.WithTimeout(ctx, TierRead)
+	defer cancel()
+	_, code, err := d.Run(ctx, "/etc/init.d/"+name, "enabled")
+	switch {
+	case err == nil:
+		return true, nil
+	case code == 1:
+		return false, nil
+	}
+	return false, err
+}
+
+var (
+	_ device.Services         = (*Device)(nil)
+	_ device.ServiceAutostart = (*Device)(nil)
+)

@@ -180,6 +180,13 @@ type Services interface {
 	ServiceAction(ctx context.Context, name, action string) error
 }
 
+// ServiceAutostart reads whether an init script starts at boot.
+type ServiceAutostart interface {
+	// ServiceEnabled is `/etc/init.d/<name> enabled`: exit 0 true, exit 1 false
+	// (testdata/device/axt1800-25.12.6/catalog/sqm-builtin.txt); anything else is an error.
+	ServiceEnabled(ctx context.Context, name string) (bool, error)
+}
+
 // ServiceActions are the init script verbs Services accepts.
 var ServiceActions = map[string]bool{"start": true, "stop": true, "restart": true, "enable": true, "disable": true}
 
