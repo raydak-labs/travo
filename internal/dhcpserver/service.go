@@ -117,7 +117,8 @@ func (s *Service) DNSNames(ctx context.Context) ([]DNSName, error) {
 	return Names(dhcp), nil
 }
 
-// AddDNSName stores name -> ip as a new travo_dns_<n> section.
+// AddDNSName stores name -> ip as a new travo_dns_<n> section. Repeating an add Travo already
+// stored commits nothing but runs the idempotent reload and returns the same entry.
 func (s *Service) AddDNSName(ctx context.Context, name, ip string) (DNSName, error) {
 	n, addr, err := ValidateName(name, ip)
 	if err != nil {
@@ -125,9 +126,9 @@ func (s *Service) AddDNSName(ctx context.Context, name, ip string) (DNSName, err
 	}
 	var id string
 	err = s.apply(ctx, func(ctx context.Context, dhcp []device.Section) (bool, error) {
-		got, serr := StageName(ctx, s.UCI, dhcp, n, addr)
+		got, changed, serr := StageName(ctx, s.UCI, dhcp, n, addr)
 		id = got
-		return serr == nil, serr
+		return changed, serr
 	})
 	if err != nil {
 		return DNSName{}, err

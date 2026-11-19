@@ -28,6 +28,11 @@ func TestAddAndRemoveDNSName(t *testing.T) {
 	if _, err := s.AddDNSName(t.Context(), "nas.HOME", "192.168.1.21"); !errors.Is(err, ErrNameExists) {
 		t.Fatal(err)
 	}
+	// The same name and ip again is a retry: no commit, the idempotent reload runs.
+	commits, reloads := f.commits, d.Reloads
+	if again, err := s.AddDNSName(t.Context(), "nas.HOME", "192.168.1.20"); err != nil || again.ID != "travo_dns_1" || f.commits != commits || d.Reloads != reloads+1 {
+		t.Fatalf("%+v %v commits=%d reloads=%d", again, err, f.commits, d.Reloads)
+	}
 	list, _ := s.DNSNames(t.Context())
 	if len(list) != 2 || list[1].ID != "travo_dns_2" || list[1].IP != "fd00::20" {
 		t.Fatalf("%+v", list)
@@ -39,7 +44,7 @@ func TestAddAndRemoveDNSName(t *testing.T) {
 	if err := s.RemoveDNSName(t.Context(), "travo_dns_1"); err != nil {
 		t.Fatal(err)
 	}
-	commits, reloads := f.commits, d.Reloads
+	commits, reloads = f.commits, d.Reloads
 	if err := s.RemoveDNSName(t.Context(), "travo_dns_1"); !errors.Is(err, ErrNameNotFound) {
 		t.Fatal(err)
 	}
@@ -84,7 +89,7 @@ func TestUserDomainSectionsAreReadOnly(t *testing.T) {
 func TestValidateName(t *testing.T) {
 	for _, c := range [][2]string{
 		{"", "192.168.1.2"}, {"-nas", "192.168.1.2"}, {"nas..lan", "192.168.1.2"}, {"nas_1", "192.168.1.2"},
-		{"host.123", "192.168.1.2"}, {"nas", "fe80::1%br-lan"}, {"nas", "0.0.0.0"}, {"nas", "224.0.0.1"}, {"nas", "nas"},
+		{"host.123", "192.168.1.2"}, {"host.123456789012345678901", "192.168.1.2"}, {"nas", "::ffff:0.0.0.0"}, {"nas", "fe80::1%br-lan"}, {"nas", "0.0.0.0"}, {"nas", "224.0.0.1"}, {"nas", "nas"},
 	} {
 		if _, _, err := ValidateName(c[0], c[1]); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q %q: %v", c[0], c[1], err)

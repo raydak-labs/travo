@@ -75,36 +75,45 @@ func ValidateName(name, ip string) (string, netip.Addr, error) {
 	if n == "" || len(n) > 253 || slices.ContainsFunc(labels, func(l string) bool { return !hostLabel.MatchString(l) }) {
 		return "", netip.Addr{}, &FieldError{"name", "must be a host name (letters, digits, hyphen, dots)"}
 	}
-	if _, err := strconv.Atoi(labels[len(labels)-1]); err == nil {
+	if last := labels[len(labels)-1]; strings.Trim(last, "0123456789") == "" {
 		return "", netip.Addr{}, &FieldError{"name", "must not end in a numeric label"}
 	}
 	addr, err := netip.ParseAddr(strings.TrimSpace(ip))
-	if err != nil || addr.Zone() != "" || addr.IsUnspecified() || addr.IsMulticast() {
+	if err != nil || addr.Zone() != "" {
 		return "", netip.Addr{}, &FieldError{"ip", "must be a unicast IPv4 or IPv6 address"}
 	}
-	return n, addr.Unmap(), nil
+	if addr = addr.Unmap(); addr.IsUnspecified() || addr.IsMulticast() {
+		return "", netip.Addr{}, &FieldError{"ip", "must be a unicast IPv4 or IPv6 address"}
+	}
+	return n, addr, nil
 }
 
-// StageName adds name -> ip as the next free travo_dns_<n>. A name any domain section
-// already answers is refused: dnsmasq would answer both addresses.
-func StageName(ctx context.Context, uci device.UCI, dhcp []device.Section, name string, ip netip.Addr) (string, error) {
+// StageName adds name -> ip as the next free travo_dns_<n> and reports whether it staged.
+// Travo's own entry with exactly that name and ip is an unchanged retry (its id, false), so a
+// retry finishes a commit whose reload failed. A name any other domain section answers is
+// refused: dnsmasq would answer both addresses.
+func StageName(ctx context.Context, uci device.UCI, dhcp []device.Section, name string, ip netip.Addr) (string, bool, error) {
 	all := Names(dhcp)
-	if slices.ContainsFunc(all, func(d DNSName) bool {
+	at := slices.IndexFunc(all, func(d DNSName) bool {
 		return slices.ContainsFunc(d.Names, func(n string) bool { return strings.EqualFold(n, name) })
-	}) {
-		return "", ErrNameExists
+	})
+	if at >= 0 {
+		if d := all[at]; d.Owned && len(d.Names) == 1 && d.IP == ip.String() {
+			return d.ID, false, nil
+		}
+		return "", false, ErrNameExists
 	}
 	if countOwned(dhcp) >= MaxNames {
-		return "", ErrNamesFull
+		return "", false, ErrNamesFull
 	}
 	id := freeSection(dhcp)
 	if err := uci.SetType(ctx, "dhcp", id, "domain"); err != nil {
-		return "", err
+		return "", false, err
 	}
 	if err := uci.Set(ctx, "dhcp", id, "name", name); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return id, uci.Set(ctx, "dhcp", id, "ip", ip.String())
+	return id, true, uci.Set(ctx, "dhcp", id, "ip", ip.String())
 }
 
 func countOwned(dhcp []device.Section) int {

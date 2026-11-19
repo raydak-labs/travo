@@ -3,7 +3,7 @@ import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
-import { fetchDHCP, saveDHCP, turnsOff, validLeaseTime } from '../api/dhcp';
+import { type DhcpView, fetchDHCP, saveDHCP, turnsOff, validLeaseTime } from '../api/dhcp';
 import { m } from '../paraglide/messages.js';
 import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
@@ -21,12 +21,17 @@ let leasetime = $state('');
 let filled = false;
 let busy = $state(false);
 let failure = $state<string>();
+// The last state the daemon reported: a successful save's answer until the next load, so a
+// failed refresh never compares a turn-off against stale data.
+let saved = $state<DhcpView>();
+const baseline = $derived(saved ?? loader.data);
 
 // Fill the form once from the first successful load; a later reload must not wipe edits.
 $effect(() => {
   const data = loader.data;
   if (!data || filled) return;
   filled = true;
+  saved = undefined;
   enabled = data.enabled;
   start = data.start;
   limit = data.limit;
@@ -35,7 +40,7 @@ $effect(() => {
 
 async function save(event: SubmitEvent) {
   event.preventDefault();
-  const current = loader.data;
+  const current = baseline;
   if (!current || busy) return;
   if (!validLeaseTime(leasetime)) {
     failure = m.dhcp_err_leasetime();
@@ -62,6 +67,7 @@ async function save(event: SubmitEvent) {
     notify.error(result.error);
     return;
   }
+  saved = result.view;
   filled = false;
   notify.success(m.dhcp_saved());
   void loader.retry();

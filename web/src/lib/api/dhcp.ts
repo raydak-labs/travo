@@ -52,6 +52,11 @@ export function dhcpError(code: string | undefined): string {
   }
 }
 
+/** DNS-name refusals: a bad name or address gets the form's own guidance. */
+export function dnsNameError(code: string | undefined): string {
+  return code === 'invalid_request' ? m.dns_names_err_input() : dhcpError(code);
+}
+
 function code(error: unknown): string | undefined {
   return (error as { code?: string } | undefined)?.code;
 }
@@ -96,9 +101,9 @@ export async function addDNSName(
       body: { name: name.trim(), ip: ip.trim() },
       client: requestClient,
     });
-    return data ? { entry: data } : { error: dhcpError(code(error)) };
+    return data ? { entry: data } : { error: dnsNameError(code(error)) };
   } catch {
-    return { error: dhcpError(undefined) };
+    return { error: dnsNameError(undefined) };
   }
 }
 
@@ -110,8 +115,8 @@ export async function removeDNSName(
   try {
     const { data, error } = await deleteDnsName({ path: { id }, client: requestClient });
     if (data || code(error) === 'not_found') return { ok: true };
-    return { error: dhcpError(code(error)) };
+    return { error: dnsNameError(code(error)) };
   } catch {
-    return { error: dhcpError(undefined) };
+    return { error: dnsNameError(undefined) };
   }
 }

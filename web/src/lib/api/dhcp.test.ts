@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { addDNSName, dhcpError, removeDNSName, saveDHCP, turnsOff, validLeaseTime } from './dhcp';
+import {
+  addDNSName,
+  dhcpError,
+  dnsNameError,
+  removeDNSName,
+  saveDHCP,
+  turnsOff,
+  validLeaseTime,
+} from './dhcp';
 import { addDnsName, deleteDnsName, setDhcpSettings } from './gen';
 
 vi.mock('./client', () => ({ client: {} }));
@@ -33,6 +41,8 @@ describe('dhcp', () => {
     expect(dhcpError('uci_busy')).toBe('Another change is staged; try again.');
     expect(dhcpError('dns_name_exists')).toBe('That name already has a local DNS entry.');
     expect(dhcpError('whatever')).toBe('Could not change the DHCP settings.');
+    expect(dnsNameError('invalid_request')).toBe('Enter a host name and an IPv4 or IPv6 address.');
+    expect(dnsNameError('dns_names_full')).toBe('Too many local DNS names.');
   });
 
   it('saves the whole config and maps refusals', async () => {
