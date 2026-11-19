@@ -3,19 +3,34 @@
 package guard
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
 )
 
-// ErrActive means a guard of that name already exists.
-var ErrActive = errors.New("guard already active")
+var (
+	// ErrActive means a guard of that name already exists (errors wrapping it: a conflicting one).
+	ErrActive = errors.New("guard already active")
+	// ErrHeld is RefuseAny's answer: another guarded operation is in progress.
+	ErrHeld = errors.New("another guarded operation is in progress")
+	// ErrTerminal is RefuseTerminal's answer; it wraps ErrActive so busy mappings apply.
+	ErrTerminal = fmt.Errorf("%w: a firmware upgrade, factory reset, reboot or update is pending", ErrActive)
+)
+
+// mu makes scan-and-create one step for every Dir of this process: two operations that
+// check each other's guards can never both pass. Creating by hard link keeps a same-name
+// create exclusive across processes too.
+var mu sync.Mutex
 
 var validName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*-in-progress$`)
 
@@ -39,7 +54,11 @@ func (d Dir) file(name string) (string, error) {
 }
 
 // Acquire writes the guard first. A failed write aborts the caller's operation.
-func (d Dir) Acquire(name string) error {
+func (d Dir) Acquire(name string) error { return d.AcquireExclusive(name, nil) }
+
+// AcquireExclusive scans the held guards and writes name in one step: ErrActive when name
+// is held, conflicts' error when it refuses the others (nil conflicts refuses nothing).
+func (d Dir) AcquireExclusive(name string, conflicts func(held []Info) error) error {
 	p, err := d.file(name)
 	if err != nil {
 		return err
@@ -47,10 +66,69 @@ func (d Dir) Acquire(name string) error {
 	if err := os.MkdirAll(d.Path, 0o700); err != nil {
 		return fmt.Errorf("guard dir: %w", err)
 	}
-	if _, err := os.Lstat(p); err == nil {
+	mu.Lock()
+	defer mu.Unlock()
+	held, err := d.Stale()
+	if err != nil {
+		return fmt.Errorf("guard scan: %w", err)
+	}
+	if slices.ContainsFunc(held, func(g Info) bool { return g.Name == name }) {
 		return ErrActive
 	}
-	return atomicfile.WriteJSON(p, Info{Name: name, Started: d.Now().UTC()}, 0o600)
+	if conflicts != nil {
+		if err := conflicts(held); err != nil {
+			return err
+		}
+	}
+	return d.create(p, Info{Name: name, Started: d.Now().UTC()})
+}
+
+// Check runs conflicts against the held guards under the lock of AcquireExclusive, for
+// operations that hold no guard of their own.
+func (d Dir) Check(conflicts func(held []Info) error) error {
+	mu.Lock()
+	defer mu.Unlock()
+	held, err := d.Stale()
+	if err != nil {
+		return fmt.Errorf("guard scan: %w", err)
+	}
+	return conflicts(held)
+}
+
+// create writes a complete temp file and links it to p: the link fails when p exists, so
+// the guard appears whole and only once. The directory is synced before returning.
+func (d Dir) create(p string, in Info) error {
+	b, err := json.MarshalIndent(in, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(d.Path, "."+filepath.Base(p)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	defer os.Remove(name)
+	_, err = tmp.Write(append(b, '\n'))
+	if err == nil {
+		err = tmp.Sync()
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	if err := os.Link(name, p); errors.Is(err, fs.ErrExist) {
+		return ErrActive
+	} else if err != nil {
+		return err
+	}
+	dir, err := os.Open(d.Path)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
 }
 
 // Release removes the guard after the operation fully succeeded.
