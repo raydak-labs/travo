@@ -24,9 +24,9 @@ func RefuseAnyGuard(ctx context.Context) context.Context {
 	return context.WithValue(ctx, refuseAnyKey{}, true)
 }
 
-// conflicts is the transaction's guard policy: never while the router is about to reboot,
-// flash, wipe or replace the daemon, or while a package operation runs.
-func conflicts(ctx context.Context) func([]guard.Info) error {
+// Conflicts is the guard policy Begin and Apply use for ctx: never while the router is
+// about to reboot, flash, wipe or replace the daemon, or while a package operation runs.
+func Conflicts(ctx context.Context) func([]guard.Info) error {
 	if refuse, _ := ctx.Value(refuseAnyKey{}).(bool); refuse {
 		return guard.RefuseAny
 	}

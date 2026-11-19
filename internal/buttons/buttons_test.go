@@ -73,10 +73,13 @@ type fakeTunnel struct {
 	calls []bool
 	st    txn.Status
 	err   error
+	// refusesAny records whether Begin would refuse any held guard for the call's ctx.
+	refusesAny bool
 }
 
-func (f *fakeTunnel) Set(_ context.Context, on bool) (txn.Status, error) {
+func (f *fakeTunnel) Set(ctx context.Context, on bool) (txn.Status, error) {
 	f.calls = append(f.calls, on)
+	f.refusesAny = txn.Conflicts(ctx)([]guard.Info{{Name: "interface-restart-in-progress"}}) != nil
 	return f.st, f.err
 }
 
@@ -183,6 +186,21 @@ func TestSwitchRunsVPN(t *testing.T) {
 	st, _ := s.Get(ctx)
 	if l := st.Buttons[1].Last; l == nil || l.Position != "released" || l.Outcome != Unchanged {
 		t.Fatalf("last %+v", l)
+	}
+}
+
+// A guard written between the fast-path scan and the transaction guard skips the slide:
+// the tunnel's Begin refuses any held guard for the slide's ctx.
+func TestSwitchSkipsAGuardWrittenAfterTheScan(t *testing.T) {
+	ctx := context.Background()
+	s, tun, _, tx := newService(t)
+	if _, err := s.Set(ctx, "switch", VPN); err != nil {
+		t.Fatal(err)
+	}
+	tun.err, tun.st = txn.ErrGuardHeld, txn.Status{}
+	err := actions(t, s)["button-btn-0-pressed"](ctx)
+	if hook.Code(err) != "skipped_guard" || !tun.refusesAny || len(tx.confirmed) != 0 {
+		t.Fatalf("%v refusesAny=%v confirmed=%v", err, tun.refusesAny, tx.confirmed)
 	}
 }
 

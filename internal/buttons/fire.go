@@ -58,6 +58,8 @@ func (s *Service) fire(ctx context.Context, node string, on bool) Outcome {
 	if held, err := s.Guards.Stale(); err != nil || len(held) > 0 {
 		return SkippedGuard
 	}
+	// The scan above is a fast path; Begin repeats it in one step with its own guard.
+	ctx = txn.RefuseAnyGuard(ctx)
 	switch action {
 	case VPN:
 		if s.Tunnel == nil {
@@ -90,6 +92,8 @@ func (s *Service) settle(st txn.Status, err error) Outcome {
 	switch {
 	case errors.Is(err, lockout.ErrLockoutRisk):
 		return SkippedLockout
+	case errors.Is(err, txn.ErrGuardHeld):
+		return SkippedGuard
 	case errors.Is(err, wifi.ErrTransactionPending), errors.Is(err, txn.ErrActive):
 		return SkippedBusy
 	case errors.Is(err, txn.ErrNoChanges):

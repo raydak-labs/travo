@@ -96,11 +96,17 @@ type fakeAPs struct {
 	got    []wifi.APRequest
 	status txn.Status
 	err    error
+	begin  func(context.Context) error // stands in for txn.Begin's guard step
 }
 
 func (f *fakeAPs) AccessPoints(context.Context) ([]wifi.APConfig, error) { return f.aps, nil }
-func (f *fakeAPs) UpdateAP(_ context.Context, r wifi.APRequest) (txn.Status, error) {
+func (f *fakeAPs) UpdateAP(ctx context.Context, r wifi.APRequest) (txn.Status, error) {
 	f.got = append(f.got, r)
+	if f.begin != nil {
+		if err := f.begin(ctx); err != nil {
+			return txn.Status{}, err
+		}
+	}
 	return f.status, f.err
 }
 
@@ -253,10 +259,11 @@ func TestFireOutcomes(t *testing.T) {
 		hook  string
 		want  Outcome
 	}{
-		"guard held":  {func(s *Service, _ *fakeAPs) { s.Guards = fakeGuards{{Name: "txn"}} }, "off", SkippedGuard},
-		"already on":  {func(*Service, *fakeAPs) {}, "on", Unchanged},
-		"lockout":     {func(_ *Service, a *fakeAPs) { a.err = lockout.ErrLockoutRisk }, "off", SkippedLockout},
-		"pending txn": {func(_ *Service, a *fakeAPs) { a.err = wifi.ErrTransactionPending }, "off", SkippedBusy},
+		"guard held":       {func(s *Service, _ *fakeAPs) { s.Guards = fakeGuards{{Name: "txn"}} }, "off", SkippedGuard},
+		"guard after scan": {func(_ *Service, a *fakeAPs) { a.err = txn.ErrGuardHeld }, "off", SkippedGuard},
+		"already on":       {func(*Service, *fakeAPs) {}, "on", Unchanged},
+		"lockout":          {func(_ *Service, a *fakeAPs) { a.err = lockout.ErrLockoutRisk }, "off", SkippedLockout},
+		"pending txn":      {func(_ *Service, a *fakeAPs) { a.err = wifi.ErrTransactionPending }, "off", SkippedBusy},
 		"probe failed": {func(_ *Service, a *fakeAPs) {
 			a.status, a.err = txn.Status{Meta: txn.Meta{ID: "x"}, State: txn.RolledBack}, errors.New("probe")
 		}, "off", RolledBack},

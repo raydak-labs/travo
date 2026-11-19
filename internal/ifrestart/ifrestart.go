@@ -44,8 +44,7 @@ var (
 
 // Guards is the slice of guard.Dir the service uses.
 type Guards interface {
-	Stale() ([]guard.Info, error)
-	Acquire(name string) error
+	AcquireExclusive(name string, conflicts func(held []guard.Info) error) error
 	Release(name string) error
 }
 
@@ -116,25 +115,31 @@ func (s *Service) Restart(ctx context.Context, req Request) (Outcome, error) {
 
 // acquire refuses while a transaction or another live-state guard is held. Under s.mu our
 // own guard can only be a crash leftover: this explicit restart is its retry path.
+// The scan and the write are one step (guard.AcquireExclusive), so a transaction or another
+// guarded operation cannot start between them.
 func (s *Service) acquire() error {
-	held, err := s.Guards.Stale()
-	if err != nil {
-		return errors.Join(ErrUnavailable, err)
+	err := s.Guards.AcquireExclusive(GuardName, refuseOthers)
+	if errors.Is(err, guard.ErrActive) {
+		if err := s.Guards.Release(GuardName); err != nil {
+			return errors.Join(ErrUnavailable, err)
+		}
+		err = s.Guards.AcquireExclusive(GuardName, refuseOthers)
 	}
+	switch {
+	case err == nil, errors.Is(err, ErrTxnPending), errors.Is(err, ErrBusy):
+		return err
+	}
+	return errors.Join(ErrUnavailable, err) // a failed guard write aborts (invariants §1)
+}
+
+func refuseOthers(held []guard.Info) error {
 	for _, g := range held {
-		switch g.Name {
-		case txn.GuardName:
+		if g.Name == txn.GuardName {
 			return ErrTxnPending
-		case GuardName:
-			if err := s.Guards.Release(GuardName); err != nil {
-				return errors.Join(ErrUnavailable, err)
-			}
-		default:
-			return ErrBusy
 		}
 	}
-	if err := s.Guards.Acquire(GuardName); err != nil {
-		return errors.Join(ErrUnavailable, err) // a failed guard write aborts (invariants §1)
+	if len(held) > 0 {
+		return ErrBusy
 	}
 	return nil
 }

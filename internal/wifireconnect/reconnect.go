@@ -62,7 +62,7 @@ type Uplink interface {
 // Guards is the slice of guard.Dir the worker needs.
 type Guards interface {
 	Stale() ([]guard.Info, error)
-	Acquire(string) error
+	AcquireExclusive(name string, conflicts func(held []guard.Info) error) error
 	Release(string) error
 }
 
@@ -209,18 +209,20 @@ func (s *Service) guarded() bool {
 	return err != nil || len(active) > 0
 }
 
-// attempt persists the counter BEFORE acting, so a crash mid-recovery still counts.
+// attempt writes its guard only while no other guard is held, in one step with the check
+// (another live-state operation, or a stuck reconnect, owns the router). The counter is
+// persisted BEFORE acting, so a crash mid-recovery still counts.
 func (s *Service) attempt(ctx context.Context, r record) {
-	if s.guarded() {
-		return // another live-state operation (or a stuck reconnect) owns the router
+	if s.guards.AcquireExclusive(GuardName, guard.RefuseAny) != nil {
+		return
 	}
 	r.Attempts++
 	r.LastAttempt = s.now().UTC()
 	if s.writeJSON(s.path, r, 0o600) != nil {
 		slog.Warn("wifi reconnect: could not persist counter, not retrying")
-		return
-	}
-	if s.guards.Acquire(GuardName) != nil {
+		if err := s.guards.Release(GuardName); err != nil {
+			slog.Warn("wifi reconnect: guard release failed", "err", err)
+		}
 		return
 	}
 	if err := s.reconnect.ReconnectUplink(ctx); err != nil {

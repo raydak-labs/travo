@@ -156,7 +156,7 @@ func (m *Manager) begin(ctx context.Context, summary string, configs []string, r
 		return Status{}, ErrStopped
 	}
 	m.reapFinished()
-	if err := m.Guards.AcquireExclusive(GuardName, conflicts(ctx)); err != nil {
+	if err := m.Guards.AcquireExclusive(GuardName, Conflicts(ctx)); err != nil {
 		switch {
 		case errors.Is(err, ErrGuarded), errors.Is(err, ErrGuardHeld):
 			return Status{}, err

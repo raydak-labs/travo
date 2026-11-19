@@ -115,7 +115,8 @@ func (s *Service) fire(ctx context.Context, id string, action Action) Outcome {
 	if aps[ap].Enabled == want {
 		return Unchanged
 	}
-	st, err := s.APs.UpdateAP(ctx, wifi.APRequest{Section: rule.Section, SSID: aps[ap].SSID, Enabled: want,
+	// The scan above is a fast path; Begin repeats it in one step with its own guard.
+	st, err := s.APs.UpdateAP(txn.RefuseAnyGuard(ctx), wifi.APRequest{Section: rule.Section, SSID: aps[ap].SSID, Enabled: want,
 		Acknowledge: rule.AcknowledgeLockout, Caller: netip.Addr{}})
 	return s.settle(st, err)
 }
@@ -125,6 +126,8 @@ func (s *Service) settle(st txn.Status, err error) Outcome {
 	switch {
 	case errors.Is(err, lockout.ErrLockoutRisk):
 		return SkippedLockout
+	case errors.Is(err, txn.ErrGuardHeld):
+		return SkippedGuard
 	case errors.Is(err, wifi.ErrTransactionPending):
 		return SkippedBusy
 	case errors.Is(err, txn.ErrNoChanges):

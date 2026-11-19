@@ -26,7 +26,7 @@ func (m *Manager) Apply(ctx context.Context, configs []string, stage func(ctx co
 	if m.stopped() {
 		return ErrStopped
 	}
-	if err := m.Guards.Check(conflicts(ctx)); err != nil {
+	if err := m.Guards.Check(Conflicts(ctx)); err != nil {
 		return err
 	}
 	lctx, unlock, err := m.Locks.Lock(ctx, cs)
