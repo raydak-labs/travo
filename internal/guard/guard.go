@@ -58,6 +58,7 @@ func (d Dir) Acquire(name string) error { return d.AcquireExclusive(name, nil) }
 
 // AcquireExclusive scans the held guards and writes name in one step: ErrActive when name
 // is held, conflicts' error when it refuses the others (nil conflicts refuses nothing).
+// conflicts runs under the process-wide guard lock: it must be pure and never touch guards.
 func (d Dir) AcquireExclusive(name string, conflicts func(held []Info) error) error {
 	p, err := d.file(name)
 	if err != nil {
@@ -66,6 +67,7 @@ func (d Dir) AcquireExclusive(name string, conflicts func(held []Info) error) er
 	if err := os.MkdirAll(d.Path, 0o700); err != nil {
 		return fmt.Errorf("guard dir: %w", err)
 	}
+	in := Info{Name: name, Started: d.Now().UTC()} // no injected callback runs under mu
 	mu.Lock()
 	defer mu.Unlock()
 	held, err := d.Stale()
@@ -80,7 +82,7 @@ func (d Dir) AcquireExclusive(name string, conflicts func(held []Info) error) er
 			return err
 		}
 	}
-	return d.create(p, Info{Name: name, Started: d.Now().UTC()})
+	return d.create(p, in)
 }
 
 // Check runs conflicts against the held guards under the lock of AcquireExclusive, for
