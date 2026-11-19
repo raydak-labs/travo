@@ -55,3 +55,9 @@ Captured on the GL-AXT1800 (OpenWrt 25.12.6, Travo 0.1.0, AGH default DNS). Verb
 - test-upstream-dns-fail.json: the same request for `https://doh.invalid/dns-query`; the value is the error text.
 
 Not captured: the `POST /control/dns_config` write itself (the session's write probe was not run); the daemon checks only its HTTP status and reads `dns_info` back. The hardware playbook (docs/testing.md, "IPv6, DNS over HTTPS, dynamic DNS") covers it.
+
+## Memory budget capture (2026-11-19, memory caps)
+
+Read-only. `initd.txt` re-read with `cat /etc/init.d/adguardhome`: byte-identical to the file above (OpenWrt 25.12.6, adguardhome 0.107.79-r1). It maps the UCI options `memlimit`, `gc`, `maxprocs` (uinteger, 0 = unset) to `GOMEMLIMIT`, `GOGC`, `GOMAXPROCS` in the procd environment, so `memlimit` is a byte count.
+
+- memory.txt: one ssh session of `date -u; uptime; tr "\0" "\n" < /proc/$(pidof AdGuardHome)/environ; grep -E "^(VmRSS|RssAnon|RssFile)" /proc/<pid>/status` for AdGuardHome and travo-greenfield, `grep -E "^(MemTotal|MemFree|MemAvailable|Shmem):" /proc/meminfo; df -h /tmp; readlink -f /var`. 3 h after boot, memlimit still `0` (environ holds only `container=ujail`). `/var` is `/tmp` (tmpfs), so AGH's work dir, query log and stats live in RAM. Verbatim; nothing needed redaction.

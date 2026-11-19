@@ -28,3 +28,13 @@ Verified facts: package 0.107.79-r1, config `/etc/adguardhome/adguardhome.yaml` 
 ## Implementation notes (#134)
 
 - The proxy listens on the daemon's `--listen` host, port 3001 (`--adguard-proxy-listen` overrides, `off` disables; off by default in mock mode). Gate: LAN source and Host check as for the API, a valid `tg_session` cookie (cookies are not port-scoped, so the Travo login carries over), and for unsafe methods an `Origin` equal to the proxy's own origin instead of the CSRF header. The session cookie is stripped before forwarding; the incoming Host is kept. Unauthenticated requests get 401 JSON (no redirect).
+
+## Memory caps
+
+AGH grew until the OOM killer took it after ~1 day on the AXT1800 (device-facts §11: ~80 MB available once the kernel and WiFi settle; AGH 54 MB anon at 3 h, killed at 116 MB). Travo owns these keys and caps them; a smaller value a user picked is kept, a larger one is lowered again on the next reconcile tick:
+
+- UCI `adguardhome.config.memlimit` = 67108864 (64 MiB `GOMEMLIMIT`, via `txn.Apply`). Above AGH's ~54 MB steady anon use, below the ~80 MB budget minus Travo's ~12 MB anon. It is a soft limit: the GC works harder near it, nothing fails an allocation, and the runtime bounds the GC's CPU share. `gc` and `maxprocs` stay unset.
+- YAML `querylog.size_memory` 100 (was 1000), `querylog.interval` 6h (was 90d; the file is in tmpfs), `statistics.interval` 1d, `dns.cache_size` 4 MiB. Other keys, including the filter lists, stay the user's.
+- The caps ride on the loopback migration's guarded swap (one AGH restart, rollback if the admin API does not answer) and are in `seed.yaml`. A memlimit change alone gets one explicit restart (GOMEMLIMIT is read at process start); the package's reload trigger may restart it once more on `reload_config`, a one-time cost per router (unverified on hardware). A stopped AGH is never started: its YAML is written in place and both take effect at its next start. Expert topology: only the memlimit is reconciled.
+- The old Travo had no caps: its seed (`travo/packaging/adguard/AdGuardHome.yaml:50,95-106`) carried the package defaults `cache_size: 4194304`, `querylog interval: 2160h, size_memory: 1000`, `statistics interval: 24h`, and its init script (`travo/packaging/openwrt/files/etc/init.d/travo:24-30`) set no Go limits. The cache size and statistics interval are kept from it.
+- The Travo daemon sets its own Go soft limit of 32 MiB at start (`GOMEMLIMIT` in its environment overrides it); steady state is ~12 MB anon, so it only bounds bursts.

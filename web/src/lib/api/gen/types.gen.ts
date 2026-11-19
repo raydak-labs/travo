@@ -80,7 +80,7 @@ export type AdGuardStatus = {
      */
     loopback: boolean;
     /**
-     * The last loopback migration failed and was rolled back; retried after an hour, on a config edit or on daemon restart
+     * The last loopback or memory-cap config migration failed and was rolled back; retried after an hour, on a config edit or on daemon restart
      */
     migration_failed: boolean;
     /**

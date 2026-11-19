@@ -11,26 +11,45 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
 )
 
-// Migrate moves an installed AGH to the loopback topology as a guarded file swap: keep the
-// old file, write the new one, restart, prove the admin API answers, else restore and restart.
-// (txn snapshots UCI only; this YAML is not UCI, see ADR 0006.)
+// Migrate moves an installed AGH to the loopback topology and the memory caps (Limits) as a
+// guarded file swap: keep the old file, write the new one, restart, prove the admin API
+// answers, else restore and restart. (txn snapshots UCI only; this YAML is not UCI, see ADR 0006.)
 func (s *Service) Migrate(ctx context.Context) error {
+	_, err := s.migrate(ctx, true)
+	return err
+}
+
+// migrate reports whether it restarted AGH. A caps-only change to a stopped AGH is written
+// without a restart: restarting would start an AGH the user turned off, and the next start
+// reads the file anyway.
+func (s *Service) migrate(ctx context.Context, running bool) (restarted bool, _ error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.idle(); err != nil {
-		return err
+		return false, err
 	}
 	old, err := os.ReadFile(s.Config)
 	if err != nil {
-		return err
+		return false, err
 	}
-	out, changed, err := Loopback(old)
-	if err != nil || !changed || s.migrationHeldOff(old) {
-		return err
+	out, loopback, err := Loopback(old)
+	if err != nil {
+		return false, err
+	}
+	out, capped := Limits(out)
+	if !loopback && !capped {
+		s.failed.Store(nil) // nothing left to do, e.g. fixed by hand after a failed try
+		return false, nil
+	}
+	if s.migrationHeldOff(old) {
+		return false, nil
+	}
+	if !loopback && !running {
+		return false, atomicfile.Write(s.Config, out, 0o600)
 	}
 	rolledBack, err := s.swap(ctx, old, out)
 	s.recordMigration(old, rolledBack, err)
-	return err
+	return err == nil, err
 }
 
 // swap reports rolledBack only when a failed try fully restored the old config and released

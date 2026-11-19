@@ -21,7 +21,7 @@ var ErrUnknownShape = errors.New("adguardhome.yaml: unrecognised shape")
 
 // Seed is the config written before a fresh install, so AGH never starts its first-run
 // wizard on the LAN. It is the captured 0.107.79 config (testdata/device/axt1800-25.12.6/
-// adguard/adguardhome.yaml) passed through Loopback; a test keeps the two in step.
+// adguard/adguardhome.yaml) passed through Loopback and Limits; a test keeps them in step.
 //
 //go:embed seed.yaml
 var Seed []byte

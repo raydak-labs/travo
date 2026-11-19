@@ -1,0 +1,16 @@
+Thu Nov 19 22:32:47 UTC 2026
+ 22:32:47 up  3:13,  load average: 0.00, 0.00, 0.00
+container=ujail
+VmRSS:	   75168 kB
+RssAnon:	   54352 kB
+RssFile:	   20760 kB
+VmRSS:	   19072 kB
+RssAnon:	   12172 kB
+RssFile:	    6900 kB
+MemTotal:         418600 kB
+MemFree:           58324 kB
+MemAvailable:      77320 kB
+Shmem:              5552 kB
+Filesystem                Size      Used Available Use% Mounted on
+tmpfs                   204.4M      5.4M    199.0M   3% /tmp
+/tmp

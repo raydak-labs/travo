@@ -63,8 +63,9 @@ func TestSeedIsTheMigratedDeviceConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	out, _ = Limits(out)
 	if !bytes.Equal(out, Seed) {
-		t.Fatal("seed.yaml drifted from Loopback(device fixture)")
+		t.Fatal("seed.yaml drifted from Limits(Loopback(device fixture))")
 	}
 }
 

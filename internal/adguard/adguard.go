@@ -54,8 +54,8 @@ type Status struct {
 	TopologyStatus
 	// ConfigError says why the config could not be read as the canonical YAML shape.
 	ConfigError string `json:"config_error,omitempty"`
-	// MigrationFailed: the last loopback migration failed and was rolled back (#164).
-	MigrationFailed bool `json:"migration_failed" doc:"The last loopback migration failed and was rolled back; retried after an hour, on a config edit or on daemon restart"`
+	// MigrationFailed: the last loopback or memory-cap migration failed and was rolled back (#164).
+	MigrationFailed bool `json:"migration_failed" doc:"The last loopback or memory-cap config migration failed and was rolled back; retried after an hour, on a config edit or on daemon restart"`
 }
 
 // Service is the only code that installs AGH or writes its config.
@@ -133,7 +133,8 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return st, nil
 	}
 	st.Loopback = l.IsLoopback() || (st.Topology == TopologyExpert && l.HTTP == LoopbackHTTP)
-	st.MigrationFailed = st.MigrationFailed && !st.Loopback
+	_, capsPending := Limits(b)
+	st.MigrationFailed = st.MigrationFailed && (!st.Loopback || (capsPending && st.Topology != TopologyExpert))
 	return st, nil
 }
 
@@ -164,12 +165,13 @@ func (s *Service) idle() error {
 	return err
 }
 
-// Reconcile is the background tick: one automatic install after the first uplink, and the
-// loopback migration of a config that still binds the LAN. Guards make it skip.
+// Reconcile is the background tick: one automatic install after the first uplink, the
+// loopback migration of a config that still binds the LAN, and the memory caps (limits.go).
+// AGH restarts at most once per tick, and only when something changed. Guards make it skip.
 func (s *Service) Reconcile(ctx context.Context) error {
 	st, err := s.Status(ctx)
-	if err != nil || st.Busy || st.Topology == TopologyExpert {
-		return err // the expert config is not loopback on purpose; never migrate it back
+	if err != nil || st.Busy {
+		return err
 	}
 	if !st.Installed {
 		return s.Install(ctx, false)
@@ -177,11 +179,19 @@ func (s *Service) Reconcile(ctx context.Context) error {
 	if _, err := os.Stat(s.Config); errors.Is(err, os.ErrNotExist) {
 		return s.SeedMissing(ctx)
 	}
-	if !st.Loopback && st.ConfigError == "" {
-		return s.Migrate(ctx)
+	memChanged, err := s.applyMemLimit(ctx)
+	if err != nil {
+		return err
 	}
-	if st.Loopback {
-		s.failed.Store(nil) // fixed by hand after a failed try
+	restarted := false
+	// The expert config is not loopback on purpose; never migrate it back.
+	if st.Topology != TopologyExpert && st.ConfigError == "" {
+		if restarted, err = s.migrate(ctx, st.Running); err != nil {
+			return err
+		}
+	}
+	if memChanged && st.Running && !restarted {
+		return s.restart(ctx)
 	}
 	return nil
 }
@@ -354,9 +364,13 @@ func (s *Service) prepareConfig() error {
 	if err != nil {
 		return err
 	}
-	out, changed, err := Loopback(old)
-	if err != nil || !changed {
+	out, loopback, err := Loopback(old)
+	if err != nil {
 		return err
+	}
+	out, capped := Limits(out)
+	if !loopback && !capped {
+		return nil
 	}
 	return atomicfile.Write(s.Config, out, 0o600)
 }
