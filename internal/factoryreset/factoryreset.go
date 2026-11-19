@@ -33,8 +33,7 @@ type Resetter interface {
 
 // Guards is the subset of guard.Dir the service needs.
 type Guards interface {
-	Acquire(name string) error
-	Stale() ([]guard.Info, error)
+	AcquireExclusive(name string, conflicts func(held []guard.Info) error) error
 }
 
 // Service serialises reset requests.
@@ -55,19 +54,16 @@ func (s *Service) Reset(ctx context.Context, phrase string) error {
 	if s.Stopped != nil && s.Stopped() {
 		return ErrUnavailable
 	}
-	if err := s.refuseHeld(); err != nil {
-		return err
-	}
-	if err := s.Guards.Acquire(GuardName); err != nil {
-		if errors.Is(err, guard.ErrActive) {
-			return ErrPending
-		}
+	// The scan and our guard are one step: a refusal writes nothing, and once our guard is
+	// written no other guarded operation can start. From here on it is never removed.
+	err := s.Guards.AcquireExclusive(GuardName, refuseOthers)
+	switch {
+	case errors.Is(err, ErrBusy):
+		return ErrBusy
+	case errors.Is(err, guard.ErrActive):
+		return ErrPending
+	case err != nil:
 		return errors.Join(ErrFailed, err) // never degrade to unguarded
-	}
-	// A guarded operation may have started between the check and our guard: refuse, and
-	// keep our guard (it is never removed), so the conflict stays visible at startup.
-	if err := s.refuseHeld(GuardName); err != nil {
-		return err
 	}
 	if err := s.Device.FactoryReset(ctx); err != nil {
 		return errors.Join(ErrFailed, err)
@@ -75,20 +71,9 @@ func (s *Service) Reset(ctx context.Context, phrase string) error {
 	return nil
 }
 
-// refuseHeld fails when a guard exists: our own one (unless ours is the allowed name)
-// means a reset is already pending, any other one a guarded operation in progress.
-func (s *Service) refuseHeld(ours ...string) error {
-	held, err := s.Guards.Stale()
-	if err != nil {
-		return errors.Join(ErrFailed, err)
-	}
-	for _, g := range held {
-		switch {
-		case g.Name != GuardName:
-			return ErrBusy
-		case len(ours) == 0:
-			return ErrPending
-		}
+func refuseOthers(held []guard.Info) error {
+	if len(held) > 0 {
+		return ErrBusy
 	}
 	return nil
 }

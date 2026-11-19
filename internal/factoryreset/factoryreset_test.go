@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,7 +37,7 @@ func setup(t *testing.T) (*Service, *device) {
 
 func held(t *testing.T, s *Service) []string {
 	t.Helper()
-	infos, err := s.Guards.Stale()
+	infos, err := s.Guards.(guard.Dir).Stale()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +82,7 @@ func TestResetRefusesWrongPhraseAndHeldGuards(t *testing.T) {
 			t.Fatalf("%q: %v", p, err)
 		}
 	}
-	if err := s.Guards.Acquire("txn-in-progress"); err != nil {
+	if err := d.guards.Acquire("txn-in-progress"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Reset(context.Background(), Phrase); !errors.Is(err, ErrBusy) {
@@ -94,7 +96,9 @@ func TestResetRefusesWrongPhraseAndHeldGuards(t *testing.T) {
 // failingGuards makes the guard write fail: the reset must abort, never run unguarded.
 type failingGuards struct{ guard.Dir }
 
-func (failingGuards) Acquire(string) error { return errors.New("read-only filesystem") }
+func (failingGuards) AcquireExclusive(string, func([]guard.Info) error) error {
+	return errors.New("read-only filesystem")
+}
 
 func TestGuardWriteFailureAborts(t *testing.T) {
 	s, d := setup(t)
@@ -104,24 +108,29 @@ func TestGuardWriteFailureAborts(t *testing.T) {
 	}
 }
 
-// lateGuards adds a txn guard right after ours, like an operation racing the reset.
-type lateGuards struct{ guard.Dir }
-
-func (g lateGuards) Acquire(name string) error {
-	if err := g.Dir.Acquire(name); err != nil {
-		return err
-	}
-	return g.Dir.Acquire("txn-in-progress")
-}
-
-func TestARaceAfterTheGuardStillRefusesAndKeepsTheGuard(t *testing.T) {
-	s, d := setup(t)
-	s.Guards = lateGuards{d.guards}
-	if err := s.Reset(context.Background(), Phrase); !errors.Is(err, ErrBusy) || d.resets != 0 {
-		t.Fatalf("err %v resets %d", err, d.resets)
-	}
-	if got := held(t, s); len(got) != 2 {
-		t.Fatalf("guards %v", got)
+// A reset racing another guarded operation: exactly one proceeds, and a refused reset
+// leaves no factory-reset guard behind (nothing was wiped).
+func TestResetRacingAnotherGuardedOperationHasOneWinner(t *testing.T) {
+	for range 30 {
+		s, d := setup(t)
+		var resetErr, otherErr error
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		wg.Add(2)
+		go func() { defer wg.Done(); <-start; resetErr = s.Reset(context.Background(), Phrase) }()
+		go func() {
+			defer wg.Done()
+			<-start
+			otherErr = d.guards.AcquireExclusive("reboot-in-progress", guard.RefuseAny)
+		}()
+		close(start)
+		wg.Wait()
+		if (resetErr == nil) == (otherErr == nil) {
+			t.Fatalf("reset %v, other %v: want exactly one winner", resetErr, otherErr)
+		}
+		if resetErr != nil && (!errors.Is(resetErr, ErrBusy) || d.resets != 0 || slices.Contains(held(t, s), GuardName)) {
+			t.Fatalf("refused reset: %v, resets %d, guards %v", resetErr, d.resets, held(t, s))
+		}
 	}
 }
 

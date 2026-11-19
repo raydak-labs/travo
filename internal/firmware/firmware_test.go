@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -252,7 +254,40 @@ func TestApplyKeepsTheGuardWhenSchedulingFails(t *testing.T) {
 
 type failingGuards struct{ guard.Dir }
 
-func (failingGuards) Acquire(string) error { return errors.New("read-only file system") }
+func (failingGuards) AcquireExclusive(string, func([]guard.Info) error) error {
+	return errors.New("read-only file system")
+}
+
+// An upgrade racing another guarded operation: exactly one proceeds, and a refused upgrade
+// leaves no firmware guard behind (nothing was flashed).
+func TestApplyRacingAnotherGuardedOperationHasOneWinner(t *testing.T) {
+	for range 30 {
+		s, d := setup(t)
+		img := staged(t, s)
+		var applyErr, otherErr error
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			applyErr = s.Apply(context.Background(), img.SHA256, true, Phrase)
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			otherErr = d.guards.AcquireExclusive("catalog-package-in-progress", guard.RefuseTerminal)
+		}()
+		close(start)
+		wg.Wait()
+		if (applyErr == nil) == (otherErr == nil) {
+			t.Fatalf("apply %v, other %v: want exactly one winner", applyErr, otherErr)
+		}
+		if applyErr != nil && (!errors.Is(applyErr, ErrBusy) || len(d.upgrades) != 0 || slices.Contains(heldNames(t, s), GuardName)) {
+			t.Fatalf("refused upgrade: %v, upgrades %v, guards %v", applyErr, d.upgrades, heldNames(t, s))
+		}
+	}
+}
 
 func TestApplyAbortsWhenTheGuardCannotBeWritten(t *testing.T) {
 	s, d := setup(t)
