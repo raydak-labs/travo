@@ -61,6 +61,8 @@ func (s *server) setWiFiGuest(ctx context.Context, in *setGuestInput) (*txnOutpu
 		return nil, fail(http.StatusBadRequest, validation.Code, "Invalid guest access point settings")
 	case errors.Is(err, wifi.ErrGuestOverlap):
 		return nil, fail(http.StatusConflict, "wifi_guest_subnet_overlap", "The guest subnet overlaps another network")
+	case errors.Is(err, wifi.ErrGuestAdGuardExpert):
+		return nil, fail(http.StatusConflict, "adguard_expert_topology", wifi.ErrGuestAdGuardExpert.Error())
 	case errors.Is(err, wifi.ErrGuestConflict):
 		return nil, fail(http.StatusConflict, "wifi_guest_conflict", "An existing guest configuration is not managed here")
 	case errors.Is(err, vpnkill.ErrUnsupported): // the kill switch is on but cannot cover the guest zone

@@ -67,6 +67,8 @@ func (s *server) adguardToggle(ctx context.Context, in *adguardToggleInput, set 
 		return s.getAdGuard(ctx, nil)
 	case errors.Is(err, pkgmgr.ErrNotInstalled):
 		return nil, fail(409, "adguard_not_installed", "adguardhome is not installed")
+	case errors.Is(err, adguard.ErrExpertTopology):
+		return nil, fail(409, "adguard_expert_topology", adguard.ErrExpertTopology.Error())
 	case errors.Is(err, adguard.ErrNotAnswering):
 		return nil, fail(409, "adguard_not_answering", adguard.ErrNotAnswering.Error())
 	case errors.Is(err, adguard.ErrBusy):

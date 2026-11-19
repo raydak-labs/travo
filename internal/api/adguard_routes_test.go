@@ -41,14 +41,14 @@ func (f *fakeAdGuard) Install(_ context.Context, explicit bool) error {
 }
 
 func TestAdGuardStatusRoute(t *testing.T) {
-	fake := &fakeAdGuard{status: adguard.Status{Installed: true, Version: "0.107.79-r1", Running: true, Loopback: true, MigrationFailed: true}}
+	fake := &fakeAdGuard{status: adguard.Status{Installed: true, Version: "0.107.79-r1", Running: true, Loopback: true, MigrationFailed: true, TopologyStatus: adguard.TopologyStatus{Topology: adguard.TopologyDefault}}}
 	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.AdGuard = fake })
 	if got := e.do(req{path: "/api/v1/adguard"}); got.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated: %d", got.Code)
 	}
 	cookie, _ := e.login()
 	got := e.do(req{path: "/api/v1/adguard", cookie: cookie})
-	want := `{"installed":true,"version":"0.107.79-r1","running":true,"loopback":true,"busy":false,"default_dns":false,"fail_open_since":null,"migration_failed":true}`
+	want := `{"installed":true,"version":"0.107.79-r1","running":true,"loopback":true,"busy":false,"default_dns":false,"fail_open_since":null,"topology":"default","migration_failed":true}`
 	if got.Code != http.StatusOK || strings.TrimSpace(got.Body.String()) != want {
 		t.Fatalf("%d %s", got.Code, got.Body)
 	}

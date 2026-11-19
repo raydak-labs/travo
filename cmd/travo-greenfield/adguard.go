@@ -74,6 +74,11 @@ func startAdGuard(ctx context.Context, deps app.Deps, layers *dnslayer.Service, 
 		},
 		Ready:  adguard.HTTPReady(&http.Client{Timeout: 2 * time.Second}, adguard.AdminURL, 500*time.Millisecond),
 		Bundle: adguard.Bundle{Path: adguard.BundlePath, SHA256: adguard.BundleSHA256},
+		// Expert topology (ADR 0021): dhcp and the mode change through the transaction module.
+		UCI: deps.Device, Txns: deps.Txn,
+		TopologyState:  filepath.Join(deps.Paths.State, "adguard-topology.json"),
+		TopologyBackup: filepath.Join(deps.Paths.State, "adguardhome.yaml.topology"),
+		ProbeAt:        func(addr string) func(context.Context) error { return adguard.UDPProbe(addr, 3*time.Second) },
 	}
 	if deps.Mock { // the mock seeds the service; keep the config off the real path
 		svc.Config = filepath.Join(deps.Paths.State, "adguardhome", "adguardhome.yaml")
@@ -100,9 +105,13 @@ func startAdGuard(ctx context.Context, deps app.Deps, layers *dnslayer.Service, 
 			}
 			return nil
 		}
+		svc.ProbeAt = func(string) func(context.Context) error { return svc.DNS.Probe }
 	}
 	if err := svc.Recover(ctx); err != nil {
 		slog.Warn("adguard: interrupted config change not recovered", "err", err)
+	}
+	if err := svc.RecoverTopology(ctx); err != nil {
+		slog.Warn("adguard: interrupted topology switch not recovered", "err", err)
 	}
 	workers.Go("adguard-reconcile", lifecycle.Every(time.Minute, func(ctx context.Context) {
 		if err := svc.Reconcile(ctx); err != nil && !errors.Is(err, adguard.ErrOffline) && ctx.Err() == nil {
@@ -110,7 +119,7 @@ func startAdGuard(ctx context.Context, deps app.Deps, layers *dnslayer.Service, 
 		}
 	}))
 	workers.Go("adguard-liveness", lifecycle.Every(15*time.Second, func(ctx context.Context) {
-		if err := svc.DNS.Tick(ctx); err != nil && ctx.Err() == nil {
+		if err := svc.LivenessTick(ctx); err != nil && ctx.Err() == nil {
 			slog.Warn("adguard liveness", "err", err)
 		}
 	}))

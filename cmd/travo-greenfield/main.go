@@ -338,9 +338,11 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	var adguardSvc api.AdGuard
 	var adguardDoH api.AdGuardDoH
+	var adguardTopology api.AdGuardTopology
 	aghService := startAdGuard(ctx, deps, dnsLayers, workers, connection)
 	if aghService != nil {
 		adguardSvc = aghService
+		adguardTopology = aghService
 		adguardDoH = &adguard.Upstreams{Client: &http.Client{Timeout: 15 * time.Second}, Base: adguard.AdminURL, Idle: aghService.Idle}
 	}
 	var tailscaleSvc api.Tailscale
@@ -348,37 +350,38 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		tailscaleSvc = svc
 	}
 	apiDeps := api.Deps{
-		DaemonContext: ctx,
-		VPNProfiles:   profiles,
-		VPNStatus:     vpnStatus,
-		VPNTunnel:     vpnTunnel,
-		VPNSplit:      vpnSplit,
-		VPNKillSwitch: vpnKill,
-		VPNDNS:        vpnDNS,
-		UpdateApply:   updater,
-		UpdateStage:   updateStage,
-		Rebooter:      rebooter,
-		BootID:        bootID,
-		Backup:        backup,
-		Updates:       updates,
-		Connectivity:  connection,
-		Captive:       captiveAssist,
-		CaptiveRenew:  captiveRenew,
-		CaptiveAccept: captiveAccept,
-		WiFi:          wireless,
-		WiFiJoin:      wirelessJoin,
-		WiFiProfiles:  savedUplinks,
-		AdGuard:       adguardSvc,
-		AdGuardDoH:    adguardDoH,
-		Tailscale:     tailscaleSvc,
-		WiFiReconnect: reconnect,
-		WiFiAPs:       wirelessAPs,
-		WiFiGuest:     wirelessGuest,
-		WiFiMAC:       wirelessMAC,
-		USBTether:     newUSBTether(deps),
-		Failover:      startFailover(deps, connection, workers),
-		Throughput:    sampler,
-		Version:       version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
+		DaemonContext:   ctx,
+		VPNProfiles:     profiles,
+		VPNStatus:       vpnStatus,
+		VPNTunnel:       vpnTunnel,
+		VPNSplit:        vpnSplit,
+		VPNKillSwitch:   vpnKill,
+		VPNDNS:          vpnDNS,
+		UpdateApply:     updater,
+		UpdateStage:     updateStage,
+		Rebooter:        rebooter,
+		BootID:          bootID,
+		Backup:          backup,
+		Updates:         updates,
+		Connectivity:    connection,
+		Captive:         captiveAssist,
+		CaptiveRenew:    captiveRenew,
+		CaptiveAccept:   captiveAccept,
+		WiFi:            wireless,
+		WiFiJoin:        wirelessJoin,
+		WiFiProfiles:    savedUplinks,
+		AdGuard:         adguardSvc,
+		AdGuardDoH:      adguardDoH,
+		AdGuardTopology: adguardTopology,
+		Tailscale:       tailscaleSvc,
+		WiFiReconnect:   reconnect,
+		WiFiAPs:         wirelessAPs,
+		WiFiGuest:       wirelessGuest,
+		WiFiMAC:         wirelessMAC,
+		USBTether:       newUSBTether(deps),
+		Failover:        startFailover(deps, connection, workers),
+		Throughput:      sampler,
+		Version:         version.Version, Accounts: deps.Accounts, Ubus: deps.Device, Txns: deps.Txn,
 		Sessions: sessions, Limiter: limiter, Clock: clock,
 		Tokens:    apitokens.New(filepath.Join(deps.Paths.State, "api-tokens.json")),
 		Trusted:   provider.Allowed,

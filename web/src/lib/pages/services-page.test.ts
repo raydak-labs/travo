@@ -26,6 +26,7 @@ const installed: AdGuardStatus = {
   busy: false,
   default_dns: true,
   fail_open_since: null,
+  topology: 'default',
   migration_failed: false,
 };
 
@@ -66,8 +67,17 @@ describe('Services page: AdGuard Home', () => {
     const body = page(installed);
     expect(body).toContain('Running');
     expect(body).toContain('Stop using as default DNS');
+    expect(body).toContain('>Stop<');
     expect(body).toContain('href="http://192.168.1.1:3001/"');
     expect(body).not.toContain('role="alert"');
+  });
+
+  it('expert topology: no stop and no default-DNS toggle, proxy link stays', () => {
+    const body = page({ ...installed, default_dns: false, topology: 'expert' });
+    expect(body).toContain('Running');
+    expect(body).not.toContain('>Stop<');
+    expect(body).not.toContain('Use as default DNS');
+    expect(body).toContain('href="http://192.168.1.1:3001/"');
   });
 
   it('fail-open: loud banner with re-enable', () => {

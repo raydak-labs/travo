@@ -58,6 +58,8 @@ func (s *server) setDoH(ctx context.Context, in *dohInput) (*dohOutput, error) {
 		return nil, fail(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, adguard.ErrDoHUnreachable):
 		return nil, fail(http.StatusConflict, "doh_upstream_unreachable", err.Error())
+	case errors.Is(err, adguard.ErrExpertTopology):
+		return nil, fail(http.StatusConflict, "adguard_expert_topology", err.Error())
 	case errors.Is(err, adguard.ErrDoHNoChange):
 		return nil, fail(http.StatusConflict, "doh_no_change", err.Error())
 	case errors.Is(err, adguard.ErrBusy):

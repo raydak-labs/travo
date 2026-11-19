@@ -217,3 +217,37 @@ func (d *DNS) save(st dnsState) error {
 	}
 	return atomicfile.WriteJSON(d.StatePath, st, 0o600)
 }
+
+// popForExpert takes the `adguard` layer off before AGH moves in front of dnsmasq
+// (ADR 0021): dnsmasq must forward to the real upstreams, or AGH -> dnsmasq -> AGH loops.
+// It keeps the user's choice; restoreLayer puts the layer back after a failed switch.
+func (d *DNS) popForExpert(ctx context.Context) (wasActive bool, _ error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.failures, d.passingSince = 0, time.Time{}
+	if err := d.adopt(ctx); err != nil {
+		return false, err
+	}
+	ls, err := d.Layers.Status()
+	if err != nil || !slices.Contains(ls.Layers, dnslayer.AdGuard) {
+		return false, err
+	}
+	return true, d.Layers.Pop(ctx, dnslayer.AdGuard)
+}
+
+// restoreLayer pushes the layer back exactly as a failed expert switch found it.
+func (d *DNS) restoreLayer(ctx context.Context) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.Layers.Push(ctx, DNSLayer)
+}
+
+// markFailOpen records an expert-mode fail-open: the banner shows and the layer returns
+// only after the hold-down or the user's confirm, like a default-mode fail-open.
+func (d *DNS) markFailOpen() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.failures, d.passingSince = 0, time.Time{}
+	now := d.Now().UTC()
+	return d.save(dnsState{FailOpenSince: &now})
+}

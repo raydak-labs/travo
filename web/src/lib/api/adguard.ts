@@ -34,8 +34,26 @@ export function adguardError(code: string | undefined): string {
       return m.adguard_err_busy();
     case 'adguard_config_unknown':
       return m.adguard_err_config();
+    case 'adguard_expert_topology':
+      return m.adguard_err_expert_topology();
     default:
       return m.adguard_err_failed();
+  }
+}
+
+/** Maps a refused PUT /adguard/topology (ADR 0021) to its message; never parses error text. */
+export function topologyRefusal(code: string | undefined): { message?: string; error?: string } {
+  switch (code) {
+    case 'adguard_topology_no_change':
+      return { message: m.adguard_topology_no_change() };
+    case 'adguard_topology_not_ready':
+      return { error: m.adguard_topology_not_ready() };
+    case 'adguard_topology_foreign':
+      return { error: m.adguard_topology_foreign() };
+    case 'transaction_pending':
+      return { error: m.vpn_tunnel_busy() };
+    default:
+      return { error: adguardError(code) };
   }
 }
 

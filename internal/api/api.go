@@ -120,6 +120,8 @@ type Deps struct {
 	AdGuard AdGuard
 	// AdGuardDoH is AdGuard Home's DoH upstream; nil answers 503 adguard_unavailable.
 	AdGuardDoH AdGuardDoH
+	// AdGuardTopology is the expert switch (ADR 0021); nil answers 503 adguard_unavailable.
+	AdGuardTopology AdGuardTopology
 	// Tailscale is nil when the daemon cannot supervise the package (no service port).
 	Tailscale Tailscale
 	Txns      Txns
@@ -307,6 +309,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWiFiProfiles(a)
 	s.registerAdGuard(a)
 	s.registerAdGuardDoH(a)
+	s.registerAdGuardTopology(a)
 	s.registerTailscale(a)
 	s.registerWiFiReconnect(a)
 	s.registerWiFiSchedule(a)

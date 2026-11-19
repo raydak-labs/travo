@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/blackdark-org/travo-greenfield/internal/adguard"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/lockout"
@@ -29,6 +30,9 @@ var (
 	ErrNoGuestRadio = errors.New("no radio for the guest access point")
 	// ErrGuestConflict: a guest-named section exists that this feature did not shape.
 	ErrGuestConflict = errors.New("existing guest configuration is not managed here")
+	// ErrGuestAdGuardExpert: AdGuard Home owns port 53 (ADR 0021) and was bound before the
+	// guest network existed, so guests would get no DNS.
+	ErrGuestAdGuardExpert = errors.New("switch AdGuard Home back to the default DNS topology before creating the guest network")
 )
 
 // GuestConfig is the configured guest AP. Keys are never returned.
@@ -62,7 +66,7 @@ func (r GuestRequest) validate() error {
 	return nil
 }
 
-type guestConfigs struct{ wireless, network, firewall, dhcp []device.Section }
+type guestConfigs struct{ wireless, network, firewall, dhcp, travo []device.Section }
 
 func (s *Service) readGuestConfigs(ctx context.Context) (guestConfigs, error) {
 	var c guestConfigs
@@ -73,6 +77,8 @@ func (s *Service) readGuestConfigs(ctx context.Context) (guestConfigs, error) {
 		}
 		*dst = sections
 	}
+	// Only the AdGuard topology is read here; a missing config is the default topology.
+	c.travo, _ = s.join.UCI.Show(ctx, adguard.TopologyConfig)
 	return c, nil
 }
 
@@ -146,6 +152,9 @@ func planGuest(c guestConfigs, live []facts.Interface, req GuestRequest) (writes
 	})
 	if foreignZone || (existing < 0 && hasSection(c.wireless, guestName)) {
 		return nil, nil, nil, ErrGuestConflict
+	}
+	if !hasSection(c.dhcp, guestName) && adguard.Mode(c.travo) == adguard.TopologyExpert {
+		return nil, nil, nil, ErrGuestAdGuardExpert
 	}
 	if existing < 0 && req.Key == "" {
 		return nil, nil, nil, ValidationError{"wifi_key_required"}

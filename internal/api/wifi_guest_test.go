@@ -46,6 +46,7 @@ func TestWiFiGuestRoutes(t *testing.T) {
 		{wifi.ValidationError{Code: "wifi_key_required"}, 400, "wifi_key_required"},
 		{wifi.ErrGuestOverlap, 409, "wifi_guest_subnet_overlap"},
 		{wifi.ErrGuestConflict, 409, "wifi_guest_conflict"},
+		{wifi.ErrGuestAdGuardExpert, 409, "adguard_expert_topology"},
 		{vpnkill.ErrUnsupported, 409, "vpn_killswitch_unsupported"},
 		{wifi.ErrNoGuestRadio, 409, "wifi_no_free_radio"},
 		{wifi.ErrRadioInUse, 409, "wifi_radio_in_use"},

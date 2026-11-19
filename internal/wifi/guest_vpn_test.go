@@ -112,6 +112,18 @@ func TestPlanGuestRefusesForeignSectionOnOwnedName(t *testing.T) {
 	}
 }
 
+func TestPlanGuestRefusedWhileAdGuardOwnsPort53(t *testing.T) {
+	c, live := guestFixtures(t)
+	c.travo = []device.Section{{Name: "main", Type: "travo-greenfield", Options: map[string]string{"adguard_topology": "expert"}}}
+	if _, _, _, err := planGuest(c, live, GuestRequest{SSID: "Guests", Key: "example-only", Enabled: true}); err != ErrGuestAdGuardExpert {
+		t.Fatalf("a new guest pool would get no DNS in the expert topology: %v", err)
+	}
+	c.dhcp = append(c.dhcp, device.Section{Name: "guest", Type: "dhcp", Options: map[string]string{"interface": "guest"}})
+	if _, _, _, err := planGuest(c, live, GuestRequest{SSID: "Guests", Key: "example-only", Enabled: true}); err == ErrGuestAdGuardExpert {
+		t.Fatal("an existing guest pool was bound at the switch; editing it stays allowed")
+	}
+}
+
 // After the guest transaction stages, the firewall matches what the kill switch and the
 // tunnel enable want, so neither finds anything left to change.
 func TestGuestWithKillSwitchMatchesVPNDesired(t *testing.T) {

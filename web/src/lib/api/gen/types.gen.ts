@@ -88,6 +88,14 @@ export type AdGuardStatus = {
      */
     running: boolean;
     /**
+     * default: dnsmasq on :53 forwards to AGH; expert: AGH on :53 forwards to dnsmasq (ADR 0021)
+     */
+    topology: 'default' | 'expert';
+    /**
+     * Addresses AGH answers on port 53 in expert mode
+     */
+    topology_hosts?: Array<string> | null;
+    /**
      * Installed package version; empty when absent
      */
     version: string;
@@ -95,6 +103,13 @@ export type AdGuardStatus = {
 
 export type AdguardToggleInputBody = {
     enabled: boolean | null;
+};
+
+export type AdguardTopologyInputBody = {
+    /**
+     * expert: AdGuard Home answers on port 53 and forwards to dnsmasq on 127.0.0.1:5354
+     */
+    mode: 'default' | 'expert';
 };
 
 export type Alert = {
@@ -2095,6 +2110,47 @@ export type SetAdGuardServiceResponses = {
 };
 
 export type SetAdGuardServiceResponse = SetAdGuardServiceResponses[keyof SetAdGuardServiceResponses];
+
+export type SetAdGuardTopologyData = {
+    body: AdguardTopologyInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard/topology';
+};
+
+export type SetAdGuardTopologyErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetAdGuardTopologyError = SetAdGuardTopologyErrors[keyof SetAdGuardTopologyErrors];
+
+export type SetAdGuardTopologyResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetAdGuardTopologyResponse = SetAdGuardTopologyResponses[keyof SetAdGuardTopologyResponses];
 
 export type PostLoginData = {
     body: LoginInputBody;

@@ -24,6 +24,7 @@
 - **Base DNS**: dnsmasq's DNS state captured before the first layer; restored when the last layer is popped.
 - **Fail open**: when a filter/service fails, fall back to working connectivity and say so loudly.
 - **AGH**: AdGuard Home.
+- **Topology (AdGuard)**: `default` = dnsmasq on :53 forwards to AGH on `127.0.0.1:5353`; `expert` = AGH on :53 forwards to dnsmasq on `127.0.0.1:5354` (ADR 0021).
 - **Fixture**: a verbatim captured device payload with provenance (device, firmware, date).
 - **Mock mode**: the daemon running against the mock `Device`, no router needed.
 - **Release source**: the GitHub repo the updater reads releases from; configurable.

@@ -16,6 +16,8 @@ import PageHost from './PageHost.svelte';
 const doh = lazyPage(() => import('./DoHCard.svelte'));
 // The optional services catalog is its own chunk too.
 const catalog = lazyPage(() => import('./CatalogCard.svelte'));
+// The expert DNS setup (ADR 0021) too.
+const topology = lazyPage(() => import('./AdGuardTopologyCard.svelte'));
 
 const request = new AbortController();
 const adguard = createLoader(fetchAdGuard, 10000);
@@ -73,8 +75,14 @@ const proxy = adguardUrl(window.location);
           {#if st.config_error}<p class="mt-2 text-muted">{m.adguard_err_config()}</p>{/if}
           {#if st.migration_failed}<p class="mt-2 text-muted">{m.adguard_migration_failed()}</p>{/if}
           <div class="mt-3 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('service', !st.running)}>{st.running ? m.adguard_stop() : m.adguard_start()}</Button>
-            {#if st.running}
+            {#if st.topology !== 'expert' || !st.running}
+              <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('service', !st.running)}>{st.running ? m.adguard_stop() : m.adguard_start()}</Button>
+            {/if}
+            {#if st.running && st.topology === 'expert'}
+              {#if st.loopback}
+                <Button variant="outline" size="sm" href={proxy} target="_blank" rel="noopener">{m.adguard_open()}</Button>
+              {/if}
+            {:else if st.running}
               <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('dns', !st.default_dns)}>{st.default_dns ? m.adguard_dns_disable() : m.adguard_dns_enable()}</Button>
               {#if st.loopback}
                 <Button variant="outline" size="sm" href={proxy} target="_blank" rel="noopener">{m.adguard_open()}</Button>
@@ -90,8 +98,11 @@ const proxy = adguardUrl(window.location);
       {/if}
     </LoadState>
   </Card>
-  {#if adguard.data?.running}
+  {#if adguard.data?.running && adguard.data.topology !== 'expert'}
     <PageHost load={doh} />
+  {/if}
+  {#if adguard.data && (adguard.data.running || adguard.data.topology === 'expert')}
+    <PageHost load={topology} props={{ expert: adguard.data.topology === 'expert', hosts: adguard.data.topology_hosts ?? [], busy: adguard.data.busy, refresh: adguard.retry }} />
   {/if}
   <PageHost load={catalog} />
 </div>

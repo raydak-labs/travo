@@ -51,6 +51,7 @@ type Status struct {
 	Loopback  bool   `json:"loopback" doc:"The config binds the admin UI and DNS to loopback only (ADR 0006)"`
 	Busy      bool   `json:"busy" doc:"An install or config change is in progress or was interrupted"`
 	DNSStatus
+	TopologyStatus
 	// ConfigError says why the config could not be read as the canonical YAML shape.
 	ConfigError string `json:"config_error,omitempty"`
 	// MigrationFailed: the last loopback migration failed and was rolled back (#164).
@@ -78,8 +79,20 @@ type Service struct {
 	// Now is the clock for the migration back-off; nil means time.Now (monotonic).
 	Now func() time.Time
 
-	mu     sync.Mutex
-	failed atomic.Pointer[migrationFailure]
+	// Expert topology (ADR 0021). UCI, Txns or ProbeAt nil: the switch is unavailable.
+	UCI  device.UCI
+	Txns TopologyTxns
+	// TopologyState records the mode's details (state dir); TopologyBackup keeps AGH's
+	// YAML while a switch is in flight.
+	TopologyState, TopologyBackup string
+	// ProbeAt resolves a fresh name through addr (UDPProbe in production).
+	ProbeAt func(addr string) func(context.Context) error
+	// SettleWait bounds the switch's waits for dnsmasq and AGH; 0 = DefaultSettleWait.
+	SettleWait time.Duration
+
+	mu             sync.Mutex
+	failed         atomic.Pointer[migrationFailure]
+	expertFailures int
 }
 
 // Status never mutates.
@@ -90,6 +103,9 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		return st, err
 	}
 	st.Busy = busy
+	if st.TopologyStatus, _, err = s.topologyStatus(); err != nil {
+		return st, err
+	}
 	if s.DNS != nil {
 		if st.DNSStatus, err = s.DNS.Status(); err != nil {
 			return st, err
@@ -116,7 +132,7 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		st.ConfigError = err.Error()
 		return st, nil
 	}
-	st.Loopback = l.IsLoopback()
+	st.Loopback = l.IsLoopback() || (st.Topology == TopologyExpert && l.HTTP == LoopbackHTTP)
 	st.MigrationFailed = st.MigrationFailed && !st.Loopback
 	return st, nil
 }
@@ -126,11 +142,19 @@ func (s *Service) busy() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return slices.ContainsFunc(g, func(x guard.Info) bool { return x.Name == InstallGuard || x.Name == ConfigGuard }), nil
+	return slices.ContainsFunc(g, func(x guard.Info) bool {
+		return x.Name == InstallGuard || x.Name == ConfigGuard || x.Name == TopologyGuard
+	}), nil
 }
 
-// Idle is ErrBusy while an install or config swap holds its guard.
-func (s *Service) Idle() error { return s.idle() }
+// Idle is ErrBusy while an install, config swap or topology switch holds its guard, and
+// ErrExpertTopology in expert mode: AGH's upstream must stay dnsmasq there (DoH refuses).
+func (s *Service) Idle() error {
+	if err := s.idle(); err != nil {
+		return err
+	}
+	return s.expertGuard()
+}
 
 func (s *Service) idle() error {
 	busy, err := s.busy()
@@ -144,8 +168,8 @@ func (s *Service) idle() error {
 // loopback migration of a config that still binds the LAN. Guards make it skip.
 func (s *Service) Reconcile(ctx context.Context) error {
 	st, err := s.Status(ctx)
-	if err != nil || st.Busy {
-		return err
+	if err != nil || st.Busy || st.Topology == TopologyExpert {
+		return err // the expert config is not loopback on purpose; never migrate it back
 	}
 	if !st.Installed {
 		return s.Install(ctx, false)
@@ -173,6 +197,10 @@ func (s *Service) SetDefaultDNS(ctx context.Context, on bool) error {
 	if _, err := s.Packages.Version(ctx, Package); err != nil {
 		return err
 	}
+	// In expert mode the layer would loop AGH -> dnsmasq -> AGH (ADR 0021).
+	if err := s.expertGuard(); err != nil {
+		return err
+	}
 	return s.DNS.SetDefault(ctx, on)
 }
 
@@ -189,6 +217,10 @@ func (s *Service) SetEnabled(ctx context.Context, on bool) error {
 	}
 	actions := []string{"enable", "start"}
 	if !on {
+		// Stopping AGH while it owns :53 is a LAN-wide DNS outage.
+		if err := s.expertGuard(); err != nil {
+			return err
+		}
 		if s.DNS != nil {
 			if err := s.DNS.SetDefault(ctx, false); err != nil {
 				return err
