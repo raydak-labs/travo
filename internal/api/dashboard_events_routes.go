@@ -11,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
+	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
 	"github.com/blackdark-org/travo-greenfield/internal/throughput"
 )
 
@@ -121,7 +122,7 @@ func (s *server) serveDashboardEvents(ctx context.Context, w http.ResponseWriter
 		default:
 		}
 		if event, ok := sub.take(); ok {
-			frame, err := marshalDashboardEvent(event)
+			frame, err := marshalDashboardEvent(redactDashboardEvent(event, cred))
 			if err != nil || !writer.write(frame) {
 				return
 			}
@@ -139,6 +140,15 @@ func (s *server) serveDashboardEvents(ctx context.Context, w http.ResponseWriter
 			return
 		}
 	}
+}
+
+// redactDashboardEvent applies the per-caller redaction of the matching GET: events are
+// read once on the daemon context and fanned out, so the caller is only known here.
+func redactDashboardEvent(event dashboardEvent, cred authed) dashboardEvent {
+	if st, ok := event.data.(tailscale.Status); ok {
+		event.data = redactTailscale(st, cred)
+	}
+	return event
 }
 
 func marshalDashboardEvent(event dashboardEvent) ([]byte, error) {

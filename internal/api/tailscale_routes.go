@@ -36,21 +36,28 @@ type tailscaleStatusOutput struct {
 
 func (s *server) registerTailscale(a huma.API) {
 	register(s, false, op("getTailscale", http.MethodGet, "/api/v1/tailscale", "Tailscale package, daemon and tailnet status", "tailscale", 503), a, s.getTailscale)
+	// Login, logout and settings are session-only (invariants §3): joining a tailnet and
+	// Tailscale SSH open a root shell, the same reason SSH-key changes are session-only.
 	for _, o := range []struct {
 		id, path, summary string
+		sessionOnly       bool
 		h                 func(context.Context, *struct{}) (*tailscaleStatusOutput, error)
 	}{
-		{"installTailscale", "/api/v1/tailscale/install", "Install the tailscale package (explicit, guarded)", s.installTailscale},
-		{"loginTailscale", "/api/v1/tailscale/login", "Bring Tailscale up; returns the auth URL until the login completes", s.loginTailscale},
-		{"logoutTailscale", "/api/v1/tailscale/logout", "Sign the router out of the tailnet", s.logoutTailscale},
+		{"installTailscale", "/api/v1/tailscale/install", "Install the tailscale package (explicit, guarded)", false, s.installTailscale},
+		{"loginTailscale", "/api/v1/tailscale/login", "Bring Tailscale up; returns the auth URL until the login completes", true, s.loginTailscale},
+		{"logoutTailscale", "/api/v1/tailscale/logout", "Sign the router out of the tailnet", true, s.logoutTailscale},
 	} {
 		x := op(o.id, http.MethodPost, o.path, o.summary, "tailscale", 409, 503)
 		x.MaxBodyBytes = 1024
-		register(s, false, x, a, o.h)
+		if o.sessionOnly {
+			registerSessionOnly(s, x, a, o.h)
+		} else {
+			register(s, false, x, a, o.h)
+		}
 	}
 	set := op("setTailscaleSettings", http.MethodPut, "/api/v1/tailscale/settings", "Set exit node, LAN advertisement and Tailscale SSH", "tailscale", 400, 409, 503)
 	set.MaxBodyBytes = 1024
-	register(s, false, set, a, s.setTailscaleSettings)
+	registerSessionOnly(s, set, a, s.setTailscaleSettings)
 	fw := op("applyTailscaleFirewall", http.MethodPost, "/api/v1/tailscale/firewall", "Stage the Tailscale firewall zone in a transaction", "tailscale", 409, 503)
 	fw.DefaultStatus = http.StatusAccepted
 	fw.MaxBodyBytes = 1024
@@ -97,7 +104,16 @@ func (s *server) getTailscale(ctx context.Context, _ *struct{}) (*tailscaleStatu
 		slog.Warn("tailscale status", "err", err)
 		return nil, tailscaleUnavailable()
 	}
-	return &tailscaleStatusOutput{Body: st}, nil
+	return &tailscaleStatusOutput{Body: redactTailscale(st, authedOf(ctx))}, nil
+}
+
+// redactTailscale hides the pending login URL from API tokens: whoever opens it claims
+// the router for their tailnet, so it is a secret only the browser session may see.
+func redactTailscale(st tailscale.Status, cred authed) tailscale.Status {
+	if cred.bearer != "" {
+		st.AuthURL = ""
+	}
+	return st
 }
 
 func (s *server) installTailscale(ctx context.Context, _ *struct{}) (*tailscaleStatusOutput, error) {

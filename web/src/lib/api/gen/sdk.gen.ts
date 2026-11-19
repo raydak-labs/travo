@@ -1399,7 +1399,7 @@ export const loginTailscale = <ThrowOnError extends boolean = false>(options?: O
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }, { scheme: 'bearer', type: 'http' }],
+        }],
     url: '/api/v1/tailscale/login',
     ...options
 });
@@ -1412,7 +1412,7 @@ export const logoutTailscale = <ThrowOnError extends boolean = false>(options?: 
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }, { scheme: 'bearer', type: 'http' }],
+        }],
     url: '/api/v1/tailscale/logout',
     ...options
 });
@@ -1425,7 +1425,7 @@ export const setTailscaleSettings = <ThrowOnError extends boolean = false>(optio
             in: 'cookie',
             name: 'tg_session',
             type: 'apiKey'
-        }, { scheme: 'bearer', type: 'http' }],
+        }],
     url: '/api/v1/tailscale/settings',
     ...options,
     headers: {
