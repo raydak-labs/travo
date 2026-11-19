@@ -15,6 +15,8 @@ const { createLoader, loader } = vi.hoisted(() => ({
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
+// The lazy DoH card has its own test (network-extras.test.ts).
+vi.mock('./PageHost.svelte', () => ({ default: () => {} }));
 
 const installed: AdGuardStatus = {
   installed: true,

@@ -1,0 +1,1 @@
+{"https://doh.invalid:443/dns-query":"couldn't communicate with upstream: exchanging: requesting https://doh.invalid:443/dns-query: Get \"https://doh.invalid:443/dns-query?dns=AAABAAABAAAAAAAABHRlc3QAAAEAAQ\": no addresses"}

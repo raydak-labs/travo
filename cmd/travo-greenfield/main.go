@@ -336,9 +336,11 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		}
 	}
 	var adguardSvc api.AdGuard
+	var adguardDoH api.AdGuardDoH
 	aghService := startAdGuard(ctx, deps, dnsLayers, workers, connection)
 	if aghService != nil {
 		adguardSvc = aghService
+		adguardDoH = &adguard.Upstreams{Client: &http.Client{Timeout: 15 * time.Second}, Base: adguard.AdminURL, Idle: aghService.Idle}
 	}
 	var tailscaleSvc api.Tailscale
 	if svc := startTailscale(deps, dnsLayers, workers, connection, vpnStatus); svc != nil {
@@ -366,6 +368,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		WiFiJoin:      wirelessJoin,
 		WiFiProfiles:  savedUplinks,
 		AdGuard:       adguardSvc,
+		AdGuardDoH:    adguardDoH,
 		Tailscale:     tailscaleSvc,
 		WiFiReconnect: reconnect,
 		WiFiAPs:       wirelessAPs,

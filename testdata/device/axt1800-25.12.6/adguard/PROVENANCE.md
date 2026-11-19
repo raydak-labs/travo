@@ -45,3 +45,13 @@ Captured read-only on the same router (OpenWrt 25.12.6 r33311-981c978eff) on Mon
 - service-list-adguardhome.json: `ubus call service list '{"name":"adguardhome"}'`
 - service-list-absent.json: `ubus call service list '{"name":"nonexistent-svc"}'` (procd answers an empty object for an unknown service)
 - df-overlay.txt: `df -k /overlay`
+
+## DNS over HTTPS upstream (2026-11-19, #245)
+
+Captured on the GL-AXT1800 (OpenWrt 25.12.6, Travo 0.1.0, AGH default DNS). Verbatim; no secrets, nothing redacted. Neither request changes AGH's config.
+
+- dns-info.json: `wget -qO- http://127.0.0.1:3000/control/dns_info` (GET). `upstream_dns` is the seed's Quad9 DoH server; `bootstrap_dns` has four entries.
+- test-upstream-dns-ok.json: `wget -qO- --header 'Content-Type: application/json' --post-data '{"upstream_dns":["https://dns10.quad9.net/dns-query"],"bootstrap_dns":["9.9.9.10"],"fallback_dns":[],"private_upstream":[]}' http://127.0.0.1:3000/control/test_upstream_dns`. The reply is keyed by the normalised URL (`:443` added), value `OK`.
+- test-upstream-dns-fail.json: the same request for `https://doh.invalid/dns-query`; the value is the error text.
+
+Not captured: the `POST /control/dns_config` write itself (the session's write probe was not run); the daemon checks only its HTTP status and reads `dns_info` back. The hardware playbook (docs/testing.md, "IPv6, DNS over HTTPS, dynamic DNS") covers it.

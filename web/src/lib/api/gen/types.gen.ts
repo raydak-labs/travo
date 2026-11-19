@@ -424,6 +424,24 @@ export type DnsNamesOutputBody = {
     names: Array<DnsName>;
 };
 
+export type DoHRequest = {
+    /**
+     * https:// DNS over HTTPS endpoint, e.g. https://dns10.quad9.net/dns-query
+     */
+    url: string;
+};
+
+export type DoHView = {
+    /**
+     * Every upstream is DNS over HTTPS, TLS or QUIC
+     */
+    encrypted: boolean;
+    /**
+     * AdGuard Home upstream_dns, in order
+     */
+    upstreams: Array<string> | null;
+};
+
 export type FactoryResetInputBody = {
     /**
      * Must be exactly "factory reset", typed by the operator
@@ -1776,6 +1794,76 @@ export type SetAdGuardDnsResponses = {
 };
 
 export type SetAdGuardDnsResponse = SetAdGuardDnsResponses[keyof SetAdGuardDnsResponses];
+
+export type GetAdGuardDohData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard/doh';
+};
+
+export type GetAdGuardDohErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetAdGuardDohError = GetAdGuardDohErrors[keyof GetAdGuardDohErrors];
+
+export type GetAdGuardDohResponses = {
+    /**
+     * OK
+     */
+    200: DoHView;
+};
+
+export type GetAdGuardDohResponse = GetAdGuardDohResponses[keyof GetAdGuardDohResponses];
+
+export type SetAdGuardDohData = {
+    body: DoHRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/adguard/doh';
+};
+
+export type SetAdGuardDohErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetAdGuardDohError = SetAdGuardDohErrors[keyof SetAdGuardDohErrors];
+
+export type SetAdGuardDohResponses = {
+    /**
+     * OK
+     */
+    200: DoHView;
+};
+
+export type SetAdGuardDohResponse = SetAdGuardDohResponses[keyof SetAdGuardDohResponses];
 
 export type InstallAdGuardData = {
     body?: never;

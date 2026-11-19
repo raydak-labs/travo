@@ -1096,5 +1096,18 @@
   "ipv6_err_foreign": "IPv6 is configured in a way Travo does not edit (relay mode or a custom wwan6); use LuCI.",
   "ipv6_err_vpn_leak": "Turn the VPN tunnel off first: it carries IPv4 only, so IPv6 traffic would bypass it.",
   "ipv6_failed": "Could not change IPv6.",
-  "ipv6_unavailable": "IPv6 settings are unavailable."
+  "ipv6_unavailable": "IPv6 settings are unavailable.",
+  "doh_title": "DNS over HTTPS",
+  "doh_intro": "AdGuard Home sends every lookup to this encrypted server. During a captive-portal bypass the hotel's resolvers answer instead, and if the server stops answering AdGuard is bypassed (fail open).",
+  "doh_state_encrypted": "Encrypted upstream",
+  "doh_state_plain": "Unencrypted upstream",
+  "doh_url": "DNS over HTTPS server",
+  "doh_save": "Test and use",
+  "doh_testing": "AdGuard Home is testing the server…",
+  "doh_saved": "AdGuard Home now uses this server.",
+  "doh_no_change": "AdGuard Home already uses this server.",
+  "doh_err_invalid": "Enter an https:// address without user name, password or query.",
+  "doh_err_unreachable": "AdGuard Home could not resolve through this server; nothing was changed.",
+  "doh_failed": "Could not change the DNS over HTTPS server.",
+  "doh_unavailable": "AdGuard Home's upstream is unavailable."
 }

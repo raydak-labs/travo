@@ -116,6 +116,8 @@ type Deps struct {
 	WiFiProfiles  WiFiProfileService
 	// AdGuard is nil when the daemon cannot supervise the package (no service port).
 	AdGuard AdGuard
+	// AdGuardDoH is AdGuard Home's DoH upstream; nil answers 503 adguard_unavailable.
+	AdGuardDoH AdGuardDoH
 	// Tailscale is nil when the daemon cannot supervise the package (no service port).
 	Tailscale Tailscale
 	Txns      Txns
@@ -295,6 +297,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWiFi(a)
 	s.registerWiFiProfiles(a)
 	s.registerAdGuard(a)
+	s.registerAdGuardDoH(a)
 	s.registerTailscale(a)
 	s.registerWiFiReconnect(a)
 	s.registerWiFiSchedule(a)

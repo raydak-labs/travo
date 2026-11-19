@@ -9,6 +9,11 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Status from '../ui/Status.svelte';
+import { lazyPage } from './lazy';
+import PageHost from './PageHost.svelte';
+
+// The DoH card is its own chunk, shown once AdGuard Home runs.
+const doh = lazyPage(() => import('./DoHCard.svelte'));
 
 const request = new AbortController();
 const adguard = createLoader(fetchAdGuard, 10000);
@@ -83,4 +88,7 @@ const proxy = adguardUrl(window.location);
       {/if}
     </LoadState>
   </Card>
+  {#if adguard.data?.running}
+    <PageHost load={doh} />
+  {/if}
 </div>

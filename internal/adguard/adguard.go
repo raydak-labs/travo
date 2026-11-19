@@ -129,6 +129,9 @@ func (s *Service) busy() (bool, error) {
 	return slices.ContainsFunc(g, func(x guard.Info) bool { return x.Name == InstallGuard || x.Name == ConfigGuard }), nil
 }
 
+// Idle is ErrBusy while an install or config swap holds its guard.
+func (s *Service) Idle() error { return s.idle() }
+
 func (s *Service) idle() error {
 	busy, err := s.busy()
 	if err == nil && busy {
