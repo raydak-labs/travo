@@ -128,24 +128,24 @@ func (m *Manager) stopped() bool { return m.Stopped != nil && m.Stopped() }
 // watchdog. On success the transaction is Pending until Confirm or the window expires.
 // stage receives a ctx that marks the locks held: helpers must not lock again.
 func (m *Manager) Begin(ctx context.Context, summary string, configs []string, stage func(ctx context.Context) error, probe Probe) (Status, error) {
-	return m.begin(ctx, summary, configs, false, stage, probe)
+	return m.begin(ctx, summary, configs, false, m.Window, stage, probe)
 }
 
 // BeginWireGuard restores the live wg0 device as part of rolling back a network change.
 func (m *Manager) BeginWireGuard(ctx context.Context, summary string, stage func(context.Context) error, probe Probe) (Status, error) {
-	return m.begin(ctx, summary, []string{"network"}, true, stage, probe)
+	return m.begin(ctx, summary, []string{"network"}, true, m.Window, stage, probe)
 }
 
 // BeginWireGuardWith is BeginWireGuard with more configs in the same snapshot and lock set
 // (e.g. firewall for the VPN zone), so one confirm or restore covers them all.
 func (m *Manager) BeginWireGuardWith(ctx context.Context, summary string, extra []string, stage func(context.Context) error, probe Probe) (Status, error) {
-	return m.begin(ctx, summary, append([]string{"network"}, extra...), true, stage, probe)
+	return m.begin(ctx, summary, append([]string{"network"}, extra...), true, m.Window, stage, probe)
 }
 
-func (m *Manager) begin(ctx context.Context, summary string, configs []string, restoreWireGuard bool, stage func(context.Context) error, probe Probe) (Status, error) {
+func (m *Manager) begin(ctx context.Context, summary string, configs []string, restoreWireGuard bool, window time.Duration, stage func(context.Context) error, probe Probe) (Status, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.Window < MinWindow || m.ApplyBudget <= 0 || m.ArmLimit < m.ApplyBudget+armMargin {
+	if m.Window < MinWindow || window < m.Window || m.ApplyBudget <= 0 || m.ArmLimit < m.ApplyBudget+armMargin {
 		return Status{}, ErrBadWindow
 	}
 	cs, err := uciwrite.Normalize(configs)
@@ -178,7 +178,7 @@ func (m *Manager) begin(ctx context.Context, summary string, configs []string, r
 	abort := func(err error) (Status, error) { // nothing committed yet
 		return Status{}, m.release(errors.Join(err, m.revertAll(context.WithoutCancel(lctx), cs), os.RemoveAll(m.path(id))))
 	}
-	meta, err := m.snapshot(id, cs, summary)
+	meta, err := m.snapshot(id, cs, summary, window)
 	if err != nil {
 		return abort(fmt.Errorf("txn: snapshot: %w", err))
 	}
@@ -207,7 +207,7 @@ func (m *Manager) begin(ctx context.Context, summary string, configs []string, r
 		return abort(err)
 	}
 	// Arm the watchdog BEFORE the first commit: from here on, any crash ends in a restore.
-	pid, err := m.Spawner.Start(m.path(id, "watchdog.sh"), m.watchdogArgs(id, m.Window, m.ArmLimit)...)
+	pid, err := m.Spawner.Start(m.path(id, "watchdog.sh"), m.watchdogArgs(id, window, m.ArmLimit)...)
 	if err != nil {
 		return abort(fmt.Errorf("txn: watchdog: %w", err))
 	}
@@ -305,7 +305,7 @@ func (m *Manager) anyPending(ctx context.Context, cs []string) (bool, error) {
 	return false, nil
 }
 
-func (m *Manager) snapshot(id string, cs []string, summary string) (Meta, error) {
+func (m *Manager) snapshot(id string, cs []string, summary string, window time.Duration) (Meta, error) {
 	if err := os.MkdirAll(m.path(id, "snap"), 0o700); err != nil {
 		return Meta{}, err
 	}
@@ -327,7 +327,7 @@ func (m *Manager) snapshot(id string, cs []string, summary string) (Meta, error)
 	if err := atomicfile.Write(m.path(id, "watchdog.sh"), WatchdogScript, 0o700); err != nil {
 		return Meta{}, err
 	}
-	meta := Meta{ID: id, Configs: cs, Started: m.Clock.Now().UTC(), Summary: summary, WindowSeconds: int(m.Window / time.Second)}
+	meta := Meta{ID: id, Configs: cs, Started: m.Clock.Now().UTC(), Summary: summary, WindowSeconds: int(window / time.Second)}
 	return meta, atomicfile.WriteJSON(m.path(id, "meta.json"), meta, 0o600)
 }
 
