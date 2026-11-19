@@ -57,7 +57,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Validate ranges/enums explicitly. Silent acceptance of a bad value is a defect.
 - Errors: `{error, code?}`; stable `code` for client branching, never message text. Ack: `{status:"ok"}`. Empty collections encode `[]`/`{}`, never `null`.
 - Missing optional package → 503 naming the package, not 500.
-- Limits: body 64 MB, read timeout 5 min, write timeout 45 min (package streams), idle 60 s, graceful shutdown ~20 s; HTTP drains BEFORE services and persistence close.
+- Limits: body 64 MB, read timeout 5 min, write timeout 45 min (package streams), idle 60 s on every listener (HTTP, HTTPS, AdGuard proxy); the dashboard stream and the firmware upload set per-request deadlines through `http.ResponseController`, graceful shutdown ~20 s; HTTP drains BEFORE services and persistence close.
 - Long ops stream (NDJSON-like). Live status via one shared push subscription, never per page.
 - GET never mutates.
 

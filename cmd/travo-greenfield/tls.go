@@ -74,6 +74,15 @@ func serveBackground(name string, srv *http.Server, certs *tlscert.Source) (stop
 	}
 }
 
+// Server timeouts of invariants §4. The long requests set their own deadlines through
+// http.ResponseController: the dashboard stream clears its write deadline after every
+// flushed frame, the firmware upload reads its body under Huma's BodyReadTimeout.
+const (
+	serverReadTimeout  = 5 * time.Minute
+	serverWriteTimeout = 45 * time.Minute
+)
+
 func newServer(addr string, h http.Handler) *http.Server {
-	return &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	return &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout: serverReadTimeout, WriteTimeout: serverWriteTimeout, IdleTimeout: 60 * time.Second}
 }

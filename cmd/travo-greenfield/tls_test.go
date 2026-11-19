@@ -57,6 +57,14 @@ func TestTLSListenerServesTheSameHandlerWithTheGeneratedCertificate(t *testing.T
 	}
 }
 
+func TestServerTimeoutsFollowTheContract(t *testing.T) {
+	srv := newServer("127.0.0.1:0", http.NotFoundHandler())
+	if srv.ReadTimeout != 5*time.Minute || srv.WriteTimeout != 45*time.Minute ||
+		srv.ReadHeaderTimeout != 10*time.Second || srv.IdleTimeout != 60*time.Second {
+		t.Fatalf("timeouts %v %v %v %v", srv.ReadTimeout, srv.WriteTimeout, srv.ReadHeaderTimeout, srv.IdleTimeout)
+	}
+}
+
 func TestProxyTLSAddrFollowsTheTLSListener(t *testing.T) {
 	for _, c := range []struct{ proxy, listenTLS, want string }{
 		{"0.0.0.0:3001", ":443", ":3443"},
