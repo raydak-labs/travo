@@ -587,6 +587,17 @@ export type HealthOutputBody = {
     version: string;
 };
 
+export type IPv6Request = {
+    enabled: boolean;
+};
+
+export type IPv6View = {
+    /**
+     * odhcpd advertises IPv6 on the LAN (dhcp.lan ra=server) and the uplink DHCPv6 clients run
+     */
+    enabled: boolean;
+};
+
 export type Interface = {
     /**
      * Kernel device carrying layer 3 (l3_device); absent while down
@@ -3036,6 +3047,80 @@ export type RestartNetworkInterfaceResponses = {
 };
 
 export type RestartNetworkInterfaceResponse = RestartNetworkInterfaceResponses[keyof RestartNetworkInterfaceResponses];
+
+export type GetIpv6SettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/ipv6';
+};
+
+export type GetIpv6SettingsErrors = {
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetIpv6SettingsError = GetIpv6SettingsErrors[keyof GetIpv6SettingsErrors];
+
+export type GetIpv6SettingsResponses = {
+    /**
+     * OK
+     */
+    200: IPv6View;
+};
+
+export type GetIpv6SettingsResponse = GetIpv6SettingsResponses[keyof GetIpv6SettingsResponses];
+
+export type SetIpv6SettingsData = {
+    body: IPv6Request;
+    path?: never;
+    query?: never;
+    url: '/api/v1/network/ipv6';
+};
+
+export type SetIpv6SettingsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetIpv6SettingsError = SetIpv6SettingsErrors[keyof SetIpv6SettingsErrors];
+
+export type SetIpv6SettingsResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetIpv6SettingsResponse = SetIpv6SettingsResponses[keyof SetIpv6SettingsResponses];
 
 export type GetLanAddressData = {
     body?: never;

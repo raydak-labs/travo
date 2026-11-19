@@ -167,6 +167,8 @@ type Deps struct {
 	DHCP DHCPServer
 	// WAN is network.wan (DHCP, static, PPPoE); nil answers 503 wan_unavailable.
 	WAN WANSettings
+	// IPv6 is the IPv6 switch (wan6/wwan6, odhcpd on lan); nil answers 503 ipv6_unavailable.
+	IPv6 IPv6Settings
 	// LAN is the router's lan address (ADR 0028); nil answers 503 lan_unavailable.
 	LAN LANAddress
 	// PortForwards is firewall redirects wan -> lan; nil answers 503 port_forwards_unavailable.
@@ -270,6 +272,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerWakeOnLAN(a)
 	s.registerDHCP(a)
 	s.registerWAN(a)
+	s.registerIPv6(a)
 	s.registerLAN(a)
 	s.registerPortForwards(a)
 	s.registerReboot(a)
@@ -332,6 +335,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "Failover" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/wansettings":
 		return "WAN" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/ipv6settings":
+		return "IPv6" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/portfwd":
 		return "Port" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/lanaddress":

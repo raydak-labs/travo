@@ -11,6 +11,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/failover"
+	"github.com/blackdark-org/travo-greenfield/internal/ipv6settings"
 	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
 	"github.com/blackdark-org/travo-greenfield/internal/usbtether"
 	"github.com/blackdark-org/travo-greenfield/internal/wansettings"
@@ -44,6 +45,15 @@ func newWAN(deps app.Deps) api.WANSettings {
 		return nil
 	}
 	return &wansettings.Service{UCI: deps.Device, Keys: keys, Ubus: deps.Device, Routes: routes, Txns: deps.Txn}
+}
+
+// newIPv6 wires the IPv6 switch; nil (503) without the route reader or transactions.
+func newIPv6(deps app.Deps) api.IPv6Settings {
+	routes, ok := deps.Device.(device.DefaultRouteReader)
+	if !ok || deps.Txn == nil {
+		return nil
+	}
+	return &ipv6settings.Service{UCI: deps.Device, Routes: routes, Txns: deps.Txn}
 }
 
 // startFailover wires multi-WAN failover and its mwan3 reconciler; nil without the ports
