@@ -156,8 +156,11 @@ func (m *Manager) begin(ctx context.Context, summary string, configs []string, r
 		return Status{}, ErrStopped
 	}
 	m.reapFinished()
-	if err := m.Guards.Acquire(GuardName); err != nil {
-		if errors.Is(err, guard.ErrActive) {
+	if err := m.Guards.AcquireExclusive(GuardName, conflicts(ctx)); err != nil {
+		switch {
+		case errors.Is(err, ErrGuarded), errors.Is(err, ErrGuardHeld):
+			return Status{}, err
+		case errors.Is(err, guard.ErrActive):
 			return Status{}, ErrActive
 		}
 		return Status{}, fmt.Errorf("txn guard: %w", err) // never degrade to unguarded
