@@ -83,15 +83,21 @@ func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
 		if err := checkPeerNames(current, desired[1:]); err != nil {
 			return err
 		}
-		split, err := currentSplit(current)
+		split, err := s.splitForProfile(current, profile)
 		if err != nil {
 			return err
 		}
-		if len(split) > 0 { // the split selection survives a profile (re)apply
+		if split.isSplit() {
 			desired = withRouteAll(desired, "0")
 		}
-		networkChanged = !matches(current, desired, wasEnabled)
-		if !networkChanged && !zoneMissing {
+		networkChanged = !matches(current, desired, wasEnabled) || split.changed()
+		resolversChanged := false
+		if !networkChanged {
+			if resolversChanged, err = s.resolversOnly(ctx, current, desired); err != nil {
+				return errUnavailable
+			}
+		}
+		if !networkChanged && !zoneMissing && !resolversChanged {
 			return txn.ErrNoChanges
 		}
 		if zoneMissing {
@@ -100,27 +106,23 @@ func (s *Service) Set(ctx context.Context, enabled bool) (txn.Status, error) {
 			}
 		}
 		if !networkChanged {
-			return nil // tunnel already as wanted: only the zone was missing
+			return nil // only the zone or the recorded resolvers changed
 		}
 
-		proof.started = s.now().Unix()
 		proof.wasEnabled = wasEnabled
-		previous, err := s.handshakes.LatestHandshakes(ctx, iface)
-		if err != nil && !errors.Is(err, device.ErrNotFound) {
-			return errUnavailable
+		if err := s.recordHandshakes(ctx, &proof, profile); err != nil {
+			return err
 		}
-		proof.previous = make(map[string]time.Time, len(previous))
-		for _, peer := range previous {
-			proof.previous[peer.PublicKey] = peer.At
+		if err := s.stageEnable(ctx, current, desired); err != nil {
+			return err
 		}
-		proof.configured = make(map[string]struct{}, len(profile.Peers))
-		for _, peer := range profile.Peers {
-			proof.configured[peer.PublicKey] = struct{}{}
+		if !split.changed() {
+			return nil
 		}
-		return s.stageEnable(ctx, current, desired)
+		return s.stageSplit(ctx, withoutPeers(current), split.next)
 	}), func(ctx context.Context) error {
 		if !networkChanged {
-			return nil // a firewall-only change leaves wg0 untouched
+			return nil // a zone or resolvers-only change leaves wg0 running
 		}
 		return s.proveEnabled(ctx, proof)
 	})

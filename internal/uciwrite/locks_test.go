@@ -76,3 +76,36 @@ func TestSameConfigIsExclusive(t *testing.T) {
 	unlock()
 	<-got
 }
+
+// OnContended fires only when a caller would block, naming the held config.
+func TestOnContendedFiresBeforeBlocking(t *testing.T) {
+	l := &Locks{}
+	contended := make(chan string, 2)
+	l.OnContended(func(c string) {
+		select {
+		case contended <- c:
+		default: // a later contention needs no report
+		}
+	})
+	_, unlock, err := l.Lock(context.Background(), []string{"network"})
+	if err != nil || len(contended) != 0 {
+		t.Fatalf("free lock reported contention: %v", err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if _, unlock2, err := l.Lock(context.Background(), []string{"network"}); err == nil {
+			unlock2()
+		}
+	}()
+	select {
+	case c := <-contended:
+		if c != "network" {
+			t.Fatalf("contended %q", c)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("contended lock never reported")
+	}
+	unlock()
+	<-done
+}

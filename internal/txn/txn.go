@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
@@ -99,7 +100,9 @@ type Manager struct {
 	// Settle bounds how long Rollback/Recover wait for an already-claimed restore to report.
 	Settle time.Duration
 
-	mu sync.Mutex
+	mu                      sync.Mutex
+	begun                   atomic.Uint64 // transactions that acquired the guard; see ShowSettled
+	testHookAfterFirstCheck func()        // runs between ShowSettled's first guard check and its read
 }
 
 // Meta is persisted beside the snapshot so status survives a daemon restart.
@@ -165,6 +168,9 @@ func (m *Manager) begin(ctx context.Context, summary string, configs []string, r
 		}
 		return Status{}, fmt.Errorf("txn guard: %w", err) // never degrade to unguarded
 	}
+	// After the guard, before its release: a reader whose first guard check missed this
+	// transaction sees either the guard or the new count at its second check.
+	m.begun.Add(1)
 	lctx, unlock, err := m.Locks.Lock(ctx, cs)
 	if err != nil {
 		return Status{}, m.release(err)

@@ -48,13 +48,14 @@ func TestValidateSplit(t *testing.T) {
 func TestSplitRoutesAddsUncoveredResolvers(t *testing.T) {
 	dns := []netip.Addr{netip.MustParseAddr("198.18.0.1"), netip.MustParseAddr("10.9.0.53"), netip.MustParseAddr("fd00::53")}
 	got := splitRoutes(prefixes4(t, "10.9.0.0/16"), dns)
-	if !slices.Equal(got, prefixes4(t, "10.9.0.0/16", "198.18.0.1/32")) {
+	want := []splitRoute{{Prefix: netip.MustParsePrefix("10.9.0.0/16")}, {Prefix: netip.MustParsePrefix("198.18.0.1/32"), Resolver: true}}
+	if !slices.Equal(got, want) {
 		t.Fatalf("%v", got)
 	}
 	if splitRoutes(nil, dns) != nil {
 		t.Fatal("full tunnel needs no routes")
 	}
-	if back := userSplit(got, dns); !slices.Equal(back, prefixes4(t, "10.9.0.0/16")) {
+	if back := userRoutes(got); !slices.Equal(back, prefixes4(t, "10.9.0.0/16")) {
 		t.Fatalf("%v", back)
 	}
 }
@@ -175,9 +176,9 @@ func TestSetSplitOnDisabledTunnelStagesOnly(t *testing.T) {
 		t.Fatalf("%+v %v", got, err)
 	}
 	secs, _ := d.Show(ctx, "network")
-	routes, _ := currentSplit(secs)
-	if !slices.Equal(routes, prefixes4(t, "10.9.0.0/16", "198.18.0.1/32")) {
-		t.Fatalf("resolver route missing: %v", routes)
+	routes, _ := currentSplit(secs, nil)
+	if !slices.Equal(routes, []splitRoute{{Prefix: netip.MustParsePrefix("10.9.0.0/16")}, {Prefix: netip.MustParsePrefix("198.18.0.1/32"), Resolver: true}}) {
+		t.Fatalf("resolver route missing or unmarked: %v", routes)
 	}
 	if err := txns.probe(ctx); err != nil {
 		t.Fatalf("disabled tunnel has nothing live to prove: %v", err)
@@ -189,7 +190,7 @@ func TestSetSplitOnDisabledTunnelStagesOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	secs, _ = d.Show(ctx, "network")
-	if routes, _ := currentSplit(secs); len(routes) != 0 || peer(t, d).Options["route_allowed_ips"] != "1" {
+	if routes, _ := currentSplit(secs, nil); len(routes) != 0 || peer(t, d).Options["route_allowed_ips"] != "1" {
 		t.Fatalf("full tunnel not restored: %v %v", routes, peer(t, d).Options)
 	}
 }

@@ -54,12 +54,15 @@ type tunnel struct {
 func (t *tunnel) Status(context.Context) (vpnstatus.TunnelStatus, error) { return t.status, t.err }
 
 type profiles struct {
-	dns []netip.Addr
-	err error
+	dns                   []netip.Addr
+	transactionDuringRead bool
+	transactionSinceRead  bool
+	err                   error
 }
 
-func (p *profiles) SelectedConfig() (vpnprofiles.Config, error) {
-	return vpnprofiles.Config{DNS: p.dns}, p.err
+func (p *profiles) resolvers(context.Context, bool) (Read, error) {
+	return Read{DNS: p.dns, NoTransactionDuringRead: !p.transactionDuringRead,
+		NoTransactionSince: func() (bool, error) { return !p.transactionDuringRead && !p.transactionSinceRead, nil }}, p.err
 }
 
 type env struct {
@@ -69,7 +72,6 @@ type env struct {
 	apply   *commitApplier
 	tunnel  *tunnel
 	profile *profiles
-	txnOpen bool
 	lookups []string
 	lookErr error
 }
@@ -94,12 +96,11 @@ func setup(t *testing.T) *env {
 		profile: &profiles{dns: []netip.Addr{netip.MustParseAddr("10.64.0.1")}}}
 	e.layers = &dnslayer.Service{Device: d, Guards: guard.Dir{Path: filepath.Join(dir, "guards"), Now: time.Now},
 		RecordPath: filepath.Join(dir, "dns-layers.json"), Apply: e.apply}
-	e.svc = &Service{Tunnel: e.tunnel, Profiles: e.profile, Layers: e.layers,
+	e.svc = &Service{Tunnel: e.tunnel, Resolvers: e.profile.resolvers, Layers: e.layers,
 		ReadDNS: func(ctx context.Context) (dnslayer.State, error) {
 			_, st, err := dnslayer.ReadState(ctx, d)
 			return st, err
 		},
-		TxnOpen: func() (bool, error) { return e.txnOpen, nil },
 		Lookup: func(_ context.Context, host string) error {
 			e.lookups = append(e.lookups, host)
 			return e.lookErr
@@ -240,7 +241,7 @@ func TestVerify(t *testing.T) {
 	if v, _ = e.svc.Verify(ctx); v.Result != LookupFailed {
 		t.Fatalf("%+v", v)
 	}
-	e.profile.dns = []netip.Addr{netip.MustParseAddr("10.8.0.1")} // selected another profile
+	e.profile.dns = []netip.Addr{netip.MustParseAddr("10.8.0.1")} // wg0 re-applied, reconcile pending
 	if v, _ = e.svc.Verify(ctx); v.Result != Mismatch {
 		t.Fatalf("%+v", v)
 	}
@@ -282,4 +283,71 @@ func TestReconcilePopsWhenTunnelConfigIsDeleted(t *testing.T) {
 	if got := e.live(t); !reflect.DeepEqual(got, base) {
 		t.Fatalf("base not restored:\n got %+v\nwant %+v", got, base)
 	}
+}
+
+// A transaction that overlapped the settled read blocks the push of what the read returned.
+func TestReconcileDoesNotPushAReadATransactionOverlapped(t *testing.T) {
+	e := setup(t)
+	e.profile.transactionDuringRead = true
+	e.reconcile(t, Keep)
+	if _, err := os.Stat(e.layers.RecordPath); !os.IsNotExist(err) {
+		t.Fatal("pushed resolvers of a read a transaction overlapped")
+	}
+	e.profile.transactionDuringRead = false // next tick
+	e.reconcile(t, Push)
+}
+
+// Status and Verify only show the resolvers: they must not wait for a transaction.
+func TestStatusUsesTheUnsettledRead(t *testing.T) {
+	e := setup(t)
+	e.svc.Resolvers = func(_ context.Context, settled bool) (Read, error) {
+		if settled {
+			t.Error("Status waited for a settled read")
+		}
+		return Read{DNS: e.profile.dns}, nil
+	}
+	if _, err := e.svc.Status(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.Verify(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A foreign travo_dns that cannot be read must not block the fail-safe pop of a tunnel
+// that is off.
+func TestUnreadableResolversStillPopAnOffTunnel(t *testing.T) {
+	e := setup(t)
+	e.reconcile(t, Push)
+	e.profile.err = errors.New("network.wg0.travo_dns is malformed")
+	e.reconcile(t, Keep) // connected: change nothing
+	e.tunnel.status.State = vpnstatus.Disabled
+	e.reconcile(t, Pop)
+}
+
+// The tunnel went off while the settled read waited: Decide must see that, not the state
+// from before the wait.
+func TestReconcileReadsTunnelStateAfterTheWait(t *testing.T) {
+	e := setup(t)
+	e.reconcile(t, Push)
+	e.svc.Resolvers = func(_ context.Context, settled bool) (Read, error) {
+		if settled {
+			e.tunnel.status.State = vpnstatus.Disabled // a Disable applied during the wait
+		}
+		return Read{DNS: e.profile.dns, NoTransactionDuringRead: true}, nil
+	}
+	e.reconcile(t, Pop)
+}
+
+// An Enable that begins after the read, before the push, may be applying other resolvers:
+// the push is skipped this tick.
+func TestReconcileRechecksTransactionsBeforePush(t *testing.T) {
+	e := setup(t)
+	e.profile.transactionSinceRead = true
+	e.reconcile(t, Keep)
+	if _, err := os.Stat(e.layers.RecordPath); !os.IsNotExist(err) {
+		t.Fatal("pushed resolvers while a transaction had begun")
+	}
+	e.profile.transactionSinceRead = false
+	e.reconcile(t, Push)
 }

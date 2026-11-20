@@ -37,7 +37,7 @@ func servers(resolvers []netip.Addr) []string {
 	return out
 }
 
-// Decide is pure: tunnel status, the selected profile's resolvers and the current `vpn`
+// Decide is pure: tunnel status, the applied tunnel's resolvers and the current `vpn`
 // layer (nil when absent) in, action out. txnOpen means a tunnel transaction awaits
 // confirmation: only the fail-safe Pop (back to the uplink resolvers) may run then.
 func Decide(st vpnstatus.TunnelStatus, resolvers []netip.Addr, current *dnslayer.Layer, txnOpen bool) Action {

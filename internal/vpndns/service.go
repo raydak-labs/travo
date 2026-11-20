@@ -19,9 +19,18 @@ type Tunnel interface {
 	Status(ctx context.Context) (vpnstatus.TunnelStatus, error)
 }
 
-// Profiles reads the selected WireGuard profile; its DNS lines are the tunnel resolvers.
-type Profiles interface {
-	SelectedConfig() (vpnprofiles.Config, error)
+// Resolvers reads the resolvers wg0 was applied with (vpntunnel.TunnelResolvers), not the
+// selected profile's (#289); vpnprofiles.ErrNotFound when there are none. settled waits
+// for any staged transaction (txn.Manager.ShowSettled); Status and Verify must not wait.
+type Resolvers func(ctx context.Context, settled bool) (Read, error)
+
+// Read is one resolver read and whether any transaction overlapped it.
+type Read struct {
+	DNS []netip.Addr
+	// NoTransactionDuringRead: none began or held its guard while the read ran.
+	NoTransactionDuringRead bool
+	// NoTransactionSince: the same still holds now; nil means NoTransactionDuringRead.
+	NoTransactionSince func() (bool, error)
 }
 
 // Layers is the shared DNS layer stack (dnslayer.Service).
@@ -37,13 +46,11 @@ type Layers interface {
 type Lookup func(ctx context.Context, host string) error
 
 type Service struct {
-	Tunnel   Tunnel
-	Profiles Profiles
-	Layers   Layers
+	Tunnel    Tunnel
+	Resolvers Resolvers
+	Layers    Layers
 	// ReadDNS reads the live dnsmasq options the layer stack owns.
 	ReadDNS func(ctx context.Context) (dnslayer.State, error)
-	// TxnOpen reports a pending transaction (guard present).
-	TxnOpen func() (bool, error)
 	Lookup  Lookup
 	// Nonce returns a fresh DNS label so the verify lookup cannot be answered from cache.
 	Nonce func() string
@@ -68,38 +75,45 @@ func (s *Service) Reconcile(ctx context.Context) (Action, error) {
 	if layers.Pending || layers.Corrupt != "" {
 		return Keep, nil // a failed stack change waits for its explicit retry
 	}
-	st, err := s.Tunnel.Status(ctx)
+	read, readErr := s.resolvers(ctx, true)
+	st, err := s.Tunnel.Status(ctx) // after the read, which may have waited out a transaction
 	if err != nil {
 		return Keep, nil
 	}
-	open, err := s.TxnOpen()
-	if err != nil {
-		return Keep, err
-	}
-	resolvers, err := s.resolvers()
-	if err != nil {
-		return Keep, nil // unreadable profile store: change nothing
+	if readErr != nil && !offState(st) {
+		return Keep, nil
 	}
 	rec, err := s.Layers.Load()
 	if err != nil {
 		return Keep, err
 	}
-	action := Decide(st, resolvers, vpnLayer(rec), open)
+	action := Decide(st, read.DNS, vpnLayer(rec), !read.NoTransactionDuringRead)
 	switch action {
 	case Push:
-		err = s.Layers.Push(ctx, Layer(resolvers))
+		if unchanged, err := read.noTransactionSince(); err != nil || !unchanged {
+			return Keep, err
+		}
+		err = s.Layers.Push(ctx, Layer(read.DNS))
 	case Pop:
 		err = s.Layers.Pop(ctx, dnslayer.VPN)
 	}
 	return action, err
 }
 
-func (s *Service) resolvers() ([]netip.Addr, error) {
-	cfg, err := s.Profiles.SelectedConfig()
+func (s *Service) resolvers(ctx context.Context, settled bool) (Read, error) {
+	read, err := s.Resolvers(ctx, settled)
 	if errors.Is(err, vpnprofiles.ErrNotFound) {
-		return nil, nil
+		read.DNS = nil
+		return read, nil
 	}
-	return cfg.DNS, err
+	return read, err
+}
+
+func (r Read) noTransactionSince() (bool, error) {
+	if r.NoTransactionSince == nil {
+		return r.NoTransactionDuringRead, nil
+	}
+	return r.NoTransactionSince()
 }
 
 func vpnLayer(rec *dnslayer.Record) *dnslayer.Layer {
@@ -126,7 +140,7 @@ const (
 
 type DNSStatus struct {
 	Layer LayerState `json:"layer" enum:"active,inactive,failed"`
-	// Resolvers are the selected profile's DNS servers ([] when it has none).
+	// Resolvers are the DNS servers the configured tunnel was applied with ([] without any).
 	Resolvers []string `json:"resolvers"`
 	// Effective is dnsmasq's live server list; null when it could not be read.
 	Effective []string `json:"effective" nullable:"true"`
@@ -146,8 +160,8 @@ func (s *Service) status(ctx context.Context) (DNSStatus, *dnslayer.State, error
 		return DNSStatus{}, nil, ErrUnavailable
 	}
 	out := DNSStatus{Layer: Inactive, Resolvers: []string{}}
-	if resolvers, err := s.resolvers(); err == nil {
-		out.Resolvers = servers(resolvers)
+	if read, err := s.resolvers(ctx, false); err == nil {
+		out.Resolvers = servers(read.DNS)
 	}
 	var rec *dnslayer.Record
 	if layers.Corrupt == "" {
@@ -251,4 +265,9 @@ func LocalLookup(addr string) Lookup {
 		}
 		return err
 	}
+}
+
+// offState: Decide's fail-safe pop for a tunnel that is off needs no resolvers.
+func offState(st vpnstatus.TunnelStatus) bool {
+	return !st.Stale && (st.State == vpnstatus.Disabled || st.State == vpnstatus.Configured)
 }

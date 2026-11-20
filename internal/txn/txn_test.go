@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -490,5 +491,87 @@ func TestReapDoesNotReleaseGuardHeldByFailedRestore(t *testing.T) {
 	}
 	if !guarded(t, m) {
 		t.Fatal("reaping a restored txn released the guard of a failed one")
+	}
+}
+
+// A reader must not see a delta staged by a transaction that then aborts:
+// ShowSettled waits for the stage and reads the reverted config.
+func TestShowSettledWaitsForStagingAndSeesRevert(t *testing.T) {
+	t.Parallel()
+	m, d := setup(t, 60*time.Second)
+	staged, release := make(chan struct{}), make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.Begin(ctx, "t", []string{"network"}, func(ctx context.Context) error {
+			if err := stageSet(d, "network")(ctx); err != nil {
+				return err
+			}
+			close(staged)
+			<-release
+			return errors.New("abort after staging")
+		}, nil)
+		done <- err
+	}()
+	<-staged
+	waiting := make(chan struct{})
+	var once sync.Once
+	m.Locks.OnContended(func(string) { once.Do(func() { close(waiting) }) })
+	read := make(chan Settled, 1)
+	go func() {
+		got, err := m.ShowSettled(ctx, "network")
+		if err != nil {
+			t.Error(err)
+		}
+		read <- got
+	}()
+	select {
+	case <-waiting: // the reader is blocked on the lock the stage holds
+	case <-read:
+		t.Fatal("read returned while the transaction was staging")
+	case <-time.After(10 * time.Second):
+		t.Fatal("reader never reached the network lock")
+	}
+	if secs, _ := d.Show(ctx, "network"); secs[0].Options["k"] != "v" {
+		t.Fatal("test setup: unlocked read should see the staged delta")
+	}
+	close(release)
+	if err := <-done; err == nil {
+		t.Fatal("Begin should fail")
+	}
+	got := <-read
+	if len(got.Sections) != 1 || got.Sections[0].Options["k"] != "" {
+		t.Fatalf("settled read saw the aborted delta: %+v", got.Sections)
+	}
+	if got.NoTransactionDuringRead {
+		t.Fatal("a read that overlapped a transaction must report it")
+	}
+}
+
+// A transaction that begins and rolls back entirely between the reader's first guard check
+// and its read leaves no guard behind, yet the read reports it.
+func TestShowSettledSeesAWholeTransactionDuringTheRead(t *testing.T) {
+	t.Parallel()
+	m, d := setup(t, 60*time.Second)
+	if got, err := m.ShowSettled(ctx, "network"); err != nil || !got.NoTransactionDuringRead {
+		t.Fatalf("idle read: %+v %v", got, err)
+	}
+	m.testHookAfterFirstCheck = func() {
+		_, err := m.Begin(ctx, "t", []string{"network"}, func(ctx context.Context) error {
+			_ = stageSet(d, "network")(ctx)
+			return errors.New("abort")
+		}, nil)
+		if err == nil {
+			t.Error("Begin should fail")
+		}
+	}
+	got, err := m.ShowSettled(ctx, "network")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if guarded(t, m) {
+		t.Fatal("guard left after the abort")
+	}
+	if got.NoTransactionDuringRead {
+		t.Fatal("a read with a whole transaction inside it must report it")
 	}
 }

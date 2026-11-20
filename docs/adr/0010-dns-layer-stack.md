@@ -1,6 +1,6 @@
 # 0010 One DNS layer stack
 
-Status: accepted (property-tested, container-tested; device behaviour via spike S5)
+Status: accepted (property-tested, container-tested; device behaviour via spike S5); `vpn` resolver source changed by [0033](0033-vpn-resolvers-recorded-on-wg0.md)
 
 Features that touch dnsmasq `server`/`noresolv`/rebind push and pop layers on one ordered record (`captive`, `vpn`, `adguard`, `tailscale`). Base is captured before the first layer. Reads never mutate. Built from day one because per-feature snapshots of the same options are how the old bugs happened. See [invariants §8](../invariants.md).
 
