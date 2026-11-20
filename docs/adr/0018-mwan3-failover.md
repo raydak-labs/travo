@@ -125,3 +125,34 @@ follow-up issue (#279).
 Limits: only a Tailscale that is stopped AND boot-disabled lets failover enable. Starting
 or boot-enabling tailscaled by hand (LuCI, shell) while failover is on bypasses Travo's check
 and breaks mwan3 again; Travo's own install and login refuse it.
+
+## Stale mangle base chains, probe reasons, one-subnet uplinks (0.2.0, #277)
+
+Verified on the AXT1800 (SPIKES.md "Failover apply probe and live failover"): after Tailscale
+stopped, `ip`/`ip6 mangle` kept two empty base chains, OUTPUT as `type filter`. iptables-nft
+builds mangle OUTPUT as `type route`, so mwan3's `set_general_iptables` batch failed ("CHAIN_ADD
+failed (File exists): chain OUTPUT"), `mwan3_hook` never existed and every apply rolled back
+although mwan3track reported the uplinks online.
+
+Decisions:
+- Before mwan3 starts, Enable reads `nft -j list ruleset ip|ip6` and deletes every base chain of
+  table `mangle` that does not match iptables-nft's built-in (PREROUTING/INPUT/FORWARD/
+  POSTROUTING `filter`, OUTPUT `route`, priority -150) when it holds no rule and its policy is
+  accept: such a chain filters nothing, so deleting it changes no traffic. One that holds a rule
+  or drops refuses with 409 `failover_mangle_incompatible` and nothing is deleted; so does an
+  `iptables -t mangle -S` that fails or still reports the table incompatible. This is the one
+  exception to "foreign chains are never touched" (invariants §9). It runs outside the
+  transaction: a rollback does not bring the chains back, and iptables-nft recreates compatible
+  ones as needed.
+- The probe names its failed check (`config`, `service`, `tracking`, `hook`, `first_rule`,
+  `policy_mark`, `outbound`): logged at WARN before the rollback and returned as `reason` plus
+  `detail` in the rolled-back transaction answer of `POST /api/v1/failover`; the Failover card
+  shows it.
+- Uplinks whose IPv4 prefixes overlap (cable and WiFi to the same home router) are refused with
+  409 `failover_same_subnet`. Live, the backup's tracking failed together with the primary and the
+  policy had no member for the whole outage; the probe cannot see this because both are online
+  at apply time.
+
+Why: deleting a behaviour-free chain is the smallest change that lets mwan3 run, and the user
+cannot fix it in the UI. A chain with rules or a drop policy might be someone's firewall, so it
+stays and the user decides.

@@ -118,3 +118,11 @@ IPv6 defaults of the image, the `ddns-scripts` package files (installed and remo
 
 ## catalog/ (2026-11-19, #268)
 Package names, sizes, the built-in SQM and init script states for the services catalog; one short install/remove probe under the lock, router restored. See `catalog/PROVENANCE.md`.
+
+## mwan3/ live failover captures (2026-11-20, #277)
+Captured from the AXT1800 (25.12.6, mwan3 2.12.0-r3, iptables-nft 1.8.10) during the failover debug session; see SPIKES.md "Failover apply probe and live failover". No public addresses occur; every byte is verbatim unless noted.
+- nft-ruleset-ip-stale-base.json, nft-ruleset-ip6-stale-base.json: `nft -j list ruleset ip|ip6` with mwan3 stopped after the rolled-back apply: Tailscale's empty `filter`/`nat` tables and `mangle` base chains (OUTPUT as `type filter`).
+- mangle-stale-base.txt: `iptables -t mangle -w -S 2>&1` at the same moment (the incompatible-base-chains note, exit 0).
+- interfaces-wan-usbtether-online.txt: the `interface` lines of `mwan3 interfaces` 6 s into the failed probe (`grep interface`; the "Interface status:" header and blank line dropped).
+- mangle-probe-no-hook.txt: the same sample's `iptables -t mangle -w -S` lines matching `mwan3_(rules|policy_travo|hook)|^-A (PRE|OUT)` (grep-filtered; no hook line existed).
+- interface-wan-status-failover.json, interface-wwan-status-failover.json, interface-usbtether-status-failover.json: `ubus call network.interface.<name> status` with all three uplinks up (wan and wwan in 10.0.1.0/24).
