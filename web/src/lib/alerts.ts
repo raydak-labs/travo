@@ -48,5 +48,7 @@ export function alertMessage(alert: Alert): string {
       return m.alert_data_budget_exceeded();
     case 'firmware_upgrade_completed':
       return m.alert_firmware_upgrade_completed();
+    case 'memory_low':
+      return m.alert_memory_low();
   }
 }

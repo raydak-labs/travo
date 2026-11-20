@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blackdark-org/travo-greenfield/internal/datausage"
+	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/guard"
 	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
 )
@@ -85,6 +86,37 @@ func TestDeriveMapsEverySource(t *testing.T) {
 	}
 }
 
+// The captured router (44 MiB available) is healthy; the bounds are strict.
+func TestDeriveMemoryLow(t *testing.T) {
+	raw, err := os.ReadFile("../../testdata/device/axt1800-25.12.6/system/system-info-meminfo.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := facts.ParseSystemInfo(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meminfo, err := os.ReadFile("../../testdata/device/axt1800-25.12.6/system/proc-meminfo.txt")
+	if err != nil || !strings.Contains(string(meminfo), "MemAvailable:      45480 kB") || info.MemAvailable != 45480*1024 {
+		t.Fatalf("system info available %d is not the captured MemAvailable: %v", info.MemAvailable, err)
+	}
+	for avail, want := range map[uint64]string{
+		info.MemAvailable:     "",
+		MemoryWarnBelow:       "",
+		MemoryWarnBelow - 1:   "warning memory_low",
+		MemoryDangerBelow:     "warning memory_low",
+		MemoryDangerBelow - 1: "danger memory_low",
+	} {
+		got := ""
+		for _, a := range Derive(Inputs{Now: time.Now(), MemAvailable: &avail}) {
+			got = string(a.Severity) + " " + a.ID
+		}
+		if got != want {
+			t.Errorf("%d: %q, want %q", avail, got, want)
+		}
+	}
+}
+
 func TestDeriveDataBudget(t *testing.T) {
 	for state, want := range map[datausage.State]string{
 		datausage.StateExceeded: "danger data_budget_exceeded",
@@ -129,13 +161,14 @@ func TestDeriveHealthyIsEmpty(t *testing.T) {
 func TestListSkipsFailedSources(t *testing.T) {
 	boom := errors.New("boom")
 	s := &Service{Sources: Sources{
-		Now:         time.Now,
-		Guards:      func() ([]guard.Info, error) { return nil, boom },
-		OverlayFree: func() (uint64, error) { return 0, boom },
-		Mounts:      func() (string, error) { return "", boom },
-		FailOpen:    func() (*time.Time, error) { return nil, boom },
-		Reconnect:   func(context.Context) (wifireconnect.Status, error) { return wifireconnect.Status{}, boom },
-		DataBudget:  func(context.Context) (datausage.State, error) { return datausage.StateExceeded, boom },
+		Now:          time.Now,
+		Guards:       func() ([]guard.Info, error) { return nil, boom },
+		OverlayFree:  func() (uint64, error) { return 0, boom },
+		Mounts:       func() (string, error) { return "", boom },
+		FailOpen:     func() (*time.Time, error) { return nil, boom },
+		Reconnect:    func(context.Context) (wifireconnect.Status, error) { return wifireconnect.Status{}, boom },
+		DataBudget:   func(context.Context) (datausage.State, error) { return datausage.StateExceeded, boom },
+		MemAvailable: func(context.Context) (uint64, error) { return 0, boom },
 	}}
 	l, err := s.List(context.Background())
 	if err != nil || len(l.Alerts) != 0 {

@@ -10,6 +10,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/api"
 	"github.com/blackdark-org/travo-greenfield/internal/app"
 	"github.com/blackdark-org/travo-greenfield/internal/datausage"
+	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
 	"github.com/blackdark-org/travo-greenfield/internal/firmware"
 	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
 )
@@ -22,6 +23,17 @@ func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectR
 		src.Mounts = func() (string, error) {
 			b, err := os.ReadFile("/proc/mounts")
 			return string(b), err
+		}
+	}
+	if deps.Device != nil {
+		// `system info` memory.available is /proc/meminfo MemAvailable (system/proc-meminfo.txt).
+		src.MemAvailable = func(ctx context.Context) (uint64, error) {
+			raw, err := deps.Device.Call(ctx, "system", "info", nil)
+			if err != nil {
+				return 0, err
+			}
+			info, err := facts.ParseSystemInfo(raw)
+			return info.MemAvailable, err
 		}
 	}
 	if agh != nil && agh.DNS != nil {

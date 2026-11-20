@@ -82,6 +82,7 @@ Verbatim; nothing needed redaction.
 
 ## system/ (2026-11-18, OpenWrt 25.12.6, #196)
 - system/proc-mounts.txt: `cat /proc/mounts` (GET-only) on the running router: ubifs `/overlay` (`/dev/ubi0_2`, rw) under the overlayfs root. Verbatim; nothing needed redaction. Alert tests derive the degraded shapes (tmpfs overlay, read-only overlay) by replacing only that line's file system type or `rw` flag.
+- system/proc-meminfo.txt and system/system-info-meminfo.json (2026-11-20 09:31 UTC, 14 h after boot, AdGuard Home on loopback): one ssh session of `cat /proc/meminfo > a; ubus call system info > b` (GET-only, both read the same instant, files in /tmp removed afterwards). `memory.available` of `system info` (46571520 bytes) is `MemAvailable` (45480 kB) times 1024: the low-memory alert reads it through the Device port. Verbatim; nothing needed redaction.
 
 ## clients/ (2026-11-18, #218, #219)
 Leases, neighbours, `network.lan` and hostapd method list, plus staged-only (reverted) block rule and host section captures. See `clients/PROVENANCE.md`.

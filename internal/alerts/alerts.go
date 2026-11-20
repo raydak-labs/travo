@@ -2,7 +2,7 @@
 // Sources: stale guards (invariants §1: a stuck guard is silent feature death), low overlay
 // space and degraded persistence (§5), AdGuard fail-open (§8), the exhausted uplink
 // reconnect cap (ADR 0014), the data budget (internal/datausage), a firmware upgrade this
-// daemon run saw complete (ADR 0030). Codes are stable; the UI owns the text.
+// daemon run saw complete (ADR 0030), low available memory (device-facts §11). Codes are stable; the UI owns the text.
 package alerts
 
 import (
@@ -37,6 +37,7 @@ const (
 	CodeDataBudgetWarning    = "data_budget_warning"
 	CodeDataBudgetExceeded   = "data_budget_exceeded"
 	CodeFirmwareCompleted    = "firmware_upgrade_completed"
+	CodeMemoryLow            = "memory_low"
 )
 
 // StaleGuardAfter separates a guard of a running operation (the longest, a package install,
@@ -46,11 +47,19 @@ const StaleGuardAfter = 15 * time.Minute
 // OverlayMinFree is the flash headroom invariants §5 and §15 keep.
 const OverlayMinFree = 20 << 20
 
+// MemoryWarnBelow and MemoryDangerBelow bound MemAvailable. The AXT1800 drifts from
+// ~75 MiB after boot to 20-30 MiB over hours with userspace flat (device-facts §11);
+// below 8 MiB the OOM killer is close.
+const (
+	MemoryWarnBelow   = 15 << 20
+	MemoryDangerBelow = 8 << 20
+)
+
 // Alert is one active condition. ID is stable while the condition lasts.
 type Alert struct {
 	ID       string     `json:"id" doc:"Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress"`
 	Severity Severity   `json:"severity" enum:"warning,danger,info"`
-	Code     string     `json:"code" enum:"stale_guard,overlay_low,persistence_degraded,adguard_fail_open,uplink_reconnect_exhausted,data_budget_warning,data_budget_exceeded,firmware_upgrade_completed"`
+	Code     string     `json:"code" enum:"stale_guard,overlay_low,persistence_degraded,adguard_fail_open,uplink_reconnect_exhausted,data_budget_warning,data_budget_exceeded,firmware_upgrade_completed,memory_low"`
 	Subject  string     `json:"subject,omitempty" doc:"What the alert is about, e.g. the guard name"`
 	Since    *time.Time `json:"since" nullable:"true" doc:"When the condition started; null when unknown"`
 }
@@ -73,6 +82,8 @@ type Inputs struct {
 	DataBudget  datausage.State
 	// FirmwareCompleted is when this daemon run released the guard of a finished upgrade.
 	FirmwareCompleted *time.Time
+	// MemAvailable is /proc/meminfo MemAvailable in bytes.
+	MemAvailable *uint64
 }
 
 // Derive is the pure mapping from inputs to alerts, by severity rank, then by id.
@@ -86,6 +97,9 @@ func Derive(in Inputs) []Alert {
 	}
 	if in.OverlayFree != nil && *in.OverlayFree < OverlayMinFree {
 		out = append(out, Alert{ID: CodeOverlayLow, Severity: Warning, Code: CodeOverlayLow})
+	}
+	if a, ok := memoryLow(in.MemAvailable); ok {
+		out = append(out, a)
 	}
 	if in.Mounts != nil && Degraded(*in.Mounts) {
 		out = append(out, Alert{ID: CodePersistenceDegraded, Severity: Danger, Code: CodePersistenceDegraded})
@@ -112,6 +126,18 @@ func Derive(in Inputs) []Alert {
 		return out[i].ID < out[j].ID
 	})
 	return out
+}
+
+// memoryLow is the memory_low alert when MemAvailable is under a bound; same id at both
+// severities, so a deepening shortage stays one alert.
+func memoryLow(avail *uint64) (Alert, bool) {
+	switch {
+	case avail == nil || *avail >= MemoryWarnBelow:
+		return Alert{}, false
+	case *avail < MemoryDangerBelow:
+		return Alert{ID: CodeMemoryLow, Severity: Danger, Code: CodeMemoryLow}, true
+	}
+	return Alert{ID: CodeMemoryLow, Severity: Warning, Code: CodeMemoryLow}, true
 }
 
 // rank orders danger, then info (both bannered), then warning.
@@ -165,6 +191,7 @@ type Sources struct {
 	DataBudget  func(context.Context) (datausage.State, error)
 	// FirmwareCompleted never fails: the value lives in the daemon's memory.
 	FirmwareCompleted func() *time.Time
+	MemAvailable      func(context.Context) (uint64, error)
 	Now               func() time.Time
 }
 
@@ -209,6 +236,11 @@ func (s *Service) List(ctx context.Context) (AlertList, error) {
 	}
 	if src.FirmwareCompleted != nil {
 		in.FirmwareCompleted = src.FirmwareCompleted()
+	}
+	if src.MemAvailable != nil {
+		if avail, err := src.MemAvailable(ctx); err == nil {
+			in.MemAvailable = &avail
+		}
 	}
 	return AlertList{Alerts: Derive(in)}, nil
 }

@@ -24,6 +24,8 @@ describe('alerts', () => {
     expect(alertMessage(alert({ code: 'firmware_upgrade_completed' }))).toContain(
       'upgrade finished',
     );
+    expect(alertRoute(alert({ code: 'memory_low', severity: 'danger' }))).toBe('system');
+    expect(alertMessage(alert({ code: 'memory_low' }))).toContain('low on memory');
     expect(bannerAlerts(undefined)).toEqual([]);
   });
 
