@@ -26,7 +26,8 @@ const (
 
 var required = []string{
 	"VERSION", "checksums.txt", "install.sh", "manifest.txt", "minisign.pub", "port80.sh",
-	"root/etc/init.d/travo-greenfield", "root/etc/uci-defaults/90-travo-greenfield",
+	"root/etc/hotplug.d/button/50-travo-greenfield", "root/etc/init.d/travo-greenfield",
+	"root/etc/uci-defaults/90-travo-greenfield",
 	"root/lib/upgrade/keep.d/travo-greenfield", "root/usr/bin/travo-greenfield",
 	webPrefix + "index.html",
 }

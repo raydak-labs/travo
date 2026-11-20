@@ -21,7 +21,7 @@ Verification allows one active attempt and one verified stage per daemon. A stag
 
 ## Activation and recovery
 
-The update worker owns the daemon binary, packaged UI tree and their installed manifest entries. The installer owns the init script, defaults, keep list, configuration and trust key. An update refuses a custom static directory.
+The update worker owns the daemon binary, packaged UI tree and their installed manifest entries. The installer owns the init script, button hotplug script, defaults, keep list, configuration and trust key. An update refuses a custom static directory.
 
 The worker copies verified staged inputs into private durable state before releasing the stage lease. It holds the same operation lock as install and uninstall, writes the guard before activation, and retains a complete rollback snapshot. Recovery verifies the running executable identity and configured health endpoint. Install and uninstall also honor the durable guard after an interrupted worker releases the process lock.
 

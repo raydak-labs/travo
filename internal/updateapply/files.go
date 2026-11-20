@@ -15,6 +15,12 @@ import (
 
 const freeFloor = 20 << 20
 
+// Owned by install.sh (docs/adr/0007): listed in the manifest, never replaced by an update.
+var installerFiles = []string{
+	"/etc/hotplug.d/button/50-travo-greenfield", "/etc/init.d/travo-greenfield",
+	"/etc/uci-defaults/90-travo-greenfield", "/lib/upgrade/keep.d/travo-greenfield",
+}
+
 type layout struct {
 	root, binary, ui, manifest, lock string
 }
@@ -123,7 +129,7 @@ func (l layout) replacementManifest(next []os.DirEntry) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	allowed := []string{l.binary, "/etc/init.d/travo-greenfield", "/etc/uci-defaults/90-travo-greenfield", "/lib/upgrade/keep.d/travo-greenfield"}
+	allowed := append([]string{l.binary}, installerFiles...)
 	expected := append(slices.Clone(allowed), uiPaths(l.ui, current)...)
 	entries := strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
 	slices.Sort(entries)
