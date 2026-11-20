@@ -66,4 +66,31 @@ func MangleDeleteScript(family string, rules []device.NftRule, chains []string) 
 	return b.String(), nil
 }
 
+func (d *Device) DeleteEmptyMangleChains(ctx context.Context, family string, chains []string) error {
+	script, err := EmptyChainDeleteScript(family, chains)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, TierWrite)
+	defer cancel()
+	_, _, err = d.RunInput(ctx, script, "nft", "-f", "-")
+	return err
+}
+
+// EmptyChainDeleteScript is `delete chain` only, never `flush`: nft fails a delete of a
+// non-empty chain ("Device or resource busy"), and the whole `nft -f` transaction with it.
+func EmptyChainDeleteScript(family string, chains []string) (string, error) {
+	if family != "ip" && family != "ip6" {
+		return "", fmt.Errorf("nft family %q", family)
+	}
+	var b strings.Builder
+	for _, c := range chains {
+		if !nftName.MatchString(c) {
+			return "", fmt.Errorf("nft chain %q", c)
+		}
+		fmt.Fprintf(&b, "delete chain %s mangle %s\n", family, c)
+	}
+	return b.String(), nil
+}
+
 var _ device.MangleCleaner = (*Device)(nil)

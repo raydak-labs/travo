@@ -81,8 +81,17 @@ func (s *Service) clearStaleBaseChains(ctx context.Context) error {
 			continue
 		}
 		slog.Warn("failover: deleting empty mangle base chains iptables-nft cannot use", "family", family, "chains", stale)
-		if err := s.Mangle.DeleteMangle(ctx, family, nil, stale); err != nil {
-			return fmt.Errorf("delete stale %s mangle base chains: %w", family, err)
+		// Delete without flush: a rule added since the read fails nft's delete, so a chain
+		// that started filtering is never emptied by us.
+		if err := s.Mangle.DeleteEmptyMangleChains(ctx, family, stale); err != nil {
+			return fmt.Errorf("%w: delete stale %s mangle base chains: %w", ErrMangleIncompatible, family, err)
+		}
+		raw, err = s.Mangle.NftRuleset(ctx, family)
+		if err != nil {
+			return fmt.Errorf("nft list ruleset %s: %w", family, err)
+		}
+		if left, err := PlanStaleBaseChains(family, raw); err != nil || len(left) > 0 {
+			return errors.Join(fmt.Errorf("%w: %s mangle still holds %v", ErrMangleIncompatible, family, left), err)
 		}
 	}
 	out, err := s.Runtime.MangleRules(ctx)

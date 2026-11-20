@@ -71,4 +71,24 @@ func (d *Device) DeleteMangle(_ context.Context, family string, rules []device.N
 	return nil
 }
 
+// DeleteEmptyMangleChains is DeleteMangle without the flush: a chain that still holds a
+// rule fails the whole delete like nft ("Device or resource busy") and nothing changes.
+func (d *Device) DeleteEmptyMangleChains(ctx context.Context, family string, chains []string) error {
+	d.mu.Lock()
+	var doc struct {
+		Nftables []map[string]map[string]any `json:"nftables"`
+	}
+	err := json.Unmarshal([]byte(d.NftRulesets[family]), &doc)
+	d.mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("nft: %s mangle: %w", family, err)
+	}
+	for _, o := range doc.Nftables {
+		if r := o["rule"]; r != nil && r["family"] == family && r["table"] == "mangle" && slices.Contains(chains, fmt.Sprint(r["chain"])) {
+			return fmt.Errorf("nft: Error: Could not process rule: Device or resource busy")
+		}
+	}
+	return d.DeleteMangle(ctx, family, nil, chains)
+}
+
 var _ device.MangleCleaner = (*Device)(nil)

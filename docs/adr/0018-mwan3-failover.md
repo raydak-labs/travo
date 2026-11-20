@@ -138,7 +138,9 @@ Decisions:
 - Before mwan3 starts, Enable reads `nft -j list ruleset ip|ip6` and deletes every base chain of
   table `mangle` that does not match iptables-nft's built-in (PREROUTING/INPUT/FORWARD/
   POSTROUTING `filter`, OUTPUT `route`, priority -150) when it holds no rule and its policy is
-  accept: such a chain filters nothing, so deleting it changes no traffic. One that holds a rule
+  accept: such a chain filters nothing, so deleting it changes no traffic. The delete is
+  `delete chain` only, never `flush`, in one `nft -f` transaction: nft refuses to delete a chain
+  that gained a rule since the read, and the ruleset is re-read afterwards. One that holds a rule
   or drops refuses with 409 `failover_mangle_incompatible` and nothing is deleted; so does an
   `iptables -t mangle -S` that fails or still reports the table incompatible. This is the one
   exception to "foreign chains are never touched" (invariants §9). It runs outside the

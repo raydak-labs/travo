@@ -203,6 +203,10 @@ type MangleCleaner interface {
 	// DeleteMangle deletes the rules, then flushes and deletes the chains, of table
 	// <family> mangle in one nft transaction: all of it applies or nothing does.
 	DeleteMangle(ctx context.Context, family string, rules []NftRule, chains []string) error
+	// DeleteEmptyMangleChains deletes chains of table <family> mangle WITHOUT flushing them,
+	// in one nft transaction: nft refuses to delete a chain that holds a rule, so a rule
+	// added after the caller checked the chain empty fails the whole delete.
+	DeleteEmptyMangleChains(ctx context.Context, family string, chains []string) error
 }
 
 // ServiceAutostart reads whether an init script starts at boot.

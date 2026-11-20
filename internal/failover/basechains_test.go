@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
 	"github.com/blackdark-org/travo-greenfield/internal/txn"
 )
 
@@ -62,8 +63,8 @@ func TestEnableDeletesStaleBaseChainsBeforeMwan3Starts(t *testing.T) {
 		t.Fatalf("enable = %+v, %v (probe %v)", st, err, r.txns.probeErr)
 	}
 	for _, family := range MangleFamilies {
-		if left, _ := PlanStaleBaseChains(family, r.d.NftRulesets[family]); len(left) != 0 {
-			t.Errorf("%s: %v left", family, left)
+		if left, err := PlanStaleBaseChains(family, r.d.NftRulesets[family]); err != nil || len(left) != 0 {
+			t.Errorf("%s: %v left, %v", family, left, err)
 		}
 		if !strings.Contains(r.d.NftRulesets[family], `"PREROUTING"`) {
 			t.Errorf("%s: compatible PREROUTING deleted", family)
@@ -84,6 +85,33 @@ func TestEnableRefusesAnIncompatibleMangleTable(t *testing.T) {
 	r.d.MangleOut = deviceCapture(t, "mangle-stale-base.txt") // read cleanly, but incompatible
 	if _, err := r.s.Enable(context.Background(), []string{"wan", "wwan"}); !errors.Is(err, ErrMangleIncompatible) {
 		t.Fatalf("enable with incompatible base chains: %v", err)
+	}
+}
+
+// racingMangle adds a rule to the stale chain right after Enable read it as empty.
+type racingMangle struct {
+	*mock.Device
+	reads int
+}
+
+func (m *racingMangle) NftRuleset(ctx context.Context, family string) (string, error) {
+	raw, err := m.Device.NftRuleset(ctx, family)
+	if m.reads++; m.reads == 1 {
+		m.Device.NftRulesets[family] = strings.Replace(raw, `]}`, `, {"rule": {"family": "ip", "table": "mangle", "chain": "OUTPUT", "handle": 9, "expr": []}}]}`, 1)
+	}
+	return raw, err
+}
+
+// #283 review: a chain that gained a rule after the check is never flushed; Enable refuses.
+func TestEnableNeverFlushesAChainThatGainedARule(t *testing.T) {
+	r := newRig(t, true)
+	r.d.NftRulesets = map[string]string{"ip": deviceCapture(t, "nft-ruleset-ip-stale-base.json")}
+	r.s.Mangle = &racingMangle{Device: r.d}
+	if _, err := r.s.Enable(context.Background(), []string{"wan", "wwan"}); !errors.Is(err, ErrMangleIncompatible) {
+		t.Fatalf("enable: %v", err)
+	}
+	if !strings.Contains(r.d.NftRulesets["ip"], `"handle": 9`) || len(r.d.ServiceActions) != 0 {
+		t.Fatalf("chain emptied or mwan3 started: %v", r.d.ServiceActions)
 	}
 }
 

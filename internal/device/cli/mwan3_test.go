@@ -76,3 +76,19 @@ func TestMangleDeleteScriptRefusesUnsafeNames(t *testing.T) {
 		}
 	}
 }
+
+// #283 review: the empty-chain delete never flushes, so nft fails it on a rule added since.
+func TestEmptyChainDeleteScriptNeverFlushes(t *testing.T) {
+	s, err := EmptyChainDeleteScript("ip6", []string{"OUTPUT"})
+	if err != nil || s != "delete chain ip6 mangle OUTPUT\n" {
+		t.Fatalf("%q, %v", s, err)
+	}
+	for _, bad := range [][]string{{"OUTPUT; flush ruleset"}, {"a\nflush ruleset"}} {
+		if s, err := EmptyChainDeleteScript("ip", bad); err == nil {
+			t.Fatalf("%q accepted: %q", bad, s)
+		}
+	}
+	if _, err := EmptyChainDeleteScript("inet", []string{"OUTPUT"}); err == nil {
+		t.Fatal("inet accepted")
+	}
+}
