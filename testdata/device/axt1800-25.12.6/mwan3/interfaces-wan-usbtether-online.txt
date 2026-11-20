@@ -1,0 +1,6 @@
+ interface wan is online and tracking is active (offline 00h:00m:02s, uptime 00h:11m:27s)
+ interface wan6 is unknown and tracking is down (23)
+ interface wanb is unknown and tracking is down (23)
+ interface wanb6 is unknown and tracking is down (23)
+ interface wwan is unknown and tracking is disabled (23)
+ interface usbtether is online and tracking is active (offline 00h:00m:02s, uptime 00h:00m:20s)

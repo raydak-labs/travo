@@ -4,6 +4,7 @@ import Button from '$lib/components/ui/button/button.svelte';
 import { enableFailover } from '../api/gen';
 import {
   failoverRefusal,
+  failoverRolledBack,
   fetchFailover,
   moveUplink,
   stopFailover,
@@ -36,7 +37,7 @@ const control = createTunnelControl(
     submit: (_enabled, signal) => enableFailover({ body: { uplinks: order }, signal }),
     refusal: failoverRefusal,
     confirmed: m.failover_confirmed,
-    rolledBack: m.failover_rolled_back,
+    rolledBack: failoverRolledBack,
     rollbackFailed: m.failover_rollback_failed,
   },
 );

@@ -44,9 +44,11 @@ type Device struct {
 	// CrontabErr makes crontab reads and writes fail.
 	CrontabErr error
 	crontab    string
-	// MWAN3Offline names mwan3 interfaces tracked offline; MangleErr makes MangleRules fail.
+	// MWAN3Offline names mwan3 interfaces tracked offline; MangleErr makes MangleRules fail
+	// and a non-empty MangleOut replaces its output (a device capture).
 	MWAN3Offline []string
 	MangleErr    error
+	MangleOut    string
 	// NftRulesets holds `nft -j list ruleset <family>` captures by family; DeleteMangle
 	// edits them, counts in MangleDeletes and fails with DeleteMangleErr.
 	NftRulesets     map[string]string

@@ -1,0 +1,6 @@
+# Table `mangle' contains incompatible base-chains, use 'nft' tool to list them.
+-P PREROUTING ACCEPT
+-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+-P POSTROUTING ACCEPT

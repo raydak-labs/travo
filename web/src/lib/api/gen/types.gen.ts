@@ -1536,7 +1536,15 @@ export type TunnelStatus = {
 
 export type TxnBody = {
     configs: Array<string> | null;
+    /**
+     * The failed check's own message (rolled_back only)
+     */
+    detail?: string;
     id: string;
+    /**
+     * Apply-probe check that failed (rolled_back only)
+     */
+    reason?: 'config' | 'service' | 'tracking' | 'hook' | 'first_rule' | 'policy_mark' | 'outbound';
     started: string;
     state: 'pending' | 'confirmed' | 'rolled_back' | 'restoring' | 'rollback_failed';
     summary: string;

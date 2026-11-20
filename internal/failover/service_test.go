@@ -3,6 +3,7 @@ package failover
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -39,7 +40,7 @@ func (f *fakeTxns) Begin(ctx context.Context, _ string, configs []string, stage 
 		}
 		_ = f.d.Load(ctx, Config, before)
 		_ = f.d.Commit(ctx, Config)
-		return txn.Status{Meta: txn.Meta{ID: "0123456789abcdef"}, State: txn.RolledBack}, txn.ErrProbeFailed
+		return txn.Status{Meta: txn.Meta{ID: "0123456789abcdef"}, State: txn.RolledBack}, fmt.Errorf("%w: %w", txn.ErrProbeFailed, f.probeErr) // as txn.Manager wraps it
 	}
 	if f.hold {
 		_ = f.guards.Acquire(txn.GuardName)
@@ -134,18 +135,23 @@ func TestProbeFailureRollsBackAndReconcilerStopsMwan3(t *testing.T) {
 // #277: a request through the main table is no proof. The probe needs every uplink tracked
 // online and the mangle rules routing by travo_failover; otherwise the apply rolls back.
 func TestProbeNeedsMwan3RoutingByThePolicy(t *testing.T) {
-	for name, script := range map[string]func(*mock.Device){
-		"backup offline": func(d *mock.Device) { d.MWAN3Offline = []string{"wwan"} },
-		"mangle unreadable": func(d *mock.Device) {
-			d.MangleErr = errors.New("iptables v1.8.10 (nf_tables): table `mangle' is incompatible, use 'nft' tool.")
-		},
+	for name, tc := range map[string]struct {
+		script func(*mock.Device)
+		check  ProbeCheck
+	}{
+		"backup offline": {func(d *mock.Device) { d.MWAN3Offline = []string{"wwan"} }, CheckTracking},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := newRig(t, true)
-			script(r.d)
+			tc.script(r.d)
 			st, err := r.s.Enable(context.Background(), []string{"wan", "wwan"})
 			if !errors.Is(err, txn.ErrProbeFailed) || st.State != txn.RolledBack || !errors.Is(r.txns.probeErr, ErrNotUp) {
 				t.Fatalf("enable = %+v, %v (probe %v)", st, err, r.txns.probeErr)
+			}
+			// The answer names the failed check (#277), so the UI can say why.
+			var pe *ProbeError
+			if !errors.As(err, &pe) || pe.Check != tc.check {
+				t.Fatalf("probe error = %v, want check %s", err, tc.check)
 			}
 			if Active(show(t, r.d)) {
 				t.Fatal("rolled-back config still active")

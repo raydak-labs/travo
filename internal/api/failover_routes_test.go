@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -51,15 +52,24 @@ func TestFailoverRoutes(t *testing.T) {
 	if got := post(`{"uplinks":["wwan","wan"]}`); got.Code != http.StatusAccepted || !slices.Equal(fake.uplinks, []string{"wwan", "wan"}) {
 		t.Fatalf("%d %s %v", got.Code, got.Body, fake.uplinks)
 	}
+	// A rollback names the failed probe check (#277).
+	fake.tx.State = txn.RolledBack
+	fake.enableErr = fmt.Errorf("%w: %w", txn.ErrProbeFailed, &failover.ProbeError{Check: failover.CheckHook, Err: errors.New(`mwan3 mangle hook "-A OUTPUT -j mwan3_hook" missing`)})
+	if got := post(`{"uplinks":["wan","usbtether"]}`); got.Code != http.StatusAccepted ||
+		!strings.Contains(got.Body.String(), `"reason":"hook","detail":"mwan3 mangle hook`) {
+		t.Fatalf("%d %s", got.Code, got.Body)
+	}
 	fake.tx = txn.Status{}
 	for err, code := range map[error]string{
-		failover.ErrOffline:   "failover_offline",
-		failover.ErrConflict:  "failover_conflict",
-		failover.ErrTailscale: "failover_tailscale_conflict",
-		failover.ErrInvalid:   "validation",
-		txn.ErrActive:         "transaction_pending",
-		txn.ErrNoChanges:      "failover_no_change",
-		errors.New("apk"):     "failover_failed",
+		failover.ErrOffline:            "failover_offline",
+		failover.ErrConflict:           "failover_conflict",
+		failover.ErrTailscale:          "failover_tailscale_conflict",
+		failover.ErrMangleIncompatible: "failover_mangle_incompatible",
+		failover.ErrSameSubnet:         "failover_same_subnet",
+		failover.ErrInvalid:            "validation",
+		txn.ErrActive:                  "transaction_pending",
+		txn.ErrNoChanges:               "failover_no_change",
+		errors.New("apk"):              "failover_failed",
 	} {
 		fake.enableErr = err
 		if got := post(`{"uplinks":["wan","wwan"]}`); errCode(t, got) != code {

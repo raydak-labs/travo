@@ -56,7 +56,12 @@ func (s *server) enableFailover(ctx context.Context, in *failoverEnableInput) (*
 	if st.ID != "" {
 		switch st.State {
 		case txn.Pending, txn.RolledBack, txn.Restoring, txn.RollbackFailed:
-			return txnResponse(st), nil
+			out := txnResponse(st)
+			var pe *failover.ProbeError
+			if st.State == txn.RolledBack && errors.As(err, &pe) {
+				out.Body.Reason, out.Body.Detail = string(pe.Check), pe.Err.Error()
+			}
+			return out, nil
 		}
 	}
 	switch {
@@ -64,6 +69,10 @@ func (s *server) enableFailover(ctx context.Context, in *failoverEnableInput) (*
 		return nil, fail(http.StatusBadRequest, "validation", failover.ErrInvalid.Error())
 	case errors.Is(err, failover.ErrOffline):
 		return nil, fail(http.StatusConflict, "failover_offline", failover.ErrOffline.Error())
+	case errors.Is(err, failover.ErrSameSubnet):
+		return nil, fail(http.StatusConflict, "failover_same_subnet", err.Error())
+	case errors.Is(err, failover.ErrMangleIncompatible):
+		return nil, fail(http.StatusConflict, "failover_mangle_incompatible", failover.ErrMangleIncompatible.Error())
 	case errors.Is(err, failover.ErrTailscale):
 		return nil, fail(http.StatusConflict, "failover_tailscale_conflict", failover.ErrTailscale.Error())
 	case errors.Is(err, failover.ErrConflict):

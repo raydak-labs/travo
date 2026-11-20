@@ -38,6 +38,11 @@ type nftObject struct {
 		Family string `json:"family"`
 		Table  string `json:"table"`
 		Name   string `json:"name"`
+		// Base chains only: type, hook, priority and policy.
+		Type   string `json:"type"`
+		Hook   string `json:"hook"`
+		Prio   int    `json:"prio"`
+		Policy string `json:"policy"`
 	} `json:"chain"`
 	Rule *struct {
 		Family string            `json:"family"`

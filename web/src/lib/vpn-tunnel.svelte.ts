@@ -78,7 +78,8 @@ export type ToggleOptions = {
   submit: Submit;
   refusal: (code: string | undefined) => { message?: string; error?: string };
   confirmed: () => string;
-  rolledBack: () => string;
+  /** Receives the settled answer: a feature may name why its probe rolled back. */
+  rolledBack: (result: TxnBody) => string;
   rollbackFailed: () => string;
   /** Request failed without an answer; defaults to the tunnel message. */
   failed?: () => string;
@@ -119,7 +120,7 @@ export function createTunnelControl(refresh: () => unknown, options: ToggleOptio
     }
     transaction = result;
     if (result.state === 'confirmed') message = options.confirmed();
-    if (result.state === 'rolled_back') message = options.rolledBack();
+    if (result.state === 'rolled_back') message = options.rolledBack(result);
     if (result.state === 'rollback_failed') error = options.rollbackFailed();
     if (result.state !== 'pending' && result.state !== 'restoring') void refresh();
   }

@@ -1,7 +1,14 @@
 import { render } from 'svelte/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FailoverStatus } from '../api/gen';
-import { failoverRefusal, fetchFailover, moveUplink, toggleUplink, warningText } from '../failover';
+import {
+  failoverRefusal,
+  failoverRolledBack,
+  fetchFailover,
+  moveUplink,
+  toggleUplink,
+  warningText,
+} from '../failover';
 import type { LoadStatus } from '../ui/loader.svelte';
 import FailoverCard from './FailoverCard.svelte';
 
@@ -85,7 +92,13 @@ describe('failover helpers', () => {
     expect(failoverRefusal('failover_tailscale_conflict').error).toContain(
       'turn off its autostart',
     );
+    expect(failoverRefusal('failover_same_subnet').error).toContain('same network');
+    expect(failoverRefusal('failover_mangle_incompatible').error).toContain('firewall');
     expect(failoverRefusal('failover_no_change').message).toBeDefined();
+    expect(failoverRolledBack({})).toBe('Failover did not verify; the previous settings are back.');
+    expect(failoverRolledBack({ reason: 'hook', detail: 'mwan3_hook missing' })).toBe(
+      'Failover did not verify: mwan3 could not hook into the firewall (mwan3_hook missing). The previous settings are back.',
+    );
     expect(failoverRefusal('x').error).toContain('Enabling again retries it');
     expect(warningText({ section: 'travo_m_wwan', reason: 'stale_edited' })).toContain(
       'kept, unused',

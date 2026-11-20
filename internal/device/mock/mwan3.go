@@ -42,6 +42,9 @@ func (d *Device) MangleRules(ctx context.Context) (string, error) {
 	if d.MangleErr != nil {
 		return "", d.MangleErr
 	}
+	if d.MangleOut != "" {
+		return d.MangleOut, nil
+	}
 	states, _ := d.MWAN3Interfaces(ctx)
 	d.mu.Lock()
 	defer d.mu.Unlock()

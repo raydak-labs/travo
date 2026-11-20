@@ -1,0 +1,75 @@
+{
+	"up": true,
+	"pending": false,
+	"available": true,
+	"autostart": true,
+	"dynamic": false,
+	"uptime": 749,
+	"l3_device": "eth0",
+	"proto": "dhcp",
+	"device": "eth0",
+	"updated": [
+		"addresses",
+		"routes",
+		"data"
+	],
+	"metric": 10,
+	"dns_metric": 0,
+	"delegation": true,
+	"ipv4-address": [
+		{
+			"address": "172.20.10.11",
+			"mask": 28
+		}
+	],
+	"ipv6-address": [
+		
+	],
+	"ipv6-prefix": [
+		
+	],
+	"ipv6-prefix-assignment": [
+		
+	],
+	"route": [
+		{
+			"target": "0.0.0.0",
+			"mask": 0,
+			"nexthop": "172.20.10.1",
+			"source": "172.20.10.11/32"
+		}
+	],
+	"dns-server": [
+		"172.20.10.1"
+	],
+	"dns-search": [
+		
+	],
+	"neighbors": [
+		
+	],
+	"inactive": {
+		"ipv4-address": [
+			
+		],
+		"ipv6-address": [
+			
+		],
+		"route": [
+			
+		],
+		"dns-server": [
+			
+		],
+		"dns-search": [
+			
+		],
+		"neighbors": [
+			
+		]
+	},
+	"data": {
+		"dhcpserver": "172.20.10.1",
+		"leasetime": 3600
+	}
+}

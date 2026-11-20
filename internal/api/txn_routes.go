@@ -18,6 +18,9 @@ type txnBody struct {
 	Configs       []string  `json:"configs"`
 	Started       time.Time `json:"started"`
 	WindowSeconds int       `json:"window_seconds" doc:"Confirm window, counted from when the change was armed"`
+	// Reason and Detail: why the apply probe rolled the change back, where the feature names it.
+	Reason string `json:"reason,omitempty" enum:"config,service,tracking,hook,first_rule,policy_mark,outbound" doc:"Apply-probe check that failed (rolled_back only)"`
+	Detail string `json:"detail,omitempty" doc:"The failed check's own message (rolled_back only)"`
 }
 
 type txnOutput struct{ Body txnBody }

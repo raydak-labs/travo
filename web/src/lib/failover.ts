@@ -1,6 +1,6 @@
 import './api/client';
 import { client } from './api/client';
-import { disableFailover, type FailoverWarning, getFailover } from './api/gen';
+import { disableFailover, type FailoverWarning, getFailover, type TxnBody } from './api/gen';
 import type { Client } from './api/gen/client';
 import { APIRequestError } from './api/request';
 import { m } from './paraglide/messages.js';
@@ -28,6 +28,25 @@ export async function stopFailover(
     : { error: m.failover_disable_failed() };
 }
 
+const probeChecks: Record<NonNullable<TxnBody['reason']>, () => string> = {
+  config: m.failover_check_config,
+  service: m.failover_check_service,
+  tracking: m.failover_check_tracking,
+  hook: m.failover_check_hook,
+  first_rule: m.failover_check_first_rule,
+  policy_mark: m.failover_check_policy_mark,
+  outbound: m.failover_check_outbound,
+};
+
+/** The rollback message, naming the probe check that failed when the daemon reports it. */
+export function failoverRolledBack(result: Pick<TxnBody, 'reason' | 'detail'>): string {
+  if (!result.reason) return m.failover_rolled_back();
+  const why = probeChecks[result.reason]();
+  return m.failover_rolled_back_reason({
+    reason: result.detail ? `${why} (${result.detail})` : why,
+  });
+}
+
 /** Maps a refused POST /failover to its message. */
 export function failoverRefusal(code: string | undefined): { message?: string; error?: string } {
   switch (code) {
@@ -37,6 +56,10 @@ export function failoverRefusal(code: string | undefined): { message?: string; e
       return { error: m.failover_conflict() };
     case 'failover_tailscale_conflict':
       return { error: m.failover_tailscale_conflict() };
+    case 'failover_same_subnet':
+      return { error: m.failover_same_subnet() };
+    case 'failover_mangle_incompatible':
+      return { error: m.failover_mangle_incompatible() };
     case 'validation':
       return { error: m.failover_invalid() };
     case 'failover_no_change':

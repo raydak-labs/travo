@@ -210,7 +210,13 @@ func (s *Service) Enable(ctx context.Context, uplinks []string) (txn.Status, err
 	if !s.Online(ctx) {
 		return txn.Status{}, ErrOffline
 	}
+	if err := s.refuseSharedSubnet(ctx, uplinks); err != nil {
+		return txn.Status{}, err
+	}
 	if err := s.install(ctx); err != nil {
+		return txn.Status{}, err
+	}
+	if err := s.clearStaleBaseChains(ctx); err != nil {
 		return txn.Status{}, err
 	}
 	current, err := s.UCI.Show(ctx, Config)
@@ -297,6 +303,7 @@ func (s *Service) prove(ctx context.Context, plan *Plan) error {
 		}
 		select {
 		case <-ctx.Done():
+			logProbeFailure(last)
 			return errors.Join(ErrNotUp, last, ctx.Err())
 		case <-tick.C:
 		}
@@ -306,19 +313,19 @@ func (s *Service) prove(ctx context.Context, plan *Plan) error {
 func (s *Service) verified(ctx context.Context, plan *Plan) error {
 	current, err := s.UCI.Show(ctx, Config)
 	if err != nil {
-		return err
+		return &ProbeError{Check: CheckConfig, Err: err}
 	}
 	if err := Verify(current, *plan, s.Ordered); err != nil {
-		return err
+		return &ProbeError{Check: CheckConfig, Err: err}
 	}
 	if running, err := s.Services.ServiceRunning(ctx, Package); err != nil || !running {
-		return errors.Join(errors.New("mwan3 is not running"), err)
+		return &ProbeError{Check: CheckService, Err: errors.Join(errors.New("mwan3 is not running"), err)}
 	}
 	if err := s.runtimeVerified(ctx, plan); err != nil {
 		return err
 	}
 	if !s.Online(ctx) {
-		return errors.New("no internet through the failover policy")
+		return probeErr(CheckOutbound, "no internet through the failover policy")
 	}
 	return nil
 }
@@ -332,13 +339,13 @@ func (s *Service) runtimeVerified(ctx context.Context, plan *Plan) error {
 	}
 	interfaces, err := s.Runtime.MWAN3Interfaces(ctx)
 	if err != nil {
-		return fmt.Errorf("mwan3 interfaces: %w", err)
+		return probeErr(CheckTracking, "mwan3 interfaces: %w", err)
 	}
 	mangle, err := s.Runtime.MangleRules(ctx)
 	if err != nil {
 		// iptables-nft refuses a mangle table holding a foreign native nft rule; mwan3
 		// cannot manage its policies then (ADR 0018).
-		return fmt.Errorf("mwan3 mangle rules unreadable: %w", err)
+		return probeErr(CheckHook, "mwan3 mangle rules unreadable: %w", err)
 	}
 	return CheckRuntime(interfaces, mangle, uplinks)
 }
