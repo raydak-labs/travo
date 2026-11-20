@@ -1,6 +1,6 @@
 # 0018 Multi-WAN failover with mwan3
 
-Status: accepted
+Status: accepted; amended in place by #277, see "Failover and Tailscale" and "Stale mangle base chains" below (recorded before the one-ADR-per-decision rule in [README](README.md))
 
 ## Context
 

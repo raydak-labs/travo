@@ -22,7 +22,7 @@ export async function fetchTailscale(signal?: AbortSignal, requestClient: Client
 
 export type TailscaleAction = 'install' | 'login' | 'logout' | 'settings';
 
-/** The status vocabulary of docs/spec.md for one tailscaled backend state. */
+/** What the Tailscale page shows for one tailscaled install, run and backend state. */
 export type TailscalePhase = 'absent' | 'stopped' | 'login' | 'connected' | 'off' | 'starting';
 
 export function tailscalePhase(

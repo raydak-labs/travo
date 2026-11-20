@@ -1,324 +1,42 @@
-# Spike results: GL-AXT1800, OpenWrt 25.12.6, 2026-11-09
+# Spike results index: GL-AXT1800, OpenWrt 25.12.6
 
-Device: GL.iNet GL-AXT1800, OpenWrt 25.12.6 r33311-981c978eff (qualcommax/ipq60xx, ath11k), old Travo 0.10.2 installed.
-Backup before any change: `~/travo-router-backups/20261109-171110-axt1800/` (sysupgrade backup, full overlay, RESTORE.md).
-During live spikes, old Travo was stopped and its per-minute `wifi-reconnect.sh` cron paused; both restored afterwards. `/etc/config/{dhcp,wireless,network,firewall}` and the crontab were verified identical to the backup at the end.
-Layout: radio0 = uplink STA `phy0-sta0` (wwan), radio1 = AP `phy1-ap0` (lan). Caller on Ethernet.
+One line per spike or issue run on hardware: what was tested, result, where the fact now lives. Facts are in [docs/device-facts.md](../../../docs/device-facts.md) (DF), rules in [docs/invariants.md](../../../docs/invariants.md), run history in git. Layout used: radio0 = uplink STA `phy0-sta0` (wwan), radio1 = AP `phy1-ap0` (lan), caller on Ethernet. Release gate: the hardware playbook in [docs/testing.md](../../../docs/testing.md).
 
-## S3 caller payloads: done
-Captures in this directory (`PROVENANCE.md`, `with-ap-client/`). Parsers in `internal/device/facts`, end-to-end classification test in `internal/lockout/device_test.go`.
-- `network.interface dump`: IPv4 as `{address, mask}`; `wan` (cable out) has no `l3_device`.
-- `hostapd.<if> get_clients`: `{freq, clients: {<mac>: {assoc, authorized, ...}}}`; empty AP = `"clients": {}`.
-- `ip -j -4 neigh`: `[{dst, dev, lladdr, state[]}]`. The phone on the AP and the Ethernet laptop are both on `br-lan`; only the hostapd MAC match separates them.
-- Only one `hostapd.*` object exists (`hostapd.phy1-ap0`): disabled APs have none. `iwinfo assoclist` was empty while `get_clients` listed the station.
+Flagged: on the test device the old Travo left the AdGuard admin API open on `0.0.0.0:3000` with `users: []`, so GET and POST `/control/*` answered 200 to any LAN client without auth. [ADR 0006](../../../docs/adr/0006-adguard-package-and-topology.md) binds AGH to loopback behind a Travo-gated proxy; do not reintroduce.
 
-## S4 watchdog on hardware: done (logs `spikes/s4-*.log`)
-| Check | Result |
-|---|---|
-| AP SSID change via `uci commit` + `reload_config` (no `wifi`) | live in 1.4 s |
-| Not confirmed: watchdog restore | 16.2 s after begin (15 s window); original SSID live 1.0 s later |
-| STA during AP-only change | stayed associated, default route kept |
-| Confirm | change kept past the window |
-| Wrong uplink SSID | `network.device status`: `present:true, up:true, carrier:false`; kernel default route gone |
-| Daemon death, wrong uplink | watchdog restored at 16.2 s; STA carrier back 7.8 s later; default route 0.5 s after that |
-| Reboot during window | boot hook ran `Recover` at uptime 13 s: `rolled_back`; original SSID live right after boot |
+## Initial spikes S1 to S5 (ADR 0006 cites these)
 
-Window: 15 s minimum stays. Restore plus uplink re-association took about 25 s end to end, so the UI must keep showing "restoring" that long.
+| Id | Tested | Result | Fact lives in |
+|---|---|---|---|
+| S1 | AdGuard package `adguardhome` 0.107.79-r1 on the device | Runs in ujail, conffiles kept by sysupgrade, config and work dir paths recorded (`adguard/`) | DF §11 |
+| S2 | Plain Go `httputil.ReverseProxy` in front of AGH with `users: []` | UI, JS and `/control/*` GET and POST work; AGH#7985 did not reproduce | DF §11, ADR 0006 |
+| S3 | Caller payloads: `network.interface dump`, hostapd `get_clients`, `ip -j -4 neigh` | Pass; fixtures in this directory and `with-ap-client/` | DF §5 |
+| S4 | Watchdog on hardware (`spikes/s4-*.log`): AP rename, restore, daemon death, reboot in window | Pass; restore plus STA re-association ~25 s end to end, so the UI keeps "restoring" that long | DF §2, §4 |
+| S5 | DNS layer over AdGuard base (`spikes/s5-*.log`) | One real bug: `uci show` prints a one-element list like an option, restored as `option server` and dnsmasq dropped it. Fixed by reading `uci export`. Fail-open restored DNS in 0.13 s | DF §0, §11 |
 
-## S5 DNS on the device: done, one real bug found (`spikes/s5-*.log`)
-- Base on this device: old Travo's AdGuard forwarding, `list server '127.0.0.1#5353'`, `noresolv=1`.
-- **Bug**: `uci show` prints a one-element list exactly like an option. The stack restored it as `option server`, and dnsmasq's init script ignores `option server` (`config_list_foreach`). Result: no `server=` line, `noresolv` set, so every query was REFUSED. The config looked identical in `uci show`. Fixed: the CLI adapter reads with `uci export`, which keeps `list` vs `option`. A device-fixture regression test was added.
-- After the fix: the captive layer over AdGuard resolves through the hotel/uplink resolver, and the pop restores base byte for byte with DNS working.
-- `reload_config` reloads dnsmasq asynchronously (procd trigger): the new `server=` was live about 2 to 4 s after commit.
-- AdGuard stopped: all LAN DNS REFUSED (confirms device-facts §11). Pushing a layer that points at the uplink resolver brought DNS back within 0.13 s (fail-open path works).
+## Issue results
 
-## S1 AdGuard package: done (`adguard/`)
-- Package `adguardhome` 0.107.79-r1 (0.107.80-r1 available). Runs in `ujail` as user `adguardhome`.
-- Config `/etc/adguardhome/adguardhome.yaml` (UCI `adguardhome.config.config_file`), work dir `/var/lib/adguardhome`. Both the yaml and `/etc/config/adguardhome` are apk conffiles and in `/lib/upgrade/keep.d/` (sysupgrade keeps them).
-- As old Travo left it: `http.address: 0.0.0.0:3000`, `users: []`, DNS `bind_hosts: 0.0.0.0` port 5353. **The admin API is open to the whole LAN without auth** (GET and POST `/control/*` return 200). This is the risk from the baseline and still live on this device.
-- `/control/install/get_addresses` returns 404 once configured, and `/install.html` still serves the wizard page.
+| Issue | Tested | Result | Fact lives in |
+|---|---|---|---|
+| #108 | WireGuard rollback: explicit, probe failure, confirm timeout, killed watchdog, disabled baseline | Pass, 3.0 to 7.4 s; configs byte-identical afterwards | DF §1, invariants §1 |
+| #87, #113 | WireGuard toggle and default-route rollback | Pass after #113: an unreachable endpoint rolled back in 80.5 s with the underlying default restored | DF §1 |
+| #71, #115 | WiFi Join with fresh STA proof, API and browser | Pass: wrong key rejected after ~40 s without reaching Pending; valid key had carrier at ~17 s. WPA2 only | DF §2 |
+| #89 | VPN kill switch firewall | Pass: wg0 needs a zone plus lan forwarding; REJECT rule sits before `accept_to_wan` | DF §1 |
+| #90 | WireGuard split tunnel UCI shape | Pass: netifd accepts CIDR `target`; leaving full mode drops the uplink default | DF §1 |
+| #87 follow-up | VPN zone on tunnel enable | Pass: zone-only re-add restores LAN egress without a wg0 restart | DF §1 |
+| #130, #131 | Captive DNS bypass and wwan lease renew (`internal/captive/hardware_test.go`) | Pass; real portal still needs the simulator (testing.md) | DF §7 |
+| #73 | STA recovery without `wifi`: `ifup wwan` vs self-recovery | `ifup wwan` heals sticky `DISCONNECT` in 6 to 8 s, AP unaffected | DF §2, ADR 0014 |
+| #132, #133, #134 | AdGuard loopback migration, default DNS and fail-open, gated proxy | Pass; backoff after a failed migration is #164 | DF §11, ADR 0006 |
+| #157, #158, #159 | DNS restore order, restore settling before the result, reconnect tick | Fixed and verified | DF §0, §4, ADR 0014 |
+| #168 | 2.4 GHz clients could not join any AP after firstboot | Open: joins started working after a regulatory change on radio1 re-initialised the radio | needs-hardware, open |
+| #74, #75, #99 | AP settings, guest AP, join AP reconcile, with a phone | Pass; the 5 GHz AP next to the STA is refused as `wifi_radio_in_use` | DF §3 |
+| #73 | Reconnect cap with a phone hotspot | Pass: attempts 1 to 5 every 2 min, then `exhausted`, no `wifi`, APs stayed up | DF §2, ADR 0014 |
+| #76 | Uplink MAC policy | Pass: factory MAC is universally administered; random and custom LAA MACs confirmed and rolled back | SPIKES.md (this row) |
+| #89, #156 | VPN on the guest zone | Pass in config, nft and with a guest client; PR #156 is merged | invariants §11 |
+| #81 | Signed update | Operator, needs a signed build; see testing.md | ADR 0007 |
+| #65 | Reboot through the API | Pass: new `boot_id`, no stale guard | testing.md |
+| #169 | AdGuard preinstalled without config after `firstboot` | Fixed: seeded loopback config in 2 s | DF §11 |
+| #277 | Failover apply probe and live failover, wan to usbtether | Pass after fix: stale mangle base chains deleted on Enable; detection 16 to 17 s, failback 31 to 33 s; same-subnet uplinks refused (`failover_same_subnet`) | DF §9, ADR 0018 |
+| #285 | Quiet 24 h memory soak with slabinfo and vmstat | Open | DF §11 |
 
-## S2 AdGuard behind a proxy: done
-A plain Go `httputil.ReverseProxy` on its own port (root path, no rewriting) served the UI, JS bundle and `/control/*` (GET and POST) against `users: []`. Issue AGH#7985 (`/control/profile` 401 without users) did not show up on 0.107.79. Conclusion: ADR 0006 works. Bind AGH to `127.0.0.1:3000`, and a Travo-gated port proxies it.
-
-## New device facts
-- BusyBox on the device has no `timeout`, `diff` or `pkill`.
-- `wpad` provides hostapd and wpa_supplicant; `ubus -v list` shows `hostapd.<if>` with `get_clients`, `del_client`, `reload`.
-- procd triggers: a `wireless` change reloads `network`, and a `dhcp` change reloads `dnsmasq` and `odhcpd`.
-
-## WireGuard rollback acceptance (#108, 2026-11-15)
-
-GL-AXT1800, OpenWrt 25.12.6, connected by Ethernet. A fresh sysupgrade
-backup passed archive verification. The test used the production transaction
-and watchdog code from PR #109, with a temporary hardware adaptation of the
-container harness. It retained the existing key material, disabled peer
-route installation and used two literal documentation addresses.
-
-| Restore trigger | Result | Scenario elapsed |
-| --- | --- | ---: |
-| Explicit rollback | RolledBack, original live endpoint observed | 3.04 s |
-| Probe failure after the new endpoint was live | RolledBack, original live endpoint observed | 3.22 s |
-| Confirmation timeout | RolledBack, original live endpoint observed | 5.21 s |
-| Startup recovery of a killed, unclaimed watchdog | RolledBack, original live endpoint observed | 3.43 s |
-| Explicit rollback to a disabled baseline | RolledBack, kernel wg0 link absent | 7.44 s |
-
-The first fixture setup attempt encountered netifd exit 4 before the logical
-object appeared. The guard restored the original configuration. The passing
-run waited for the netifd reload before checking the fixture endpoint.
-After cleanup, configuration and crontabs matched the backup byte for byte.
-The kernel default remained on the WiFi uplink, wg0 was absent and no
-transaction guard remained.
-
-## WireGuard toggle and default-route rollback (#87, #113)
-
-Tested over Ethernet on OpenWrt 25.12.6, using the configured single-peer
-test profile through SSH stdin. A fresh handshake let enable reach Pending
-and confirm after 1.18 s. Disable removed wg0 and restored the underlying
-kernel default before confirmation after 12.18 s.
-
-An in-memory unreachable endpoint first exposed the rollback defect. The
-watchdog returned RolledBack after 69.24 s with the network file restored
-and wg0 absent, but the kernel had no default. Manual uplink restart
-restored that route. After #113's watchdog fix, the same failed-enable
-scenario reached RolledBack after 80.50 s with the original underlying
-default present and wg0 absent. The network configuration and crontabs
-matched the backup byte for byte, and the guard cleared.
-
-## WiFi Join and fresh STA proof (#71, #115)
-
-On the AXT1800 over Ethernet SSH, changing the key for the already-connected
-WPA2 uplink could arm confirmation on the old STA's carrier and default route.
-The next sample showed no carrier or default. A valid change likewise armed
-on the old kernel link, before the replacement gained carrier and a route.
-
-With the link-index check, the wrong key was rejected after 39.86 s without
-reaching Pending. The original kernel default returned following rollback,
-and configuration and crontabs matched the pre-test backup byte for byte.
-For a valid key and a changed BSSID pin, the replacement had carrier at
-17.21 s and the independent sample saw the kernel default at 17.62 s. The
-transaction confirmed and the route persisted. The AP stayed up on its own
-radio in both cases. Times are from invoking Join and include the site survey.
-This test used WPA2; mixed WPA2/WPA3 was not exercised.
-
-
-## WiFi Join browser acceptance (#71, 2026-11-15)
-
-GL-AXT1800, OpenWrt 25.12.6, Ethernet. Tested the SPA and daemon built
-from `2341539`, including #115, on a temporary LAN listener at port 8082.
-Health reported `dev`; the running executable was verified at the temporary
-test path. The installed daemon on port 80 stayed running. A fresh sysupgrade
-backup was copied off the router before testing.
-
-The browser signed in with the router's root password and used WiFi → Scan →
-the operator-owned WPA2 uplink → Join. Credentials and network identities
-are omitted here. Fetch observations recorded only HTTP status, transaction
-state and elapsed time; they did not replace responses.
-
-- Wrong key for the connected SSID: the page showed Connecting while POST
-  was in flight, then Rolled back only after the 202 response reported
-  `rolled_back`, after 39.74 s. No Pending response occurred. Independent
-  samples observed STA carrier false and no STA default before recovery.
-- Valid key, no confirmation: POST reached Pending after 15.65 s. The UI
-  showed Confirm, Rollback and the countdown, then polled every two seconds.
-  After the normal confirmation window expired, a GET returned
-  `rolled_back` and the page showed Rolled back.
-- Valid key, explicit confirmation: POST reached Pending after 21.54 s.
-  Before confirmation, an independent SSH read proved STA carrier and the
-  kernel default via that STA. Clicking Confirm returned `confirmed` and
-  the page displayed Connection confirmed. The kernel default persisted.
-
-A guarded API join first pinned the existing uplink BSSID so the browser's
-un-pinned Join made an effective change. The timeout restored that pin;
-final browser confirmation removed it. The setup confirmation connection
-reset after the request; a subsequent read found the pin persisted and no
-guard. This setup is separate from the successful browser confirmation.
-
-The AP was up in the independent readable samples, including while the
-wrong key had no carrier. `iw dev` showed AP and STA on separate radios.
-A combined sample could not parse the transiently absent STA during reload;
-it is not evidence of an AP outage or uninterrupted AP availability.
-After recovery, all `/etc/config` files and crontabs in the pre-test backup
-matched byte for byte, the kernel default used the original STA, and no
-transaction guard remained. The temporary listener was stopped after testing.
-Mixed WPA2/WPA3 was not tested. The AP lockout-refusal case is not applicable
-to Join because it does not edit APs. `mise run check` passed with unchanged
-limits (WiFi chunk 5,210 bytes gzip).
-
-## VPN kill switch firewall (#89), 2026-11-17
-
-AXT1800 25.12.6 over Ethernet, uplink STA `wwan`, operator WireGuard profile already in
-`network.wg0` (one peer, `allowed_ips=0.0.0.0/0`, `route_allowed_ips=1`). Lock held,
-`uci export firewall`/`network` saved before and restored byte for byte after (cmp), wg0
-back to `disabled=1`. The LAN client was a laptop on `br-lan` bound to its router-facing NIC
-(`curl --interface`); egress addresses compared by hash only.
-
-- Stock firewall (zones `lan`, `wan` with `wan wan6 wwan`, forwarding lan -> wan), wg0
-  enabled, handshake within 1 s, kernel `default dev wg0`: the LAN client had NO internet.
-  wg0 is in no zone, so fw4 rejects lan -> wg0 forwards. The router itself was online.
-- Added zone `travo_vpn` (network wg0, masq, mtu_fix) and forwarding `travo_vpn_lan`
-  exactly as `vpnkill.VPNZone()` writes them: `forward_lan` gained
-  `jump accept_to_travo_vpn`; the LAN client egressed with the VPN address.
-- Added rule `travo_killswitch_wan` (src lan, dest wan, proto all, REJECT): fw4 placed
-  `jump reject_to_wan` FIRST in `forward_lan`, before `accept_to_wan`. Tunnel up: LAN
-  egress still via VPN. `ifdown wg0` removed every default route (device-facts §1); after
-  `ifup wwan` the kernel default used the STA and the router was online, but the LAN
-  client stayed blocked and the rule counter increased. The admin UI answered 200.
-- Deleted the rule only: LAN egress returned via the uplink address.
-
-## WireGuard split tunnel UCI shape (#90), 2026-11-17
-
-Same session and restore as the kill switch spike above. Starting from a connected full
-tunnel, I set every `wireguard_wg0` peer to `route_allowed_ips=0` and added
-`network.travo_split_<n>` route sections (`interface=wg0`, `target=<a.b.c.d>/32`) for the
-echo service and both profile resolvers, as `vpntunnel.SetSplit` stages them, then ran
-`reload_config`, `ifdown wg0` and `ifup wg0`. The handshake came back within 1 s, and
-`ip -4 route show dev wg0` listed the three /32 routes (netifd accepts CIDR in `target`).
-No default route remained, so leaving full mode dropped the uplink default (device-facts §1).
-After `ifup wwan` the default used the STA. The LAN client reached the echo service with the
-VPN address, and other sites answered (HTTP 204) via the uplink. With
-`travo_killswitch_wan` added, the echo service still answered through the tunnel and other
-sites were blocked.
-
-## VPN zone on tunnel enable (#87 follow-up), 2026-11-17
-
-AXT1800 25.12.6, lock held, `uci export firewall`/`network` restored byte for byte after (cmp),
-wg0 back to `disabled=1`, router and LAN egress via the uplink afterwards. Kill switch OFF
-throughout (no `travo_killswitch_*`). The LAN client was bound to its `br-lan` NIC, and egress
-addresses were compared by hash only.
-- wg0 enabled, handshake within 1 s, `default dev wg0`, no `travo_vpn`: LAN client BLOCKED.
-- Added `travo_vpn` + `travo_vpn_lan`, the sections tunnel enable now stages: LAN egress used the
-  VPN address.
-- Deleted both sections: LAN blocked again. Re-adding only the zone (`reload_config`, no wg0
-  restart) restored LAN egress through the VPN. The wg0 link stayed present and the handshake
-  stayed fresh, so the zone-only path does not need a tunnel restart.
-## Captive bypass and wwan renew (#130, #131, 2026-11-17)
-
-GL-AXT1800, OpenWrt 25.12.6, uplink wwan on phy0-sta0 (no AdGuard base: dnsmasq had no `server`, no `noresolv`, `rebind_protection 1`). `internal/captive/hardware_test.go` under the shared router lock: Enable pushed `list server` = the uplink DHCP resolver, `noresolv 0`, `rebind_protection 0`; resolution worked during the bypass (after the 2 to 4 s procd reload) and after restore; restore returned the base exactly. `RenewLease("wwan")` produced `udhcpc: sending renew` and an unchanged lease, no interface down; the default route via phy0-sta0 was proven after the 2 s settle (2.02 s total). `uci export` was identical before and after; no guard left. Not covered: a real portal (needs the simulator in testing.md).
-## STA recovery without `wifi` (#73, 2026-11-17)
-
-Router shared under the agent lock; `uci export` before and after was byte-identical.
-Layout: STA `wwan` on radio0 (5 GHz), AP on radio1 (2.4 GHz). Sampled every 2 s:
-STA and AP `network.device status` carrier, `wwan` IPv4 present, and `wpa_state`
-from `ubus call wpa_supplicant.phy0-sta0 control '{"command":"STATUS"}'`.
-SSIDs, BSSIDs and addresses are not recorded.
-
-- `iw dev phy0-sta0 disconnect`: `Operation not permitted (-1)`. wpa_supplicant owns the STA.
-- Upstream hidden with `control "SET bssid_filter 02:00:00:00:00:01"` and then
-  `DISCONNECT`/`RECONNECT`: `SCANNING`, no STA carrier and no wwan IPv4 for 40 s.
-  After the filter was cleared, with no other action, the STA was `COMPLETED` with
-  carrier and IPv4 at the next sample (2 s). (`BSSID_IGNORE` is not a valid
-  stand-in: wpa_supplicant cleared it and re-associated within 4 s.)
-- `ifup wwan` while the filter was still set: the STA was `COMPLETED` with
-  IPv4 after 6 s. netifd rebuilt the STA, which reset the runtime filter.
-- Sticky `control DISCONNECT`: `DISCONNECTED` for 10 s with no self-recovery.
-  `ifup wwan` led to `SCANNING` at 4 s and `COMPLETED` with IPv4 at 8 s.
-- AP `phy1-ap0` carrier was true in every sample. logread for each `ifup` showed
-  `hostapd: Reload all interfaces`, `Reloaded settings for phy phy1`,
-  `radio0 ... wifi-scripts: Starting`, and `Interface 'wwan' is disabled/enabled`.
-  It also showed a harmless `rmdir[ctrl_interface=...]: Permission denied` from
-  wpa_supplicant. dmesg had no new ath11k lines.
-- `/sbin/ifup` on this firmware is `ubus call network reload` followed by
-  `network.interface down` and `up` for the named interface.
-
-Outcome: ADR 0014 adopts `ifup wwan`, capped at 5, after two disconnected
-60 s ticks. Plain `ubus call network.interface.wwan down/up` without the global
-reload was not measured; the lock was held by another agent.
-
-## 0.1.0 release playbook, 2026-11-17
-
-GL-AXT1800, OpenWrt 25.12.6 r33311-981c978eff. Build: `mise run package` of main at `dc403f6`
-(`VERSION=0.1.0-rc.dc403f6`), installed with `install.sh --insecure` (no release key used).
-Exclusive router lock held for the run; fresh `sysupgrade -b` taken first and kept outside the
-repo. Caller on Ethernet (br-lan) unless noted; API reached directly on `192.168.1.1` or through an
-SSH local forward (which the daemon correctly classifies as an unknown caller, see step 2).
-Layout throughout: uplink STA `phy0-sta0` (wwan) on radio0, AP `phy1-ap0` on radio1. SSIDs,
-BSSIDs, MACs, keys, addresses and endpoints are not recorded.
-
-| Step | Result | Notes |
-| --- | --- | --- |
-| 1 install / LuCI port | pass | Clean baseline via `--uninstall --purge` of the previous build. That left a stray `/www/travo-greenfield` from an out-of-band asset deploy (not in its manifest), removed by hand. Clean: LuCI login on :80 OK, uhttpd `list listen_http '0.0.0.0:80'`, `'[::]:80'`, `list listen_https '0.0.0.0:443'`, `'[::]:443'`. Install without `--port`: 4 s, LuCI moved to 8080/8443, daemon on `:::80`, greenfield login OK on `http://192.168.1.1/`, LuCI login OK on :8080. `sysupgrade -l` lists config, init, rc links, binary, `manifest.txt`, `uhttpd.orig` and the `/www` assets. After the step-8 reboot both UIs answered. `--uninstall`: the four listener values back in the original order and `list` form, LuCI login OK on :80, then reinstalled. Cosmetic: the first install prints `Command failed: ubus call service delete ... (Not found)`. |
-| 2 wireless change not confirmed | pass | AP rename reached Pending after 2.3 s, and `iwinfo` already showed the new SSID. Unconfirmed: the watchdog restored after the 60 s window and `uci changes` was empty. Rename + confirm: still live 70 s later. Renamed back + confirm. `rolled_back` is reported about 2 s before hostapd reloads (#158). |
-| 3 lockout from a phone | operator | No phone on the AP. From Ethernet: disabling the only enabled AP over the SSH forward (unknown caller) gave 409 `wifi_lockout_risk` with no write, the fail-closed direction. From the wired LAN it proceeded. |
-| 4 wrong uplink password | pass with #158 | Wrong key for the connected SSID: `rolled_back` after 39.8 s, never Pending, wireless config byte-identical. At the response the STA had no carrier or default route; the route returned 4 to 6 s later (#158). |
-| 5 DNS captive over AdGuard / fail-open | pass with #157 | Bypass over the AdGuard base and restore: same values, but `list server` moves after `option noresolv`, so not byte-identical (#157). AdGuard stopped: no `server`/`noresolv` after 40 s (repeat: 33 s), LAN resolution via the uplink. |
-| 6 config backup | pass | `GET /api/v1/system/backup` 200 `application/gzip`, `gzip -t` OK, 107 entries incl. `etc/config/*`. Archive deleted after the check. |
-| 7 dashboard connectivity | pass | Connected: `phy0-sta0`, carrier true, online, matching the kernel default and `wwan` status. `ifdown wwan`: Offline, interface and carrier null, answered in 7 ms. `ifup wwan`: route back after about 11 s. |
-| 8 reboot (#65) | pass (API) | (a) Pending AP change: 409 `transaction_pending`, no reboot, guard only `txn-in-progress`. (b) Confirmed reboot: 202. New health `boot_id` after 41 s. Uptime 0 min, kernel boot_id changed, no guards, no `reboot.json`, no `stale guard` log. The UI "Restarting…" and "Router restarted" text was not watched (operator). |
-| 8 WireGuard status (#86) | pass | `disabled`, then `configured` after select. `no_handshake` with null age during the unreachable-endpoint enable (24/25 samples). `connected` with handshake age 21 s. |
-| WiFi Join (#71) | pass with #158 | Join with a 5 GHz BSSID pin: carrier 16.6 s, kernel default 17.7 s, Pending 17.7 s; confirmed, route persisted. Unconfirmed: rolled back after the window and the route returned about 6 s after `rolled_back`. The AP stayed up on radio1 throughout. WPA2/WPA3 not exercised. |
-| Saved uplinks (#72) | pass | Two saves, wireless unchanged and no `uci changes`; file `-rw-------`. The order survived reorder + daemon restart. Selecting the connected profile: 409 `wifi_no_change`. After a BSSID pin, selecting it: Pending 16 s, confirmed, `connected_id` matches the live SSID. Forgetting it kept carrier and the default. The second profile was a neighbour network (not ours), so it was never joined. |
-| WireGuard toggle (#87) | pass | Enable: Pending 1.4 s, handshake under 1 s, `default dev wg0`, LAN egress = VPN hash; confirmed. Disable: Pending 14.3 s, wg0 absent and default via `phy0-sta0` before confirm, LAN egress = uplink hash. Unreachable documentation endpoint from a disabled baseline: `rolled_back` after 80.6 s, no wg0, default via the STA, configs identical. Dashboard VPN card (#63) not checked (UI, operator). |
-| VPN zone on enable | pass | Zone deleted by hand: LAN blocked; enable again re-added only the zone (same wg0 ifindex, handshake 6 s old), LAN egress via the VPN. First enable without the zone and unconfirmed: `restoring` at 62 s, `rolled_back` at 78 s, `firewall` and `network` byte-identical, no wg0. |
-| VPN kill switch (#89) | pass | Rule `travo_killswitch_wan` (REJECT lan→wan) first in `forward_lan`, before `jump accept_to_wan`. User `@forwarding[0]` lan→wan unchanged. `ifdown wg0`: LAN curl failed (exit 7), router :80 200. `ifup wg0`: VPN egress. Tunnel off: LAN still blocked. Kill switch off: uplink egress, `travo_vpn` kept. Unconfirmed enable: firewall byte-identical after rollback; the live nft rule cleared about 2 s after `rolled_back` (#158). Enabling with no tunnel: 409 `vpn_not_connected`. |
-| VPN split tunnel (#90) | pass | One /32 for the echo service: 3 `travo_split_*` sections (echo + 2 resolvers), `route_allowed_ips='0'`, 3 routes on wg0, default via the STA. Echo service = VPN hash, other site = uplink hash. Kill switch on: echo still answers, other sites blocked. Empty list: `default dev wg0`, no `travo_split`, `network` byte-identical to before. Unconfirmed: `restoring` 61 s, `rolled_back` 63 s, byte-identical. |
-| VPN DNS layer (#88) | pass | The layer is present at confirm; `top: vpn`, verify `ok`. Both resolvers route via wg0 (`ip route get`; no tcpdump on the device). AdGuard on top: verify `overridden`, `top: adguard`, server = `127.0.0.1#5353`. AdGuard off: VPN resolvers return. Disable: record gone and dhcp equal to base within 30 s. |
-| WireGuard rollback (#108) | partial | Failed probe with the tunnel enabled: the documentation endpoint was live in `wg show wg0 endpoints` for 64 s, then the old endpoint returned with a fresh handshake; `rolled_back` after 67.4 s and `network` byte-identical. The explicit-rollback, confirm-timeout and killed-watchdog paths need a second reachable endpoint (operator). The container script was not run here. |
-| Access point settings (#74) | pass (Ethernet part) | Rename: Pending 2.3 to 3 s, only after `iwinfo` showed the SSID. Disable from the wired LAN: Pending 2.3 s with `phy1-ap0` gone from `network.wireless status`; rollback brought it back. Enabling the 5 GHz AP while the STA is on radio0: 409 `wifi_radio_in_use`, `uci changes` empty. Phone lockout: operator. `TestHWAPRenameProvesNewSSIDThenRollsBack` PASS (2.3 s). |
-| Guest AP (#75) | pass (Ethernet part) | Pending 3.9 s with `phy1-ap0` and `phy1-ap1` up/present, guest SSID in `iwinfo`, `guest` up. Fixtures in `guest/`. Unconfirmed: rolled back at 45 s, all four configs byte-identical, no `br-guest`. Confirmed + same settings again: 409 `wifi_no_change`. Phone checks (192.168.2.x, internet, no LAN access): operator. Guest removed afterwards. |
-| Uplink MAC policy (#76) | pass | Factory MAC is universally administered (LAA bit 0). Random: Pending after 8.4 s with an LAA MAC, carrier and route; rollback restored the factory MAC and route within 5 s. Custom LAA: Pending 7 s, confirmed. Default: Pending 8 s, confirmed; wireless byte-identical. `TestHWUplinkMACRandomThenRollsBack` PASS (9.3 s). |
-| Join AP reconcile (#99) | pass (Ethernet part) | AP on radio0 (5 GHz), radio1 AP and STA disabled; joined the uplink pinned to its 5 GHz BSSID. Pending 19.6 s with the AP on `phy1-ap0` (moved as `default_radio0.device='radio1'`) and the STA with carrier and default; confirmed. Unconfirmed repeat: `rolled_back` at 61 s, AP back on radio0 about 2 s later, wireless byte-identical to the baseline. The dialog text is not checked in the UI. From a phone: operator. |
-| Uplink reconnect cap (#73) | partial, bug fixed (#159) | Sticky `DISCONNECT` is healed by attempt 1 (`ifup wwan` rebuilds the STA), so the 5-attempt cap cannot be reached without powering off the upstream (operator). Attempt 1 came 24 s after the outage, because the previous tick fell inside a profile-select outage (wwan down 14:36:30 to 14:36:35): fixed in #159. The counter returned to 0 within 90 s of the address coming back. No `wifi` command or ath11k error, AP carrier kept, `uci export` unchanged. A 45 s outage healed by `RECONNECT` gave no attempt. |
-| AdGuard install / migration (#132) | pass (a, c) | (c) `apk del`, yaml and marker removed, daemon restarted: 0.107.80-r1 installed. 0 samples with a wildcard :3000 (1 s polling); loopback :3000 after 65 s. The yaml equals `internal/adguard/seed.yaml`; hagezi pro enabled (242264 rules); no install guard. (a) Old-Travo yaml (`0.0.0.0:3000`, `bind_hosts 0.0.0.0`, AGH on `:::3000` and `:::5353`): migrated within 1 s of daemon start; only `127.0.0.1:3000` and `:5353` listen, LAN :3000 refused, the diff changes only those two lines, no `.old` file or guard. (b) port-taken restore: not run. |
-| AdGuard default DNS (#133) | pass | (a) Adopt: record within 1 s, dhcp byte-identical. (b) Fail-open 40 s / 33 s, `fail_open_since` set. (c) Hold-down: the layer returned about 10.5 min after AGH restarted; re-enable via `POST /adguard/dns` took 0.4 s. (d) Service off: layer removed, 0/40 lookups failed during the call, never re-added. (e) `ifdown wwan` for 60 s: no fail-open. Note: a transient VPN outage (no handshake while wg0 held the default) correctly failed AGH open too. |
-| AdGuard gated proxy (#134) | pass (curl) | No session: 401. Session: dashboard 200, `/control/status` 200, protection POST with the same origin 200. `Origin: http://evil.example`: 403. AGH stopped: 502 `adguard_unavailable`. Uplink side: wan zone input REJECT (config only, no probe from the uplink network). |
-| Captive DNS bypass (#130) | pass with #157 (no portal) | Bypass without a portal: `server` = uplink resolver, `rebind_protection 0`, `noresolv 0`, countdown 294. Restore now: values back (order: #157). Daemon restart during the bypass: countdown re-armed at 297 s; auto-restore landed within 10 s of the deadline (2 s poll). No `dns-layer-in-progress` guard. Portal name resolution: operator. |
-| Captive portal (#129), DHCP renew (#131) | operator | Needs the portal simulator on the WAN port. `TestHWBypassUsesUplinkDNSAndRestoresBase` PASS (8.7 s), `TestHWRenewWWANProvesRoute` PASS (2.5 s), `TestHWCaptiveOverAdGuardRestoresBase` PASS, `TestHWAdGuardDownFailOpen` PASS. |
-| Signed update (#81) | operator | Needs a newer signed build and a signed broken release; no signing keys were used here. |
-| VPN on the guest zone (#89, PR #156) | pending #156 | #156 was not merged during the run. |
-
-End state: main `dc403f6` installed, uplink STA on radio0 and AP on radio1, AdGuard default DNS on,
-wg0 `disabled=1` (`travo_vpn` zone kept, as disable keeps it), one saved uplink and the restored VPN
-profile, no guards. Against the pre-run backup, `wireless`, `uhttpd` and `travo-greenfield`
-are byte-identical. `network` differs only in the option order of the wg0 peer, `firewall` by
-`travo_vpn`/`travo_vpn_lan`, and `dhcp` by the AdGuard `server`/`noresolv`.
-The exclusive lock `/tmp/agent-lock` lives on tmpfs: the step-8 reboot removed it, and it was not
-re-taken for the rest of the run. No other writer showed up in `logread`.
-
-### Re-test after #156 and #159, 2026-11-17 (main `c25579a`)
-
-Build: `mise run package` of main `c25579a`, installed with `install.sh --insecure --force`; health reports `0.0.0-dev`. Driven over Ethernet through the API, router lock held.
-
-**VPN on the guest zone (#89 / #156): pass (config and nft; guest-client egress is operator).**
-- (1) Guest AP created and confirmed, then tunnel enabled and confirmed: `firewall.travo_vpn_guest` (src `guest`, dest `travo_vpn`) present.
-- (2) Kill switch enabled and confirmed: `travo_killswitch_wan` and `travo_killswitch_guest_wan`; `nft list chain inet fw4 forward_guest` jumps to `reject_to_wan` ("Travo VPN kill switch (guest to wan)") before `accept_to_wan`. With `ifdown wg0` the admin API on br-lan still answered.
-- (3) Baseline restored (no guest AP), tunnel and kill switch enabled first, then the guest AP created: that one transaction (configs dhcp, firewall, network, wireless) added `travo_vpn_guest` and `travo_killswitch_guest_wan`. Kill switch disabled: both kill switch rules gone, `travo_vpn_guest` kept.
-
-**Reconnect (#159): behaves as ADR 0014 describes.** The 19:26:51 tick fell inside my manual `ifup wwan` (outside the daemon, so unguarded): `logread` shows phy0-sta0 deauthenticated at 19:26:48, reassociated at 19:26:52 and leased at 19:26:58, so at the tick the STA was enabled, not associated and had no IPv4 address, which is `Observation.down()`; a sticky `DISCONNECT` at 19:27:23 was down at the 19:27:51 tick, so attempt 1 fired (`ifup wwan`) and healed the link in 6 s. Status `retrying` 1/5, back to `idle` 0/5 within 2 minutes. The guest, tunnel and kill switch transactions in between triggered no attempt.
-
-Restore: `uci import` of the saved firewall, network, wireless and dhcp, `ubus call network reload` and `ifup wwan` (the reload alone left wwan "up" in netifd with no default route until `ifup wwan`). Final `uci export` has the same lines as before; only `dhcp` `list server` / `noresolv` order differs (#157).
-
-### Fix verification and #132 (b), 2026-11-17 (build 0.1.0-rc.fix157-158b = main + #162 + #163)
-
-**DNS restore order (#157): pass.** AdGuard default DNS off → on (new record, base order `[rebind_protection]`), `uci export dhcp` saved, `POST /api/v1/captive/dns-bypass` then `dns-restore`: `cmp` byte-identical. The AdGuard layer writes `list server` before `option noresolv`.
-
-**Restore settles before the result (#158): pass.** Wrong-key `POST /api/v1/wifi/join` for the connected SSID: `rolled_back` after 47 s (39.8 s before the fix). A sample taken right after the response already shows `default via <gw> dev phy0-sta0` and `radio1` `up:true pending:false` (before: no route for 4–6 s).
-
-**AdGuard restore when the loopback port is taken (#132 b): pass.** Daemon stopped, yaml `http.address` set to `0.0.0.0:3002` (old-Travo style on another port), AGH restarted on :3002, `uhttpd -p 127.0.0.1:3000` started on an empty root, daemon started. AGH logged `listen tcp 127.0.0.1:3000: bind: address already in use`; the daemon logged `adguard: loopback migration: context deadline exceeded (last: control/status: HTTP 404)`, put the old yaml back (`cmp` equal), AGH answered on :3002 again, no `adguardhome.yaml.old`, no guard. Reconcile retried the migration once more within ~3 minutes (each try restarts AGH twice); backoff is #164. Cleanup: real yaml back, AGH on `127.0.0.1:3000`/`:5353`, LAN DNS resolves.
-
-### Live phone tests, 2026-11-17 evening (router after `firstboot`, build 0.1.0-rc.5177e12 then 0.1.0-rc.agh-seed)
-
-Base: `firstboot` on OpenWrt 25.12.6, then uplink STA `wwan` on radio0, AP on radio1, country set, Travo installed with `install.sh --insecure`. Operator on an iPhone, coordinator over Ethernet and SSH.
-
-- **2.4 GHz joins failed first (#168).** hostapd `did not acknowledge authentication response` on channels 1, 6 and auto, HE20 and HT20, before Travo was installed, after a reboot and after `firstboot`. The joins started working after a regulatory change on radio1 (DE, then US again) re-initialised the radio. They kept working on US afterwards.
-- **5 GHz AP next to the STA.** It worked while the STA was associated first. After a regulatory change it started first on channel 36 and blocked the STA from returning to channel 149 (`#channels <= 1`) until it was disabled. A second AP hot-added to the STA radio by hand never started (`handle_probe_req: send failed`). This matches the `wifi_radio_in_use` refusal.
-- **Lockout (#74), phone on the only AP: pass.** Disabling it showed the lockout warning with Apply anyway (inline, see #170). With another LAN AP enabled, no warning, by design (`lockout.Check`). Apply anyway: AP off at 20:47:34. It was back without a confirm at 20:48:37. Joining a network that needs the phone's radio was refused with no write (`uci changes` empty).
-- **Guard after an unpolled timeout restore.** It stayed held. Fixed in #167.
-- **Guest (#75): pass.** Created through the API, then the phone on TGGuest got 192.168.2.x and internet, and `http://192.168.1.1` did not load.
-- **VPN on the guest zone (#89 / #156): pass.** A guest client egressed via the VPN (provider location shown). Kill switch on plus `ifdown wg0`: no internet on the guest, no fallback. `ifup wg0`: handshake in 4 s, egress back.
-- **Port 3001 and 80 from the uplink network: pass.** The phone on the home WiFi could open neither `http://<wwan ip>:3001` nor `http://<wwan ip>`.
-- **Join AP reconcile (#99): pass with a phone.** Joining the uplink's 2.4 GHz BSSID gave Pending in 25 s. STA `phy1-sta0` was on channel 11, and both APs moved to radio0 channel 36. The phone rejoined on 5 GHz and had internet. Joining the 5 GHz BSSID again moved the APs back to radio1.
-- **Reconnect cap (#73): pass.** Uplink was the iPhone hotspot, which was switched off. Attempts 1 to 5 ran at 21:31:53, 21:33:53, 21:35:53, 21:37:53 and 21:39:53, then `exhausted`. `wifi-reconnect.json` read `attempts:5`. UCI was byte-identical, with no `wifi` command or ath11k error, and both APs stayed up. After a daemon restart it stayed `exhausted` with no 6th attempt. The hotspot came back at about 21:52 (the iPhone only broadcasts with its hotspot screen open), and the status was `idle` 0/5 within about 20 s of the route.
-- **AdGuard preinstalled without a config.** After `firstboot` the image had `adguardhome` installed with an empty `/etc/adguardhome/`. AGH served its wizard on `:::3000`. Fixed in #169: seeded config, loopback in 2 s.
-- **UI checks: pass.** The dashboard VPN card enabled and disabled (looks need work, #170), the AdGuard dashboard opened through :3001, and reboot showed "Restarting…" then "Router restarted". A new login after the reboot is expected (in-memory sessions).
-
-## Failover apply probe and live failover (#277, 2026-11-20)
-
-Router: AXT1800, OpenWrt 25.12.6, mwan3 2.12.0-r3, iptables-nft 1.8.10. Uplinks `wan` (Ethernet, DHCP 10.0.1.0/24), `wwan` (home WiFi, same 10.0.1.0/24) and `usbtether` (iPhone over USB, `eth0`, ipheth, 172.20.10.0/28). Tailscale stopped and boot-disabled (stopped 00:03, 10 min before the test). Builds 0.2.0-rc.a4e48c8 (main), then fix/failover-probe. Captures: `mwan3/` (PROVENANCE.md).
-
-- **Root cause of the rolled-back wan → usbtether apply.** mwan3track reported both uplinks online 5 s after the start, but `mwan3-init` logged `set_general_iptables (ipv4): iptables-restore v1.8.10 (nf_tables): line 22: CHAIN_ADD failed (File exists): chain OUTPUT` (and ipv6). `nft list table ip mangle` held only two empty base chains, PREROUTING `type filter hook prerouting priority mangle` and OUTPUT `type filter hook output priority mangle`, both policy accept; `iptables -t mangle -S` printed `# Table 'mangle' contains incompatible base-chains` (exit 0). iptables-nft builds mangle OUTPUT as `type route`, so its batch failed: no `mwan3_hook`, no PREROUTING/OUTPUT jumps, every hotplug "called on <iface> before mwan3 has been set up", and the policy only got `out <iface> <dev>` rules plus `default`. The probe failed on the hook check for 45 s and rolled back, without saying why. The chains matched no mwan3 shape and appeared after Tailscale ran (nftables mode, which writes into `ip`/`ip6 mangle`); the writer is inferred, not observed.
-- **Fix confirmed by hand first.** `nft delete chain ip|ip6 mangle OUTPUT|PREROUTING`, then the same apply on main passed the probe in 7.5 s (`mwan3_hook` present, `"wan 1 1"` marking 0x100).
-- **Fix build.** Recreated the OUTPUT chains as `type filter`; Enable logged `WARN failover: deleting empty mangle base chains iptables-nft cannot use family=ip chains=[OUTPUT]` (and ip6), mwan3 set up cleanly (OUTPUT now `type route`), and the apply was pending after 7.8 s. PREROUTING (compatible) stayed.
-- **Probe reason.** With `oifname eth0` dropped, Enable wan → usbtether answered `rolled_back` with `"reason":"tracking","detail":"mwan3 reports usbtether offline, not online"`, and the log had `WARN failover: apply probe failed; rolling back check=tracking ...`.
-- **Failover wan → usbtether: pass (twice).** Primary failed without touching the cable: `nft add table inet travotest; nft add chain inet travotest out '{ type filter hook postrouting priority 0; }'; nft add rule inet travotest out oifname "wan" drop`. Detection (policy comment `"usbtether 1 1"`, wan "offline and tracking is active"): **16 s and 17 s** (down 3 x interval 5 s). Router-local egress (`wget -4 -qO- https://ifconfig.me/ip`) changed from the cable's public address to the phone carrier's; `ip route get 1.1.1.1 mark 0x600` → `via 172.20.10.1 dev eth0 table 6`. Unmarked `ip route get 1.1.1.1` keeps naming `wan` (main table; only mangle-marked traffic moves). Failback after `nft delete table inet travotest`: **33 s and 31 s** to `"wan 1 1"` (mwan3track "is online" exactly 30 s after, up 6 x 5 s), egress back on the cable. LAN-client download not measured (no LAN client in this session).
-- **wan + wwan in one subnet: does not fail over.** The probe passed (both online at apply time), but with `wan` dropped wwan's tracking went offline too within the same window, the policy fell back to `out wwan phy0-sta0` with no member, and `ip route get 1.1.1.1 mark 0x500` answered `Network unreachable` for 91 s until the drop was removed (failback 29 s). AdGuard lost its upstream meanwhile and failed open (dnsmasq `server 127.0.0.1#5353` removed, re-enabled after its hold-down). Enable now refuses uplinks whose IPv4 prefixes overlap: 409 `failover_same_subnet` ("... wan and wwan").
-- **Disable: pass.** `DELETE /api/v1/failover` → mwan3 stopped and boot-disabled, `nft list table ip|ip6 mangle` only the iptables-nft base chains (PREROUTING filter, OUTPUT route), no `mwan3_` chain, `iptables -t mangle -S` without the incompatible note. `/etc/config/network` and `firewall` byte-identical after USB tethering was disabled again; `/etc/config/mwan3` keeps the last failover settings by design and was restored to the saved export by hand.
+Open `needs-hardware` issues: #199, #168, #131 (renew on a real portal), #97, #25 (portal detection and assist).

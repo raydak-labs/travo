@@ -11,6 +11,7 @@ An issue is **ready-for-agent** only when it carries an agent brief that a small
 - Before labelling ready, run a **readiness probe**: a fresh small model reads the brief plus the repo and lists every sentence it would have to guess at, every referenced name that does not exist, and every acceptance item no command or test can check. Fix the brief and re-probe until it says "implementable: yes". Verify the facts a brief states (status codes, library behaviour) by running them, not from memory. This step is cheaper than any review loop.
 - Shared tooling that several briefs need (a test helper, a dev task) is its own small ticket that blocks them, not a "reuse it if merged" clause.
 - Rules live in `docs/` and the brief links them; the brief never copies a rule.
+- Product intent lives in issues: a PRD issue, then `/to-tickets`. There is no spec file to update. A rejected feature request goes to `.out-of-scope/` (`/triage`).
 
 ## 2. Implement
 

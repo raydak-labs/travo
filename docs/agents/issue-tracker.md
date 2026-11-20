@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues in `blackdark-org/travo-greenfield`, milestone `0.1.0`, project board https://github.com/orgs/blackdark-org/projects/1. Use the `gh` CLI for all operations (gh 2.94+: native sub-issues and blocked-by).
+Issues and specs for this repo live as GitHub issues in `blackdark-org/travo-greenfield`, the milestone of the next release (`gh api repos/blackdark-org/travo-greenfield/milestones --jq ".[].title"`), project board https://github.com/orgs/blackdark-org/projects/1. Use the `gh` CLI for all operations (gh 2.94+: native sub-issues and blocked-by).
 
 ## Conventions
 

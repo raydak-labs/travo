@@ -37,7 +37,13 @@ Test router: GL-AXT1800, OpenWrt 25.12.6, `ssh root@192.168.1.1` (key auth) when
 
 `hardware`-tagged tests (`internal/txn/hardware_test.go`, `internal/dnslayer/hardware_test.go`, `internal/captive/hardware_test.go`) run ON the router from Ethernet: cross-compile with `GOOS=linux GOARCH=arm64 go test -tags hardware -c`, copy with `scp -O`, run with `-test.timeout` (no `timeout` in BusyBox). They change live wireless/DNS state and rely on the watchdog/stack to restore it; take a sysupgrade backup first and pause competing configuration writers. The reboot test needs a temporary boot hook that calls `Recover`; remove it after. Results of the first run: `testdata/device/axt1800-25.12.6/SPIKES.md`.
 
-## Hardware playbook (run before each release; console or Ethernet fallback ready)
+## Hardware playbook
+
+Run before each release, with a console or Ethernet fallback ready. Record results in `testdata/device/axt1800-25.12.6/SPIKES.md`, one line per issue.
+
+**2.4 GHz joins (#168).** Right after `firstboot`, join a phone to a 2.4 GHz AP on radio1 and read hostapd in `logread`: a pass is an association, not `did not acknowledge authentication response`.
+
+**Scan fixtures (#97).** Capture `ubus call iwinfo scan '{"device":"<radio>"}'` on each radio whose band carries a test network (see `wifi-scan/PROVENANCE.md` for the selectors), with a genuinely open network and a WPA3-only (SAE-only) network in range, verbatim with provenance, under `testdata/device/axt1800-25.12.6/wifi-scan/`.
 
 **Offline AdGuard Home bundle (#184).** From Ethernet with a fresh backup and the uplink down (`ifdown wwan`). `apk del adguardhome`, remove `/etc/adguardhome/adguardhome.yaml` and `/etc/travo-greenfield/adguard-install-attempted`. Copy the release tarball and its `adguardhome-*.apk` to `/tmp`; `sh install.sh --adguard-bundle /tmp/adguardhome-*.apk` prints "bundle staged". Within one minute (no uplink, `GET /api/v1/connectivity` not online) `GET /api/v1/adguard` reports `installed:true, loopback:true`; `logread -e travo-greenfield` shows "installing from the offline bundle"; AGH never listens on `0.0.0.0:3000`; no `adguard-install-in-progress` guard remains; `apk list -I adguardhome` shows the bundled version. A tampered copy (`echo x >> file`) is refused by install.sh. Restore the uplink and the previous AGH state. Record sizes, versions and pass/fail in SPIKES.md.
 
@@ -45,7 +51,6 @@ Test router: GL-AXT1800, OpenWrt 25.12.6, `ssh root@192.168.1.1` (key auth) when
 
 **Self-signed HTTPS (#183).** After `install.sh` on the router: `uci get travo-greenfield.main.listen_tls` is `:443`; `netstat -ltn` shows `:443` and `:3443` (Travo) and `:8443` (uhttpd). `logread -e travo-greenfield | grep tls` shows one "new self-signed certificate" line after the first `https://` request, with a fingerprint equal to the one the browser shows. In a phone and a laptop browser: `https://192.168.8.1/` warns once, then login, the dashboard, a confirm flow (e.g. AP edit cancelled) and live updates work; the session cookie has `Secure`. Services → "Open AdGuard Home" opens `https://<router>:3443/`. From the uplink side `:443` and `:3443` are not reachable. `/etc/init.d/travo-greenfield restart` keeps the same fingerprint. With the clock set to 1970 before the first request (`date -s 1970-01-02`, then restore time), the certificate is still valid today (`openssl s_client` from a laptop: notBefore ≥ build time − 1 day). Record pass or fail in SPIKES.md.
 
-Done on 2026-11-09 (results: `testdata/device/axt1800-25.12.6/SPIKES.md`): payload captures; watchdog restore without confirm, after daemon kill and across reboot; wrong uplink password reads `carrier:false` and rolls back; DNS layer round trip with AdGuard and captive. The 0.1.0 release run on 2026-11-17 (same file, "0.1.0 release playbook") lists each step as pass, partial or operator, with the operator-only remainder.
 
 **LEDs and night schedule (#194).** From Ethernet. (a) `GET /api/v1/system/leds` lists `blue:run` (on) and `white:system`, not `mmc0::`; `uci show system | grep travo_led` is empty. (b) `PUT {"off":true}`: both LEDs are dark on the case, `uci show system` has `travo_led_blue_run` and `travo_led_white_system` (`trigger none`, `default 0`), `uci changes` is empty, both radios keep their clients and the uplink keeps its default route. (c) `PUT {"off":false}`: the run LED is lit again exactly as before, the Travo sections are gone, `/var/run/led.state` is gone. (d) `PUT /api/v1/system/leds/schedule` with `enabled:true`, `off_at` two minutes and `on_at` four minutes from now (router local time): `/etc/crontabs/root` ends with the `travo-greenfield:leds` block (two `--hook leds-off|leds-on` lines), other lines unchanged, `cronloglevel` 9. (e) At the off minute the LEDs go dark and `logread -e travo-greenfield` shows the `leds-off` hook; at the on minute they return. (f) PUT `enabled:false`: the block is removed, foreign lines kept. Restore: LEDs default, crontab as before. Record pass or fail in SPIKES.md.
 
@@ -199,7 +204,7 @@ Record each check as pass or fail in SPIKES.md ("Captive portal joint session") 
 
 Saved uplinks (#72): build, then run `scripts/with-mock.sh -- node web/scripts/e2e-wifi-profiles.mjs`. It saves, reorders, selects (stubbed transaction) and forgets at 390 px in light and dark and writes ignored screenshots to `web/screenshots/wifi-profiles/`. Set `CDP_PORT` to run beside another headless Chrome.
 
-Component migration checks: build, then run `scripts/with-mock.sh -- node web/scripts/e2e-components.mjs`. These check keyboard/focus, form validation, confirmations and transaction controls against mock/HTTP seams. See [the migration inventory](testing/shadcn-migration.md); no hardware is required.
+Component migration checks: build, then run `scripts/with-mock.sh -- node web/scripts/e2e-components.mjs`. These check keyboard/focus, form validation, confirmations and transaction controls against mock/HTTP seams. No hardware is required ([ADR 0013](adr/0013-shadcn-components.md)).
 
 ### Signed update hardware acceptance
 

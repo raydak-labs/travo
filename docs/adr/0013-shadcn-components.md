@@ -33,4 +33,4 @@ its MIT notice. That notice ships once, as
 Dialogs load on demand with their routes; the toaster is part of the shell
 (79.7 KB shell gzip after #170). Accessibility remains implemented by
 Bits UI. No router or device behavior changes are part of adoption. The
-inventory lives in [the migration evidence](../testing/shadcn-migration.md).
+inventory lives in [the migration evidence](https://github.com/blackdark-org/travo-greenfield/blob/v0.2.0/docs/testing/shadcn-migration.md).

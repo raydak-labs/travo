@@ -12,17 +12,19 @@ Follows https://github.com/BlackDark/agent-presets/blob/main/stack/core.md and `
 Deviations:
 - Backend Go with Huma-generated OpenAPI + hey-api client: no hand-written spec (docs/adr/0003).
 - Paraglide with `en` only (docs/adr/0004).
-- No Zod in the daemon path; Zod Mini/Valibot only for UI boundaries not covered by the generated client.
+- No Zod in the daemon path; Zod Mini/Valibot only if a UI boundary outside the generated client needs runtime validation (none so far, docs/adr/0031).
 - Distribution is a release tarball + install script, not a package (docs/adr/0007).
 
 ## Map
 
-- `docs/spec.md` product scope for 0.1.0.
 - `docs/invariants.md` MUST rules; read before touching live state, auth, DNS, WiFi. Breaking one needs an ADR.
 - `docs/device-facts.md` hardware lessons; `docs/testing.md` test layers and fixture rules.
-- `docs/web-ui.md` how pages confirm risky changes (dialog) and report results (toasts).
-- `docs/adr/` decisions; `GLOSSARY.md` terms (use them verbatim in code, tests, issues).
+- `docs/web-ui.md` page rules, and how pages confirm risky changes (dialog) and report results (toasts).
+- `docs/adr/README.md` decision index; `GLOSSARY.md` terms (use them verbatim in code, tests, issues).
 - `testdata/device/<device>-<firmware>/` verbatim device captures with `PROVENANCE.md` and redaction policy; `SPIKES.md` there has hardware results.
+- `.out-of-scope/` rejected feature requests, one file per concept; `/triage` checks it.
+
+There is no spec file. Product intent lives in issues (PRD, then tickets); shipped behaviour lives in tests and the generated OpenAPI.
 
 ## Work
 
@@ -35,7 +37,7 @@ Work is GitHub issues, rules are `docs/`. Before any task, read `docs/agents/wor
 
 ### Issue tracker
 
-GitHub issues on `blackdark-org/travo-greenfield`, milestone `0.1.0`, project board 1, native sub-issues and blocked-by. See `docs/agents/issue-tracker.md`.
+GitHub issues on `blackdark-org/travo-greenfield`, milestone of the next release (`gh api repos/blackdark-org/travo-greenfield/milestones --jq ".[].title"`), project board 1, native sub-issues and blocked-by. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -49,7 +51,7 @@ Single context: `GLOSSARY.md`, `docs/adr/`, `docs/invariants.md`, `docs/device-f
 
 Same PR, only what the change touches:
 - tests for the changed behaviour; fixtures are verbatim device payloads with provenance, never invented fields
-- docs that describe it (spec, invariants, ADR when a decision changes)
+- docs that describe it (invariants, ADR when a decision changes)
 - README when a user-visible feature changes
 - screenshots after visual changes
 

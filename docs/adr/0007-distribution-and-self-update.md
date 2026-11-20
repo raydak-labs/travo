@@ -1,6 +1,6 @@
 # 0007 Release tarball, install script, signed self-update
 
-Status: accepted
+Status: accepted; native `.apk` revisited by [0015](0015-no-native-apk-yet.md)
 
 Not a native package: a self-updating binary and apk/opkg would both own the same files and desync the package database. A tarball holds binary, UI, init script, `uci-defaults` and a `/lib/upgrade/keep.d/` entry (incl. `S99travo-greenfield` boot link). The installer targets a fresh OpenWrt installation and verifies the service answers before moving LuCI to :8080/:8443 (reversible on uninstall). Only `install.sh` moves the uhttpd ports. `internal/txn` has no uhttpd path. The install and uninstall port changes use a guard and a uhttpd snapshot. Restoration preserves each section’s listen values, their order, and whether they were an option or list. Settings live in UCI so backup/sysupgrade cover them.
 

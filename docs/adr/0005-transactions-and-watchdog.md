@@ -1,6 +1,6 @@
 # 0005 Self-owned transactions with an out-of-process watchdog
 
-Status: accepted (watchdog behaviour to be proven by spike S4)
+Status: accepted (watchdog proven on hardware by spike S4, testdata/device/axt1800-25.12.6/SPIKES.md)
 
 rpcd `uci apply` rollback snapshots at apply time and needs a session id and stored root login ([device-facts §4](../device-facts.md)). Travo does not use it.
 

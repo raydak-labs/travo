@@ -7,7 +7,7 @@ States:
 - no-handshake/: `disabled=0`, peer endpoint `192.0.2.1:51820` (TEST-NET-1, unreachable), 30 s after `reload_config`.
 - connected/: endpoint set to the real server, then `ifup wg0` (a `reload_config` alone kept the old endpoint), 15 s later; `wget http://ifconfig.me/ip` returned the VPN egress address.
 
-Per state:
+Per state (each file exists in `disabled/`, `no-handshake/` and `connected/`, next to `date.txt`):
 - interface-wg0-status.json: ubus call network.interface.wg0 status
 - interface-dump.json: ubus call network.interface dump
 - device-status-wg0.json: ubus call network.device status '{"name":"wg0"}'

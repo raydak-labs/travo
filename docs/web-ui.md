@@ -1,4 +1,4 @@
-# Web UI patterns: confirmations and results
+# Web UI patterns
 
 Every page uses the same three tools from `web/src/lib/ui/`. A new page follows them
 instead of putting warnings, confirm buttons or result text at the bottom of a form.
@@ -58,3 +58,19 @@ fail-open, an update in progress) stays in the card.
 
 The shell mounts the one `Toaster` (svelte-sonner) in `App.svelte`. `mise run screenshots`
 also captures a dialog, the pending toast and a result toast.
+
+## Page rules
+
+- Svelte 5 SPA, dark by default without a flash (a stored choice can switch to light), English via Paraglide.
+- Size budgets (`web/scripts/size-budget.mjs`): shell ≤ 128 KB gzip, route chunk ≤ 16 KB, total ≤ 256 KB.
+- Use the copied shadcn-svelte primitives for applicable controls. Keep the app wrapper contracts, semantic tokens and localization; record measured exceptions in [ADR 0013](adr/0013-shadcn-components.md).
+- Responsive and mobile-first, route-level code split, vector assets. No CDN or external fonts: the router is often offline.
+- Call only the generated API client; no hand-typed endpoints.
+- One card surface and one status vocabulary (ok / warn / danger / info / neutral / stale), no raw colour classes.
+- One group-heading component and one load/error wrapper: skeleton, inline error with retry, content. A failed request never renders as "absent".
+- Multi-status pages have a summary band of flat tiles that each degrade separately (WiFi is the reference).
+- `stale` shows the last known value dimmed and marked; never blank a known value.
+- One page scroll container. Live charts do not animate on push and state the window they retain. Rates in bits, at most two integer digits, unit per direction.
+- Sidebar-only nav: Dashboard, WiFi, Network, VPN, Services, System. The header holds actions only. A first visit lands on Dashboard with groups collapsed; a child route expands its parent; the group label opens the default page and the chevron toggles; stored nav state is versioned.
+- Optional service pages leave the nav when their package is absent (a failed check is not absent).
+- Errors name the cause. "Rolled back" is shown only when it is true.
