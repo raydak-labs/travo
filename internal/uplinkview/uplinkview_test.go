@@ -109,7 +109,7 @@ func TestUplinksNeedTheInterfaceDump(t *testing.T) {
 
 func TestBuildRules(t *testing.T) {
 	pfx := func(s string) []netip.Prefix { return []netip.Prefix{netip.MustParsePrefix(s)} }
-	got := Build(Inputs{
+	got := build(inputs{
 		Interfaces: []facts.Interface{
 			{Name: "wan", Up: true, L3Device: "eth0"}, // carrier, no address yet
 			{Name: "wwan", Up: true, L3Device: "phy0-sta0", IPv4: pfx("192.168.90.241/24")},
@@ -134,7 +134,7 @@ func TestBuildRules(t *testing.T) {
 		t.Errorf("failover = %+v", got.Failover)
 	}
 
-	down := Build(Inputs{
+	down := build(inputs{
 		Interfaces: []facts.Interface{{Name: "wwan"}},
 		Radios:     []facts.Radio{{Ifaces: []facts.WirelessIface{{Mode: "sta", SSID: "Hotel"}}}},
 		Links:      []device.NetLink{{Name: "eth1", Bus: "usb", Driver: "r8152"}},

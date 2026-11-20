@@ -17,7 +17,7 @@ const connectivityBody = {
   internet: 'online',
 };
 const resourcesBody = { hostname: 'router', uptime_seconds: 10 };
-// wwan as the daemon reports it from the AXT1800 interface dump (internal/device/mock/testdata).
+// DashboardUplinks shape; values follow the AXT1800 interface dump, details trimmed to null.
 const uplinksBody = {
   uplinks: [
     { name: 'wan', configured: true, up: false, device: null, ipv4: null, ssid: null, kind: null },

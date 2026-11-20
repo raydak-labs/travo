@@ -253,7 +253,10 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 	e := newEnvWithDashboard(t, nil, rates, snapshot, func(d *Deps) {
 		d.Alerts = fakeAlerts{}
 		d.Clients = &fakeClients{}
-		d.Uplinks = fakeUplinks{body: uplinkview.Uplinks{Uplinks: []uplinkview.Uplink{}}}
+		dev := d.Ubus.(*mock.Device)
+		mock.SeedClients(dev) // verbatim interface dump
+		mock.SeedWiFi(dev)
+		d.Uplinks = &uplinkview.Service{Ubus: dev, UCI: dev, Links: dev}
 	})
 	mock.SeedSystem(e.dev)
 	if rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/events"}); rec.Code != http.StatusUnauthorized {

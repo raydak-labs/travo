@@ -16,8 +16,8 @@ import (
 // ErrUnavailable means the interface dump could not be read.
 var ErrUnavailable = errors.New("uplink data is unavailable")
 
-// Names is the topology order; wan6 is wan's IPv6 side and is not drawn.
-var Names = []string{"wan", "wwan", "usbtether"}
+// names is the topology order; wan6 is wan's IPv6 side and is not drawn.
+var names = []string{"wan", "wwan", "usbtether"}
 
 // Uplinks is GET /api/v1/dashboard/uplinks.
 type Uplinks struct {
@@ -45,18 +45,18 @@ type Failover struct {
 	Order   []string `json:"order" nullable:"false" doc:"Uplinks in priority order"`
 }
 
-// Inputs are the reads Build joins; a nil optional input leaves its fields null.
-type Inputs struct {
+// inputs are the reads build joins; a nil optional input leaves its fields null.
+type inputs struct {
 	Interfaces []facts.Interface
 	Radios     []facts.Radio    // nil: wireless status unreadable
 	Links      []device.NetLink // nil: sysfs unreadable
 	Failover   *Failover
 }
 
-// Build is the pure join of the reads.
-func Build(in Inputs) Uplinks {
-	out := Uplinks{Uplinks: make([]Uplink, 0, len(Names)), Failover: in.Failover}
-	for _, name := range Names {
+// build is the pure join of the reads.
+func build(in inputs) Uplinks {
+	out := Uplinks{Uplinks: make([]Uplink, 0, len(names)), Failover: in.Failover}
+	for _, name := range names {
 		u := uplink(name, in.Interfaces)
 		switch name {
 		case "wwan":
@@ -87,14 +87,14 @@ func uplink(name string, ifaces []facts.Interface) Uplink {
 }
 
 // staSSID: the STA on the wwan device, else the first STA (wwan is down), else null.
-func staSSID(radios []facts.Radio, device *string) *string {
+func staSSID(radios []facts.Radio, l3 *string) *string {
 	var first *string
 	for _, radio := range radios {
 		for _, iface := range radio.Ifaces {
 			if iface.Mode != "sta" {
 				continue
 			}
-			if device != nil && iface.Ifname == *device {
+			if l3 != nil && iface.Ifname == *l3 {
 				return nonEmpty(iface.SSID)
 			}
 			if first == nil {
@@ -105,12 +105,12 @@ func staSSID(radios []facts.Radio, device *string) *string {
 	return first
 }
 
-func tetherKind(links []device.NetLink, device *string) *string {
-	if device == nil {
+func tetherKind(links []device.NetLink, l3 *string) *string {
+	if l3 == nil {
 		return nil
 	}
 	for _, link := range links {
-		if link.Name != *device {
+		if link.Name != *l3 {
 			continue
 		}
 		if kind, ok := facts.Tether(link); ok {
@@ -150,7 +150,7 @@ func (s *Service) Uplinks(ctx context.Context) (Uplinks, error) {
 	if err != nil {
 		return Uplinks{}, errors.Join(ErrUnavailable, err)
 	}
-	in := Inputs{}
+	in := inputs{}
 	if in.Interfaces, err = facts.ParseInterfaceDump(raw); err != nil {
 		return Uplinks{}, errors.Join(ErrUnavailable, err)
 	}
@@ -161,7 +161,7 @@ func (s *Service) Uplinks(ctx context.Context) (Uplinks, error) {
 		in.Links, _ = s.Links.NetLinks(ctx)
 	}
 	in.Failover = s.failover(ctx)
-	return Build(in), nil
+	return build(in), nil
 }
 
 func (s *Service) failover(ctx context.Context) *Failover {

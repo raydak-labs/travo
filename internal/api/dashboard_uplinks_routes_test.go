@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
 	"github.com/blackdark-org/travo-greenfield/internal/uplinkview"
 )
 
@@ -24,6 +25,25 @@ func TestDashboardUplinksRoute(t *testing.T) {
 	cookie, _ := e.login()
 	rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/uplinks", cookie: cookie})
 	want := `{"uplinks":[{"name":"wan","configured":false,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null}],"failover":{"enabled":false,"active":false,"order":["wan"]}}`
+	if rec.Code != http.StatusOK || compactJSON(t, rec.Body.Bytes()) != compactJSON(t, []byte(want)) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestDashboardUplinksFromMockCaptures(t *testing.T) {
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) {
+		dev := d.Ubus.(*mock.Device)
+		mock.SeedClients(dev) // verbatim AXT1800 interface dump: wan down, wwan up on phy0-sta0
+		mock.SeedWiFi(dev)
+		d.Uplinks = &uplinkview.Service{Ubus: dev, UCI: dev, Links: dev}
+	})
+	cookie, _ := e.login()
+	rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/uplinks", cookie: cookie})
+	want := `{"uplinks":[
+		{"name":"wan","configured":true,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null},
+		{"name":"wwan","configured":true,"up":true,"device":"phy0-sta0","ipv4":"192.168.90.241/24","ssid":"HomeUplink","kind":null},
+		{"name":"usbtether","configured":false,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null}
+	],"failover":null}`
 	if rec.Code != http.StatusOK || compactJSON(t, rec.Body.Bytes()) != compactJSON(t, []byte(want)) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
