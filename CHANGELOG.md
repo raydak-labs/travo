@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/blackdark-org/travo-greenfield/compare/v0.2.0...v0.2.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **update:** accept signed release additions and stage with the previous release in CI ([7586411](https://github.com/blackdark-org/travo-greenfield/commit/7586411418b000f84745d7b2a15660637702a255))
+* **vpn:** DNS layer follows the applied profile's resolvers ([#295](https://github.com/blackdark-org/travo-greenfield/issues/295)) ([c9e39d4](https://github.com/blackdark-org/travo-greenfield/commit/c9e39d460b3573571d3dcd6bce3d10c0d9d9ddde))
+
+
+### Documentation
+
+* clean up docs and README after 0.2.0 ([#291](https://github.com/blackdark-org/travo-greenfield/issues/291)) ([865a3e9](https://github.com/blackdark-org/travo-greenfield/commit/865a3e9f61ac4b6105a1597707d5f8a41efa07b4))
+* record self-update forward compatibility (ADR 0032) ([d41faf5](https://github.com/blackdark-org/travo-greenfield/commit/d41faf55ff6c575b1ea2b2fc00a35ef0d294953d))
+
 ## [0.2.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.1.0...v0.2.0) (2026-11-20)
 
 
