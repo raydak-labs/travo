@@ -89,6 +89,21 @@ done
 docker cp "$tmp/pkg-wrongsig/checksums.txt.sig" "$NAME:/tmp/stage-fixture/bad.sig"
 docker exec -e TRAVO_STAGE_PACKAGE_FIXTURE=/tmp/stage-fixture -e TRAVO_STAGE_PACKAGE_VERSION="$VERSION" \
   "$NAME" /tmp/stage.test -test.run '^TestRealReleasePackage$' -test.v
+
+# Self-update runs the INSTALLED release's stager on the new tarball (#287, docs/adr/0032).
+step "the previous release's stager accepts this package"
+prev=$(git ls-remote --tags origin 'v*' | sed -n 's|.*refs/tags/\(v[0-9][0-9.]*\)$|\1|p' | sort -V | tail -n 1)
+[ -n "$prev" ] || fail "no previous release tag on origin"
+git rev-parse -q --verify "refs/tags/$prev" >/dev/null || git fetch -q --depth=1 origin tag "$prev"
+mkdir "$tmp/prev"
+git archive "$prev" | tar -x -C "$tmp/prev"
+(cd "$tmp/prev" && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -tags integration -c -o "$tmp/stage-prev.test" ./internal/updatestage)
+docker cp "$tmp/stage-prev.test" "$NAME:/tmp/stage-prev.test"
+docker exec -e TRAVO_STAGE_PACKAGE_FIXTURE=/tmp/stage-fixture -e TRAVO_STAGE_PACKAGE_VERSION="$VERSION" \
+  "$NAME" /tmp/stage-prev.test -test.run '^TestRealReleasePackage$' -test.v ||
+  fail "$prev cannot stage this package: self-update from $prev would break"
+dx 'rm /tmp/stage-prev.test'
+echo "ok: $prev stages it"
 dx 'rm -r /tmp/stage-fixture /tmp/stage.test'
 
 step "refusals before the real install"

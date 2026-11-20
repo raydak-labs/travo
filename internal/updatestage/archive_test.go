@@ -19,11 +19,12 @@ type testMember struct {
 	kind       byte
 }
 
-func testPackage(version string) ([]testMember, string) {
+func testPackage(version string, extra ...string) ([]testMember, string) {
 	var members []testMember
 	var paths []string
 	var signed strings.Builder
-	for _, name := range required {
+	names := append(slices.Clone(required), extra...)
+	for _, name := range names {
 		if name == "checksums.txt" {
 			continue
 		}
@@ -32,7 +33,7 @@ func testPackage(version string) ([]testMember, string) {
 		}
 	}
 	slices.Sort(paths)
-	for _, name := range required {
+	for _, name := range names {
 		if name == "checksums.txt" {
 			continue
 		}
@@ -78,6 +79,37 @@ func gzipBytes(t *testing.T, raw []byte) []byte {
 		t.Fatal(err)
 	}
 	return compressed.Bytes()
+}
+
+// A later release adds files the running stager has never heard of (#287): the signed
+// manifest admits them under the package's own prefixes, never anywhere else.
+func TestArchiveSignedAdditions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ok   bool
+	}{
+		{"root/etc/hotplug.d/iface/60-travo-greenfield", true},
+		{"root/usr/share/travo-greenfield/data.json", true},
+		{webPrefix + "app.js", true},
+		{webPrefix + "assets/app.js", false},
+		{"root/sbin/travo-greenfield", false},
+		{"root/etc", false},
+		{"root/etc/../sbin/x", false},
+		{"extra.sh", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			members, signed := testPackage("1.2.3", tc.name)
+			dir := t.TempDir()
+			archive := filepath.Join(dir, "archive")
+			if err := os.WriteFile(archive, gzipBytes(t, tarBytes(t, members)), 0600); err != nil {
+				t.Fatal(err)
+			}
+			err := extract(context.Background(), archive, filepath.Join(dir, "payload"), []byte(signed), "1.2.3")
+			if (err == nil) != tc.ok {
+				t.Fatalf("accepted=%v, want %v: %v", err == nil, tc.ok, err)
+			}
+		})
+	}
 }
 
 func TestArchive(t *testing.T) {

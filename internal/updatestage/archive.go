@@ -32,6 +32,10 @@ var required = []string{
 	webPrefix + "index.html",
 }
 
+// A later release may add files under these prefixes; the signed manifest vouches for them
+// (docs/adr/0032). Staging only extracts them: the update worker installs the binary and UI.
+var signedPrefixes = []string{"root/etc/", "root/lib/", "root/usr/"}
+
 var errArchive = errors.New("invalid release archive")
 
 func allowed(name string) bool {
@@ -41,6 +45,12 @@ func allowed(name string) bool {
 	if slices.Contains(required, name) {
 		return true
 	}
+	for _, prefix := range signedPrefixes {
+		if rest, ok := strings.CutPrefix(name, prefix); ok && rest != "" {
+			return true
+		}
+	}
+	// flat: the update worker copies the UI as one directory of regular files
 	base, web := strings.CutPrefix(name, webPrefix)
 	return web && base != "" && !strings.Contains(base, "/")
 }
