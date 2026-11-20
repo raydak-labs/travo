@@ -74,6 +74,10 @@ curl -H "Authorization: Bearer tgt_..." http://192.168.8.1/api/v1/system/info
 
 The Svelte UI uses locally owned shadcn-svelte components, with the same light/dark palette and offline assets. New controls compose these primitives through the existing app wrappers. See [ADR 0013](docs/adr/0013-shadcn-components.md) for the size tradeoffs and [migration evidence](docs/testing/shadcn-migration.md) for the inventory and keyboard checks.
 
+## Known issues
+
+- **GL-AXT1800 on OpenWrt 25.12.6: available memory drifts down over hours.** Travo and AdGuard Home stay flat, but the kernel's free memory falls from about 75 MB after boot to 20-30 MB within 6 hours (#285). The System page warns below 15 MiB available and the banner shows below 8 MiB; a reboot frees the memory.
+
 ## Docs
 
 - [Spec](docs/spec.md) · [Invariants](docs/invariants.md) · Plan: [milestone 0.1.0](https://github.com/blackdark-org/travo-greenfield/milestone/1) and [project board](https://github.com/orgs/blackdark-org/projects/1)
