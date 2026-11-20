@@ -35,3 +35,4 @@ ADRs record decisions and stay as written. A later decision that changes one is 
 | [0029](0029-slide-switch-self-confirm.md) | Slide switch actions confirm themselves |
 | [0030](0030-firmware-guard-completion.md) | A finished firmware upgrade releases its guard |
 | [0031](0031-runtime-validation-only-where-needed.md) | Zod Mini or Valibot only when a UI boundary outside the generated client needs runtime validation |
+| [0032](0032-self-update-forward-compatibility.md) | Self-update accepts signed additions; CI stages each release with the previous one |

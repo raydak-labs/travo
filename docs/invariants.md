@@ -198,7 +198,7 @@ dnsmasq is the single DNS authority for upstream choice; in expert mode AGH owns
 
 ## 14. Updates and releases
 
-- Travo self-update: signed release (minisign public key embedded), download to `/tmp`, verify, keep previous as `.old`, atomic swap, procd restart, health check, automatic rollback on failure. Guarded. No background phone-home; on-demand and at most daily on page open. Release source configurable.
+- Travo self-update: signed release (minisign public key embedded), download to `/tmp`, verify, keep previous as `.old`, atomic swap, procd restart, health check, automatic rollback on failure. Guarded. No background phone-home; on-demand and at most daily on page open. Release source configurable. Each release must stage with the previous release's stager ([ADR 0032](adr/0032-self-update-forward-compatibility.md)).
 - After any upgrade verify the RUNNING exe path, not just file existence; restart, not start.
 - Sysupgrade keep-list includes the init script, the boot link `/etc/rc.d/S99travo-greenfield`, binary, and UCI enable.
 - Build stamps version and build time into the binary; build time is the time-plausibility floor. A missing stamp is a release defect.
