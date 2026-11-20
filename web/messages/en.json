@@ -208,6 +208,7 @@
   "usbtether_enable": "Use as uplink",
   "usbtether_disable": "Stop using the USB uplink",
   "usbtether_enable_title": "Use {device} as uplink?",
+  "usbtether_iphone_hint": "Unlock the iPhone, tap Trust, and turn on Personal Hotspot (Allow Others to Join) before enabling.",
   "usbtether_enable_help": "The phone joins the internet uplinks behind Ethernet and WiFi: it carries traffic while they have no connection. Confirm the change once the phone link is up.",
   "usbtether_disable_title": "Stop using the USB uplink?",
   "usbtether_disable_help": "If the phone is your only uplink, the router and its clients lose internet.",

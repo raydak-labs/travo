@@ -18,6 +18,7 @@ import {
   installDrivers,
   type Phone,
   usbTetherRefusal,
+  withIphoneHint,
 } from '../usbtether';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
 
@@ -27,9 +28,12 @@ let chosen = '';
 const control = createTunnelControl(() => usb.retry(), {
   submit: (enabled, signal) =>
     setUsbTether({ body: enabled && chosen ? { enabled, device: chosen } : { enabled }, signal }),
-  refusal: usbTetherRefusal,
+  refusal: (code) => {
+    const r = usbTetherRefusal(code);
+    return r.error ? { error: withIphoneHint(r.error, usb.data, chosen) } : r;
+  },
   confirmed: m.usbtether_confirmed,
-  rolledBack: m.usbtether_rolled_back,
+  rolledBack: () => withIphoneHint(m.usbtether_rolled_back(), usb.data, chosen),
   rollbackFailed: m.usbtether_rollback_failed,
 });
 transactionToast(
@@ -66,10 +70,15 @@ async function install(phone: Phone) {
 }
 
 // Both directions change which uplink carries traffic; disabling the only uplink cuts the router off.
-async function change(enable: boolean, device = '') {
+// An iPhone only carries traffic once it is unlocked, trusts the router and shares its hotspot.
+async function change(enable: boolean, device = '', kind = '') {
+  const help =
+    kind === 'ipheth'
+      ? `${m.usbtether_enable_help()} ${m.usbtether_iphone_hint()}`
+      : m.usbtether_enable_help();
   const ok = await confirm.ask({
     title: enable ? m.usbtether_enable_title({ device }) : m.usbtether_disable_title(),
-    description: enable ? m.usbtether_enable_help() : m.usbtether_disable_help(),
+    description: enable ? help : m.usbtether_disable_help(),
     action: enable ? m.usbtether_enable() : m.usbtether_disable(),
     tone: enable ? 'default' : 'danger',
   });
@@ -112,7 +121,10 @@ async function change(enable: boolean, device = '') {
                 <Status kind={link.carrier ? 'ok' : 'danger'}>{link.carrier ? m.dashboard_carrier_up() : m.dashboard_carrier_down()}</Status>
               {/if}
               {#if !(st.configured && st.device === link.name) && !control.busy}
-                <Button variant="outline" size="sm" type="button" onclick={() => change(true, link.name)}>{m.usbtether_enable()}</Button>
+                <Button variant="outline" size="sm" type="button" onclick={() => change(true, link.name, link.kind)}>{m.usbtether_enable()}</Button>
+              {/if}
+              {#if link.kind === 'ipheth' && link.carrier === false}
+                <span class="basis-full text-muted-foreground">{m.usbtether_iphone_hint()}</span>
               {/if}
             </li>
           {/each}

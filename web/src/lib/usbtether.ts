@@ -73,3 +73,21 @@ export function driverState(
 export function boundLinkMissing(status: UsbTetherStatus): boolean {
   return status.configured && !status.links.some((l) => l.name === status.device);
 }
+
+/**
+ * The iPhone link an enable targets has no carrier: the phone is locked, does not trust the
+ * router yet, or Personal Hotspot is off. Live, the first enable rolled back for this reason.
+ */
+export function iphoneNotReady(status: UsbTetherStatus | undefined, device: string): boolean {
+  const link = status?.links.find((l) => l.name === device);
+  return link?.kind === 'ipheth' && link.carrier === false;
+}
+
+/** Adds the iPhone hint to a refusal or rollback toast when iphoneNotReady explains it. */
+export function withIphoneHint(
+  text: string,
+  status: UsbTetherStatus | undefined,
+  device: string,
+): string {
+  return iphoneNotReady(status, device) ? `${text} ${m.usbtether_iphone_hint()}` : text;
+}
