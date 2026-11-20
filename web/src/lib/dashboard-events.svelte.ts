@@ -60,6 +60,13 @@ export type DashboardEventsOptions = {
   fallbackInterval?: number;
 };
 
+function perSource<T>(value: T): Record<DashboardSourceName, T> {
+  return Object.fromEntries(SOURCE_NAMES.map((source) => [source, value])) as Record<
+    DashboardSourceName,
+    T
+  >;
+}
+
 function freshState(): SourceState {
   return { status: { state: 'loading' } };
 }
@@ -234,14 +241,8 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
       controller: new AbortController(),
       client: clientFactory(),
       connected: false,
-      inFlight: {
-        connectivity: false,
-        resources: false,
-        throughput: false,
-        tailscale: false,
-        alerts: false,
-      },
-      versions: { connectivity: 0, resources: 0, throughput: 0, tailscale: 0, alerts: 0 },
+      inFlight: perSource(false),
+      versions: perSource(0),
     };
     active = owner;
     startFallback(owner);
