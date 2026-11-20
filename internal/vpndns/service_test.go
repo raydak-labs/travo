@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blackdark-org/travo-greenfield/internal/device"
 	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
 	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
 	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
@@ -254,5 +255,31 @@ func TestStatusWithoutDnsmasqStillReportsLayer(t *testing.T) {
 	}
 	if _, err := e.svc.Verify(ctx); err != nil {
 		t.Fatalf("inactive layer needs no live read: %v", err)
+	}
+}
+
+type networkWithoutWG0 struct{}
+
+func (networkWithoutWG0) Show(context.Context, string) ([]device.Section, error) {
+	return []device.Section{{Name: "lan", Type: "interface", Options: map[string]string{"proto": "static"}}}, nil
+}
+
+type selectedProfile struct{}
+
+func (selectedProfile) List() (vpnprofiles.List, error) {
+	id := "p1"
+	return vpnprofiles.List{Profiles: []vpnprofiles.Summary{}, SelectedID: &id}, nil
+}
+
+// #290: the layer record survives but network.wg0 is deleted (for example in LuCI).
+// The real classifier reads that as configured, so the next reconcile pops the layer.
+func TestReconcilePopsWhenTunnelConfigIsDeleted(t *testing.T) {
+	e := setup(t)
+	base := e.live(t)
+	e.reconcile(t, Push)
+	e.svc.Tunnel = vpnstatus.New(networkWithoutWG0{}, nil, nil, selectedProfile{}, time.Now, func() time.Duration { return 0 })
+	e.reconcile(t, Pop)
+	if got := e.live(t); !reflect.DeepEqual(got, base) {
+		t.Fatalf("base not restored:\n got %+v\nwant %+v", got, base)
 	}
 }
