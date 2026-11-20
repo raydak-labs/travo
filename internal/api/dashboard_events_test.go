@@ -17,6 +17,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
 	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
 	"github.com/blackdark-org/travo-greenfield/internal/throughput"
+	"github.com/blackdark-org/travo-greenfield/internal/uplinkview"
 )
 
 func TestDashboardEventServiceSharesProducersAndStops(t *testing.T) {
@@ -249,7 +250,11 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 	carrier := true
 	snapshot := &connectivitySnapshot{ActiveInterface: &link, Carrier: &carrier, Internet: connectivity.Online}
 	rates := &throughputSnapshot{ready: true, rates: []throughput.Rate{{Name: "phy0-sta0"}}}
-	e := newEnvWithDashboard(t, nil, rates, snapshot, func(d *Deps) { d.Alerts = fakeAlerts{} })
+	e := newEnvWithDashboard(t, nil, rates, snapshot, func(d *Deps) {
+		d.Alerts = fakeAlerts{}
+		d.Clients = &fakeClients{}
+		d.Uplinks = fakeUplinks{body: uplinkview.Uplinks{Uplinks: []uplinkview.Uplink{}}}
+	})
 	mock.SeedSystem(e.dev)
 	if rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/events"}); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("events before login: %d %s", rec.Code, rec.Body)
@@ -271,7 +276,7 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 	}
 
 	events := map[string]map[string]any{}
-	for len(events) < 4 {
+	for len(events) < 6 {
 		frame := readSSEFrame(t, reader)
 		name, data := parseSSEEvent(t, frame)
 		events[name] = data
@@ -284,6 +289,8 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 		{name: "resources", path: "/api/v1/system/info"},
 		{name: "throughput", path: "/api/v1/dashboard/throughput"},
 		{name: "alerts", path: "/api/v1/system/alerts"},
+		{name: "uplinks", path: "/api/v1/dashboard/uplinks"},
+		{name: "clients", path: "/api/v1/clients"},
 	} {
 		rec := e.do(req{method: http.MethodGet, path: tc.path, cookie: cookie})
 		var want map[string]any
@@ -297,7 +304,7 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 }
 
 func TestDashboardEventsSourceUnavailable(t *testing.T) {
-	e := newEnv(t) // resources, throughput and alerts are unavailable
+	e := newEnv(t) // resources, throughput, alerts, uplinks and clients are unavailable
 	cookie, _ := e.login()
 	ts := httptest.NewServer(e.h)
 	defer ts.Close()
@@ -305,7 +312,7 @@ func TestDashboardEventsSourceUnavailable(t *testing.T) {
 	reader := bufio.NewReader(resp.Body)
 	_ = readSSEFrame(t, reader)
 	unavailable := map[string]bool{}
-	for len(unavailable) < 3 {
+	for len(unavailable) < 5 {
 		name, data := parseSSEEvent(t, readSSEFrame(t, reader))
 		if name != "source_unavailable" {
 			continue
@@ -314,7 +321,7 @@ func TestDashboardEventsSourceUnavailable(t *testing.T) {
 		unavailable[source] = true
 	}
 	resp.Body.Close()
-	if !unavailable["resources"] || !unavailable["throughput"] || !unavailable["alerts"] {
+	if !unavailable["resources"] || !unavailable["throughput"] || !unavailable["alerts"] || !unavailable["uplinks"] || !unavailable["clients"] {
 		t.Fatalf("source_unavailable events = %v", unavailable)
 	}
 }

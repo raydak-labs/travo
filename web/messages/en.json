@@ -321,6 +321,7 @@
   "dashboard_internet_captive": "Captive portal",
   "dashboard_connectivity_unknown": "Unknown",
   "dashboard_connectivity_unavailable": "Could not refresh connectivity",
+  "dashboard_uplinks_unavailable": "Could not refresh uplinks",
   "captive_title": "Hotel WiFi login",
   "captive_login_needed": "This network asks you to sign in before it lets you online.",
   "captive_open_login": "Open hotel login",

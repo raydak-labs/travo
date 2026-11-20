@@ -19,6 +19,19 @@ describe('reduceDashboardEvent', () => {
     });
   });
 
+  it('accepts the uplinks and clients sources', () => {
+    const clients = { clients: [], partial: true };
+    expect(reduceDashboardEvent('clients', clients)).toEqual({
+      kind: 'data',
+      source: 'clients',
+      data: clients,
+    });
+    expect(reduceDashboardEvent('source_unavailable', { source: 'uplinks' })).toEqual({
+      kind: 'unavailable',
+      source: 'uplinks',
+    });
+  });
+
   it('ignores unknown event names, even with odd bodies', () => {
     expect(reduceDashboardEvent('message', 'hello')).toEqual({ kind: 'ignore' });
     expect(reduceDashboardEvent('future_source', null)).toEqual({ kind: 'ignore' });

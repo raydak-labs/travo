@@ -1,9 +1,13 @@
 import { fetchAlerts } from './api/alerts';
 import { scopedAPIClient } from './api/client';
+import { fetchClients } from './api/clients';
 import { fetchConnectivity } from './api/connectivity';
+import { fetchDashboardUplinks } from './api/dashboard-uplinks';
 import type {
   AlertList,
+  ClientsOutputBody,
   DashboardConnectivity,
+  DashboardUplinks,
   SystemInfoBody,
   TailscaleStatus,
   ThroughputBody,
@@ -39,6 +43,8 @@ const readers: Record<DashboardSourceName, Reader> = {
   throughput: fetchThroughput,
   tailscale: fetchTailscale,
   alerts: fetchAlerts,
+  uplinks: fetchDashboardUplinks,
+  clients: fetchClients,
 };
 
 type Ownership = {
@@ -83,12 +89,16 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
   const throughput = $state(freshState());
   const tailscale = $state(freshState());
   const alerts = $state(freshState());
+  const uplinks = $state(freshState());
+  const clients = $state(freshState());
   const states: Record<DashboardSourceName, SourceState> = {
     connectivity,
     resources,
     throughput,
     tailscale,
     alerts,
+    uplinks,
+    clients,
   };
   let streaming = $state(false);
   let active: Ownership | undefined;
@@ -256,6 +266,8 @@ export function createDashboardEvents(options: DashboardEventsOptions = {}) {
     throughput: view<ThroughputBody>('throughput'),
     tailscale: view<TailscaleStatus>('tailscale'),
     alerts: view<AlertList>('alerts'),
+    uplinks: view<DashboardUplinks>('uplinks'),
+    clients: view<ClientsOutputBody>('clients'),
     get streaming(): boolean {
       return streaming;
     },

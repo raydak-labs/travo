@@ -461,6 +461,57 @@ export type DashboardConnectivity = {
     portal_url: string | null;
 };
 
+export type DashboardFailover = {
+    /**
+     * The committed mwan3 config carries Travo's rules
+     */
+    active: boolean;
+    /**
+     * The saved failover choice
+     */
+    enabled: boolean;
+    /**
+     * Uplinks in priority order
+     */
+    order: Array<string>;
+} | null;
+
+export type DashboardUplink = {
+    /**
+     * The netifd interface exists
+     */
+    configured: boolean;
+    /**
+     * Kernel device carrying layer 3; null when absent
+     */
+    device: string | null;
+    /**
+     * First IPv4 address in CIDR form; null when none
+     */
+    ipv4: string | null;
+    /**
+     * usbtether only: tether protocol of the bound link (rndis, ncm, ecm, ipheth); null when unknown or not usbtether
+     */
+    kind: string | null;
+    name: 'wan' | 'wwan' | 'usbtether';
+    /**
+     * wwan only: SSID of the uplink STA; null when unknown or not wwan
+     */
+    ssid: string | null;
+    /**
+     * netifd reports it up and it has an IPv4 address
+     */
+    up: boolean;
+};
+
+export type DashboardUplinks = {
+    /**
+     * null when the failover settings or mwan3's config cannot be read (mwan3 not installed)
+     */
+    failover: DashboardFailover;
+    uplinks: Array<DashboardUplink>;
+};
+
 export type DataUsageAvailability = {
     name: 'wan' | 'wwan' | 'usbtether';
     samples: number;
@@ -2910,6 +2961,35 @@ export type GetDashboardThroughputResponses = {
 };
 
 export type GetDashboardThroughputResponse = GetDashboardThroughputResponses[keyof GetDashboardThroughputResponses];
+
+export type GetDashboardUplinksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/dashboard/uplinks';
+};
+
+export type GetDashboardUplinksErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetDashboardUplinksError = GetDashboardUplinksErrors[keyof GetDashboardUplinksErrors];
+
+export type GetDashboardUplinksResponses = {
+    /**
+     * OK
+     */
+    200: DashboardUplinks;
+};
+
+export type GetDashboardUplinksResponse = GetDashboardUplinksResponses[keyof GetDashboardUplinksResponses];
 
 export type DisableFailoverData = {
     body?: never;

@@ -23,12 +23,14 @@ const (
 	// The Tailscale read runs the tailscale CLI twice; tailnet state changes slowly.
 	dashboardTailscaleInterval = 15 * time.Second
 	dashboardAlertsInterval    = 15 * time.Second
-	dashboardInitialComment    = ": connected\n\n"
-	dashboardHeartbeatComment  = ": heartbeat\n\n"
+	// The clients read asks every AP for its station list.
+	dashboardClientsInterval  = 10 * time.Second
+	dashboardInitialComment   = ": connected\n\n"
+	dashboardHeartbeatComment = ": heartbeat\n\n"
 )
 
 type sourceUnavailableBody struct {
-	Source string `json:"source" enum:"connectivity,resources,throughput,alerts,tailscale"`
+	Source string `json:"source" enum:"connectivity,resources,throughput,alerts,tailscale,uplinks,clients"`
 }
 
 func (s *server) registerDashboardEvents(a huma.API) {
@@ -54,6 +56,20 @@ func (s *server) registerDashboardEvents(a huma.API) {
 			}
 			return out.Body, nil
 		}},
+		{name: "uplinks", interval: dashboardStatusInterval, read: func(ctx context.Context) (any, error) {
+			out, err := s.getDashboardUplinks(ctx, nil)
+			if err != nil {
+				return nil, err
+			}
+			return out.Body, nil
+		}},
+		{name: "clients", interval: dashboardClientsInterval, read: func(ctx context.Context) (any, error) {
+			out, err := s.listClients(ctx, nil)
+			if err != nil {
+				return nil, err
+			}
+			return out.Body, nil
+		}},
 		{name: "alerts", interval: dashboardAlertsInterval, read: func(ctx context.Context) (any, error) {
 			out, err := s.getSystemAlerts(ctx, nil)
 			if err != nil {
@@ -73,7 +89,7 @@ func (s *server) registerDashboardEvents(a huma.API) {
 	}
 	s.events = newDashboardEventService(s.DaemonContext, dashboardStreamLimit, sources)
 	operation := op("getDashboardEvents", http.MethodGet, "/api/v1/dashboard/events", "Live dashboard status", "dashboard", 503)
-	operation.Description = "Server-sent events named connectivity, resources, throughput, alerts, tailscale (only when the daemon supervises the package) and source_unavailable. Event data is the corresponding dashboard GET body; source_unavailable data identifies the failed source."
+	operation.Description = "Server-sent events named connectivity, resources, throughput, uplinks, clients, alerts, tailscale (only when the daemon supervises the package) and source_unavailable. Event data is the corresponding dashboard GET body; source_unavailable data identifies the failed source."
 	operation.Responses = map[string]*huma.Response{"200": {
 		Description: "Live dashboard event stream",
 		Content: map[string]*huma.MediaType{"text/event-stream": {Schema: &huma.Schema{

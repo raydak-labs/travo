@@ -53,6 +53,7 @@ import (
 	"github.com/blackdark-org/travo-greenfield/internal/updateapply"
 	"github.com/blackdark-org/travo-greenfield/internal/updatecheck"
 	"github.com/blackdark-org/travo-greenfield/internal/updatestage"
+	"github.com/blackdark-org/travo-greenfield/internal/uplinkview"
 	"github.com/blackdark-org/travo-greenfield/internal/version"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
 	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
@@ -432,6 +433,14 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	apiDeps.Clients = newClients(deps)
 	apiDeps.NetworkView = &netview.Service{UCI: deps.Device, Ubus: deps.Device}
+	uplinks := &uplinkview.Service{Ubus: deps.Device, UCI: deps.Device}
+	if links, ok := deps.Device.(device.NetLinkReader); ok {
+		uplinks.Links = links
+	}
+	if fo != nil {
+		uplinks.Failover = fo
+	}
+	apiDeps.Uplinks = uplinks
 	if r, ok := deps.Device.(device.InterfaceRestarter); ok {
 		apiDeps.InterfaceRestart = &ifrestart.Service{Device: r, Ubus: deps.Device, Guards: deps.Guards, Lockout: staLockout,
 			Now: clock.Now, Sleep: ifrestart.SleepContext, Wait: ifrestart.DefaultWait, Poll: ifrestart.DefaultPoll}

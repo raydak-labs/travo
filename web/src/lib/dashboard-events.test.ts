@@ -6,6 +6,7 @@ import { deferred } from './deferred.test-utils';
 const CONNECTIVITY = '/api/v1/dashboard/connectivity';
 const RESOURCES = '/api/v1/system/info';
 const THROUGHPUT = '/api/v1/dashboard/throughput';
+const UPLINKS = '/api/v1/dashboard/uplinks';
 const EVENTS = '/api/v1/dashboard/events';
 const GETS = [CONNECTIVITY, RESOURCES, THROUGHPUT];
 
@@ -16,6 +17,31 @@ const connectivityBody = {
   internet: 'online',
 };
 const resourcesBody = { hostname: 'router', uptime_seconds: 10 };
+// wwan as the daemon reports it from the AXT1800 interface dump (internal/device/mock/testdata).
+const uplinksBody = {
+  uplinks: [
+    { name: 'wan', configured: true, up: false, device: null, ipv4: null, ssid: null, kind: null },
+    {
+      name: 'wwan',
+      configured: true,
+      up: true,
+      device: 'phy0-sta0',
+      ipv4: '192.168.90.241/24',
+      ssid: null,
+      kind: null,
+    },
+    {
+      name: 'usbtether',
+      configured: false,
+      up: false,
+      device: null,
+      ipv4: null,
+      ssid: null,
+      kind: null,
+    },
+  ],
+  failover: null,
+};
 const throughputBody = {
   interfaces: [{ name: 'wan', rx_bytes_per_second: 1, tx_bytes_per_second: 2 }],
 };
@@ -31,6 +57,7 @@ function bodyFor(path: string): Response {
   if (path === CONNECTIVITY) return json(connectivityBody);
   if (path === RESOURCES) return json(resourcesBody);
   if (path === THROUGHPUT) return json(throughputBody);
+  if (path === UPLINKS) return json(uplinksBody);
   return json({ error: 'not found' }, 404);
 }
 
@@ -282,6 +309,32 @@ describe('dashboard event state', () => {
     stream.event('connectivity', recovered);
     await eventually(() => expect(active?.dashboard.connectivity.data).toEqual(recovered));
     expect(active.dashboard.connectivity.status).toEqual({ state: 'ready' });
+  });
+
+  it('holds pushed uplinks and falls back to their GET while the stream is down', async () => {
+    const stream = controlledSSE();
+    let eventCalls = 0;
+    active = harness((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === EVENTS) {
+        eventCalls += 1;
+        return eventCalls === 1 ? stream.response : json({ error: 'offline' }, 503);
+      }
+      return bodyFor(path);
+    });
+    active.dashboard.start(1);
+    await eventually(() => expect(active?.dashboard.streaming).toBe(true));
+    const pushed = { ...uplinksBody, failover: { enabled: true, active: true, order: ['wan'] } };
+    stream.event('uplinks', pushed);
+    await eventually(() => expect(active?.dashboard.uplinks.data).toEqual(pushed));
+    const seeded = paths(active, UPLINKS).length;
+    stream.close();
+    await eventually(() => expect(active?.dashboard.uplinks.status.state).toBe('error'));
+    expect(active.dashboard.uplinks.data).toEqual(pushed);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await eventually(() => expect(active?.dashboard.uplinks.data).toEqual(uplinksBody));
+    expect(active.dashboard.uplinks.status).toEqual({ state: 'ready' });
+    expect(paths(active, UPLINKS).length).toBeGreaterThan(seeded);
   });
 
   it.each(['success', 'failure'])(

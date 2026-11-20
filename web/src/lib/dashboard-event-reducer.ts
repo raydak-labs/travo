@@ -1,6 +1,8 @@
 import type {
   AlertList,
+  ClientsOutputBody,
   DashboardConnectivity,
+  DashboardUplinks,
   SystemInfoBody,
   TailscaleStatus,
   ThroughputBody,
@@ -13,6 +15,8 @@ export const SOURCE_NAMES = [
   'throughput',
   'tailscale',
   'alerts',
+  'uplinks',
+  'clients',
 ] as const;
 export type DashboardSourceName = (typeof SOURCE_NAMES)[number];
 export type SourceData =
@@ -20,7 +24,9 @@ export type SourceData =
   | SystemInfoBody
   | ThroughputBody
   | TailscaleStatus
-  | AlertList;
+  | AlertList
+  | DashboardUplinks
+  | ClientsOutputBody;
 
 export const sourceLabels: Record<DashboardSourceName, string> = {
   connectivity: 'Connectivity',
@@ -28,6 +34,8 @@ export const sourceLabels: Record<DashboardSourceName, string> = {
   throughput: 'Throughput',
   tailscale: 'Tailscale',
   alerts: 'Alerts',
+  uplinks: 'Uplinks',
+  clients: 'Clients',
 };
 
 /** What one SSE event means for the dashboard state. */

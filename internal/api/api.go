@@ -163,6 +163,8 @@ type Deps struct {
 	Clients Clients
 	// NetworkView is the read-only interface and zone view; nil answers 503 network_unavailable.
 	NetworkView NetworkView
+	// Uplinks is the dashboard uplink snapshot; nil answers 503 network_unavailable.
+	Uplinks UplinkReader
 	// InterfaceRestart restarts uplinks; nil answers 503 interface_restart_unavailable.
 	InterfaceRestart InterfaceRestarter
 	// Diagnostics runs ping/traceroute/lookup; nil answers 503 diagnostics_unavailable.
@@ -304,6 +306,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerStatsHistory(a)
 	s.registerDataUsage(a)
 	s.registerConnectivity(a)
+	s.registerDashboardUplinks(a)
 	s.registerCaptive(a)
 	s.registerWiFi(a)
 	s.registerWiFiProfiles(a)
@@ -350,6 +353,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "Tailscale" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/failover":
 		return "Failover" + name
+	case "github.com/blackdark-org/travo-greenfield/internal/uplinkview":
+		return "Dashboard" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/wansettings":
 		return "WAN" + name
 	case "github.com/blackdark-org/travo-greenfield/internal/ipv6settings":
