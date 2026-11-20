@@ -68,6 +68,9 @@ type lanState struct {
 	prefix  netip.Prefix // unmasked: the router's address and the subnet length
 	list    bool         // ipaddr is a one-element list (25.12 default, wan/uci-export-network.txt)
 	netmask bool
+	// tail rewrites every option stored after a list ipaddr, in order: uci appends the
+	// re-added list, so the tail is re-appended behind it to keep `uci export` identical.
+	tail []Write
 }
 
 // read takes network.lan: proto static with exactly one IPv4 address, CIDR or ipaddr + netmask.
@@ -93,7 +96,29 @@ func read(network []device.Section) (lanState, error) {
 	if !ok || !p.Addr().Is4() {
 		return lanState{}, ErrForeign
 	}
-	return lanState{prefix: p, list: list, netmask: netmask}, nil
+	return lanState{prefix: p, list: list, netmask: netmask, tail: tailAfter(s, "ipaddr")}, nil
+}
+
+// tailAfter returns the writes that delete and re-add every option ordered after name.
+func tailAfter(s device.Section, name string) []Write {
+	at := slices.Index(s.Order, name)
+	if at < 0 {
+		return nil
+	}
+	var w []Write
+	for _, opt := range s.Order[at+1:] {
+		if opt == "netmask" {
+			continue // dropped by writes
+		}
+		w = append(w, Write{"delete", opt, ""})
+		if v, ok := s.Options[opt]; ok {
+			w = append(w, Write{"set", opt, v})
+		}
+		for _, v := range s.Lists[opt] {
+			w = append(w, Write{"add", opt, v})
+		}
+	}
+	return w
 }
 
 // Validate parses the request: a private IPv4 host address of a /24 to /30 subnet.

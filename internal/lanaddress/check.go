@@ -147,12 +147,13 @@ type Write struct {
 	Value  string
 }
 
-// writes keeps the stored form: a one-element list stays a list, the address is CIDR and a
-// netmask option is dropped (25.12 writes CIDR, uci-show-network.txt).
+// writes keeps the stored form: a one-element list stays a list in its place, the address is
+// CIDR and a netmask option is dropped (25.12 writes CIDR, uci-show-network.txt).
 func writes(cur lanState, next netip.Prefix) []Write {
 	var w []Write
 	if cur.list {
 		w = append(w, Write{"delete", "ipaddr", ""}, Write{"add", "ipaddr", next.String()})
+		w = append(w, cur.tail...)
 	} else {
 		w = append(w, Write{"set", "ipaddr", next.String()})
 	}

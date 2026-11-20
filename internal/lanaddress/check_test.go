@@ -56,9 +56,49 @@ func inputs(t *testing.T) Inputs {
 
 func TestPlanKeepsTheListForm(t *testing.T) {
 	ws, err := Plan(inputs(t), netip.MustParsePrefix("192.168.8.1/24"))
-	want := []Write{{"delete", "ipaddr", ""}, {"add", "ipaddr", "192.168.8.1/24"}}
+	want := []Write{{"delete", "ipaddr", ""}, {"add", "ipaddr", "192.168.8.1/24"},
+		{"delete", "ip6assign", ""}, {"set", "ip6assign", "60"}}
 	if err != nil || !slices.Equal(ws, want) {
 		t.Fatalf("%v %v", ws, err)
+	}
+}
+
+// uciOrder applies writes to an option order the way uci does: set keeps an existing
+// option's place, a new option or list entry is appended, delete removes it.
+func uciOrder(order []string, ws []Write) []string {
+	out := slices.Clone(order)
+	for _, w := range ws {
+		switch {
+		case w.Op == "delete":
+			out = slices.DeleteFunc(out, func(n string) bool { return n == w.Option })
+		case !slices.Contains(out, w.Option):
+			out = append(out, w.Option)
+		}
+	}
+	return out
+}
+
+// A move and the move back leave `uci export network` byte-identical: the re-added list
+// ipaddr stays before ip6assign (live finding, 0.2.0 pre-release).
+func TestPlanRoundTripKeepsTheOptionOrder(t *testing.T) {
+	in := inputs(t)
+	i := slices.IndexFunc(in.Network, func(s device.Section) bool { return s.Name == Interface })
+	orig := in.Network[i].Order
+	ws, err := Plan(in, netip.MustParsePrefix("192.168.8.1/24"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := uciOrder(orig, ws)
+	if !slices.Equal(moved, orig) {
+		t.Fatalf("after the move: %v, want %v", moved, orig)
+	}
+	in.Network[i].Lists["ipaddr"] = []string{"192.168.8.1/24"}
+	back, err := Plan(in, netip.MustParsePrefix("192.168.1.1/24"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := uciOrder(moved, back); !slices.Equal(got, orig) {
+		t.Fatalf("after the move back: %v, want %v", got, orig)
 	}
 }
 
