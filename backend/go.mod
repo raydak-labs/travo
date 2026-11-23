@@ -5,7 +5,7 @@ go 1.27.4
 require (
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/fasthttp/websocket v1.5.12
-	github.com/gofiber/contrib/v3/websocket v1.2.14
+	github.com/gofiber/contrib/v3/websocket v1.2.16
 	github.com/gofiber/fiber/v3 v3.7.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	go.etcd.io/bbolt v1.5.0
@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	github.com/gofiber/schema v1.9.4 // indirect
+	github.com/gofiber/schema v1.10.0 // indirect
 	github.com/gofiber/utils/v2 v2.6.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.20.4 // indirect
@@ -25,8 +25,8 @@ require (
 	github.com/savsgio/gotils v0.0.0-20250924091648-bce9a52d7761 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.78.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
+	github.com/valyala/fasthttp v1.79.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 )
