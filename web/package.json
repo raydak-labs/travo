@@ -11,24 +11,24 @@
     "check": "biome check . && svelte-check --tsconfig ./tsconfig.json && vitest run && pnpm build && node scripts/size-budget.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@hey-api/openapi-ts": "0.99.0",
     "@inlang/paraglide-js": "3.2.2",
     "@inlang/plugin-message-format": "4.6.0",
     "@internationalized/date": "3.12.4",
-    "@lucide/svelte": "1.73.0",
+    "@lucide/svelte": "1.76.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tailwindcss/vite": "4.3.5",
     "bits-ui": "2.21.0",
     "cn": "0.3.3",
     "shadcn-svelte": "1.8.1",
-    "svelte": "5.57.3",
+    "svelte": "5.58.0",
     "svelte-check": "4.7.8",
     "svelte-sonner": "1.2.3",
     "tailwind-variants": "3.3.1",
     "tailwindcss": "4.3.5",
     "typescript": "6.0.3",
     "vite": "8.3.8",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   }
 }
