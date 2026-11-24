@@ -404,7 +404,7 @@
   "system_load": "Load",
   "system_memory": "Memory",
   "system_storage": "Storage",
-  "system_app_version": "travo-greenfield version",
+  "system_app_version": "Travo version",
   "system_build_time": "Build time",
   "system_used_of": "{used} of {total}",
   "update_title": "Software updates",
@@ -1287,5 +1287,14 @@
   "system_device_description": "This router: hardware, settings, backup, access and restart.",
   "system_leds_description": "The LEDs, their night schedule, and what the hardware buttons and slide switch do.",
   "system_updates_description": "Travo updates, OpenWrt release checks and firmware upgrades.",
-  "system_reset_description": "Erase all settings and start over."
+  "system_reset_description": "Erase all settings and start over.",
+  "vpn_status_label": "Status",
+  "vpn_tunnel_needs_profile": "Import and select a profile below to turn the tunnel on.",
+  "vpn_kill_needs_tunnel": "Connect the tunnel first; the kill switch only turns on while the VPN is up.",
+  "vpn_change_failed": "The VPN profile was not saved.",
+  "port_forwards_rules": "Forwarding rules",
+  "diag_run_title": "Run a test",
+  "tokens_yours": "Your tokens",
+  "reset_section": "Erase all settings",
+  "dashboard_description": "What the router is connected to right now, and how it is doing."
 }

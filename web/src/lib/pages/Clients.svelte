@@ -165,9 +165,9 @@ async function removeReservation(r: Reservation) {
                   {#if c.reserved}<Status kind="info">{m.clients_reserved()}</Status>{/if}
                   {#if c.blocked}<Status kind="danger">{m.clients_blocked()}</Status>{/if}
                 </div>
-                <p class="break-all font-mono text-sm text-muted-foreground">
+                <p class="font-mono text-sm break-words text-muted-foreground">
                   {c.ip ? m.clients_details({ ip: c.ip, mac: c.mac }) : c.mac}
-                  {#if c.ssid}<span class="font-sans"> {m.clients_on_ssid({ ssid: c.ssid })}</span>{/if}
+                  {#if c.ssid}<span class="font-sans whitespace-nowrap"> {m.clients_on_ssid({ ssid: c.ssid })}</span>{/if}
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
@@ -203,7 +203,7 @@ async function removeReservation(r: Reservation) {
           {#each reservations.data as r (r.mac)}
             <li class="flex flex-wrap items-center gap-2 py-2">
               <span class="break-all font-medium">{reservationName(r)}</span>
-              <span class="break-all font-mono text-sm text-muted-foreground">{r.ip ? m.clients_details({ ip: r.ip, mac: r.mac }) : r.mac}</span>
+              <span class="font-mono text-sm break-words text-muted-foreground">{r.ip ? m.clients_details({ ip: r.ip, mac: r.mac }) : r.mac}</span>
               <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy}
                 aria-label={m.clients_wake_name({ name: reservationName(r) })}
                 onclick={() => wakeUp(r.mac, reservationName(r))}>{m.clients_wake()}</Button>

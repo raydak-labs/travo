@@ -46,7 +46,7 @@ async function toggle(enabled: boolean) {
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {@const on = loader.data.enabled}
-      <SettingsRow label={m.ipv6_title()}>
+      <SettingsRow label={m.vpn_status_label()}>
         {#snippet control()}
           <Status kind={on ? 'ok' : 'neutral'}>{on ? m.ipv6_state_on() : m.ipv6_state_off()}</Status>
           <Button variant="outline" size="sm" type="button" disabled={txn.busy} onclick={() => toggle(!on)}>

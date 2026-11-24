@@ -92,7 +92,7 @@ async function revoke(token: Token) {
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_system_tokens()} description={m.system_tokens_description()} />
 
-  <Section title={m.tokens_title()} description={m.tokens_intro()}>
+  <Section title={m.tokens_yours()} description={m.tokens_intro()}>
     <LoadState status={tokens.status} retry={tokens.retry} stale={tokens.data !== undefined}>
       {#if tokens.data?.length === 0}
         <EmptyState icon={KeyRound} title={m.tokens_empty()} />

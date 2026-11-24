@@ -37,7 +37,7 @@ async function reset(event: SubmitEvent) {
 }
 </script>
 
-<Section title={m.reset_title()}>
+<Section title={m.reset_section()}>
   {#if started}
     <Alert class="status status-danger" role="status" aria-live="polite">{m.reset_started()}</Alert>
   {:else}

@@ -40,7 +40,7 @@ async function run(event: SubmitEvent) {
 }
 </script>
 
-<Section title={m.diag_title()} description={m.diag_intro()}>
+<Section title={m.diag_run_title()} description={m.diag_intro()}>
   <form class="flex flex-wrap items-end gap-3" onsubmit={run}>
     <Label class="grid gap-1">
       {m.diag_tool()}

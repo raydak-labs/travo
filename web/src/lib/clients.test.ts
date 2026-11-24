@@ -59,7 +59,7 @@ describe('client labels', () => {
 
   it('labels connections without claiming Ethernet for lan', () => {
     expect(connectionStatus({ connection: 'wifi', signal: -38 })).toEqual({
-      kind: 'ok',
+      kind: 'info',
       label: 'WiFi · -38 dBm',
     });
     expect(connectionStatus({ connection: 'lan' }).label).toBe('LAN');

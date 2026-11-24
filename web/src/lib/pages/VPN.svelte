@@ -70,6 +70,8 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
     if (!response.data) {
       const code = (response.error as { code?: string } | undefined)?.code;
       notify.error(
+        m.vpn_change_failed(),
+        undefined,
         code === 'invalid_profile'
           ? m.vpn_invalid()
           : code === 'profile_limit'

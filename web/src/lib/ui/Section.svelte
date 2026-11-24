@@ -17,7 +17,7 @@ const headingId = $props.id();
 </script>
 
 <!-- Phones get the compact card spacing so content keeps most of the 390 px width. -->
-<Root role="region" aria-labelledby={headingId} class="max-sm:[--card-spacing:--spacing(4)]">
+<Root role="region" aria-labelledby={headingId} class="gap-4 max-sm:[--card-spacing:--spacing(4)]">
   <Header>
     <h2 id={headingId} class="text-base leading-normal font-semibold">{title}</h2>
     {#if description}<Description>{description}</Description>{/if}

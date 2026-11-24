@@ -75,7 +75,7 @@ let trafficOpen = $state(false);
 
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={m.nav_dashboard()}>
+  <PageHeader title={m.nav_dashboard()} description={m.dashboard_description()}>
     {#snippet actions()}
       <Button size="sm" href={href('wifi')}>{m.dashboard_connect_to_wifi()}</Button>
     {/snippet}

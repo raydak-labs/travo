@@ -8,8 +8,14 @@ import { toast } from 'svelte-sonner';
 export const notify = {
   success: (text: string, id?: string) => toast.success(text, { id, duration: 5000 }),
   info: (text: string, id?: string) => toast.info(text, { id, duration: 5000 }),
-  error: (text: string, id?: string) =>
-    toast.error(text, { id, duration: Number.POSITIVE_INFINITY, closeButton: true }),
+  /** `detail` adds the fix under a title that names the failure. */
+  error: (text: string, id?: string, detail?: string) =>
+    toast.error(text, {
+      id,
+      description: detail,
+      duration: Number.POSITIVE_INFINITY,
+      closeButton: true,
+    }),
   progress: (text: string, id: string) =>
     toast.loading(text, { id, duration: Number.POSITIVE_INFINITY, dismissible: false }),
   dismiss: (id: string) => toast.dismiss(id),

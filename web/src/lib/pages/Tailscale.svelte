@@ -72,7 +72,7 @@ const phaseStatus = {
 <div class="flex flex-col gap-6">
   <PageHeader title={m.tailscale_title()} description={m.tailscale_page_description()}>
     {#snippet actions()}
-      <Button variant="link" size="sm" class="px-0" href={href('vpn')}>{m.tailscale_back()}</Button>
+      <Button variant="outline" size="sm" href={href('vpn')}>{m.tailscale_back()}</Button>
     {/snippet}
   </PageHeader>
   <Section title={m.tailscale_status_title()}>

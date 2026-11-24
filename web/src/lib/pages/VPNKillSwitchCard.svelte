@@ -10,6 +10,7 @@ import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl, killSwitchRefusal } from '../vpn-tunnel.svelte';
@@ -52,8 +53,12 @@ async function change(enable: boolean) {
 <Section title={m.vpn_kill()}>
   <LoadState status={state.status} retry={state.retry} stale={state.data !== undefined}>
     {#if state.data}
-      <Status kind={state.data.enabled ? 'ok' : 'neutral'}>{state.data.enabled ? m.vpn_kill_on() : m.vpn_kill_off()}</Status>
-      <p class="text-muted-foreground">{state.data.enabled ? m.vpn_kill_on_help() : m.vpn_kill_off_help()}</p>
+      {@const on = state.data.enabled}
+      <SettingsRow label={m.vpn_status_label()} description={on ? m.vpn_kill_on_help() : m.vpn_kill_off_help()}>
+        {#snippet control()}
+          <Status kind={on ? 'ok' : 'neutral'}>{on ? m.vpn_kill_on() : m.vpn_kill_off()}</Status>
+        {/snippet}
+      </SettingsRow>
     {/if}
   </LoadState>
   {#if state.data && !control.busy}
@@ -64,6 +69,9 @@ async function change(enable: boolean) {
         <Button variant="outline" size="sm" type="button" disabled={!connected} onclick={() => change(true)}>{m.vpn_kill_enable()}</Button>
       {/if}
     </div>
+    {#if !state.data.enabled && !connected}
+      <p class="text-sm text-muted-foreground">{m.vpn_kill_needs_tunnel()}</p>
+    {/if}
   {/if}
 </Section>
 

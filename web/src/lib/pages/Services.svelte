@@ -73,9 +73,9 @@ const proxy = adguardUrl(window.location);
           {#if st.busy}<Status kind="info">{m.adguard_busy()}</Status>{/if}
         </div>
         {#if st.installed}
-          <p class="text-muted">{m.adguard_version({ version: st.version })}</p>
-          {#if st.config_error}<p class="text-muted">{m.adguard_err_config()}</p>{/if}
-          {#if st.migration_failed}<p class="text-muted">{m.adguard_migration_failed()}</p>{/if}
+          <p class="text-sm text-muted-foreground">{m.adguard_version({ version: st.version })}</p>
+          {#if st.config_error}<p class="text-sm text-muted-foreground">{m.adguard_err_config()}</p>{/if}
+          {#if st.migration_failed}<p class="text-sm text-muted-foreground">{m.adguard_migration_failed()}</p>{/if}
           <div class="flex flex-wrap gap-2">
             {#if st.topology !== 'expert' || !st.running}
               <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('service', !st.running)}>{st.running ? m.adguard_stop() : m.adguard_start()}</Button>
@@ -92,7 +92,7 @@ const proxy = adguardUrl(window.location);
             {/if}
           </div>
         {:else}
-          <p class="text-muted">{m.adguard_absent_body()}</p>
+          <p class="text-sm text-muted-foreground">{m.adguard_absent_body()}</p>
           <div class="mt-3">
             <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('install', true)}>{m.adguard_install()}</Button>
           </div>

@@ -82,18 +82,18 @@ async function restart(name: Restartable) {
               <Status kind={state.kind}>{state.label}</Status>
               {#if it.uplink}<Status kind="info">{m.netview_uplink()}</Status>{/if}
               {#if it.zone}<span class="text-sm text-muted-foreground">{m.netview_zone({ zone: it.zone })}</span>{/if}
-              {#if restartable(it.name)}
-                {@const name = it.name}
-                <Button variant="outline" size="sm" type="button" class="ml-auto" disabled={restarting !== undefined}
-                  aria-label={m.netview_restart_name({ name })}
-                  onclick={() => restart(name)}>{m.netview_restart()}</Button>
-              {/if}
             </div>
-            <p class="break-all font-mono text-sm text-muted-foreground">
+            <p class="font-mono text-sm break-words text-muted-foreground">
               {it.proto}{#if it.device} · {it.device}{/if}{#if addrs} · {addrs}{/if}
             </p>
             {#if it.dns_servers.length}
               <p class="break-all text-sm text-muted-foreground">{m.netview_dns({ servers: it.dns_servers.join(', ') })}</p>
+            {/if}
+            {#if restartable(it.name)}
+              {@const name = it.name}
+              <Button variant="destructive" size="sm" type="button" class="self-start" disabled={restarting !== undefined}
+                aria-label={m.netview_restart_name({ name })}
+                onclick={() => restart(name)}>{m.netview_restart()}</Button>
             {/if}
           </li>
         {/each}

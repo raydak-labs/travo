@@ -60,7 +60,7 @@ async function toggle(on: boolean) {
         </Button>
       </div>
       {#if expert && hosts.length > 0}
-        <p class="text-muted">{m.adguard_topology_hosts({ hosts: hosts.join(', ') })}</p>
+        <p class="text-sm text-muted-foreground">{m.adguard_topology_hosts({ hosts: hosts.join(', ') })}</p>
       {/if}
     </Collapsible.Content>
   </Collapsible.Root>

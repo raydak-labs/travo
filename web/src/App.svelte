@@ -219,7 +219,7 @@ $effect(() => {
                   {#snippet child({ props })}
                     <Button {...props} variant="ghost" size="icon" type="button"
                       aria-label={m.nav_group_toggle({ group: group.label() })}
-                      class="shrink-0 [&[data-state=open]>svg]:rotate-90"
+                      class="shrink-0 aria-expanded:bg-transparent [&[data-state=open]>svg]:rotate-90"
                       ><ChevronRight aria-hidden="true" size={18} class="transition-transform" /></Button
                     >
                   {/snippet}

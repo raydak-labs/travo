@@ -101,7 +101,7 @@ async function remove(f: PortForward) {
 }
 </script>
 
-<Section title={m.port_forwards_title()} description={m.port_forwards_intro()}>
+<Section title={m.port_forwards_rules()} description={m.port_forwards_intro()}>
   <LoadState status={forwards.status} retry={forwards.retry} stale={forwards.data !== undefined}>
     {#if forwards.data}
       {#if forwards.data.length === 0}

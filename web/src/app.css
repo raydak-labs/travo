@@ -202,3 +202,12 @@ body {
   stroke: var(--neutral);
   stroke-dasharray: 2 4;
 }
+
+/* Toast close button sits inside the toast's top-right corner, not off its top-left edge.
+   Doubled attribute: one step more specific than svelte-sonner's injected rule. */
+[data-sonner-toast][data-styled="true"] [data-close-button][data-close-button] {
+  left: auto;
+  right: 0.5rem;
+  top: 0.5rem;
+  transform: none;
+}

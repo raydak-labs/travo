@@ -8,6 +8,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import type { LoadStatus } from '../ui/loader.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import {
@@ -58,13 +59,13 @@ async function toggle(enabled: boolean) {
   {#if status.data}
     {@const snapshot = status.data}
     {@const badge = tunnelStates[snapshot.state]}
-    <div class="flex flex-wrap items-center gap-2">
-      <Status kind={badge.kind}>{badge.label()}</Status>
-      {#if snapshot.stale}<Status kind="stale">{m.load_stale()}</Status>{/if}
-    </div>
-    {#if snapshot.handshake_age_seconds !== null}
-      <p class="text-muted-foreground">{m.vpn_handshake_age({ age: formatUptime(snapshot.handshake_age_seconds) })}</p>
-    {/if}
+    <SettingsRow label={m.vpn_status_label()}
+      description={snapshot.handshake_age_seconds !== null ? m.vpn_handshake_age({ age: formatUptime(snapshot.handshake_age_seconds) }) : undefined}>
+      {#snippet control()}
+        <Status kind={badge.kind}>{badge.label()}</Status>
+        {#if snapshot.stale}<Status kind="stale">{m.load_stale()}</Status>{/if}
+      {/snippet}
+    </SettingsRow>
   {/if}
 </LoadState>
 {#if status.data && !control.busy}
@@ -75,6 +76,9 @@ async function toggle(enabled: boolean) {
     {@render extra?.(snapshot)}
     <Button variant={enabled ? 'destructive' : 'outline'} size="sm" type="button" disabled={snapshot.stale || (!enabled && !canEnable(snapshot))} onclick={() => toggle(enabled)}>{enabled ? m.vpn_tunnel_disable() : m.vpn_tunnel_enable()}</Button>
   </div>
+  {#if !enabled && !canEnable(snapshot)}
+    <p class="text-sm text-muted-foreground">{m.vpn_tunnel_needs_profile()}</p>
+  {/if}
 {/if}
 
 <ConfirmDialog {confirm} />

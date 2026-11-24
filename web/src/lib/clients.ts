@@ -40,14 +40,14 @@ export function connectionStatus(c: Pick<LanClient, 'connection' | 'signal'>): {
   switch (c.connection) {
     case 'wifi':
       return {
-        kind: 'ok',
+        kind: 'info',
         label:
           c.signal === undefined
             ? m.clients_conn_wifi()
             : `${m.clients_conn_wifi()} · ${m.clients_signal({ signal: c.signal })}`,
       };
     case 'lan':
-      return { kind: 'ok', label: m.clients_conn_lan() };
+      return { kind: 'info', label: m.clients_conn_lan() };
     default:
       return { kind: 'neutral', label: m.clients_conn_offline() };
   }

@@ -83,6 +83,8 @@ Scale, applied by these components and the shell:
 
 The WiFi page is the reference that the other pages copy.
 
+Edit forms (several fields saved together with one button, such as WAN, DHCP server, device settings or the LED schedule) stay stacked label-over-input inside their `Section`; `SettingsRow` is for a setting that applies on its own and for list items. A single-section page gives its section a title that does not repeat the page title. A control that is disabled says why next to it.
+
 Danger actions (disable, delete, remove, revoke, restart, block) use the `destructive` button tone and sit last in their row or section; they still ask through `ConfirmDialog`.
 
 ## Dashboard network map
