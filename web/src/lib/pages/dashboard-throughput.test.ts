@@ -1,7 +1,6 @@
 import { render } from 'svelte/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Rate } from '../api/gen';
-import { fetchHealth } from '../api/health';
 import type { LoadStatus } from '../ui/loader.svelte';
 import Dashboard from './Dashboard.svelte';
 
@@ -14,6 +13,7 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
     tailscale: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
     uplinks: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
     clients: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
+    alerts: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
@@ -56,7 +56,6 @@ describe('Dashboard throughput', () => {
     expect(body).toContain('Unknown');
     expect(body).toContain('1.0 KB/s');
     expect(body).toContain('256 B/s');
-    expect(createLoader).toHaveBeenCalledWith(fetchHealth);
   });
 
   it('keeps last values visible when refresh fails', () => {
@@ -84,7 +83,7 @@ describe('Dashboard Tailscale', () => {
 
   it('stays hidden while the package is absent', () => {
     dashboardEvents.tailscale.data = { installed: false };
-    expect(dashboard({ state: 'ready' }, [])).not.toContain('Open Tailscale');
+    expect(dashboard({ state: 'ready' }, [])).not.toContain('#/vpn/tailscale');
   });
 
   it('shows the pushed state on the map and links the Tailscale page', () => {
@@ -97,7 +96,9 @@ describe('Dashboard Tailscale', () => {
     };
     const body = dashboard({ state: 'ready' }, []);
     expect(body).toContain('Tailscale: Connected');
-    expect(body).toContain('Open Tailscale');
-    expect(body).toContain('#/vpn/tailscale');
+    const plain = body.replace(/<!--[^>]*-->/g, '');
+    expect(plain).toContain('<a href="#/vpn/tailscale"><span data-slot="badge"');
+    expect(plain).toContain('Tailscale Connected');
+    // An absent package hides the Tailscale row and chip.
   });
 });

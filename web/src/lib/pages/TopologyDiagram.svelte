@@ -1,8 +1,8 @@
 <script lang="ts">
 import Cable from '@lucide/svelte/icons/cable';
-import Laptop from '@lucide/svelte/icons/laptop';
+import Monitor from '@lucide/svelte/icons/monitor';
 import RouterIcon from '@lucide/svelte/icons/router';
-import Usb from '@lucide/svelte/icons/usb';
+import Smartphone from '@lucide/svelte/icons/smartphone';
 import Wifi from '@lucide/svelte/icons/wifi';
 import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 import { formatBitRate } from '../format';
@@ -22,6 +22,9 @@ import {
 import type { LoadStatus } from '../ui/loader.svelte';
 import Status from '../ui/Status.svelte';
 
+// The dashboard map in the original Travo look: uplinks as light rows on the left, thin curved
+// links into a square router tile, client counts on the right. Desktop only; phones get the
+// dashboard cards instead (docs/web-ui.md "Dashboard network map").
 type Part = 'uplinks' | 'connectivity' | 'throughput' | 'clients';
 let {
   model,
@@ -29,12 +32,19 @@ let {
 }: { model: TopologyModel; status: Record<Part, LoadStatus> & { vpn?: LoadStatus } } = $props();
 
 const captionId = $props.id();
-const icons: Record<UplinkName, typeof Wifi> = { wan: Cable, wwan: Wifi, usbtether: Usb };
+const icons: Record<UplinkName, typeof Wifi> = { wan: Cable, wwan: Wifi, usbtether: Smartphone };
 const configure: Record<UplinkName, string> = {
   wan: href('network-wan'),
   wwan: href('wifi'),
   usbtether: href('internet'),
 };
+
+// Geometry: rows are ROW px apart; lines are drawn in a 100 × HEIGHT box stretched to the gap.
+const ROW = 56;
+const HEIGHT = 4 * ROW;
+const sourceY = (i: number, count: number) => ((i + 0.5) / count) * HEIGHT;
+const MID = HEIGHT / 2;
+const curve = (y1: number, y2: number) => `M 0 ${y1} C 50 ${y1}, 50 ${y2}, 100 ${y2}`;
 
 // Stale: the part has a known value but its source is reloading or failed (docs/web-ui.md).
 const refreshing = (s: LoadStatus) => s.state !== 'ready';
@@ -56,14 +66,14 @@ const firstLoad = $derived(
     status.clients.state === 'loading',
 );
 
-// The stacked layout draws one connector for all sources: the best state among them.
-const RANK: SourceState[] = ['active', 'standby', 'down', 'unknown', 'not_configured'];
-const bestState = $derived(
-  RANK.find((state) => model.sources.some((s) => s.state === state)) ?? 'unknown',
-);
-const clientCount = $derived(model.clients ? model.clients.wifi + model.clients.lan : 0);
-const clientLink = $derived<SourceState>(
-  model.clients === null ? 'unknown' : clientCount > 0 ? 'active' : 'down',
+const clientRows = $derived([
+  { key: 'wifi', icon: Wifi, count: model.clients?.wifi, label: m.topology_clients_wifi_label() },
+  { key: 'lan', icon: Monitor, count: model.clients?.lan, label: m.topology_clients_lan_label() },
+]);
+const clientLink = (count: number | undefined): SourceState =>
+  count === undefined ? 'unknown' : count > 0 ? 'active' : 'down';
+const routerDot = $derived(
+  { online: 'active', captive: 'warn', offline: 'danger', unknown: 'down' }[model.internet],
 );
 </script>
 
@@ -71,18 +81,10 @@ const clientLink = $derived<SourceState>(
   {#if stale}<Status kind="stale">{m.load_stale()}</Status>{/if}
 {/snippet}
 
-{#snippet stackLink(state: SourceState)}
-  <svg aria-hidden="true" class="mx-auto h-6 w-2 @xl:hidden" viewBox="0 0 2 24" preserveAspectRatio="none">
-    {#if state !== 'not_configured'}
-      <line x1="1" y1="0" x2="1" y2="24" class="topology-link topology-link-{state}" vector-effect="non-scaling-stroke" />
-    {/if}
-  </svg>
-{/snippet}
-
 {#if firstLoad}
-  <Skeleton class="h-48 w-full" />
+  <Skeleton class="h-56 w-full" />
 {:else}
-  <figure class="@container m-0" aria-labelledby={captionId}>
+  <figure class="m-0" aria-labelledby={captionId}>
     <figcaption id={captionId} class="sr-only">{m.topology_label()}</figcaption>
     <ul class="sr-only" data-testid="topology-summary">
       {#each model.sources as source (source.name)}<li>{sourceSummary(source)}</li>{/each}
@@ -90,84 +92,101 @@ const clientLink = $derived<SourceState>(
       <li>{clientsSummary(model.clients)}</li>
     </ul>
 
-    <div class="flex flex-col @xl:grid @xl:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,1fr)]">
-      <ul data-part="sources" class="grid auto-rows-fr">
-        {#each model.sources as source (source.name)}
+    <div class="flex items-stretch" style="height: {HEIGHT}px">
+      <ul data-part="sources" class="relative w-48 shrink-0">
+        {#each model.sources as source, i (source.name)}
           {@const Icon = icons[source.name]}
-          <li class="py-1" data-state={source.state}>
+          <li
+            class="absolute inset-x-0 -translate-y-1/2"
+            style="top: {sourceY(i, model.sources.length)}px"
+            data-state={source.state}
+          >
             <a
               href={configure[source.name]}
-              class="flex h-full flex-col gap-1 rounded-lg border border-border bg-card p-3 hover:bg-muted {source.state === 'not_configured' || sourcesStale ? 'opacity-60' : ''}"
+              class="flex items-start gap-2 rounded-md px-1 py-0.5 hover:bg-muted {source.state === 'not_configured' || sourcesStale ? 'opacity-60' : ''}"
             >
-              <span class="flex items-center gap-2 font-medium">
-                <Icon aria-hidden="true" size={16} class="shrink-0" />{sourceLabel[source.name]()}
-              </span>
-              <span class="text-xs">{stateLabel[source.state]()}</span>
-              {#if source.detail}<span class="text-xs break-all text-muted-foreground">{source.detail}</span>{/if}
-              {#if source.rate}
-                <span class="text-xs tabular-nums text-muted-foreground {ratesStale && !sourcesStale ? 'opacity-60' : ''}" data-rate>
-                  ↓ {formatBitRate(source.rate.rxBitsPerSecond)} · ↑ {formatBitRate(source.rate.txBitsPerSecond)}
+              <span class="mt-1.5 size-2 shrink-0 rounded-full topology-dot-{source.state}" aria-hidden="true"></span>
+              <Icon aria-hidden="true" size={16} class="mt-0.5 shrink-0 {source.state === 'active' ? 'topology-icon-active' : 'text-muted-foreground'}" />
+              <span class="min-w-0">
+                <span class="block text-xs font-medium">{sourceLabel[source.name]()}</span>
+                <span class="block truncate text-xs text-muted-foreground">
+                  {stateLabel[source.state]()}{#if source.detail}{' · '}{source.detail}{/if}
                 </span>
-              {/if}
-              {@render staleMark(sourcesStale)}
+                {#if source.rate}
+                  <span class="block text-xs tabular-nums text-muted-foreground {ratesStale && !sourcesStale ? 'opacity-60' : ''}" data-rate>
+                    ↓ {formatBitRate(source.rate.rxBitsPerSecond)} · ↑ {formatBitRate(source.rate.txBitsPerSecond)}
+                  </span>
+                {/if}
+                {@render staleMark(sourcesStale)}
+              </span>
             </a>
           </li>
         {/each}
       </ul>
 
-      <!-- Wide layout: one line from each source row to the router's middle. -->
-      <svg aria-hidden="true" class="hidden h-full w-full @xl:block" viewBox="0 0 100 300" preserveAspectRatio="none">
+      <svg aria-hidden="true" class="min-w-10 flex-1" viewBox="0 0 100 {HEIGHT}" preserveAspectRatio="none">
         {#each model.sources as source, i (source.name)}
           {#if source.state !== 'not_configured'}
-            <line
-              x1="0"
-              y1={50 + 100 * i}
-              x2="100"
-              y2="150"
+            <path
+              d={curve(sourceY(i, model.sources.length), MID)}
               class="topology-link topology-link-{source.state}"
               vector-effect="non-scaling-stroke"
             />
           {/if}
         {/each}
       </svg>
-      {@render stackLink(bestState)}
 
-      <div data-part="router" class="flex flex-col gap-2 self-center rounded-lg border border-border bg-card p-3 {routerStale ? 'opacity-60' : ''}">
-        <span class="flex items-center gap-2 font-medium">
-          <RouterIcon aria-hidden="true" size={16} class="shrink-0" />{model.router?.hostname ?? m.topology_router()}
-        </span>
-        {#if model.router}<span class="text-xs text-muted-foreground">{model.router.model}</span>{/if}
-        <dl class="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-xs">
-          <dt class="text-muted-foreground">{m.topology_internet()}</dt>
-          <dd><Status kind={internetChip[model.internet].kind}>{internetChip[model.internet].label()}</Status></dd>
-          <dt class="text-muted-foreground">{m.dashboard_vpn()}</dt>
-          <dd><Status kind={vpnChip[model.vpn].kind}>{vpnChip[model.vpn].label()}</Status></dd>
+      <div data-part="router" class="flex w-44 shrink-0 flex-col items-center justify-center gap-2 text-center {routerStale ? 'opacity-60' : ''}">
+        <div class="relative flex size-20 items-center justify-center rounded-2xl border border-border bg-muted">
+          <RouterIcon aria-hidden="true" size={40} class="text-foreground/80" />
+          <span class="absolute -top-1 -right-1 size-3 rounded-full ring-2 ring-card topology-dot-{routerDot}" aria-hidden="true"></span>
+        </div>
+        <div class="min-w-0">
+          <div class="text-xs font-semibold">{model.router?.hostname ?? m.topology_router()}</div>
+          {#if model.router}<div class="text-xs break-words text-muted-foreground">{model.router.model}</div>{/if}
+        </div>
+        <div class="flex flex-wrap justify-center gap-1">
+          <Status kind={internetChip[model.internet].kind}>{m.topology_internet()} {internetChip[model.internet].label()}</Status>
+          <Status kind={vpnChip[model.vpn].kind}>{m.dashboard_vpn()} {vpnChip[model.vpn].label()}</Status>
           {#if model.tailscale !== 'absent'}
             {@const chip = tailscaleChip[model.tailscale]}
-            <dt class="text-muted-foreground"><a href={href('vpn-tailscale')} class="underline-offset-2 hover:underline">{m.tailscale_title()}</a></dt>
-            <dd><Status kind={chip.kind}>{chip.label()}</Status></dd>
+            <a href={href('vpn-tailscale')}><Status kind={chip.kind}>{m.tailscale_title()} {chip.label()}</Status></a>
           {/if}
-        </dl>
+        </div>
         {@render staleMark(routerStale)}
       </div>
 
-      <svg aria-hidden="true" class="hidden h-full w-full @xl:block" viewBox="0 0 100 300" preserveAspectRatio="none">
-        <line x1="0" y1="150" x2="100" y2="150" class="topology-link topology-link-{clientLink}" vector-effect="non-scaling-stroke" />
+      <svg aria-hidden="true" class="min-w-10 flex-1" viewBox="0 0 100 {HEIGHT}" preserveAspectRatio="none">
+        {#each clientRows as row, i (row.key)}
+          <path
+            d={curve(MID, sourceY(i, clientRows.length))}
+            class="topology-link topology-link-{clientLink(row.count)}"
+            vector-effect="non-scaling-stroke"
+          />
+        {/each}
       </svg>
-      {@render stackLink(clientLink)}
 
-      <div data-part="clients" class="flex flex-col gap-1 self-center rounded-lg border border-border bg-card p-3 {clientsStale ? 'opacity-60' : ''}">
-        <span class="flex items-center gap-2 font-medium">
-          <Laptop aria-hidden="true" size={16} class="shrink-0" />{m.nav_clients()}
-        </span>
-        {#if model.clients}
-          <a href={href('clients')} class="text-xs underline-offset-2 hover:underline">{m.topology_clients_wifi({ count: model.clients.wifi })}</a>
-          <a href={href('clients')} class="text-xs underline-offset-2 hover:underline">{m.topology_clients_lan({ count: model.clients.lan })}</a>
-          {#if model.clients.partial}<Status kind="warn">{m.topology_clients_incomplete()}</Status>{/if}
-        {:else}
-          <span class="text-xs">{m.topology_state_unknown()}</span>
+      <div data-part="clients" class="relative w-40 shrink-0 {clientsStale ? 'opacity-60' : ''}">
+        {#each clientRows as row, i (row.key)}
+          {@const Icon = row.icon}
+          <a
+            href={href('clients')}
+            class="absolute inset-x-0 flex -translate-y-1/2 items-center gap-3 rounded-md px-1 hover:bg-muted"
+            style="top: {sourceY(i, clientRows.length)}px"
+          >
+            <span class="rounded-lg border border-border bg-muted p-1.5"><Icon aria-hidden="true" size={16} class="text-muted-foreground" /></span>
+            <span>
+              <span class="block text-2xl leading-none font-bold tabular-nums">{row.count ?? '–'}</span>
+              <span class="block text-xs text-muted-foreground">{row.count === undefined ? m.topology_state_unknown() : row.label}</span>
+            </span>
+          </a>
+        {/each}
+        {#if model.clients?.partial || clientsStale}
+          <div class="absolute inset-x-0 bottom-0 flex flex-wrap gap-1">
+            {#if model.clients?.partial}<Status kind="warn">{m.topology_clients_incomplete()}</Status>{/if}
+            {@render staleMark(clientsStale)}
+          </div>
         {/if}
-        {@render staleMark(clientsStale)}
       </div>
     </div>
   </figure>

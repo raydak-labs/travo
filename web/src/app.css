@@ -185,22 +185,47 @@ body {
   display: none;
 }
 
-/* Topology diagram connectors: colour and dash per uplink state; every state also has text. */
+/* Topology diagram: thin links, solid and brighter for the active uplink, dashed and faint
+   otherwise; dots and the active icon take the same tokens. Every state also has text. */
 .topology-link {
   fill: none;
-  stroke-width: 2;
+  stroke-width: 1.5;
 }
 .topology-link-active {
   stroke: var(--ok);
+  opacity: 0.8;
 }
 .topology-link-standby {
   stroke: var(--info);
-  stroke-dasharray: 6 4;
+  stroke-dasharray: 4 3;
+  opacity: 0.6;
 }
 .topology-link-down,
 .topology-link-unknown {
   stroke: var(--neutral);
-  stroke-dasharray: 2 4;
+  stroke-dasharray: 4 3;
+  opacity: 0.4;
+}
+.topology-dot-active {
+  background: var(--ok);
+}
+.topology-dot-standby {
+  background: var(--info);
+}
+.topology-dot-warn {
+  background: var(--warn);
+}
+.topology-dot-danger {
+  background: var(--danger);
+}
+.topology-dot-down,
+.topology-dot-unknown,
+.topology-dot-not_configured {
+  background: var(--neutral);
+  opacity: 0.5;
+}
+.topology-icon-active {
+  color: var(--ok);
 }
 
 /* Toast close button sits inside the toast's top-right corner, not off its top-left edge.

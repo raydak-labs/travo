@@ -1299,5 +1299,15 @@
   "dashboard_description": "What the router is connected to right now, and how it is doing.",
   "firmware_choose": "Choose image",
   "firmware_no_file": "No file chosen",
-  "menu_open": "Open menu"
+  "menu_open": "Open menu",
+  "topology_clients_wifi_label": "WiFi clients",
+  "topology_clients_lan_label": "Wired clients",
+  "uplink_card_address": "Address",
+  "uplink_card_network": "Network",
+  "uplink_card_link": "Connection",
+  "uplink_card_device": "Device",
+  "uplink_card_traffic": "Traffic",
+  "uplink_card_setup": "Set up",
+  "dashboard_quick_status": "Quick status",
+  "dashboard_system_open": "Details"
 }

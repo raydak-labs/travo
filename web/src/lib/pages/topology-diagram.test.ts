@@ -41,7 +41,7 @@ function html(
 }
 
 const sourceItem = (body: string, state: string) =>
-  body.match(new RegExp(`<li class="py-1" data-state="${state}">[\\s\\S]*?</li>`))?.[0] ?? '';
+  body.match(new RegExp(`<li[^>]*data-state="${state}"[^>]*>[\\s\\S]*?</li>`))?.[0] ?? '';
 
 describe('TopologyDiagram', () => {
   it('renders sources, router and clients in that DOM order', () => {
@@ -76,7 +76,8 @@ describe('TopologyDiagram', () => {
     expect(body).toContain('topology-link topology-link-active');
     expect(body).toContain('topology-link topology-link-down');
     // A source that is not set up gets no connector.
-    expect(body.match(/<line[^>]*x1="0" y1="250"/)).toBeNull();
+    // usbtether is not set up, so it has no link: two source links plus the two client links.
+    expect(body.match(/<path d="M 0 /g)).toHaveLength(4);
   });
 
   it('draws standby dashed and unknown with text', () => {
@@ -101,8 +102,10 @@ describe('TopologyDiagram', () => {
 
   it('links client counts to the clients page and marks partial data', () => {
     const body = html(full);
-    expect(body).toMatch(/<a href="#\/clients"[^>]*>1 on WiFi<\/a>/);
-    expect(body).toMatch(/<a href="#\/clients"[^>]*>1 wired<\/a>/);
+    const part = body.slice(body.indexOf('data-part="clients"'));
+    expect(part.match(/<a href="#\/clients"/g)).toHaveLength(2);
+    expect(part).toMatch(/>1<\/span>[\s\S]*?WiFi clients/);
+    expect(part).toMatch(/>1<\/span>[\s\S]*?Wired clients/);
     expect(body).not.toContain('Incomplete');
     const partial = topologyModel({ clients: { ...clients, partial: true } });
     expect(html(partial)).toContain('Incomplete');
@@ -112,7 +115,7 @@ describe('TopologyDiagram', () => {
     const body = html(topologyModel({ uplinks, connectivity }));
     const part = body.slice(body.indexOf('data-part="clients"'));
     expect(part).toContain('Unknown');
-    expect(part).not.toContain('0 on WiFi');
+    expect(part).not.toMatch(/>0<\/span>/);
   });
 
   it('shows the router chips and hides Tailscale when absent', () => {
@@ -142,7 +145,7 @@ describe('TopologyDiagram', () => {
     const part = body.slice(body.indexOf('data-part="clients"'));
     expect(part).toContain('opacity-60');
     expect(part).toContain('status-stale');
-    expect(part).toContain('1 on WiFi');
+    expect(part).toContain('WiFi clients');
     expect(body.slice(0, body.indexOf('data-part="router"'))).not.toContain('status-stale');
   });
 
@@ -150,7 +153,7 @@ describe('TopologyDiagram', () => {
     const body = html(full, { throughput: { state: 'error', message: 'Throughput unavailable' } });
     const active = sourceItem(body, 'active');
     expect(active).not.toContain('status-stale');
-    expect(active).toMatch(/opacity-60[^"]*" data-rate/);
+    expect(active).toMatch(/opacity-60" data-rate/);
   });
 
   it('marks the router stale when the VPN poll fails with a known state', () => {

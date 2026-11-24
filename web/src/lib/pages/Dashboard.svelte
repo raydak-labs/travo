@@ -2,29 +2,24 @@
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
-import type { SystemInfoBody } from '../api/gen';
-import { fetchHealth } from '../api/health';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
-import { formatBytes, formatLoad, formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
 import { topologyModel } from '../topology';
-import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
-import Status from '../ui/Status.svelte';
-import SummaryBand from '../ui/SummaryBand.svelte';
-import SummaryTile from '../ui/SummaryTile.svelte';
 import { createTunnelControl } from '../vpn-tunnel.svelte';
 import CaptivePortalCard from './CaptivePortalCard.svelte';
 import InterfaceTraffic from './InterfaceTraffic.svelte';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
+import QuickStatus from './QuickStatus.svelte';
+import SystemCard from './SystemCard.svelte';
 import TopologyDiagram from './TopologyDiagram.svelte';
-import VPNTunnelPanel from './VPNTunnelPanel.svelte';
+import UplinkCards from './UplinkCards.svelte';
 
 // Own chunk: the history card loads after the live cards (#232).
 const historyCard = lazyPage(() => import('./StatsHistoryCard.svelte'));
@@ -34,12 +29,11 @@ let {
 }: {
   events: Pick<
     typeof dashboardEvents,
-    'connectivity' | 'resources' | 'throughput' | 'tailscale' | 'uplinks' | 'clients'
+    'connectivity' | 'resources' | 'throughput' | 'tailscale' | 'uplinks' | 'clients' | 'alerts'
   >;
 } = $props();
 
 const connectivity = $derived(events.connectivity);
-const health = createLoader(fetchHealth);
 const resources = $derived(events.resources);
 const throughput = $derived(events.throughput);
 const tailscale = $derived(events.tailscale);
@@ -65,15 +59,6 @@ onDestroy(() => {
 let trafficOpen = $state(false);
 </script>
 
-{#snippet resource(label: string, value: (info: SystemInfoBody) => string)}
-  <SummaryTile {label}>
-    <LoadState status={resources.status} retry={resources.retry} stale={resources.data !== undefined}>
-      {#if resources.data}<span class="break-all tabular-nums">{value(resources.data)}</span>{/if}
-    </LoadState>
-  </SummaryTile>
-{/snippet}
-
-
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_dashboard()} description={m.dashboard_description()}>
     {#snippet actions()}
@@ -85,47 +70,28 @@ let trafficOpen = $state(false);
     <CaptivePortalCard info={connectivity.data} refresh={connectivity.retry} />
   {/if}
 
-  <Section title={m.topology_title()}>
-    <TopologyDiagram
-      model={topology}
-      status={{
-        uplinks: events.uplinks.status,
-        connectivity: connectivity.status,
-        throughput: throughput.status,
-        clients: events.clients.status,
-        vpn: vpn.status,
-      }}
-    />
-  </Section>
+  <!-- The map needs width; phones and narrow windows get the same facts from the cards below. -->
+  <div class="hidden lg:block">
+    <Section title={m.topology_title()}>
+      <TopologyDiagram
+        model={topology}
+        status={{
+          uplinks: events.uplinks.status,
+          connectivity: connectivity.status,
+          throughput: throughput.status,
+          clients: events.clients.status,
+          vpn: vpn.status,
+        }}
+      />
+    </Section>
+  </div>
 
-  <SummaryBand title={m.dashboard_resources()}>
-    {@render resource(m.dashboard_cpu_load(), (info) => formatLoad([info.load[0]]))}
-    {@render resource(m.system_memory(), (info) =>
-      info.memory.total_bytes === 0
-        ? m.dashboard_unavailable()
-        : m.system_used_of({
-            used: formatBytes(Math.max(0, info.memory.total_bytes - info.memory.available_bytes)),
-            total: formatBytes(info.memory.total_bytes),
-          }),
-    )}
-    {@render resource(m.system_uptime(), (info) => formatUptime(info.uptime_seconds))}
-    {@render resource(m.dashboard_version(), (info) => info.app.version)}
-    <SummaryTile label={m.dashboard_daemon()}>
-      <LoadState status={health.status} retry={health.retry}>
-        <div><Status kind="ok">{m.status_ok()}</Status></div>
-      </LoadState>
-    </SummaryTile>
-  </SummaryBand>
+  <UplinkCards sources={topology.sources} uplinks={events.uplinks} />
 
-  <Section title={m.dashboard_vpn()}>
-    <VPNTunnelPanel status={vpn} control={tunnel} canEnable={(snapshot) => snapshot.state === 'configured'} />
-    <div class="flex flex-wrap gap-x-4">
-      <Button variant="link" size="sm" class="px-0" href={href('vpn')}>{m.dashboard_vpn_settings()}</Button>
-      {#if tailscale.data?.installed}
-        <Button variant="link" size="sm" class="px-0" href={href('vpn-tailscale')}>{m.tailscale_open()}</Button>
-      {/if}
-    </div>
-  </Section>
+  <div class="grid items-start gap-4 lg:grid-cols-2">
+    <QuickStatus model={topology} {vpn} {tunnel} />
+    <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
+  </div>
 
   <Section title={m.dashboard_throughput()} description={m.dashboard_traffic_description()}>
     <Collapsible.Root bind:open={trafficOpen}>

@@ -30,6 +30,7 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
     tailscale: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
     uplinks: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
     clients: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
+    alerts: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
@@ -53,16 +54,18 @@ describe('Dashboard resources', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows one-minute load, memory used and total, uptime, and the running version', () => {
+  it('shows one-minute load, memory and storage with bars, and uptime in one card', () => {
     const body = dashboard({ state: 'ready' }, fixture);
     expect(body).toContain('CPU load (1 min)');
     expect(body).toContain('0.39');
     expect(body).not.toContain('0.24');
     expect(body).toContain('266.4 MB of 408.8 MB');
     expect(body).toContain('3m');
-    expect(body).toContain('>dev<');
+    expect(body).toContain('11.5 MB of 77.8 MB');
+    expect(body.match(/data-slot="progress"/g)).toHaveLength(2);
     expect(body).not.toContain('>Refresh<');
-    expect(body.match(/data-slot="summary-tile"/g)).toHaveLength(5);
+    // The version lives in the header menu now.
+    expect(body).not.toContain('>dev<');
   });
 
   it('shows unavailable memory when total memory is zero', () => {
@@ -100,8 +103,7 @@ describe('Dashboard resources', () => {
     expect(body).toContain('Last known value');
     expect(body).toContain('Retry');
     // Each resource tile keeps its own dimmed value instead of blanking.
-    expect(body.match(/opacity-60/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(body).toContain('opacity-60');
     expect(body).toContain('3m');
-    expect(body).toContain('>dev<');
   });
 });

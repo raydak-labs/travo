@@ -89,11 +89,13 @@ Danger actions (disable, delete, remove, revoke, restart, block) use the `destru
 
 ## Dashboard network map
 
-`TopologyDiagram.svelte` draws `topologyModel()` (`web/src/lib/topology.ts`): uplinks (wan, wwan, usbtether), the router with Internet, VPN and Tailscale chips, and LAN client counts, in that DOM and tab order.
+`TopologyDiagram.svelte` draws `topologyModel()` (`web/src/lib/topology.ts`) in the original Travo look: uplinks (wan, wwan, usbtether) as light rows (status dot, icon, label, state and detail, live rate) on the left, thin curved links into a square router tile with a status dot, hostname, model and Internet/VPN/Tailscale chips, and client counts (WiFi, wired) as large numbers on the right. DOM and tab order: sources, router, clients.
 
-- One markup tree; a container query (`@xl`, 36 rem) switches between three columns with stretched SVG connectors and a vertical stack. Connectors are `aria-hidden`; the `figure` carries a hidden text summary.
-- Connector per uplink state: active solid `ok`, standby dashed `info`, down and unknown dashed `neutral`, not set up dimmed without a connector. Every state also has text; nothing animates on push.
+- Shown from the `lg` breakpoint only; below it the dashboard cards carry the same facts.
+- Link per uplink state: active solid `ok`, standby dashed `info`, down and unknown dashed faint `neutral`, not set up dimmed without a link. Every state also has text; nothing animates on push. Links are `aria-hidden`; the `figure` carries a hidden text summary.
 - Stale is per part: an uplinks or connectivity failure dims the sources, a throughput failure only the rates, connectivity or VPN the router, clients the client counts. A failed clients read shows Unknown, never 0.
+
+Under the map: one card per uplink (state, network or tether kind, address, device, live traffic; "Set up" when not configured), Quick status (clients, live traffic of the active uplink, Tailscale, the VPN tunnel with its guarded toggle) and the System card (CPU load, memory and storage bars, uptime, the daemon's low-memory warning). The app version is in the header menu.
 
 ## Page rules
 

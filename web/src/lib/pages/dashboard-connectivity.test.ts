@@ -1,7 +1,6 @@
 import { render } from 'svelte/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardConnectivity } from '../api/gen';
-import { fetchHealth } from '../api/health';
 import type { LoadStatus } from '../ui/loader.svelte';
 import Dashboard from './Dashboard.svelte';
 
@@ -14,6 +13,7 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
     tailscale: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
     uplinks: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
     clients: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
+    alerts: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
@@ -67,7 +67,6 @@ describe('Dashboard connectivity', () => {
     expect(body).toContain('Internet: Offline');
     expect(body).not.toContain('Active uplink');
     expect(body).not.toContain('Link up');
-    expect(createLoader).toHaveBeenCalledWith(fetchHealth);
   });
 
   it('keeps the last connectivity on the map, dimmed and marked, when a refresh fails', () => {
