@@ -1,4 +1,6 @@
 <script lang="ts">
+import Bookmark from '@lucide/svelte/icons/bookmark';
+import Laptop from '@lucide/svelte/icons/laptop';
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import {
@@ -17,12 +19,14 @@ import { wake } from '../api/wol';
 import type { ClientEdit } from '../clients';
 import { connectionStatus } from '../clients';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
@@ -140,17 +144,17 @@ async function removeReservation(r: Reservation) {
 }
 </script>
 
-<div class="flex flex-col gap-4">
-  <Card title={m.clients_title()}>
-    <p class="text-muted-foreground">{m.clients_intro()}</p>
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_clients()} description={m.clients_intro()} />
+  <Section title={m.clients_devices_title()}>
     <LoadState status={list.status} retry={list.retry} stale={list.data !== undefined}>
       {#if list.data?.partial}
-        <p class="mt-2" role="note"><Status kind="warn">{m.clients_partial()}</Status></p>
+        <p role="note"><Status kind="warn">{m.clients_partial()}</Status></p>
       {/if}
       {#if list.data?.clients.length === 0}
-        <p class="mt-3 text-muted-foreground">{m.clients_empty()}</p>
+        <EmptyState icon={Laptop} title={m.clients_empty()} />
       {:else if list.data}
-        <ul class="mt-3 divide-y divide-border" aria-label={m.clients_title()}>
+        <ul class="divide-y divide-border" aria-label={m.clients_title()}>
           {#each list.data.clients as c (c.mac)}
             {@const conn = connectionStatus(c)}
             <li class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
@@ -170,32 +174,32 @@ async function removeReservation(r: Reservation) {
                 <Button variant="outline" size="sm" type="button" disabled={busy}
                   aria-label={m.clients_edit_name({ name: clientName(c) })}
                   onclick={() => { editing = c; }}>{m.clients_edit()}</Button>
-                <Button variant="outline" size="sm" type="button" disabled={busy || block.busy}
-                  onclick={() => toggleBlock(c)}>{c.blocked ? m.clients_unblock() : m.clients_block()}</Button>
-                {#if c.connection === 'wifi'}
-                  <Button variant="outline" size="sm" type="button" disabled={busy}
-                    onclick={() => disconnect(c)}>{m.clients_kick()}</Button>
-                {/if}
                 {#if c.connection === 'offline'}
                   <Button variant="outline" size="sm" type="button" disabled={busy}
                     aria-label={m.clients_wake_name({ name: clientName(c) })}
                     onclick={() => wakeUp(c.mac, clientName(c))}>{m.clients_wake()}</Button>
                 {/if}
+                <!-- Danger actions last: disconnect and block cut the device off. -->
+                {#if c.connection === 'wifi'}
+                  <Button variant="destructive" size="sm" type="button" disabled={busy}
+                    onclick={() => disconnect(c)}>{m.clients_kick()}</Button>
+                {/if}
+                <Button variant={c.blocked ? 'outline' : 'destructive'} size="sm" type="button" disabled={busy || block.busy}
+                  onclick={() => toggleBlock(c)}>{c.blocked ? m.clients_unblock() : m.clients_block()}</Button>
               </div>
             </li>
           {/each}
         </ul>
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 
-  <Card title={m.clients_reservations()}>
-    <p class="text-muted-foreground">{m.clients_reservations_intro()}</p>
+  <Section title={m.clients_reservations()} description={m.clients_reservations_intro()}>
     <LoadState status={reservations.status} retry={reservations.retry} stale={reservations.data !== undefined}>
       {#if reservations.data?.length === 0}
-        <p class="mt-3 text-muted-foreground">{m.clients_reservations_empty()}</p>
+        <EmptyState icon={Bookmark} title={m.clients_reservations_empty()} />
       {:else if reservations.data}
-        <ul class="mt-3 divide-y divide-border" aria-label={m.clients_reservations()}>
+        <ul class="divide-y divide-border" aria-label={m.clients_reservations()}>
           {#each reservations.data as r (r.mac)}
             <li class="flex flex-wrap items-center gap-2 py-2">
               <span class="break-all font-medium">{reservationName(r)}</span>
@@ -203,7 +207,7 @@ async function removeReservation(r: Reservation) {
               <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy}
                 aria-label={m.clients_wake_name({ name: reservationName(r) })}
                 onclick={() => wakeUp(r.mac, reservationName(r))}>{m.clients_wake()}</Button>
-              <Button variant="outline" size="sm" type="button" disabled={busy}
+              <Button variant="destructive" size="sm" type="button" disabled={busy}
                 aria-label={m.clients_reservation_remove_name({ name: reservationName(r) })}
                 onclick={() => removeReservation(r)}>{m.clients_reservation_remove()}</Button>
             </li>
@@ -211,7 +215,7 @@ async function removeReservation(r: Reservation) {
         </ul>
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 </div>
 
 {#if editing}

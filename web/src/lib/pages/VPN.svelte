@@ -5,16 +5,20 @@ import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 import '../api/client';
+import KeyRound from '@lucide/svelte/icons/key-round';
 import { deleteVpnProfile, getVpnProfiles, postVpnProfile, selectVpnProfile } from '../api/gen';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
+import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import { createTunnelControl, tunnelEnabled } from '../vpn-tunnel.svelte';
 import VPNDNSCard from './VPNDNSCard.svelte';
 import VPNKillSwitchCard from './VPNKillSwitchCard.svelte';
@@ -94,8 +98,10 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
 }
 </script>
 
-<div class="grid gap-4">
-  <Card title={m.vpn_tunnel()}>
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_vpn()} description={m.vpn_page_description()} />
+
+  <Section title={m.vpn_tunnel()}>
     <VPNTunnelPanel {status} control={tunnel} canEnable={() => Boolean(profiles.data?.selected_id)}>
       {#snippet extra(snapshot)}
         {#if tunnelEnabled(snapshot.state) && profiles.data?.selected_id}
@@ -103,45 +109,46 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
         {/if}
       {/snippet}
     </VPNTunnelPanel>
-  </Card>
+  </Section>
 
-  <Card title={m.tailscale_title()}>
-    <p class="text-muted-foreground">{m.tailscale_vpn_intro()}</p>
-    <Button variant="outline" size="sm" class="self-start" href={href('vpn-tailscale')}>{m.tailscale_open()}</Button>
-  </Card>
+  <Section title={m.tailscale_title()} description={m.tailscale_vpn_intro()}>
+    {#snippet actions()}
+      <Button variant="outline" size="sm" href={href('vpn-tailscale')}>{m.tailscale_open()}</Button>
+    {/snippet}
+  </Section>
 
   <VPNKillSwitchCard tunnel={status.data} />
 
   <VPNSplitCard />
   <VPNDNSCard />
 
-  <Card title={m.vpn_saved_profiles()}>
+  <Section title={m.vpn_saved_profiles()}>
     <LoadState status={profiles.status} retry={profiles.retry}>
       {#if profiles.data}
         {#if profiles.data.profiles.length === 0}
-          <p class="text-muted-foreground">{m.vpn_no_profiles()}</p>
+          <EmptyState icon={KeyRound} title={m.vpn_no_profiles()} />
         {:else}
-          <ul class="space-y-3">
+          {@const selectedId = profiles.data.selected_id}
+          <div>
             {#each profiles.data.profiles as profile (profile.id)}
-              <li class="flex flex-wrap items-center justify-between gap-2">
-                <span class="break-all">{profile.name}</span>
-                <div class="flex flex-wrap items-center gap-2">
-                  {#if profile.id === profiles.data.selected_id}
+              <SettingsRow label={profile.name}>
+                {#snippet control()}
+                  {#if profile.id === selectedId}
                     <span class="text-muted-foreground">{m.vpn_selected()}</span>
                   {:else}
-                    <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => change('select', profile.id, profile.name)}>{m.vpn_select()}</Button>
+                    <Button variant="outline" size="sm" type="button" disabled={pending} onclick={() => change('select', profile.id, profile.name)}>{m.vpn_select()}</Button>
                   {/if}
-                  <Button variant="outline" size="sm" type="button" class="text-sm" disabled={pending} onclick={() => remove(profile)}>{m.vpn_delete()}</Button>
-                </div>
-              </li>
+                  <Button variant="destructive" size="sm" type="button" disabled={pending} onclick={() => remove(profile)}>{m.vpn_delete()}</Button>
+                {/snippet}
+              </SettingsRow>
             {/each}
-          </ul>
+          </div>
         {/if}
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 
-  <Card title={m.vpn_import()}>
+  <Section title={m.vpn_import()} description={m.vpn_import_description()}>
     <form class="grid gap-3" autocomplete="off" onsubmit={(event) => { event.preventDefault(); void change('import'); }}>
       <Label class="grid gap-1">
         <span>{m.vpn_name()}</span>
@@ -153,7 +160,7 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
       </Label>
       <Button variant="default" type="submit" class="w-fit" disabled={pending || !name.trim() || !config.trim()}>{m.vpn_import()}</Button>
     </form>
-  </Card>
+  </Section>
 </div>
 
 <ConfirmDialog {confirm} />

@@ -7,9 +7,9 @@ import '../api/client';
 import { setVpnSplit } from '../api/gen';
 import { fetchSplit } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl, parseRoutes, splitRefusal } from '../vpn-tunnel.svelte';
@@ -42,7 +42,7 @@ onDestroy(() => {
 });
 </script>
 
-<Card title={m.vpn_split()}>
+<Section title={m.vpn_split()} description={m.vpn_split_help()}>
   <LoadState status={split.status} retry={split.retry} stale={split.data !== undefined}>
     {#if split.data}
       <Status kind="info">{split.data.routes.length ? m.vpn_split_on({ count: split.data.routes.length }) : m.vpn_split_full()}</Status>
@@ -53,7 +53,6 @@ onDestroy(() => {
       <span>{m.vpn_split_routes()}</span>
       <Textarea class="w-full font-mono" rows={4} value={text} oninput={(event) => { draft = event.currentTarget.value; }} disabled={control.busy} spellcheck="false" placeholder="10.0.0.0/8"></Textarea>
     </Label>
-    <p class="text-muted-foreground">{m.vpn_split_help()}</p>
     <Button variant="outline" size="sm" type="submit" class="w-fit" disabled={control.busy || !split.data}>{m.vpn_split_save()}</Button>
   </form>
-</Card>
+</Section>

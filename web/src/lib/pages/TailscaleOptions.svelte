@@ -2,11 +2,14 @@
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import '../api/client';
+import Globe from '@lucide/svelte/icons/globe';
 import { applyTailscaleFirewall, type TailscaleSettings, type TailscaleStatus } from '../api/gen';
 import { firewallRefusal } from '../api/tailscale';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import type { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
+import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
@@ -58,46 +61,40 @@ async function useExitNode(id: string, name: string) {
 }
 </script>
 
-<Card title={m.tailscale_exit_title()}>
-  <p class="text-muted-foreground">{m.tailscale_exit_help()}</p>
+<Section title={m.tailscale_exit_title()} description={m.tailscale_exit_help()}>
   {#if exitNodes.length === 0}
-    <p class="text-muted-foreground">{m.tailscale_exit_none()}</p>
+    <EmptyState icon={Globe} title={m.tailscale_exit_none()} />
   {:else}
-    <ul class="space-y-3">
+    <div>
       {#each exitNodes as node (node.id)}
-        <li class="flex flex-wrap items-center justify-between gap-2">
-          <span class="flex flex-wrap items-center gap-2">
-            <span class="break-all">{node.host_name}</span>
-            <Status kind={node.online ? 'ok' : 'neutral'}>{node.online ? m.tailscale_online() : m.tailscale_offline()}</Status>
-          </span>
+        <SettingsRow label={node.host_name}>
+          {#snippet control()}
+          <Status kind={node.online ? 'ok' : 'neutral'}>{node.online ? m.tailscale_online() : m.tailscale_offline()}</Status>
           {#if node.id === settings.exit_node}
             <Button variant="outline" size="sm" type="button" {disabled} onclick={() => save({ exit_node: '' })}>{m.tailscale_exit_stop()}</Button>
           {:else}
             <Button variant="outline" size="sm" type="button" disabled={disabled || !node.online} onclick={() => useExitNode(node.id, node.host_name)}>{m.tailscale_exit_use()}</Button>
           {/if}
-        </li>
+          {/snippet}
+        </SettingsRow>
       {/each}
-    </ul>
+    </div>
   {/if}
-</Card>
+</Section>
 
-<Card title={m.tailscale_options_title()}>
-  <dl class="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3">
-    <dt>
-      <span class="block">{m.tailscale_advertise_lan()}</span>
-      <span class="block text-muted-foreground">{m.tailscale_advertise_lan_help()}</span>
-    </dt>
-    <dd>
+<Section title={m.tailscale_options_title()}>
+  <div>
+    <SettingsRow label={m.tailscale_advertise_lan()} description={m.tailscale_advertise_lan_help()}>
+      {#snippet control()}
       <Button variant="outline" size="sm" type="button" {disabled} onclick={() => save({ advertise_lan: !settings.advertise_lan })}>{settings.advertise_lan ? m.tailscale_turn_off() : m.tailscale_turn_on()}</Button>
-    </dd>
-    <dt>
-      <span class="block">{m.tailscale_ssh()}</span>
-      <span class="block text-muted-foreground">{m.tailscale_ssh_help()}</span>
-    </dt>
-    <dd>
+      {/snippet}
+    </SettingsRow>
+    <SettingsRow label={m.tailscale_ssh()} description={m.tailscale_ssh_help()}>
+      {#snippet control()}
       <Button variant="outline" size="sm" type="button" {disabled} onclick={() => save({ ssh: !settings.ssh })}>{settings.ssh ? m.tailscale_turn_off() : m.tailscale_turn_on()}</Button>
-    </dd>
-  </dl>
+      {/snippet}
+    </SettingsRow>
+  </div>
   <div class="flex flex-wrap items-center gap-2">
     <Status kind={status.firewall_in_sync ? 'ok' : 'warn'}>{status.firewall_in_sync ? m.tailscale_fw_ok() : m.tailscale_fw_needed()}</Status>
   </div>
@@ -107,4 +104,4 @@ async function useExitNode(id: string, name: string) {
       <Button variant="outline" size="sm" type="button" class="self-start" {disabled} onclick={() => firewall.set(true)}>{m.tailscale_fw_apply()}</Button>
     {/if}
   {/if}
-</Card>
+</Section>

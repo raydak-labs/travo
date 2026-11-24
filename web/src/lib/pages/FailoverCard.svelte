@@ -14,12 +14,13 @@ import {
   warningText,
 } from '../failover';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
@@ -28,7 +29,7 @@ const fo = createLoader(fetchFailover, 5000);
 // The draft priority list; undefined follows the saved settings.
 let draft = $state<Uplink[]>();
 const order = $derived(draft ?? ((fo.data?.uplinks ?? []) as Uplink[]));
-const control = createTunnelControl(
+const txn = createTunnelControl(
   () => {
     draft = undefined;
     return fo.retry();
@@ -43,15 +44,15 @@ const control = createTunnelControl(
 );
 transactionToast(
   'failover',
-  () => controlPhase(control, m.failover_applying()),
-  (ok) => void control.settle(ok),
+  () => controlPhase(txn, m.failover_applying()),
+  (ok) => void txn.settle(ok),
 );
 const confirm = createConfirm();
 const request = new AbortController();
 let stopping = $state(false);
 onDestroy(() => {
   fo.stop();
-  control.stop();
+  txn.stop();
   request.abort();
 });
 
@@ -67,7 +68,7 @@ async function apply() {
     description: m.failover_enable_help({ order: order.map((u) => labels[u]()).join(' → ') }),
     action: m.failover_enable(),
   });
-  if (ok) void control.set(true);
+  if (ok) void txn.set(true);
 }
 
 async function stop() {
@@ -88,7 +89,7 @@ async function stop() {
 }
 </script>
 
-<Card title={m.failover_title()}>
+<Section title={m.failover_title()} description={m.failover_help()}>
   <LoadState status={fo.status} retry={fo.retry} stale={fo.data !== undefined}>
     {#if fo.data}
       {@const st = fo.data}
@@ -102,23 +103,24 @@ async function stop() {
         {/if}
         {#if st.blocked}<Status kind="warn">{m.failover_blocked()}</Status>{/if}
       </div>
-      <p class="text-muted-foreground">{m.failover_help()}</p>
-      <ol class="flex flex-col gap-2">
+      <ol>
         {#each order as uplink, i (uplink)}
           {@const live = st.states.find((s) => s.name === uplink)}
-          <li class="flex flex-wrap items-center gap-2">
-            <span class="w-6 text-muted-foreground">{i + 1}.</span>
-            <span>{labels[uplink]()}</span>
+          <li>
+          <SettingsRow label={`${i + 1}. ${labels[uplink]()}`}>
+            {#snippet control()}
             <Status kind={live?.up ? 'ok' : 'neutral'}>{live?.up ? m.failover_up() : m.failover_down()}</Status>
-            <Button variant="outline" size="sm" type="button" disabled={i === 0 || control.busy} aria-label={m.failover_move_up({ uplink: labels[uplink]() })} onclick={() => (draft = moveUplink(order, i, -1))}>↑</Button>
-            <Button variant="outline" size="sm" type="button" disabled={i === order.length - 1 || control.busy} aria-label={m.failover_move_down({ uplink: labels[uplink]() })} onclick={() => (draft = moveUplink(order, i, 1))}>↓</Button>
-            <Button variant="ghost" size="sm" type="button" disabled={control.busy} onclick={() => (draft = toggleUplink(order, uplink))}>{m.failover_remove()}</Button>
+            <Button variant="outline" size="sm" type="button" disabled={i === 0 || txn.busy} aria-label={m.failover_move_up({ uplink: labels[uplink]() })} onclick={() => (draft = moveUplink(order, i, -1))}>↑</Button>
+            <Button variant="outline" size="sm" type="button" disabled={i === order.length - 1 || txn.busy} aria-label={m.failover_move_down({ uplink: labels[uplink]() })} onclick={() => (draft = moveUplink(order, i, 1))}>↓</Button>
+            <Button variant="ghost" size="sm" type="button" disabled={txn.busy} onclick={() => (draft = toggleUplink(order, uplink))}>{m.failover_remove()}</Button>
+            {/snippet}
+          </SettingsRow>
           </li>
         {/each}
       </ol>
       <div class="flex flex-wrap gap-2">
       {#each UPLINKS.filter((u) => !order.includes(u)) as uplink (uplink)}
-        <Button variant="outline" size="sm" type="button" disabled={control.busy} onclick={() => (draft = toggleUplink(order, uplink))}>{m.failover_add({ uplink: labels[uplink]() })}</Button>
+        <Button variant="outline" size="sm" type="button" disabled={txn.busy} onclick={() => (draft = toggleUplink(order, uplink))}>{m.failover_add({ uplink: labels[uplink]() })}</Button>
       {/each}
       </div>
       {#if st.warnings.length > 0}
@@ -127,16 +129,16 @@ async function stop() {
         </ul>
       {/if}
       {#if !st.installed}<p class="text-muted-foreground">{m.failover_install_note()}</p>{/if}
-      {#if !control.busy}
+      {#if !txn.busy}
         <div class="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" type="button" disabled={order.length < 2} onclick={apply}>{st.enabled ? m.failover_apply() : m.failover_enable()}</Button>
           {#if st.enabled || st.running}
-            <Button variant="outline" size="sm" type="button" disabled={stopping} onclick={stop}>{m.failover_disable()}</Button>
+            <Button variant="destructive" size="sm" type="button" disabled={stopping} onclick={stop}>{m.failover_disable()}</Button>
           {/if}
         </div>
       {/if}
     {/if}
   </LoadState>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

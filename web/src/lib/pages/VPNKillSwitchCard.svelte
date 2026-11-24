@@ -5,11 +5,11 @@ import '../api/client';
 import { setVpnKillSwitch, type TunnelStatus } from '../api/gen';
 import { fetchKillSwitch } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl, killSwitchRefusal } from '../vpn-tunnel.svelte';
@@ -49,7 +49,7 @@ async function change(enable: boolean) {
 }
 </script>
 
-<Card title={m.vpn_kill()}>
+<Section title={m.vpn_kill()}>
   <LoadState status={state.status} retry={state.retry} stale={state.data !== undefined}>
     {#if state.data}
       <Status kind={state.data.enabled ? 'ok' : 'neutral'}>{state.data.enabled ? m.vpn_kill_on() : m.vpn_kill_off()}</Status>
@@ -59,12 +59,12 @@ async function change(enable: boolean) {
   {#if state.data && !control.busy}
     <div class="flex flex-wrap gap-2">
       {#if state.data.enabled}
-        <Button variant="outline" size="sm" type="button" onclick={() => change(false)}>{m.vpn_kill_disable()}</Button>
+        <Button variant="destructive" size="sm" type="button" onclick={() => change(false)}>{m.vpn_kill_disable()}</Button>
       {:else}
         <Button variant="outline" size="sm" type="button" disabled={!connected} onclick={() => change(true)}>{m.vpn_kill_enable()}</Button>
       {/if}
     </div>
   {/if}
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

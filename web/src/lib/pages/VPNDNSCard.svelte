@@ -6,9 +6,10 @@ import '../api/client';
 import { type DnsVerification, verifyVpndns } from '../api/gen';
 import { fetchVpnDns } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 
 const request = new AbortController();
@@ -55,7 +56,7 @@ async function verify() {
 }
 </script>
 
-<Card title={m.vpn_dns()}>
+<Section title={m.vpn_dns()}>
   <LoadState status={dns.status} retry={dns.retry} stale={dns.data !== undefined}>
     {#if dns.data}
       {@const info = dns.data}
@@ -66,18 +67,19 @@ async function verify() {
           <Status kind="warn">{m.vpn_dns_overridden({ layer: info.top })}</Status>
         {/if}
       </div>
-      <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-        <dt class="text-muted-foreground">{m.vpn_dns_resolvers()}</dt>
-        <dd class="break-all">{info.resolvers?.length ? info.resolvers.join(', ') : m.vpn_dns_none()}</dd>
-      </dl>
+      <SettingsRow label={m.vpn_dns_resolvers()}>
+        {#snippet control()}
+          <span class="break-all">{info.resolvers?.length ? info.resolvers.join(', ') : m.vpn_dns_none()}</span>
+        {/snippet}
+      </SettingsRow>
     {/if}
   </LoadState>
   <Button variant="outline" size="sm" type="button" class="w-fit" disabled={verifying} onclick={verify}>{m.vpn_dns_verify()}</Button>
   {#if verifying}
-    <p role="status" class="mt-2">{m.vpn_dns_verifying()}</p>
+    <p role="status">{m.vpn_dns_verifying()}</p>
   {:else if verified}
     {@const result = results[verified]}
-    <p role="status" class="mt-2"><Status kind={result.kind}>{result.label()}</Status></p>
+    <p role="status"><Status kind={result.kind}>{result.label()}</Status></p>
   {/if}
-  {#if verifyError}<Alert class="mt-2 text-danger">{verifyError}</Alert>{/if}
-</Card>
+  {#if verifyError}<Alert class="text-danger">{verifyError}</Alert>{/if}
+</Section>

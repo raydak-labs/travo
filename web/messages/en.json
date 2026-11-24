@@ -1270,5 +1270,10 @@
   "topology_clients_incomplete": "Incomplete",
   "dashboard_traffic_description": "Live rates of every interface, including LAN and radios.",
   "dashboard_traffic_show": "Show interfaces",
-  "dashboard_traffic_hide": "Hide interfaces"
+  "dashboard_traffic_hide": "Hide interfaces",
+  "vpn_page_description": "Route LAN traffic through a WireGuard tunnel, or join your Tailscale network.",
+  "vpn_import_description": "Paste a WireGuard configuration from your VPN provider.",
+  "tailscale_page_description": "Join this router to your tailnet: reach it from anywhere, use an exit node, share the LAN.",
+  "tailscale_status_title": "Connection",
+  "clients_devices_title": "Devices"
 }

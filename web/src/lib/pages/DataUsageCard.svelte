@@ -1,4 +1,5 @@
 <script lang="ts">
+import ChartColumn from '@lucide/svelte/icons/chart-column';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
@@ -21,12 +22,14 @@ import {
 } from '../data-usage';
 import { formatBytes } from '../format';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
+import GroupHeading from '../ui/GroupHeading.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Sparkline from '../ui/Sparkline.svelte';
 import Status from '../ui/Status.svelte';
 import type { StatusKind } from '../ui/status';
@@ -126,14 +129,13 @@ async function reset() {
 }
 </script>
 
-<Card title={m.usage_title()}>
-  <p class="text-muted-foreground">{m.usage_intro()}</p>
+<Section title={m.usage_title()} description={m.usage_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {@const v = loader.data}
       {@const period = range === 'today' ? v.today : v.billing_period}
       {@const frame = dayFrame(v.days)}
-      <div class="mt-3 flex flex-col gap-4">
+      <div class="flex flex-col gap-4">
         <div class="flex flex-wrap items-center gap-2">
           <Status kind={stateKind[v.budget_state]}>{stateText(v)}</Status>
           {#if v.budget_state === 'unreadable'}
@@ -151,7 +153,7 @@ async function reset() {
         </div>
         <p class="text-sm text-muted-foreground">{m.usage_period({ start: period.start, end: period.end })}</p>
         {#if period.uplinks.length === 0}
-          <p class="text-muted-foreground">{m.usage_none()}</p>
+          <EmptyState icon={ChartColumn} title={m.usage_none()} />
         {:else}
           <dl class="grid gap-1 text-sm">
             {#each uplinkTotals(period.uplinks) as row (row.name)}
@@ -175,8 +177,8 @@ async function reset() {
           </dl>
         {/if}
 
-        <form class="flex flex-col gap-3" onsubmit={save}>
-          <h3 class="font-medium">{m.usage_budget()}</h3>
+        <form class="flex flex-col gap-3 border-t border-border pt-4" onsubmit={save}>
+          <GroupHeading label={m.usage_budget()} />
           <label class="flex items-center gap-2">
             <input type="checkbox" bind:checked={form.enabled} disabled={busy} />
             {m.usage_budget_enabled()}
@@ -207,8 +209,8 @@ async function reset() {
           <div><Button type="submit" disabled={busy || form.uplinks.length === 0}>{m.usage_save()}</Button></div>
         </form>
 
-        <div class="flex flex-col gap-2">
-          <h3 class="font-medium">{m.usage_uptime_title({ days: Math.round(v.retention_hours / 24) })}</h3>
+        <div class="flex flex-col gap-2 border-t border-border pt-4">
+          <GroupHeading label={m.usage_uptime_title({ days: Math.round(v.retention_hours / 24) })} />
           {#each v.uptime.availability as a (a.name)}
             <p class="text-sm">{m.usage_availability({ uplink: a.name, percent: usedPercent(a.up_samples, a.samples) })}</p>
           {/each}
@@ -231,5 +233,5 @@ async function reset() {
       </div>
     {/if}
   </LoadState>
-</Card>
+</Section>
 <ConfirmDialog {confirm} />

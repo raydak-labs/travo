@@ -71,8 +71,9 @@ async function toggle(enabled: boolean) {
   {@const snapshot = status.data}
   {@const enabled = tunnelEnabled(snapshot.state)}
   <div class="flex flex-wrap gap-2">
-    <Button variant="outline" size="sm" type="button" disabled={snapshot.stale || (!enabled && !canEnable(snapshot))} onclick={() => toggle(enabled)}>{enabled ? m.vpn_tunnel_disable() : m.vpn_tunnel_enable()}</Button>
+    <!-- Turning the tunnel off is the danger action, so it sits last. -->
     {@render extra?.(snapshot)}
+    <Button variant={enabled ? 'destructive' : 'outline'} size="sm" type="button" disabled={snapshot.stale || (!enabled && !canEnable(snapshot))} onclick={() => toggle(enabled)}>{enabled ? m.vpn_tunnel_disable() : m.vpn_tunnel_enable()}</Button>
   </div>
 {/if}
 

@@ -11,12 +11,14 @@ import {
 } from '../api/tailscale';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
+import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import TailscaleOptions from './TailscaleOptions.svelte';
 
@@ -67,9 +69,13 @@ const phaseStatus = {
 } as const;
 </script>
 
-<div class="grid gap-4">
-  <Button variant="link" size="sm" class="justify-self-start px-0" href={href('vpn')}>{m.tailscale_back()}</Button>
-  <Card title={m.tailscale_title()}>
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.tailscale_title()} description={m.tailscale_page_description()}>
+    {#snippet actions()}
+      <Button variant="link" size="sm" class="px-0" href={href('vpn')}>{m.tailscale_back()}</Button>
+    {/snippet}
+  </PageHeader>
+  <Section title={m.tailscale_status_title()}>
     <LoadState status={ts.status} retry={ts.retry} stale={ts.data !== undefined}>
       {#if ts.data}
         {@const st = ts.data}
@@ -78,34 +84,37 @@ const phaseStatus = {
           <Status kind={phaseStatus[phase].kind}>{phaseStatus[phase].label()}</Status>
           {#if st.busy}<Status kind="info">{m.tailscale_busy()}</Status>{/if}
         </div>
+        {#if st.installed}<p class="text-sm text-muted-foreground">{m.tailscale_version({ version: st.version })}</p>{/if}
         {#if st.installed && st.prefs.accept_dns}
-          <Alert class="mt-3 text-danger" role="alert">{m.tailscale_accept_dns_warning()}</Alert>
+          <Alert class="text-danger" role="alert">{m.tailscale_accept_dns_warning()}</Alert>
         {/if}
         {#if phase === 'absent'}
-          <p class="mt-2 text-muted-foreground">{m.tailscale_absent_body()}</p>
-          <Button variant="outline" size="sm" type="button" class="mt-3 self-start" disabled={pending !== undefined || st.busy} onclick={() => change('install')}>{m.tailscale_install()}</Button>
+          <p class="text-muted-foreground">{m.tailscale_absent_body()}</p>
+          <Button variant="outline" size="sm" type="button" class="self-start" disabled={pending !== undefined || st.busy} onclick={() => change('install')}>{m.tailscale_install()}</Button>
         {:else if phase === 'login' && st.auth_url}
-          <p class="mt-2 text-muted-foreground">{m.tailscale_login_body()}</p>
-          <Button size="sm" class="mt-3 self-start" href={st.auth_url} target="_blank" rel="noopener noreferrer">{m.tailscale_open_login()}</Button>
+          <p class="text-muted-foreground">{m.tailscale_login_body()}</p>
+          <Button size="sm" class="self-start" href={st.auth_url} target="_blank" rel="noopener noreferrer">{m.tailscale_open_login()}</Button>
         {:else if phase === 'login' || phase === 'off'}
-          <Button variant="outline" size="sm" type="button" class="mt-3 self-start" disabled={pending !== undefined || st.busy} onclick={() => change('login')}>{phase === 'login' ? m.tailscale_login() : m.tailscale_connect()}</Button>
+          <Button variant="outline" size="sm" type="button" class="self-start" disabled={pending !== undefined || st.busy} onclick={() => change('login')}>{phase === 'login' ? m.tailscale_login() : m.tailscale_connect()}</Button>
         {:else if phase === 'connected'}
-          <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-            <dt class="text-muted-foreground">{m.tailscale_name()}</dt>
-            <dd class="break-all">{st.self.dns_name.replace(/\.$/, '') || st.self.host_name}</dd>
-            <dt class="text-muted-foreground">{m.tailscale_addresses()}</dt>
-            <dd class="break-all">{(st.self.ips ?? []).join(', ')}</dd>
+          <div>
+            <SettingsRow label={m.tailscale_name()}>
+              {#snippet control()}<span class="break-all">{st.self.dns_name.replace(/\.$/, '') || st.self.host_name}</span>{/snippet}
+            </SettingsRow>
+            <SettingsRow label={m.tailscale_addresses()}>
+              {#snippet control()}<span class="break-all">{(st.self.ips ?? []).join(', ')}</span>{/snippet}
+            </SettingsRow>
             {#if st.magic_dns.enabled}
-              <dt class="text-muted-foreground">{m.tailscale_magic_dns()}</dt>
-              <dd class="break-all">{st.magic_dns.suffix}</dd>
+              <SettingsRow label={m.tailscale_magic_dns()}>
+                {#snippet control()}<span class="break-all">{st.magic_dns.suffix}</span>{/snippet}
+              </SettingsRow>
             {/if}
-          </dl>
-          <Button variant="outline" size="sm" type="button" class="mt-3 self-start" disabled={pending !== undefined || st.busy} onclick={logout}>{m.tailscale_logout()}</Button>
+          </div>
+          <Button variant="destructive" size="sm" type="button" class="self-start" disabled={pending !== undefined || st.busy} onclick={logout}>{m.tailscale_logout()}</Button>
         {/if}
-        {#if st.installed}<p class="mt-2 text-muted-foreground">{m.tailscale_version({ version: st.version })}</p>{/if}
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 
   {#if ts.data && tailscalePhase(ts.data) === 'connected'}
     <TailscaleOptions status={ts.data} disabled={pending !== undefined || ts.data.busy} {confirm} onchange={(settings) => change('settings', settings)} refresh={() => ts.retry()} />
