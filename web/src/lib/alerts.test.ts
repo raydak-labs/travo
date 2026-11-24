@@ -20,7 +20,7 @@ describe('alerts', () => {
       ],
     };
     expect(bannerAlerts(list).map((a) => a.id)).toEqual(['a', 'c']);
-    expect(alertRoute(alert({ code: 'firmware_upgrade_completed' }))).toBe('system');
+    expect(alertRoute(alert({ code: 'firmware_upgrade_completed' }))).toBe('system-updates');
     expect(alertMessage(alert({ code: 'firmware_upgrade_completed' }))).toContain(
       'upgrade finished',
     );
@@ -39,7 +39,14 @@ describe('alerts', () => {
     expect(guard('wifi-apply-in-progress')).toBe('wifi');
     expect(guard('vpn-tunnel-in-progress')).toBe('vpn');
     expect(guard('tailscale-change-in-progress')).toBe('services');
-    expect(guard('firmware-upgrade-in-progress')).toBe('system');
+    expect(guard('firmware-upgrade-in-progress')).toBe('system-updates');
+    expect(guard('update-in-progress')).toBe('system-updates');
+    expect(guard('factory-reset-in-progress')).toBe('system-reset');
+    expect(guard('failover-install-in-progress')).toBe('internet');
+    expect(guard('usbtether-install-in-progress')).toBe('internet');
+    expect(guard('ddns-install-in-progress')).toBe('network-ipv6');
+    expect(guard('interface-restart-in-progress')).toBe('network-lan');
+    expect(guard('reboot-in-progress')).toBe('system');
   });
 
   it('names the guard in its message', () => {

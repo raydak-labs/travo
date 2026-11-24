@@ -39,7 +39,8 @@ Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied
 | Dashboard | Uplink, carrier and internet reachability; VPN toggle; hotel WiFi login with automatic click-through; CPU, memory, throughput; 24 h / 7 day history |
 | WiFi | Scan and join uplinks, saved uplinks by priority, capped automatic reconnect, access point and guest network settings, uplink MAC address, on/off schedule |
 | VPN | WireGuard profiles, split tunnel, kill switch, DNS check; Tailscale with exit node, LAN sharing and SSH |
-| Network | USB tethering, failover across two or three uplinks, WAN (DHCP, static, PPPoE), LAN address, DHCP server, local DNS names, port forwards, IPv6, dynamic DNS, data usage with a monthly budget, diagnostics, Wake-on-LAN, interfaces and firewall zones (read-only) |
+| Internet | USB tethering, failover across two or three uplinks, data usage with a monthly budget |
+| Network | WAN (DHCP, static, PPPoE), LAN address, interfaces and firewall zones (read-only), DHCP server, local DNS names, port forwards, IPv6, dynamic DNS, diagnostics, Wake-on-LAN |
 | Clients | Connected devices; name, reserve an address, block, disconnect, wake |
 | Services | AdGuard Home (default DNS, DNS over HTTPS, expert topology on port 53); optional SQM, Cloudflare Tunnel, vnStat, Watchcat, speedtestcpp |
 | System | Device settings, LEDs and night schedule, hardware buttons and slide switch, SSH keys, OpenWrt and firmware updates, system log, backup, restart, API tokens, Travo updates |
