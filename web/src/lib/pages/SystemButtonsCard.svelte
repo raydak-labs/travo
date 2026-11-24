@@ -1,4 +1,5 @@
 <script lang="ts">
+import ToggleLeft from '@lucide/svelte/icons/toggle-left';
 import Button from '$lib/components/ui/button/button.svelte';
 import {
   actionLabel,
@@ -12,12 +13,13 @@ import {
 } from '../api/buttons';
 import { runTime } from '../api/wifi-schedule';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchButtons);
@@ -51,11 +53,11 @@ async function save(name: string, action: ButtonAction) {
 }
 </script>
 
-<Card title={m.buttons_title()}>
+<Section title={m.buttons_title()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {#if loader.data.buttons.length === 0}
-        <p class="text-muted-foreground">{m.buttons_none()}</p>
+        <EmptyState icon={ToggleLeft} title={m.buttons_none()} />
       {:else}
         <ul class="divide-y divide-border" aria-label={m.buttons_title()}>
           {#each loader.data.buttons as button (button.name)}
@@ -102,5 +104,5 @@ async function save(name: string, action: ButtonAction) {
       {/if}
     {/if}
   </LoadState>
-</Card>
+</Section>
 <ConfirmDialog {confirm} />

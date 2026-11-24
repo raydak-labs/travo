@@ -11,9 +11,9 @@ import {
 } from '../api/gen';
 import '../api/client';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import Section from '../ui/Section.svelte';
 
 type Update = NonNullable<Awaited<ReturnType<typeof postSystemUpdateCheck>>['data']>;
 let result = $state<Update>();
@@ -157,7 +157,7 @@ onMount(() => {
 });
 </script>
 
-<Card title={m.update_title()}>
+<Section title={m.update_title()}>
   <div class="flex flex-wrap items-center gap-3">
     <p aria-live="polite" class="text-muted-foreground">
       {#if pending}
@@ -191,12 +191,12 @@ onMount(() => {
   </div>
   <div aria-live="polite">
     {#if verifying || stage?.status === 'verifying'}
-      <p class="mt-2 text-muted-foreground">{m.update_verifying()}</p>
+      <p class="text-muted-foreground">{m.update_verifying()}</p>
     {:else if stage?.status === 'verified' && stage.version}
       <p class="mt-2">{m.update_verified({ version: stage.version })}</p>
     {/if}
     {#if verifyFailed}
-      <p class="mt-2 text-danger">{m.update_verify_failed()}</p>
+      <p class="text-danger">{m.update_verify_failed()}</p>
     {/if}
   </div>
   <div aria-live="polite">
@@ -205,14 +205,14 @@ onMount(() => {
     {:else if operation?.state === 'succeeded'}
       <p class="mt-2">{m.update_succeeded({ version: operation.version ?? '' })}</p>
     {:else if operation?.state === 'rolled_back'}
-      <p class="mt-2 text-danger">{m.update_rolled_back()}</p>
+      <p class="text-danger">{m.update_rolled_back()}</p>
     {:else if operation?.state === 'aborted'}
       <p class="mt-2">{m.update_aborted()}</p>
     {:else if operation?.state === 'recovery_required'}
-      <p class="mt-2 text-danger">{m.update_recovery_required()}</p>
+      <p class="text-danger">{m.update_recovery_required()}</p>
     {/if}
     {#if applyFailed}
-      <p class="mt-2 text-danger">{m.update_apply_failed()}</p>
+      <p class="text-danger">{m.update_apply_failed()}</p>
     {/if}
   </div>
   {#if operation?.state === 'recovery_required'}
@@ -222,11 +222,11 @@ onMount(() => {
     </Button>
   {:else if operation && operation.state !== 'applying' && stage?.status === 'verified' && stage.version}
     {@const version = stage.version}
-    <Button variant="outline" type="button" class="mt-2 w-fit"
+    <Button variant="outline" type="button" class="w-fit"
       disabled={updating} onclick={() => askApply(version)}>
       {m.update_apply()}
     </Button>
   {/if}
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

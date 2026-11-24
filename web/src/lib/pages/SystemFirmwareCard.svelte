@@ -14,12 +14,12 @@ import {
 import type { FirmwareImage } from '../api/gen';
 import { formatBytes } from '../format';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const status = createLoader(fetchFirmware);
@@ -79,13 +79,13 @@ async function flash(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.firmware_title()}>
+<Section title={m.firmware_title()}>
   {#if started || status.data?.pending}
     <Alert class="status status-danger" role="status" aria-live="polite">{m.firmware_started()}</Alert>
   {:else}
     <p class="text-muted-foreground">{m.firmware_intro()}</p>
     <LoadState status={status.status} retry={status.retry} stale={status.data !== undefined}>
-      <form class="mt-3 flex flex-col gap-3" onsubmit={upload}>
+      <form class="flex flex-col gap-3" onsubmit={upload}>
         <Label class="grid gap-1">
           {m.firmware_file({ max: formatBytes(maxBytes) })}
           <Input type="file" accept=".bin,.img,.itb" bind:files disabled={busy} />
@@ -97,7 +97,7 @@ async function flash(event: SubmitEvent) {
         </div>
       </form>
       {#if image}
-        <dl class="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
+        <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
           <dt class="text-muted-foreground">{m.firmware_validation()}</dt>
           <dd>
             <Status kind={image.validation.valid ? 'ok' : 'danger'}>
@@ -115,7 +115,7 @@ async function flash(event: SubmitEvent) {
           <dt class="text-muted-foreground">{m.firmware_sha()}</dt>
           <dd class="break-all font-mono text-sm">{image.sha256}</dd>
         </dl>
-        <Alert class="status status-warn mt-3" role="note">
+        <Alert class="status status-warn" role="note">
           {#if !image.packages_known}
             {m.firmware_packages_unknown()}
           {:else if image.dropped_packages.length === 0}
@@ -128,7 +128,7 @@ async function flash(event: SubmitEvent) {
           {/if}
         </Alert>
         {#if image.validation.valid}
-          <form class="mt-3 flex flex-col gap-3" onsubmit={flash}>
+          <form class="flex flex-col gap-3" onsubmit={flash}>
             <label class="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -149,11 +149,11 @@ async function flash(event: SubmitEvent) {
             </div>
           </form>
         {:else}
-          <p class="mt-3 text-muted-foreground">{m.firmware_invalid_hint()}</p>
+          <p class="text-muted-foreground">{m.firmware_invalid_hint()}</p>
         {/if}
       {/if}
     </LoadState>
   {/if}
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

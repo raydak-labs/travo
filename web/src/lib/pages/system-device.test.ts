@@ -32,6 +32,7 @@ describe('System Device card', () => {
     vi.doUnmock('./PageHost.svelte');
     for (const text of [
       'Device',
+      'Hardware',
       'GL.iNet GL-AXT1800',
       'OpenWrt',
       '25.12.6',

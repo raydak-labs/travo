@@ -1,4 +1,5 @@
 <script lang="ts">
+import KeyRound from '@lucide/svelte/icons/key-round';
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
@@ -14,12 +15,14 @@ import {
 } from '../api/tokens';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import TokenSecretDialog from './TokenSecretDialog.svelte';
 
@@ -86,18 +89,15 @@ async function revoke(token: Token) {
 }
 </script>
 
-<div class="flex flex-col gap-4">
-  <div>
-    <Button variant="link" class="px-0" href={href('system')}>{m.tokens_back()}</Button>
-  </div>
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_system_tokens()} description={m.system_tokens_description()} />
 
-  <Card title={m.tokens_title()}>
-    <p class="text-muted-foreground">{m.tokens_intro()}</p>
+  <Section title={m.tokens_title()} description={m.tokens_intro()}>
     <LoadState status={tokens.status} retry={tokens.retry} stale={tokens.data !== undefined}>
       {#if tokens.data?.length === 0}
-        <p class="mt-3 text-muted-foreground">{m.tokens_empty()}</p>
+        <EmptyState icon={KeyRound} title={m.tokens_empty()} />
       {:else if tokens.data}
-        <ul class="mt-3 divide-y divide-border" aria-label={m.tokens_title()}>
+        <ul class="divide-y divide-border" aria-label={m.tokens_title()}>
           {#each tokens.data as token (token.id)}
             <li class="flex flex-wrap items-center gap-2 py-2">
               <span class="break-all font-medium">{token.name}</span>
@@ -105,7 +105,7 @@ async function revoke(token: Token) {
               <span class="text-sm text-muted-foreground">
                 {m.tokens_created_at({ date: createdLabel(token.created_at) })}
               </span>
-              <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy}
+              <Button variant="destructive" size="sm" class="ml-auto" type="button" disabled={busy}
                 aria-label={m.tokens_revoke_name({ name: token.name })}
                 onclick={() => revoke(token)}>{m.tokens_revoke()}</Button>
             </li>
@@ -113,9 +113,9 @@ async function revoke(token: Token) {
         </ul>
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 
-  <Card title={m.tokens_new()}>
+  <Section title={m.tokens_new()}>
     <form class="flex flex-col gap-4" onsubmit={create}>
       <Label class="grid gap-1">
         {m.tokens_name()}
@@ -143,7 +143,7 @@ async function revoke(token: Token) {
         </Button>
       </div>
     </form>
-  </Card>
+  </Section>
 </div>
 
 <TokenSecretDialog {created} close={() => { created = undefined; }} />

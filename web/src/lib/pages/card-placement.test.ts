@@ -65,7 +65,7 @@ describe('card placement after the nav split', () => {
   });
 
   it.each(INLINE_CARDS)('%s renders on exactly one page', (title) => {
-    expect(pagesWith(`<Card title={${title}}>`)).toHaveLength(1);
+    expect(pagesWith(`<Section title={${title}}`)).toHaveLength(1);
   });
 
   it('drops the link cards the nav replaces', () => {

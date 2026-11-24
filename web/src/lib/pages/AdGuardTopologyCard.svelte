@@ -5,9 +5,9 @@ import * as Collapsible from '$lib/components/ui/collapsible';
 import { topologyRefusal } from '../api/adguard';
 import { setAdGuardTopology } from '../api/gen';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
@@ -48,22 +48,22 @@ async function toggle(on: boolean) {
 }
 </script>
 
-<Card title={m.adguard_topology_title()}>
+<Section title={m.adguard_topology_title()}>
   <Collapsible.Root open={expert}>
     <Collapsible.Trigger class="cursor-pointer font-medium">{m.adguard_topology_disclosure()}</Collapsible.Trigger>
     <Collapsible.Content>
-      <p class="mt-2 text-muted-foreground">{m.adguard_topology_intro()}</p>
-      <div class="mt-3 flex flex-wrap items-center gap-3">
+      <p class="text-muted-foreground">{m.adguard_topology_intro()}</p>
+      <div class="flex flex-wrap items-center gap-3">
         <Status kind={expert ? 'warn' : 'neutral'}>{expert ? m.adguard_topology_state_expert() : m.adguard_topology_state_default()}</Status>
         <Button variant="outline" type="button" disabled={control.busy || busy} onclick={() => toggle(!expert)}>
           {control.applying ? m.adguard_topology_applying() : expert ? m.adguard_topology_turn_off() : m.adguard_topology_turn_on()}
         </Button>
       </div>
       {#if expert && hosts.length > 0}
-        <p class="mt-2 text-muted">{m.adguard_topology_hosts({ hosts: hosts.join(', ') })}</p>
+        <p class="text-muted">{m.adguard_topology_hosts({ hosts: hosts.join(', ') })}</p>
       {/if}
     </Collapsible.Content>
   </Collapsible.Root>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

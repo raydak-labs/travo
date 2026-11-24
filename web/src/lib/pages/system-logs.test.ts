@@ -41,7 +41,7 @@ describe('System log page', () => {
     expect(body).toContain('Got unexpected signal 1');
     expect(body).toContain('status-danger');
     expect(body).toContain('Showing the newest 2 matching lines.');
-    expect(body).toContain('href="#/system"');
+    expect(body).toMatch(/<h1[^>]*>Logs<\/h1>/);
   });
 
   it('says when nothing matches', () => {

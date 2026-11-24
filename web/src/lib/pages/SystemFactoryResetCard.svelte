@@ -5,10 +5,10 @@ import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import { phraseMatches, RESET_PHRASE, requestFactoryReset } from '../api/factory-reset';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 
 const confirm = createConfirm();
 let typed = $state('');
@@ -37,12 +37,12 @@ async function reset(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.reset_title()}>
+<Section title={m.reset_title()}>
   {#if started}
     <Alert class="status status-danger" role="status" aria-live="polite">{m.reset_started()}</Alert>
   {:else}
     <p class="text-muted-foreground">{m.reset_intro()}</p>
-    <form class="mt-3 flex flex-col gap-3" onsubmit={reset}>
+    <form class="flex flex-col gap-3" onsubmit={reset}>
       <Label class="grid gap-1">
         {m.reset_type_phrase({ phrase: RESET_PHRASE })}
         <Input bind:value={typed} autocomplete="off" spellcheck={false} disabled={busy} />
@@ -52,6 +52,6 @@ async function reset(event: SubmitEvent) {
       </div>
     </form>
   {/if}
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

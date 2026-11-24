@@ -1,4 +1,5 @@
 <script lang="ts">
+import KeySquare from '@lucide/svelte/icons/key-square';
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
@@ -6,12 +7,13 @@ import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 import type { PublicKey } from '../api/gen';
 import { addSSHKey, fetchSSHKeys, pastedKey, removeSSHKey } from '../api/ssh-keys';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 
 const keys = createLoader(fetchSSHKeys);
 const confirm = createConfirm();
@@ -58,21 +60,20 @@ async function remove(key: PublicKey) {
 }
 </script>
 
-<Card title={m.ssh_title()}>
-  <p class="text-muted-foreground">{m.ssh_intro()}</p>
+<Section title={m.ssh_title()} description={m.ssh_intro()}>
   <LoadState status={keys.status} retry={keys.retry} stale={keys.data !== undefined}>
     {#if keys.data}
       {#if keys.data.keys.length === 0}
-        <p class="mt-3 text-muted-foreground">{m.ssh_empty()}</p>
+        <EmptyState icon={KeySquare} title={m.ssh_empty()} />
       {:else}
-        <ul class="mt-3 divide-y divide-border" aria-label={m.ssh_title()}>
+        <ul class="divide-y divide-border" aria-label={m.ssh_title()}>
           {#each keys.data.keys as key (key.id)}
             <li class="flex flex-wrap items-center gap-2 py-2">
               <span class="min-w-0 flex-1">
                 <span class="block break-all font-medium">{label(key)}</span>
                 <span class="block break-all font-mono text-xs text-muted-foreground">{key.type} {key.fingerprint}</span>
               </span>
-              <Button variant="outline" size="sm" type="button" disabled={busy}
+              <Button variant="destructive" size="sm" type="button" disabled={busy}
                 aria-label={m.ssh_remove_name({ name: label(key) })}
                 onclick={() => remove(key)}>{m.ssh_remove()}</Button>
             </li>
@@ -80,11 +81,11 @@ async function remove(key: PublicKey) {
         </ul>
       {/if}
       {#if keys.data.unmanaged > 0}
-        <p class="mt-2 text-sm text-muted-foreground">{m.ssh_unmanaged({ count: keys.data.unmanaged })}</p>
+        <p class="text-sm text-muted-foreground">{m.ssh_unmanaged({ count: keys.data.unmanaged })}</p>
       {/if}
     {/if}
   </LoadState>
-  <form class="mt-4 flex flex-col gap-3" onsubmit={add}>
+  <form class="flex flex-col gap-3" onsubmit={add}>
     <Label class="grid gap-1">
       {m.ssh_add_label()}
       <Textarea bind:value={text} rows={3} spellcheck={false} autocomplete="off" disabled={busy}
@@ -97,6 +98,6 @@ async function remove(key: PublicKey) {
       <Button variant="default" type="submit" disabled={busy}>{m.ssh_add()}</Button>
     </div>
   </form>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

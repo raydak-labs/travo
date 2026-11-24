@@ -9,12 +9,12 @@ import {
   sizeMiB,
 } from '../api/catalog';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchCatalog);
@@ -85,13 +85,12 @@ async function run(it: CatalogItem, action: CatalogAction) {
 }
 </script>
 
-<Card title={m.catalog_title()}>
-  <p class="text-muted-foreground">{m.catalog_intro()}</p>
+<Section title={m.catalog_title()} description={m.catalog_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data?.busy}
       <p class="mt-2"><Status kind="warn">{m.catalog_err_busy()}</Status></p>
     {/if}
-    <ul class="mt-3 grid gap-3">
+    <ul class="grid gap-3">
       {#each loader.data?.entries ?? [] as it (it.id)}
         <li class="rounded-md border p-3">
           <div class="flex flex-wrap items-center gap-2">
@@ -112,7 +111,7 @@ async function run(it: CatalogItem, action: CatalogAction) {
             {about[it.id]?.()}
             {#if it.installed && it.version}{m.catalog_version({ version: it.version })}{/if}
           </p>
-          <div class="mt-2 flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2">
             {#if !it.installed}
               <Button variant="outline" size="sm" type="button" disabled={pending !== undefined}
                 onclick={() => run(it, 'install')}>{m.catalog_install_size({ size: sizeMiB(it.size_bytes) })}</Button>
@@ -126,7 +125,7 @@ async function run(it: CatalogItem, action: CatalogAction) {
                   rel="noopener">{m.catalog_luci()}</Button>
               {/if}
               {#if !it.built_in}
-                <Button variant="outline" size="sm" type="button" disabled={pending !== undefined}
+                <Button variant="destructive" size="sm" type="button" disabled={pending !== undefined}
                   onclick={() => run(it, 'remove')}>{m.catalog_remove()}</Button>
               {/if}
             {/if}
@@ -135,5 +134,5 @@ async function run(it: CatalogItem, action: CatalogAction) {
       {/each}
     </ul>
   </LoadState>
-</Card>
+</Section>
 <ConfirmDialog {confirm} />

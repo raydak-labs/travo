@@ -395,7 +395,7 @@
       }
     }
   ],
-  "system_device": "Device",
+  "system_device": "Hardware",
   "system_model": "Model",
   "system_hostname": "Hostname",
   "system_openwrt": "OpenWrt",
@@ -720,7 +720,6 @@
   "wifi_mac_clone_unavailable": "The router does not know this device's MAC. Connect directly and try again.",
   "tokens_title": "API tokens",
   "tokens_intro": "Tokens let scripts and home automation call the API from the LAN with an Authorization: Bearer header. A read token can only read status; an admin token can change settings.",
-  "tokens_back": "Back to System",
   "tokens_empty": "No API tokens yet.",
   "tokens_created_at": "Created {date}",
   "tokens_scope_read": "Read",
@@ -1281,5 +1280,12 @@
   "network_dhcp_description": "How devices on your network get addresses and names.",
   "network_port_forwards_description": "Let devices from the uplink side reach a service on your network.",
   "network_ipv6_description": "IPv6 on the LAN and a dynamic DNS name for the router.",
-  "network_diagnostics_description": "Check reachability from the router and wake devices on the LAN."
+  "network_diagnostics_description": "Check reachability from the router and wake devices on the LAN.",
+  "system_logs_description": "Recent router messages, for troubleshooting.",
+  "system_tokens_description": "Access for scripts and home automation.",
+  "services_description": "Optional services on the router: AdGuard Home and extra packages.",
+  "system_device_description": "This router: hardware, settings, backup, access and restart.",
+  "system_leds_description": "The LEDs, their night schedule, and what the hardware buttons and slide switch do.",
+  "system_updates_description": "Travo updates, OpenWrt release checks and firmware upgrades.",
+  "system_reset_description": "Erase all settings and start over."
 }

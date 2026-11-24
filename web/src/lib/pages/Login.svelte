@@ -3,9 +3,9 @@ import Button from '$lib/components/ui/button/button.svelte';
 import { type AuthMessage, loginMessage } from '../auth-messages';
 import { m } from '../paraglide/messages.js';
 import { session } from '../session.svelte';
-import Card from '../ui/Card.svelte';
 import FormMessage from '../ui/FormMessage.svelte';
 import PasswordField from '../ui/PasswordField.svelte';
+import Section from '../ui/Section.svelte';
 
 let password = $state('');
 let pending = $state(false);
@@ -22,7 +22,8 @@ async function submit(event?: SubmitEvent) {
 }
 </script>
 
-<Card title={m.login_title()}>
+<div class="mx-auto w-full max-w-md pt-6 md:pt-12">
+<Section title={m.login_title()}>
   <form class="flex flex-col gap-4" onsubmit={submit}>
     <PasswordField
       id="login-password"
@@ -44,4 +45,5 @@ async function submit(event?: SubmitEvent) {
       </Button>
     </div>
   </form>
-</Card>
+</Section>
+</div>

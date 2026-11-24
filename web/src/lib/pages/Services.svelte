@@ -4,10 +4,11 @@ import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import { type AdGuardAction, adguardUrl, changeAdGuard, fetchAdGuard } from '../api/adguard';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
@@ -45,8 +46,9 @@ async function change(action: AdGuardAction, enabled: boolean) {
 const proxy = adguardUrl(window.location);
 </script>
 
-<div class="grid gap-4">
-  <Card title={m.adguard_title()}>
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_services()} description={m.services_description()} />
+  <Section title={m.adguard_title()}>
     <LoadState status={adguard.status} retry={adguard.retry} stale={adguard.data !== undefined}>
       {#if adguard.data}
         {@const st = adguard.data}
@@ -71,10 +73,10 @@ const proxy = adguardUrl(window.location);
           {#if st.busy}<Status kind="info">{m.adguard_busy()}</Status>{/if}
         </div>
         {#if st.installed}
-          <p class="mt-2 text-muted">{m.adguard_version({ version: st.version })}</p>
-          {#if st.config_error}<p class="mt-2 text-muted">{m.adguard_err_config()}</p>{/if}
-          {#if st.migration_failed}<p class="mt-2 text-muted">{m.adguard_migration_failed()}</p>{/if}
-          <div class="mt-3 flex flex-wrap gap-2">
+          <p class="text-muted">{m.adguard_version({ version: st.version })}</p>
+          {#if st.config_error}<p class="text-muted">{m.adguard_err_config()}</p>{/if}
+          {#if st.migration_failed}<p class="text-muted">{m.adguard_migration_failed()}</p>{/if}
+          <div class="flex flex-wrap gap-2">
             {#if st.topology !== 'expert' || !st.running}
               <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('service', !st.running)}>{st.running ? m.adguard_stop() : m.adguard_start()}</Button>
             {/if}
@@ -90,14 +92,14 @@ const proxy = adguardUrl(window.location);
             {/if}
           </div>
         {:else}
-          <p class="mt-2 text-muted">{m.adguard_absent_body()}</p>
+          <p class="text-muted">{m.adguard_absent_body()}</p>
           <div class="mt-3">
             <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('install', true)}>{m.adguard_install()}</Button>
           </div>
         {/if}
       {/if}
     </LoadState>
-  </Card>
+  </Section>
   {#if adguard.data?.running && adguard.data.topology !== 'expert'}
     <PageHost load={doh} />
   {/if}

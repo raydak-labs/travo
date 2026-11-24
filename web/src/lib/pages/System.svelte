@@ -13,14 +13,16 @@ import { m } from '../paraglide/messages.js';
 import { passwordRulesOk } from '../password-rules';
 import { session } from '../session.svelte';
 import { theme } from '../theme.svelte';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import FormMessage from '../ui/FormMessage.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
 import PasswordField from '../ui/PasswordField.svelte';
+import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
 
@@ -136,8 +138,9 @@ async function logout() {
 }
 </script>
 
-<div class="flex flex-col gap-4">
-  <Card title={m.system_device()}>
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_system()} description={m.system_device_description()} />
+  <Section title={m.system_device()}>
     <LoadState status={info.status} retry={info.retry} stale={info.data !== undefined}>
       {#if info.data}
         {@const d = info.data}
@@ -175,11 +178,11 @@ async function logout() {
         </dl>
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 
   <PageHost load={settingsCard} />
 
-  <Card title={m.system_backup()}>
+  <Section title={m.system_backup()}>
     <div>
       <Button variant="outline"
         type="button"
@@ -190,34 +193,29 @@ async function logout() {
         {backupPending ? m.system_backup_pending() : m.system_backup_download()}
       </Button>
     </div>
-  </Card>
+  </Section>
 
   <PageHost load={sshKeysCard} />
 
-  <Card title={m.reboot_title()}>
-    <p class="text-muted-foreground">{m.reboot_confirm()}</p>
+  <Section title={m.reboot_title()} description={m.reboot_confirm()}>
     <div>
-      <Button variant="outline" type="button" disabled={rebootState !== 'idle'} onclick={askRestart}>
+      <Button variant="destructive" type="button" disabled={rebootState !== 'idle'} onclick={askRestart}>
         {m.reboot_router()}
       </Button>
     </div>
-  </Card>
+  </Section>
 
-  <Card title={m.system_about()}>
-    <div class="flex items-center justify-between gap-4">
-      <span>{m.system_theme()}</span>
-      <Button variant="outline" size="sm"
-        type="button"
-        class="text-sm"
-        aria-pressed={theme.value === 'dark'}
-        onclick={() => theme.toggle()}
-      >
-        {m.theme_toggle()}
-      </Button>
-    </div>
-  </Card>
+  <Section title={m.system_about()}>
+    <SettingsRow label={m.system_theme()}>
+      {#snippet control()}
+        <Button variant="outline" size="sm" type="button" aria-pressed={theme.value === 'dark'} onclick={() => theme.toggle()}>
+          {m.theme_toggle()}
+        </Button>
+      {/snippet}
+    </SettingsRow>
+  </Section>
 
-  <Card title={m.password_change_title()}>
+  <Section title={m.password_change_title()}>
     <form class="flex flex-col gap-4" onsubmit={submit}>
       <PasswordField
         id="password-current"
@@ -252,7 +250,7 @@ async function logout() {
         </Button>
       </div>
     </form>
-  </Card>
+  </Section>
 
   <div>
     <Button variant="outline"

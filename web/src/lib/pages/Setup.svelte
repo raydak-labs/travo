@@ -4,9 +4,9 @@ import { type AuthMessage, setupMessage } from '../auth-messages';
 import { m } from '../paraglide/messages.js';
 import { passwordRulesOk } from '../password-rules';
 import { session } from '../session.svelte';
-import Card from '../ui/Card.svelte';
 import FormMessage from '../ui/FormMessage.svelte';
 import PasswordField from '../ui/PasswordField.svelte';
+import Section from '../ui/Section.svelte';
 
 let password = $state('');
 let confirm = $state('');
@@ -34,9 +34,9 @@ async function submit(event?: SubmitEvent) {
 }
 </script>
 
-<Card title={m.setup_title()}>
+<div class="mx-auto w-full max-w-md pt-6 md:pt-12">
+<Section title={m.setup_title()} description={m.setup_body()}>
   <form class="flex flex-col gap-4" onsubmit={submit}>
-    <p class="text-muted-foreground">{m.setup_body()}</p>
     <PasswordField
       id="setup-password"
       label={m.setup_password()}
@@ -64,4 +64,5 @@ async function submit(event?: SubmitEvent) {
       </Button>
     </div>
   </form>
-</Card>
+</Section>
+</div>

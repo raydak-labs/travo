@@ -57,8 +57,10 @@ describe('API tokens page', () => {
     expect(body).not.toContain('tgt_');
   });
 
-  it('links back to System', () => {
-    expect(page([])).toContain('href="#/system"');
+  it('opens with its page header, without a back link (the nav reaches System)', () => {
+    const body = page([]);
+    expect(body).toMatch(/<h1[^>]*>API tokens<\/h1>/);
+    expect(body).not.toContain('href="#/system"');
   });
 
   it('shows the load error with retry', () => {

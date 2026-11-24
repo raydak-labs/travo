@@ -7,10 +7,10 @@ import {
   runOpenWrtCheck,
 } from '../api/openwrt-updates';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 
 const last = createLoader(fetchOpenWrtUpdates);
 let fresh = $state<OpenWrtCheck>();
@@ -34,11 +34,10 @@ async function check(refreshLists: boolean) {
 }
 </script>
 
-<Card title={m.osupdate_title()}>
-  <p class="text-muted-foreground">{m.osupdate_intro()}</p>
+<Section title={m.osupdate_title()} description={m.osupdate_intro()}>
   <LoadState status={last.status} retry={last.retry} stale={last.data !== undefined}>
     {#if result?.checked_at}
-      <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
+      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
         <dt class="text-muted-foreground">{m.osupdate_running()}</dt>
         <dd>{result.current} <span class="text-muted-foreground">{result.target}</span></dd>
         <dt class="text-muted-foreground">{m.osupdate_in_series()}</dt>
@@ -54,7 +53,7 @@ async function check(refreshLists: boolean) {
           {:else}
             <details>
               <summary class="cursor-pointer">{m.osupdate_packages_count({ count: result.packages.length })}</summary>
-              <ul class="mt-2 text-sm">
+              <ul class="text-sm">
                 {#each result.packages as p (p.name)}
                   <li class="break-all"><span class="font-medium">{p.name}</span> <span class="text-muted-foreground">{p.installed} → {p.available}</span></li>
                 {/each}
@@ -66,13 +65,13 @@ async function check(refreshLists: boolean) {
         <dd>{new Date(result.checked_at).toLocaleString()}</dd>
       </dl>
     {:else}
-      <p class="mt-3 text-muted-foreground">{m.osupdate_never()}</p>
+      <p class="text-muted-foreground">{m.osupdate_never()}</p>
     {/if}
   </LoadState>
-  <p class="mt-3 text-sm text-muted-foreground">{m.osupdate_luci_hint()}</p>
-  <div class="mt-3 flex flex-wrap gap-2">
+  <p class="text-sm text-muted-foreground">{m.osupdate_luci_hint()}</p>
+  <div class="flex flex-wrap gap-2">
     <Button variant="default" type="button" disabled={busy} onclick={() => check(false)}>{m.osupdate_check()}</Button>
     <Button variant="outline" type="button" disabled={busy} onclick={() => check(true)}>{m.osupdate_check_refresh()}</Button>
     <Button variant="outline" href={luci} target="_blank" rel="noopener noreferrer">{m.osupdate_open_luci()}</Button>
   </div>
-</Card>
+</Section>

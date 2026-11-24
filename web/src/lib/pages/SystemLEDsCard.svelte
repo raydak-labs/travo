@@ -1,14 +1,16 @@
 <script lang="ts">
+import Lightbulb from '@lucide/svelte/icons/lightbulb';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import type { LedSchedule } from '../api/gen';
 import { fetchLEDs, saveLEDSchedule, scheduleProblem, setLEDsOff } from '../api/leds';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchLEDs);
@@ -51,12 +53,12 @@ function save(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.leds_title()}>
+<Section title={m.leds_title()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {@const view = loader.data}
       {#if view.leds.length === 0}
-        <p class="text-muted-foreground">{m.leds_none()}</p>
+        <EmptyState icon={Lightbulb} title={m.leds_none()} />
       {:else}
         <ul class="divide-y divide-border" aria-label={m.leds_title()}>
           {#each view.leds as led (led.name)}
@@ -66,14 +68,14 @@ function save(event: SubmitEvent) {
             </li>
           {/each}
         </ul>
-        <div class="mt-3 flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => toggle(!view.off)}>
             {view.off ? m.leds_default() : m.leds_off()}
           </Button>
           {#if view.off}<Status kind="info">{m.leds_held_off()}</Status>{/if}
         </div>
       {/if}
-      <form class="mt-4 flex flex-col gap-3" onsubmit={save}>
+      <form class="flex flex-col gap-3" onsubmit={save}>
         <label class="flex items-center gap-2">
           <input type="checkbox" bind:checked={form.enabled} disabled={busy} />
           {m.leds_schedule()}
@@ -96,4 +98,4 @@ function save(event: SubmitEvent) {
       </form>
     {/if}
   </LoadState>
-</Card>
+</Section>

@@ -4,10 +4,10 @@ import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import { dohPresets, fetchDoH, saveDoH, validDoH } from '../api/doh';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchDoH);
@@ -39,18 +39,17 @@ async function save(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.doh_title()}>
-  <p class="text-muted-foreground">{m.doh_intro()}</p>
+<Section title={m.doh_title()} description={m.doh_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {@const ups = loader.data.upstreams ?? []}
-      <div class="mt-3 flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <Status kind={loader.data.encrypted ? 'ok' : 'warn'}>
           {loader.data.encrypted ? m.doh_state_encrypted() : m.doh_state_plain()}
         </Status>
         <span class="break-all text-sm text-muted-foreground">{ups.join(', ')}</span>
       </div>
-      <form class="mt-3 flex flex-col gap-3" onsubmit={save}>
+      <form class="flex flex-col gap-3" onsubmit={save}>
         <div class="flex flex-wrap gap-2">
           {#each dohPresets as [name, preset] (preset)}
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => (url = preset)}>{name}</Button>
@@ -68,4 +67,4 @@ async function save(event: SubmitEvent) {
       </form>
     {/if}
   </LoadState>
-</Card>
+</Section>
