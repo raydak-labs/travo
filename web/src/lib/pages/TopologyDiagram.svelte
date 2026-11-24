@@ -23,7 +23,10 @@ import type { LoadStatus } from '../ui/loader.svelte';
 import Status from '../ui/Status.svelte';
 
 type Part = 'uplinks' | 'connectivity' | 'throughput' | 'clients';
-let { model, status }: { model: TopologyModel; status: Record<Part, LoadStatus> } = $props();
+let {
+  model,
+  status,
+}: { model: TopologyModel; status: Record<Part, LoadStatus> & { vpn?: LoadStatus } } = $props();
 
 const captionId = $props.id();
 const icons: Record<UplinkName, typeof Wifi> = { wan: Cable, wwan: Wifi, usbtether: Usb };
@@ -36,10 +39,15 @@ const configure: Record<UplinkName, string> = {
 // Stale: the part has a known value but its source is reloading or failed (docs/web-ui.md).
 const refreshing = (s: LoadStatus) => s.state !== 'ready';
 const sourcesKnown = $derived(model.sources.some((s) => s.state !== 'unknown'));
+// States come from uplinks and connectivity; a throughput failure only makes the rates stale.
 const sourcesStale = $derived(
-  sourcesKnown && [status.uplinks, status.connectivity, status.throughput].some(refreshing),
+  sourcesKnown && [status.uplinks, status.connectivity].some(refreshing),
 );
-const routerStale = $derived(model.internet !== 'unknown' && refreshing(status.connectivity));
+const ratesStale = $derived(refreshing(status.throughput));
+const routerStale = $derived(
+  (model.internet !== 'unknown' && refreshing(status.connectivity)) ||
+    (model.vpn !== 'unknown' && status.vpn !== undefined && refreshing(status.vpn)),
+);
 const clientsStale = $derived(model.clients !== null && refreshing(status.clients));
 const firstLoad = $derived(
   !sourcesKnown &&
@@ -83,13 +91,13 @@ const clientLink = $derived<SourceState>(
     </ul>
 
     <div class="flex flex-col @xl:grid @xl:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)_2.5rem_minmax(0,1fr)]">
-      <ul data-part="sources" class="grid auto-rows-fr {sourcesStale ? 'opacity-60' : ''}">
+      <ul data-part="sources" class="grid auto-rows-fr">
         {#each model.sources as source (source.name)}
           {@const Icon = icons[source.name]}
           <li class="py-1" data-state={source.state}>
             <a
               href={configure[source.name]}
-              class="flex h-full flex-col gap-1 rounded-lg border border-border bg-card p-3 hover:bg-muted {source.state === 'not_configured' ? 'opacity-60' : ''}"
+              class="flex h-full flex-col gap-1 rounded-lg border border-border bg-card p-3 hover:bg-muted {source.state === 'not_configured' || sourcesStale ? 'opacity-60' : ''}"
             >
               <span class="flex items-center gap-2 font-medium">
                 <Icon aria-hidden="true" size={16} class="shrink-0" />{sourceLabel[source.name]()}
@@ -97,7 +105,7 @@ const clientLink = $derived<SourceState>(
               <span class="text-xs">{stateLabel[source.state]()}</span>
               {#if source.detail}<span class="text-xs break-all text-muted-foreground">{source.detail}</span>{/if}
               {#if source.rate}
-                <span class="text-xs tabular-nums text-muted-foreground" data-rate>
+                <span class="text-xs tabular-nums text-muted-foreground {ratesStale && !sourcesStale ? 'opacity-60' : ''}" data-rate>
                   ↓ {formatBitRate(source.rate.rxBitsPerSecond)} · ↑ {formatBitRate(source.rate.txBitsPerSecond)}
                 </span>
               {/if}

@@ -36,7 +36,7 @@ Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied
 
 | Page | What it does |
 |---|---|
-| Dashboard | Uplink, carrier and internet reachability; VPN toggle; hotel WiFi login with automatic click-through; CPU, memory, throughput; 24 h / 7 day history |
+| Dashboard | Network map of uplinks, router and clients with live rates; uplink, carrier and internet reachability; VPN toggle; hotel WiFi login with automatic click-through; CPU, memory, throughput; 24 h / 7 day history |
 | WiFi | Scan and join uplinks, saved uplinks by priority, capped automatic reconnect, access point and guest network settings, uplink MAC address, on/off schedule |
 | VPN | WireGuard profiles, split tunnel, kill switch, DNS check; Tailscale with exit node, LAN sharing and SSH |
 | Internet | USB tethering, failover across two or three uplinks, data usage with a monthly budget |

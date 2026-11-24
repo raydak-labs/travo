@@ -101,6 +101,7 @@ function formatRate(rate: number | null): string {
         connectivity: connectivity.status,
         throughput: throughput.status,
         clients: events.clients.status,
+        vpn: vpn.status,
       }}
     />
   </Section>

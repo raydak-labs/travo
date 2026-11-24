@@ -15,7 +15,7 @@ import TopologyDiagram from './TopologyDiagram.svelte';
 
 const ready: LoadStatus = { state: 'ready' };
 type Part = 'uplinks' | 'connectivity' | 'throughput' | 'clients';
-const allReady: Record<Part, LoadStatus> = {
+const allReady: Record<Part, LoadStatus> & { vpn?: LoadStatus } = {
   uplinks: ready,
   connectivity: ready,
   throughput: ready,
@@ -31,7 +31,10 @@ const full = topologyModel({
   vpn: tunnel('connected'),
 });
 
-function html(model: TopologyModel, status: Partial<Record<Part, LoadStatus>> = {}): string {
+function html(
+  model: TopologyModel,
+  status: Partial<Record<Part | 'vpn', LoadStatus>> = {},
+): string {
   return render(TopologyDiagram, {
     props: { model, status: { ...allReady, ...status } },
   }).body.replace(/<!--[^>]*-->/g, '');
@@ -141,6 +144,23 @@ describe('TopologyDiagram', () => {
     expect(part).toContain('status-stale');
     expect(part).toContain('1 on WiFi');
     expect(body.slice(0, body.indexOf('data-part="router"'))).not.toContain('status-stale');
+  });
+
+  it('dims only the rates when just throughput fails', () => {
+    const body = html(full, { throughput: { state: 'error', message: 'Throughput unavailable' } });
+    const active = sourceItem(body, 'active');
+    expect(active).not.toContain('status-stale');
+    expect(active).toMatch(/opacity-60[^"]*" data-rate/);
+  });
+
+  it('marks the router stale when the VPN poll fails with a known state', () => {
+    const body = html(full, { vpn: { state: 'error', message: 'VPN status unavailable' } });
+    const router = body.slice(
+      body.indexOf('data-part="router"'),
+      body.indexOf('data-part="clients"'),
+    );
+    expect(router).toContain('status-stale');
+    expect(router).toContain('Connected');
   });
 
   it('shows a skeleton until the first data arrives', () => {
