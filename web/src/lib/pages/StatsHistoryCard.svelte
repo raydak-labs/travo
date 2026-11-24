@@ -4,12 +4,12 @@ import { clearStatsHistory, fetchStatsHistory, type HistoryRange } from '../api/
 import { formatBytes, formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
 import { historyView, type Sample, summarize } from '../stats-history';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Sparkline from '../ui/Sparkline.svelte';
 import Status from '../ui/Status.svelte';
 
@@ -71,7 +71,7 @@ async function reset() {
 }
 </script>
 
-<Card title={m.history_title()}>
+<Section title={m.history_title()}>
   <div class="flex flex-col gap-4">
     <div class="flex gap-2" role="group" aria-label={m.history_range_label()}>
       {#each ranges as range (range.hours)}
@@ -147,5 +147,5 @@ async function reset() {
       {/if}
     </LoadState>
   </div>
-</Card>
+</Section>
 <ConfirmDialog {confirm} />

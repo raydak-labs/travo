@@ -9,10 +9,10 @@ import {
 } from '../api/gen';
 import { acceptError, acceptMessage, captiveError, formatCountdown, renewError } from '../captive';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 // Shown only when an action exists (captiveCardVisible); refresh re-reads connectivity.
@@ -71,7 +71,7 @@ async function bypass() {
 }
 </script>
 
-<Card title={m.captive_title()}>
+<Section title={m.captive_title()}>
   <div class="flex flex-col items-start gap-3">
     {#if info.internet === 'captive'}
       <Status kind="warn">{m.dashboard_internet_captive()}</Status>
@@ -122,6 +122,6 @@ async function bypass() {
       {/if}
     </div>
   </div>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />
