@@ -59,6 +59,29 @@ fail-open, an update in progress) stays in the card.
 The shell mounts the one `Toaster` (svelte-sonner) in `App.svelte`. `mise run screenshots`
 also captures a dialog, the pending toast and a result toast.
 
+## Layout
+
+Pages are built from the wrappers in `web/src/lib/ui/`; a page never hand-rolls a card,
+a heading or row spacing.
+
+| Component | Use it for |
+|---|---|
+| `PageHeader` | The top of every page: `title` (the page's one `h1`), optional `description` and `actions` (right of the title from `sm`, below it on phones). |
+| `Section` | Each block of the page: one card surface with an `h2` `title`, optional `description` and `actions` (the card action slot, e.g. Scan). It replaces `Card` for page sections; `Card` goes once every page has moved (#305–#309). |
+| `SettingsRow` | One setting or item inside a `Section`: `label` and `description` left, the `control` snippet right from `sm`, stacked on phones. Pass `for` when the control has an id so the label targets it. Consecutive rows get a divider by themselves. |
+| `GroupHeading` | The only subheading (`h3`), for a group inside a section (Guest network) or a summary tile. |
+| `EmptyState` | "Nothing here yet" content: icon, title, optional text and action. A failed load is never empty: `LoadState` shows that. |
+
+Scale, applied by these components and the shell:
+
+- Shell padding `p-4`, `md:p-6`; the content column stays `max-w-3xl`.
+- The page root is `flex flex-col gap-6`: header, summary band and sections are `gap-6` apart; content inside a section is `gap-4`; a `SettingsRow` is `py-3`.
+- `h1` `text-xl font-semibold`; `h2` `text-base font-semibold`; `h3` `text-sm font-medium text-muted-foreground`; descriptions `text-sm text-muted-foreground`.
+- Below `sm` (640 px) everything stacks; from `sm` rows and headers sit side by side.
+- A summary band sits between the header and the first section, outside any card. Its tiles use the card surface and `GroupHeading`; the band carries a visually hidden `h2` so the heading order stays h1 → h2 → h3.
+
+The WiFi page is the reference that the other pages copy.
+
 ## Page rules
 
 - Svelte 5 SPA, dark by default without a flash (a stored choice can switch to light), English via Paraglide.

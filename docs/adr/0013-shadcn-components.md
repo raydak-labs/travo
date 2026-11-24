@@ -23,7 +23,7 @@ budgets are shell 128 KB, each other JS chunk 16 KB, and total 256 KB
 
 The product palette stays on `data-theme`. Default utilities read it through
 the existing `--color-*` mappings, plus `--color-muted` and `--radius-md`.
-App wrappers still own page contracts: Card keeps an h2, status colors stay on
+App wrappers still own page contracts: Section keeps an h2, PageHeader owns the page's h1, status colors stay on
 Badge, and the mobile sheet is constrained to the sidebar width. Close labels
 use Paraglide. A disabled anchor Button does not run its click handler.
 The component source is not an npm package, so `package.json` does not carry
