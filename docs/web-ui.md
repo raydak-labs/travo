@@ -98,7 +98,7 @@ Danger actions (disable, delete, remove, revoke, restart, block) use the `destru
 ## Page rules
 
 - Svelte 5 SPA, dark by default without a flash (a stored choice can switch to light), English via Paraglide.
-- Size budgets (`web/scripts/size-budget.mjs`): shell ≤ 128 KB gzip, route chunk ≤ 16 KB, total ≤ 256 KB.
+- Size budgets (`web/scripts/size-budget.mjs`): shell ≤ 128 KB gzip, route chunk ≤ 24 KB, total ≤ 320 KB.
 - Use the copied shadcn-svelte primitives for applicable controls. Keep the app wrapper contracts, semantic tokens and localization; record measured exceptions in [ADR 0013](adr/0013-shadcn-components.md).
 - Responsive and mobile-first, route-level code split, vector assets. No CDN or external fonts: the router is often offline.
 - Call only the generated API client; no hand-typed endpoints.

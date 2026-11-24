@@ -17,7 +17,7 @@ Those files use `tailwind-variants` and `cn`. `web/src/lib/utils.ts` re-exports
 `cn`. An earlier probe at 95ecdf0 fit a 40 KB shell only by replacing that
 default with a static class lookup (63,878 B shell and 19,152 B WiFi chunk for
 stock Button and Dialog; 39,757 B shell after the fork). The fork is gone. Gzip
-budgets are shell 128 KB, each other JS chunk 16 KB, and total 256 KB
+budgets are shell 128 KB, each other JS chunk 24 KB, and total 320 KB
 ([0004](0004-frontend-stack.md)). The CLI reinstall measures 69,108 B shell,
 10,265 B largest lazy chunk, and 113,836 B total.
 

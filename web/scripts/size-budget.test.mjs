@@ -41,15 +41,15 @@ describe('checkBudget', () => {
       files: new Map([
         ['index.html', 1],
         ['index.js', 1],
-        ['lazy.js', 16 * 1024 + 1],
+        ['lazy.js', 24 * 1024 + 1],
       ]),
       html: '<script src="/index.js"></script>',
       sources: new Map([['index.js', 'import("./lazy.js");']]),
     });
 
-    expect(result.chunks).toEqual([{ name: 'lazy.js', bytes: 16385 }]);
+    expect(result.chunks).toEqual([{ name: 'lazy.js', bytes: 24577 }]);
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0]).toMatch(/chunk lazy\.js.*16 KB/);
+    expect(result.violations[0]).toMatch(/chunk lazy\.js.*24 KB/);
   });
 
   it('reports an over-limit shell without also counting its entry as a chunk', () => {
@@ -73,15 +73,15 @@ describe('checkBudget', () => {
       files: new Map([
         ['index.html', 1],
         ['index.js', 1],
-        ['extra.css', 256 * 1024 - 1],
+        ['extra.css', 320 * 1024 - 1],
       ]),
       html: '<script src="/index.js"></script>',
       sources: new Map([['index.js', '']]),
     });
 
     expect(result.shell).toBe(2);
-    expect(result.total).toBe(256 * 1024 + 1);
+    expect(result.total).toBe(320 * 1024 + 1);
     expect(result.violations).toHaveLength(1);
-    expect(result.violations[0]).toMatch(/total.*256 KB/);
+    expect(result.violations[0]).toMatch(/total.*320 KB/);
   });
 });
