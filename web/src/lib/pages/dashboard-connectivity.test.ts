@@ -52,7 +52,7 @@ describe('Dashboard connectivity', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows active uplink and link up even when the internet is offline', () => {
+  it('shows the internet state on the network map, without a separate connectivity card', () => {
     const body = dashboard(
       { state: 'ready' },
       {
@@ -63,43 +63,14 @@ describe('Dashboard connectivity', () => {
         portal_url: null,
       },
     );
-    expect(body).toContain('phy0-sta0');
-    expect(body).toContain('· WiFi');
-    expect(body).toContain('Link up');
-    expect(body).toContain('Offline');
+    expect(body).toContain('Network map');
+    expect(body).toContain('Internet: Offline');
+    expect(body).not.toContain('Active uplink');
+    expect(body).not.toContain('Link up');
     expect(createLoader).toHaveBeenCalledWith(fetchHealth);
   });
 
-  it('names a USB tether uplink by its medium', () => {
-    const body = dashboard(
-      { state: 'ready' },
-      {
-        active_interface: 'eth0',
-        medium: 'usb',
-        carrier: true,
-        internet: 'online',
-        portal_url: null,
-      },
-    );
-    expect(body).toContain('eth0');
-    expect(body).toContain('· USB tethering');
-  });
-
-  it('distinguishes unknown and down carrier', () => {
-    const data = {
-      active_interface: null,
-      carrier: null,
-      internet: 'online',
-      portal_url: null,
-    } as const;
-    const body = dashboard({ state: 'ready' }, data);
-    expect(body).toContain('Unknown');
-    expect(body).toContain('Online');
-    expect(body).not.toContain('Link down');
-    expect(dashboard({ state: 'ready' }, { ...data, carrier: false })).toContain('Link down');
-  });
-
-  it('retains the last connectivity snapshot on failed refresh', () => {
+  it('keeps the last connectivity on the map, dimmed and marked, when a refresh fails', () => {
     const body = dashboard(
       { state: 'error', message: 'Connectivity unavailable' },
       {
@@ -109,11 +80,22 @@ describe('Dashboard connectivity', () => {
         internet: 'captive',
         portal_url: null,
       },
+    ).replace(/<!--.*?-->/g, '');
+    const router = body.slice(
+      body.indexOf('data-part="router"'),
+      body.indexOf('data-part="clients"'),
     );
-    expect(body).toContain('Last known value');
-    expect(body).toContain('phy0-sta0');
-    expect(body).toContain('Captive portal');
-    expect(body).toContain('Connectivity unavailable');
+    expect(router).toContain('Captive portal');
+    expect(router).toContain('Last known value');
+    expect(router).toContain('opacity-60');
+  });
+
+  it('has no refresh button for the pushed connectivity source', () => {
+    const body = dashboard(
+      { state: 'ready' },
+      { active_interface: 'phy0-sta0', carrier: true, internet: 'online', portal_url: null },
+    );
+    expect(body).not.toContain('>Refresh<');
   });
 
   it('keeps the WiFi button available when connectivity is unavailable', () => {

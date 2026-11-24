@@ -61,7 +61,8 @@ describe('Dashboard resources', () => {
     expect(body).toContain('266.4 MB of 408.8 MB');
     expect(body).toContain('3m');
     expect(body).toContain('>dev<');
-    expect(body).toContain('Refresh');
+    expect(body).not.toContain('>Refresh<');
+    expect(body.match(/data-slot="summary-tile"/g)).toHaveLength(5);
   });
 
   it('shows unavailable memory when total memory is zero', () => {
@@ -98,5 +99,9 @@ describe('Dashboard resources', () => {
     expect(body).toContain('266.4 MB of 408.8 MB');
     expect(body).toContain('Last known value');
     expect(body).toContain('Retry');
+    // Each resource tile keeps its own dimmed value instead of blanking.
+    expect(body.match(/opacity-60/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(body).toContain('3m');
+    expect(body).toContain('>dev<');
   });
 });

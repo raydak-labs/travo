@@ -42,6 +42,12 @@ describe('Dashboard throughput', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('keeps interface traffic behind a closed toggle', () => {
+    const body = dashboard({ state: 'ready' }, []);
+    expect(body).toContain('Show interfaces');
+    expect(body).toMatch(/aria-expanded="false"/);
+  });
+
   it('lists named interfaces and distinguishes unknown rates from zero', () => {
     const body = dashboard({ state: 'ready' }, interfaces);
     expect(body).toContain('br-lan');
@@ -81,7 +87,7 @@ describe('Dashboard Tailscale', () => {
     expect(dashboard({ state: 'ready' }, [])).not.toContain('Open Tailscale');
   });
 
-  it('shows the pushed state, addresses and an active exit node', () => {
+  it('shows the pushed state on the map and links the Tailscale page', () => {
     dashboardEvents.tailscale.data = {
       installed: true,
       running: true,
@@ -90,9 +96,8 @@ describe('Dashboard Tailscale', () => {
       settings: { exit_node: 'nA', advertise_lan: false, ssh: false },
     };
     const body = dashboard({ state: 'ready' }, []);
-    expect(body).toContain('Connected');
-    expect(body).toContain('100.64.0.1');
-    expect(body).toContain('Exit node in use');
+    expect(body).toContain('Tailscale: Connected');
+    expect(body).toContain('Open Tailscale');
     expect(body).toContain('#/vpn/tailscale');
   });
 });
