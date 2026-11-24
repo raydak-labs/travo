@@ -1,16 +1,13 @@
 <script lang="ts">
-import { onMount } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import { postSystemReboot } from '../api/gen';
 import '../api/client';
-import { fetchHealth } from '../api/health';
-import { rebootErrorKey, waitForBoot } from '../api/reboot';
 import { downloadSystemBackup, fetchSystemInfo } from '../api/system';
 import { type AuthMessage, passwordMessage } from '../auth-messages';
 import { formatBytes, formatLoad, formatUptime } from '../format';
 import { navigate } from '../navigate';
 import { m } from '../paraglide/messages.js';
 import { passwordRulesOk } from '../password-rules';
+import { restart } from '../restart.svelte';
 import { session } from '../session.svelte';
 import { theme } from '../theme.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
@@ -32,63 +29,6 @@ const sshKeysCard = lazyPage(() => import('./SystemSSHKeysCard.svelte'));
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
 const confirm = createConfirm();
-
-// Progress and outcome are toasts (id 'reboot'); the card only blocks a second request.
-type RebootState = 'idle' | 'requesting' | 'restarting' | 'done';
-let rebootState = $state<RebootState>('idle');
-let rebootController: AbortController | undefined;
-
-onMount(() => {
-  const controller = new AbortController();
-  rebootController = controller;
-  return () => controller.abort();
-});
-
-async function askRestart() {
-  const ok = await confirm.ask({
-    title: m.reboot_confirm_title(),
-    description: m.reboot_confirm(),
-    action: m.reboot_router(),
-    tone: 'danger',
-  });
-  if (ok) void restartRouter();
-}
-
-function rebootFailed(key: ReturnType<typeof rebootErrorKey>) {
-  rebootState = 'idle';
-  notify.error(m.reboot_error({ key }), 'reboot');
-}
-
-async function restartRouter() {
-  const controller = rebootController;
-  if (!controller || rebootState !== 'idle') return;
-  rebootState = 'requesting';
-  try {
-    const { data, error } = await postSystemReboot({
-      body: { confirm: true },
-      signal: controller.signal,
-    });
-    if (controller.signal.aborted) return;
-    if (!data) {
-      rebootFailed(rebootErrorKey((error as { code?: string } | undefined)?.code));
-      return;
-    }
-    rebootState = 'restarting';
-    notify.progress(m.reboot_restarting(), 'reboot');
-    const result = await waitForBoot(data.boot_id, {
-      health: fetchHealth,
-      sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
-      now: Date.now,
-      signal: controller.signal,
-    });
-    if (controller.signal.aborted) return;
-    rebootState = 'done';
-    if (result === 'restarted') notify.success(m.reboot_back(), 'reboot');
-    else notify.error(m.reboot_timeout(), 'reboot');
-  } catch {
-    if (!controller.signal.aborted) rebootFailed('generic');
-  }
-}
 
 async function downloadBackup() {
   backupPending = true;
@@ -199,7 +139,7 @@ async function logout() {
 
   <Section title={m.reboot_title()} description={m.reboot_confirm()}>
     <div>
-      <Button variant="destructive" type="button" disabled={rebootState !== 'idle'} onclick={askRestart}>
+      <Button variant="destructive" type="button" disabled={restart.state !== 'idle'} onclick={() => restart.ask(confirm)}>
         {m.reboot_router()}
       </Button>
     </div>
