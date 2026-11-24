@@ -1,4 +1,5 @@
 <script lang="ts">
+import RadioTower from '@lucide/svelte/icons/radio-tower';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
@@ -8,8 +9,11 @@ import { fetchAccessPoints, fetchGuest, updateAccessPoint, updateGuest } from '.
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
+import GroupHeading from '../ui/GroupHeading.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import { bandLabel } from '../wifi';
 
@@ -74,53 +78,48 @@ function save(event: SubmitEvent) {
 
 <LoadState status={aps.status} retry={aps.retry} stale={aps.data !== undefined}>
   {#if aps.data?.length === 0}
-    <Status kind="neutral">{m.wifi_none()}</Status>
+    <EmptyState icon={RadioTower} title={m.wifi_none()} />
   {:else if aps.data}
-    <ul class="space-y-3">
+    <div>
       {#each aps.data.filter((ap) => ap.section !== 'guest') as ap (ap.section)}
-        <li class="flex flex-wrap items-center gap-2">
-          <span class="break-all">{ap.ssid}</span>
-          <span class="text-sm text-muted-foreground">{bandLabel(ap.band)}</span>
-          {#if ap.guest}<Status kind="info">{m.wifi_ap_guest()}</Status>{/if}
-          <Status kind={ap.enabled ? 'ok' : 'neutral'}>{ap.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
-          <span class="ml-auto flex gap-2">
+        <SettingsRow label={ap.ssid} description={ap.guest ? `${bandLabel(ap.band)} · ${m.wifi_ap_guest()}` : bandLabel(ap.band)}>
+          {#snippet control()}
+            <Status kind={ap.enabled ? 'ok' : 'neutral'}>{ap.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit(ap.section, ap.ssid, ap.enabled)}>{m.wifi_ap_edit()}</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy}
               onclick={() => toggle(ap.section, ap.ssid, ap.enabled)}>
               {ap.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
             </Button>
-          </span>
-        </li>
+          {/snippet}
+        </SettingsRow>
       {/each}
-    </ul>
+    </div>
   {/if}
 </LoadState>
 
-<section class="mt-4 border-t border-border pt-4">
-  <h3 class="text-sm font-semibold">{m.wifi_guest_title()}</h3>
+<div class="flex flex-col gap-1 border-t border-border pt-4">
+  <GroupHeading label={m.wifi_guest_title()} />
   <LoadState status={guest.status} retry={guest.retry} stale={guest.data !== undefined}>
     {#if guest.data}
-      <p class="mt-1 text-sm text-muted-foreground">{m.wifi_guest_hint({ subnet: guest.data.subnet })}</p>
-      <div class="mt-2 flex flex-wrap items-center gap-2">
-        {#if guest.data.configured}
-          {@const g = guest.data}
-          <span class="break-all">{g.ssid}</span>
-          <Status kind={g.enabled ? 'ok' : 'neutral'}>{g.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
-          <span class="ml-auto flex gap-2">
+      {@const g = guest.data}
+      <SettingsRow label={g.configured ? g.ssid : m.wifi_guest_none()} description={m.wifi_guest_hint({ subnet: g.subnet })}>
+        {#snippet control()}
+          {#if g.configured}
+            <Status kind={g.enabled ? 'ok' : 'neutral'}>{g.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit('guest', g.ssid, g.enabled)}>{m.wifi_ap_edit()}</Button>
             <Button variant="outline" size="sm" type="button" disabled={busy}
               onclick={() => toggle('guest', g.ssid, g.enabled)}>
               {g.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
             </Button>
-          </span>
-        {:else}
-          <Status kind="neutral">{m.wifi_guest_none()}</Status>
-          <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy} onclick={() => edit('guest', '', true)}>{m.wifi_guest_setup()}</Button>
-        {/if}
-      </div>
+          {:else}
+            <Status kind="neutral">{m.wifi_guest_none()}</Status>
+            <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit('guest', '', true)}>{m.wifi_guest_setup()}</Button>
+          {/if}
+        {/snippet}
+      </SettingsRow>
     {/if}
   </LoadState>
-</section>
+</div>
 
 <Dialog.Root bind:open onOpenChange={(value) => { if (!value) key = ''; }}>
 <Dialog.Content portalProps={{ disabled: typeof window === "undefined" }} showCloseButton={false}

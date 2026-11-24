@@ -1,15 +1,17 @@
 <script lang="ts">
 import type { WiFiSummary as Summary } from '../api/gen';
 import { m } from '../paraglide/messages.js';
+import GroupHeading from '../ui/GroupHeading.svelte';
 import Status from '../ui/Status.svelte';
 import { bandLabel } from '../wifi';
 
 let { data }: { data: Summary } = $props();
 </script>
 
-<div class="grid gap-3 sm:grid-cols-3">
-  <section class="rounded-md bg-bg p-3">
-    <h3 class="text-sm font-semibold">{m.wifi_uplink()}</h3>
+<section class="grid gap-3 sm:grid-cols-3" aria-labelledby="wifi-summary-heading">
+  <h2 id="wifi-summary-heading" class="sr-only">{m.wifi_summary_title()}</h2>
+  <div class="rounded-xl bg-card p-4 text-sm ring-1 ring-foreground/10">
+    <GroupHeading label={m.wifi_uplink()} />
     {#if data.stas.length === 0}
       <div class="mt-2"><Status kind="neutral">{m.wifi_no_uplink()}</Status></div>
     {:else}
@@ -28,10 +30,10 @@ let { data }: { data: Summary } = $props();
         {/each}
       </ul>
     {/if}
-  </section>
+  </div>
 
-  <section class="rounded-md bg-bg p-3">
-    <h3 class="text-sm font-semibold">{m.wifi_access_points()}</h3>
+  <div class="rounded-xl bg-card p-4 text-sm ring-1 ring-foreground/10">
+    <GroupHeading label={m.wifi_access_points()} />
     {#if data.aps.length === 0}
       <div class="mt-2"><Status kind="neutral">{m.wifi_none()}</Status></div>
     {:else}
@@ -50,10 +52,10 @@ let { data }: { data: Summary } = $props();
         {/each}
       </ul>
     {/if}
-  </section>
+  </div>
 
-  <section class="rounded-md bg-bg p-3">
-    <h3 class="text-sm font-semibold">{m.wifi_radios_configured()}</h3>
+  <div class="rounded-xl bg-card p-4 text-sm ring-1 ring-foreground/10">
+    <GroupHeading label={m.wifi_radios_configured()} />
     {#if data.radios.length === 0}
       <div class="mt-2"><Status kind="neutral">{m.wifi_none()}</Status></div>
     {:else}
@@ -72,5 +74,5 @@ let { data }: { data: Summary } = $props();
         {/each}
       </ul>
     {/if}
-  </section>
-</div>
+  </div>
+</section>

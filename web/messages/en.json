@@ -1260,5 +1260,9 @@
   "nav_system_reset": "Factory reset",
   "nav_group_network": "Network",
   "nav_group_system": "System",
-  "nav_group_toggle": "Show or hide {group}"
+  "nav_group_toggle": "Show or hide {group}",
+  "wifi_page_description": "Join a network for internet, and set the networks this router broadcasts.",
+  "wifi_saved_description": "Networks the router rejoins on its own, top first.",
+  "wifi_mac_description": "The address the router shows to the network it joins.",
+  "wifi_mac_mode_label": "Address"
 }

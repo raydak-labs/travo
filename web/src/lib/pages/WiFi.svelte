@@ -1,4 +1,5 @@
 <script lang="ts">
+import Radar from '@lucide/svelte/icons/radar';
 import { onDestroy, onMount } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import {
@@ -23,12 +24,14 @@ import {
   selectWifiProfile,
 } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader, type LoadStatus } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import PageHeader from '../ui/PageHeader.svelte';
+import Section from '../ui/Section.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { wifiScanErrorMessage } from '../wifi';
 import { type JoinState, joinPhase, reduceJoin } from '../wifi-join';
@@ -276,25 +279,24 @@ async function scan() {
 }
 </script>
 
-<div class="grid gap-4">
-  <Card title={m.wifi_summary_title()}>
-    <LoadState status={summary.status} retry={summary.retry} stale={summary.data !== undefined}>
-      {#if summary.data}
-        <WiFiSummary data={summary.data} />
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_wifi()} description={m.wifi_page_description()}>
+    {#snippet actions()}
+      {#if summary.status.state === 'ready'}
+        <Button variant="outline" size="sm" type="button" onclick={summary.retry}>
+          {m.wifi_refresh()}
+        </Button>
       {/if}
-    </LoadState>
-    {#if summary.status.state === 'ready'}
-      <Button variant="outline" size="sm"
-        type="button"
-        class="w-fit text-sm"
-        onclick={summary.retry}
-      >
-        {m.wifi_refresh()}
-      </Button>
-    {/if}
-  </Card>
+    {/snippet}
+  </PageHeader>
 
-  <Card title={m.wifi_saved_title()}>
+  <LoadState status={summary.status} retry={summary.retry} stale={summary.data !== undefined}>
+    {#if summary.data}
+      <WiFiSummary data={summary.data} />
+    {/if}
+  </LoadState>
+
+  <Section title={m.wifi_saved_title()} description={m.wifi_saved_description()}>
     <WiFiReconnect status={reconnect.status} data={reconnect.data} profiles={profiles.data?.profiles ?? []}
       scan={scanData} joinBusy={busy} select={selectProfile} />
     <LoadState status={profiles.status} retry={profiles.retry} stale={profiles.data !== undefined}>
@@ -313,50 +315,50 @@ async function scan() {
         />
       {/if}
     </LoadState>
-  </Card>
+  </Section>
 
-  <Card title={m.wifi_mac_title()}>
-    {#key apVersion}
-      <PageHost load={uplinkMAC} props={{ busy, apply: submitChange }} />
-    {/key}
-  </Card>
-
-  <Card title={m.wifi_aps_title()}>
-    {#key apVersion}
-      <PageHost load={accessPoints} props={{ busy, apply: submitAP }} />
-    {/key}
-  </Card>
-
-  <Card title={m.wifi_schedule_title()}>
-    <PageHost load={schedule} />
-  </Card>
-
-  <Card title={m.wifi_scan_title()}>
+  <Section title={m.wifi_scan_title()}>
+    {#snippet actions()}
+      {#if scanStatus.state !== 'error'}
+        <Button variant="outline" size="sm"
+          type="button"
+          disabled={scanStatus.state === 'loading'}
+          aria-busy={scanStatus.state === 'loading'}
+          onclick={scan}
+        >
+          {scanStatus.state === 'loading'
+            ? m.wifi_scanning()
+            : scanData
+              ? m.wifi_scan_again()
+              : m.wifi_scan()}
+        </Button>
+      {/if}
+    {/snippet}
     <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
       {#if scanData}
         <WiFiScanList result={scanData} join={(network) => { joinTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null; selected = network; }} {busy} />
       {:else}
-        <p class="text-muted-foreground">{m.wifi_scan_idle()}</p>
+        <EmptyState icon={Radar} title={m.wifi_scan_idle()} />
       {/if}
     </LoadState>
-    {#if scanStatus.state !== 'error'}
-      <Button variant="outline" size="sm"
-        type="button"
-        class="w-fit text-sm"
-        disabled={scanStatus.state === 'loading'}
-        aria-busy={scanStatus.state === 'loading'}
-        onclick={scan}
-      >
-        {scanStatus.state === 'loading'
-          ? m.wifi_scanning()
-          : scanData
-            ? m.wifi_scan_again()
-            : m.wifi_scan()}
-      </Button>
-    {/if}
-  </Card>
-</div>
+  </Section>
 
+  <Section title={m.wifi_aps_title()}>
+    {#key apVersion}
+      <PageHost load={accessPoints} props={{ busy, apply: submitAP }} />
+    {/key}
+  </Section>
+
+  <Section title={m.wifi_mac_title()} description={m.wifi_mac_description()}>
+    {#key apVersion}
+      <PageHost load={uplinkMAC} props={{ busy, apply: submitChange }} />
+    {/key}
+  </Section>
+
+  <Section title={m.wifi_schedule_title()}>
+    <PageHost load={schedule} />
+  </Section>
+</div>
 
 {#if selected}
   <PageHost load={joinDialog} props={{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />

@@ -1,9 +1,11 @@
 <script lang="ts">
+import Bookmark from '@lucide/svelte/icons/bookmark';
 import Button from '$lib/components/ui/button/button.svelte';
 import type { WiFiProfileList, WiFiProfileSummary } from '../api/gen';
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import Status from '../ui/Status.svelte';
 import { securityLabel } from '../wifi';
 import { moveProfile } from '../wifi-profiles';
@@ -38,7 +40,7 @@ async function askForget(profile: WiFiProfileSummary, connected: boolean) {
 </script>
 
 {#if list.profiles.length === 0}
-  <p class="text-muted-foreground">{m.wifi_saved_empty()}</p>
+  <EmptyState icon={Bookmark} title={m.wifi_saved_empty()} />
 {:else}
   <ol class="divide-y divide-border" aria-label={m.wifi_saved_title()}>
     {#each list.profiles as profile, index (profile.id)}
