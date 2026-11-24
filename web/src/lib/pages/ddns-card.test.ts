@@ -31,10 +31,11 @@ describe('DDNS card', () => {
     expect(render(DDNSCard).body).toContain('Install ddns-scripts');
   });
 
-  it('shows the providers and never a stored token', () => {
+  it('shows the chosen provider in the select and never a stored token', () => {
     loader.data = base;
     const body = render(DDNSCard).body;
-    expect(body).toContain('dynv6.com');
+    // The provider list opens in a popover; the closed trigger shows the current choice.
+    expect(body).toMatch(/data-slot="select-trigger"[\s\S]*?duckdns\.org/);
     expect(body).toContain('Registered address 203.0.113.7');
     expect(body).toContain('Stored; leave empty to keep');
   });

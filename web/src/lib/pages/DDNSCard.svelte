@@ -8,6 +8,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SelectField from '../ui/SelectField.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchDDNS);
@@ -82,12 +83,8 @@ function save(event: SubmitEvent) {
         <div class="flex flex-wrap gap-3">
           <Label class="grid w-56 gap-1">
             {m.ddns_service()}
-            <select bind:value={form.service} disabled={busy} required
-              class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-              {#each data.services ?? [] as s (s)}
-                <option value={s}>{s}</option>
-              {/each}
-            </select>
+            <SelectField bind:value={form.service} disabled={busy} class="w-full"
+              options={(data.services ?? []).map((s) => ({ value: s, label: s }))} />
           </Label>
           <Label class="grid w-64 gap-1">
             {m.ddns_domain()}

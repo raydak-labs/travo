@@ -6,6 +6,7 @@ import EmptyState from './EmptyState.svelte';
 import GroupHeading from './GroupHeading.svelte';
 import PageHeader from './PageHeader.svelte';
 import Section from './Section.svelte';
+import SelectField from './SelectField.svelte';
 import SettingsRow from './SettingsRow.svelte';
 
 const snippet = (html: string) => createRawSnippet(() => ({ render: () => html }));
@@ -115,5 +116,23 @@ describe('GroupHeading', () => {
   it('is an h3', () => {
     const { body } = render(GroupHeading, { props: { label: 'Guest network' } });
     expect(body).toMatch(/<h3[^>]*>Guest network<\/h3>/);
+  });
+});
+
+describe('SelectField', () => {
+  const options = [
+    { value: '', label: 'All levels' },
+    { value: 'warn', label: 'warn and worse' },
+  ];
+
+  it('shows the label of an empty-string value, not a blank trigger', () => {
+    const { body } = render(SelectField, { props: { value: '', options } });
+    expect(body).toMatch(/data-slot="select-trigger"[\s\S]*?All levels/);
+  });
+
+  it('shows the label of the selected value', () => {
+    const { body } = render(SelectField, { props: { value: 'warn', options } });
+    expect(body).toContain('warn and worse');
+    expect(body).not.toContain('All levels');
   });
 });

@@ -11,6 +11,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
+import SelectField from '../ui/SelectField.svelte';
 import Status from '../ui/Status.svelte';
 
 let level = $state<LogLevel | ''>('');
@@ -33,12 +34,8 @@ function apply(event?: SubmitEvent) {
     <form class="flex flex-wrap items-end gap-3" onsubmit={apply}>
       <Label class="grid gap-1">
         {m.logs_level()}
-        <select bind:value={level} class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-          <option value="">{m.logs_level_all()}</option>
-          {#each LOG_LEVELS as option (option)}
-            <option value={option}>{m.logs_level_at_least({ level: option })}</option>
-          {/each}
-        </select>
+        <SelectField bind:value={level} class="w-44"
+          options={[{ value: '', label: m.logs_level_all() }, ...LOG_LEVELS.map((option) => ({ value: option, label: m.logs_level_at_least({ level: option }) }))]} />
       </Label>
       <Label class="grid min-w-40 flex-1 gap-1">
         {m.logs_filter()}

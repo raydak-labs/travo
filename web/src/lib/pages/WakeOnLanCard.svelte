@@ -8,6 +8,7 @@ import { validWakeMAC, wake, wakeInterfaces } from '../api/wol';
 import { m } from '../paraglide/messages.js';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SelectField from '../ui/SelectField.svelte';
 
 let mac = $state('');
 let iface = $state('');
@@ -54,10 +55,8 @@ async function send(event: SubmitEvent) {
     {#if networks.length > 1}
       <Label class="grid gap-1">
         {m.wol_interface()}
-        <select bind:value={iface} disabled={sending} class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-          <option value="">{m.wol_all_networks()}</option>
-          {#each networks as name (name)}<option value={name}>{name}</option>{/each}
-        </select>
+        <SelectField bind:value={iface} disabled={sending} class="w-40"
+          options={[{ value: '', label: m.wol_all_networks() }, ...networks.map((name) => ({ value: name, label: name }))]} />
       </Label>
     {/if}
     <Button variant="outline" type="submit" disabled={sending || !mac.trim()}>

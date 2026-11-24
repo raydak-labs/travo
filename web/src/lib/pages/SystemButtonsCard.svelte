@@ -20,6 +20,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SelectField from '../ui/SelectField.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchButtons);
@@ -75,16 +76,9 @@ async function save(name: string, action: ButtonAction) {
                 <div class="flex flex-wrap items-center gap-2">
                   <label class="flex items-center gap-2 text-sm">
                     {m.buttons_action()}
-                    <select
-                      value={choice}
-                      onchange={(e) => (picked[button.name] = e.currentTarget.value as ButtonAction)}
-                      disabled={busy}
-                      class="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                    >
-                      {#each buttonActions as a (a)}
-                        <option value={a}>{actionLabel(a)}</option>
-                      {/each}
-                    </select>
+                    <SelectField value={choice} disabled={busy} class="w-48"
+                      onchange={(v) => (picked[button.name] = v as ButtonAction)}
+                      options={buttonActions.map((a) => ({ value: a, label: actionLabel(a) }))} />
                   </label>
                   <Button variant="outline" size="sm" type="button" disabled={busy || choice === button.action}
                     onclick={() => void save(button.name, choice)}>{m.buttons_save()}</Button>

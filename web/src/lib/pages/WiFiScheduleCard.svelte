@@ -27,6 +27,7 @@ import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import SelectField from '../ui/SelectField.svelte';
 import Status from '../ui/Status.svelte';
 
 const schedule = createLoader(fetchSchedule);
@@ -181,12 +182,8 @@ async function remove(rule: WiFiScheduleRule) {
     <Dialog.Title level={2} class="text-lg font-semibold">{m.wifi_schedule_dialog()}</Dialog.Title>
     <Label class="grid gap-1">
       {m.wifi_schedule_ap()}
-      <select bind:value={form.section} disabled={saving} required
-        class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-        {#each schedule.data?.aps ?? [] as ap (ap.section)}
-          <option value={ap.section}>{ap.ssid || ap.section}{ap.guest ? ` (${m.wifi_ap_guest()})` : ''}</option>
-        {/each}
-      </select>
+      <SelectField bind:value={form.section} disabled={saving} class="w-full"
+        options={(schedule.data?.aps ?? []).map((ap) => ({ value: ap.section, label: `${ap.ssid || ap.section}${ap.guest ? ` (${m.wifi_ap_guest()})` : ''}` }))} />
     </Label>
     <div class="flex gap-3">
       <Label class="grid flex-1 gap-1">

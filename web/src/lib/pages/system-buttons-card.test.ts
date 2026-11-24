@@ -29,7 +29,8 @@ describe('Buttons card', () => {
     expect(body).toContain('Stock behaviour');
     expect(body).toContain('factory reset');
     expect(body).toContain('Switch action');
-    expect(body).toContain('Guest WiFi on / off');
+    // The action list opens in a popover; the closed trigger shows the current action.
+    expect(body).toContain('data-slot="select-trigger"');
     expect(body).not.toContain('Last slide');
   });
 

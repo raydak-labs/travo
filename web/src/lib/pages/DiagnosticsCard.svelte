@@ -13,6 +13,7 @@ import {
 import { m } from '../paraglide/messages.js';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SelectField from '../ui/SelectField.svelte';
 import Status from '../ui/Status.svelte';
 
 const labels: Record<DiagnosticTool, () => string> = {
@@ -44,11 +45,8 @@ async function run(event: SubmitEvent) {
   <form class="flex flex-wrap items-end gap-3" onsubmit={run}>
     <Label class="grid gap-1">
       {m.diag_tool()}
-      <select bind:value={tool} disabled={running} class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-        {#each DIAGNOSTIC_TOOLS as option (option)}
-          <option value={option}>{labels[option]()}</option>
-        {/each}
-      </select>
+      <SelectField bind:value={tool} disabled={running} class="w-40"
+        options={DIAGNOSTIC_TOOLS.map((option) => ({ value: option, label: labels[option]() }))} />
     </Label>
     <Label class="grid min-w-40 flex-1 gap-1">
       {m.diag_target()}

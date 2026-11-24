@@ -24,6 +24,7 @@ import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Section from '../ui/Section.svelte';
+import SelectField from '../ui/SelectField.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
 
@@ -139,12 +140,8 @@ async function remove(f: PortForward) {
     </Label>
     <Label class="grid gap-1">
       {m.port_forwards_proto()}
-      <select bind:value={form.proto} disabled={control.busy}
-        class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-        {#each protos as [value, text] (value)}
-          <option {value}>{text()}</option>
-        {/each}
-      </select>
+      <SelectField bind:value={form.proto} disabled={control.busy} class="w-32"
+        options={protos.map(([value, text]) => ({ value, label: text() }))} />
     </Label>
     <Label class="grid w-32 gap-1">
       {m.port_forwards_external()}
