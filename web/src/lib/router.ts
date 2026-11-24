@@ -2,39 +2,92 @@ export type Route =
   | 'dashboard'
   | 'login'
   | 'setup'
+  | 'internet'
   | 'wifi'
-  | 'network'
-  | 'clients'
   | 'vpn'
-  | 'services'
-  | 'system'
-  | 'system-tokens'
   | 'vpn-tailscale'
-  | 'system-logs';
+  | 'clients'
+  | 'services'
+  | 'network-wan'
+  | 'network-lan'
+  | 'network-dhcp'
+  | 'network-port-forwards'
+  | 'network-ipv6'
+  | 'network-diagnostics'
+  | 'system'
+  | 'system-leds'
+  | 'system-logs'
+  | 'system-updates'
+  | 'system-tokens'
+  | 'system-reset';
 
-const ROUTES: Record<string, Route> = {
-  '/': 'dashboard',
-  '/login': 'login',
-  '/setup': 'setup',
-  '/wifi': 'wifi',
-  '/network': 'network',
-  '/clients': 'clients',
-  '/vpn': 'vpn',
-  '/services': 'services',
-  '/system': 'system',
-  '/system/tokens': 'system-tokens',
-  '/vpn/tailscale': 'vpn-tailscale',
-  '/system/logs': 'system-logs',
+/** Canonical path of every route; `href` builds these and `parseHash` reads them back. */
+const PATHS: Record<Route, string> = {
+  dashboard: '/',
+  login: '/login',
+  setup: '/setup',
+  internet: '/internet',
+  wifi: '/wifi',
+  vpn: '/vpn',
+  'vpn-tailscale': '/vpn/tailscale',
+  clients: '/clients',
+  services: '/services',
+  'network-wan': '/network/wan',
+  'network-lan': '/network/lan',
+  'network-dhcp': '/network/dhcp',
+  'network-port-forwards': '/network/port-forwards',
+  'network-ipv6': '/network/ipv6',
+  'network-diagnostics': '/network/diagnostics',
+  system: '/system',
+  'system-leds': '/system/leds',
+  'system-logs': '/system/logs',
+  'system-updates': '/system/updates',
+  'system-tokens': '/system/tokens',
+  'system-reset': '/system/reset',
 };
 
-const PATHS = Object.fromEntries(
-  Object.entries(ROUTES).map(([path, route]) => [route, path]),
-) as Record<Route, string>;
+// `#/network` has no page of its own: it opens the group's default page.
+const ROUTES: Record<string, Route> = {
+  ...Object.fromEntries(Object.entries(PATHS).map(([route, path]) => [path, route as Route])),
+  '/network': 'network-wan',
+};
 
-/** The nav entry a route belongs to: a subpage highlights its parent. */
+export const ROUTE_LIST = Object.keys(PATHS) as Route[];
+
+export type NavGroup = 'network' | 'system';
+
+/** Children of each collapsible nav group, in nav order; the first is the group's default page. */
+export const NAV_GROUPS: Record<NavGroup, readonly Route[]> = {
+  network: [
+    'network-wan',
+    'network-lan',
+    'network-dhcp',
+    'network-port-forwards',
+    'network-ipv6',
+    'network-diagnostics',
+  ],
+  system: [
+    'system',
+    'system-leds',
+    'system-logs',
+    'system-updates',
+    'system-tokens',
+    'system-reset',
+  ],
+};
+
+/** The nav item a route highlights: a child page that is not in the nav highlights its parent. */
 export function section(route: Route): Route {
-  if (route === 'system-tokens' || route === 'system-logs') return 'system';
   return route === 'vpn-tailscale' ? 'vpn' : route;
+}
+
+/** The nav group a route's nav item sits in, or null for an everyday page. */
+export function navGroup(route: Route): NavGroup | null {
+  const item = section(route);
+  for (const group of Object.keys(NAV_GROUPS) as NavGroup[]) {
+    if (NAV_GROUPS[group].includes(item)) return group;
+  }
+  return null;
 }
 
 /** Maps a location hash (`#/wifi`) to a route; anything unknown is the dashboard. */

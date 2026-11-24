@@ -1,4 +1,6 @@
 <script lang="ts">
+import ChevronRight from '@lucide/svelte/icons/chevron-right';
+import Globe from '@lucide/svelte/icons/globe';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
 import LogOut from '@lucide/svelte/icons/log-out';
 import Menu from '@lucide/svelte/icons/menu';
@@ -10,16 +12,19 @@ import Shield from '@lucide/svelte/icons/shield';
 import Sun from '@lucide/svelte/icons/sun';
 import Users from '@lucide/svelte/icons/users';
 import Wifi from '@lucide/svelte/icons/wifi';
+import { untrack } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as Collapsible from '$lib/components/ui/collapsible';
 import { Toaster } from '$lib/components/ui/sonner';
 import { getAdGuard } from './lib/api/gen';
 import { ownDashboardEvents, restoreDashboardEvents } from './lib/app-dashboard-events';
 import { dashboardEvents } from './lib/dashboard-events.svelte';
+import { loadNavState, type NavState, saveNavState, withRoute } from './lib/nav-state';
 import { navigate } from './lib/navigate';
 import { lazyPage, pages } from './lib/pages/lazy';
 import PageHost from './lib/pages/PageHost.svelte';
 import { m } from './lib/paraglide/messages.js';
-import { guard, href, type Route, section } from './lib/router';
+import { guard, href, NAV_GROUPS, type NavGroup, type Route, section } from './lib/router';
 import { router } from './lib/router.svelte';
 import { session } from './lib/session.svelte';
 import { theme } from './lib/theme.svelte';
@@ -66,16 +71,54 @@ function onDrawerKey(event: KeyboardEvent) {
   closeDrawer();
 }
 
-// Groups per spec. Sections without a route; the rest render the "not yet" card.
-const nav: { route: Route | null; label: () => string; icon: typeof Wifi }[] = [
+// Everyday pages first; expert settings sit one level deeper in the Network and System groups.
+type NavItem = { route: Route; label: () => string; icon: typeof Wifi };
+const everyday: NavItem[] = [
   { route: 'dashboard', label: () => m.nav_dashboard(), icon: LayoutDashboard },
+  { route: 'internet', label: () => m.nav_internet(), icon: Globe },
   { route: 'wifi', label: () => m.nav_wifi(), icon: Wifi },
-  { route: 'clients', label: () => m.nav_clients(), icon: Users },
-  { route: 'network', label: () => m.nav_network(), icon: Network },
   { route: 'vpn', label: () => m.nav_vpn(), icon: Shield },
+  { route: 'clients', label: () => m.nav_clients(), icon: Users },
   { route: 'services', label: () => m.nav_services(), icon: Server },
-  { route: 'system', label: () => m.nav_system(), icon: Settings },
 ];
+const childLabels: Partial<Record<Route, () => string>> = {
+  'network-wan': () => m.nav_network_wan(),
+  'network-lan': () => m.nav_network_lan(),
+  'network-dhcp': () => m.nav_network_dhcp(),
+  'network-port-forwards': () => m.nav_network_port_forwards(),
+  'network-ipv6': () => m.nav_network_ipv6(),
+  'network-diagnostics': () => m.nav_network_diagnostics(),
+  system: () => m.nav_system(),
+  'system-leds': () => m.nav_system_leds(),
+  'system-logs': () => m.nav_system_logs(),
+  'system-updates': () => m.nav_system_updates(),
+  'system-tokens': () => m.nav_system_tokens(),
+  'system-reset': () => m.nav_system_reset(),
+};
+const groups: { id: NavGroup; label: () => string; icon: typeof Wifi }[] = [
+  { id: 'network', label: () => m.nav_group_network(), icon: Network },
+  { id: 'system', label: () => m.nav_group_system(), icon: Settings },
+];
+
+// Open groups survive reloads (nav:v1); the group holding the current page always opens.
+const storage = (() => {
+  try {
+    return localStorage;
+  } catch {
+    return undefined;
+  }
+})();
+let navState = $state<NavState>(loadNavState(storage));
+$effect(() => {
+  const route = shown;
+  untrack(() => {
+    navState = withRoute(navState, route);
+  });
+});
+function setGroup(group: NavGroup, open: boolean) {
+  navState = { ...navState, [group]: open };
+  saveNavState(storage, navState);
+}
 
 // Services leaves the nav only when the daemon cannot supervise AdGuard Home at all (503).
 // An absent package stays visible: the page is the retry path for a failed install.
@@ -91,7 +134,7 @@ $effect(() => {
   return () => request.abort();
 });
 const shownNav = $derived(
-  nav.filter((item) => !(item.route === 'services' && servicesUnavailable)),
+  everyday.filter((item) => !(item.route === 'services' && servicesUnavailable)),
 );
 
 void session.bootstrap();
@@ -146,24 +189,50 @@ $effect(() => {
     restoreDashboardEvents(e.persisted, authenticated, session.generation, dashboardEvents)}
 />
 
+{#snippet navLink(route: Route, label: string, Icon?: typeof Wifi)}
+  <Button variant="ghost"
+    href={href(route)}
+    aria-current={section(shown) === route ? 'page' : undefined}
+    class="w-full justify-start gap-3 text-base font-normal aria-[current=page]:bg-bg aria-[current=page]:font-semibold"
+    >{#if Icon}<Icon aria-hidden="true" size={18} />{/if}{label}</Button
+  >
+{/snippet}
+
 {#snippet navigation()}
     <nav aria-label={m.nav_label()} class="flex-1 overflow-y-auto px-2 pb-4">
       <ul class="flex flex-col gap-1">
-        {#each shownNav as item (item.label())}
-          {@const Icon = item.icon}
+        {#each shownNav as item (item.route)}
+          <li>{@render navLink(item.route, item.label(), item.icon)}</li>
+        {/each}
+        {#each groups as group (group.id)}
+          {@const Icon = group.icon}
+          {@const children = NAV_GROUPS[group.id]}
           <li>
-            {#if item.route}
-              <Button variant="ghost"
-                href={href(item.route)}
-                aria-current={section(shown) === item.route ? 'page' : undefined}
-                class="w-full justify-start gap-3 text-base font-normal aria-[current=page]:bg-bg aria-[current=page]:font-semibold"
-                ><Icon aria-hidden="true" size={18} />{item.label()}</Button
-              >
-            {:else}
-              <span class="flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground"
-                ><Icon aria-hidden="true" size={18} />{item.label()}</span
-              >
-            {/if}
+            <Collapsible.Root open={navState[group.id]} onOpenChange={(open) => setGroup(group.id, open)}>
+              <div class="flex items-center gap-1">
+                <Button variant="ghost"
+                  href={href(children[0] as Route)}
+                  class="min-w-0 flex-1 justify-start gap-3 text-base font-normal"
+                  ><Icon aria-hidden="true" size={18} />{group.label()}</Button
+                >
+                <Collapsible.Trigger>
+                  {#snippet child({ props })}
+                    <Button {...props} variant="ghost" size="icon" type="button"
+                      aria-label={m.nav_group_toggle({ group: group.label() })}
+                      class="shrink-0 [&[data-state=open]>svg]:rotate-90"
+                      ><ChevronRight aria-hidden="true" size={18} class="transition-transform" /></Button
+                    >
+                  {/snippet}
+                </Collapsible.Trigger>
+              </div>
+              <Collapsible.Content>
+                <ul class="mt-1 flex flex-col gap-1 pl-7">
+                  {#each children as route (route)}
+                    <li>{@render navLink(route, childLabels[route]?.() ?? route)}</li>
+                  {/each}
+                </ul>
+              </Collapsible.Content>
+            </Collapsible.Root>
           </li>
         {/each}
       </ul>
@@ -252,32 +321,8 @@ $effect(() => {
             <LoadState status={bootstrapStatus} retry={() => session.bootstrap()}>
               <span></span>
             </LoadState>
-          {:else if shown === 'dashboard'}
-            <PageHost load={pages.dashboard} props={{ events: dashboardEvents }} />
-          {:else if shown === 'wifi'}
-            <PageHost load={pages.wifi} />
-          {:else if shown === 'network'}
-            <PageHost load={pages.network} />
-          {:else if shown === 'clients'}
-            <PageHost load={pages.clients} />
-          {:else if shown === 'vpn'}
-            <PageHost load={pages.vpn} />
-          {:else if shown === 'services'}
-            <PageHost load={pages.services} />
-          {:else if shown === 'system'}
-            <PageHost load={pages.system} />
-          {:else if shown === 'system-tokens'}
-            <PageHost load={pages.systemTokens} />
-          {:else if shown === 'vpn-tailscale'}
-            <PageHost load={pages.vpnTailscale} />
-          {:else if shown === 'system-logs'}
-            <PageHost load={pages.systemLogs} />
-          {:else if shown === 'login'}
-            <PageHost load={pages.login} />
-          {:else if shown === 'setup'}
-            <PageHost load={pages.setup} />
           {:else}
-            <PageHost load={pages.notYet} />
+            <PageHost load={pages[shown]} props={shown === 'dashboard' ? { events: dashboardEvents } : {}} />
           {/if}
         {/key}
       </div>

@@ -1,4 +1,5 @@
 import type { Component } from 'svelte';
+import type { Route } from '../router';
 
 export type PageComponent = Component<Record<string, unknown>>;
 export type PageImport = () => Promise<PageComponent>;
@@ -21,18 +22,27 @@ export function lazyPage(importer: () => Promise<{ default: unknown }>): PageImp
   };
 }
 
-export const pages = {
+/** One chunk per route; the shell picks the page by the guarded route. */
+export const pages: Record<Route, PageImport> = {
   dashboard: lazyPage(() => import('./Dashboard.svelte')),
-  wifi: lazyPage(() => import('./WiFi.svelte')),
-  network: lazyPage(() => import('./Network.svelte')),
-  clients: lazyPage(() => import('./Clients.svelte')),
-  vpn: lazyPage(() => import('./VPN.svelte')),
-  services: lazyPage(() => import('./Services.svelte')),
-  system: lazyPage(() => import('./System.svelte')),
-  systemTokens: lazyPage(() => import('./SystemTokens.svelte')),
-  vpnTailscale: lazyPage(() => import('./Tailscale.svelte')),
-  systemLogs: lazyPage(() => import('./SystemLogs.svelte')),
   login: lazyPage(() => import('./Login.svelte')),
   setup: lazyPage(() => import('./Setup.svelte')),
-  notYet: lazyPage(() => import('./NotYet.svelte')),
+  internet: lazyPage(() => import('./Internet.svelte')),
+  wifi: lazyPage(() => import('./WiFi.svelte')),
+  vpn: lazyPage(() => import('./VPN.svelte')),
+  'vpn-tailscale': lazyPage(() => import('./Tailscale.svelte')),
+  clients: lazyPage(() => import('./Clients.svelte')),
+  services: lazyPage(() => import('./Services.svelte')),
+  'network-wan': lazyPage(() => import('./NetworkWAN.svelte')),
+  'network-lan': lazyPage(() => import('./NetworkLAN.svelte')),
+  'network-dhcp': lazyPage(() => import('./NetworkDHCP.svelte')),
+  'network-port-forwards': lazyPage(() => import('./NetworkPortForwards.svelte')),
+  'network-ipv6': lazyPage(() => import('./NetworkIPv6.svelte')),
+  'network-diagnostics': lazyPage(() => import('./NetworkDiagnostics.svelte')),
+  system: lazyPage(() => import('./System.svelte')),
+  'system-leds': lazyPage(() => import('./SystemLEDs.svelte')),
+  'system-logs': lazyPage(() => import('./SystemLogs.svelte')),
+  'system-updates': lazyPage(() => import('./SystemUpdates.svelte')),
+  'system-tokens': lazyPage(() => import('./SystemTokens.svelte')),
+  'system-reset': lazyPage(() => import('./SystemReset.svelte')),
 };

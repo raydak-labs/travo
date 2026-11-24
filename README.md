@@ -50,11 +50,11 @@ A banner above every page names conditions that need you, such as a guard left b
 
 Under System, Travo checks GitHub for a newer stable release at most once a day, or on **Check for updates**. **Verify package** checks the signed archive and stages it; **Apply update** installs it and restarts the service, so sign in again afterwards. If the updater reports that recovery is required, use **Retry recovery** or the console command in [ADR 0007](docs/adr/0007-distribution-and-self-update.md). To use another release source, set `travo-greenfield.main.release_source` to `OWNER/REPO` (or `off`) and restart the daemon.
 
-Firmware: **System → OpenWrt updates** checks downloads.openwrt.org and links LuCI attended sysupgrade. **System → Firmware upgrade** flashes an image you uploaded, after checking that it fits this board.
+Firmware: **System → Updates & firmware → OpenWrt updates** checks downloads.openwrt.org and links LuCI attended sysupgrade. **System → Updates & firmware → Firmware upgrade** flashes an image you uploaded, after checking that it fits this board.
 
 ## Automation
 
-Scripts on the LAN use an API token instead of the browser login. Create one under System → Manage API tokens, or with `POST /api/v1/auth/tokens` (`{"name":"ci","scope":"read"}` or `"admin"`) from a signed-in session. The token is shown once. `read` tokens can only GET, and no token can manage tokens, change the password or flash firmware ([ADR 0008](docs/adr/0008-auth-and-trust-boundary.md)). The OpenAPI spec is served at `/api/openapi.json`.
+Scripts on the LAN use an API token instead of the browser login. Create one under System → API tokens, or with `POST /api/v1/auth/tokens` (`{"name":"ci","scope":"read"}` or `"admin"`) from a signed-in session. The token is shown once. `read` tokens can only GET, and no token can manage tokens, change the password or flash firmware ([ADR 0008](docs/adr/0008-auth-and-trust-boundary.md)). The OpenAPI spec is served at `/api/openapi.json`.
 
 ```sh
 curl -H "Authorization: Bearer tgt_..." http://192.168.8.1/api/v1/system/info
@@ -62,7 +62,7 @@ curl -H "Authorization: Bearer tgt_..." http://192.168.8.1/api/v1/system/info
 
 ## Known issues
 
-- GL-AXT1800 on OpenWrt 25.12.6: the kernel's available memory drifts down over hours while Travo and AdGuard Home stay flat ([device facts](docs/device-facts.md)). The System page warns below 15 MiB and the banner shows below 8 MiB; a reboot frees it.
+- GL-AXT1800 on OpenWrt 25.12.6: the kernel's available memory drifts down over hours while Travo and AdGuard Home stay flat ([device facts](docs/device-facts.md)). System → Device warns below 15 MiB and the banner shows below 8 MiB; a reboot frees it.
 
 ## Development
 

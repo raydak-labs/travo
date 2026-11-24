@@ -4,10 +4,10 @@ import { adoptedTxn, LOST_ANSWER_SECONDS, lanRefusal, moveOutcome, moveURL } fro
 describe('moveURL', () => {
   it('keeps scheme and port and opens the Network page', () => {
     expect(moveURL('192.168.8.1/24', { protocol: 'http:', port: '' })).toBe(
-      'http://192.168.8.1/#/network',
+      'http://192.168.8.1/#/network/lan',
     );
     expect(moveURL('10.0.0.1/30', { protocol: 'https:', port: '8443' })).toBe(
-      'https://10.0.0.1:8443/#/network',
+      'https://10.0.0.1:8443/#/network/lan',
     );
   });
 });

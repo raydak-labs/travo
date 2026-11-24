@@ -11,7 +11,6 @@ import { formatBytes, formatLoad, formatUptime } from '../format';
 import { navigate } from '../navigate';
 import { m } from '../paraglide/messages.js';
 import { passwordRulesOk } from '../password-rules';
-import { href } from '../router';
 import { session } from '../session.svelte';
 import { theme } from '../theme.svelte';
 import Card from '../ui/Card.svelte';
@@ -24,15 +23,9 @@ import { notify } from '../ui/notify';
 import PasswordField from '../ui/PasswordField.svelte';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
-import SystemUpdate from './SystemUpdate.svelte';
 
 const settingsCard = lazyPage(() => import('./SystemSettingsCard.svelte'));
 const sshKeysCard = lazyPage(() => import('./SystemSSHKeysCard.svelte'));
-const openWrtCard = lazyPage(() => import('./SystemOpenWrtCard.svelte'));
-const ledsCard = lazyPage(() => import('./SystemLEDsCard.svelte'));
-const buttonsCard = lazyPage(() => import('./SystemButtonsCard.svelte'));
-const firmwareCard = lazyPage(() => import('./SystemFirmwareCard.svelte'));
-const factoryResetCard = lazyPage(() => import('./SystemFactoryResetCard.svelte'));
 
 const info = createLoader(fetchSystemInfo);
 let backupPending = $state(false);
@@ -186,14 +179,6 @@ async function logout() {
 
   <PageHost load={settingsCard} />
 
-  <PageHost load={ledsCard} />
-  <PageHost load={buttonsCard} />
-
-  <SystemUpdate />
-
-  <PageHost load={openWrtCard} />
-  <PageHost load={firmwareCard} />
-
   <Card title={m.system_backup()}>
     <div>
       <Button variant="outline"
@@ -207,21 +192,7 @@ async function logout() {
     </div>
   </Card>
 
-  <Card title={m.tokens_title()}>
-    <p class="text-muted-foreground">{m.tokens_intro()}</p>
-    <div class="mt-3">
-      <Button variant="outline" href={href('system-tokens')}>{m.tokens_open()}</Button>
-    </div>
-  </Card>
-
   <PageHost load={sshKeysCard} />
-
-  <Card title={m.logs_title()}>
-    <p class="text-muted-foreground">{m.logs_intro()}</p>
-    <div class="mt-3">
-      <Button variant="outline" href={href('system-logs')}>{m.logs_open()}</Button>
-    </div>
-  </Card>
 
   <Card title={m.reboot_title()}>
     <p class="text-muted-foreground">{m.reboot_confirm()}</p>
@@ -282,8 +253,6 @@ async function logout() {
       </div>
     </form>
   </Card>
-
-  <PageHost load={factoryResetCard} />
 
   <div>
     <Button variant="outline"

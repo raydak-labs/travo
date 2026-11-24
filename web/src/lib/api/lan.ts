@@ -12,10 +12,10 @@ export const LOST_ANSWER_SECONDS = 180 + 65;
 /** How long the old-address page waits for the PUT before it assumes the address moved. */
 export const ANSWER_WAIT_MS = 10_000;
 
-/** The page to open on the new address: same scheme and port, the Network page. */
+/** The page to open on the new address: same scheme and port, the LAN page. */
 export function moveURL(address: string, at: { protocol: string; port: string }): string {
   const ip = address.split('/')[0] ?? address;
-  return `${at.protocol}//${ip}${at.port ? `:${at.port}` : ''}/#/network`;
+  return `${at.protocol}//${ip}${at.port ? `:${at.port}` : ''}/#/network/lan`;
 }
 
 /** Maps a refused PUT /network/lan to its message; never parses error text. */

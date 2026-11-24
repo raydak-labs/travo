@@ -88,6 +88,21 @@ async function scheduleLockout(chrome, base, vp, shoot) {
   await shoot('wifi-schedule-lockout-dialog');
 }
 
+/** The navigation sheet below md, opened on a grouped child page so its group shows expanded. */
+async function navSheet(chrome, base, vp, shoot) {
+  if (!vp.mobile) return;
+  await chrome.open(`${base}/#/network/dhcp`, vp);
+  await waitFor(
+    chrome,
+    `!!document.querySelector('header button[aria-controls="sidebar"]')`,
+    'menu',
+  );
+  await chrome.evaluate(`document.querySelector('header button[aria-controls="sidebar"]').click()`);
+  await waitFor(chrome, `!!document.querySelector('[data-slot="sheet-content"] nav')`, 'nav sheet');
+  await sleep(500);
+  await shoot('nav-sheet');
+}
+
 async function resultToast(chrome, base, vp, shoot) {
   await chrome.open(`${base}/#/vpn`, vp);
   await chrome.evaluate(`(() => {
@@ -114,7 +129,7 @@ export async function shootOverlays(chrome, base, viewports, schemes, out) {
     ]),
   });
   try {
-    for (const flow of [rebootDialog, apDisableFlow, scheduleLockout, resultToast]) {
+    for (const flow of [rebootDialog, apDisableFlow, scheduleLockout, resultToast, navSheet]) {
       for (const viewport of viewports) {
         for (const scheme of schemes) {
           await flow(chrome, base, { ...viewport, scheme }, async (name) => {

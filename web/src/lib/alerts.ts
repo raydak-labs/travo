@@ -16,7 +16,7 @@ export function alertRoute(alert: Alert): Route {
       return 'wifi';
     case 'data_budget_warning':
     case 'data_budget_exceeded':
-      return 'network';
+      return 'internet';
     case 'stale_guard': {
       const name = alert.subject ?? '';
       if (/^(wifi|wireless|uplink)/.test(name)) return 'wifi';

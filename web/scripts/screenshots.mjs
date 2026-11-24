@@ -9,15 +9,24 @@ const BASE_URL = process.env.SCREENSHOT_URL ?? `http://localhost:${process.env.W
 // Login and setup are only reachable signed out; the rest needs the session (see main).
 const SIGNED_IN_ROUTES = [
   '/',
+  '/internet',
   '/wifi',
-  '/network',
-  '/system',
-  '/system/tokens',
   '/vpn',
   '/vpn/tailscale',
-  '/system/logs',
   '/clients',
   '/services',
+  '/network/wan',
+  '/network/lan',
+  '/network/dhcp',
+  '/network/port-forwards',
+  '/network/ipv6',
+  '/network/diagnostics',
+  '/system',
+  '/system/leds',
+  '/system/logs',
+  '/system/updates',
+  '/system/tokens',
+  '/system/reset',
 ];
 const MOCK_PASSWORD = 'mock-password';
 const VIEWPORTS = [
