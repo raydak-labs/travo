@@ -12,7 +12,7 @@ let {
   description,
   actions,
   children,
-}: { title: string; description?: string; actions?: Snippet; children: Snippet } = $props();
+}: { title: string; description?: string; actions?: Snippet; children?: Snippet } = $props();
 const headingId = $props.id();
 </script>
 
@@ -23,5 +23,5 @@ const headingId = $props.id();
     {#if description}<Description>{description}</Description>{/if}
     {#if actions}<Action class="flex flex-wrap gap-2">{@render actions()}</Action>{/if}
   </Header>
-  <Content class="gap-4">{@render children()}</Content>
+  {#if children}<Content class="gap-4">{@render children()}</Content>{/if}
 </Root>
