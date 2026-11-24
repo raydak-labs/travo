@@ -28,6 +28,8 @@ const { createLoader, dashboardEvents } = vi.hoisted(() => ({
     resources: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
     throughput: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
     tailscale: { status: { state: 'ready' }, data: undefined as unknown, retry: vi.fn() },
+    uplinks: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
+    clients: { status: { state: 'ready' }, data: undefined, retry: vi.fn() },
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));

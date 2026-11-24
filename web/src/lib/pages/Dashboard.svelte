@@ -10,14 +10,17 @@ import type { dashboardEvents } from '../dashboard-events.svelte';
 import { formatBytes, formatLoad, formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
+import { topologyModel } from '../topology';
 import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { createTunnelControl } from '../vpn-tunnel.svelte';
 import CaptivePortalCard from './CaptivePortalCard.svelte';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
+import TopologyDiagram from './TopologyDiagram.svelte';
 import VPNTunnelPanel from './VPNTunnelPanel.svelte';
 
 // Own chunk: the history card loads after the live cards (#232).
@@ -26,7 +29,10 @@ const historyCard = lazyPage(() => import('./StatsHistoryCard.svelte'));
 let {
   events,
 }: {
-  events: Pick<typeof dashboardEvents, 'connectivity' | 'resources' | 'throughput' | 'tailscale'>;
+  events: Pick<
+    typeof dashboardEvents,
+    'connectivity' | 'resources' | 'throughput' | 'tailscale' | 'uplinks' | 'clients'
+  >;
 } = $props();
 
 const connectivity = $derived(events.connectivity);
@@ -37,6 +43,17 @@ const tailscale = $derived(events.tailscale);
 // Same status poll and guarded toggle as the VPN page: Enable, then Confirm (two taps).
 const vpn = createLoader(fetchVpnStatus, 10000);
 const tunnel = createTunnelControl(() => vpn.retry());
+const topology = $derived(
+  topologyModel({
+    uplinks: events.uplinks.data,
+    connectivity: connectivity.data,
+    throughput: throughput.data,
+    clients: events.clients.data,
+    resources: resources.data,
+    tailscale: tailscale.data,
+    vpn: vpn.data,
+  }),
+);
 onDestroy(() => {
   vpn.stop();
   tunnel.stop();
@@ -76,6 +93,17 @@ function formatRate(rate: number | null): string {
   {#if connectivity.data && captiveCardVisible(connectivity.data)}
     <CaptivePortalCard info={connectivity.data} refresh={connectivity.retry} />
   {/if}
+  <Section title={m.topology_title()}>
+    <TopologyDiagram
+      model={topology}
+      status={{
+        uplinks: events.uplinks.status,
+        connectivity: connectivity.status,
+        throughput: throughput.status,
+        clients: events.clients.status,
+      }}
+    />
+  </Section>
   <Card title={m.dashboard_connectivity()}>
     <LoadState status={connectivity.status} retry={connectivity.retry} stale={connectivity.data !== undefined}>
       {#if connectivity.data}

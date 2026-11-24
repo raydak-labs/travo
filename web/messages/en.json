@@ -1264,5 +1264,20 @@
   "wifi_page_description": "Join a network for internet, and set the networks this router broadcasts.",
   "wifi_saved_description": "Networks the router rejoins on its own, top first.",
   "wifi_mac_description": "The address the router shows to the network it joins.",
-  "wifi_mac_mode_label": "Address"
+  "wifi_mac_mode_label": "Address",
+  "topology_title": "Network map",
+  "topology_label": "How this router connects: uplinks, router and clients",
+  "topology_router": "Router",
+  "topology_internet": "Internet",
+  "topology_state_active": "Active",
+  "topology_state_standby": "Standby",
+  "topology_state_down": "Down",
+  "topology_state_not_configured": "Not set up",
+  "topology_state_unknown": "Unknown",
+  "topology_vpn_connecting": "Connecting",
+  "topology_rate_down": "{rate} down",
+  "topology_rate_up": "{rate} up",
+  "topology_clients_wifi": "{count} on WiFi",
+  "topology_clients_lan": "{count} wired",
+  "topology_clients_incomplete": "Incomplete"
 }

@@ -14,6 +14,8 @@ const { createLoader, dashboardEvents, vpn } = vi.hoisted(() => {
       resources: idle(),
       throughput: idle(),
       tailscale: idle(),
+      uplinks: idle(),
+      clients: idle(),
     },
     vpn: {
       status: { state: 'ready' } as LoadStatus,

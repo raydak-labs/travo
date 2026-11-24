@@ -184,3 +184,21 @@ body {
 [data-slot="collapsible-content"][data-state="closed"] {
   display: none;
 }
+
+/* Topology diagram connectors: colour and dash per uplink state; every state also has text. */
+.topology-link {
+  fill: none;
+  stroke-width: 2;
+}
+.topology-link-active {
+  stroke: var(--ok);
+}
+.topology-link-standby {
+  stroke: var(--info);
+  stroke-dasharray: 6 4;
+}
+.topology-link-down,
+.topology-link-unknown {
+  stroke: var(--neutral);
+  stroke-dasharray: 2 4;
+}
