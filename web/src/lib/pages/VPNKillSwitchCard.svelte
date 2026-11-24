@@ -50,11 +50,11 @@ async function change(enable: boolean) {
 }
 </script>
 
-<Section title={m.vpn_kill()}>
+<Section title={m.vpn_kill()} description={state.data ? (state.data.enabled ? m.vpn_kill_on_help() : m.vpn_kill_off_help()) : undefined}>
   <LoadState status={state.status} retry={state.retry} stale={state.data !== undefined}>
     {#if state.data}
       {@const on = state.data.enabled}
-      <SettingsRow label={m.vpn_status_label()} description={on ? m.vpn_kill_on_help() : m.vpn_kill_off_help()}>
+      <SettingsRow label={m.vpn_status_label()}>
         {#snippet control()}
           <Status kind={on ? 'ok' : 'neutral'}>{on ? m.vpn_kill_on() : m.vpn_kill_off()}</Status>
         {/snippet}

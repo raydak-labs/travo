@@ -37,11 +37,10 @@ async function reset(event: SubmitEvent) {
 }
 </script>
 
-<Section title={m.reset_section()}>
+<Section title={m.reset_section()} description={started ? undefined : m.reset_intro()}>
   {#if started}
     <Alert class="status status-danger" role="status" aria-live="polite">{m.reset_started()}</Alert>
   {:else}
-    <p class="text-muted-foreground">{m.reset_intro()}</p>
     <form class="flex flex-col gap-3" onsubmit={reset}>
       <Label class="grid gap-1">
         {m.reset_type_phrase({ phrase: RESET_PHRASE })}

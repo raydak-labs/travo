@@ -25,6 +25,7 @@ import Status from '../ui/Status.svelte';
 const status = createLoader(fetchFirmware);
 const confirm = createConfirm();
 let files = $state<FileList>();
+let fileInput = $state<HTMLInputElement | null>(null);
 let uploaded = $state<FirmwareImage>();
 let keepSettings = $state(true);
 let typed = $state('');
@@ -86,10 +87,15 @@ async function flash(event: SubmitEvent) {
     <p class="text-muted-foreground">{m.firmware_intro()}</p>
     <LoadState status={status.status} retry={status.retry} stale={status.data !== undefined}>
       <form class="flex flex-col gap-3" onsubmit={upload}>
-        <Label class="grid gap-1">
-          {m.firmware_file({ max: formatBytes(maxBytes) })}
-          <Input type="file" accept=".bin,.img,.itb" bind:files disabled={busy} />
-        </Label>
+        <!-- The native picker shows the browser's language; the button and file name are ours. -->
+        <div class="grid gap-1">
+          <Label for="firmware-file">{m.firmware_file({ max: formatBytes(maxBytes) })}</Label>
+          <input id="firmware-file" type="file" accept=".bin,.img,.itb" class="sr-only" bind:this={fileInput} bind:files disabled={busy} />
+          <div class="flex flex-wrap items-center gap-2">
+            <Button variant="outline" type="button" disabled={busy} onclick={() => fileInput?.click()}>{m.firmware_choose()}</Button>
+            <span class="text-sm break-all text-muted-foreground">{files?.[0]?.name ?? m.firmware_no_file()}</span>
+          </div>
+        </div>
         <div>
           <Button variant="outline" type="submit" disabled={busy || !files?.length}>
             {busy && !image ? m.firmware_uploading() : m.firmware_upload()}

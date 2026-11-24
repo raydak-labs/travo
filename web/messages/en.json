@@ -1296,5 +1296,7 @@
   "diag_run_title": "Run a test",
   "tokens_yours": "Your tokens",
   "reset_section": "Erase all settings",
-  "dashboard_description": "What the router is connected to right now, and how it is doing."
+  "dashboard_description": "What the router is connected to right now, and how it is doing.",
+  "firmware_choose": "Choose image",
+  "firmware_no_file": "No file chosen"
 }
