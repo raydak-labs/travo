@@ -103,6 +103,25 @@ async function navSheet(chrome, base, vp, shoot) {
   await shoot('nav-sheet');
 }
 
+/** The header menu (version, theme on phones, log out, restart). */
+async function headerMenu(chrome, base, vp, shoot) {
+  await chrome.open(`${base}/#/`, vp);
+  await waitFor(
+    chrome,
+    `!!document.querySelector('header button[aria-label="Open menu"]')`,
+    'menu button',
+  );
+  await chrome.evaluate(`(() => {
+    const b = document.querySelector('header button[aria-label="Open menu"]');
+    // bits-ui opens the menu from the keyboard as well as the pointer; Enter is deterministic here.
+    b.focus();
+    b.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  })()`);
+  await waitFor(chrome, `!!document.querySelector('[data-slot="dropdown-menu-content"]')`, 'menu');
+  await sleep(300);
+  await shoot('header-menu');
+}
+
 async function resultToast(chrome, base, vp, shoot) {
   await chrome.open(`${base}/#/vpn`, vp);
   await chrome.evaluate(`(() => {
@@ -129,7 +148,14 @@ export async function shootOverlays(chrome, base, viewports, schemes, out) {
     ]),
   });
   try {
-    for (const flow of [rebootDialog, apDisableFlow, scheduleLockout, resultToast, navSheet]) {
+    for (const flow of [
+      rebootDialog,
+      apDisableFlow,
+      scheduleLockout,
+      resultToast,
+      navSheet,
+      headerMenu,
+    ]) {
       for (const viewport of viewports) {
         for (const scheme of schemes) {
           await flow(chrome, base, { ...viewport, scheme }, async (name) => {

@@ -2,7 +2,6 @@
 import ChevronRight from '@lucide/svelte/icons/chevron-right';
 import Globe from '@lucide/svelte/icons/globe';
 import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
-import LogOut from '@lucide/svelte/icons/log-out';
 import Menu from '@lucide/svelte/icons/menu';
 import MoonStar from '@lucide/svelte/icons/moon-star';
 import Network from '@lucide/svelte/icons/network';
@@ -18,6 +17,7 @@ import * as Collapsible from '$lib/components/ui/collapsible';
 import { Toaster } from '$lib/components/ui/sonner';
 import { getAdGuard } from './lib/api/gen';
 import { ownDashboardEvents, restoreDashboardEvents } from './lib/app-dashboard-events';
+import logo from './lib/assets/logo.webp';
 import { dashboardEvents } from './lib/dashboard-events.svelte';
 import { loadNavState, type NavState, saveNavState, withRoute } from './lib/nav-state';
 import { navigate } from './lib/navigate';
@@ -36,6 +36,7 @@ let drawerOpen = $state(false);
 let navChunk = $state<LoadStatus>({ state: 'loading' });
 let menuButton: HTMLElement | null = $state(null);
 const mobileNav = lazyPage(() => import('./lib/ui/MobileNav.svelte'));
+const headerMenu = lazyPage(() => import('./lib/ui/HeaderMenu.svelte'));
 // Below md, mount the modal navigation only while open.
 const mobile = $state({ value: false });
 $effect(() => {
@@ -268,7 +269,9 @@ $effect(() => {
       {/if}
     {:else}
       <aside id="sidebar" class="flex w-60 shrink-0 flex-col border-r border-border bg-surface">
-        <div class="px-4 py-3 text-lg font-semibold">{m.app_name()}</div>
+        <div class="flex items-center gap-2 px-4 py-3 text-lg font-semibold">
+          <img src={logo} alt="" class="size-7" />{m.app_name()}
+        </div>
         {@render navigation()}
       </aside>
     {/if}
@@ -290,6 +293,7 @@ $effect(() => {
       <div class="flex items-center gap-1">
         <Button variant="ghost" size="icon"
           type="button"
+          class={authenticated && mobile.value ? 'hidden' : ''}
           aria-label={m.theme_toggle()}
           onclick={() => theme.toggle()}
         >
@@ -300,13 +304,10 @@ $effect(() => {
           {/if}
         </Button>
         {#if authenticated}
-          <Button variant="ghost" size="icon"
-            type="button"
-            aria-label={m.logout()}
-            onclick={logout}
-          >
-            <LogOut aria-hidden="true" size={20} />
-          </Button>
+          <PageHost
+            load={headerMenu}
+            props={{ version: dashboardEvents.resources.data?.app.version, mobile: mobile.value, logout }}
+          />
         {/if}
       </div>
     </header>

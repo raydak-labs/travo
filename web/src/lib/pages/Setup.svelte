@@ -1,5 +1,6 @@
 <script lang="ts">
 import Button from '$lib/components/ui/button/button.svelte';
+import logo from '../assets/logo.webp';
 import { type AuthMessage, setupMessage } from '../auth-messages';
 import { m } from '../paraglide/messages.js';
 import { passwordRulesOk } from '../password-rules';
@@ -35,6 +36,10 @@ async function submit(event?: SubmitEvent) {
 </script>
 
 <div class="mx-auto w-full max-w-md pt-6 md:pt-12">
+<div class="mb-6 flex flex-col items-center gap-2">
+  <img src={logo} alt="" class="size-20" />
+  <span class="text-xl font-semibold">{m.app_name()}</span>
+</div>
 <Section title={m.setup_title()} description={m.setup_body()}>
   <form class="flex flex-col gap-4" onsubmit={submit}>
     <PasswordField
