@@ -112,7 +112,6 @@ function save(event: SubmitEvent) {
               {g.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
             </Button>
           {:else}
-            <Status kind="neutral">{m.wifi_guest_none()}</Status>
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit('guest', '', true)}>{m.wifi_guest_setup()}</Button>
           {/if}
         {/snippet}
