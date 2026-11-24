@@ -13,11 +13,11 @@ import {
   wanRefusal,
 } from '../api/wan';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Section from '../ui/Section.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
 
@@ -83,11 +83,10 @@ async function save(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.wan_title()}>
-  <p class="text-muted-foreground">{m.wan_intro()}</p>
+<Section title={m.wan_title()} description={m.wan_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
-      <form class="mt-3 flex flex-col gap-4" onsubmit={save}>
+      <form class="flex flex-col gap-4" onsubmit={save}>
         <fieldset class="flex flex-wrap gap-4" disabled={control.busy}>
           <legend class="sr-only">{m.wan_proto()}</legend>
           {#each protos as [value, label] (value)}
@@ -139,6 +138,6 @@ async function save(event: SubmitEvent) {
       </form>
     {/if}
   </LoadState>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

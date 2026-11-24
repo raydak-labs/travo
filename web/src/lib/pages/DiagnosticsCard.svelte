@@ -11,8 +11,8 @@ import {
   runDiagnostic,
 } from '../api/diagnostics';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const labels: Record<DiagnosticTool, () => string> = {
@@ -40,9 +40,8 @@ async function run(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.diag_title()}>
-  <p class="text-muted-foreground">{m.diag_intro()}</p>
-  <form class="mt-3 flex flex-wrap items-end gap-3" onsubmit={run}>
+<Section title={m.diag_title()} description={m.diag_intro()}>
+  <form class="flex flex-wrap items-end gap-3" onsubmit={run}>
     <Label class="grid gap-1">
       {m.diag_tool()}
       <select bind:value={tool} disabled={running} class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
@@ -62,7 +61,7 @@ async function run(event: SubmitEvent) {
   </form>
   {#if result}
     {@const state = diagnosisStatus(result)}
-    <div class="mt-3 grid gap-2" aria-live="polite">
+    <div class="grid gap-2" aria-live="polite">
       <p class="flex flex-wrap items-center gap-2">
         <span class="break-all font-medium">{labels[result.tool]()} {result.target}</span>
         <Status kind={state.kind}>{state.label}</Status>
@@ -71,4 +70,4 @@ async function run(event: SubmitEvent) {
       {#if result.truncated}<p class="text-sm text-muted-foreground">{m.diag_truncated()}</p>{/if}
     </div>
   {/if}
-</Card>
+</Section>

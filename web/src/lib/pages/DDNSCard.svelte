@@ -4,10 +4,10 @@ import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import { type DdnsRequest, type DdnsView, fetchDDNS, installDDNS, saveDDNS } from '../api/ddns';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchDDNS);
@@ -56,26 +56,25 @@ function save(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.ddns_title()}>
-  <p class="text-muted-foreground">{m.ddns_intro()}</p>
+<Section title={m.ddns_title()} description={m.ddns_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data && !loader.data.installed}
-      <div class="mt-3 flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <Status kind="neutral">{m.ddns_state_absent()}</Status>
         <Button variant="outline" type="button" disabled={busy} onclick={() => run(installDDNS, m.ddns_installed())}>
           {m.ddns_install()}
         </Button>
       </div>
-      <p class="mt-2 text-sm text-muted-foreground">{m.ddns_install_note()}</p>
+      <p class="text-sm text-muted-foreground">{m.ddns_install_note()}</p>
     {:else if loader.data}
       {@const data = loader.data}
-      <div class="mt-3 flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <Status kind={data.enabled ? 'ok' : 'neutral'}>{data.enabled ? m.ddns_state_on() : m.ddns_state_off()}</Status>
         {#if data.registered_ip}
           <span class="text-sm text-muted-foreground">{m.ddns_registered({ ip: data.registered_ip })}</span>
         {/if}
       </div>
-      <form class="mt-3 flex flex-col gap-4" onsubmit={save}>
+      <form class="flex flex-col gap-4" onsubmit={save}>
         <label class="flex items-center gap-2">
           <input type="checkbox" bind:checked={form.enabled} disabled={busy} />
           {m.ddns_enabled()}
@@ -112,4 +111,4 @@ function save(event: SubmitEvent) {
       </form>
     {/if}
   </LoadState>
-</Card>
+</Section>

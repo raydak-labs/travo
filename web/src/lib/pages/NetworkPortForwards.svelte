@@ -1,4 +1,6 @@
 <script lang="ts">
+import { m } from '../paraglide/messages.js';
+import PageHeader from '../ui/PageHeader.svelte';
 import { lazyPage } from './lazy';
 import PageHost from './PageHost.svelte';
 
@@ -6,6 +8,7 @@ import PageHost from './PageHost.svelte';
 const portForwards = lazyPage(() => import('./PortForwardsCard.svelte'));
 </script>
 
-<div class="grid gap-4">
+<div class="flex flex-col gap-6">
+  <PageHeader title={m.nav_network_port_forwards()} description={m.network_port_forwards_description()} />
   <PageHost load={portForwards} />
 </div>

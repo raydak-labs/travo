@@ -14,12 +14,12 @@ import {
   moveURL,
 } from '../api/lan';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
 
@@ -113,10 +113,9 @@ async function save(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.lan_title()}>
-  <p class="text-muted-foreground">{m.lan_intro()}</p>
+<Section title={m.lan_title()} description={m.lan_intro()}>
   {#if moving}
-    <Alert class="status status-warn mt-3 flex flex-col gap-2" role="status">
+    <Alert class="status status-warn flex flex-col gap-2" role="status">
       {#if left > 0}
         <span>{m.lan_moving({ seconds: left })}</span>
         <a class="font-medium underline" href={moving.url}>{moving.url}</a>
@@ -129,11 +128,11 @@ async function save(event: SubmitEvent) {
     <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
       {#if loader.data}
         {#if loader.data.pending}
-          <Alert class="status status-warn mt-3" role="status">
+          <Alert class="status status-warn" role="status">
             {m.lan_pending({ address: loader.data.pending.address })}
           </Alert>
         {/if}
-        <form class="mt-3 flex flex-col gap-4" onsubmit={save}>
+        <form class="flex flex-col gap-4" onsubmit={save}>
           <Label class="grid w-56 gap-1">
             {m.lan_address()}
             <Input bind:value={address} required maxlength={18} placeholder="192.168.8.1/24"
@@ -149,6 +148,6 @@ async function save(event: SubmitEvent) {
       {/if}
     </LoadState>
   {/if}
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

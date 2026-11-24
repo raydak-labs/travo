@@ -5,12 +5,12 @@ import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
 import { type DhcpView, fetchDHCP, saveDHCP, turnsOff, validLeaseTime } from '../api/dhcp';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 
 const loader = createLoader(fetchDHCP);
 const confirm = createConfirm();
@@ -74,11 +74,10 @@ async function save(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.dhcp_title()}>
-  <p class="text-muted-foreground">{m.dhcp_intro()}</p>
+<Section title={m.dhcp_title()} description={m.dhcp_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
-      <form class="mt-3 flex flex-col gap-4" onsubmit={save}>
+      <form class="flex flex-col gap-4" onsubmit={save}>
         <label class="flex items-center gap-2">
           <input type="checkbox" bind:checked={enabled} disabled={busy} />
           {m.dhcp_enabled()}
@@ -114,6 +113,6 @@ async function save(event: SubmitEvent) {
       </form>
     {/if}
   </LoadState>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

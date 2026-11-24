@@ -1,4 +1,5 @@
 <script lang="ts">
+import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 import { onDestroy } from 'svelte';
 import Badge from '$lib/components/ui/badge/badge.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
@@ -17,11 +18,12 @@ import {
   targetLabel,
 } from '../api/port-forwards';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Section from '../ui/Section.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
 
@@ -99,14 +101,13 @@ async function remove(f: PortForward) {
 }
 </script>
 
-<Card title={m.port_forwards_title()}>
-  <p class="text-muted-foreground">{m.port_forwards_intro()}</p>
+<Section title={m.port_forwards_title()} description={m.port_forwards_intro()}>
   <LoadState status={forwards.status} retry={forwards.retry} stale={forwards.data !== undefined}>
     {#if forwards.data}
       {#if forwards.data.length === 0}
-        <p class="mt-3 text-muted-foreground">{m.port_forwards_empty()}</p>
+        <EmptyState icon={ArrowRightLeft} title={m.port_forwards_empty()} />
       {:else}
-        <ul class="mt-3 divide-y divide-border" aria-label={m.port_forwards_title()}>
+        <ul class="divide-y divide-border" aria-label={m.port_forwards_title()}>
           {#each forwards.data as f (f.id)}
             <li class="flex flex-wrap items-center gap-2 py-2">
               <span class="min-w-0 flex-1">
@@ -119,7 +120,7 @@ async function remove(f: PortForward) {
                 <Badge variant="outline">{m.port_forwards_disabled()}</Badge>
               {/if}
               {#if f.owned}
-                <Button variant="outline" size="sm" type="button" disabled={control.busy}
+                <Button variant="destructive" size="sm" type="button" disabled={control.busy}
                   aria-label={m.port_forwards_remove_name({ name: label(f) })}
                   onclick={() => remove(f)}>{m.port_forwards_remove()}</Button>
               {:else}
@@ -131,7 +132,7 @@ async function remove(f: PortForward) {
       {/if}
     {/if}
   </LoadState>
-  <form class="mt-4 flex flex-wrap items-end gap-3" onsubmit={add}>
+  <form class="flex flex-wrap items-end gap-3" onsubmit={add}>
     <Label class="grid min-w-32 flex-1 gap-1">
       {m.port_forwards_name()}
       <Input bind:value={form.name} maxlength={64} autocomplete="off" disabled={control.busy} placeholder="NAS" />
@@ -171,7 +172,7 @@ async function remove(f: PortForward) {
       {/if}
     {/each}
   </datalist>
-  <p class="mt-2 text-sm text-muted-foreground">{m.port_forwards_note()}</p>
-</Card>
+  <p class="text-sm text-muted-foreground">{m.port_forwards_note()}</p>
+</Section>
 
 <ConfirmDialog {confirm} />

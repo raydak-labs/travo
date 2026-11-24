@@ -1,4 +1,5 @@
 <script lang="ts">
+import Shield from '@lucide/svelte/icons/shield';
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import {
@@ -11,12 +12,13 @@ import {
   restartUplink,
 } from '../api/network-view';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 
 // Read-only view except the uplink restart; edits stay in LuCI. Uptime moves, so the list refreshes.
@@ -64,14 +66,13 @@ async function restart(name: Restartable) {
 }
 </script>
 
-<Card title={m.netview_interfaces()}>
-  <p class="text-muted-foreground">{m.netview_intro()}</p>
+<Section title={m.netview_interfaces()} description={m.netview_intro()}>
   <LoadState status={ifaces.status} retry={ifaces.retry} stale={ifaces.data !== undefined}>
     {#if ifaces.data?.partial}
       <p class="mt-2" role="note"><Status kind="warn">{m.netview_partial()}</Status></p>
     {/if}
     {#if ifaces.data}
-      <ul class="mt-3 divide-y divide-border" aria-label={m.netview_interfaces()}>
+      <ul class="divide-y divide-border" aria-label={m.netview_interfaces()}>
         {#each ifaces.data.interfaces as it (it.name)}
           {@const state = interfaceStatus(it)}
           {@const addrs = interfaceAddresses(it)}
@@ -99,12 +100,12 @@ async function restart(name: Restartable) {
       </ul>
     {/if}
   </LoadState>
-</Card>
+</Section>
 
-<Card title={m.netview_zones()}>
+<Section title={m.netview_zones()}>
   <LoadState status={zones.status} retry={zones.retry} stale={zones.data !== undefined}>
     {#if zones.data?.length === 0}
-      <p class="text-muted-foreground">{m.netview_zones_empty()}</p>
+      <EmptyState icon={Shield} title={m.netview_zones_empty()} />
     {:else if zones.data}
       <ul class="divide-y divide-border" aria-label={m.netview_zones()}>
         {#each zones.data as z (z.name)}
@@ -125,6 +126,6 @@ async function restart(name: Restartable) {
       </ul>
     {/if}
   </LoadState>
-</Card>
+</Section>
 
 <ConfirmDialog {confirm} />

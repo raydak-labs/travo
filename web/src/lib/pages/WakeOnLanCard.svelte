@@ -6,8 +6,8 @@ import Label from '$lib/components/ui/label/label.svelte';
 import { fetchInterfaces } from '../api/network-view';
 import { validWakeMAC, wake, wakeInterfaces } from '../api/wol';
 import { m } from '../paraglide/messages.js';
-import Card from '../ui/Card.svelte';
 import { notify } from '../ui/notify';
+import Section from '../ui/Section.svelte';
 
 let mac = $state('');
 let iface = $state('');
@@ -44,9 +44,8 @@ async function send(event: SubmitEvent) {
 }
 </script>
 
-<Card title={m.wol_title()}>
-  <p class="text-muted-foreground">{m.wol_intro()}</p>
-  <form class="mt-3 flex flex-wrap items-end gap-3" onsubmit={send}>
+<Section title={m.wol_title()} description={m.wol_intro()}>
+  <form class="flex flex-wrap items-end gap-3" onsubmit={send}>
     <Label class="grid min-w-40 flex-1 gap-1">
       {m.wol_mac()}
       <Input bind:value={mac} maxlength={17} autocomplete="off" autocapitalize="off" spellcheck={false}
@@ -65,4 +64,4 @@ async function send(event: SubmitEvent) {
       {sending ? m.wol_sending() : m.wol_send()}
     </Button>
   </form>
-</Card>
+</Section>
