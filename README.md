@@ -36,14 +36,14 @@ Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied
 
 | Page | What it does |
 |---|---|
-| Dashboard | Network map of uplinks, router and clients with live rates; uplink, carrier and internet reachability; VPN toggle; hotel WiFi login with automatic click-through; CPU, memory, throughput; 24 h / 7 day history |
-| WiFi | Scan and join uplinks, saved uplinks by priority, capped automatic reconnect, access point and guest network settings, uplink MAC address, on/off schedule |
-| VPN | WireGuard profiles, split tunnel, kill switch, DNS check; Tailscale with exit node, LAN sharing and SSH |
+| Dashboard | Network map of uplinks, router and clients with live rates and Internet/VPN/Tailscale state; hotel WiFi login with automatic click-through; CPU, memory, uptime and version tiles; VPN toggle; per-interface traffic; 24 h / 7 day history |
 | Internet | USB tethering, failover across two or three uplinks, data usage with a monthly budget |
-| Network | WAN (DHCP, static, PPPoE), LAN address, interfaces and firewall zones (read-only), DHCP server, local DNS names, port forwards, IPv6, dynamic DNS, diagnostics, Wake-on-LAN |
+| WiFi | Scan and join uplinks, saved uplinks by priority, capped automatic reconnect, access point and guest network settings, uplink MAC address, on/off schedule |
+| VPN & Tailscale | WireGuard profiles, split tunnel, kill switch, DNS check; Tailscale with exit node, LAN sharing and SSH |
 | Clients | Connected devices; name, reserve an address, block, disconnect, wake |
 | Services | AdGuard Home (default DNS, DNS over HTTPS, expert topology on port 53); optional SQM, Cloudflare Tunnel, vnStat, Watchcat, speedtestcpp |
-| System | Device settings, LEDs and night schedule, hardware buttons and slide switch, SSH keys, OpenWrt and firmware updates, system log, backup, restart, API tokens, Travo updates |
+| Network → WAN, LAN, DHCP & DNS names, Port forwards, IPv6 & DDNS, Diagnostics | WAN (DHCP, static, PPPoE); LAN address with interfaces and firewall zones (read-only); DHCP server and local DNS names; port forwards; IPv6 and dynamic DNS; ping/traceroute/DNS lookup and Wake-on-LAN |
+| System → Device, LEDs & switch, Logs, Updates & firmware, API tokens, Factory reset | Hardware facts, device settings, backup, SSH keys, restart; LEDs and night schedule, hardware buttons and slide switch; system log; Travo updates, OpenWrt release check and firmware upgrade; API tokens; factory reset |
 
 A banner above every page names conditions that need you, such as a guard left by an interrupted operation, AdGuard Home bypassed, or low memory, and links to the page that fixes them.
 
