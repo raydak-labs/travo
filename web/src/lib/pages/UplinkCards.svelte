@@ -95,10 +95,10 @@ const protoLabel = (proto: string) => protoLabels[proto]?.() ?? proto;
               <dd class="text-right tabular-nums">{m.clients_signal({ signal: u.signal_dbm })}</dd>
             {/if}
             <dt class="text-muted-foreground">{m.uplink_card_address()}</dt>
-            <dd class="text-right font-mono break-all">{u?.ipv4 ?? '–'}</dd>
+            <dd class="text-right font-mono whitespace-nowrap">{u?.ipv4 ?? '–'}</dd>
             {#if u?.gateway}
               <dt class="text-muted-foreground">{m.uplink_card_gateway()}</dt>
-              <dd class="text-right font-mono break-all">{u.gateway}</dd>
+              <dd class="text-right font-mono whitespace-nowrap">{u.gateway}</dd>
             {/if}
             {#if u?.device}
               <dt class="text-muted-foreground">{m.uplink_card_device()}</dt>
