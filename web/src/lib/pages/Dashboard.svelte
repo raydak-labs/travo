@@ -86,10 +86,24 @@ let trafficOpen = $state(false);
     </Section>
   </div>
 
-  <UplinkCards sources={topology.sources} uplinks={events.uplinks} />
+  <UplinkCards
+    sources={topology.sources}
+    uplinks={events.uplinks}
+    status={{ connectivity: connectivity.status, throughput: throughput.status }}
+  />
 
   <div class="grid items-start gap-4 lg:grid-cols-2">
-    <QuickStatus model={topology} {vpn} {tunnel} />
+    <QuickStatus
+      model={topology}
+      status={{
+        connectivity: connectivity.status,
+        clients: events.clients.status,
+        throughput: throughput.status,
+        tailscale: tailscale.status,
+      }}
+      {vpn}
+      {tunnel}
+    />
     <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
   </div>
 

@@ -20,10 +20,16 @@ import type { StatusKind } from '../ui/status';
 let {
   sources,
   uplinks,
+  status,
 }: {
   sources: TopologySource[];
   uplinks: { status: LoadStatus; data?: DashboardUplinks; retry: () => void };
+  /** The state also comes from connectivity, the rate from throughput: each marks its own part stale. */
+  status: { connectivity: LoadStatus; throughput: LoadStatus };
 } = $props();
+
+const stateStale = $derived(status.connectivity.state !== 'ready');
+const rateStale = $derived(status.throughput.state !== 'ready');
 
 const icons: Record<UplinkName, typeof Wifi> = { wan: Cable, wwan: Wifi, usbtether: Smartphone };
 const configure: Record<UplinkName, string> = {
@@ -52,7 +58,10 @@ const raw = (name: UplinkName) => uplinks.data?.uplinks.find((u) => u.name === n
     {@const u = raw(source.name)}
     <Section title={sourceLabel[source.name]()}>
       {#snippet actions()}
-        <Status kind={kind[source.state]}>{stateLabel[source.state]()}</Status>
+        <span class={stateStale && source.state !== 'unknown' ? 'opacity-60' : ''}>
+          <Status kind={kind[source.state]}>{stateLabel[source.state]()}</Status>
+        </span>
+        {#if stateStale && source.state !== 'unknown'}<Status kind="stale">{m.load_stale()}</Status>{/if}
       {/snippet}
       <LoadState status={uplinks.status} retry={uplinks.retry} stale={uplinks.data !== undefined}>
         {#if source.state === 'not_configured'}
@@ -74,7 +83,10 @@ const raw = (name: UplinkName) => uplinks.data?.uplinks.find((u) => u.name === n
             {/if}
             {#if source.rate}
               <dt class="text-muted-foreground">{m.uplink_card_traffic()}</dt>
-              <dd class="text-right tabular-nums">↓ {formatBitRate(source.rate.rxBitsPerSecond)} · ↑ {formatBitRate(source.rate.txBitsPerSecond)}</dd>
+              <dd class="text-right tabular-nums {rateStale ? 'opacity-60' : ''}" data-rate>
+                ↓ {formatBitRate(source.rate.rxBitsPerSecond)} · ↑ {formatBitRate(source.rate.txBitsPerSecond)}
+                {#if rateStale}<Status kind="stale">{m.load_stale()}</Status>{/if}
+              </dd>
             {/if}
           </dl>
         {/if}
