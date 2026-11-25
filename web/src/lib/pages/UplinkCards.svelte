@@ -14,6 +14,7 @@ import type { LoadStatus } from '../ui/loader.svelte';
 import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import type { StatusKind } from '../ui/status';
+import { bandLabel } from '../wifi';
 
 // One card per uplink, like the original Travo: what it is connected to, its address and live
 // traffic. On phones these carry what the network map shows on desktop.
@@ -50,6 +51,12 @@ const detailLabel: Record<UplinkName, () => string> = {
   usbtether: m.uplink_card_link,
 };
 const raw = (name: UplinkName) => uplinks.data?.uplinks.find((u) => u.name === name);
+const protoLabels: Record<string, () => string> = {
+  dhcp: m.wan_proto_dhcp,
+  static: m.wan_proto_static,
+  pppoe: m.wan_proto_pppoe,
+};
+const protoLabel = (proto: string) => protoLabels[proto]?.() ?? proto;
 </script>
 
 <div class="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -75,8 +82,24 @@ const raw = (name: UplinkName) => uplinks.data?.uplinks.find((u) => u.name === n
               <dt class="text-muted-foreground">{detailLabel[source.name]()}</dt>
               <dd class="text-right break-all">{source.detail}</dd>
             {/if}
+            {#if source.name === 'wan' && u?.proto}
+              <dt class="text-muted-foreground">{m.uplink_card_protocol()}</dt>
+              <dd class="text-right">{protoLabel(u.proto)}</dd>
+            {/if}
+            {#if source.name === 'wwan' && u?.band}
+              <dt class="text-muted-foreground">{m.uplink_card_band()}</dt>
+              <dd class="text-right">{bandLabel(u.band)}</dd>
+            {/if}
+            {#if source.name === 'wwan' && u?.signal_dbm != null}
+              <dt class="text-muted-foreground">{m.uplink_card_signal()}</dt>
+              <dd class="text-right tabular-nums">{m.clients_signal({ signal: u.signal_dbm })}</dd>
+            {/if}
             <dt class="text-muted-foreground">{m.uplink_card_address()}</dt>
             <dd class="text-right font-mono break-all">{u?.ipv4 ?? '–'}</dd>
+            {#if u?.gateway}
+              <dt class="text-muted-foreground">{m.uplink_card_gateway()}</dt>
+              <dd class="text-right font-mono break-all">{u.gateway}</dd>
+            {/if}
             {#if u?.device}
               <dt class="text-muted-foreground">{m.uplink_card_device()}</dt>
               <dd class="text-right font-mono">{u.device}</dd>

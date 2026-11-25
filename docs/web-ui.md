@@ -95,7 +95,7 @@ Danger actions (disable, delete, remove, revoke, restart, block) use the `destru
 - Link per uplink state: active solid `ok`, standby dashed `info`, down and unknown dashed faint `neutral`, not set up dimmed without a link. Every state also has text; nothing animates on push. Links are `aria-hidden`; the `figure` carries a hidden text summary.
 - Stale is per part: an uplinks or connectivity failure dims the sources, a throughput failure only the rates, connectivity or VPN the router, clients the client counts. A failed clients read shows Unknown, never 0.
 
-Under the map: one card per uplink (state, network or tether kind, address, device, live traffic; "Set up" when not configured), Quick status (clients, live traffic of the active uplink, Tailscale, the VPN tunnel with its guarded toggle) and the System card (CPU load, memory and storage bars, uptime, the daemon's low-memory warning). The app version is in the header menu.
+Under the map: one card per uplink (state; WAN protocol; WiFi network, band and signal; USB tether kind; address; gateway on the uplink that carries the default route; device; live traffic; "Set up" when not configured), Quick status (clients, live traffic of the active uplink, Tailscale, the VPN tunnel with its guarded toggle) and the System card (CPU load, memory and storage bars, uptime, the daemon's low-memory warning). The app version is in the header menu.
 
 ## Page rules
 

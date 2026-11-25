@@ -11,7 +11,19 @@ import type {
 // Responses of the mock daemon (`scripts/with-mock.sh`), trimmed only where noted.
 export const uplinks: DashboardUplinks = {
   uplinks: [
-    { name: 'wan', configured: true, up: false, device: null, ipv4: null, ssid: null, kind: null },
+    {
+      name: 'wan',
+      configured: true,
+      up: false,
+      device: null,
+      ipv4: null,
+      ssid: null,
+      kind: null,
+      proto: 'dhcp',
+      gateway: null,
+      band: null,
+      signal_dbm: null,
+    },
     {
       name: 'wwan',
       configured: true,
@@ -20,6 +32,10 @@ export const uplinks: DashboardUplinks = {
       ipv4: '192.168.90.241/24',
       ssid: 'HomeUplink',
       kind: null,
+      proto: 'dhcp',
+      gateway: '192.168.90.2',
+      band: '5g',
+      signal_dbm: -63,
     },
     {
       name: 'usbtether',
@@ -29,6 +45,10 @@ export const uplinks: DashboardUplinks = {
       ipv4: null,
       ssid: null,
       kind: null,
+      proto: null,
+      gateway: null,
+      band: null,
+      signal_dbm: null,
     },
   ],
   failover: { enabled: false, active: false, order: ['wan', 'wwan'] },
